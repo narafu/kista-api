@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;
@@ -32,15 +31,15 @@ class TradingPriceFetcher {
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, Account account) {
         return fetchWithFallback(tickers, account, "현재가",
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getPrices(t, toBrokerRef(acc)),
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getPrice(t, toBrokerRef(acc)));
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrices(t, acc.toBrokerRef()),
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrice(t, acc.toBrokerRef()));
     }
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
     Map<StrategyTicker, PriceSnapshot> fetchPriceSnapshots(List<StrategyTicker> tickers, Account account) {
         Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> brokerSnapshots = fetchWithFallback(tickers, account, "스냅샷",
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getPriceSnapshots(t, toBrokerRef(acc)),
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getPriceSnapshot(t, toBrokerRef(acc)));
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPriceSnapshots(t, acc.toBrokerRef()),
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPriceSnapshot(t, acc.toBrokerRef()));
         // broker 소유 PriceSnapshot(2필드 복제 타입) → trading 소유 PriceSnapshot 매핑 — 필드 구성 동일, 타입만 다름
         // snap==null(일괄+단건 fallback 모두 실패)이면 그대로 배제 — 호출부(collectCycleCandidate 등)가 맵에 키 부재를 이미 null-tolerant하게 처리함
         Map<StrategyTicker, PriceSnapshot> result = new HashMap<>();
@@ -53,15 +52,15 @@ class TradingPriceFetcher {
     // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
     Map<StrategyTicker, BigDecimal> fetchPrevCloses(List<StrategyTicker> tickers, Account account) {
         return fetchWithFallback(tickers, account, "전일종가",
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getPrevCloses(t, toBrokerRef(acc)),
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getPrevClose(t, toBrokerRef(acc)));
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrevCloses(t, acc.toBrokerRef()),
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrevClose(t, acc.toBrokerRef()));
     }
 
     // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용)
     Map<StrategyTicker, BigDecimal> fetchClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, Account account) {
         return fetchWithFallback(tickers, account, "확정종가",
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getClosingPrices(t, tradeDate, toBrokerRef(acc)),
-                (t, acc) -> registry.require(toBrokerRef(acc), BrokerPricePort.class).getClosingPrice(t, tradeDate, toBrokerRef(acc)));
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getClosingPrices(t, tradeDate, acc.toBrokerRef()),
+                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getClosingPrice(t, tradeDate, acc.toBrokerRef()));
     }
 
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격
@@ -93,14 +92,5 @@ class TradingPriceFetcher {
                     failedTickers + " " + label + " 조회 실패(일괄+단건 모두 실패)"));
         }
         return result;
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

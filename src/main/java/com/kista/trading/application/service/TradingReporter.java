@@ -4,7 +4,6 @@ import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -54,7 +53,7 @@ class TradingReporter {
         cancelUnresolvedOrders(mainOrders, account);
 
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
-        List<Execution> executions = registry.require(toBrokerRef(account), ExecutionPort.class).getExecutions(today, today, strategy.ticker(), toBrokerRef(account));
+        List<Execution> executions = registry.require(account.toBrokerRef(), ExecutionPort.class).getExecutions(today, today, strategy.ticker(), account.toBrokerRef());
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로) — broker Execution → Fill 매핑 경유
@@ -81,8 +80,8 @@ class TradingReporter {
         for (Order order : mainOrders) {
             if (order.status() != Order.OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {
-                registry.require(toBrokerRef(account), BrokerOrderCorrectionPort.class)
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), toBrokerRef(account));
+                registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
+                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
             } catch (Exception e) {
                 if (isAlreadyFilled(e)) {
                     // 취소 요청 직전/직후 체결 확정 — 브로커 주석대로 예상된 경합, 관리자 알림 불필요
@@ -144,14 +143,5 @@ class TradingReporter {
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, strategyType, ticker, totalBought, totalSold);
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

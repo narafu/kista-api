@@ -6,7 +6,6 @@ import com.kista.common.CycleLookups;
 import com.kista.common.TimeZones;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.strategyconfig.domain.model.*; import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserPort;
@@ -152,7 +151,7 @@ class StrategyService implements StrategyUseCase {
     // 조회 실패 시 등록 자체가 실패한다 — BrokerCallGuard가 IllegalStateException으로 래핑해 GlobalExceptionHandler 400 매핑
     private BigDecimal fetchMarketPrice(Account account, StrategyTicker ticker) {
         return BrokerCallGuard.wrap("전일종가 조회",
-                () -> registry.require(toBrokerRef(account), BrokerPricePort.class).getPrevClose(ticker, toBrokerRef(account)));
+                () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrevClose(ticker, account.toBrokerRef()));
     }
 
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.
@@ -430,7 +429,7 @@ class StrategyService implements StrategyUseCase {
 
     // 예수금 = 증권사 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {
-        BigDecimal kisUsdAmount = registry.require(toBrokerRef(account), MarginPort.class).getUsdBuyableAmount(toBrokerRef(account));
+        BigDecimal kisUsdAmount = registry.require(account.toBrokerRef(), MarginPort.class).getUsdBuyableAmount(account.toBrokerRef());
 
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
                 .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())
@@ -572,15 +571,6 @@ class StrategyService implements StrategyUseCase {
         Integer currentHoldings = latestPosition.map(CyclePosition::holdings).orElse(null);
 
         return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 
 }

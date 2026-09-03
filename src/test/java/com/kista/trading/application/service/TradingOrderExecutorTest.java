@@ -58,7 +58,7 @@ class TradingOrderExecutorTest {
             "74420614", "key", "secret", null,
             Account.Broker.KIS, null);
 
-    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 
@@ -333,13 +333,5 @@ class TradingOrderExecutorTest {
         assertThat(result).isEmpty();
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.message() != null && tee.message().contains("DB 불일치")));
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

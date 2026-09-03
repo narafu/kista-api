@@ -1,7 +1,6 @@
 package com.kista.strategyconfig.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.common.TimeZones;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
@@ -236,8 +235,8 @@ class StrategyServiceTest {
         });
         when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         if (type == StrategyType.VR) {
-            when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-            when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("1000000"));
+            when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+            when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("1000000"));
             when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         }
     }
@@ -674,8 +673,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID)); // balanceCheckEnabled=true
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("1000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(reservedPosition));
 
@@ -708,8 +707,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID)); // balanceCheckEnabled=true
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("1000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(reservedPosition));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedStrategy);
@@ -752,8 +751,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -786,10 +785,10 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("50.00"));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(brokerPricePort);
+        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("50.00"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class)))
@@ -823,8 +822,8 @@ class StrategyServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
@@ -877,8 +876,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -934,8 +933,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("3000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("3000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -975,8 +974,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -1012,8 +1011,8 @@ class StrategyServiceTest {
         // 검증 순서상 잔고 검증(validateBalanceIfRequired)이 VR 파라미터 검증보다 먼저 실행된다
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(BigDecimal.ZERO);
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(BigDecimal.ZERO);
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, hold))
@@ -1037,8 +1036,8 @@ class StrategyServiceTest {
         // 검증 순서상 잔고 검증(validateBalanceIfRequired)이 VR 파라미터 검증보다 먼저 실행된다
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
@@ -1068,8 +1067,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -1109,8 +1108,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -1173,8 +1172,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("3000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("3000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -1297,8 +1296,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 StrategyType.VR, null, new BigDecimal("1000"), null, 20,
@@ -1322,8 +1321,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 StrategyType.VR, null, new BigDecimal("1000"), null, 20,
@@ -1347,8 +1346,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
                 StrategyType.VR, null, new BigDecimal("1000"), null, 20,
@@ -1690,11 +1689,11 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("2000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("2000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
-        when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("50.00"));
+        when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(brokerPricePort);
+        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(new BigDecimal("50.00"));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1733,11 +1732,11 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, ticker)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
-        when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(ticker, toBrokerRef(account))).thenReturn(new BigDecimal("100.00"));
+        when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(brokerPricePort);
+        when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1769,11 +1768,11 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(toBrokerRef(account))).thenReturn(new BigDecimal("5000"));
+        when(registry.require(account.toBrokerRef(), MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
-        when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("120"));
+        when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(brokerPricePort);
+        when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("120"));
         when(strategyPort.save(any())).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(invocation -> {
             StrategyCycle cycle = invocation.getArgument(0);
@@ -1796,7 +1795,7 @@ class StrategyServiceTest {
         assertThat(result.vr().value()).isEqualByComparingTo("600.00");
         assertThat(result.vr().poolLimit()).isEqualByComparingTo("750.00");
         // VR live 잔고 조회는 완전히 제거됨 — BrokerPricePort 시장가 조회 1회로만 V가 계산된다
-        verify(registry, times(1)).require(toBrokerRef(account), BrokerPricePort.class);
+        verify(registry, times(1)).require(account.toBrokerRef(), BrokerPricePort.class);
     }
 
     @Test
@@ -1865,8 +1864,8 @@ class StrategyServiceTest {
         when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(false);
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(activeUser());
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
-        when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(brokerPricePort);
-        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, toBrokerRef(account)))
+        when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(brokerPricePort);
+        when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenThrow(new RuntimeException("증권사 API 조회 실패"));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
@@ -1938,13 +1937,5 @@ class StrategyServiceTest {
                 .hasMessageContaining("시작예정일");
 
         verify(strategyPort, never()).save(any());
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
@@ -109,7 +108,7 @@ class OrderCancelServiceTest {
         assertThat(result.cancelledCount()).isEqualTo(3);
         assertThat(result.failedCount()).isEqualTo(0);
         verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class));
-        verify(brokerPort, times(2)).cancel(any(), eq(toBrokerRef(ownedAccount)));
+        verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount.toBrokerRef()));
         verify(orderPort, times(2)).markCancelled(any());
         verifyNoInteractions(eventPublisher);
     }
@@ -209,7 +208,7 @@ class OrderCancelServiceTest {
 
         service.cancelOrder(orderId, requesterId);
 
-        verify(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
+        verify(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
         verify(orderPort).markCancelled(orderId);
     }
 
@@ -233,7 +232,7 @@ class OrderCancelServiceTest {
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
-                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
+                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
 
         service.cancelOrder(orderId, requesterId);
 
@@ -246,7 +245,7 @@ class OrderCancelServiceTest {
         Order order = placedOrder(orderId, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        doThrow(new RuntimeException("네트워크 오류")).when(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
+        doThrow(new RuntimeException("네트워크 오류")).when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
                 .isInstanceOf(RuntimeException.class)
@@ -321,7 +320,7 @@ class OrderCancelServiceTest {
         service.cancelOrder(orderId, requesterId);
 
         InOrder inOrder = inOrder(brokerPort, orderPort);
-        inOrder.verify(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
+        inOrder.verify(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
         inOrder.verify(orderPort).markCancelled(orderId);
     }
 
@@ -337,13 +336,5 @@ class OrderCancelServiceTest {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLANNED, null, null, null);
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

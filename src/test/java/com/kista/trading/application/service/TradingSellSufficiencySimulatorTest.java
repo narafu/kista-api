@@ -57,7 +57,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sufficient_whenSellableQuantityCoversRequiredAndReserved() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 10));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(2);
@@ -74,7 +74,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenRequiredAloneExceedsSellableQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 2));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
@@ -89,7 +89,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenExistingReservationsLeaveNotEnoughQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(3);
@@ -103,7 +103,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sumsMultipleSellOrderQuantities_asRequiredQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 20));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
@@ -119,7 +119,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, toBrokerRef(account)))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
@@ -129,13 +129,5 @@ class TradingSellSufficiencySimulatorTest {
         assertThat(result.sufficientQuantity()).isTrue();
         assertThat(result.sellableQuantity()).isEqualTo(0);
         assertThat(result.requiredQuantity()).isEqualTo(3);
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

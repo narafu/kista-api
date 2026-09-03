@@ -19,7 +19,6 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.strategyconfig.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderInstruction;
@@ -118,8 +117,8 @@ class AdminReorderService implements AdminReorderUseCase {
         switch (order.status()) {
             case PLANNED -> orderPort.markCancelled(order.id());
             case PLACED -> {
-                brokerAdapterRegistry.require(toBrokerRef(account), BrokerOrderCorrectionPort.class)
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), toBrokerRef(account));
+                brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
+                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
                 orderPort.markCancelled(order.id());
             }
             default -> {} // FILLED/PARTIALLY_FILLED/FAILED/CANCELLED: 이미 종료 상태, no-op
@@ -129,11 +128,11 @@ class AdminReorderService implements AdminReorderUseCase {
     // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
     private PlacementResult placeOrSave(Order newOrder, Account account, Order.OrderTiming timing) {
         if (timing == Order.OrderTiming.IMMEDIATE) {
-            BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(toBrokerRef(account), BrokerOrderCorrectionPort.class);
+            BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class);
             try {
                 OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), toDirection(newOrder.direction()),
                         toOrderType(newOrder.orderType()), newOrder.quantity(), newOrder.price());
-                OrderResult result = broker.place(instruction, toBrokerRef(account));
+                OrderResult result = broker.place(instruction, account.toBrokerRef());
                 Order placed = newOrder.withPlaced(result.externalOrderId());
                 orderPort.saveAll(List.of(placed));
                 return new PlacementResult(Order.OrderStatus.PLACED, placed.externalOrderId());
@@ -199,14 +198,5 @@ class AdminReorderService implements AdminReorderUseCase {
             payload.put("memo", command.memo());
         }
         return payload;
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

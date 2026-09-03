@@ -46,8 +46,8 @@ class TradingPriceFetcherTest {
     void fetchPrices_bulkResultContainsNull_fallsBackToSingleFetch() {
         Map<StrategyTicker, BigDecimal> bulkResult = new HashMap<>();
         bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함
-        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), toBrokerRef(account))).thenReturn(bulkResult);
-        when(pricePort.getPrice(StrategyTicker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("25.50"));
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.toBrokerRef())).thenReturn(bulkResult);
+        when(pricePort.getPrice(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(new BigDecimal("25.50"));
 
         Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account);
 
@@ -59,20 +59,12 @@ class TradingPriceFetcherTest {
     void fetchPriceSnapshots_bothNull_excludedFromResultWithoutThrowing() {
         Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> bulkResult = new HashMap<>();
         bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(TradingPriceFetcher.java:44-45 NPE 회귀 방지)
-        when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), toBrokerRef(account))).thenReturn(bulkResult);
-        when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, toBrokerRef(account))).thenReturn(null);
+        when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), account.toBrokerRef())).thenReturn(bulkResult);
+        when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(null);
 
         Map<StrategyTicker, com.kista.trading.domain.model.PriceSnapshot> result =
                 priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account);
 
         assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

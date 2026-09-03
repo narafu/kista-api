@@ -65,7 +65,7 @@ class VrCycleRolloverServiceTest {
     static final AccountBalance POST_BALANCE = new AccountBalance(10, new BigDecimal("45.00"), USD_DEPOSIT);
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
-    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 
     static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
 
@@ -524,13 +524,5 @@ class VrCycleRolloverServiceTest {
                 any(), any(), any(), any(), any(), gradientCaptor.capture(), rateCaptor.capture(), any());
         assertThat(gradientCaptor.getValue()).isEqualTo(10); // initialGradient
         assertThat(rateCaptor.getValue()).isEqualByComparingTo(new BigDecimal("0.75")); // initialPoolLimitRate
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

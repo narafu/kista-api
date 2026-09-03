@@ -33,7 +33,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,7 +51,7 @@ class StrategySeedPreviewServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
 
     AccountStatisticsService service;
-    Account mockAccount;
+    Account account;
     UUID accountId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();
 
@@ -67,10 +66,9 @@ class StrategySeedPreviewServiceTest {
                 brokerStatisticsRouter, registry,
                 privacyTradePort, cycleStrategies
         );
-        mockAccount = mock(Account.class);
-        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mockAccount);
-        // toBrokerRef(account) 변환이 account.broker().name()을 호출하므로 stub 필수 (일부 테스트는 도달 전 종료 → lenient)
-        lenient().when(mockAccount.broker()).thenReturn(Account.Broker.KIS);
+        // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
+        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Account.Broker.KIS, null);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
         // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
         lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }

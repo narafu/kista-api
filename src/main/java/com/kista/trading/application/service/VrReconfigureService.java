@@ -4,7 +4,6 @@ import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.common.CycleLookups;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.AccountBalance;
@@ -96,7 +95,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
         // 현재가 조회 — 수량 주입 시 V 증분·holdings 승계 스냅샷 종가 기준 (구조적 검증 통과 후에만 호출, 실패 시 불필요한 API 호출 방지)
         BigDecimal currentPrice = BrokerCallGuard.wrap("현재가 조회",
-                () -> registry.require(toBrokerRef(account), BrokerPricePort.class).getPrice(strategy.ticker(), toBrokerRef(account)));
+                () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrice(strategy.ticker(), account.toBrokerRef()));
         BigDecimal newValue = computeNewValue(cmd, currentCycleVr, currentPrice);
 
         // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(StrategyService.validateVrCommand)과 동일 규칙,
@@ -256,14 +255,5 @@ class VrReconfigureService implements VrReconfigureUseCase {
                 throw new IllegalArgumentException("인출식 VR 전략의 자산은 " + required + " 이상이어야 합니다");
             }
         }
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

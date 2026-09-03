@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.Direction;
 import com.kista.trading.domain.model.Order;
 import com.kista.broker.domain.model.OrderInstruction;
@@ -102,7 +101,7 @@ class TradingOrderExecutor {
                     toOrderType(p.orderType()), p.quantity(), p.price());
             OrderResult result;
             try {
-                result = registry.require(toBrokerRef(account), BrokerOrderCorrectionPort.class).place(instruction, toBrokerRef(account));
+                result = registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class).place(instruction, account.toBrokerRef());
             } catch (Exception e) {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
@@ -160,14 +159,5 @@ class TradingOrderExecutor {
             }
             orderPort.markPlaced(orderId, externalOrderId);
         }
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

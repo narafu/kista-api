@@ -1,5 +1,6 @@
 package com.kista.account.domain.model;
 
+import com.kista.broker.domain.model.BrokerAccountRef;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -32,6 +33,13 @@ public record Account(
     public Account withNickname(String newNickname) {
         return new Account(id, userId, newNickname != null ? newNickname : nickname,
                 accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt);
+    }
+
+    // broker 포트 시그니처용 자격증명 투영 — broker 모듈이 account.Account를 참조하지 않도록 Account가 스스로 변환한다
+    // (broker↔account 순환 해소 산물: broker는 BrokerAccountRef만 알고 역방향 참조는 0. 이전엔 각 호출부가 private 헬퍼로 중복 보유했음)
+    public BrokerAccountRef toBrokerRef() {
+        return new BrokerAccountRef(id, appKey, secretKey, accountNo, brokerAccountCode,
+                BrokerAccountRef.Broker.valueOf(broker.name()));
     }
 
     // 소유권 불일치 시 SecurityException → 컨트롤러에서 403 매핑

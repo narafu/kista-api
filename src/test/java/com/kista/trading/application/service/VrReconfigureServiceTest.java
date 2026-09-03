@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.AccountBalance;
@@ -119,8 +118,8 @@ class VrReconfigureServiceTest {
     private void stubHappyPathChain(LocalDate firstStartDate) {
         lenient().when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
         lenient().when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
-        lenient().when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(pricePort);
-        lenient().when(pricePort.getPrice(StrategyTicker.TQQQ, toBrokerRef(account))).thenReturn(currentPrice);
+        lenient().when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(pricePort);
+        lenient().when(pricePort.getPrice(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(currentPrice);
         lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
         lenient().when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(currentCycle));
         lenient().when(strategyVrDetailPort.findByStrategyVersionId(strategyVersionId)).thenReturn(Optional.of(currentDetail));
@@ -526,13 +525,5 @@ class VrReconfigureServiceTest {
                 anyInt(), anyInt(), anyInt(), anyInt(),
                 any(), anyInt(), anyInt(), any(),
                 any(), any(), any(), anyLong());
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

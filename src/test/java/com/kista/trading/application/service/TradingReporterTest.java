@@ -60,7 +60,7 @@ class TradingReporterTest {
     static final BigDecimal CLOSE = new BigDecimal("22.00");
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
     static final StrategyRef STRATEGY = new StrategyRef(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
@@ -75,7 +75,7 @@ class TradingReporterTest {
 
     // 마감 후 잔여 주문 취소는 Toss 전용(KIS는 정규장 종료 시 자동 취소) — 취소 검증 테스트만 별도 Toss 계좌 사용
     static final Account TOSS_ACCOUNT = DomainFixtures.tossAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef TOSS_ACCOUNT_REF = toBrokerRef(TOSS_ACCOUNT);
+    static final BrokerAccountRef TOSS_ACCOUNT_REF = TOSS_ACCOUNT.toBrokerRef();
     static final StrategyRef TOSS_STRATEGY = new StrategyRef(
             UUID.randomUUID(), TOSS_ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
@@ -241,13 +241,5 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
 
         verify(brokerOrderPort, never()).cancel(any(), any());
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

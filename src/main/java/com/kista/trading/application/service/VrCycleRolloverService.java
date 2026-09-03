@@ -2,8 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.*;
 import com.kista.application.port.output.*;
@@ -82,8 +80,8 @@ class VrCycleRolloverService {
         LocalDate evaluationDate = lastTradingDayOnOrBefore(dueDate);
         BigDecimal evaluationClosingPrice;
         try {
-            evaluationClosingPrice = registry.require(toBrokerRef(ctx.account()), BrokerPricePort.class)
-                    .getClosingPrice(strategy.ticker(), evaluationDate, toBrokerRef(ctx.account()));
+            evaluationClosingPrice = registry.require(ctx.account().toBrokerRef(), BrokerPricePort.class)
+                    .getClosingPrice(strategy.ticker(), evaluationDate, ctx.account().toBrokerRef());
         } catch (Exception e) {
             log.warn("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",
                     strategy.id(), evaluationDate, e);
@@ -178,14 +176,5 @@ class VrCycleRolloverService {
             candidate = candidate.minusDays(1);
         }
         return candidate;
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

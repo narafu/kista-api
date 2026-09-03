@@ -62,7 +62,7 @@ class CycleRotationServiceTest {
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 
     static final User USER = DomainFixtures.activeUserWithTelegram(ACCOUNT.userId());
 
@@ -185,13 +185,5 @@ class CycleRotationServiceTest {
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null));
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
-    }
-
-    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
-    private static BrokerAccountRef toBrokerRef(Account account) {
-        return new BrokerAccountRef(
-                account.id(), account.appKey(), account.secretKey(),
-                account.accountNo(), account.brokerAccountCode(),
-                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }
