@@ -1,4 +1,4 @@
-package com.kista.application.service.account;
+package com.kista.stats.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;

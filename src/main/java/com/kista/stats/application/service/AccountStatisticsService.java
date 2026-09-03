@@ -1,4 +1,4 @@
-package com.kista.application.service.account;
+package com.kista.stats.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
@@ -18,7 +18,7 @@ import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.strategyconfig.domain.model.StrategySeedPreview;
-import com.kista.application.usecase.AccountStatisticsUseCase;
+import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;

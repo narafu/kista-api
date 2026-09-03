@@ -1,4 +1,4 @@
-package com.kista.application.usecase;
+package com.kista.stats.application.usecase;
 
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.MarginItem;

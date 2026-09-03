@@ -1,11 +1,11 @@
-package com.kista.application.service.account;
+package com.kista.stats.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
-import com.kista.application.usecase.TossStatisticsUseCase;
+import com.kista.stats.application.usecase.TossStatisticsUseCase;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;

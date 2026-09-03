@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.trading.domain.model.CycleHistoryPage;
-import com.kista.application.usecase.AccountStatisticsUseCase;
+import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

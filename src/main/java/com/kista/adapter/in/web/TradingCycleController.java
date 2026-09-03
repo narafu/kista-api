@@ -3,7 +3,7 @@ package com.kista.adapter.in.web;
 import com.kista.adapter.in.web.dto.*;
 import com.kista.common.TimeZones;
 import com.kista.strategyconfig.domain.model.Strategy;
-import com.kista.application.usecase.AccountStatisticsUseCase;
+import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.strategyconfig.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;

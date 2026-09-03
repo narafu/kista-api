@@ -2,7 +2,7 @@ package com.kista.adapter.in.web;
 
 import com.kista.adapter.in.web.dto.CycleHistoryPageResponse;
 import com.kista.adapter.in.web.dto.DailyTransactionResponse;
-import com.kista.application.usecase.AccountStatisticsUseCase;
+import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

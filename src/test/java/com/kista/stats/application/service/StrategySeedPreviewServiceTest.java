@@ -1,4 +1,4 @@
-package com.kista.application.service.account;
+package com.kista.stats.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
@@ -15,7 +15,6 @@ import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.application.service.account.BrokerStatisticsRouter;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

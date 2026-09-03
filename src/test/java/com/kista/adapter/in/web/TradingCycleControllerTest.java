@@ -8,7 +8,7 @@ import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.strategyconfig.domain.model.StrategyDetail;
 import com.kista.strategyconfig.domain.model.RegisterStrategyCommand;
 import com.kista.strategyconfig.domain.model.StrategySeedPreview;
-import com.kista.application.usecase.AccountStatisticsUseCase;
+import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.strategyconfig.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
