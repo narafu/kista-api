@@ -80,6 +80,8 @@ class HexagonalArchitectureTest {
         ArchRule rule = classes()
                 .that().resideInAPackage("com.kista..domain.port.out..")
                 .and().areInterfaces()
+                // package-info.class는 ACC_INTERFACE 플래그로 컴파일되어 areInterfaces()에 오탐 매칭됨 — 제외
+                .and().doNotHaveSimpleName("package-info")
                 .should().haveSimpleNameEndingWith("Port");
         rule.check(classes);
     }

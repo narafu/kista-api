@@ -66,7 +66,18 @@ adapter/out/
   alpaca/        ← AlpacaCalendarAdapter, AlpacaIndexPriceAdapter — Alpaca Markets API
   heartbeat/     ← HeartbeatAdapter — 스케쥴러 dead-man's switch 핑, Open/Close 스케쥴러가 호출
   crypto/        ← AesCryptoService(AES-256, persistence 경계에서만 사용), AccountNoHasher(계좌번호 결정론적 HMAC-SHA256 해시 — 전역 중복 체크용)
+
+com.kista.finance/   ← Spring Modulith 첫 이전 모듈(CLOSED) — 가계부 애그리게이트, 위 레거시 4패키지와 별개 최상위. 내부는 동일 Hexagonal 레이어 유지
+  domain/model/      ← AssetSnapshot/FinanceAccount/FinanceBudget/FinanceCategory/FinanceGroup/FinanceTransaction/MonthlyClosing 등 record + Command — domain/port/{in,out}와 함께 "domain" NamedInterface로 병합 공개
+  domain/port/in/    ← UseCase 인터페이스, domain/port/out/ ← *Port 접미사
+  application/service/  ← FinanceAccountService/FinanceBudgetService/FinanceCategoryService/FinanceGroupService/FinanceTransactionService/AssetSnapshotService/BulkFinanceRegisterService/MonthlyClosingService/FinanceRegistrationReminderNotifier — 모두 internal(외부 비공개)
+  adapter/in/web/     ← Finance*Controller/AssetSnapshotController/MonthlyClosingController/AdminFinanceCategoryController(경로만 /api/admin/**, finance 소유 유지) + dto/
+  adapter/in/schedule/ ← FinanceRegistrationReminderScheduler
+  adapter/out/persistence/ ← Entity + *JpaRepository + *PersistenceAdapter 3종
 ```
+
+### Spring Modulith 점진 도입
+`finance`가 첫 이전 모듈이다(`@ApplicationModule` CLOSED, `domain` 레이어만 `@NamedInterface("domain")`으로 공개). 레거시 최상위 4패키지(`common`/`domain`/`application`/`adapter`)는 아직 옮기지 않은 코드가 담긴 임시 이전 shim으로 `Type.OPEN` 선언돼 있어 외부 참조를 계속 허용한다 — 내용물이 모두 새 모듈로 옮겨지면 package-info와 함께 자연 소멸한다. `ApplicationModules.verify()`(`ModulithArchitectureTest`)와 일반화된 `HexagonalArchitectureTest`(`..domain..` 등 와일드카드 매처로 옛 최상위 구조·새 모듈 구조를 규칙 하나로 동시 커버) 둘 다 `com.kista.architecture` 패키지에서 실행된다 — 전자는 모듈 **간** 경계, 후자는 모듈 **내부** 레이어 방향을 각각 담당하는 직교 축. 전체 계획·향후 모듈 순서(finance → notify → broker/kis/toss → trading)는 `docs/superpowers/specs/2026-08-27-spring-modulith-migration-design.md` 참고.
 
 ### DashboardController vs StatisticsController 응답 형식 차이
 - `DashboardController`: DB 기반 전용 DTO 반환 — `GET /api/accounts/{accountId}/cycle-history` → `CycleHistoryPageResponse` (커서 페이지네이션)

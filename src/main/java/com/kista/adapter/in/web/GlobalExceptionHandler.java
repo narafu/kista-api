@@ -1,10 +1,10 @@
 package com.kista.adapter.in.web;
 
 import com.kista.domain.model.account.Account;
-import com.kista.domain.model.finance.FinanceAccount;
-import com.kista.domain.model.finance.FinanceBudget;
-import com.kista.domain.model.finance.FinanceCategory;
-import com.kista.domain.model.finance.FinanceGroupInvitation;
+import com.kista.finance.domain.model.FinanceAccount;
+import com.kista.finance.domain.model.FinanceBudget;
+import com.kista.finance.domain.model.FinanceCategory;
+import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.domain.model.user.User;
 import com.kista.domain.model.auth.InvalidRefreshTokenException;
 import com.kista.domain.model.kis.KisApiException;

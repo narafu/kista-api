@@ -62,8 +62,8 @@ com.kista.finance/
 ### 이동 대상
 
 - `domain/model/finance/*` (17개: AssetSnapshot, FinanceAccount, FinanceBudget, FinanceCategory, FinanceGroup, FinanceTransaction, MonthlyClosing 등 + 각 Command)
-- `domain/port/in/{AssetSnapshotUseCase, BulkFinanceRegisterUseCase, Finance*UseCase}.java` (8개)
-- `domain/port/out/{AssetSnapshotPort, Finance*Port}.java` (6개)
+- `domain/port/in/{AssetSnapshotUseCase, BulkFinanceRegisterUseCase, MonthlyClosingUseCase, Finance*UseCase}.java` (9개)
+- `domain/port/out/{AssetSnapshotPort, MonthlyClosingPort, Finance*Port}.java` (7개)
 - `application/service/finance/*` (10개: AssetSnapshotService, BulkFinanceRegisterService, Finance*Service, FinanceRegistrationReminderNotifier, GroupShareSupport, MonthlyClosingService)
 - `adapter/in/web/{Finance*, AssetSnapshot*, MonthlyClosing*, AdminFinanceCategory}Controller.java` + 대응 `dto/` (약 26개 DTO)
 - `adapter/in/schedule/FinanceRegistrationReminderScheduler.java`
@@ -78,7 +78,7 @@ com.kista.finance/
 - `UserPort`, `UserSettingsPort` (user 모듈 소유)
 - `UserNotificationPort` (notify 모듈 소유)
 
-방향은 전부 finance → 나머지(단방향, 순환 없음). user/notify가 아직 모듈로 안 옮겨진 동안은 옛 `com.kista.domain.port.out` 경로 그대로 두고 finance가 참조하도록 허용한다. user/notify 모듈이 이전되면 그 시점 스펙에서 Named Interface로 재정의한다.
+이 방향(finance → 나머지, 단방향, 순환 없음)과는 별개로, 반대 방향(레거시 → finance) 참조도 4곳 존재한다 — `UserCascadeDeleter`(탈퇴 cascade가 finance 포트 6개 직접 호출), `MetaController`(`/api/meta`가 finance enum 4종 직렬화), `GlobalExceptionHandler`(finance 중첩 예외 6종 HTTP 매핑), `UserNotificationPort`(범용 알림 포트에 `notifyFinanceRegistrationReminder()` 보유). 넷 다 이번 이전 스코프에서는 손대지 않고 유지한다 — 각각 user/adapter.in.web/notify 모듈이 이전되는 시점에 정리한다. 이 역방향 참조들이 finance를 CLOSED로 선언하면서도 `domain` 레이어를 Named Interface로 공개해야 하는 이유다. user/notify가 아직 모듈로 안 옮겨진 동안은 옛 `com.kista.domain.port.out` 경로 그대로 두고 finance가 참조하도록 허용한다. user/notify 모듈이 이전되면 그 시점 스펙에서 Named Interface로 재정의한다.
 
 ### DB
 
@@ -89,7 +89,7 @@ com.kista.finance/
 두 테스트가 직교하는 축을 각각 담당:
 
 1. **`HexagonalArchitectureTest` 일반화** — 기존 `"com.kista.domain.."` 같은 리터럴 최상위 패키지 매처를 `"..domain.."` 식 ArchUnit 관용 와일드카드로 변경. 옛 최상위 구조(`com.kista.domain.*`)와 새 모듈 구조(`com.kista.finance.domain.*`)를 규칙 하나로 동시에 커버 — 이전 기간 내내 규칙을 이중 유지할 필요 없음. 레이어 **방향**(모듈 내부) 검증 담당.
-2. **신규 `ModulithArchitectureTest`** — `ApplicationModules.of(KistaApiApplication.class).verify()` 추가. 모듈 **간** 경계(누가 누굴 참조 가능한지) 검증 담당. 아직 안 옮긴 옛 `domain`/`application`/`adapter` 최상위 패키지도 Modulith 입장에선 모듈 후보로 잡히므로, 이전 완료 전까지는 이들에 느슨한 `allowedDependencies`를 걸어 사실상 개방 — 이전이 끝나 해당 패키지가 비면 자연 소멸.
+2. **신규 `ModulithArchitectureTest`** — `ApplicationModules.of(KistaApplication.class).verify()` 추가. 모듈 **간** 경계(누가 누굴 참조 가능한지) 검증 담당. 아직 안 옮긴 옛 `domain`/`application`/`adapter` 최상위 패키지도 Modulith 입장에선 모듈 후보로 잡히므로, 이전 완료 전까지는 이들에 느슨한 `allowedDependencies`를 걸어 사실상 개방 — 이전이 끝나 해당 패키지가 비면 자연 소멸.
 
 ## 보류 항목 (이번 스코프 아님, 별도 작업으로 추후 진행)
 

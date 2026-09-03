@@ -1,9 +1,10 @@
 package com.kista.application.service.user;
 
 import com.kista.application.event.UserDeletedEvent;
-import com.kista.domain.model.finance.FinanceGroup;
-import com.kista.domain.model.finance.FinanceGroupMember;
+import com.kista.finance.domain.model.FinanceGroup;
+import com.kista.finance.domain.model.FinanceGroupMember;
 import com.kista.domain.port.out.*;
+import com.kista.finance.domain.port.out.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;

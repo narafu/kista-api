@@ -14,12 +14,12 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class SchedulerLockService {
+public class SchedulerLockService {
 
     private final JdbcTemplate jdbcTemplate;
     private final String ownerId = buildOwnerId();
 
-    boolean tryRun(String lockName, Duration lockAtMostFor, LockedTask task) throws InterruptedException {
+    public boolean tryRun(String lockName, Duration lockAtMostFor, LockedTask task) throws InterruptedException {
         if (!tryAcquire(lockName, lockAtMostFor)) {
             log.info("[{}] 스케쥴러 락 획득 실패 — 다른 인스턴스가 실행 중", lockName);
             return false;
@@ -70,7 +70,7 @@ class SchedulerLockService {
     }
 
     @FunctionalInterface
-    interface LockedTask {
+    public interface LockedTask {
         void run() throws InterruptedException;
     }
 }

@@ -8,6 +8,9 @@
 ### domain/port/out/ 네이밍 규칙
 - 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
 
+### Spring Modulith 이전 중 신규 파일 배치
+- 진행 중인 Modulith 이전으로 finance 애그리게이트는 `com.kista.finance`로 이미 옮겨졌다 — 신규 finance 관련 코드는 레거시 `com.kista.domain`/`com.kista.application`/`com.kista.adapter`가 아닌 `com.kista.finance` 안에 추가하고, 내부 `domain/{model,port/in,port/out}` + `application/service` + `adapter/{in,out}` 서브구조를 그대로 따른다 (→ architecture.md "Spring Modulith 점진 도입")
+
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
 - 다른 패키지 adapter에서 DB 조작이 필요하면 도메인 포트(`domain/port/out/`) 경유 필수
