@@ -3,7 +3,9 @@ package com.kista.broker.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.common.TimeZones;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.broker.domain.model.BrokerCredentialException;
+import com.kista.broker.domain.model.BrokerRateLimitException;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
@@ -73,7 +75,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
             OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
             long expiresInSeconds = Duration.between(OffsetDateTime.now(KST), expiresAt).getSeconds();
             return new TokenCoordinator.IssuedToken(response.accessToken(), expiresInSeconds);
-        } catch (Account.InvalidBrokerKeyException e) {
+        } catch (BrokerCredentialException e) {
             throw e; // 증권사 키 검증 실패는 그대로 전파
         } catch (Exception e) {
             throw new KisApiException("KIS 토큰 발급 실패 accountId=" + accountId, e);
@@ -83,8 +85,8 @@ class KisAuthApi implements BrokerConnectionTestPort {
     // ── BrokerConnectionTestPort ───────────────────────────────────────────────
 
     @Override
-    public Account.Broker supports() {
-        return Account.Broker.KIS;
+    public BrokerAccountRef.Broker supports() {
+        return BrokerAccountRef.Broker.KIS;
     }
 
     @Override
@@ -112,7 +114,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
             throw kisKeyException(e, "KIS 연결 테스트");
         } catch (RestClientException e) {
             log.debug("KIS 연결 테스트 실패: {}", e.getMessage());
-            throw new Account.InvalidBrokerKeyException();
+            throw new BrokerCredentialException();
         }
     }
 
@@ -134,7 +136,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
                 throw kisKeyException(e, "계좌번호 검증 중 토큰 발급");
             } catch (RestClientException e) {
                 log.debug("계좌번호 검증 중 토큰 발급 실패: {}", e.getMessage());
-                throw new Account.InvalidBrokerKeyException();
+                throw new BrokerCredentialException();
             }
         }
 
@@ -156,23 +158,23 @@ class KisAuthApi implements BrokerConnectionTestPort {
             if (response == null || !"0".equals(response.rtCd())) {
                 // rt_cd != "0" = 계좌번호 불일치 또는 KIS 오류 → 422
                 log.debug("계좌번호 검증 실패: rt_cd={}, msg={}", response != null ? response.rtCd() : "null", response != null ? response.msg1() : "null");
-                throw new Account.InvalidBrokerKeyException();
+                throw new BrokerCredentialException();
             }
         } catch (RestClientException e) {
             log.debug("계좌번호 검증 실패: {}", e.getMessage());
-            throw new Account.InvalidBrokerKeyException();
+            throw new BrokerCredentialException();
         }
         return null; // KIS: brokerAccountCode 없음 (accountNo에 통합)
     }
 
-    // EGW00133: KIS 1분당 1회 발급 제한 초과 → KisRateLimitException, 그 외 → InvalidBrokerKeyException
+    // EGW00133: KIS 1분당 1회 발급 제한 초과 → BrokerRateLimitException, 그 외 → BrokerCredentialException
     private RuntimeException kisKeyException(HttpStatusCodeException e, String context) {
         if (e.getResponseBodyAsString().contains("EGW00133")) {
             log.debug("{} rate limit (EGW00133)", context);
-            return new Account.KisRateLimitException();
+            return new BrokerRateLimitException();
         }
         log.debug("{} 실패: {}", context, e.getMessage());
-        return new Account.InvalidBrokerKeyException();
+        return new BrokerCredentialException();
     }
 
     // KIS OAuth 토큰 발급 — getToken/verifyCredentials/verifyAccount 공용
@@ -190,7 +192,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
                 .body(body)
                 .retrieve()
                 .body(TokenResponse.class);
-        if (response == null) throw new Account.InvalidBrokerKeyException();
+        if (response == null) throw new BrokerCredentialException();
         return response;
     }
 

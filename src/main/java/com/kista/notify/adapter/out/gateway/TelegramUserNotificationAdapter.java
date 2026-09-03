@@ -5,7 +5,7 @@ import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;

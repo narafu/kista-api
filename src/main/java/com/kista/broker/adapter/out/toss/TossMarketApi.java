@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.toss.TossAccountInfo;
 import com.kista.broker.domain.model.toss.TossMarketSession;
 import com.kista.broker.domain.model.toss.TossMarketSession.SessionHours;
@@ -92,7 +92,7 @@ class TossMarketApi {
 
     // ── TossAccountListPort ────────────────────────────────────────────────────
 
-    public List<TossAccountInfo> getAccountList(Account account) {
+    public List<TossAccountInfo> getAccountList(BrokerAccountRef account) {
         TossResult<List<AccountItem>> wrapper = tossHttpClient.getNoAccountHeader(
                 ACCOUNTS_PATH, account, new LinkedMultiValueMap<>(),
                 new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});

@@ -2,7 +2,8 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.user.domain.model.User;
@@ -61,6 +62,7 @@ class VrCycleRolloverServiceTest {
     static final AccountBalance POST_BALANCE = new AccountBalance(10, new BigDecimal("45.00"), USD_DEPOSIT);
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
 
     static final User USER = DomainFixtures.activeUserWithTelegram(USER_ID);
 
@@ -101,7 +103,7 @@ class VrCycleRolloverServiceTest {
         lenient().when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         // due일 확정 종가 조회 — 기본은 항상 거래일(휴장 역탐색 불필요) + CLOSING_PRICE 반환
         lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        lenient().when(registry.require(any(Account.class), eq(BrokerPricePort.class))).thenReturn(brokerPricePort);
+        lenient().when(registry.require(any(BrokerAccountRef.class), eq(BrokerPricePort.class))).thenReturn(brokerPricePort);
         lenient().when(brokerPricePort.getClosingPrice(any(), any(), any())).thenReturn(CLOSING_PRICE);
     }
 
@@ -179,7 +181,7 @@ class VrCycleRolloverServiceTest {
         when(marketCalendarPort.isMarketOpen(dueDate.minusDays(2))).thenReturn(false);
         when(marketCalendarPort.isMarketOpen(lastTradingDay)).thenReturn(true);
         BigDecimal holidayEvalPrice = new BigDecimal("60.00");
-        when(brokerPricePort.getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT)).thenReturn(holidayEvalPrice);
+        when(brokerPricePort.getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT_REF)).thenReturn(holidayEvalPrice);
         when(cycleSnapshotCreator.createVrCycleAndSnapshot(any(), any(), any(), any(), any(), anyInt(), any(), any()))
                 .thenReturn(new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, STRATEGY_VERSION_ID,
                         USD_DEPOSIT, null, lastTradingDay, null, Instant.now(), null));
@@ -187,7 +189,7 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         // 평가금 = holdings(10) × 직전 거래일 종가(60.00) = 600.00 — due일 자체가 아닌 직전 거래일 종가로 계산됨
-        verify(brokerPricePort).getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT);
+        verify(brokerPricePort).getClosingPrice(Ticker.TQQQ, lastTradingDay, ACCOUNT_REF);
         verify(strategyCyclePort).markEnded(eq(CYCLE_ID), eq(new BigDecimal("1600.00")), eq(lastTradingDay));
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 any(), any(), any(), eq(holidayEvalPrice), any(), anyInt(), any(), eq(lastTradingDay));
@@ -519,5 +521,13 @@ class VrCycleRolloverServiceTest {
                 any(), any(), any(), any(), any(), gradientCaptor.capture(), rateCaptor.capture(), any());
         assertThat(gradientCaptor.getValue()).isEqualTo(10); // initialGradient
         assertThat(rateCaptor.getValue()).isEqualByComparingTo(new BigDecimal("0.75")); // initialPoolLimitRate
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

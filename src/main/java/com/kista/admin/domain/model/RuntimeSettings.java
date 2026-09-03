@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.domain.model.account.Account.Broker;
+import com.kista.account.domain.model.Account.Broker;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.Strategy.Type;

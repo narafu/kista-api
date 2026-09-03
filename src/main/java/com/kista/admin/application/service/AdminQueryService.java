@@ -1,7 +1,7 @@
 package com.kista.admin.application.service;
 
 import com.kista.common.TimeZones;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminCycleStrategySummary;
 import com.kista.admin.domain.model.AdminAnomalies;
 import com.kista.admin.domain.model.AdminStats;
@@ -13,7 +13,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.port.output.*;

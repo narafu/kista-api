@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.admin.adapter.in.web.dto.AdminAccountResponse;
 import com.kista.admin.adapter.in.web.dto.AdminStrategyResponse;
 import com.kista.admin.adapter.in.web.dto.StrategyStatusRequest;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;

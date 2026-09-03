@@ -1,7 +1,8 @@
 package com.kista.admin.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.trading.domain.model.Order;
@@ -9,7 +10,7 @@ import com.kista.trading.domain.model.DstInfo;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.trading.application.port.output.OrderPort;
@@ -96,11 +97,11 @@ class AdminReorderServiceTest {
     @Test
     void reorder_fromPlaced_cancelsBrokerThenSavesPlanned() {
         stubCommon(placedOrder());
-        when(brokerAdapterRegistry.require(account(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
+        when(brokerAdapterRegistry.require(toBrokerRef(account()), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
 
         reorder(command(Order.OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
-        verify(brokerOrderCorrectionPort).cancel(new CancelInstruction(placedOrder().ticker(), placedOrder().externalOrderId()), account()); // 증권사 취소
+        verify(brokerOrderCorrectionPort).cancel(new CancelInstruction(placedOrder().ticker(), placedOrder().externalOrderId()), toBrokerRef(account())); // 증권사 취소
         verify(orderPort).markCancelled(ORDER_ID);
         verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, Order.OrderTiming.AT_CLOSE));
     }
@@ -130,7 +131,7 @@ class AdminReorderServiceTest {
     @Test
     void reorder_immediate_success_savesPlaced() {
         stubCommon(plannedOrder());
-        when(brokerAdapterRegistry.require(account(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
+        when(brokerAdapterRegistry.require(toBrokerRef(account()), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
         when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-1"));
 
         AdminReorderResult result = reorder(command(Order.OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
@@ -143,7 +144,7 @@ class AdminReorderServiceTest {
     @Test
     void reorder_immediate_brokerError_savesFailed() {
         stubCommon(plannedOrder());
-        when(brokerAdapterRegistry.require(account(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
+        when(brokerAdapterRegistry.require(toBrokerRef(account()), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
         when(brokerOrderCorrectionPort.place(any(), any())).thenThrow(new RuntimeException("증권사 오류"));
 
         AdminReorderResult result = reorder(command(Order.OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
@@ -275,5 +276,13 @@ class AdminReorderServiceTest {
                 new BigDecimal("250.00"),
                 "reorder memo"
         );
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

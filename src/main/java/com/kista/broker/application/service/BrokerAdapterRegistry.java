@@ -1,7 +1,7 @@
 package com.kista.broker.application.service;
 
-import com.kista.domain.model.account.Account;
 import com.kista.broker.application.port.output.BrokerAdapterPort;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -11,12 +11,12 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// 증권사 어댑터 레지스트리 — account.broker()로 BrokerAdapterPort 조회 후 Capability 캐스팅
+// 증권사 어댑터 레지스트리 — BrokerAccountRef.broker()로 BrokerAdapterPort 조회 후 Capability 캐스팅
 @Slf4j
 @Component
 public class BrokerAdapterRegistry {
 
-    private final Map<Account.Broker, BrokerAdapterPort> registry;
+    private final Map<BrokerAccountRef.Broker, BrokerAdapterPort> registry;
 
     BrokerAdapterRegistry(List<BrokerAdapterPort> adapters) {
         registry = adapters.stream()
@@ -25,7 +25,7 @@ public class BrokerAdapterRegistry {
     }
 
     // 지원하지 않으면 IllegalArgumentException — GlobalExceptionHandler → 400
-    public <T> T require(Account account, Class<T> capability) {
+    public <T> T require(BrokerAccountRef account, Class<T> capability) {
         BrokerAdapterPort adapter = getAdapter(account);
         if (!capability.isInstance(adapter)) {
             throw new IllegalArgumentException(
@@ -35,13 +35,13 @@ public class BrokerAdapterRegistry {
     }
 
     // 지원하지 않으면 Optional.empty() — 호출자가 fallback 처리
-    public <T> Optional<T> find(Account account, Class<T> capability) {
+    public <T> Optional<T> find(BrokerAccountRef account, Class<T> capability) {
         BrokerAdapterPort adapter = registry.get(account.broker());
         if (adapter == null || !capability.isInstance(adapter)) return Optional.empty();
         return Optional.of(capability.cast(adapter));
     }
 
-    private BrokerAdapterPort getAdapter(Account account) {
+    private BrokerAdapterPort getAdapter(BrokerAccountRef account) {
         BrokerAdapterPort adapter = registry.get(account.broker());
         if (adapter == null) {
             throw new IllegalArgumentException("지원하지 않는 증권사: " + account.broker());

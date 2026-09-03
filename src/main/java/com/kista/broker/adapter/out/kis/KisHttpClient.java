@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +31,7 @@ class KisHttpClient {
     private final String baseUrl;
 
     // 계좌별 자격증명으로 헤더 구성 — 모든 KIS API 호출에 사용
-    public HttpHeaders buildHeaders(String trId, Account account) {
+    public HttpHeaders buildHeaders(String trId, BrokerAccountRef account) {
         String token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         return buildHeaders(token, account.appKey(), account.secretKey(), trId);
     }
@@ -72,12 +72,12 @@ class KisHttpClient {
 
     // 계좌 기반 POST — buildHeaders + post + 401 재시도 일괄 처리 (KisOrderApi 등)
     // 주문 접수/취소라 재시도 안 함(중복 주문 위험 배제) — 대신 executeWithRetry의 계좌 호출 간격 게이트가 사전 예방
-    public <T> T post(String trId, String path, Account account, Object body, Class<T> responseType) {
+    public <T> T post(String trId, String path, BrokerAccountRef account, Object body, Class<T> responseType) {
         return executeWithRetry(trId, account, false, headers -> post(path, headers, body, responseType));
     }
 
     // Trading API용: CANO/ACNT_PRDT_CD 자동 주입 + buildHeaders + get 일괄 처리
-    public <T> T tradingGet(String trId, String path, Account account,
+    public <T> T tradingGet(String trId, String path, BrokerAccountRef account,
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         String[] parts = splitAccountNo(account.accountNo());
@@ -88,7 +88,7 @@ class KisHttpClient {
     }
 
     // 시세 API용: AUTH="" 기본 주입 + buildHeaders + get 일괄 처리 (계좌 파라미터 없음)
-    public <T> T pricingGet(String trId, String path, Account account,
+    public <T> T pricingGet(String trId, String path, BrokerAccountRef account,
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("AUTH", "");
@@ -109,7 +109,7 @@ class KisHttpClient {
     // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
     // retryOnRateLimit=true: 조회(GET) 전용 — EGW00201 감지 시 추가 백오프 재시도까지 안전. false: 주문 접수/취소(POST) — 재시도 안 함(중복 위험 배제, 사전 게이트로만 방어)
     // RestClientException은 KisApiException으로 래핑 → GlobalExceptionHandler 503
-    private <T> T executeWithRetry(String trId, Account account, boolean retryOnRateLimit, Function<HttpHeaders, T> call) {
+    private <T> T executeWithRetry(String trId, BrokerAccountRef account, boolean retryOnRateLimit, Function<HttpHeaders, T> call) {
         String token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
         for (int attempt = 0; ; attempt++) {
             awaitAccountSlot(account); // 매 시도(최초 호출 + EGW00201 재시도) 전에 간격 확보
@@ -151,7 +151,7 @@ class KisHttpClient {
     // 측정용이라 NTP 보정 등 벽시계 역행에 영향받지 않는다.
     // 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않는다 — accumulateAndGet처럼 무조건 먼저 예약해버리면
     // 거부된 호출도 대기열을 뒤로 밀어버려 반복 거부가 대기열을 무한히 미래로 누적시키는 회귀가 생긴다.
-    private void awaitAccountSlot(Account account) {
+    private void awaitAccountSlot(BrokerAccountRef account) {
         AtomicLong nextSlot = nextSlotByAppKey.computeIfAbsent(account.appKey(), key -> new AtomicLong(0));
         long intervalNanos = MIN_CALL_INTERVAL_MILLIS * 1_000_000L;
         long maxWaitNanos = MAX_QUEUE_WAIT_MILLIS * 1_000_000L;

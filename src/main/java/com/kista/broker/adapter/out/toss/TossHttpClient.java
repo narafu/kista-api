@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,12 +31,12 @@ class TossHttpClient {
     private final String baseUrl;
 
     // 계좌 컨텍스트 API용 — X-Tossinvest-Account 헤더 포함 (주문·잔고·매수가능금액)
-    public <T> T get(String path, Account account, MultiValueMap<String, String> params, Class<T> responseType) {
+    public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
         return executeGet(path, account, params, responseType, true);
     }
 
     // 계좌 헤더 불필요 API용 — 시세 조회·환율 등 (개별 계좌 토큰 사용)
-    public <T> T getNoAccountHeader(String path, Account account, MultiValueMap<String, String> params, Class<T> responseType) {
+    public <T> T getNoAccountHeader(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
         return executeGet(path, account, params, responseType, false);
     }
 
@@ -51,7 +51,7 @@ class TossHttpClient {
                 });
     }
 
-    public <T> T post(String path, Account account, Object body, Class<T> responseType) {
+    public <T> T post(String path, BrokerAccountRef account, Object body, Class<T> responseType) {
         return executeWithRetry(account, path, token -> tossRestClient.post()
                 .uri(baseUrl + path)
                 .headers(h -> h.addAll(buildHeaders(account, token)))
@@ -63,7 +63,7 @@ class TossHttpClient {
     // ParameterizedTypeReference 오버로드 — 제네릭 래퍼 타입(TossResult<T> 등) 역직렬화용
 
     // 계좌 컨텍스트 API용 (ParameterizedTypeReference 버전)
-    public <T> T get(String path, Account account, MultiValueMap<String, String> params,
+    public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
                      ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
@@ -73,7 +73,7 @@ class TossHttpClient {
     }
 
     // 계좌 헤더 불필요 API용 (ParameterizedTypeReference 버전)
-    public <T> T getNoAccountHeader(String path, Account account, MultiValueMap<String, String> params,
+    public <T> T getNoAccountHeader(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
                                     ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
@@ -95,7 +95,7 @@ class TossHttpClient {
     }
 
     // POST 요청 (ParameterizedTypeReference 버전)
-    public <T> T post(String path, Account account, Object body, ParameterizedTypeReference<T> typeRef) {
+    public <T> T post(String path, BrokerAccountRef account, Object body, ParameterizedTypeReference<T> typeRef) {
         return executeWithRetry(account, path, token -> tossRestClient.post()
                 .uri(baseUrl + path)
                 .headers(h -> h.addAll(buildHeaders(account, token)))
@@ -106,7 +106,7 @@ class TossHttpClient {
 
     // ── private helpers ────────────────────────────────────────────────────────
 
-    private <T> T executeGet(String path, Account account, MultiValueMap<String, String> params,
+    private <T> T executeGet(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
                               Class<T> responseType, boolean withAccountHeader) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
@@ -123,7 +123,7 @@ class TossHttpClient {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     // 계좌 토큰 재시도 — 공통 헬퍼에 계좌별 토큰 조회/원자적 401 복구만 주입
-    private <T> T executeWithRetry(Account account, String path, Function<String, T> call) {
+    private <T> T executeWithRetry(BrokerAccountRef account, String path, Function<String, T> call) {
         return executeWithBackoffRetry("계좌", path,
                 () -> tossAuthApi.getToken(account.id(), account.appKey(), account.secretKey()),
                 (rejectedToken, forceReissue) -> tossAuthApi.recoverToken(
@@ -196,7 +196,7 @@ class TossHttpClient {
     }
 
     // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.brokerAccountCode에 accountSeq가 저장됨
-    private HttpHeaders buildHeaders(Account account, String token) {
+    private HttpHeaders buildHeaders(BrokerAccountRef account, String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
         headers.set("X-Tossinvest-Account", account.brokerAccountCode());

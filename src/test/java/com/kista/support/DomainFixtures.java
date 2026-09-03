@@ -1,6 +1,6 @@
 package com.kista.support;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
 

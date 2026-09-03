@@ -5,7 +5,7 @@ import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.user.application.usecase.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
 import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import org.junit.jupiter.api.Test;

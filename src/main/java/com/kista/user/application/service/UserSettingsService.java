@@ -6,7 +6,7 @@ import com.kista.user.application.usecase.GetUserSettingsQuery;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase;
 import com.kista.user.application.usecase.UpdateNotificationPrefUseCase;
 import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;

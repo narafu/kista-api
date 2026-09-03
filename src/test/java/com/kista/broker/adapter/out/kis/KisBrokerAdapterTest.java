@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.application.port.output.BrokerAccountPort;
 import com.kista.broker.application.port.output.BrokerAdapterPort;
 import com.kista.broker.application.port.output.BrokerMarketCalendarPort;
@@ -45,7 +45,7 @@ class KisBrokerAdapterTest {
     @Test
     @DisplayName("supports()는 KIS를 반환한다")
     void supportsReturnsKis() {
-        assertThat(adapter().supports()).isEqualTo(Account.Broker.KIS);
+        assertThat(adapter().supports()).isEqualTo(BrokerAccountRef.Broker.KIS);
     }
 
     @Test

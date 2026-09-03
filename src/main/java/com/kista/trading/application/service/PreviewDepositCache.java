@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import lombok.RequiredArgsConstructor;
@@ -49,13 +50,22 @@ class PreviewDepositCache {
             if (doubleChecked != null && doubleChecked.isValid(Instant.now())) {
                 return doubleChecked.usdDeposit();
             }
-            BigDecimal fresh = registry.require(account, LiveBalancePort.class)
-                    .getLiveBalance(account, probeTicker)
+            BigDecimal fresh = registry.require(toBrokerRef(account), LiveBalancePort.class)
+                    .getLiveBalance(toBrokerRef(account), probeTicker)
                     .usdDeposit();
             cache.put(account.id(), new Entry(fresh, Instant.now().plus(TTL)));
             return fresh;
         } finally {
             lock.unlock();
         }
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

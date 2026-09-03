@@ -1,14 +1,14 @@
 package com.kista.stats.application.service;
 
 import com.kista.common.TimeZones;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.stats.domain.model.*;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
 import com.kista.stats.application.usecase.UserStatsUseCase;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.application.port.output.StrategyPort;
 import com.kista.stats.application.port.output.*;
 import com.kista.trading.application.port.output.*;

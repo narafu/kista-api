@@ -3,7 +3,8 @@ package com.kista.application.service.account;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.common.TimeZones;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.DailyTransaction;
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
@@ -18,7 +19,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
 import com.kista.application.usecase.AccountStatisticsUseCase;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -121,7 +122,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public Map<Ticker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<Ticker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("전일종가 조회",
-                () -> registry.require(account, BrokerPricePort.class).getPrevCloses(tickers, account));
+                () -> registry.require(toBrokerRef(account), BrokerPricePort.class).getPrevCloses(tickers, toBrokerRef(account)));
     }
 
     @Override
@@ -173,7 +174,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
-                : registry.require(account, BrokerPricePort.class).getPrevClose(ticker, account);
+                : registry.require(toBrokerRef(account), BrokerPricePort.class).getPrevClose(ticker, toBrokerRef(account));
         BigDecimal basePrice = strategy.requiresPrivacyBase()
                 ? privacyBase.currentCycleStart()
                 : price;
@@ -205,5 +206,14 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private Instant resolveTo(LocalDate to) {
         var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
         return resolved.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // KST 자정 경계 (to 당일 포함)
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

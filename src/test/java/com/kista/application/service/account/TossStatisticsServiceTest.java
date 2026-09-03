@@ -1,9 +1,10 @@
 package com.kista.application.service.account;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.broker.application.port.output.ExchangeRatePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +64,7 @@ class TossStatisticsServiceTest {
         Account kisAccount = kisAccount();
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(kisAccount);
         // KIS 브로커는 ExchangeRatePort(Toss 전용) 미지원 — registry.require가 거절
-        when(registry.require(kisAccount, ExchangeRatePort.class))
+        when(registry.require(toBrokerRef(kisAccount), ExchangeRatePort.class))
                 .thenThrow(new IllegalArgumentException(
                         kisAccount.broker() + " 브로커는 ExchangeRatePort를 지원하지 않습니다"));
 
@@ -78,7 +79,7 @@ class TossStatisticsServiceTest {
         TossExchangeRate expected = new TossExchangeRate(new BigDecimal("1380.50"), new BigDecimal("1375.00"));
         ExchangeRatePort exchangeRatePort = mock(ExchangeRatePort.class);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(tossAccount);
-        when(registry.require(tossAccount, ExchangeRatePort.class)).thenReturn(exchangeRatePort);
+        when(registry.require(toBrokerRef(tossAccount), ExchangeRatePort.class)).thenReturn(exchangeRatePort);
         when(exchangeRatePort.getExchangeRate()).thenReturn(expected);
 
         TossExchangeRate actual = sut.getExchangeRate(accountId, requesterId);
@@ -86,5 +87,13 @@ class TossStatisticsServiceTest {
         assertThat(actual).isSameAs(expected);
         assertThat(actual.rate()).isEqualByComparingTo("1380.50");
         assertThat(actual.midRate()).isEqualByComparingTo("1375.00");
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

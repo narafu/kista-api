@@ -75,12 +75,8 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 1. **market**[^2], stats(+backtest+portfolio)[^5], admin(+settings)[^6] — ✅ **1단계 전부 완료**. 셋 다 리프 성격이라 순서 무관, 병렬 진행 가능이었음. (2단계 privacy도 완료 — 다음은 3단계 user.)
 2. **privacy**[^3] — trading.Order 직접 참조 4개 파일을 자체 타입으로 교체 후 착수. 소규모.
 3. **user(+auth)**[^7] — notify `UserNotificationPort` 13개 메서드 + `NotifyPort`류를 EPR 이벤트 전환 때 쓴 ID+포트재조회 패턴으로 통일 후 착수. nested enum 3개 sharedkernel 이관도 이 단계에서 함께.
-4. **account, strategy-config** — 서로 얽혀있어 분리 착수 어려움, 묶어서 별도 서브스펙 진행:
-   - broker 8~9개 포트 인터페이스를 own-type 패턴(Direction/OrderType 선례)으로 전환
-   - `AccountStatisticsService`/`TossStatisticsService`/`BrokerStatisticsRouter`→stats 재배치, `VrStrategyLifecycle`→trading 재배치
-   - 탈퇴/계좌삭제 cascade를 `UserDeletedEvent`/`AccountDeletedEvent` 발행-구독으로 전환
-   - Strategy nested enum sharedkernel 이관(3번 user 단계와 별개로 여기서 완료)
-   - 이 묶음은 규모·성격상 `trading-broker-notify 디커플링`(2026-08-29)과 동급 — 별도 스펙+계획 문서로 진행
+4. **account**[^8] — ✅ 완료. **정정**: 실측 결과 이 표의 "account, strategy-config가 서로 얽혀있어 분리 착수 어려움"이라는 전제가 틀렸다 — account는 진짜 나쁜 엣지(account→strategy-config cascade 역방향) 1건뿐인 거의 리프 성격이고, strategy-config는 trading과 원자적 트랜잭션으로 결합돼(`CycleSnapshotCreator.reconfigureVrCycle`) own-type/이벤트로 못 푸는 별도 문제였다. account를 단독 이전하고 strategy-config는 별도 스펙으로 분리했다.
+   - **strategy-config**(미착수) — trading과의 원자적 트랜잭션 결합(`CycleSnapshotCreator.reconfigureVrCycle`이 strategy-config 소유 `StrategyVersionPort`/`VrStrategyLifecycle`과 trading 소유 `StrategyCycleVrPort`/`CyclePositionPort`를 한 트랜잭션에서 호출) 때문에 별도 설계 필요 — `VrStrategyLifecycle` 재배치 여부도 그 스펙에서 확정. Strategy nested enum(`Ticker`/`Type`/`Status`/`CycleSeedType`) sharedkernel 이관도 이 단계 대상(account 단계에서는 불필요하다고 판정해 손대지 않음).
 
 [^2]: ✅ 완료(2026-08-31, commit 범위는 이 계획의 6개 태스크 — `2026-08-31-modulith-market-migration` 실행 계획, 실측 발견된 순환 2건 해소 태스크 포함).
 
@@ -92,11 +88,13 @@ DDD Shared Kernel(스펙 원문의 "2~3개 모�듈만 합의한 도메인 개�
 
 [^7]: ✅ 완료(2026-09-01, `2026-09-01-modulith-user-migration` 실행 계획 8개 태스크 + 사후 순환 해소 태스크 2개). CLOSED 9번째 모듈, 4개 NamedInterface("domain"/"usecase"/"port"/"event"). **실측 정정(2단계)**: 1차로 이 표의 "user는 notify만 순환"이라는 판정을 물리 이전 전 사전조사에서 이미 뒤집었다 — `user↔admin`(AdminService의 UserCascadeDeleter 직접 참조 + RuntimeSettingsPort 상호소비)·`user↔trading`(UserCascadeDeleter의 cyclePosition/strategyCycle 직접 호출)·`user↔finance`(UserCascadeDeleter의 finance 6포트+그룹승계 직접 호출) 3개를 실순환으로 재판정하고 sharedkernel enum 추출·ApprovalPolicyPort 포트 역전·cascade 이벤트 팬아웃(Task 1~3)으로 물리 이전 전 전부 사전 해소했다. 그런데 물리 이전(Task 5/6) 완료 후 `ApplicationModules.verify()`를 실행하자 **이 사전조사 자체의 재판정도 불완전**했음이 드러났다 — admin은 사전 해소한 것과 별개로 두 번째 엣지(`AdminUserView`/`AdminUserViewPort` 소유 역전 + `ClientErrorLogController` 오배치)가 물리 이전 후에야 나타났고, notify는 "순환 아님"이라는 재판정 자체가 틀려서(`RefreshTokenCleanupScheduler`의 `NotifyPort` 직접 주입, `UserProfileService`의 `TelegramBotInfoPort` 직접 주입이 notify의 기존 UserPort/UserUseCase 소비와 만나 진짜 2-cycle을 이룸) 별도 태스크(Task 6.5, 6.6)로 사후 해소해야 했다. **다음 모듈(account+strategy-config) 착수 시 교훈**: "스펙 표가 어느 방향을 안전하다고 적었든" 신뢰하지 말라는 기존 교훈에 더해, **이번엔 "물리 이전 전 사전조사로 재확인한 순환 목록"조차 완전하지 않았다** — 코드 레벨 forward/backward import 전수 조사는 물리 이전 직후 `verify()`를 1차로 무조건 돌려서 재검증하는 단계를 계획에 항상 포함시킬 것 (6번째 반복: market/privacy/stats/admin에 이어, 이번엔 스펙뿐 아니라 계획 자체의 사전조사도 뚫렸다는 점이 새로운 교훈).
 
+[^8]: ✅ 완료(2026-09-02, `2026-09-02-modulith-account-migration` 실행 계획 5개 태스크 + 사후 발견 태스크 1개(Task 3.5) 삽입). CLOSED 10번째 모듈, 4개 NamedInterface("domain"/"usecase"/"port"/"event"). **실측 정정(2단계)**: 1차로 이 계획서 원안의 "account+strategy-config가 서로 얽혀있어 분리 불가"라는 전제를 계획 작성 중 코드 실측으로 뒤집었다 — strategy-config↔trading이 `CycleSnapshotCreator.reconfigureVrCycle`(VR 재설정 트랜잭션)에서 원자적으로 결합돼있어 own-type/이벤트로 풀 수 없는 별도 문제임이 드러나 스펙을 account 단독으로 재정의했다(account는 진짜 나쁜 엣지 1건뿐). 사전 실측으로 account↔strategy-config(cascade 이벤트 전환, Task 1)·admin↔account(`BrokerEnabledPort` 포트 역전, Task 2) 2개 순환을 해소한 뒤 착수했음에도, 물리 이전(Task 4) 1차 실행이 `ApplicationModules.verify()`에서 **세 번째 순환**(`broker↔account` — `account→broker`는 `AccountService`의 `BrokerConnectionTesters` 직접 호출, `broker→account`는 broker 11개 포트+KIS/Toss/Mock 어댑터 176개 이상 지점의 `Account` 직접 참조)을 뒤늦게 발견해 BLOCKED, 커밋 없이 revert됐다 — 이 순환은 스펙 원안이 "own-type 전환 불필요"로 명시적으로 기각했던 항목이었다(계획 작성 시점 `account→broker` 엣지가 레거시 OPEN 패키지 안에 있어 `verify()` 검사 대상이 아니었던 게 원인). Task 3.5(broker own-type 전환: `BrokerAccountRef`/`SellableQuantity`/`BrokerCredentialException`/`BrokerRateLimitException` 신설)를 삽입해 해소한 뒤 Task 4 2차 실행에서 `verify()` 통과. **다음 모듈(strategy-config) 착수 시 교훈**: 스펙이 "own-type 전환 불필요"로 판정한 항목이라도 물리 이전을 실제로 실행해 `verify()`를 돌리기 전까지는 그 판정을 신뢰하지 말 것 — 이 프로젝트에서 7번째로 반복된 "pairwise/사전조사 실패" 패턴이며, 이번엔 스펙의 원래 판정(own-type 필요)이 옳았는데 계획 작성 시점 재확인이 성급하게 뒤집었다가 물리 이전 실행 중 실측으로 재역전된 유일한 사례다.
+
 ## 스코프 아웃
 
 - **스케쥴러 배포 분리**(kista-api 배포와 독립된 프로세스로 스케쥴러 실행) — 컴파일 경계가 아닌 배포 토폴로지 결정이라 이 스펙과 성격이 다름. 별도 브레인스토밍으로 다룬다.
-- 4단계(account/strategy-config 묶음)의 구체 태스크 분해 — 별도 서브스펙에서 진행.
+- strategy-config 이전의 구체 태스크 분해 — trading과의 원자적 트랜잭션 결합(`CycleSnapshotCreator.reconfigureVrCycle`) 때문에 별도 스펙부터 필요, 이 문서 스코프 아님.
 
 ## 다음 단계
 
-이 스펙 승인 후 `writing-plans`로 **1단계(market/stats/admin) 착수 대상부터** 실행 계획 작성. 어느 것부터/몇 개를 한 계획에 묶을지는 계획 작성 시점에 결정.
+1~4단계(market/stats/admin/privacy/user/account) 전부 완료. 남은 건 strategy-config 하나뿐 — trading과의 원자적 트랜잭션 결합(`CycleSnapshotCreator.reconfigureVrCycle`) 때문에 이 스펙의 착수 순서표를 그대로 재사용할 수 없다. 다음 세션은 strategy-config 전용 브레인스토밍부터 시작해 별도 설계 스펙을 작성할 것.

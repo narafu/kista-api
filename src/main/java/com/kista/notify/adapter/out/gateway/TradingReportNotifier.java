@@ -1,9 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.TradingReportReadyEvent;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.TradeEvent;

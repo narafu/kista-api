@@ -4,7 +4,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;

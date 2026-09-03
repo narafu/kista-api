@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.OrderCancelException;
@@ -10,7 +11,7 @@ import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.trading.application.event.OrderCancelFailedEvent;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.application.port.output.StrategyPort;
@@ -105,7 +106,7 @@ class OrderCancelServiceTest {
         assertThat(result.cancelledCount()).isEqualTo(3);
         assertThat(result.failedCount()).isEqualTo(0);
         verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class));
-        verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount));
+        verify(brokerPort, times(2)).cancel(any(), eq(toBrokerRef(ownedAccount)));
         verify(orderPort, times(2)).markCancelled(any());
         verifyNoInteractions(eventPublisher);
     }
@@ -205,7 +206,7 @@ class OrderCancelServiceTest {
 
         service.cancelOrder(orderId, requesterId);
 
-        verify(brokerPort).cancel(cancelOf(order), ownedAccount);
+        verify(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
         verify(orderPort).markCancelled(orderId);
     }
 
@@ -229,7 +230,7 @@ class OrderCancelServiceTest {
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
-                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), ownedAccount);
+                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
 
         service.cancelOrder(orderId, requesterId);
 
@@ -242,7 +243,7 @@ class OrderCancelServiceTest {
         Order order = placedOrder(orderId, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        doThrow(new RuntimeException("네트워크 오류")).when(brokerPort).cancel(cancelOf(order), ownedAccount);
+        doThrow(new RuntimeException("네트워크 오류")).when(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
                 .isInstanceOf(RuntimeException.class)
@@ -317,7 +318,7 @@ class OrderCancelServiceTest {
         service.cancelOrder(orderId, requesterId);
 
         InOrder inOrder = inOrder(brokerPort, orderPort);
-        inOrder.verify(brokerPort).cancel(cancelOf(order), ownedAccount);
+        inOrder.verify(brokerPort).cancel(cancelOf(order), toBrokerRef(ownedAccount));
         inOrder.verify(orderPort).markCancelled(orderId);
     }
 
@@ -333,5 +334,13 @@ class OrderCancelServiceTest {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), Ticker.SOXL,
                 Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLANNED, null, null, null);
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

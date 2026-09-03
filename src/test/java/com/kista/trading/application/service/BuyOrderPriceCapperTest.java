@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;

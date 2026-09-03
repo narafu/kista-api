@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
@@ -92,8 +93,8 @@ class TradingOrderBudgetAllocator {
             AccountBalance liveBalance = null;
             if (!buyCandidates.isEmpty()) {
                 Candidate probe = buyCandidates.stream().sorted(buyPriorityComparator()).findFirst().orElseThrow();
-                BrokerBalance bb = registry.require(account, LiveBalancePort.class)
-                        .getLiveBalance(account, probe.ctx().strategy().ticker());
+                BrokerBalance bb = registry.require(toBrokerRef(account), LiveBalancePort.class)
+                        .getLiveBalance(toBrokerRef(account), probe.ctx().strategy().ticker());
                 liveBalance = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
             }
 
@@ -104,8 +105,8 @@ class TradingOrderBudgetAllocator {
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
             Map<Strategy.Ticker, Integer> sellableByTicker = new LinkedHashMap<>();
             for (Strategy.Ticker ticker : sellTickers) {
-                int sellable = registry.require(account, SellableQuantityPort.class)
-                        .getSellableQuantity(ticker, account)
+                int sellable = registry.require(toBrokerRef(account), SellableQuantityPort.class)
+                        .getSellableQuantity(ticker, toBrokerRef(account))
                         .quantity();
                 sellableByTicker.put(ticker, sellable);
             }
@@ -305,4 +306,13 @@ class TradingOrderBudgetAllocator {
     private record SellAllocation(List<Candidate> approved, List<Candidate> rejected) {}
 
     private record BuyAllocation(List<Candidate> approved, List<Candidate> rejected) {}
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
+    }
 }

@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.Direction;
@@ -25,7 +25,7 @@ class KisOrderApi {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    public OrderResult place(OrderInstruction instruction, Account account) {
+    public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
         String trId = instruction.direction() == Direction.BUY ? BUY_TR_ID : SELL_TR_ID;
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
@@ -68,7 +68,7 @@ class KisOrderApi {
         return new OrderResult(odno);
     }
 
-    public void cancel(CancelInstruction instruction, Account account) {
+    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
         String acntPrdtCd = acctParts[1];
@@ -102,7 +102,7 @@ class KisOrderApi {
     }
 
     // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KisHttpClient 공용 헬퍼 위임)
-    private static String[] splitAccountNo(Account account) {
+    private static String[] splitAccountNo(BrokerAccountRef account) {
         return KisHttpClient.splitAccountNo(account.accountNo());
     }
 

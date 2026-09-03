@@ -1,9 +1,11 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.common.CycleLookups;
-import com.kista.domain.model.account.Account;
+import com.kista.account.application.port.output.AccountPort;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -124,7 +126,7 @@ class ManualTradingService {
     // live 잔고 조회 실패 시 ManualTradingException으로 래핑
     private AccountBalance fetchLiveBalanceOrThrow(Account account, Strategy strategy) {
         try {
-            BrokerBalance bb = registry.require(account, LiveBalancePort.class).getLiveBalance(account, strategy.ticker());
+            BrokerBalance bb = registry.require(toBrokerRef(account), LiveBalancePort.class).getLiveBalance(toBrokerRef(account), strategy.ticker());
             AccountBalance lb = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
             log.info("live 잔고 조회: [{}] {} holdings={}주, usdDeposit=${}",
                     account.nickname(), strategy.ticker().name(), lb.holdings(), lb.usdDeposit());
@@ -143,7 +145,7 @@ class ManualTradingService {
         int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
-        int sellableQty = registry.require(account, SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account).quantity();
+        int sellableQty = registry.require(toBrokerRef(account), SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), toBrokerRef(account)).quantity();
         int reservedSellTotal = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
                 account.id(), tradeDate, strategy.ticker());
         log.info("SELL 수량 검증: [{}] {} 예약={}주, 신규={}주, 판매가능={}주",
@@ -167,5 +169,14 @@ class ManualTradingService {
             log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
             orderExecutor.placeAtOpenOrders(today, account, cycleId, currentPrice, position, vrPosition, strategy);
         }
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

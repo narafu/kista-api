@@ -2,7 +2,7 @@ package com.kista.trading.adapter.in.schedule;
 
 import com.kista.adapter.in.schedule.SchedulerJobRunner;
 import com.kista.adapter.in.schedule.SchedulerLockService;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.BatchContext;

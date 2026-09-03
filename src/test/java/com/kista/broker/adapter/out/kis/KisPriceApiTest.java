@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import org.junit.jupiter.api.DisplayName;
@@ -27,10 +27,10 @@ class KisPriceApiTest {
     @Spy KisExchangeRegistry exchangeRegistry = new KisExchangeRegistry();
     @InjectMocks KisPriceApi api;
 
-    private static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "appKey", "appSecret", null,
-            Account.Broker.KIS, null
+    private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
+            UUID.randomUUID(), "appKey", "appSecret",
+            "74420614", null,
+            BrokerAccountRef.Broker.KIS
     );
 
     @Test

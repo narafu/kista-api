@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
@@ -57,7 +58,7 @@ class StrategyOrderPlanBuilderTest {
     void setUp() {
         builder = new StrategyOrderPlanBuilder(balanceLoader, registry, privacyTradePort, orderComputer, cycleOrderStrategies);
         lenient().when(cycleOrderStrategies.of(strategy)).thenReturn(orderStrategy);
-        lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
+        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 
     @Test
@@ -78,7 +79,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
-        when(pricePort.getPrevClose(Ticker.SOXL, account)).thenReturn(new BigDecimal("21.00"));
+        when(pricePort.getPrevClose(Ticker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("21.00"));
         when(privacyTradePort.findBaseIfPrivacy(strategy, today)).thenReturn(null);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
@@ -102,7 +103,7 @@ class StrategyOrderPlanBuilderTest {
         when(cycleOrderStrategies.of(vrStrategy)).thenReturn(vrOrderStrategy);
         when(balanceLoader.tryLoadBalance(vrStrategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
-        when(pricePort.getPrevClose(Ticker.TQQQ, account)).thenReturn(new BigDecimal("100.00"));
+        when(pricePort.getPrevClose(Ticker.TQQQ, toBrokerRef(account))).thenReturn(new BigDecimal("100.00"));
         when(privacyTradePort.findBaseIfPrivacy(vrStrategy, today)).thenReturn(null);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(eq(balance), eq(vrStrategy), nullable(BigDecimal.class),
@@ -113,7 +114,7 @@ class StrategyOrderPlanBuilderTest {
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
-        verify(pricePort).getPrevClose(Ticker.TQQQ, account);
+        verify(pricePort).getPrevClose(Ticker.TQQQ, toBrokerRef(account));
         verify(orderComputer).compute(balance, vrStrategy, new BigDecimal("100.00"),
                 today, vrCycle, null, "vr-preview", null);
     }
@@ -160,7 +161,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
-        when(pricePort.getPrevClose(Ticker.SOXL, account)).thenReturn(new BigDecimal("21.00"));
+        when(pricePort.getPrevClose(Ticker.SOXL, toBrokerRef(account))).thenReturn(new BigDecimal("21.00"));
         when(privacyTradePort.findBaseIfPrivacy(strategy, today)).thenReturn(null);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
@@ -169,7 +170,7 @@ class StrategyOrderPlanBuilderTest {
         StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
 
         assertThat(result.isSkip()).isFalse();
-        verify(pricePort).getPrevClose(Ticker.SOXL, account);
+        verify(pricePort).getPrevClose(Ticker.SOXL, toBrokerRef(account));
     }
 
     @Test
@@ -186,5 +187,13 @@ class StrategyOrderPlanBuilderTest {
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

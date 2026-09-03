@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.CycleCompletedEvent;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.user.domain.model.User;

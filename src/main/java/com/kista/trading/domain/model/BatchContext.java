@@ -1,6 +1,6 @@
 package com.kista.trading.domain.model;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.user.domain.model.User;
 

@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
@@ -33,8 +34,8 @@ class TradingSellSufficiencySimulator {
 
         int sellableQuantity;
         try {
-            sellableQuantity = registry.require(account, SellableQuantityPort.class)
-                    .getSellableQuantity(strategy.ticker(), account)
+            sellableQuantity = registry.require(toBrokerRef(account), SellableQuantityPort.class)
+                    .getSellableQuantity(strategy.ticker(), toBrokerRef(account))
                     .quantity();
         } catch (KisApiException | TossApiException e) {
             log.warn("대상 전략 판매가능수량 조회 실패, 충족 판정 생략: strategyId={}, error={}", strategy.id(), e.getMessage());
@@ -45,5 +46,14 @@ class TradingSellSufficiencySimulator {
                 account.id(), tradeDate, strategy.ticker());
         boolean sufficient = reservedQuantity + requiredQuantity <= sellableQuantity;
         return new SellSufficiencyPreview(sufficient, sellableQuantity, reservedQuantity, requiredQuantity, false);
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,10 +58,10 @@ class TossHttpClientTest {
     private static final String PATH = "/api/v1/holdings";
     private static final String URL = BASE_URL + PATH;
 
-    private static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "12345678901", "cid", "csecret", "1",
-            Account.Broker.TOSS, null
+    private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
+            UUID.randomUUID(), "cid", "csecret",
+            "12345678901", "1",
+            BrokerAccountRef.Broker.TOSS
     );
 
     RestClient.Builder restClientBuilder;

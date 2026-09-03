@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.application.port.output.BrokerAccountPort;
 import com.kista.broker.application.port.output.BrokerAdapterPort;
 import com.kista.broker.application.port.output.BrokerMarketCalendarPort;
@@ -51,7 +51,7 @@ class TossBrokerAdapterTest {
     @Test
     @DisplayName("supports()는 TOSS를 반환한다")
     void supportsReturnsToss() {
-        assertThat(adapter().supports()).isEqualTo(Account.Broker.TOSS);
+        assertThat(adapter().supports()).isEqualTo(BrokerAccountRef.Broker.TOSS);
     }
 
     @Test

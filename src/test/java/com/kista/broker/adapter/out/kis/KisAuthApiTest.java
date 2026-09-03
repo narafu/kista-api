@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -163,7 +163,7 @@ class KisAuthApiTest {
             expectOAuthTokenFails();
 
             assertThatThrownBy(() -> api.verifyCredentials("badKey", "badSecret", null))
-                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
+                    .isInstanceOf(BrokerCredentialException.class);
             server.verify();
         }
     }

@@ -92,7 +92,7 @@ class AdminTradeControllerTest {
         UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
         // 단일 계좌/사용자 조회 — 전체 풀스캔 대신 findAccount/findUser 사용
         when(adminQuery.findAccount(accountId)).thenReturn(Optional.of(
-                new com.kista.domain.model.account.Account(
+                new com.kista.account.domain.model.Account(
                         accountId,
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         "toss-main",
@@ -100,7 +100,7 @@ class AdminTradeControllerTest {
                         null,
                         null,
                         null,
-                        com.kista.domain.model.account.Account.Broker.TOSS,
+                        com.kista.account.domain.model.Account.Broker.TOSS,
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
         ));

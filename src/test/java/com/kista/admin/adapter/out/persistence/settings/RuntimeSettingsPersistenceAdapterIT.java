@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.out.persistence.settings;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.domain.model.account.Account.Broker;
+import com.kista.account.domain.model.Account.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.Tag;

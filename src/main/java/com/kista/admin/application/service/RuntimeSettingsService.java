@@ -1,6 +1,6 @@
 package com.kista.admin.application.service;
 
-import com.kista.domain.model.account.Account.Broker;
+import com.kista.account.domain.model.Account.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.user.domain.model.User;
@@ -9,6 +9,7 @@ import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.RuntimeSettingsPort;
+import com.kista.account.application.port.output.BrokerEnabledPort;
 import com.kista.user.application.port.output.ApprovalPolicyPort;
 import com.kista.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ import com.kista.sharedkernel.UserStatus;
 @Service
 @RequiredArgsConstructor
 @Transactional
-class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUseCase, ApprovalPolicyPort {
+class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUseCase, ApprovalPolicyPort, BrokerEnabledPort {
 
     private final RuntimeSettingsPort settingsPort; // 런타임 설정 영속화 포트
     private final UserPort userPort; // 승인 대기 사용자 조회 포트
@@ -40,6 +41,12 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
     @Transactional
     public boolean approvalRequiredForUpdate() {
         return settingsPort.loadForUpdate().approvalRequired();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean enabled(Broker broker) {
+        return settingsPort.load().brokers().get(broker).enabled();
     }
 
     @Override

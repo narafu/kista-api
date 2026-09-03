@@ -2,7 +2,8 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
@@ -61,7 +62,7 @@ class StrategyOrderPlanBuilder {
             prevClosePrice = prevCloseCache != null && prevCloseCache.containsKey(strategy.ticker())
                     ? prevCloseCache.get(strategy.ticker())
                     : BrokerCallGuard.wrap("전일종가 조회",
-                            () -> registry.require(account, BrokerPricePort.class).getPrevClose(strategy.ticker(), account));
+                            () -> registry.require(toBrokerRef(account), BrokerPricePort.class).getPrevClose(strategy.ticker(), toBrokerRef(account)));
         }
         PrivacyTradeBase privacyBase = privacyTradePort.findBaseIfPrivacy(strategy, today);
 
@@ -72,5 +73,14 @@ class StrategyOrderPlanBuilder {
             return new PlanResult(null, SkipReason.NO_PRIVACY_BASE);
         }
         return new PlanResult(plan, null);
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

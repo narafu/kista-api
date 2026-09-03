@@ -1,7 +1,7 @@
 package com.kista.user.application.service;
 
 import com.kista.user.application.event.UserDeletedEvent;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.RefreshTokenPort;
 import com.kista.application.port.output.StrategyPort;

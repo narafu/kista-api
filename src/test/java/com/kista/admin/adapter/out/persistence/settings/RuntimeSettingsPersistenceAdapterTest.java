@@ -98,8 +98,8 @@ class RuntimeSettingsPersistenceAdapterTest {
 
         RuntimeSettings loaded = adapter.load();
 
-        assertThat(loaded.brokers()).containsKey(com.kista.domain.model.account.Account.Broker.MOCK);
-        assertThat(loaded.brokers().get(com.kista.domain.model.account.Account.Broker.MOCK).enabled()).isTrue();
+        assertThat(loaded.brokers()).containsKey(com.kista.account.domain.model.Account.Broker.MOCK);
+        assertThat(loaded.brokers().get(com.kista.account.domain.model.Account.Broker.MOCK).enabled()).isTrue();
     }
 
     @Test

@@ -2,7 +2,7 @@ package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.common.UsTradeDates;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -33,12 +33,12 @@ class KisPriceApi {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    public BigDecimal getPrice(Ticker ticker, Account account) {
+    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
         // 현재가만 필요한 경우 — snapshot 조회 후 current 반환 (KIS API 호출 횟수 동일)
         return getPriceSnapshot(ticker, account).current();
     }
 
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
         if (tickers.isEmpty()) return Map.of();
 
         MultiPriceResponse response = fetchMultiPrice(tickers, account);
@@ -59,7 +59,7 @@ class KisPriceApi {
         return result;
     }
 
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
+    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
         String excd = exchangeRegistry.excd(ticker);
         PriceResponse response = kisHttpClient.pricingGet(
                 SINGLE_TR_ID, SINGLE_PATH, account, PriceResponse.class,
@@ -82,7 +82,7 @@ class KisPriceApi {
         return new PriceSnapshot(current, prevClose);
     }
 
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
         if (tickers.isEmpty()) return Map.of();
 
         MultiPriceResponse response = fetchMultiPrice(tickers, account);
@@ -114,11 +114,11 @@ class KisPriceApi {
     }
 
     // KIS는 base(전일종가)가 현재가 응답에 묶여 있어 별도 API 없음 — snapshot 재사용 (호출 횟수 절감 없음)
-    public BigDecimal getPrevClose(Ticker ticker, Account account) {
+    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
         return getPriceSnapshot(ticker, account).prevClose();
     }
 
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
         getPriceSnapshots(tickers, account).forEach((ticker, snapshot) -> result.put(ticker, snapshot.prevClose()));
         return result;
@@ -126,12 +126,12 @@ class KisPriceApi {
 
     // 정규장 확정 종가 — 마감 리포트 전용(dailyprice, HHDFS76240000). 응답 봉 날짜가 기대 거래일과 다르면
     // (미발행 등) 라이브 현재가로 fallback — "하루 전 종가를 오늘 종가로 오기록"하는 사고를 방지한다.
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
+    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return fetchConfirmedClose(ticker, tradeDate, account).orElseGet(() -> getPrice(ticker, account));
     }
 
     // dailyprice는 종목당 단건 TR이라 벌크 API 없음 — 종목 수만큼 순차 호출(마감 리포트 1일 1회라 허용)
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
+    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
         for (Ticker ticker : tickers) {
             result.put(ticker, getClosingPrice(ticker, tradeDate, account));
@@ -140,7 +140,7 @@ class KisPriceApi {
     }
 
     // dailyprice 확정 종가 조회 — 응답 봉 날짜(xymd)가 기대 US 거래일과 일치할 때만 신뢰
-    private Optional<BigDecimal> fetchConfirmedClose(Ticker ticker, LocalDate tradeDate, Account account) {
+    private Optional<BigDecimal> fetchConfirmedClose(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         String expectedUsDate = UsTradeDates.toUsTradeDate(tradeDate).format(DateTimeFormatter.BASIC_ISO_DATE);
         try {
             DailyPriceResponse response = kisHttpClient.pricingGet(
@@ -174,7 +174,7 @@ class KisPriceApi {
     }
 
     // multprice(HHDFS76220000) 1회 호출 — NREC + 종목별 EXCD_nn/SYMB_nn 파라미터 구성
-    private MultiPriceResponse fetchMultiPrice(List<Ticker> tickers, Account account) {
+    private MultiPriceResponse fetchMultiPrice(List<Ticker> tickers, BrokerAccountRef account) {
         return kisHttpClient.pricingGet(
                 MULTI_TR_ID, MULTI_PATH, account, MultiPriceResponse.class,
                 p -> {

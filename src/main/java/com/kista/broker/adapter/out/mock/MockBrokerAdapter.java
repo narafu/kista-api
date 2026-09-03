@@ -1,8 +1,6 @@
 package com.kista.broker.adapter.out.mock;
 
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.*;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -35,13 +33,13 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)
 
     @Override
-    public Account.Broker supports() {
-        return Account.Broker.MOCK;
+    public BrokerAccountRef.Broker supports() {
+        return BrokerAccountRef.Broker.MOCK;
     }
 
     // --- 계좌+ticker → 전략 해석 공통 헬퍼 ---
     // Account에는 ticker 정보가 없다(전략이 소유) — 계좌에 속한 전략 중 ticker가 일치하는 것을 찾는다
-    private Strategy resolveStrategy(Account account, Ticker ticker) {
+    private Strategy resolveStrategy(BrokerAccountRef account, Ticker ticker) {
         return strategyPort.findByAccountId(account.id()).stream()
                 .filter(s -> s.ticker() == ticker)
                 .findFirst()
@@ -50,7 +48,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     }
 
     // --- 계좌+ticker → 최신 포지션 해석 공통 헬퍼 ---
-    private PositionView resolveLatestPosition(Account account, Ticker ticker) {
+    private PositionView resolveLatestPosition(BrokerAccountRef account, Ticker ticker) {
         Strategy strategy = resolveStrategy(account, ticker);
         return mockSimulationDataPort.findLatestPosition(strategy.id())
                 .orElseThrow(() -> new IllegalStateException(
@@ -60,7 +58,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // 계좌 전체 가용 예수금 — 실제 브로커는 계좌 단일 현금풀을 여러 전략이 공유하므로(TradingOrderBudgetAllocator가
     // 대표 전략 1개로 getLiveBalance를 호출해 계좌의 모든 BUY 후보에 그대로 적용) 모의계좌도 전략별 usdDeposit을
     // 합산해 계좌 단위 값으로 맞춘다 — 전략별 값을 그대로 반환하면 다른 전략의 잔고로 매수 승인/거절이 오염된다
-    private BigDecimal sumUsdDepositAcrossStrategies(Account account) {
+    private BigDecimal sumUsdDepositAcrossStrategies(BrokerAccountRef account) {
         return strategyPort.findByAccountId(account.id()).stream()
                 .map(s -> mockSimulationDataPort.findLatestPosition(s.id()))
                 .flatMap(Optional::stream)
@@ -71,43 +69,43 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- BrokerPricePort (account 파라미터 무시, priceFeed에 위임 — Toss 패턴과 동일) ---
 
     @Override
-    public BigDecimal getPrice(Ticker ticker, Account account) {
+    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
         return priceFeed.getPrice(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
         return priceFeed.getPrices(tickers); // 공통 API — account 불필요
     }
 
     @Override
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
+    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
         return priceFeed.getPriceSnapshot(ticker); // 공통 API — account 불필요, priceFeed가 이미 broker 소유 PriceSnapshot 반환
     }
 
     @Override
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
         return priceFeed.getPriceSnapshots(tickers); // 공통 API — account 불필요
     }
 
     @Override
-    public BigDecimal getPrevClose(Ticker ticker, Account account) {
+    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
         return priceFeed.getPrevClose(ticker); // 공통 API — account 불필요
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
         return priceFeed.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
     // tradeDate 일봉 확정 종가 — 시세는 Toss 공용 피드 재사용(CommonMarketPriceFeed.getClosingPrice)
     @Override
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
+    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return priceFeed.getClosingPrice(ticker, tradeDate);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
+    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         Map<Ticker, BigDecimal> result = new LinkedHashMap<>();
         for (Ticker ticker : tickers) {
             result.put(ticker, priceFeed.getClosingPrice(ticker, tradeDate));
@@ -118,7 +116,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- LiveBalancePort ---
 
     @Override
-    public BrokerBalance getLiveBalance(Account account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(BrokerAccountRef account, Ticker ticker) {
         // usdDeposit은 계좌 전체 합산(위 sumUsdDepositAcrossStrategies 주석 참고), holdings/avgPrice는 해당 ticker 전략 값
         PositionView position = resolveLatestPosition(account, ticker);
         return new BrokerBalance(position.holdings(), position.avgPrice(), sumUsdDepositAcrossStrategies(account));
@@ -127,7 +125,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- SellableQuantityPort ---
 
     @Override
-    public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
         int holdings = resolveLatestPosition(account, ticker).holdings();
         return new SellableQuantity(ticker.name(), holdings);
     }
@@ -135,13 +133,13 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- BrokerOrderCorrectionPort ---
 
     @Override
-    public OrderResult place(OrderInstruction instruction, Account account) {
+    public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
         // 실제 증권사 접수 없이 합성 주문번호 부여 — 이 ID를 getExecutions()가 그대로 echo해 TradingReporter.markFilledOrders와 매칭시킨다
         return new OrderResult("MOCK-" + UUID.randomUUID());
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, Account account) {
+    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
         // no-op — 모의계좌는 별도 취소 대상이 없음(getExecutions에서 미체결 주문은 TradingReporter가 자체적으로 CANCELLED 처리)
     }
 
@@ -149,7 +147,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // MOC: 항상 체결(종가) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
     // LIMIT: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 지정가 그대로 — LOC와 달리 종가로 재계산하지 않음)
     @Override
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
         // 실제 호출부(TradingReporter)는 항상 from==to(당일)로만 호출 — to를 거래일로 사용
         // cycleId로 스코프 — account+ticker만으로 조회하면 사이클 롤오버 당일 종료된 이전 사이클의
         // 잔류 PLACED 주문(취소 실패 등)이 새 사이클의 체결에 잘못 합산될 수 있어 활성 사이클 격리 조회를 재사용한다
@@ -187,12 +185,12 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // 주의: 이 값은 GET /api/accounts/{id}/margin에도 그대로 노출되므로 화면상 "가용현금"이 실제와 다르게 크게
     // 보일 수 있다 — 모의계좌 UI에서 이 필드는 참고용이 아님을 별도 안내하는 것을 권장한다.
     @Override
-    public BigDecimal getUsdBuyableAmount(Account account) {
+    public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return new BigDecimal("999999999.00");
     }
 
     @Override
-    public List<MarginItem> getMargin(Account account) {
+    public List<MarginItem> getMargin(BrokerAccountRef account) {
         BigDecimal buyable = getUsdBuyableAmount(account);
         return List.of(new MarginItem(Currency.USD, buyable, buyable, buyable, BigDecimal.ONE));
     }
@@ -200,7 +198,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // --- PortfolioPort ---
 
     @Override
-    public PresentBalanceResult getPresentBalance(Account account) {
+    public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
         List<Strategy> strategies = strategyPort.findByAccountId(account.id());
         List<PresentBalanceResult.TossHolding> holdings = new ArrayList<>();
         BigDecimal totalUsdDeposit = BigDecimal.ZERO;

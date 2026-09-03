@@ -2,7 +2,7 @@ package com.kista.admin.application.service;
 
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.common.CycleLookups;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.broker.domain.model.Execution;
@@ -13,7 +13,7 @@ import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;

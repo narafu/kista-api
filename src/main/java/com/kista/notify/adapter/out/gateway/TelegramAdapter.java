@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.notify.application.port.output.NotifyPort;

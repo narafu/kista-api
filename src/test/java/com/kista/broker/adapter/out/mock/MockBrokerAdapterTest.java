@@ -1,8 +1,8 @@
 package com.kista.broker.adapter.out.mock;
 
 import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.Direction;
@@ -59,8 +59,8 @@ class MockBrokerAdapterTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final UUID CYCLE_ID = UUID.randomUUID();
-    private static final Account ACCOUNT = new Account(ACCOUNT_ID, UUID.randomUUID(), "모의계좌",
-            "12345678", "key", "secret", null, Account.Broker.MOCK, null);
+    private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(ACCOUNT_ID, "key", "secret",
+            "12345678", null, BrokerAccountRef.Broker.MOCK);
     private static final LocalDate TRADE_DATE = LocalDate.of(2026, 7, 25);
     private static final Strategy TQQQ_STRATEGY = new Strategy(STRATEGY_ID, ACCOUNT_ID, Strategy.Type.VR,
             Strategy.Status.ACTIVE, Ticker.TQQQ, Strategy.CycleSeedType.NONE);
@@ -80,7 +80,7 @@ class MockBrokerAdapterTest {
     @Test
     @DisplayName("supports()는 MOCK을 반환한다")
     void supportsReturnsMock() {
-        assertThat(adapter().supports()).isEqualTo(Account.Broker.MOCK);
+        assertThat(adapter().supports()).isEqualTo(BrokerAccountRef.Broker.MOCK);
     }
 
     // --- getExecutions() 체결 시뮬레이션 규칙표 ---

@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;

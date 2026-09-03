@@ -1,8 +1,8 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.broker.domain.model.Currency;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
@@ -46,7 +46,7 @@ class TossHoldingsApi {
     // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개
     private final UsdKrwRateCache exchangeRateCache = new UsdKrwRateCache(Duration.ofSeconds(60), Instant::now);
 
-    public BrokerBalance getBalance(Account account, Ticker ticker) {
+    public BrokerBalance getBalance(BrokerAccountRef account, Ticker ticker) {
         // 보유 종목 조회 — 응답 {"result": {"items": [...]}} TossResult 제네릭 래퍼 구조
         TossResult<HoldingsResponse> wrapper = tossHttpClient.get(
                 HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
@@ -74,12 +74,12 @@ class TossHoldingsApi {
 
     // ── TossMarginPort ─────────────────────────────────────────────────────────
 
-    public BigDecimal getUsdBuyableAmount(Account account) {
+    public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return fetchBuyingPower(account, "USD");
     }
 
     // USD·KRW 예수금 통화별 조회 (통합 아님 — UI 표시용)
-    public List<MarginItem> getMargin(Account account) {
+    public List<MarginItem> getMargin(BrokerAccountRef account) {
         // USD·KRW 예수금·환율 3개 독립 HTTP 호출을 virtual thread로 병렬 실행
         BigDecimal usdBuyable;
         BigDecimal krwBuyable;
@@ -102,7 +102,7 @@ class TossHoldingsApi {
         );
     }
 
-    public PresentBalanceResult getPresentBalance(Account account) {
+    public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
         // 1~4. 보유 종목·USD·KRW 예수금·환율 4개 독립 HTTP 호출을 virtual thread로 병렬 실행
         HoldingsResponse holdingsResponse;
         BigDecimal usdDeposit;
@@ -147,7 +147,7 @@ class TossHoldingsApi {
     }
 
     // currency 파라미터로 매수가능금액 단건 조회
-    private BigDecimal fetchBuyingPower(Account account, String currencyCode) {
+    private BigDecimal fetchBuyingPower(BrokerAccountRef account, String currencyCode) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("currency", currencyCode);
         TossResult<BuyableAmountResponse> wrapper = tossHttpClient.get(
@@ -191,12 +191,12 @@ class TossHoldingsApi {
 
     // ── TossSellableQuantityPort ───────────────────────────────────────────────
 
-    public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
         return fetchSellableQuantity(ticker, account);
     }
 
     // 내부 헬퍼: Toss 판매 가능 수량 조회
-    private SellableQuantity fetchSellableQuantity(Ticker ticker, Account account) {
+    private SellableQuantity fetchSellableQuantity(Ticker ticker, BrokerAccountRef account) {
         var params = new LinkedMultiValueMap<String, String>();
         params.add("symbol", ticker.name());
         TossResult<SellableQuantityResult> wrapper = tossHttpClient.get(

@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.Direction;
@@ -34,10 +34,10 @@ class KisOrderApiTest {
     @Spy KisExchangeRegistry exchangeRegistry = new KisExchangeRegistry();
     @InjectMocks KisOrderApi api;
 
-    private static final Account ACCOUNT = new Account(
-            UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
-            "74420614", "appKey", "appSecret", null,
-            Account.Broker.KIS, null
+    private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
+            UUID.randomUUID(), "appKey", "appSecret",
+            "74420614", null,
+            BrokerAccountRef.Broker.KIS
     );
 
     @Test
@@ -47,7 +47,7 @@ class KisOrderApiTest {
         OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 10, locPrice);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.place(instruction, ACCOUNT);
@@ -63,7 +63,7 @@ class KisOrderApiTest {
         OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.MOC, 5, BigDecimal.ZERO);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.place(instruction, ACCOUNT);
@@ -80,7 +80,7 @@ class KisOrderApiTest {
         OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LIMIT, 3, limitPrice);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.place(instruction, ACCOUNT);
@@ -96,7 +96,7 @@ class KisOrderApiTest {
         OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.SELL, OrderType.LOC, 8, BigDecimal.ZERO);
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(ok);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
 
         api.place(instruction, ACCOUNT);
 
@@ -109,7 +109,7 @@ class KisOrderApiTest {
         OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
         KisOrderApi.OrderResponse response =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD123"));
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(response);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(response);
 
         OrderResult result = api.place(instruction, ACCOUNT);
 
@@ -122,7 +122,7 @@ class KisOrderApiTest {
         OrderInstruction instruction = new OrderInstruction(Ticker.SOXL, Direction.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
         KisOrderApi.OrderResponse errorResponse =
                 new KisOrderApi.OrderResponse("1", "EGW00202", "GW라우팅 중 오류가 발생했습니다.", null);
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(errorResponse);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(errorResponse);
 
         assertThatThrownBy(() -> api.place(instruction, ACCOUNT))
                 .isInstanceOf(KisApiException.class)
@@ -133,7 +133,7 @@ class KisOrderApiTest {
     @DisplayName("cancel: TTTT1004U + CANCEL_PATH 호출, RVSE_CNCL_DVSN_CD=02, ORGN_ODNO=기존주문번호")
     void cancel_sendsCorrectParameters() {
         CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "ORD_123");
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any())).thenReturn(null);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(null);
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.cancel(instruction, ACCOUNT);
@@ -153,7 +153,7 @@ class KisOrderApiTest {
     @DisplayName("cancel: KIS 오류(RuntimeException) 전파")
     void cancel_kisError_propagatesException() {
         CancelInstruction instruction = new CancelInstruction(Ticker.SOXL, "ORD_456");
-        when(kisHttpClient.post(anyString(), anyString(), any(Account.class), any(), any()))
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
                 .thenThrow(new RuntimeException("KIS 오류"));
 
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,

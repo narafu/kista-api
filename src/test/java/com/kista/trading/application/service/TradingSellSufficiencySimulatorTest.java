@@ -1,8 +1,9 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.domain.model.strategy.Strategy;
@@ -44,7 +45,7 @@ class TradingSellSufficiencySimulatorTest {
     @BeforeEach
     void setUp() {
         simulator = new TradingSellSufficiencySimulator(registry, orderPort);
-        lenient().when(registry.require(any(Account.class), eq(SellableQuantityPort.class))).thenReturn(sellableQuantityPort);
+        lenient().when(registry.require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class))).thenReturn(sellableQuantityPort);
     }
 
     private Order sellOrder(int quantity, BigDecimal price) {
@@ -53,7 +54,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sufficient_whenSellableQuantityCoversRequiredAndReserved() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, account))
+        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 10));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
                 .thenReturn(2);
@@ -70,7 +71,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenRequiredAloneExceedsSellableQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, account))
+        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 2));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
                 .thenReturn(0);
@@ -85,7 +86,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenExistingReservationsLeaveNotEnoughQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, account))
+        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
                 .thenReturn(3);
@@ -99,7 +100,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sumsMultipleSellOrderQuantities_asRequiredQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, account))
+        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
                 .thenReturn(new SellableQuantity("SOXL", 20));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, Ticker.SOXL))
                 .thenReturn(0);
@@ -115,7 +116,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
-        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, account))
+        when(sellableQuantityPort.getSellableQuantity(Ticker.SOXL, toBrokerRef(account)))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
@@ -125,5 +126,13 @@ class TradingSellSufficiencySimulatorTest {
         assertThat(result.sufficientQuantity()).isTrue();
         assertThat(result.sellableQuantity()).isEqualTo(0);
         assertThat(result.requiredQuantity()).isEqualTo(3);
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

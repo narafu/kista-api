@@ -1,7 +1,9 @@
 package com.kista.trading.application.service;
 
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.broker.domain.model.SellableQuantity;
+import com.kista.account.application.port.output.AccountPort;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
 import com.kista.domain.model.strategy.*; import com.kista.trading.domain.model.*;
@@ -67,6 +69,7 @@ class ManualTradingServiceTest {
 
     static final UUID REQUESTER_ID = UUID.randomUUID();
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
+    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), Strategy.Type.INFINITE,
             Strategy.Status.ACTIVE, Ticker.SOXL, Strategy.CycleSeedType.NONE
@@ -99,10 +102,10 @@ class ManualTradingServiceTest {
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
         // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)
-        doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(Account.class), eq(BrokerPricePort.class));
+        doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
 
         // LiveBalancePort: 필드 mock 직접 연결
-        doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(Account.class), eq(LiveBalancePort.class));
+        doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(LiveBalancePort.class));
 
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry, eventPublisher);
         service = new ManualTradingService(
@@ -130,7 +133,7 @@ class ManualTradingServiceTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(STRATEGY.id()))
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
-        lenient().when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT)))
+        lenient().when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(Ticker.SOXL, new PriceSnapshot(new BigDecimal("22.00"), new BigDecimal("20.00"))));
     }
 
@@ -144,7 +147,7 @@ class ManualTradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder));
         // live holdings=10, sellable=10 < SELL 15주
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(Ticker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 10));
@@ -164,7 +167,7 @@ class ManualTradingServiceTest {
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyOrder));
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(Ticker.SOXL)))
                 .thenThrow(new RuntimeException("Toss API 오류"));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
@@ -181,7 +184,7 @@ class ManualTradingServiceTest {
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder));
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(Ticker.SOXL)))
                 .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 5));
@@ -210,7 +213,7 @@ class ManualTradingServiceTest {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate));
         // live 잔고 충분: usdDeposit=$10,000 > BUY $20
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(Ticker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of()); // AT_OPEN 없음(BUY뿐) — 개장 후에만 호출되므로 lenient
@@ -280,7 +283,7 @@ class ManualTradingServiceTest {
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(Ticker.SOXL), eq(new BigDecimal("20.00")), isNull(), any()))
                 .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
         // live 잔고 검증 — BUY $22 << usdDeposit $10,000
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT), eq(Ticker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(Ticker.SOXL)))
                 .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
 
@@ -315,7 +318,7 @@ class ManualTradingServiceTest {
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
                 .thenReturn(List.of(fx.vrBuyPlanned(), fx.vrSellPlanned()));
         // BUY cap 판단용 최신 현재가 재조회 — placeAtOpenOrdersIfMarketOpen 내부에서 fetchPrices 호출
-        when(kisPricePort.getPrices(eq(List.of(Ticker.SOXL)), eq(ACCOUNT)))
+        when(kisPricePort.getPrices(eq(List.of(Ticker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(Ticker.SOXL, new BigDecimal("21.00")));
 
         List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen());
@@ -340,5 +343,13 @@ class ManualTradingServiceTest {
         assertThat(result).hasSize(2);
         // 개장 전이므로 AT_OPEN 즉시 접수가 호출되지 않아야 함 — 개장 스케쥴러가 담당
         verify(orderExecutor, never()).placeAtOpenOrders(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

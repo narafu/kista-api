@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerCredentialException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -117,12 +117,12 @@ class TossAuthApiTest {
         }
 
         @Test
-        @DisplayName("REST 오류 시 Account.InvalidBrokerKeyException throw")
+        @DisplayName("REST 오류 시 BrokerCredentialException throw")
         void getToken_restClientException_throwsInvalidBrokerKeyException() {
             expectOAuthTokenUnauthorized();
 
             assertThatThrownBy(() -> api.getToken(ACCOUNT_ID, CLIENT_ID, CLIENT_SECRET))
-                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
+                    .isInstanceOf(BrokerCredentialException.class);
             server.verify();
         }
 
@@ -230,17 +230,17 @@ class TossAuthApiTest {
         }
 
         @Test
-        @DisplayName("OAuth 인증 실패 시 Account.InvalidBrokerKeyException throw")
+        @DisplayName("OAuth 인증 실패 시 BrokerCredentialException throw")
         void verifyAccount_authFails_throwsInvalidBrokerKeyException() {
             expectOAuthTokenUnauthorized();
 
             assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
-                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
+                    .isInstanceOf(BrokerCredentialException.class);
             server.verify();
         }
 
         @Test
-        @DisplayName("계좌 목록 비어있으면 Account.InvalidBrokerKeyException throw")
+        @DisplayName("계좌 목록 비어있으면 BrokerCredentialException throw")
         void verifyAccount_emptyAccounts_throwsInvalidBrokerKeyException() {
             expectOAuthToken("temp-token", 86400L);
             expectAccountsList("""
@@ -248,18 +248,18 @@ class TossAuthApiTest {
                     """);
 
             assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
-                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
+                    .isInstanceOf(BrokerCredentialException.class);
             server.verify();
         }
 
         @Test
-        @DisplayName("계좌 조회 REST 오류 시 Account.InvalidBrokerKeyException throw")
+        @DisplayName("계좌 조회 REST 오류 시 BrokerCredentialException throw")
         void verifyAccount_accountsFetchFails_throwsInvalidBrokerKeyException() {
             expectOAuthToken("temp-token", 86400L);
             expectAccountsListForbidden();
 
             assertThatThrownBy(() -> api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null))
-                    .isInstanceOf(Account.InvalidBrokerKeyException.class);
+                    .isInstanceOf(BrokerCredentialException.class);
             server.verify();
         }
     }

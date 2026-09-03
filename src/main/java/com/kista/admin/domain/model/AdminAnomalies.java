@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 
 import java.util.List;
 

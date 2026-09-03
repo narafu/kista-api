@@ -4,7 +4,7 @@ import com.kista.adapter.in.web.dto.EnumMeta;
 import com.kista.adapter.in.web.dto.MetaBundle;
 import com.kista.adapter.in.web.dto.StrategyTypeMeta;
 import com.kista.adapter.in.web.dto.TickerMeta;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceCategory;

@@ -2,14 +2,15 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.common.CycleLookups;
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.application.port.output.StrategyPort;
@@ -67,8 +68,8 @@ class OrderCancelService {
 
         for (Order order : placedOrders) {
             try {
-                registry.require(account, BrokerOrderCorrectionPort.class)
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account);
+                registry.require(toBrokerRef(account), BrokerOrderCorrectionPort.class)
+                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), toBrokerRef(account));
                 stateWriter.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
@@ -114,8 +115,8 @@ class OrderCancelService {
         }
 
         try {
-            registry.require(account, BrokerOrderCorrectionPort.class)
-                    .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account);
+            registry.require(toBrokerRef(account), BrokerOrderCorrectionPort.class)
+                    .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), toBrokerRef(account));
         } catch (Exception e) {
             if (!isAlreadyCanceled(e)) {
                 throw e;
@@ -129,6 +130,15 @@ class OrderCancelService {
     // 중복 취소 요청으로 브로커가 거부한 예상된 경합 여부 — TossHttpClient가 409 CONFLICT(already-canceled) 응답을 판정해 전달
     private boolean isAlreadyCanceled(Exception e) {
         return e instanceof TossApiException tae && tae.isAlreadyCanceledConflict();
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 
 }

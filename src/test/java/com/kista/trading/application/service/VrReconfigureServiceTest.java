@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
@@ -16,7 +17,7 @@ import com.kista.domain.model.strategy.StrategyVrDetail;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
 import com.kista.application.usecase.StrategyUseCase;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.StrategyCyclePort;
@@ -120,8 +121,8 @@ class VrReconfigureServiceTest {
     private void stubHappyPathChain(LocalDate firstStartDate) {
         lenient().when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
         lenient().when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
-        lenient().when(registry.require(account, BrokerPricePort.class)).thenReturn(pricePort);
-        lenient().when(pricePort.getPrice(Ticker.TQQQ, account)).thenReturn(currentPrice);
+        lenient().when(registry.require(toBrokerRef(account), BrokerPricePort.class)).thenReturn(pricePort);
+        lenient().when(pricePort.getPrice(Ticker.TQQQ, toBrokerRef(account))).thenReturn(currentPrice);
         lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
         lenient().when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(currentCycle));
         lenient().when(strategyVrDetailPort.findByStrategyVersionId(strategyVersionId)).thenReturn(Optional.of(currentDetail));
@@ -531,5 +532,13 @@ class VrReconfigureServiceTest {
                 anyInt(), anyInt(), anyInt(), anyInt(),
                 any(), anyInt(), anyInt(), any(),
                 any(), any(), any(), anyLong());
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

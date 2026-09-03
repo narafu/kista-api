@@ -1,11 +1,12 @@
 package com.kista.application.service.account;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.domain.model.strategy.StrategySeedPreview;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -30,6 +31,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -67,14 +69,16 @@ class StrategySeedPreviewServiceTest {
         );
         mockAccount = mock(Account.class);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mockAccount);
+        // toBrokerRef(account) 변환이 account.broker().name()을 호출하므로 stub 필수 (일부 테스트는 도달 전 종료 → lenient)
+        lenient().when(mockAccount.broker()).thenReturn(Account.Broker.KIS);
         // registry.require(account, BrokerPricePort.class) → pricePort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
-        lenient().doReturn(pricePort).when(registry).require(any(Account.class), any());
+        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 
     @Test
     void infinite_uses_prev_close_not_current() {
         // given: 전일종가 89.20 — 실제 첫 주문(holdings=0)과 동일하게 전일종가를 기준가로 사용해야 함 (현재가 API 미사용)
-        when(pricePort.getPrevClose(Strategy.Ticker.SOXL, mockAccount))
+        when(pricePort.getPrevClose(eq(Strategy.Ticker.SOXL), any(BrokerAccountRef.class)))
                 .thenReturn(new BigDecimal("89.20"));
 
         // when
@@ -122,7 +126,7 @@ class StrategySeedPreviewServiceTest {
     @Test
     void getPrices_returns_prev_close_not_current() {
         // given: 전략 생성 화면 티커 목록 가격도 basePrice와 동일 소스(전일종가)를 써야 함 (현재가 API 미사용)
-        when(pricePort.getPrevCloses(List.of(Strategy.Ticker.SOXL), mockAccount))
+        when(pricePort.getPrevCloses(eq(List.of(Strategy.Ticker.SOXL)), any(BrokerAccountRef.class)))
                 .thenReturn(Map.of(Strategy.Ticker.SOXL, new BigDecimal("89.20")));
 
         // when

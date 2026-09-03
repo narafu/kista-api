@@ -1,6 +1,6 @@
 package com.kista.admin.application.usecase;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminCycleStrategySummary;
 import com.kista.admin.domain.model.AdminAnomalies;
 import com.kista.admin.domain.model.AdminStats;

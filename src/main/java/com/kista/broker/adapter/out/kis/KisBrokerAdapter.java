@@ -1,7 +1,5 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.domain.model.account.Account;
-import com.kista.domain.model.account.SellableQuantity;
 import com.kista.broker.domain.model.*;
 import com.kista.domain.model.strategy.Strategy.Ticker;
 import com.kista.broker.application.port.output.*;
@@ -27,13 +25,13 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     private final KisPriceApi kisPriceApi;     // price/snapshot
 
     @Override
-    public Account.Broker supports() {
-        return Account.Broker.KIS;
+    public BrokerAccountRef.Broker supports() {
+        return BrokerAccountRef.Broker.KIS;
     }
 
     // CTRP6504R 결과에 TTTC2101R(margin)에서 예수금·환율 보정
     @Override
-    public PresentBalanceResult getPresentBalance(Account account) {
+    public PresentBalanceResult getPresentBalance(BrokerAccountRef account) {
         PresentBalanceResult portfolio = kisTradingApi.getPresentBalance(account);
         List<MarginItem> margins = kisTradingApi.getMargin(account);
         BigDecimal usdDeposit = margins.stream()
@@ -51,77 +49,77 @@ public class KisBrokerAdapter implements BrokerAdapterPort,
     }
 
     @Override
-    public List<MarginItem> getMargin(Account account) {
+    public List<MarginItem> getMargin(BrokerAccountRef account) {
         return kisTradingApi.getMargin(account);
     }
 
     @Override
-    public BigDecimal getUsdBuyableAmount(Account account) {
+    public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return kisTradingApi.getUsdBuyableAmount(account);
     }
 
     @Override
-    public SellableQuantity getSellableQuantity(Ticker ticker, Account account) {
+    public SellableQuantity getSellableQuantity(Ticker ticker, BrokerAccountRef account) {
         return kisTradingApi.getSellableQuantity(ticker, account);
     }
 
     @Override
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
         return kisTradingApi.getExecutions(from, to, ticker, account);
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, Account account) {
+    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
         kisOrderApi.cancel(instruction, account);
     }
 
     @Override
-    public OrderResult place(OrderInstruction instruction, Account account) {
+    public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
         return kisOrderApi.place(instruction, account);
     }
 
     @Override
-    public BigDecimal getPrice(Ticker ticker, Account account) {
+    public BigDecimal getPrice(Ticker ticker, BrokerAccountRef account) {
         return kisPriceApi.getPrice(ticker, account);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrices(List<Ticker> tickers, BrokerAccountRef account) {
         return kisPriceApi.getPrices(tickers, account);
     }
 
     @Override
-    public PriceSnapshot getPriceSnapshot(Ticker ticker, Account account) {
+    public PriceSnapshot getPriceSnapshot(Ticker ticker, BrokerAccountRef account) {
         return kisPriceApi.getPriceSnapshot(ticker, account);
     }
 
     @Override
-    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, Account account) {
+    public Map<Ticker, PriceSnapshot> getPriceSnapshots(List<Ticker> tickers, BrokerAccountRef account) {
         return kisPriceApi.getPriceSnapshots(tickers, account);
     }
 
     @Override
-    public BigDecimal getPrevClose(Ticker ticker, Account account) {
+    public BigDecimal getPrevClose(Ticker ticker, BrokerAccountRef account) {
         return kisPriceApi.getPrevClose(ticker, account);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, Account account) {
+    public Map<Ticker, BigDecimal> getPrevCloses(List<Ticker> tickers, BrokerAccountRef account) {
         return kisPriceApi.getPrevCloses(tickers, account);
     }
 
     @Override
-    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, Account account) {
+    public BigDecimal getClosingPrice(Ticker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return kisPriceApi.getClosingPrice(ticker, tradeDate, account);
     }
 
     @Override
-    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, Account account) {
+    public Map<Ticker, BigDecimal> getClosingPrices(List<Ticker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         return kisPriceApi.getClosingPrices(tickers, tradeDate, account);
     }
 
     @Override
-    public BrokerBalance getLiveBalance(Account account, Ticker ticker) {
+    public BrokerBalance getLiveBalance(BrokerAccountRef account, Ticker ticker) {
         return kisTradingApi.getBalance(account, ticker);
     }
 }

@@ -1,11 +1,11 @@
 package com.kista.trading.adapter.in.schedule;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
-import com.kista.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.user.application.port.output.UserPort;

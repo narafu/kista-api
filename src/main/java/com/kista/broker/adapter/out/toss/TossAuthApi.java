@@ -2,7 +2,8 @@ package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,8 +74,8 @@ class TossAuthApi implements BrokerConnectionTestPort {
     // ── BrokerConnectionTestPort ───────────────────────────────────────────────
 
     @Override
-    public Account.Broker supports() {
-        return Account.Broker.TOSS;
+    public BrokerAccountRef.Broker supports() {
+        return BrokerAccountRef.Broker.TOSS;
     }
 
     @Override
@@ -115,12 +116,12 @@ class TossAuthApi implements BrokerConnectionTestPort {
                     .retrieve()
                     .body(TokenResponse.class);
             if (response == null || response.accessToken() == null) {
-                throw new Account.InvalidBrokerKeyException();
+                throw new BrokerCredentialException();
             }
             return response;
         } catch (RestClientException e) {
             log.warn("Toss OAuth 토큰 발급 실패: {}", e.getMessage());
-            throw new Account.InvalidBrokerKeyException();
+            throw new BrokerCredentialException();
         }
     }
 
@@ -137,12 +138,12 @@ class TossAuthApi implements BrokerConnectionTestPort {
             List<AccountItem> accounts = response == null ? null : response.result();
             if (accounts == null || accounts.isEmpty()) {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
-                throw new Account.InvalidBrokerKeyException();
+                throw new BrokerCredentialException();
             }
             return String.valueOf(accounts.get(0).accountSeq());
         } catch (RestClientException e) {
             log.warn("Toss 계좌 조회 실패: {}", e.getMessage(), e);
-            throw new Account.InvalidBrokerKeyException();
+            throw new BrokerCredentialException();
         }
     }
 

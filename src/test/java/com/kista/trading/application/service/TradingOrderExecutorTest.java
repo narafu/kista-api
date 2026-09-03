@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
@@ -54,6 +55,8 @@ class TradingOrderExecutorTest {
             "74420614", "key", "secret", null,
             Account.Broker.KIS, null);
 
+    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
+
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 
     static final BigDecimal CURRENT_PRICE = new BigDecimal("50.00");
@@ -82,7 +85,7 @@ class TradingOrderExecutorTest {
     @BeforeEach
     void setUp() {
         // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
-        lenient().doReturn(brokerPort).when(registry).require(any(Account.class), any());
+        lenient().doReturn(brokerPort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 
     private TradingOrderExecutor executor() {
@@ -115,7 +118,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-001"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-001"));
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
@@ -133,7 +136,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-002"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-002"));
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION, null, INFINITE_STRATEGY);
 
@@ -146,7 +149,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-003"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-003"));
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
@@ -162,7 +165,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-VR-001"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-001"));
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, VR_STRATEGY);
 
@@ -178,7 +181,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-VR-002"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-002"));
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY);
 
@@ -208,7 +211,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-VR-OPEN-001"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-OPEN-001"));
 
         List<Order> result = executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY);
 
@@ -227,7 +230,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-VR-OPEN-002"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-OPEN-002"));
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, null, VR_POSITION, VR_STRATEGY);
 
@@ -240,7 +243,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-INF-OPEN-001"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-INF-OPEN-001"));
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
@@ -254,7 +257,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-PRIV-OPEN-001"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-PRIV-OPEN-001"));
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
@@ -281,8 +284,8 @@ class TradingOrderExecutorTest {
         Order order1 = planned(id1, Order.OrderDirection.BUY, "50.00", 10);
         Order order2 = planned(id2, Order.OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(order1, order2));
-        when(brokerPort.place(eq(instructionOf(order1)), eq(ACCOUNT))).thenReturn(brokerResult("KIS-101"));
-        when(brokerPort.place(eq(instructionOf(order2)), eq(ACCOUNT))).thenReturn(brokerResult("KIS-102"));
+        when(brokerPort.place(eq(instructionOf(order1)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-101"));
+        when(brokerPort.place(eq(instructionOf(order2)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-102"));
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
@@ -301,7 +304,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-201"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-201"));
         doThrow(new RuntimeException("일시적 DB 오류")).doNothing()
                 .when(orderPort).markPlaced(orderId, "KIS-201");
 
@@ -318,7 +321,7 @@ class TradingOrderExecutorTest {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT))).thenReturn(brokerResult("KIS-202"));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-202"));
         doThrow(new RuntimeException("DB down")).when(orderPort).markPlaced(orderId, "KIS-202");
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
@@ -327,5 +330,13 @@ class TradingOrderExecutorTest {
         assertThat(result).isEmpty();
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.message() != null && tee.message().contains("DB 불일치")));
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

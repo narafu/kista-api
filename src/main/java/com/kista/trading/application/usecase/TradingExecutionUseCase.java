@@ -1,6 +1,6 @@
 package com.kista.trading.application.usecase;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;

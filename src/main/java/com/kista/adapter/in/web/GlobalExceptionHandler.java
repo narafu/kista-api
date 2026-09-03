@@ -1,6 +1,8 @@
 package com.kista.adapter.in.web;
 
-import com.kista.domain.model.account.Account;
+import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.BrokerCredentialException;
+import com.kista.broker.domain.model.BrokerRateLimitException;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceCategory;
@@ -48,8 +50,8 @@ public class GlobalExceptionHandler {
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
         Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
         Map.entry(SecurityException.class,                         new Mapping(HttpStatus.FORBIDDEN,              "Access Denied")),
-        Map.entry(Account.InvalidBrokerKeyException.class,         new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
-        Map.entry(Account.KisRateLimitException.class,             new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
+        Map.entry(BrokerCredentialException.class,                  new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
+        Map.entry(BrokerRateLimitException.class,                   new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
         Map.entry(IllegalStateException.class,                     new Mapping(HttpStatus.BAD_REQUEST,            "Invalid State")),
         Map.entry(NoSuchElementException.class,                    new Mapping(HttpStatus.NOT_FOUND,              "Resource Not Found")),
         Map.entry(IllegalArgumentException.class,                  new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Request")),

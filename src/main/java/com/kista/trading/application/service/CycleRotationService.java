@@ -4,7 +4,8 @@ import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
@@ -129,7 +130,7 @@ class CycleRotationService {
     // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
     private BigDecimal fetchUsdBalance(Strategy strategy, Account account) {
         try {
-            BigDecimal usdAmount = registry.require(account, MarginPort.class).getUsdBuyableAmount(account);
+            BigDecimal usdAmount = registry.require(toBrokerRef(account), MarginPort.class).getUsdBuyableAmount(toBrokerRef(account));
             if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
                 eventPublisher.publishEvent(new TradingErrorEvent(null,
@@ -142,5 +143,14 @@ class CycleRotationService {
             eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
             return null;
         }
+    }
+
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    // Account.Broker → BrokerAccountRef.Broker는 상수명 byte-identical이라 valueOf(name())으로 매핑
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
     }
 }

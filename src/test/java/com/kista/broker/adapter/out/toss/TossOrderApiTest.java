@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
@@ -38,9 +38,9 @@ class TossOrderApiTest {
     @Mock TossHttpClient tossHttpClient;
     TossOrderApi tossOrderApi;
 
-    static final Account ACCOUNT = new Account(
-        UUID.randomUUID(), UUID.randomUUID(), "테스트",
-        "12345678901", "cid", "csecret", "1", Account.Broker.TOSS, null
+    static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
+        UUID.randomUUID(), "cid", "csecret",
+        "12345678901", "1", BrokerAccountRef.Broker.TOSS
     );
 
     @BeforeEach

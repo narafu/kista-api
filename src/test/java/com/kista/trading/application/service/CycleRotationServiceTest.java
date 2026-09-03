@@ -1,7 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.domain.model.strategy.Strategy;
 import com.kista.domain.model.strategy.Strategy.Ticker;
@@ -58,6 +59,7 @@ class CycleRotationServiceTest {
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final BrokerAccountRef ACCOUNT_REF = toBrokerRef(ACCOUNT);
 
     static final User USER = DomainFixtures.activeUserWithTelegram(ACCOUNT.userId());
 
@@ -99,8 +101,8 @@ class CycleRotationServiceTest {
         Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
         // MAINTAIN도 실잔고 확인 — actual >= maintainSeed 이면 재등록
-        when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("1500.00"));
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("1500.00"));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
@@ -117,8 +119,8 @@ class CycleRotationServiceTest {
         BigDecimal deposit = new BigDecimal("500.00");
         Strategy strategy = strategy(Strategy.CycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
-        when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("600.00"));
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("600.00"));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
@@ -140,8 +142,8 @@ class CycleRotationServiceTest {
         // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
         CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, null, null);
 
-        when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(new BigDecimal("2000.00"));
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(lastPosition));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
@@ -156,8 +158,8 @@ class CycleRotationServiceTest {
         Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         RuntimeException kisError = new RuntimeException("KIS 잔고 조회 실패");
-        when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenThrow(kisError);
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(kisError);
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
@@ -172,8 +174,8 @@ class CycleRotationServiceTest {
         Strategy strategy = strategy(Strategy.CycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         // USD 잔고 없음 → router가 BigDecimal.ZERO 반환
-        when(registry.require(ACCOUNT, MarginPort.class)).thenReturn(marginPort);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT)).thenReturn(BigDecimal.ZERO);
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(BigDecimal.ZERO);
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
@@ -182,4 +184,11 @@ class CycleRotationServiceTest {
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
 
+    // broker 모듈 순환 방지 — Account → BrokerAccountRef 변환 (broker는 Account를 직접 참조하지 않음)
+    private static BrokerAccountRef toBrokerRef(Account account) {
+        return new BrokerAccountRef(
+                account.id(), account.appKey(), account.secretKey(),
+                account.accountNo(), account.brokerAccountCode(),
+                BrokerAccountRef.Broker.valueOf(account.broker().name()));
+    }
 }

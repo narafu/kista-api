@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.domain.model.account.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
@@ -34,7 +34,7 @@ class TossOrderApi {
 
     private final TossHttpClient tossHttpClient;
 
-    public OrderResult place(OrderInstruction instruction, Account account) {
+    public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
         // Toss는 MARKET 주문 미지원 — MOC도 LIMIT+CLS로 대체
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("symbol", instruction.ticker().name());              // 종목 코드 (예: SOXL)
@@ -58,12 +58,12 @@ class TossOrderApi {
         return new OrderResult(resp.orderId());
     }
 
-    public void cancel(CancelInstruction instruction, Account account) {
+    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
         // POST /api/v1/orders/{externalOrderId}/cancel — DELETE 아님 (Toss 공식 스펙, cancelOrder)
         tossHttpClient.post(ORDER_PATH + "/" + instruction.externalOrderId() + "/cancel", account, Map.of(), Void.class);
     }
 
-    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, Account account) {
+    public List<Execution> getExecutions(LocalDate from, LocalDate to, Ticker ticker, BrokerAccountRef account) {
         // CLOSED + OPEN 두 상태 모두 조회 — PARTIAL_FILLED는 OPEN에 속함
         List<Execution> result = new ArrayList<>();
         result.addAll(fetchExecutions("CLOSED", from, to, ticker, account));
@@ -73,7 +73,7 @@ class TossOrderApi {
 
     // status별 GET /api/v1/orders — 페이지네이션 루프 처리 (CLOSED), OPEN은 단일 응답
     private List<Execution> fetchExecutions(String status, LocalDate from, LocalDate to,
-                                             Ticker ticker, Account account) {
+                                             Ticker ticker, BrokerAccountRef account) {
         List<Execution> result = new ArrayList<>();
         String cursor = null;
         boolean hasNext = true;
