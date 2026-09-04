@@ -135,9 +135,13 @@ notify는 이미 Telegram(관리자봇)·FCM(사용자 푸시) 발송을 소유�
 
 ### 5. DTO 이중 소유
 
-`MarketSessionResponse`와 `TossCandleResponse`는 `market.adapter.in.web.MarketHolidayController`와 (stats로 이동할) `TossStatisticsController` **양쪽**에서 소비된다. 두 모듈은 서로의 internal `adapter.in.web.dto`를 import할 수 없다.
+플랜 작성 시 grep으로 정밀 재확인한 결과, 이중 소유는 2건이다(스펙 초안의 `MarketSessionResponse`는 오기 — `MarketHolidayController` 단독):
 
-**해법은 복제다** — `market.adapter.in.web.dto`에 한 벌, `stats.adapter.in.web.dto`에 한 벌. 이 코드베이스에 이미 11개의 own-type 복제 선례가 있다([[constraints]] "모듈 경계 포트 시그니처"). 응답 DTO에 공유 집을 찾으려 하지 않는다. 두 DTO는 순수 데이터 홀더(`from()`/`fromList()` 팩토리 + record 필드)라 복제 비용이 낮다.
+- **`CycleHistoryPageResponse` + 중첩용 `CycleHistoryResponse`** — `DashboardController`(→stats) + `TradingCycleController`(→web). 둘 다 `trading.domain.model.{CycleHistoryPage,CyclePositionHistoryEntry}`만 소비.
+- **`TossCandleResponse`** — `TossStatisticsController`(→stats) + `market.adapter.in.web.MarketHolidayController`. `broker.domain.model.toss.TossCandle` 소비.
+- **`MarketSessionResponse`** — `MarketHolidayController` 단독 → `market.adapter.in.web.dto`로 단순 이동.
+
+**이중 소유 해법은 복제다** — 각 소유 모듈의 internal `adapter.in.web.dto`에 byte-identical 사본. 이 코드베이스에 이미 11개의 own-type 복제 선례가 있다([[constraints]] "모듈 경계 포트 시그니처"). 응답 DTO에 공유 집을 찾으려 하지 않는다. 세 DTO는 순수 데이터 홀더(`from()`/`fromList()` 팩토리 + record 필드)라 복제 비용이 낮다.
 
 ### 선결과제: `SchedulerJobRunner` 디커플링
 
