@@ -38,9 +38,9 @@ jobs:
           now=$((10#$(TZ=Asia/Seoul date +%H%M)))
           dow=$(TZ=Asia/Seoul date +%u)   # 1=월 ... 7=일
           blocked=no
-          # 개장 스케쥴러 실행 구간: 월~금 22:20~23:40 KST
+          # 개장 스케쥴러 실행 구간: 월~금 22:20~23:40 KST (22:30 기동, 비DST 23:30 개장 접수)
           if [ "$dow" -le 5 ] && [ "$now" -ge 2220 ] && [ "$now" -le 2340 ]; then blocked=yes; fi
-          # 마감 스케쥴러 실행 구간: 화~토 04:20~06:20 KST
+          # 마감 스케쥴러 실행 구간: 화~토 04:20~06:20 KST (04:30 기동, 비DST 06:10 리포트)
           if [ "$dow" -ge 2 ] && [ "$dow" -le 6 ] && [ "$now" -ge 420 ] && [ "$now" -le 620 ]; then blocked=yes; fi
           if [ "$blocked" = yes ]; then
             echo "::error::현재 KST $(TZ=Asia/Seoul date +%H:%M)는 매매 스케쥴러 실행 시간대 — kista-scheduler 배포가 sleep 중인 매매 스레드를 강제 종료해 주문 접수가 유실될 수 있어 차단합니다. 장 종료 후 이 잡만 Re-run 하거나, 긴급 시 workflow_dispatch force=true 로 강제 배포하세요."
@@ -127,11 +127,13 @@ jobs:
             cd "${DEPLOY_PATH}"
 
             echo "헬스 게이트 시작 — ${SERVICE} (최대 5분)..."
+            # container_name이 서비스명과 우연히 같을 뿐이므로 compose 서비스→컨테이너 ID로 명시 해석
+            CID=$(docker compose ps -q "${SERVICE}")
             for i in $(seq 1 30); do
-              STATUS=$(docker inspect --format '{{.State.Health.Status}}' "${SERVICE}" 2>/dev/null || echo "unknown")
+              STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$CID" 2>/dev/null || echo "unknown")
               if [ "$STATUS" = "healthy" ]; then
                 echo "✓ ${SERVICE} 헬스체크 통과 (${i}회 시도)"
-                docker exec "${SERVICE}" wget -qO- http://localhost:8080/actuator/health || echo "  (전체 헬스 관측 실패 — 배포는 계속, DB/Redis 확인)"
+                docker exec "$CID" wget -qO- http://localhost:8080/actuator/health || echo "  (전체 헬스 관측 실패 — 배포는 계속, DB/Redis 확인)"
                 docker image prune -f || true
                 exit 0
               fi

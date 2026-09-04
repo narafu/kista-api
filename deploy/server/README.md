@@ -7,7 +7,7 @@
 > - `REDIS_URL=redis://redis:6379`가 아직 존재하지 않는 `data_net`을 가리켜 Redis 연결 실패 → Toss 토큰 스토어가 DB fallback 없이 fail-closed(503) → 실거래 경로 장애 (`docs/agents/docker-infra.md` "Fly.io 다중 인스턴스 Toss 토큰 조정" 참고)
 > **병합 가능 조건**: kista-infra의 Phase 0(인스턴스 재편) + kista-infra 자체 최초 배포(`kista-infra/.github/workflows/server-deploy.yml` 성공 실행)가 완료된 뒤에만 이 브랜치를 `main`에 병합할 것.
 
-`kista-api`를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 리버스 프록시(Caddy)·Postgres·Redis는
+`kista-api`(HTTP)와 `kista-scheduler`(배치, 같은 이미지)를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 리버스 프록시(Caddy)·Postgres·Redis는
 `kista-infra` 레포가 소유하며, 이 레포는 `shared_net`(Caddy 라우팅)·`data_net`(Postgres/Redis 접근) 두 외부
 네트워크에 합류만 한다.
 
@@ -113,33 +113,39 @@ JAVA_OPTS=-Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize
 ## 배포 흐름
 
 1. `main` push → `verify` job (전체 테스트 스위트, ArchUnit 포함)
-2. Docker 이미지 빌드 → GHCR push
-3. 배포 창 체크 (KST 개장 22:20~23:40, 마감 04:20~06:20 시간대 자동 차단 — `workflow_dispatch` force=true로 우회 가능)
-4. 필수 환경변수 존재 검증 (서버 `.env` 기준)
-5. `docker compose pull kista-api && docker compose up -d --no-deps kista-api`
-6. 헬스 게이트: 호스트에서 `docker inspect --format '{{.State.Health.Status}}' kista-api`로 컨테이너 헬스 상태를 10초 간격 최대 5분(300초) 폴링 — 컨테이너 healthcheck의 start_period(180s)+retries×interval(90s)보다 여유 있게 설정
-7. 실패 시 이전 이미지로 자동 롤백
-8. kista-infra의 Caddy `lb_try_duration 120s`(kista-infra 레포 소유 설정)가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
+2. Docker 이미지 빌드 → GHCR push (`kista-api`/`kista-scheduler` 공용 단일 이미지)
+3. `verify`·`build` 완료 후 `deploy-api`·`deploy-scheduler` 두 독립 GitHub Actions 잡(`_deploy-role.yml` 재사용 워크플로)이 각자 role을 배포한다. 각 잡의 흐름은 다음과 같다:
+   - 배포 창 체크 — `deploy-scheduler`만 적용(KST 개장 22:20~23:40, 마감 04:20~06:20 시간대 자동 차단, `workflow_dispatch` force=true로 우회 가능). `deploy-api`는 가드 없이 항상 배포
+   - 필수 환경변수 존재 검증 (서버 `.env` 기준)
+   - `docker compose pull <service> && docker compose up -d --no-deps <service>` (`<service>`는 `kista-api` 또는 `kista-scheduler`)
+   - 헬스 게이트: 호스트에서 `docker inspect --format '{{.State.Health.Status}}' <service>`로 컨테이너 헬스 상태를 10초 간격 최대 5분(300초) 폴링 — 컨테이너 healthcheck의 start_period(180s)+retries×interval(90s)보다 여유 있게 설정
+   - 실패 시 해당 role만 이전 이미지로 자동 롤백
+4. 두 잡은 서버의 같은 `docker-compose.yml`·`.env`를 공유하므로 flock으로 직렬화되어 있다 — 동시 push 시 서로를 기다렸다가 순차 실행됨
+5. kista-infra의 Caddy `lb_try_duration 120s`(kista-infra 레포 소유 설정)가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
 
 ## 배포 시간 제한
 
-개장 스케쥴러 실행 구간(월~금 22:20~23:40 KST)과 마감 스케쥴러 실행 구간(화~토 04:20~06:20 KST)에 배포 자동 차단 — `workflow_dispatch` `force=true`로 긴급 우회 가능.
+매매 시간대 배포 가드는 `deploy-scheduler` 잡에만 적용된다 — `deploy-api`는 시간대 무관하게 항상 배포 가능하다(`docs/agents/docker-infra.md` 참고).
+개장 스케쥴러 실행 구간(월~금 22:20~23:40 KST)과 마감 스케쥴러 실행 구간(화~토 04:20~06:20 KST)에 `deploy-scheduler` 배포 자동 차단 — `workflow_dispatch` `force=true`로 긴급 우회 가능.
 - `TradingOpenScheduler`: 월~금 22:30 KST
 - `TradingCloseScheduler`: 화~토 04:30 KST + 최대 60분 대기 (비DST 시 ~05:30까지)
 
 ## 롤백 Runbook
 
-**자동 롤백**: 헬스 게이트 실패 시 Actions가 이전 이미지로 자동 복구. 자동 롤백 후 롤백된 컨테이너의 헬스는 재검증되지 않으므로, Actions 실패 알림을 받으면 서버에서 `docker inspect --format '{{.State.Health.Status}}' kista-api`로 수동 확인 필요.
+**자동 롤백**: 헬스 게이트 실패 시 해당 role의 Actions 잡(`deploy-api` 또는 `deploy-scheduler`)이 그 role만 이전 이미지로 자동 복구 — 다른 role은 영향받지 않는다. 이전 이미지 태그는 서버의 `/tmp/kista-<service>-prev-image`(`kista-api` 또는 `kista-scheduler`, `_deploy-role.yml` 참고)에 매 배포마다 기록된다. 자동 롤백 후 롤백된 컨테이너의 헬스는 재검증되지 않으므로, Actions 실패 알림을 받으면 서버에서 `docker inspect --format '{{.State.Health.Status}}' <service>`로 수동 확인 필요.
 
-**수동 롤백**: GHCR에 SHA 태그 이미지가 보존됨.
+**수동 롤백**: GHCR에 SHA 태그 이미지가 보존됨. `kista-api`/`kista-scheduler` 어느 role이든 동일 절차 — `<service>`를 해당 role 이름으로 치환.
 ```bash
 cd /opt/kista-api
 # 롤백할 이미지 태그 확인
 docker images | grep kista-api
 
-# 이전 이미지로 교체
+# 이전 이미지로 교체 (kista-api 예시)
 export KISTA_API_IMAGE=ghcr.io/<org>/kista-api:<previous-sha>
 docker compose up -d --no-deps kista-api
+
+# kista-scheduler 롤백은 서비스명만 교체
+docker compose up -d --no-deps kista-scheduler
 ```
 
 **Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요.
