@@ -15,9 +15,6 @@ permissions:
   contents: read
   packages: write
 
-env:
-  DEPLOY_PATH: /opt/kista-api
-
 jobs:
   verify:
     name: Full Test Suite
