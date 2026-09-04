@@ -1,6 +1,7 @@
 package com.kista.trading.adapter.in.schedule;
 
 import com.kista.adapter.in.schedule.SchedulerJobRunner;
+import com.kista.adapter.in.schedule.SchedulerLifecycleEvent;
 import com.kista.adapter.in.schedule.SchedulerLockService;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BatchContext;
@@ -9,15 +10,16 @@ import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.user.domain.model.User;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.port.output.HeartbeatPort;
-import com.kista.notify.application.port.output.NotifyPort;
 import com.kista.trading.application.port.output.StrategyLookupPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.stubbing.Answer;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -41,7 +43,7 @@ class TradingCloseSchedulerTest {
     @Mock StrategyLookupPort strategyPort;
     @Mock SchedulerLockService schedulerLockService;
     @Mock BatchContextFactory contextFactory;
-    @Mock NotifyPort notifyPort;
+    @Mock ApplicationEventPublisher events;
     @Mock HeartbeatPort heartbeatPort;
 
     TradingCloseScheduler scheduler;
@@ -71,7 +73,7 @@ class TradingCloseSchedulerTest {
     @BeforeEach
     void setUp() throws InterruptedException {
         // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
-        SchedulerJobRunner jobRunner = new SchedulerJobRunner(notifyPort);
+        SchedulerJobRunner jobRunner = new SchedulerJobRunner(events);
         scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort);
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
@@ -138,7 +140,7 @@ class TradingCloseSchedulerTest {
     }
 
     @Test
-    void run_executeBatchException_notifiesAdminViaNotifyPort() throws InterruptedException {
+    void run_executeBatchException_publishesFailedLifecycleEvent() throws InterruptedException {
         StrategyRef strategy = mockStrategy();
         BatchContext context = new BatchContext(strategy, mockStrategyCycle(strategy.id()), mockAccount(), mockUser());
         RuntimeException ex = new RuntimeException("KIS API 호출 실패");
@@ -149,7 +151,11 @@ class TradingCloseSchedulerTest {
 
         scheduler.run();
 
-        verify(notifyPort).notifyError(ex);
+        // notify 직접 호출 대신 FAILED 생명주기 이벤트 발행 — 이벤트는 예외 identity가 아닌 message만 담는다
+        ArgumentCaptor<SchedulerLifecycleEvent> captor = ArgumentCaptor.forClass(SchedulerLifecycleEvent.class);
+        verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
+        assertThat(captor.getAllValues().get(1).phase()).isEqualTo(SchedulerLifecycleEvent.Phase.FAILED);
+        assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("KIS API 호출 실패");
         verify(heartbeatPort).pingClose(); // jobRunner가 RuntimeException을 삼키므로 runLocked는 정상 종료 — 핑 도달
     }
 
@@ -159,6 +165,6 @@ class TradingCloseSchedulerTest {
 
         scheduler.run();
 
-        verifyNoInteractions(strategyPort, contextFactory, useCase, notifyPort, heartbeatPort);
+        verifyNoInteractions(strategyPort, contextFactory, useCase, events, heartbeatPort);
     }
 }
