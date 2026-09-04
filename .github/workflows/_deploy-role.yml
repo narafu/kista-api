@@ -1,0 +1,145 @@
+name: _deploy-role
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: '배포할 GHCR 이미지 (SHA 태그)'
+        required: true
+        type: string
+      service:
+        description: 'docker compose 서비스명 (kista-api | kista-scheduler)'
+        required: true
+        type: string
+      apply_trading_guard:
+        description: '매매 시간대 배포 가드 적용 여부'
+        required: true
+        type: boolean
+      force:
+        description: 'workflow_dispatch force 입력 (가드 무시)'
+        required: false
+        type: string
+        default: 'false'
+
+env:
+  DEPLOY_PATH: /opt/kista-api
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.service }}
+    runs-on: ubuntu-latest
+    concurrency: server-${{ inputs.service }}
+    environment:
+      name: production
+    steps:
+      - name: 매매 시간대 배포 가드 (KST)
+        if: inputs.apply_trading_guard && inputs.force != 'true'
+        run: |
+          now=$((10#$(TZ=Asia/Seoul date +%H%M)))
+          dow=$(TZ=Asia/Seoul date +%u)   # 1=월 ... 7=일
+          blocked=no
+          # 개장 스케쥴러 실행 구간: 월~금 22:20~23:40 KST
+          if [ "$dow" -le 5 ] && [ "$now" -ge 2220 ] && [ "$now" -le 2340 ]; then blocked=yes; fi
+          # 마감 스케쥴러 실행 구간: 화~토 04:20~06:20 KST
+          if [ "$dow" -ge 2 ] && [ "$dow" -le 6 ] && [ "$now" -ge 420 ] && [ "$now" -le 620 ]; then blocked=yes; fi
+          if [ "$blocked" = yes ]; then
+            echo "::error::현재 KST $(TZ=Asia/Seoul date +%H:%M)는 매매 스케쥴러 실행 시간대 — kista-scheduler 배포가 sleep 중인 매매 스레드를 강제 종료해 주문 접수가 유실될 수 있어 차단합니다. 장 종료 후 이 잡만 Re-run 하거나, 긴급 시 workflow_dispatch force=true 로 강제 배포하세요."
+            exit 1
+          fi
+          echo "매매 시간대 아님 (KST $(TZ=Asia/Seoul date +%H:%M)) — 배포 진행"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "$SERVER_SSH_PORT" "$SERVER_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload deployment files
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '${DEPLOY_PATH}'"
+          scp -i ~/.ssh/deploy_key -P "$SERVER_SSH_PORT" \
+            deploy/server/docker-compose.yml \
+            "$SERVER_USER@$SERVER_HOST:${DEPLOY_PATH}/"
+
+      - name: Verify .env and restart ${{ inputs.service }}
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          KISTA_API_IMAGE: ${{ inputs.image }}
+          SERVICE: ${{ inputs.service }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
+            "DEPLOY_PATH='${DEPLOY_PATH}' KISTA_API_IMAGE='${KISTA_API_IMAGE}' SERVICE='${SERVICE}' GHCR_USERNAME='${GHCR_USERNAME}' GHCR_TOKEN='${GHCR_TOKEN}' bash -s" << 'ENDSSH'
+            set -e
+            cd "${DEPLOY_PATH}"
+
+            for key in DB_URL DB_USERNAME DB_PASSWORD JWT_SIGNING_KEY AES_ENCRYPTION_KEY KAKAO_CLIENT_ID CORS_ALLOWED_ORIGINS TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID API_DOMAIN; do
+              grep -q "^${key}=" .env || { echo "::error::필수 환경변수 누락: ${key}"; exit 1; }
+            done
+
+            # role별 롤백용 이전 이미지 기록
+            PREV_IMAGE=$(docker compose ps "${SERVICE}" --format '{{.Image}}' 2>/dev/null || echo "")
+            echo "$PREV_IMAGE" > "/tmp/kista-${SERVICE}-prev-image"
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            export KISTA_API_IMAGE
+            docker compose pull "${SERVICE}"
+
+            for net in shared_net data_net; do docker network create "$net" 2>/dev/null || true; done
+
+            docker compose up -d --no-deps "${SERVICE}"
+          ENDSSH
+
+      - name: Health gate & auto-rollback (${{ inputs.service }})
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          SERVICE: ${{ inputs.service }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
+            "DEPLOY_PATH='${DEPLOY_PATH}' SERVICE='${SERVICE}' bash -s" << 'ENDSSH'
+            set -e
+            cd "${DEPLOY_PATH}"
+
+            echo "헬스 게이트 시작 — ${SERVICE} (최대 5분)..."
+            for i in $(seq 1 30); do
+              STATUS=$(docker inspect --format '{{.State.Health.Status}}' "${SERVICE}" 2>/dev/null || echo "unknown")
+              if [ "$STATUS" = "healthy" ]; then
+                echo "✓ ${SERVICE} 헬스체크 통과 (${i}회 시도)"
+                docker exec "${SERVICE}" wget -qO- http://localhost:8080/actuator/health || echo "  (전체 헬스 관측 실패 — 배포는 계속, DB/Redis 확인)"
+                docker image prune -f || true
+                exit 0
+              fi
+              if [ "$STATUS" = "unhealthy" ]; then
+                echo "✗ ${SERVICE} 헬스체크 실패 (unhealthy, ${i}회)"
+                break
+              fi
+              echo "  대기 중... (${i}/30, 상태: ${STATUS})"
+              sleep 10
+            done
+
+            PREV_IMAGE=$(cat "/tmp/kista-${SERVICE}-prev-image" 2>/dev/null || echo "")
+            if [ -n "$PREV_IMAGE" ]; then
+              echo "✗ ${SERVICE} 헬스체크 실패 — 이전 이미지로 롤백: $PREV_IMAGE"
+              export KISTA_API_IMAGE="$PREV_IMAGE"
+              docker compose up -d --no-deps "${SERVICE}"
+            else
+              echo "✗ ${SERVICE} 헬스체크 실패 — 이전 이미지 정보 없음, 수동 복구 필요"
+            fi
+            exit 1
+          ENDSSH
