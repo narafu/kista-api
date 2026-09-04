@@ -10,6 +10,7 @@ services:
       - .env
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      SCHEDULER_ENABLED: "false"
       REDIS_URL: redis://redis:6379  # kista-infra가 소유하는 data_net의 redis alias — depends_on 미사용 (Spring Data Redis lazy connection)
       JAVA_OPTS: ${JAVA_OPTS:--Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
@@ -19,6 +20,41 @@ services:
       - data_net     # kista-infra postgres/redis 접근용
     stop_grace_period: 35s   # Spring graceful shutdown 30s + 여유 5s
     mem_limit: 4096m         # 힙3072m + 메타384m + 코드캐시96m + 네이티브 여유 (OCI 12GB 인스턴스, 2 OCPU — 나머지는 OS/Docker/kista-infra용)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # 스케쥴러 role — kista-api와 동일 이미지, SCHEDULER_ENABLED=true 로 @Scheduled 빈 등록
+  # 매매 배치(sleep·주문 접수)가 이 프로세스에서 실행됨. HTTP는 /api/admin/scheduler/* + actuator 용도로만 기동
+  kista-scheduler:
+    image: ${KISTA_API_IMAGE:?KISTA_API_IMAGE is required}
+    container_name: kista-scheduler
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SCHEDULER_ENABLED: "true"
+      # EPR 미완료 이벤트 재발행 소유자 = 이 컨테이너 단독 (application-prod.yml 은 false)
+      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
+      REDIS_URL: redis://redis:6379
+      # 요청 부하 없는 배치 전용 — 힙 작게. OOM 회피가 중요(OOM-kill 시 scheduler_locks 락 2h 홀드)
+      JAVA_OPTS: "-Xmx1536m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+    expose:
+      - "8080"
+    networks:
+      - shared_net   # Caddy 가 /api/admin/scheduler/* 라우팅 (kista-infra)
+      - data_net     # postgres/redis
+    stop_grace_period: 200s   # 매매 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + rethrow → 락 즉시 해제까지 여유
+    mem_limit: 2048m
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
