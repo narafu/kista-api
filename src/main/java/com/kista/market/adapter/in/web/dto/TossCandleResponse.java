@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web.dto;
+package com.kista.market.adapter.in.web.dto;
 
 import com.kista.broker.domain.model.toss.TossCandle;
 import io.swagger.v3.oas.annotations.media.Schema;
