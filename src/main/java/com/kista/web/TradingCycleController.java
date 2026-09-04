@@ -2,7 +2,6 @@ package com.kista.web;
 
 import com.kista.web.dto.*;
 import com.kista.common.TimeZones;
-import com.kista.strategyconfig.domain.model.Strategy;
 import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.strategyconfig.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
