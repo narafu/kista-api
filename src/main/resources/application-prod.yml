@@ -10,6 +10,16 @@ spring:
     show-sql: false
   lifecycle:
     timeout-per-shutdown-phase: 30s  # docker stop_grace_period 35s와 쌍으로 관리
+  modulith:
+    events:
+      # EPR 재발행 소유자 = kista-scheduler 단독. API role은 재발행 안 함
+      # (양쪽 true면 미완료 event_publication 행을 둘 다 claim → 중복 알림)
+      # kista-scheduler 서비스가 SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true로 되켬
+      republish-outstanding-events-on-restart: false
+
+# prod 기본은 API role — 스케쥴러 미등록. kista-scheduler 서비스가 SCHEDULER_ENABLED=true로 override
+scheduler:
+  enabled: false
 
 management:
   health:
