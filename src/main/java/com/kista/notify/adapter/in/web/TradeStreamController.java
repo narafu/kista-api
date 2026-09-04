@@ -1,6 +1,6 @@
-package com.kista.adapter.in.web;
+package com.kista.notify.adapter.in.web;
 
-import com.kista.adapter.out.sse.TradeSseEmitterRegistry;
+import com.kista.notify.adapter.out.sse.TradeSseEmitterRegistry;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

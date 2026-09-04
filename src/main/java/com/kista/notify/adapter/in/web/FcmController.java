@@ -1,6 +1,6 @@
-package com.kista.adapter.in.web;
+package com.kista.notify.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.FcmTokenRequest;
+import com.kista.notify.adapter.in.web.dto.FcmTokenRequest;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

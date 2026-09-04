@@ -1,9 +1,9 @@
-package com.kista.adapter.out.sse;
+package com.kista.notify.adapter.out.sse;
 
 import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.trading.domain.model.TradeEvent;
-import com.kista.application.port.output.RealtimeNotificationPort;
+import com.kista.notify.application.port.output.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

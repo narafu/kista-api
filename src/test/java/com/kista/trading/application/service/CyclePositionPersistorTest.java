@@ -5,7 +5,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
-import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;

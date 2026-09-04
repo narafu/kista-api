@@ -50,7 +50,6 @@ class AuthControllerTokenTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase;
     @MockitoBean GetUserSettingsQuery getUserSettingsQuery;
-    @MockitoBean com.kista.adapter.out.sse.SseEmitterRegistry sseEmitterRegistry;
 
     private static final UUID USER_ID = UUID.randomUUID();
 

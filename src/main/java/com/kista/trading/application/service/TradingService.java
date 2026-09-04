@@ -10,7 +10,7 @@ import com.kista.trading.domain.model.StrategyRef;
 import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.CycleOrderStrategy;

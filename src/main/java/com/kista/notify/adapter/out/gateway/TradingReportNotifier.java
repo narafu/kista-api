@@ -8,7 +8,7 @@ import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.TradeEvent;
 import com.kista.user.domain.model.User;
-import com.kista.application.port.output.RealtimeNotificationPort;
+import com.kista.notify.application.port.output.RealtimeNotificationPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

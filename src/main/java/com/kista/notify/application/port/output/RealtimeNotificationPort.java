@@ -1,4 +1,4 @@
-package com.kista.application.port.output;
+package com.kista.notify.application.port.output;
 
 import com.kista.trading.domain.model.TradeEvent;
 

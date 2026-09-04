@@ -1,4 +1,4 @@
-package com.kista.adapter.out.sse;
+package com.kista.notify.adapter.out.sse;
 
 import com.kista.trading.domain.model.TradeEvent;
 import org.junit.jupiter.api.BeforeEach;

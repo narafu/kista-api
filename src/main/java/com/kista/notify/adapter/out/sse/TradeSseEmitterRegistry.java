@@ -1,4 +1,4 @@
-package com.kista.adapter.out.sse;
+package com.kista.notify.adapter.out.sse;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.trading.domain.model.TradeEvent;

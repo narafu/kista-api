@@ -8,7 +8,7 @@ import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
 import com.kista.user.application.usecase.UserUseCase;
-import com.kista.user.application.port.output.*; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.user.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.finance.application.port.output.*;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;
@@ -44,7 +44,6 @@ class UserServiceTest {
     @Mock UserPort userPort;
     @Mock UserCascadeDeleter userCascadeDeleter;
     @Mock UserNotificationPort notificationPort;
-    @Mock RealtimeNotificationPort realtimeNotificationPort;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock AdminBootstrapProperties bootstrapProps;
     @Mock KakaoOAuthPort kakaoOAuthPort;

@@ -9,7 +9,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
-import com.kista.application.port.output.RealtimeNotificationPort;
+import com.kista.notify.application.port.output.RealtimeNotificationPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;

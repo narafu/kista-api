@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web;
+package com.kista.notify.adapter.in.web;
 
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;

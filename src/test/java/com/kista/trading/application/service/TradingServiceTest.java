@@ -27,7 +27,7 @@ import com.kista.user.domain.model.User;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSettingsPort;
-import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.application.port.output.BrokerPricePort;

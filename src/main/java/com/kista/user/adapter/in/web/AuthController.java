@@ -6,7 +6,6 @@ import com.kista.user.adapter.in.web.dto.RefreshResponse;
 import com.kista.user.adapter.in.web.dto.UserResponse;
 import com.kista.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.user.adapter.in.web.security.RefreshTokenCookieHelper;
-import com.kista.adapter.out.sse.SseEmitterRegistry;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.usecase.GetUserSettingsQuery;
@@ -22,12 +21,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -43,7 +40,6 @@ public class AuthController {
     private final JwtIssuerService jwtIssuerService;
     private final JwtDecoder jwtDecoder; // AT 파싱용 — logout 시 jti 추출
     private final RefreshTokenCookieHelper cookieHelper;
-    private final SseEmitterRegistry sseEmitterRegistry; // SSE 연결 등록
     private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse.balanceCheckEnabled 조회용
 
 
@@ -118,14 +114,6 @@ public class AuthController {
         User user = userUseCase.getById(userId);
         UserSettings settings = getUserSettingsQuery.getByUserId(userId);
         return UserResponse.from(user, settings);
-    }
-
-    // PENDING 상태 사용자의 SSE 연결 — 승인/거절 시 브라우저 자동 리다이렉트
-    @Operation(summary = "승인 상태 SSE 스트림", description = "PENDING 상태 사용자가 연결. 관리자 승인/거절 시 이벤트 수신 후 브라우저 자동 이동.")
-    @ApiResponse(responseCode = "200", description = "SSE 스트림 연결 성공")
-    @GetMapping(value = "/status-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter statusStream(@AuthenticationPrincipal UUID userId) {
-        return sseEmitterRegistry.connect(userId);
     }
 
     // REJECTED(24h)/PENDING(1h) 쿨다운 후 재신청 — CooldownException→429, IllegalStateException→400은 GlobalExceptionHandler 처리
