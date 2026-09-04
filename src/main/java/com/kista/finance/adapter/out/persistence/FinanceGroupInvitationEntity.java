@@ -1,6 +1,6 @@
 package com.kista.finance.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

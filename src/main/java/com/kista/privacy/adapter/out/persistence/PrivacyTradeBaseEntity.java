@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.sharedkernel.StrategyTicker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

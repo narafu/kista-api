@@ -45,6 +45,20 @@ class HexagonalArchitectureTest {
     }
 
     @Test
+    @DisplayName("platform은 common 외 다른 com.kista 모듈에 의존하지 않는다 — 인프라 leaf 불변식")
+    void platform_must_not_depend_on_other_modules() {
+        // platform은 persistence base·crypto·scheduler 골격 등 순수 인프라만 담는다는 전제로 OPEN 선언됨 —
+        // 이 패키지가 다른 애그리게이트 모듈을 참조하는 순간 인프라 leaf 전제가 깨진다 (sharedkernel과 동일 강제).
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.platform..")
+                .should().dependOnClassesThat(
+                        resideInAPackage("com.kista..")
+                                .and(resideOutsideOfPackage("com.kista.platform.."))
+                                .and(resideOutsideOfPackage("com.kista.common..")));
+        rule.check(classes);
+    }
+
+    @Test
     @DisplayName("도메인은 어떤 외부 레이어도 의존하지 않는다")
     void domain_must_not_depend_on_outer_layers() {
         ArchRule rule = noClasses()

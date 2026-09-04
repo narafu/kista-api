@@ -1,6 +1,6 @@
 package com.kista.strategyconfig.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.strategyconfig.domain.model.Strategy;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

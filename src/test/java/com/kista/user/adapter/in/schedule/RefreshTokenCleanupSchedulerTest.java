@@ -1,8 +1,8 @@
 package com.kista.user.adapter.in.schedule;
 
 import com.kista.user.application.usecase.TokenUseCase;
-import com.kista.adapter.in.schedule.SchedulerJobRunner;
-import com.kista.adapter.in.schedule.SchedulerLockService;
+import com.kista.platform.scheduling.SchedulerJobRunner;
+import com.kista.platform.scheduling.SchedulerLockService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

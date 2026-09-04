@@ -1,4 +1,4 @@
-package com.kista.adapter.in.schedule;
+package com.kista.platform.scheduling;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

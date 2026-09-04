@@ -1,4 +1,4 @@
-package com.kista.adapter.in.schedule;
+package com.kista.platform.scheduling;
 
 // 스케쥴러 공통 골격의 생명주기 알림 — SchedulerJobRunner→notify 직접 호출을 끊기 위한 이벤트
 // (market FearGreedFetchFailedEvent / privacy PrivacyAlertRaisedEvent와 동일 패턴, EPR 추적).

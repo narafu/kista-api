@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.adapter.in.schedule.SchedulerLifecycleEvent;
+import com.kista.platform.scheduling.SchedulerLifecycleEvent;
 import com.kista.notify.application.port.output.NotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.user;
 
-import com.kista.adapter.out.crypto.AesCryptoService;
+import com.kista.platform.crypto.AesCryptoService;
 import com.kista.user.domain.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

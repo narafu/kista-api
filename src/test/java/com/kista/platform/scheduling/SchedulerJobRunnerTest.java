@@ -1,6 +1,6 @@
-package com.kista.adapter.in.schedule;
+package com.kista.platform.scheduling;
 
-import com.kista.adapter.in.schedule.SchedulerLifecycleEvent.Phase;
+import com.kista.platform.scheduling.SchedulerLifecycleEvent.Phase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

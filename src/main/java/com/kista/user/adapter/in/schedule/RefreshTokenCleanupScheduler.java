@@ -1,8 +1,8 @@
 package com.kista.user.adapter.in.schedule;
 
 import com.kista.user.application.usecase.TokenUseCase;
-import com.kista.adapter.in.schedule.SchedulerJobRunner;
-import com.kista.adapter.in.schedule.SchedulerLockService;
+import com.kista.platform.scheduling.SchedulerJobRunner;
+import com.kista.platform.scheduling.SchedulerLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

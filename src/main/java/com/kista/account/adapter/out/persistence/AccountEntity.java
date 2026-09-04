@@ -1,6 +1,6 @@
 package com.kista.account.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.sharedkernel.Broker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

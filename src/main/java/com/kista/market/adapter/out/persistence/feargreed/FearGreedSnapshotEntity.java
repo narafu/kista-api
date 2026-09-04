@@ -1,6 +1,6 @@
 package com.kista.market.adapter.out.persistence.feargreed;
 
-import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.market.domain.model.FearGreedRating;
 import com.kista.market.domain.model.FearGreedSnapshot;
 import jakarta.persistence.*;

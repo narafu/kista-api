@@ -1,4 +1,4 @@
-package com.kista.adapter.out.persistence;
+package com.kista.platform.persistence;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;

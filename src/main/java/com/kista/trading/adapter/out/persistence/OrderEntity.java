@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.StrategyTicker;
 import jakarta.persistence.*;

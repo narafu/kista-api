@@ -1,4 +1,4 @@
-package com.kista.adapter.out.crypto;
+package com.kista.platform.crypto;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

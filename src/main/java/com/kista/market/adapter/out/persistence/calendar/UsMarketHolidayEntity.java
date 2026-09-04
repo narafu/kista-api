@@ -1,6 +1,6 @@
 package com.kista.market.adapter.out.persistence.calendar;
 
-import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.platform.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

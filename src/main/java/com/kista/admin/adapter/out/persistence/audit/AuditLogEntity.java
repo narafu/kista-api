@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.out.persistence.audit;
 
-import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.platform.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;

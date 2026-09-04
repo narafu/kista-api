@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import jakarta.persistence.*;

@@ -1,6 +1,6 @@
 package com.kista.stats.adapter.out.persistence.marketindex;
 
-import com.kista.adapter.out.persistence.BaseCreatedAtEntity;
+import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.stats.domain.model.IndexPrice;
 import jakarta.persistence.*;
 import lombok.Getter;

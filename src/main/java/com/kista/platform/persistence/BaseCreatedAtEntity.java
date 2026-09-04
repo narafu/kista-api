@@ -1,4 +1,4 @@
-package com.kista.adapter.out.persistence;
+package com.kista.platform.persistence;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

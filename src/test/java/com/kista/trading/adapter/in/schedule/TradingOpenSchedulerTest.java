@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.in.schedule;
 
-import com.kista.adapter.in.schedule.SchedulerJobRunner;
-import com.kista.adapter.in.schedule.SchedulerLockService;
+import com.kista.platform.scheduling.SchedulerJobRunner;
+import com.kista.platform.scheduling.SchedulerLockService;
 import com.kista.account.domain.model.Account;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
@@ -14,7 +14,7 @@ import com.kista.trading.application.port.output.*;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.trading.application.port.output.HeartbeatPort;
-import com.kista.adapter.in.schedule.SchedulerLifecycleEvent;
+import com.kista.platform.scheduling.SchedulerLifecycleEvent;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

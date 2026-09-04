@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.user;
 
-import com.kista.adapter.out.crypto.AesCryptoService;
+import com.kista.platform.crypto.AesCryptoService;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.port.output.UserPort;
 import lombok.AccessLevel;

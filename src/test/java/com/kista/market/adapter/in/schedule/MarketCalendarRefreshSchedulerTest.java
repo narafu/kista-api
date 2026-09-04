@@ -1,7 +1,7 @@
 package com.kista.market.adapter.in.schedule;
 
-import com.kista.adapter.in.schedule.SchedulerJobRunner;
-import com.kista.adapter.in.schedule.SchedulerLockService;
+import com.kista.platform.scheduling.SchedulerJobRunner;
+import com.kista.platform.scheduling.SchedulerLockService;
 import com.kista.market.application.port.output.MarketCalendarRefreshPort;
 import com.kista.market.application.port.output.MarketHolidayStorePort;
 import org.junit.jupiter.api.Test;

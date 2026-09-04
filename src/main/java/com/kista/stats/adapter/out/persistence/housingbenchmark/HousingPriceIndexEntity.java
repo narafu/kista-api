@@ -1,6 +1,6 @@
 package com.kista.stats.adapter.out.persistence.housingbenchmark;
 
-import com.kista.adapter.out.persistence.BaseAuditEntity;
+import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.stats.domain.model.HousingPriceIndex;
 import jakarta.persistence.*;
 import lombok.Getter;
