@@ -1,6 +1,8 @@
 # 배치 스케줄러 시간표
 
-이 문서는 `src/main/java/com/kista/adapter/in/schedule` 기준의 배치 실행 시점을 정리한다.
+이 문서는 각 모듈 `adapter/in/schedule` 패키지의 배치 실행 시점을 정리한다.
+모든 스케줄러는 `kista-scheduler` 컨테이너(같은 이미지, `SCHEDULER_ENABLED=true`)에서만 실행되며,
+`kista-api` 컨테이너는 `scheduler.enabled=false`로 스케줄러를 등록하지 않는다.
 모든 시각은 `KST` 기준이다.
 
 ## 거래 관련
@@ -42,6 +44,6 @@
 
 ## 참고
 
-- 모든 스케줄러는 `scheduler.enabled=true`일 때만 동작한다.
+- 모든 스케줄러는 `scheduler.enabled=true`일 때만 동작한다. — 운영에서는 kista-scheduler 컨테이너만 이 값이 true다.
 - 거래 스케줄러는 cron 시간 외에 내부 대기 로직을 추가로 가질 수 있다.
 - 실제 운영 흐름은 [docs/agents/workflow.md](workflow.md)도 함께 보면 된다.

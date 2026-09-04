@@ -92,6 +92,7 @@ graph TB
     subgraph OciInfra["OCI 단일 인스턴스 (kista-api-server)"]
         Caddy["Caddy (리버스 프록시·HTTPS)"]
         APIApp["kista-api (Spring Boot)"]
+        SchedApp["kista-scheduler (같은 이미지, 배치)"]
         UIApp["kista-ui (Next.js 16)"]
         PG[("PostgreSQL (자체 호스팅)")]
         Redis[("Redis (자체 호스팅)")]
@@ -105,18 +106,24 @@ graph TB
     end
 
     RepoUI -->|"main push → 이미지 빌드·GHCR push<br/>→ SSH 배포"| UIApp
-    RepoAPI -->|"main push → 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ SSH 배포"| APIApp
+    RepoAPI -->|"main push → 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ deploy-api 잡"| APIApp
+    RepoAPI -->|"deploy-scheduler 잡<br/>(매매 시간대 가드)"| SchedApp
     RepoInfra -->|"Caddy·Postgres·Redis·백업 cron 소유"| Caddy
     Caddy --> APIApp
+    Caddy -->|"/api/admin/scheduler/*"| SchedApp
     Caddy --> UIApp
     APIApp --> PG
+    SchedApp --> PG
     APIApp --> Redis
+    SchedApp --> Redis
     PG --> Backup
     Uptime --> APIApp
-    APIApp --> HC
+    SchedApp --> HC
     APIApp --> Grafana
+    SchedApp --> Grafana
 ```
 
 - `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다(2026-08-07 인스턴스 재편·DB 이관 완료 — 기존 Fly.io·Vercel·Supabase는 폐지).
+- `kista-api`와 `kista-scheduler`는 **같은 GHCR 이미지**를 `SCHEDULER_ENABLED` 환경변수로 역할만 갈라 띄운다. API 배포는 매매 시간대 제약 없이 잦게, 스케쥴러 배포는 매매 시간대 가드 유지. API 크래시·OOM·요청경로 버그가 매매 배치를 건드리지 않는다 (상세 → `docs/agents/docker-infra.md`).
 - 백업 메커니즘·주기 상세는 `docs/agents/docker-infra.md` 참고.
 - 외부 모니터링은 서로 다른 실패 모드를 감지한다: 가동 모니터링(서버 다운) / 생존 확인(스케쥴러 정지) / 메트릭 추세(리소스 악화).

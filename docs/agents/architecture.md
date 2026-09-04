@@ -106,6 +106,7 @@ com.kista.market/    ← Spring Modulith 5번째 이전 모듈(CLOSED) — 공�
   application/service/ ← internal(비공개) — FearGreedQueryService/FearGreedService/MarketHolidayService
   adapter/in/web/     ← internal(비공개) — FearGreedController/MarketHolidayController + dto/(FearGreedResponse/MarketSessionResponse(레거시에서 market 소유로 이동)/TossCandleResponse(stats·web 사본과 byte-identical own-type))
   adapter/in/schedule/ ← internal(비공개) — FearGreedScheduler/MarketCalendarRefreshScheduler
+    - **2-role 이후 캘린더 부트스트랩 staleness**: `MarketCalendarRefreshScheduler`의 초기 적재(`ApplicationReadyEvent`, "기동 시 캘린더 초기 적재")는 `@ConditionalOnProperty(scheduler.enabled)`로 게이팅되므로 이제 `kista-scheduler` 재기동 시에만 실행된다 — `kista-api` 재기동마다(잦음)가 아니다. 캘린더 데이터 self-heal 창이 수시간 → 수주로 늘어난다. 월간(매월 1일)·연간(1월 1일) 갱신 크론이 있어 무해하나, 캘린더 이상 시 `kista-scheduler`를 재기동하면 즉시 재적재된다는 점을 기억
   adapter/out/feargreed/ ← internal(비공개) — CnnFearGreedAdapter/CryptoFearGreedAdapter/FearGreedConfig
   adapter/out/alpaca/  ← internal(비공개) — AlpacaCalendarAdapter/AlpacaConfig/AlpacaProperties (`com.kista.stats.adapter.out.alpaca`의 동명 클래스(AlpacaIndexPriceAdapter/AlpacaConfig/AlpacaProperties, 원래 빈 이름 `alpacaRestClient` 유지)와 빈 이름 충돌 방지를 위해 market판만 `marketAlpacaConfig`/`marketAlpacaRestClient`로 명시적 개명)
   adapter/out/persistence/calendar/  ← internal(비공개) — UsMarketHolidayEntity + UsMarketHolidayJpaRepository + MarketCalendarPersistenceAdapter

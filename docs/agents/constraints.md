@@ -4,6 +4,7 @@
 - `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
 - 커밋 전 author 확인 (`git config user.name`/`user.email`): `narafu <narafu@kakao.com>`
 - 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`, `fix:`, `docs:`, `debug:` 등) + 명령형 제목
+- 매매 시간대 배포 가드는 이제 `deploy-scheduler` 잡에만 적용된다 — `deploy-api`는 시간대 무관하게 배포 가능
 
 ### application/port/output/ 네이밍 규칙
 - 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
@@ -190,6 +191,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지** (V1 포함 전체 버전) — Flyway 체크섬 불일치로 앱 기동 즉시 크래시. 새 마이그레이션은 기존 최신 버전 다음 번호로 (`ls src/main/resources/db/migration`로 확인) — 과거 적용된 버전 수정으로 실제 운영 크래시가 난 사례 있음
 - 마이그레이션 이력은 과거 스쿼시된 적이 있다(현재 `V1__init.sql`이 예전 여러 버전을 흡수) — `constraints.md`·`architecture.md` 등 문서에 특정 버전 번호(`V24`, `V28` 등)를 근거로 서술하지 말 것. 버전 번호는 `git log`로만 추적하고, 문서에는 "어떤 컬럼/제약이 어느 파일에 있는지"만 현재 파일 기준으로 기록
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
+- **2-role 배포 backward-compat (expand/contract)**: `kista-api`·`kista-scheduler`가 독립 배포되므로, 새 마이그레이션은 직전 배포 이미지와 호환돼야 한다 — 컬럼 추가는 nullable 또는 DEFAULT, 컬럼/테이블 드롭·리네임은 두 배포에 분리(먼저 코드 참조 제거 → 다음 배포에서 스키마 변경). 이를 못 지키는 마이그레이션을 실은 커밋은 두 role을 함께 배포한다. `ddl-auto: validate`는 기동 시에만 검사하므로, 스큐 상태의 스케쥴러는 드롭된 컬럼을 매매 도중 런타임에 만날 때까지 계속 돈다
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale` 변경 시 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 불일치만 런타임 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException`
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, JPA 1차 캐시에는 원본 BigDecimal 유지 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤 — 특정 위치 강제는 테이블 재생성 패턴 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME`)
