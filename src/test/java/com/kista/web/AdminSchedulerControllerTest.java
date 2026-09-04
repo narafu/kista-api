@@ -1,4 +1,4 @@
-package com.kista.admin.adapter.in.web;
+package com.kista.web;
 
 import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
@@ -27,7 +27,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// 스케쥴러 빈이 정상 등록된 상태에서의 수동 트리거 API 검증
+// 스케쥴러 빈이 정상 등록된 상태(kista-scheduler role)에서의 수동 트리거 API 검증
 @WebMvcTest(AdminSchedulerController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)

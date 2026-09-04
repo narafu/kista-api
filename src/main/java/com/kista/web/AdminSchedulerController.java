@@ -1,4 +1,4 @@
-package com.kista.admin.adapter.in.web;
+package com.kista.web;
 
 import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
@@ -8,25 +8,28 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+// 2-role 배포에서 kista-scheduler에만 유효 — kista-api role(scheduler.enabled=false)에서는
+// 참조하는 4개 스케쥴러 빈과 동일 게이트로 이 컨트롤러 빈 자체가 등록되지 않는다(오라우팅 시 404)
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/scheduler")
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 @Tag(name = "Admin", description = "관리자 API")
 public class AdminSchedulerController {
 
-    // ObjectProvider — @ConditionalOnProperty로 빈이 없을 수 있는 필드 주입을 생성자 주입으로 처리하기 위함(Modulith field-injection 경고 해소)
-    private final ObjectProvider<TradingOpenScheduler> openScheduler;
-    private final ObjectProvider<TradingCloseScheduler> closeScheduler;
-    private final ObjectProvider<KbLandHousingBenchmarkScheduler> kbLandScheduler;
-    private final ObjectProvider<KbLandPriceIndexScheduler> kbLandPriceIndexScheduler;
+    // 컨트롤러 빈이 존재하면 동일 게이트로 4개 스케쥴러 빈도 항상 함께 존재 — null 체크 불필요
+    private final TradingOpenScheduler openScheduler;
+    private final TradingCloseScheduler closeScheduler;
+    private final KbLandHousingBenchmarkScheduler kbLandScheduler;
+    private final KbLandPriceIndexScheduler kbLandPriceIndexScheduler;
 
     private interface InterruptibleAction {
         void run() throws InterruptedException;
@@ -51,9 +54,7 @@ public class AdminSchedulerController {
     @PostMapping("/open")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerOpen() {
-        TradingOpenScheduler scheduler = openScheduler.getIfAvailable();
-        if (scheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
-        triggerAsync("개장 스케쥴러", scheduler::runNow);
+        triggerAsync("개장 스케쥴러", openScheduler::runNow);
     }
 
     // 마감 스케쥴러 수동 트리거 — 주문 대기 없이 즉시 실행, 202 반환 후 백그라운드 실행
@@ -61,9 +62,7 @@ public class AdminSchedulerController {
     @PostMapping("/close")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerClose() {
-        TradingCloseScheduler scheduler = closeScheduler.getIfAvailable();
-        if (scheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
-        triggerAsync("마감 스케쥴러", scheduler::runNow);
+        triggerAsync("마감 스케쥴러", closeScheduler::runNow);
     }
 
     // KB Land 주택 벤치마크 스케쥴러 수동 트리거 — 수동으로 즉시 실행, 202 반환 후 백그라운드 실행
@@ -71,9 +70,7 @@ public class AdminSchedulerController {
     @PostMapping("/kbland-housing-benchmark")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerKbLandHousingBenchmark() {
-        KbLandHousingBenchmarkScheduler scheduler = kbLandScheduler.getIfAvailable();
-        if (scheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
-        triggerAsync("KB Land 주택 벤치마크 스케쥴러", scheduler::runNow);
+        triggerAsync("KB Land 주택 벤치마크 스케쥴러", kbLandScheduler::runNow);
     }
 
     // KB Land 주간 아파트 매매가격지수 스케쥴러 수동 트리거 — 수동으로 즉시 실행, 202 반환 후 백그라운드 실행
@@ -81,9 +78,7 @@ public class AdminSchedulerController {
     @PostMapping("/kbland-price-index")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerKbLandPriceIndex() {
-        KbLandPriceIndexScheduler scheduler = kbLandPriceIndexScheduler.getIfAvailable();
-        if (scheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
-        triggerAsync("KB Land 주간 아파트 매매가격지수 스케쥴러", scheduler::runNow);
+        triggerAsync("KB Land 주간 아파트 매매가격지수 스케쥴러", kbLandPriceIndexScheduler::runNow);
     }
 
     // KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 수동 트리거 — 과거 값 보정을 다음 달 1일까지 기다리지 않고 즉시 반영
@@ -91,8 +86,6 @@ public class AdminSchedulerController {
     @PostMapping("/kbland-price-index/full-refresh")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerKbLandPriceIndexFullRefresh() {
-        KbLandPriceIndexScheduler scheduler = kbLandPriceIndexScheduler.getIfAvailable();
-        if (scheduler == null) throw new IllegalStateException("스케쥴러가 비활성화 상태입니다");
-        triggerAsync("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시", scheduler::runFullRefreshNow);
+        triggerAsync("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시", kbLandPriceIndexScheduler::runFullRefreshNow);
     }
 }

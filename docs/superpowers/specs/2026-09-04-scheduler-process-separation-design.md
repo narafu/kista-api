@@ -189,5 +189,5 @@ kista-scheduler:
 ## 미해결 / 후속
 
 - `kista-scheduler`의 Spring `spring.lifecycle.timeout-per-shutdown-phase`를 role별로 다르게 줄지(현재 prod 공통 30s) — §6 참고, 구현 시 실측.
-- `AdminSchedulerController`가 `kista-scheduler`에만 유효해지므로, 장기적으로 이 컨트롤러를 `com.kista.web`에서 스케쥴러 role 전용 위치로 옮길지 검토(지금은 무변경 — `ObjectProvider` null 처리로 API에서도 안전하게 404/500).
+- ~~`AdminSchedulerController`가 `kista-scheduler`에만 유효해지므로, 장기적으로 이 컨트롤러를 `com.kista.web`에서 스케쥴러 role 전용 위치로 옮길지 검토~~ **해소**(2026-09-04, 별도 bounded 브레인스토밍): `com.kista.admin.adapter.in.web` → `com.kista.web`으로 패키지 이동(클래스명·경로·Swagger Tag 불변) + 클래스 레벨 `@ConditionalOnProperty(scheduler.enabled)` 추가 — kista-api role에서 컨트롤러 빈 자체가 미등록돼 오라우팅 시 500 대신 404. 컨트롤러 빈이 존재하면 참조하는 4개 스케쥴러 빈도 동일 게이트로 항상 함께 존재하므로 `ObjectProvider`/null 체크/`IllegalStateException`도 함께 삭제.
 - Fallback(API 프록시) 경로는 `kista-infra` 접근이 불가능한 상황에서만 — 스펙에 이름만.
