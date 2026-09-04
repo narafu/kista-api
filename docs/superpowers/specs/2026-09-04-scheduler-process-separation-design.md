@@ -85,7 +85,7 @@ spring:
 SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true
 ```
 
-- 비용: `kista-api`가 발행 origin인 이벤트(`NewUserRegisteredEvent`·`UserApprovedEvent` 등)가 재기동 복구를 잃는다. `kista-api`는 자주 재기동되므로 in-flight 창이 짧고, 중복 새벽 알림보다 싸다.
+- 정정(구현 후 확인): `event_publication`은 발행 origin을 구분하지 않는 공유 테이블 — API가 발행한 이벤트(`NewUserRegisteredEvent` 등)의 리스너가 실패해도 그 미완료 행은 `kista-scheduler`의 다음 재기동 때 republish로 그대로 회수된다(양쪽이 동일 리스너 코드를 갖고 있으므로). 즉 재기동 복구 자체를 잃는 게 아니라 "복구 시점이 API 자체 재기동 대신 스케쥴러 재기동으로 이동"할 뿐 — API가 자주 재기동되고 스케쥴러는 드물게 재기동되므로 in-flight 창은 이전보다 넓어지지만 영구 유실은 아니다. 비용은 중복 재발행 방지(양쪽 true 시 발생)와의 트레이드오프뿐.
 - `spring.modulith.events.jdbc.schema-initialization.enabled: false`는 무변경(Flyway 소유).
 
 ### 3. 스키마/코드 스큐 규율 — **blocker**

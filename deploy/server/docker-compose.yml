@@ -53,7 +53,7 @@ services:
     networks:
       - shared_net   # Caddy 가 /api/admin/scheduler/* 라우팅 (kista-infra)
       - data_net     # postgres/redis
-    stop_grace_period: 200s   # 매매 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + rethrow → 락 해제 시도 시간 확보 목적(잠정값, 최초 배포 실측 후 조정 — spring.task.scheduling.shutdown.await-termination 미설정 상태라 보장은 아님)
+    stop_grace_period: 200s   # 매매 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + rethrow → 락 해제 시도 시간 확보 목적(잠정값, 최초 배포 실측 후 조정 — spring.task.scheduling.shutdown.await-termination 미설정 상태라 보장은 아님. application-prod.yml의 spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 실제로 쓰이지 않을 가능성 있음 — 최초 배포 시 실측 확인)
     mem_limit: 2048m
     restart: unless-stopped
     healthcheck:
