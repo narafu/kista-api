@@ -1,6 +1,6 @@
 package com.kista.stats.adapter.in.web.dto;
 
-import com.kista.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
+import com.kista.stats.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;

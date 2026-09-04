@@ -1,6 +1,6 @@
-package com.kista.adapter.in.web;
+package com.kista.stats.adapter.in.web;
 
-import com.kista.adapter.in.web.dto.*;
+import com.kista.stats.adapter.in.web.dto.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;

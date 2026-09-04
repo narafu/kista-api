@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web;
+package com.kista.stats.adapter.in.web;
 
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PresentBalanceResult;

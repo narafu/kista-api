@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web.dto;
+package com.kista.stats.adapter.in.web.dto;
 
 import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;

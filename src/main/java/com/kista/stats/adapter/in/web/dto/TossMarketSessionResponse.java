@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web.dto;
+package com.kista.stats.adapter.in.web.dto;
 
 import com.kista.broker.domain.model.toss.TossMarketSession;
 import com.kista.broker.domain.model.toss.TossMarketSession.SessionHours;

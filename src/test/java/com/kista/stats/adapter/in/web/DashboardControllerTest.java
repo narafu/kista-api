@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web;
+package com.kista.stats.adapter.in.web;
 
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;

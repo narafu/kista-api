@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web.openapi;
+package com.kista.stats.adapter.in.web.openapi;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.ComposedSchema;

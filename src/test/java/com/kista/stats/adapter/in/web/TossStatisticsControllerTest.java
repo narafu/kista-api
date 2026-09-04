@@ -1,4 +1,4 @@
-package com.kista.adapter.in.web;
+package com.kista.stats.adapter.in.web;
 
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.*;
