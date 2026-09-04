@@ -2,7 +2,7 @@ package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.PrevCloseCache;
-import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
+import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.common.TimeZones;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;

@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.mock;
 
-import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
+import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.broker.domain.model.BrokerBalance;

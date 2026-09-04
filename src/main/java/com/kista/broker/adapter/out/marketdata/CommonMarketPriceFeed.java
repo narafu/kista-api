@@ -1,4 +1,4 @@
-package com.kista.adapter.out.marketdata;
+package com.kista.broker.adapter.out.marketdata;
 
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;

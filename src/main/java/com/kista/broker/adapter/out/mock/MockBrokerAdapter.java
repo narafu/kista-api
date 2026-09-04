@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.mock;
 
-import com.kista.adapter.out.marketdata.CommonMarketPriceFeed;
+import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.*;
 import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
