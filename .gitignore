@@ -66,3 +66,6 @@ logs/
 # npm 잔재 (Java 프로젝트 — node 의존성 없음)
 package-lock.json
 node_modules/
+
+# Claude Code native worktrees
+.claude/worktrees/
