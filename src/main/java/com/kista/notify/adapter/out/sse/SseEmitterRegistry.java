@@ -2,7 +2,7 @@ package com.kista.notify.adapter.out.sse;
 
 import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
-import com.kista.trading.domain.model.TradeEvent;
+import com.kista.notify.domain.model.TradeEventView;
 import com.kista.notify.application.port.output.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -45,7 +45,7 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
     }
 
     @Override
-    public void notifyTrade(UUID userId, TradeEvent event) {
+    public void notifyTrade(UUID userId, TradeEventView event) {
         tradeSseEmitterRegistry.send(userId, event);
     }
 

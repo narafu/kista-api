@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.sse;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.trading.domain.model.TradeEvent;
+import com.kista.notify.domain.model.TradeEventView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +39,7 @@ class TradeSseEmitterRegistryTest {
     @Test
     void send_to_unknown_user_is_safe() {
         UUID userId = UUID.randomUUID(); // 연결 없는 사용자
-        TradeEvent event = TradeEvent.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
+        TradeEventView event = TradeEventView.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
         assertThatCode(() -> registry.send(userId, event)).doesNotThrowAnyException();
     }
 
@@ -47,7 +47,7 @@ class TradeSseEmitterRegistryTest {
     void send_to_connected_user_sends_event() {
         UUID userId = UUID.randomUUID();
         registry.connect(userId);
-        TradeEvent event = TradeEvent.sell("SOXL", 5, 23.0, 115.0, "테스트계좌");
+        TradeEventView event = TradeEventView.sell("SOXL", 5, 23.0, 115.0, "테스트계좌");
         assertThatCode(() -> registry.send(userId, event)).doesNotThrowAnyException();
     }
 }

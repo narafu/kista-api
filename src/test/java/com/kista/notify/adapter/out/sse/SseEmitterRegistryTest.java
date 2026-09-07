@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.sse;
 
-import com.kista.trading.domain.model.TradeEvent;
+import com.kista.notify.domain.model.TradeEventView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +51,7 @@ class SseEmitterRegistryTest {
     @Test
     void notifyTrade_delegates_to_trade_registry() {
         UUID userId = UUID.randomUUID();
-        TradeEvent event = TradeEvent.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
+        TradeEventView event = TradeEventView.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
         registry.notifyTrade(userId, event);
         verify(tradeSseEmitterRegistry).send(userId, event);
     }

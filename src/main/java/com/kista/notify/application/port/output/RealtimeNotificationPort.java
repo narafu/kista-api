@@ -1,6 +1,6 @@
 package com.kista.notify.application.port.output;
 
-import com.kista.trading.domain.model.TradeEvent;
+import com.kista.notify.domain.model.TradeEventView;
 
 import java.util.UUID;
 import com.kista.sharedkernel.UserStatus;
@@ -10,5 +10,5 @@ public interface RealtimeNotificationPort {
     void notifyStatusChange(UUID userId, UserStatus status);
 
     // 특정 사용자에게 매매 이벤트를 SSE로 실시간 알림
-    void notifyTrade(UUID userId, TradeEvent event);
+    void notifyTrade(UUID userId, TradeEventView event);
 }

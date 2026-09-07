@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.sse;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.trading.domain.model.TradeEvent;
+import com.kista.notify.domain.model.TradeEventView;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,7 +44,7 @@ public class TradeSseEmitterRegistry {
     }
 
     // 특정 사용자에게 매매 이벤트 전송
-    public void send(UUID userId, TradeEvent event) {
+    public void send(UUID userId, TradeEventView event) {
         List<SseEmitter> userEmitters = emitters.get(userId);
         if (userEmitters == null || userEmitters.isEmpty()) return;
 
