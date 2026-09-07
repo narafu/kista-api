@@ -7,6 +7,7 @@ import com.kista.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.finance.domain.model.FinanceTransactionCommand;
 import com.kista.finance.application.usecase.BulkFinanceRegisterUseCase;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,13 +35,14 @@ public class FinanceBulkController {
     @PostMapping
     public BulkFinanceRegisterResponse register(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
+            @Parameter(description = "생성 후 소유자의 현재 그룹으로 공유 전환 (기본 false, 무그룹 유저가 true면 400)")
+            @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody BulkFinanceRegisterRequest request) {
         List<AssetSnapshotCommand> assets = request.assets() == null ? List.of() : request.assets().stream()
                 .map(BulkFinanceRegisterRequest.AssetItem::toCommand).toList();
         List<FinanceTransactionCommand> transactions = request.transactions() == null ? List.of() : request.transactions().stream()
                 .map(BulkFinanceRegisterRequest.TransactionItem::toCommand).toList();
-        BulkFinanceRegisterResult result = bulkFinanceRegisterUseCase.register(userId, groupId, assets, transactions);
+        BulkFinanceRegisterResult result = bulkFinanceRegisterUseCase.register(userId, shareToGroup, assets, transactions);
         return BulkFinanceRegisterResponse.from(result);
     }
 }
