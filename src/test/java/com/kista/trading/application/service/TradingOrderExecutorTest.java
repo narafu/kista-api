@@ -7,7 +7,7 @@ import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
@@ -73,11 +73,11 @@ class TradingOrderExecutorTest {
             new BigDecimal("10000.00"), new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
 
     // 전략 타입별 상수 — placeOrders 호출 시 캡 분기 결정에 사용
-    static final StrategyRef INFINITE_STRATEGY = new StrategyRef(UUID.randomUUID(), ACCOUNT.userId(),
+    static final Strategy INFINITE_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
             StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-    static final StrategyRef PRIVACY_STRATEGY = new StrategyRef(UUID.randomUUID(), ACCOUNT.userId(),
+    static final Strategy PRIVACY_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
             StrategyType.PRIVACY, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-    static final StrategyRef VR_STRATEGY = new StrategyRef(UUID.randomUUID(), ACCOUNT.userId(),
+    static final Strategy VR_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
             StrategyType.VR, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
     // 실제 capability 구현체로 CycleOrderStrategies 조립 — priceCapMode() 실제 값 검증

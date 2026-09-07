@@ -3,7 +3,7 @@ package com.kista.web;
 import com.kista.web.dto.*;
 import com.kista.common.TimeZones;
 import com.kista.stats.application.usecase.AccountStatisticsUseCase;
-import com.kista.strategyconfig.application.usecase.StrategyUseCase;
+import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
 import io.swagger.v3.oas.annotations.Operation;

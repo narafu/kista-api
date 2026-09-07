@@ -1,7 +1,7 @@
 package com.kista.admin.domain.model;
 
 import com.kista.sharedkernel.Broker;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,6 +11,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.RecurringMode;
+import com.kista.sharedkernel.StrategyCreationSettings;
+import com.kista.sharedkernel.StrategyFieldSettings;
 
 class RuntimeSettingsTest {
 

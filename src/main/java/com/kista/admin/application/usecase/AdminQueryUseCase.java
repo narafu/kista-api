@@ -1,14 +1,14 @@
 package com.kista.admin.application.usecase;
 
 import com.kista.account.domain.model.Account;
-import com.kista.admin.domain.model.AdminCycleStrategySummary;
 import com.kista.admin.domain.model.AdminAnomalies;
 import com.kista.admin.domain.model.AdminStats;
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.domain.model.AuditLog;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBaseView;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
+import com.kista.trading.domain.model.StrategySummary;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,7 +30,7 @@ public interface AdminQueryUseCase {
     List<PrivacyTradeBaseView> listPrivacyBases(Integer days);
 
     // strategy_cycle.id → strategyId + strategy.type 배치 조회 (관리자 거래내역 전략 식별용)
-    Map<UUID, AdminCycleStrategySummary> getStrategySummariesByCycleIds(Set<UUID> cycleIds);
+    Map<UUID, StrategySummary> getStrategySummariesByCycleIds(Set<UUID> cycleIds);
 
     // 계좌 선택 이후 전략 선택 UI용 목록
     List<Strategy> listStrategies(UUID accountId);

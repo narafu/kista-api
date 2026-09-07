@@ -7,7 +7,7 @@ import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
@@ -138,7 +138,7 @@ class AdminTradeControllerTest {
         when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId)))
                 .thenReturn(java.util.Map.of(
                         cycleId,
-                        new com.kista.admin.domain.model.AdminCycleStrategySummary(strategyId, StrategyType.PRIVACY)
+                        new com.kista.trading.domain.model.StrategySummary(strategyId, StrategyType.PRIVACY)
                 ));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)

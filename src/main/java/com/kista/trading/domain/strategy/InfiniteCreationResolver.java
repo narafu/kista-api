@@ -1,5 +1,6 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 

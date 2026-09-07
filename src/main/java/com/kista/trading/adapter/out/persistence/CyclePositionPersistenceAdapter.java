@@ -2,7 +2,7 @@ package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     private final CyclePositionJpaRepository positionRepo;
     private final StrategyCycleJpaRepository cycleRepo;     // strategy_cycle 조인: 현재 사이클 조회
-    private final StrategyLookupPort strategyPort;            // ticker 조회: strategy_cycle → strategy (trading own-type 포트 경유)
+    private final StrategyPort strategyPort;            // ticker 조회: strategy_cycle → strategy (trading own-type 포트 경유)
 
     @Override
     public CyclePosition save(CyclePosition position) {

@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out;
 
-import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderType;
 import com.kista.broker.domain.model.PlacedOrderView;
@@ -31,7 +31,7 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
     private final OrderPort orderPort;
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
-    private final StrategyLookupPort strategyPort;
+    private final StrategyPort strategyPort;
 
     @Override
     public List<StrategyRefLite> findStrategiesByAccountId(UUID accountId) {

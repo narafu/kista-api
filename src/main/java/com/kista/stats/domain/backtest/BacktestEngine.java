@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
@@ -371,8 +371,8 @@ public class BacktestEngine {
     }
 
     // 백테스트용 합성 전략 — 계좌·PK 없이 타입/종목만 유효한 값으로 채운다(plan()이 type·ticker만 참조)
-    private static StrategyRef syntheticStrategy(BacktestCommand command) {
-        return new StrategyRef(null, null, command.type(), StrategyStatus.ACTIVE,
+    private static Strategy syntheticStrategy(BacktestCommand command) {
+        return new Strategy(null, null, command.type(), StrategyStatus.ACTIVE,
                 command.ticker(), StrategyCycleSeedType.NONE);
     }
 

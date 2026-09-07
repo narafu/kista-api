@@ -1,8 +1,8 @@
 package com.kista.trading.adapter.out;
 
-import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.broker.domain.model.StrategyRefLite;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
@@ -28,7 +28,7 @@ class MockSimulationDataAdapterTest {
     @Mock OrderPort orderPort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock StrategyCyclePort strategyCyclePort;
-    @Mock StrategyLookupPort strategyPort;
+    @Mock StrategyPort strategyPort;
 
     private MockSimulationDataAdapter adapter() {
         return new MockSimulationDataAdapter(orderPort, cyclePositionPort, strategyCyclePort, strategyPort);
@@ -38,7 +38,7 @@ class MockSimulationDataAdapterTest {
     void findStrategiesByAccountId_mapsStrategyToStrategyRefLite() {
         UUID accountId = UUID.randomUUID();
         UUID strategyId = UUID.randomUUID();
-        StrategyRef strategy = new StrategyRef(strategyId, accountId, StrategyType.VR,
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(strategy));
 

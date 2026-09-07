@@ -1,6 +1,6 @@
 package com.kista.web;
 
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;

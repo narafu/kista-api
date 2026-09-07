@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.web.dto;
 
 import com.kista.account.domain.model.Account;
-import com.kista.admin.domain.model.AdminCycleStrategySummary;
+import com.kista.trading.domain.model.StrategySummary;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.trading.domain.model.Order;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -50,13 +50,13 @@ public record AdminTradeResponse(
 ) {
     public static AdminTradeResponse from(Order t, Map<UUID, Account> accountMap,
                                           Map<UUID, AdminUserView> userMap,
-                                          Map<UUID, AdminCycleStrategySummary> strategySummaryMap) {
+                                          Map<UUID, StrategySummary> strategySummaryMap) {
         // accountId → userId → nickname 순서로 역방향 조회
         Account account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
         UUID userId = account != null ? account.userId() : null;
         AdminUserView user = userId != null ? userMap.get(userId) : null;
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
-        AdminCycleStrategySummary strategySummary = t.strategyCycleId() != null ? strategySummaryMap.get(t.strategyCycleId()) : null;
+        StrategySummary strategySummary = t.strategyCycleId() != null ? strategySummaryMap.get(t.strategyCycleId()) : null;
         return new AdminTradeResponse(
                 t.id(), userId, t.accountId(),
                 strategySummary != null ? strategySummary.strategyId() : null,

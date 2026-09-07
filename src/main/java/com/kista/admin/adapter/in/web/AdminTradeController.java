@@ -8,7 +8,7 @@ import com.kista.admin.adapter.in.web.dto.AdminTradeResponse;
 import com.kista.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
 import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
-import com.kista.admin.domain.model.AdminCycleStrategySummary;
+import com.kista.trading.domain.model.StrategySummary;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.DstInfo;
@@ -88,7 +88,7 @@ public class AdminTradeController {
         Map<UUID, Account> accountMap = Map.of(accountId, account);
         Map<UUID, AdminUserView> userMap = Map.of(account.userId(), user);
         Set<UUID> cycleIds = orders.stream().map(Order::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, AdminCycleStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Map<UUID, StrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap)).toList();
     }
 
@@ -134,7 +134,7 @@ public class AdminTradeController {
                 .map(Order::strategyCycleId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<UUID, AdminCycleStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Map<UUID, StrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream()
                 .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap))
                 .toList();

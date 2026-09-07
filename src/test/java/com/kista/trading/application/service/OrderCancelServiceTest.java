@@ -5,7 +5,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.OrderCancelException;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossApiException;
@@ -13,7 +13,7 @@ import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.support.DomainFixtures;
@@ -53,7 +53,7 @@ class OrderCancelServiceTest {
     @Mock BrokerAdapterRegistry registry;
     @Mock BrokerOrderCorrectionPort brokerPort;  // registry.require(account, BrokerOrderCorrectionPort.class) 반환값
     @Mock AccountPort accountPort;
-    @Mock StrategyLookupPort cyclePort;
+    @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock ApplicationEventPublisher eventPublisher;
     OrderCancelService service;
@@ -65,13 +65,13 @@ class OrderCancelServiceTest {
     private final UUID strategyCycleId = UUID.randomUUID();
 
     private Account ownedAccount;
-    private StrategyRef cycle;
+    private Strategy cycle;
     private StrategyCycle currentCycle;
 
     @BeforeEach
     void setUp() {
         ownedAccount = DomainFixtures.kisAccount(accountId, requesterId);
-        cycle = new StrategyRef(cycleId, accountId, StrategyType.INFINITE,
+        cycle = new Strategy(cycleId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
                 null, LocalDate.now(), null, null, null);

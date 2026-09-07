@@ -1,7 +1,7 @@
 package com.kista.web.dto;
 
-import com.kista.strategyconfig.domain.model.Strategy;
-import com.kista.strategyconfig.domain.model.StrategyDetail;
+import com.kista.trading.domain.model.Strategy;
+import com.kista.trading.domain.model.StrategyDetail;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

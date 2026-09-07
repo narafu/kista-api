@@ -1,7 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.strategyconfig.adapter.out.persistence.StrategyPersistenceAdapter;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyVersion;
 import com.kista.trading.domain.model.StrategyVrDetail;
 import com.kista.support.DataJpaTestBase;

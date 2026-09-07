@@ -5,7 +5,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -51,7 +51,7 @@ class StrategyOrderPlanBuilderTest {
     StrategyOrderPlanBuilder builder;
 
     Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-    StrategyRef strategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
+    Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
             new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
@@ -95,7 +95,7 @@ class StrategyOrderPlanBuilderTest {
 
     @Test
     void build_fetchesPrevClose_forVrPreviewReferencePrice() {
-        StrategyRef vrStrategy = new StrategyRef(UUID.randomUUID(), account.id(), StrategyType.VR,
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, today, null, null, null);

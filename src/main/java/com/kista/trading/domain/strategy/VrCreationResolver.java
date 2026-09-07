@@ -1,5 +1,7 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.sharedkernel.RecurringMode;
+import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.sharedkernel.StrategyDefaults;
 
 import java.math.BigDecimal;

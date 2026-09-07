@@ -117,7 +117,7 @@ class RuntimeSettingsServiceTest {
         RuntimeSettings settings = RuntimeSettings.defaults();
         when(settingsPort.load()).thenReturn(settings);
 
-        Optional<com.kista.trading.domain.strategy.StrategyCreationSettings> result =
+        Optional<com.kista.sharedkernel.StrategyCreationSettings> result =
                 service.find(StrategyType.INFINITE);
 
         assertThat(result).isPresent();

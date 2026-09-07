@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 
 import java.util.List;
 import java.util.Map;
@@ -24,7 +24,7 @@ public class CycleOrderStrategies {
         return s;
     }
 
-    public CycleOrderStrategy of(StrategyRef strategy) {
+    public CycleOrderStrategy of(Strategy strategy) {
         return of(strategy.type());
     }
 }

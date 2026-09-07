@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.domain.model.ReconfigureVrCommand;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
@@ -19,7 +19,7 @@ import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -60,7 +60,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 @DisplayName("VrReconfigureService 단위 테스트")
 class VrReconfigureServiceTest {
 
-    @Mock StrategyLookupPort strategyPort;
+    @Mock StrategyPort strategyPort;
     @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock StrategyCyclePort strategyCyclePort;
@@ -82,7 +82,7 @@ class VrReconfigureServiceTest {
     private final UUID cycleId = UUID.randomUUID();
 
     private Account account;
-    private StrategyRef vrStrategy;
+    private Strategy vrStrategy;
     private StrategyCycle currentCycle;
     private StrategyVrDetail currentDetail;
     private StrategyCycleVrDetail currentCycleVr;
@@ -95,7 +95,7 @@ class VrReconfigureServiceTest {
     @BeforeEach
     void setUp() {
         account = DomainFixtures.kisAccount(accountId, requesterId);
-        vrStrategy = new StrategyRef(strategyId, accountId, StrategyType.VR,
+        vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
                 BigDecimal.valueOf(1000), null, LocalDate.now().minusWeeks(4), null, null, null);
@@ -377,7 +377,7 @@ class VrReconfigureServiceTest {
     @Test
     @DisplayName("비-VR 전략 재설정 시도 → IllegalArgumentException")
     void reconfigure_nonVrStrategy_throwsIllegalArgumentException() {
-        StrategyRef infiniteStrategy = new StrategyRef(strategyId, accountId, StrategyType.INFINITE,
+        Strategy infiniteStrategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(infiniteStrategy);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);

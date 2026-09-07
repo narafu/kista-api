@@ -10,7 +10,7 @@ import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.ReconfigureVrCommand;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.trading.domain.model.StrategyVrDetail;
@@ -20,7 +20,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
-import com.kista.trading.application.port.output.StrategyLookupPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -43,7 +43,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class VrReconfigureService implements VrReconfigureUseCase {
 
-    private final StrategyLookupPort strategyPort;
+    private final StrategyPort strategyPort;
     private final AccountPort accountPort;
     private final UserPort userPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -57,7 +57,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
     @Override
     public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
-        StrategyRef strategy = strategyPort.findByIdOrThrow(strategyId);
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.isVr()) {
             throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다: " + strategyId);

@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.*;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.trading.application.port.output.*;
@@ -39,7 +39,7 @@ class VrCycleRolloverService {
     // 마감 리포트(saveCyclePosition) 직후 호출 — due 도래 시 V′ 계산 후 사이클 교체
     void rollIfDue(BatchContext ctx, AccountBalance postBalance, BigDecimal closingPrice, LocalDate today) {
         StrategyCycle cycle = ctx.currentCycle();
-        StrategyRef strategy = ctx.strategy();
+        Strategy strategy = ctx.strategy();
 
         // VR 사이클 상세 + 전략 버전 VR 설정 조회 — 미존재 시 배치 격리
         StrategyCycleVrDetail cycleVr;

@@ -5,7 +5,7 @@ import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 

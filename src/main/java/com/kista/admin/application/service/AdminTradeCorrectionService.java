@@ -9,9 +9,8 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.trading.domain.model.StrategyRef;
 import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.account.application.port.output.AccountPort;
@@ -19,7 +18,7 @@ import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.strategyconfig.application.port.output.StrategyPort;
+import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -88,7 +87,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
         }
 
         if (cycleEnded) {
-            eventPublisher.publishEvent(new CycleEndedEvent(user.id(), account.id(), toStrategyRef(updatedStrategy)));
+            eventPublisher.publishEvent(new CycleEndedEvent(user.id(), account.id(), updatedStrategy));
         }
         orderPort.saveAll(manualOrders);
         auditLogPort.log(adminId, AUDIT_ACTION, "STRATEGY", strategy.id(),
@@ -150,11 +149,5 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                 cycleEnded,
                 cycleEnded ? command.fills().getLast().tradeDate() : null
         );
-    }
-
-    // trading own-type 변환 — CycleEndedEvent(trading "event")는 StrategyRef만 받는다(Task 7 순환 해소)
-    private static StrategyRef toStrategyRef(Strategy strategy) {
-        return new StrategyRef(strategy.id(), strategy.accountId(), strategy.type(),
-                strategy.status(), strategy.ticker(), strategy.cycleSeedType());
     }
 }

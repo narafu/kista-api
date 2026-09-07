@@ -7,7 +7,7 @@ import com.kista.stats.domain.model.HousingBenchmarkPoint;
 import com.kista.stats.domain.model.InvestmentPoint;
 import com.kista.stats.domain.model.PerformanceComparisonSummary;
 import com.kista.stats.domain.model.ReturnMetrics;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

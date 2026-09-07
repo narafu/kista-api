@@ -1,6 +1,6 @@
 package com.kista.stats.domain.model;
 
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 
 import java.math.BigDecimal;
 import java.time.Instant;

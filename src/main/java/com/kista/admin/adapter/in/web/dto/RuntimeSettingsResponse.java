@@ -5,8 +5,8 @@ import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.admin.domain.model.StrategyCreationSettings;
-import com.kista.admin.domain.model.StrategyFieldSettings;
+import com.kista.sharedkernel.StrategyCreationSettings;
+import com.kista.sharedkernel.StrategyFieldSettings;
 import com.kista.sharedkernel.StrategyType;
 import io.swagger.v3.oas.annotations.media.Schema;
 

@@ -1,8 +1,8 @@
 package com.kista.trading.application.event;
 
-import com.kista.trading.domain.model.StrategyRef;
+import com.kista.trading.domain.model.Strategy;
 
 import java.util.UUID;
 
 // 관리자 수동 체결 보정으로 사이클이 종료됨 — 트랜잭션 커밋 후에만 발행됨 (사용자 알림용)
-public record CycleEndedEvent(UUID userId, UUID accountId, StrategyRef strategy) {}
+public record CycleEndedEvent(UUID userId, UUID accountId, Strategy strategy) {}

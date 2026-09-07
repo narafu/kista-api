@@ -2,7 +2,7 @@ package com.kista.admin.application.service;
 
 import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
@@ -12,7 +12,8 @@ import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.account.application.port.output.BrokerEnabledPort;
 import com.kista.user.application.port.output.ApprovalPolicyPort;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.strategyconfig.application.port.output.StrategyCreationPolicyPort;
+import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
+import com.kista.sharedkernel.StrategyCreationSettings;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,43 +54,11 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
         return settingsPort.load().brokers().get(broker).enabled();
     }
 
-    // strategy-config가 소비하는 own-type 포트 구현 — admin 내부 StrategyCreationSettings를
-    // trading 소유 타입으로 매핑해 반환한다(strategy-config↔admin 순환 해소).
+    // strategy-config가 소비하는 포트 구현 — StrategyCreationSettings가 sharedkernel 공용 타입이라 매핑 없이 그대로 반환한다.
     @Override
     @Transactional(readOnly = true)
-    public Optional<com.kista.trading.domain.strategy.StrategyCreationSettings> find(StrategyType type) {
-        com.kista.admin.domain.model.StrategyCreationSettings settings = settingsPort.load().strategies().get(type);
-        return Optional.ofNullable(settings).map(RuntimeSettingsService::toTradingSettings);
-    }
-
-    // admin StrategyCreationSettings → trading 자체 타입. 필드 구조 동일, RecurringMode만 valueOf(name()).
-    private static com.kista.trading.domain.strategy.StrategyCreationSettings toTradingSettings(
-            com.kista.admin.domain.model.StrategyCreationSettings s) {
-        return new com.kista.trading.domain.strategy.StrategyCreationSettings(
-                s.enabled(),
-                mapField(s.ticker()),
-                mapField(s.divisionCount()),
-                mapRecurringField(s.recurringMode()),
-                mapField(s.bandWidth()),
-                mapField(s.intervalWeeks()));
-    }
-
-    // 동일 원소 타입 필드는 그대로 재래핑 — trading StrategyFieldSettings 생성자가 List.copyOf로 불변 복제한다.
-    private static <T> com.kista.trading.domain.strategy.StrategyFieldSettings<T> mapField(
-            com.kista.admin.domain.model.StrategyFieldSettings<T> f) {
-        if (f == null) return null;
-        return new com.kista.trading.domain.strategy.StrategyFieldSettings<>(
-                f.customizable(), f.allowedValues(), f.defaultValue());
-    }
-
-    // RecurringMode는 상수명 byte-identical이라 valueOf(name())으로 trading enum에 매핑한다.
-    private static com.kista.trading.domain.strategy.StrategyFieldSettings<com.kista.trading.domain.strategy.RecurringMode> mapRecurringField(
-            com.kista.admin.domain.model.StrategyFieldSettings<com.kista.admin.domain.model.RecurringMode> f) {
-        if (f == null) return null;
-        return new com.kista.trading.domain.strategy.StrategyFieldSettings<>(
-                f.customizable(),
-                f.allowedValues().stream().map(m -> com.kista.trading.domain.strategy.RecurringMode.valueOf(m.name())).toList(),
-                com.kista.trading.domain.strategy.RecurringMode.valueOf(f.defaultValue().name()));
+    public Optional<StrategyCreationSettings> find(StrategyType type) {
+        return Optional.ofNullable(settingsPort.load().strategies().get(type));
     }
 
     @Override

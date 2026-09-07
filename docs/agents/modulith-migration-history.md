@@ -125,3 +125,15 @@ strategy-config 이전은 3개 서브프로젝트로 분해해 진행됐다 — 
 `strategyconfig`가 열한 번째 이전 모듈이다(`@ApplicationModule` CLOSED, "domain"(domain.model)·"usecase"(application.usecase)·"port"(application.port.output) 3개 NamedInterface 공개 — application.service·adapter.out.persistence는 비공개. event/schedule NamedInterface 없음, admin과 동일 사유).
 
 `com.kista.platform`(인프라 leaf, 열두 번째)·`com.kista.web`(앱셸, 열세 번째)은 애그리게이트 모듈이 아니라 레거시 `adapter`/`application` shim 최종 해소로 신설됐다(위 "platform/web" 절 참고).
+
+---
+
+## strategyconfig → trading 모듈 병합 (2026-09-07)
+
+13개 모듈 CLOSED 전환 완료 후, 모듈 경계 own-type 부채(`docs/agents/constraints.md` "모듈 경계 포트 시그니처")를 전수 재검토하는 과정에서 `strategyconfig`(열한 번째 이전 모듈)가 own-type을 통해서만 존속하는 얇은 위성 모듈이었음이 드러났다. 판정 기준(constraints.md "모듈 경계 own-type — 정당화 게이트")을 적용한 결과 `strategyconfig↔trading` 관계는 (a) 순환 불가피도, (b) 외부 계약 분리도 성립하지 않았다 — `strategyconfig→trading` 13참조 vs `trading→strategyconfig` 0(주석 2줄뿐), 외부 소비자(admin 21/stats 16/web 10)는 전부 이미 trading을 단방향 참조 중이었다. 병합해도 새 순환이 생기지 않음을 `user→trading`/`account→trading`(둘 다 0건) 실측으로 사전 확인한 뒤 `com.kista.strategyconfig`(22파일) 전체를 `com.kista.trading` 내부로 흡수했다.
+
+병합으로 own-type 우회 장치 4개(`StrategyRef`/`StrategyLookupPort`/`StrategyPausePort`/`StrategyLookupAdapter`)가 통째로 소멸했다 — `StrategyRef`는 병합 전 strategyconfig 소유 `Strategy`와 필드가 완전히 동일한 복제였고, 나머지 3개는 그 복제를 매개하던 ISP 분리 포트·어댑터였다. `StrategyPort`(옛 strategyconfig 소유, 병합 후 trading 내부 포트)가 `findTickerById`/`pause` default 메서드를 흡수해 그대로 대체했다. 이 사례는 이 프로젝트에서 처음으로 "own-type 부채 자체가 잘못된 모듈 구획의 증상"이었던 케이스다 — 이전까지의 own-type들은 진짜 모듈 순환을 막기 위한 정당한 설계(broker/privacy/trading order enum, DTO 삼중복제 — 전부 (b) 외부 계약 분리)였던 것과 대비된다.
+
+같은 재검토에서 발견된 진짜 부채 2건도 함께 정리했다: admin↔trading own-type이던 settings 3종(`StrategyCreationSettings`/`StrategyFieldSettings`/`RecurringMode`, 검증 로직까지 byte-identical 복제)은 외부 계약이 없어 `com.kista.sharedkernel`로 승격, `RuntimeSettingsService`의 양방향 매핑 코드가 통째로 소멸했다. `AdminCycleStrategySummary`(admin)는 strategyconfig `StrategySummary`와 byte-identical 쌍둥이 + 죽은 import였다는 게 확인돼 삭제하고 admin이 `StrategySummary`를 직접 소비하도록 전환했다.
+
+모듈 수는 13 → 12로 줄었다(finance/notify/broker/trading/market/privacy/stats/admin/user/account/platform/web). 나머지 own-type(broker/privacy/trading 3종 order enum, DTO 삼중복제, narrowing projection들)은 게이트 재검토 결과 정당한 설계로 확인돼 유지했다 — 상세는 constraints.md 참고. 고아 스캔(own-type 대응 원본 타입 전수 참조 실측)도 이 재검토에서 함께 수행했으며 잔존 고아는 0건이었다(직전 세션에서 발견된 4건은 이미 정리된 상태).

@@ -5,9 +5,9 @@ import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.CycleHistoryPage;
-import com.kista.strategyconfig.domain.model.Strategy;
+import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.strategyconfig.domain.model.StrategySeedPreview;
+import com.kista.trading.domain.model.StrategySeedPreview;
 
 import java.math.BigDecimal;
 import java.time.Instant;

@@ -1,6 +1,6 @@
 package com.kista.web.dto;
 
-import com.kista.strategyconfig.domain.model.StrategySeedPreview;
+import com.kista.trading.domain.model.StrategySeedPreview;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

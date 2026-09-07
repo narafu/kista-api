@@ -13,7 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-// com.kista.strategyconfig.adapter.out.persistence의 StrategyPersistenceAdapterTest가
+// com.kista.trading.adapter.out.persistence의 StrategyPersistenceAdapterTest가
 // @DataJpaTest 픽스처로 직접 @Import/@Autowired하므로 public 유지
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)

@@ -8,7 +8,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.trading.domain.model.StrategyRef; import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
@@ -34,7 +34,7 @@ import com.kista.sharedkernel.StrategyTicker;
 @RequiredArgsConstructor
 class ManualTradingService {
 
-    private final StrategyLookupPort strategyPort;
+    private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final AccountPort accountPort;
     private final OrderPort orderPort;
@@ -55,7 +55,7 @@ class ManualTradingService {
     // package-private: DstInfo 주입으로 단위 테스트에서 개장 여부를 결정론적으로 고정
     List<Order> execute(UUID strategyId, UUID requesterId, DstInfo dst) {
         // 동기 검증: 소유권·상태
-        StrategyRef strategy = strategyPort.findByIdOrThrow(strategyId);
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.isActive())
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
@@ -111,7 +111,7 @@ class ManualTradingService {
     }
 
     // 시세 조회 실패 시 ManualTradingException으로 래핑
-    private BigDecimal fetchPrevCloseOrThrow(StrategyRef strategy, Account account) {
+    private BigDecimal fetchPrevCloseOrThrow(Strategy strategy, Account account) {
         try {
             Map<StrategyTicker, PriceSnapshot> snapshots =
                     priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
@@ -125,7 +125,7 @@ class ManualTradingService {
     }
 
     // live 잔고 조회 실패 시 ManualTradingException으로 래핑
-    private AccountBalance fetchLiveBalanceOrThrow(Account account, StrategyRef strategy) {
+    private AccountBalance fetchLiveBalanceOrThrow(Account account, Strategy strategy) {
         try {
             BrokerBalance bb = registry.require(account.toBrokerRef(), LiveBalancePort.class).getLiveBalance(account.toBrokerRef(), strategy.ticker());
             AccountBalance lb = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
@@ -142,7 +142,7 @@ class ManualTradingService {
     }
 
     // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
-    private void checkSellableOrThrow(Account account, StrategyRef strategy, LocalDate tradeDate, List<Order> orders) {
+    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<Order> orders) {
         int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == Order.OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
@@ -160,7 +160,7 @@ class ManualTradingService {
     // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
-    private void placeAtOpenOrdersIfMarketOpen(StrategyRef strategy, Account account, UUID cycleId, LocalDate today,
+    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today,
                                                InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
         if (Instant.now().isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
