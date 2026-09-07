@@ -20,8 +20,6 @@ import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.trading.adapter.out.persistence.StrategyInfiniteDetailPersistenceAdapter;
-import com.kista.trading.adapter.out.persistence.StrategyVersionPersistenceAdapter;
 
 @Import({
         StrategyPersistenceAdapter.class,

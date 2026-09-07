@@ -1,6 +1,5 @@
 package com.kista.trading.domain.model;
 
-import com.kista.trading.domain.model.VrSummary;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
