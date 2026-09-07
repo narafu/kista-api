@@ -9,7 +9,8 @@ import java.util.UUID;
 
 public interface FinanceBudgetUseCase {
     List<FinanceBudget> list(UUID userId, UUID requestedGroupId, UUID categoryId, LocalDate date);
-    FinanceBudget create(UUID userId, UUID requestedGroupId, FinanceBudgetCommand command);
+    // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
+    FinanceBudget create(UUID userId, boolean shareToGroup, FinanceBudgetCommand command);
     FinanceBudget update(UUID budgetId, UUID userId, FinanceBudgetCommand command);
     void delete(UUID budgetId, UUID userId);
 

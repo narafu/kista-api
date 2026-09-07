@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface FinanceAccountUseCase {
     List<FinanceAccount> list(UUID userId, UUID requestedGroupId);
-    FinanceAccount create(UUID userId, UUID requestedGroupId, FinanceAccountCommand command);
+    FinanceAccount create(UUID userId, boolean shareToGroup, FinanceAccountCommand command);
     FinanceAccount update(UUID accountId, UUID userId, FinanceAccountCommand command);
     void delete(UUID accountId, UUID userId);
     FinanceAccount shareToGroup(UUID accountId, UUID userId);

@@ -52,9 +52,9 @@ public class FinanceTransactionController {
     @PostMapping
     public ResponseEntity<FinanceTransactionResponse> create(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
+            @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody FinanceTransactionRequest request) {
-        var saved = transactionUseCase.create(userId, groupId, request.toCommand());
+        var saved = transactionUseCase.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/transactions/" + saved.id()))
                 .body(FinanceTransactionResponse.from(saved));
     }

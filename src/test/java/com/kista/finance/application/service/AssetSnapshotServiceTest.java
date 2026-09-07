@@ -68,17 +68,42 @@ class AssetSnapshotServiceTest {
     }
 
     @Test
-    @DisplayName("create는 requestedGroupId를 무시하고 개인 소유(groupId=null)로 저장")
-    void create_alwaysSavesAsPersonalOwnership() {
+    @DisplayName("create는 shareToGroup=false면 개인 소유(groupId=null)로 저장")
+    void create_shareToGroupFalse_savesAsPersonalOwnership() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
         when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        AssetSnapshot result = assetSnapshotService.create(userId, groupId, command());
+        AssetSnapshot result = assetSnapshotService.create(userId, false, command());
 
         assertThat(result.groupId()).isNull();
         assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.amount()).isEqualTo(2_000_000L);
+    }
+
+    @Test
+    @DisplayName("create는 shareToGroup=true면 현재 그룹 소유(groupId=currentGroupId)로 저장")
+    void create_shareToGroupTrue_savesAsGroupOwnership() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(assetSnapshotPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssetSnapshot result = assetSnapshotService.create(userId, true, command());
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+        assertThat(result.userId()).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName("create는 shareToGroup=true인데 소속 그룹이 없으면 IllegalStateException")
+    void create_shareToGroupTrue_noCurrentGroup_throwsIllegalState() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+
+        assertThatThrownBy(() -> assetSnapshotService.create(userId, true, command()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("소속된 그룹이 없습니다");
+        verify(assetSnapshotPort, never()).save(any());
     }
 
     @Test
@@ -90,7 +115,7 @@ class AssetSnapshotServiceTest {
         AssetSnapshotCommand commandWithMemo = new AssetSnapshotCommand(categoryId, accountId, LocalDate.of(2026, 2, 1),
                 AssetClass.EQUITY, Market.GLOBAL, "장기투자", "비상금 별도 관리", 2_000_000L);
 
-        AssetSnapshot result = assetSnapshotService.create(userId, groupId, commandWithMemo);
+        AssetSnapshot result = assetSnapshotService.create(userId, false, commandWithMemo);
 
         assertThat(result.memo()).isEqualTo("비상금 별도 관리");
     }
@@ -117,7 +142,7 @@ class AssetSnapshotServiceTest {
                 FinanceCategory.Type.EXPENSE, "식비", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(expenseCategory);
 
-        assertThatThrownBy(() -> assetSnapshotService.create(userId, null, command()))
+        assertThatThrownBy(() -> assetSnapshotService.create(userId, false, command()))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(assetSnapshotPort, never()).save(any());
     }
@@ -130,7 +155,7 @@ class AssetSnapshotServiceTest {
                 FinanceCategory.Type.ASSET, "투자", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(othersPersonalCategory);
 
-        assertThatThrownBy(() -> assetSnapshotService.create(userId, null, command()))
+        assertThatThrownBy(() -> assetSnapshotService.create(userId, false, command()))
                 .isInstanceOf(SecurityException.class);
         verify(assetSnapshotPort, never()).save(any());
     }

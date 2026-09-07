@@ -34,12 +34,17 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         return transactionPort.findMyScope(userId, currentGroupId, from, to, categoryId, filterUserId);
     }
 
-    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시(그룹 공유는 shareToGroup으로 별도 전환).
+    // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
     @Override
-    public FinanceTransaction create(UUID userId, UUID requestedGroupId, FinanceTransactionCommand command) {
+    public FinanceTransaction create(UUID userId, boolean shareToGroup, FinanceTransactionCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyCategory(userId, currentGroupId, command.categoryId());
-        FinanceTransaction transaction = new FinanceTransaction(null, null, command.categoryId(), userId,
+        // 그룹 공유 생성을 요청했는데 소속 그룹이 없으면 거부 — GroupShareSupport와 동일 메시지
+        if (shareToGroup && currentGroupId == null) {
+            throw new IllegalStateException("소속된 그룹이 없습니다");
+        }
+        UUID ownerGroupId = shareToGroup ? currentGroupId : null;
+        FinanceTransaction transaction = new FinanceTransaction(null, ownerGroupId, command.categoryId(), userId,
                 command.transactionDate(), command.amount(), command.memo(), null);
         FinanceTransaction saved = transactionPort.save(transaction);
         log.info("거래내역 등록: userId={}, transactionId={}", userId, saved.id());

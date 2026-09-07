@@ -64,17 +64,42 @@ class FinanceTransactionServiceTest {
     }
 
     @Test
-    @DisplayName("create는 requestedGroupId를 무시하고 개인 소유(groupId=null)로 저장")
-    void create_alwaysSavesAsPersonalOwnership() {
+    @DisplayName("create는 shareToGroup=false면 개인 소유(groupId=null)로 저장")
+    void create_shareToGroupFalse_savesAsPersonalOwnership() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
         when(transactionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        FinanceTransaction result = transactionService.create(userId, groupId, command());
+        FinanceTransaction result = transactionService.create(userId, false, command());
 
         assertThat(result.groupId()).isNull();
         assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.amount()).isEqualTo(30_000L);
+    }
+
+    @Test
+    @DisplayName("create는 shareToGroup=true면 현재 그룹 소유(groupId=currentGroupId)로 저장")
+    void create_shareToGroupTrue_savesAsGroupOwnership() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(transactionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceTransaction result = transactionService.create(userId, true, command());
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+        assertThat(result.userId()).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName("create는 shareToGroup=true인데 무그룹 유저면 IllegalStateException")
+    void create_shareToGroupTrue_noGroup_throwsIllegalState() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+
+        assertThatThrownBy(() -> transactionService.create(userId, true, command()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("소속된 그룹이 없습니다");
+        verify(transactionPort, never()).save(any());
     }
 
     @Test
@@ -99,7 +124,7 @@ class FinanceTransactionServiceTest {
                 FinanceCategory.Type.ASSET, "투자", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(assetCategory);
 
-        assertThatThrownBy(() -> transactionService.create(userId, null, command()))
+        assertThatThrownBy(() -> transactionService.create(userId, false, command()))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(transactionPort, never()).save(any());
     }
@@ -112,7 +137,7 @@ class FinanceTransactionServiceTest {
                 FinanceCategory.Type.EXPENSE, "식비", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(othersPersonalCategory);
 
-        assertThatThrownBy(() -> transactionService.create(userId, null, command()))
+        assertThatThrownBy(() -> transactionService.create(userId, false, command()))
                 .isInstanceOf(SecurityException.class);
         verify(transactionPort, never()).save(any());
     }

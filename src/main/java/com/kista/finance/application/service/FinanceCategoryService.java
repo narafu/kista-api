@@ -33,12 +33,22 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
                 .toList();
     }
 
-    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시.
+    // shareToGroup=true면 현재 소속 그룹 소유로, false면 개인 소유로 생성한다.
     @Override
-    public FinanceCategory create(UUID userId, UUID requestedGroupId, FinanceCategoryCommand command) {
+    public FinanceCategory create(UUID userId, boolean shareToGroup, FinanceCategoryCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        resolveParent(command.parentId(), userId, currentGroupId, command.type());
-        FinanceCategory category = new FinanceCategory(null, null, command.parentId(), userId,
+        FinanceCategory parent = resolveParent(command.parentId(), userId, currentGroupId, command.type());
+        // 그룹 공유 생성을 요청했는데 소속 그룹이 없으면 거부 — GroupShareSupport와 동일 메시지
+        if (shareToGroup && currentGroupId == null) {
+            throw new IllegalStateException("소속된 그룹이 없습니다");
+        }
+        // 그룹 소유 카테고리는 그룹 소유 부모 아래에만 생성한다 — 개인 부모 아래 그룹 자식은
+        // 다른 멤버에게 부모 없는 트리 고아로 보이고, shareToGroup()/unshare()의 "같은 소유자 트리" 전제를 깬다
+        if (shareToGroup && parent != null && !currentGroupId.equals(parent.groupId())) {
+            throw new IllegalArgumentException("그룹 공유 카테고리는 그룹 공유 부모 아래에만 만들 수 있습니다");
+        }
+        UUID ownerGroupId = shareToGroup ? currentGroupId : null;
+        FinanceCategory category = new FinanceCategory(null, ownerGroupId, command.parentId(), userId,
                 command.type(), command.name(), command.sortOrder(), null);
         FinanceCategory saved = categoryPort.save(category);
         log.info("카테고리 등록: userId={}, categoryId={}", userId, saved.id());
@@ -163,9 +173,10 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     // 부모는 (같은 type) AND (시스템이거나 접근 가능한 개인/그룹 카테고리)이어야 한다.
     // verifyAccessibleBy가 던지는 SecurityException을 IllegalArgumentException(400)으로 재던진다 —
     // "권한 없음"이 아니라 "잘못된 부모 지정"으로 취급하는 게 이 API의 기존 계약이었다.
-    private void resolveParent(UUID parentId, UUID userId, UUID currentGroupId, FinanceCategory.Type type) {
+    // 부모가 없으면 null, 있으면 검증된 부모 카테고리를 반환한다.
+    private FinanceCategory resolveParent(UUID parentId, UUID userId, UUID currentGroupId, FinanceCategory.Type type) {
         if (parentId == null) {
-            return; // 신규 루트 — 허용
+            return null; // 신규 루트 — 허용
         }
         FinanceCategory parent = categoryPort.findByIdOrThrow(parentId);
         if (parent.type() != type) {
@@ -176,5 +187,6 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         } catch (SecurityException e) {
             throw new IllegalArgumentException("다른 그룹의 카테고리를 부모로 지정할 수 없습니다");
         }
+        return parent;
     }
 }

@@ -34,12 +34,17 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         return assetSnapshotPort.findMyScope(userId, currentGroupId, from, to, filterUserId);
     }
 
-    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시.
+    // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
     @Override
-    public AssetSnapshot create(UUID userId, UUID requestedGroupId, AssetSnapshotCommand command) {
+    public AssetSnapshot create(UUID userId, boolean shareToGroup, AssetSnapshotCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyAssetCategory(userId, currentGroupId, command.categoryId());
-        AssetSnapshot snapshot = new AssetSnapshot(null, null, command.categoryId(), command.accountId(), userId,
+        // 그룹 공유를 요청했는데 소속 그룹이 없으면 거부 (GroupShareSupport와 동일 메시지)
+        if (shareToGroup && currentGroupId == null) {
+            throw new IllegalStateException("소속된 그룹이 없습니다");
+        }
+        UUID ownerGroupId = shareToGroup ? currentGroupId : null;
+        AssetSnapshot snapshot = new AssetSnapshot(null, ownerGroupId, command.categoryId(), command.accountId(), userId,
                 command.entryDate(), command.assetClass(), command.market(), command.strategy(), command.memo(), command.amount(), null);
         AssetSnapshot saved = assetSnapshotPort.save(snapshot);
         log.info("자산 스냅샷 등록: userId={}, snapshotId={}", userId, saved.id());

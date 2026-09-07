@@ -51,9 +51,10 @@ public class FinanceBudgetController {
     @PostMapping
     public ResponseEntity<FinanceBudgetResponse> create(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
+            @Parameter(description = "true면 현재 그룹 소유로 생성")
+            @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody FinanceBudgetRequest request) {
-        var saved = budgetUseCase.create(userId, groupId, request.toCommand());
+        var saved = budgetUseCase.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/budgets/" + saved.id()))
                 .body(FinanceBudgetResponse.from(saved));
     }

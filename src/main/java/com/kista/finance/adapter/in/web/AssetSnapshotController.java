@@ -61,9 +61,9 @@ public class AssetSnapshotController {
     @PostMapping
     public ResponseEntity<AssetSnapshotResponse> create(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
+            @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody AssetSnapshotRequest request) {
-        AssetSnapshot saved = assetSnapshotUseCase.create(userId, groupId, request.toCommand());
+        AssetSnapshot saved = assetSnapshotUseCase.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/asset-snapshots/" + saved.id()))
                 .body(enrich(saved));
     }

@@ -34,21 +34,28 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
         return budgetPort.findMyScope(userId, currentGroupId, categoryId, date);
     }
 
-    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시(그룹 공유는 shareToGroup으로 별도 전환).
-    // 등록 전, 같은 카테고리·개인 스코프에서 겹치는 기존 예산을 규칙에 따라 자동 트림/삭제한다.
+    // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
+    // shareToGroup 여부와 무관하게 등록 전 같은 카테고리·개인 스코프에서 겹치는 기존 예산을 규칙에 따라
+    // 자동 트림/삭제한다(findOverlapping 쿼리가 user_id=? AND group_id IS NULL이라 개인 후보만 반환 — 스펙 Option A).
     // 규칙으로 판단 불가한 겹침(중간에 끼거나 새 예산 종료일 뒤로 이어짐)은 409로 거부하며,
     // 거부 시 어떤 후보도 변경하지 않는다(전량 판정 후 실행) — resolveOverlapActions() 참고.
+    // 그룹 소유 save 시 그룹 스코프 겹침은 finance_budgets_no_overlap EXCLUDE가 잡아 어댑터가
+    // OverlappingPeriodException(409)으로 변환·롤백한다(shareToGroup() PATCH와 동일).
     @Override
-    public FinanceBudget create(UUID userId, UUID requestedGroupId, FinanceBudgetCommand command) {
+    public FinanceBudget create(UUID userId, boolean shareToGroup, FinanceBudgetCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyBudgetCommand(userId, currentGroupId, command);
+        if (shareToGroup && currentGroupId == null) {
+            throw new IllegalStateException("소속된 그룹이 없습니다");
+        }
+        UUID ownerGroupId = shareToGroup ? currentGroupId : null;
 
         List<FinanceBudget> candidates = budgetPort.findOverlapping(
                 userId, command.categoryId(), command.applyStartDate(), command.applyEndDate());
         List<OverlapAction> actions = resolveOverlapActions(candidates, command);
         actions.forEach(action -> action.execute(budgetPort));
 
-        FinanceBudget budget = new FinanceBudget(null, null, command.categoryId(), userId,
+        FinanceBudget budget = new FinanceBudget(null, ownerGroupId, command.categoryId(), userId,
                 command.applyStartDate(), command.applyEndDate(), command.amount(), null);
         // 기간 중첩 시 어댑터가 finance_budgets_no_overlap EXCLUDE 위반을 OverlappingPeriodException으로 변환한다.
         FinanceBudget saved = budgetPort.save(budget);

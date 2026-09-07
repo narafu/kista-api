@@ -88,7 +88,7 @@ class FinanceCategoryServiceTest {
         FinanceCategoryCommand command = new FinanceCategoryCommand(
                 otherGroupParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
 
-        assertThatThrownBy(() -> categoryService.create(userId, null, command))
+        assertThatThrownBy(() -> categoryService.create(userId, false, command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("다른 그룹");
 
@@ -110,7 +110,7 @@ class FinanceCategoryServiceTest {
         FinanceCategoryCommand command = new FinanceCategoryCommand(
                 personalParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
 
-        assertThat(categoryService.create(userId, null, command)).isEqualTo(saved);
+        assertThat(categoryService.create(userId, false, command)).isEqualTo(saved);
         verify(categoryPort).save(any());
     }
 
@@ -126,7 +126,7 @@ class FinanceCategoryServiceTest {
         FinanceCategoryCommand command = new FinanceCategoryCommand(
                 othersPersonalParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
 
-        assertThatThrownBy(() -> categoryService.create(userId, null, command))
+        assertThatThrownBy(() -> categoryService.create(userId, false, command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("다른 그룹");
 
@@ -144,26 +144,89 @@ class FinanceCategoryServiceTest {
         FinanceCategoryCommand command = new FinanceCategoryCommand(
                 incomeParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
 
-        assertThatThrownBy(() -> categoryService.create(userId, null, command))
+        assertThatThrownBy(() -> categoryService.create(userId, false, command))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("타입");
 
         verify(categoryPort, never()).save(any());
     }
 
-    // 신규 등록은 항상 개인 소유(groupId=null, userId=userId)로 저장한다 — requestedGroupId는 무시된다.
+    // shareToGroup=false면 그룹 소속 여부와 무관하게 개인 소유(groupId=null)로 저장한다.
     @Test
-    @DisplayName("생성은 requestedGroupId와 무관하게 항상 개인 소유(groupId=null)로 저장된다")
-    void create_alwaysSavesAsPersonalOwnership() {
+    @DisplayName("생성 시 shareToGroup=false면 개인 소유(groupId=null)로 저장된다")
+    void create_shareToGroupFalse_savesAsPersonalOwnership() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         FinanceCategoryCommand command = new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "새카테고리", 10);
         when(categoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        FinanceCategory result = categoryService.create(userId, groupId, command);
+        FinanceCategory result = categoryService.create(userId, false, command);
 
         assertThat(result.groupId()).isNull();
         assertThat(result.userId()).isEqualTo(userId);
         verify(categoryPort).save(argThat(c -> c.groupId() == null && userId.equals(c.userId())));
+    }
+
+    // shareToGroup=true + 그룹 소속이면 현재 그룹 소유(groupId=currentGroupId)로 원자적 생성한다.
+    @Test
+    @DisplayName("생성 시 shareToGroup=true + 그룹 소속이면 그룹 소유(groupId=currentGroupId)로 저장된다")
+    void create_shareToGroupTrue_withGroup_savesAsGroupOwnership() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategoryCommand command = new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+        when(categoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceCategory result = categoryService.create(userId, true, command);
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+        assertThat(result.userId()).isEqualTo(userId);
+        verify(categoryPort).save(argThat(c -> groupId.equals(c.groupId()) && userId.equals(c.userId())));
+    }
+
+    // shareToGroup=true인데 부모가 개인 소유면 트리 고아가 되므로 거부한다.
+    @Test
+    @DisplayName("생성 시 shareToGroup=true + 개인 소유 부모면 IllegalArgumentException")
+    void create_shareToGroupTrue_personalParent_throws() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategory personalParent = personalCategory();
+        when(categoryPort.findByIdOrThrow(personalParent.id())).thenReturn(personalParent);
+        FinanceCategoryCommand command = new FinanceCategoryCommand(
+                personalParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+
+        assertThatThrownBy(() -> categoryService.create(userId, true, command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("그룹 공유 부모");
+
+        verify(categoryPort, never()).save(any());
+    }
+
+    // shareToGroup=true + 부모도 같은 그룹 소유면 정상 생성된다.
+    @Test
+    @DisplayName("생성 시 shareToGroup=true + 같은 그룹 소유 부모면 그룹 소유로 저장된다")
+    void create_shareToGroupTrue_groupParent_succeeds() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        FinanceCategory groupParent = groupCategory(groupId);
+        when(categoryPort.findByIdOrThrow(groupParent.id())).thenReturn(groupParent);
+        when(categoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        FinanceCategoryCommand command = new FinanceCategoryCommand(
+                groupParent.id(), FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+
+        FinanceCategory result = categoryService.create(userId, true, command);
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+        verify(categoryPort).save(argThat(c -> groupId.equals(c.groupId())));
+    }
+
+    // shareToGroup=true인데 소속 그룹이 없으면 IllegalStateException으로 거부하고 저장하지 않는다.
+    @Test
+    @DisplayName("생성 시 shareToGroup=true + 무그룹 유저면 IllegalStateException")
+    void create_shareToGroupTrue_noGroup_throws() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        FinanceCategoryCommand command = new FinanceCategoryCommand(null, FinanceCategory.Type.EXPENSE, "새카테고리", 10);
+
+        assertThatThrownBy(() -> categoryService.create(userId, true, command))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("소속된 그룹이 없습니다");
+
+        verify(categoryPort, never()).save(any());
     }
 
     @Test

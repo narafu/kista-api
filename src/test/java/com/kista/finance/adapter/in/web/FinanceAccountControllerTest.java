@@ -58,7 +58,7 @@ class FinanceAccountControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceAccount saved = new FinanceAccount(savedId, null, USER_ID,
                 FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
-        when(accountUseCase.create(any(), any(), any(FinanceAccountCommand.class))).thenReturn(saved);
+        when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -66,6 +66,25 @@ class FinanceAccountControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/accounts/" + savedId));
+    }
+
+    @Test
+    void create_withShareToGroupTrue_forwardsFlagToUseCase() throws Exception {
+        UUID savedId = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        FinanceAccount saved = new FinanceAccount(savedId, groupId, USER_ID,
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+        when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/finance/accounts")
+                        .param("shareToGroup", "true")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountType\":\"SECURITIES\",\"name\":\"토스증권 일반계좌\"}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+
+        verify(accountUseCase).create(eq(USER_ID), eq(true), any(FinanceAccountCommand.class));
     }
 
     @Test
@@ -93,7 +112,7 @@ class FinanceAccountControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceAccount saved = new FinanceAccount(savedId, null, USER_ID,
                 FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", "12345678", null, Instant.now());
-        when(accountUseCase.create(any(), any(), any(FinanceAccountCommand.class))).thenReturn(saved);
+        when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/accounts")
                         .contentType(MediaType.APPLICATION_JSON)

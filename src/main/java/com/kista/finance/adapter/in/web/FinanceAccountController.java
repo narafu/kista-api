@@ -46,9 +46,9 @@ public class FinanceAccountController {
     @PostMapping
     public ResponseEntity<FinanceAccountResponse> create(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
+            @RequestParam(required = false, defaultValue = "false") boolean shareToGroup,
             @Valid @RequestBody FinanceAccountRequest request) {
-        var saved = accountUseCase.create(userId, groupId, request.toCommand());
+        var saved = accountUseCase.create(userId, shareToGroup, request.toCommand());
         return ResponseEntity.created(URI.create("/api/finance/accounts/" + saved.id()))
                 .body(FinanceAccountResponse.from(saved));
     }

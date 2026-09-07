@@ -31,13 +31,19 @@ class FinanceAccountService implements FinanceAccountUseCase {
         return accountPort.findMyScope(userId, currentGroupId);
     }
 
-    // 신규 등록은 항상 개인 소유로 저장한다 — requestedGroupId는 무시.
+    // 신규 등록은 기본 개인 소유. shareToGroup=true면 등록자의 현재 그룹 소유로 원자적 생성.
     @Override
-    public FinanceAccount create(UUID userId, UUID requestedGroupId, FinanceAccountCommand command) {
+    public FinanceAccount create(UUID userId, boolean shareToGroup, FinanceAccountCommand command) {
         if (command.accountNo() != null && accountPort.existsByAccountNo(command.accountNo(), null)) {
             throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
         }
-        FinanceAccount account = new FinanceAccount(null, null, userId, command.accountType(),
+        // 대상 그룹은 클라가 아닌 서버가 현재 그룹으로 해석 — 단건 share PATCH와 동일 모델
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        if (shareToGroup && currentGroupId == null) {
+            throw new IllegalStateException("소속된 그룹이 없습니다");
+        }
+        UUID ownerGroupId = shareToGroup ? currentGroupId : null;
+        FinanceAccount account = new FinanceAccount(null, ownerGroupId, userId, command.accountType(),
                 command.name(), command.accountNo(), command.memo(), null);
         FinanceAccount saved = accountPort.save(account);
         log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());

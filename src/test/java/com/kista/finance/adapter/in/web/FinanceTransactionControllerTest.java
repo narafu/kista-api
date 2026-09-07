@@ -74,7 +74,7 @@ class FinanceTransactionControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceTransaction saved = new FinanceTransaction(savedId, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 8, 1), 344000L, null, Instant.now());
-        when(transactionUseCase.create(any(), any(), any(FinanceTransactionCommand.class))).thenReturn(saved);
+        when(transactionUseCase.create(any(), anyBoolean(), any(FinanceTransactionCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/transactions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,6 +82,28 @@ class FinanceTransactionControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/transactions/" + savedId));
+
+        // shareToGroup 미지정 시 기본 false로 usecase 호출
+        verify(transactionUseCase).create(eq(USER_ID), eq(false), any(FinanceTransactionCommand.class));
+    }
+
+    @Test
+    void create_withShareToGroupParam_passesTrueToUsecase() throws Exception {
+        UUID savedId = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        FinanceTransaction saved = new FinanceTransaction(savedId, groupId, UUID.randomUUID(), USER_ID,
+                LocalDate.of(2026, 8, 1), 344000L, null, Instant.now());
+        when(transactionUseCase.create(any(), anyBoolean(), any(FinanceTransactionCommand.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/finance/transactions")
+                        .param("shareToGroup", "true")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoryId\":\"" + saved.categoryId() + "\",\"transactionDate\":\"2026-08-01\",\"amount\":344000}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+
+        verify(transactionUseCase).create(eq(USER_ID), eq(true), any(FinanceTransactionCommand.class));
     }
 
     @Test

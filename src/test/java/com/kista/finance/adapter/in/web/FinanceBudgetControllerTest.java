@@ -23,6 +23,8 @@ import java.util.UUID;
 import static com.kista.support.WebMvcTestSupport.*;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -72,14 +74,33 @@ class FinanceBudgetControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceBudget saved = new FinanceBudget(savedId, null, UUID.randomUUID(), USER_ID,
                 LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
-        when(budgetUseCase.create(any(), any(), any(FinanceBudgetCommand.class))).thenReturn(saved);
+        when(budgetUseCase.create(any(), anyBoolean(), any(FinanceBudgetCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/budgets")
+                        .param("shareToGroup", "true")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"categoryId\":\"" + saved.categoryId() + "\",\"applyStartDate\":\"2026-01-01\",\"amount\":350000}")
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/budgets/" + savedId));
+
+        verify(budgetUseCase).create(eq(USER_ID), eq(true), any(FinanceBudgetCommand.class));
+    }
+
+    @Test
+    void create_withoutShareToGroupParam_defaultsToFalse() throws Exception {
+        UUID savedId = UUID.randomUUID();
+        FinanceBudget saved = new FinanceBudget(savedId, null, UUID.randomUUID(), USER_ID,
+                LocalDate.of(2026, 1, 1), null, 350000L, Instant.now());
+        when(budgetUseCase.create(any(), anyBoolean(), any(FinanceBudgetCommand.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/finance/budgets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"categoryId\":\"" + saved.categoryId() + "\",\"applyStartDate\":\"2026-01-01\",\"amount\":350000}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated());
+
+        verify(budgetUseCase).create(eq(USER_ID), eq(false), any(FinanceBudgetCommand.class));
     }
 
     @Test

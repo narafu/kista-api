@@ -66,19 +66,78 @@ class FinanceBudgetServiceTest {
         verify(budgetPort).findMyScope(userId, groupId, categoryId, null);
     }
 
-    // 신규 등록은 requestedGroupId와 무관하게 항상 개인 소유(groupId=null)로 저장된다.
+    // shareToGroup=false면 개인 소유(groupId=null)로 저장된다.
     @Test
-    @DisplayName("create는 requestedGroupId를 무시하고 개인 소유(groupId=null)로 저장")
-    void create_alwaysSavesAsPersonalOwnership() {
+    @DisplayName("create shareToGroup=false는 개인 소유(groupId=null)로 저장")
+    void create_shareToGroupFalse_savesAsPersonalOwnership() {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
         when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        FinanceBudget result = budgetService.create(userId, groupId, command());
+        FinanceBudget result = budgetService.create(userId, false, command());
 
         assertThat(result.groupId()).isNull();
         assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.amount()).isEqualTo(300_000L);
+    }
+
+    // shareToGroup=true + 그룹 소속이면 현재 그룹 소유로 저장된다.
+    @Test
+    @DisplayName("create shareToGroup=true는 현재 그룹 소유(groupId=currentGroupId)로 저장")
+    void create_shareToGroupTrue_savesAsGroupOwnership() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceBudget result = budgetService.create(userId, true, command());
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+        assertThat(result.userId()).isEqualTo(userId);
+    }
+
+    // shareToGroup=true인데 소속 그룹이 없으면 IllegalStateException.
+    @Test
+    @DisplayName("create shareToGroup=true + 무그룹 유저면 IllegalStateException")
+    void create_shareToGroupTrue_noGroup_throwsIllegalState() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+
+        assertThatThrownBy(() -> budgetService.create(userId, true, command()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("소속된 그룹이 없습니다");
+        verify(budgetPort, never()).save(any());
+    }
+
+    // shareToGroup=true + 그룹에 겹치는 예산이 있으면 EXCLUDE 위반을 어댑터가 변환한 예외가 그대로 전파된다.
+    @Test
+    @DisplayName("create shareToGroup=true + 그룹 스코프 겹침이면 OverlappingPeriodException 전파")
+    void create_shareToGroupTrue_groupScopeOverlap_propagates() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.save(any())).thenThrow(new FinanceBudget.OverlappingPeriodException("기간이 겹칩니다"));
+
+        assertThatThrownBy(() -> budgetService.create(userId, true, command()))
+                .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
+    }
+
+    // shareToGroup=true여도 내 개인 예산 겹침은 먼저 트림하고 그 다음 그룹 소유로 save한다(스펙 Option A).
+    @Test
+    @DisplayName("create shareToGroup=true + 내 개인 예산만 겹치면 트림 후 그룹 소유 저장 성공")
+    void create_shareToGroupTrue_personalOverlap_trimsThenSavesGroupOwned() {
+        FinanceBudget personalOverlap = budgetOf(LocalDate.of(2020, 1, 1), null); // 무기한 개인 예산
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
+                .thenReturn(List.of(personalOverlap));
+        when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        budgetService.create(userId, true, command());
+
+        ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
+        verify(budgetPort, times(2)).save(captor.capture()); // 1) 트림된 개인 예산 2) 신규 그룹 예산
+        assertThat(captor.getAllValues().get(0).id()).isEqualTo(personalOverlap.id());
+        assertThat(captor.getAllValues().get(0).applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
+        assertThat(captor.getAllValues().get(1).groupId()).isEqualTo(groupId);
     }
 
     @Test
@@ -128,7 +187,7 @@ class FinanceBudgetServiceTest {
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
         when(budgetPort.save(any())).thenThrow(new FinanceBudget.OverlappingPeriodException("기간이 겹칩니다"));
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+        assertThatThrownBy(() -> budgetService.create(userId, false, command()))
                 .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
     }
 
@@ -140,7 +199,7 @@ class FinanceBudgetServiceTest {
         FinanceBudgetCommand invalid = new FinanceBudgetCommand(categoryId,
                 LocalDate.of(2026, 6, 1), LocalDate.of(2026, 1, 1), 300_000L);
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, invalid))
+        assertThatThrownBy(() -> budgetService.create(userId, false, invalid))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(budgetPort, never()).save(any());
     }
@@ -153,7 +212,7 @@ class FinanceBudgetServiceTest {
                 FinanceCategory.Type.ASSET, "투자", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(assetCategory);
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+        assertThatThrownBy(() -> budgetService.create(userId, false, command()))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(budgetPort, never()).save(any());
     }
@@ -166,7 +225,7 @@ class FinanceBudgetServiceTest {
                 FinanceCategory.Type.EXPENSE, "식비", 0, null);
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(othersPersonalCategory);
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+        assertThatThrownBy(() -> budgetService.create(userId, false, command()))
                 .isInstanceOf(SecurityException.class);
         verify(budgetPort, never()).save(any());
     }
@@ -299,7 +358,7 @@ class FinanceBudgetServiceTest {
                 .thenReturn(List.of(existing));
         when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        budgetService.create(userId, null, command()); // command() = 2026/06/01~2026/12/31
+        budgetService.create(userId, false, command()); // command() = 2026/06/01~2026/12/31
 
         ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
         verify(budgetPort, times(2)).save(captor.capture()); // 1) 트림된 기존 2) 신규
@@ -319,7 +378,7 @@ class FinanceBudgetServiceTest {
                 .thenReturn(List.of(existing));
         when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        budgetService.create(userId, null, command());
+        budgetService.create(userId, false, command());
 
         verify(budgetPort).delete(existing.id());
         verify(budgetPort, times(1)).save(any()); // 신규만 저장, 트림 없음
@@ -334,7 +393,7 @@ class FinanceBudgetServiceTest {
         when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
                 .thenReturn(List.of(existing));
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+        assertThatThrownBy(() -> budgetService.create(userId, false, command()))
                 .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
 
         verify(budgetPort, never()).save(any());
@@ -350,7 +409,7 @@ class FinanceBudgetServiceTest {
         when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
                 .thenReturn(List.of(existing));
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+        assertThatThrownBy(() -> budgetService.create(userId, false, command()))
                 .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
 
         verify(budgetPort, never()).save(any());
@@ -368,7 +427,7 @@ class FinanceBudgetServiceTest {
                 .thenReturn(List.of(toTrim, toDelete));
         when(budgetPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        budgetService.create(userId, null, command());
+        budgetService.create(userId, false, command());
 
         verify(budgetPort).delete(toDelete.id());
         ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
@@ -387,7 +446,7 @@ class FinanceBudgetServiceTest {
         when(budgetPort.findOverlapping(userId, categoryId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 12, 31)))
                 .thenReturn(List.of(validTrim, wrapsAround));
 
-        assertThatThrownBy(() -> budgetService.create(userId, null, command()))
+        assertThatThrownBy(() -> budgetService.create(userId, false, command()))
                 .isInstanceOf(FinanceBudget.OverlappingPeriodException.class);
 
         verify(budgetPort, never()).save(any());

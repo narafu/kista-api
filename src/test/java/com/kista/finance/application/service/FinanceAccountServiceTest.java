@@ -56,16 +56,39 @@ class FinanceAccountServiceTest {
     }
 
     @Test
-    @DisplayName("create는 requestedGroupId를 무시하고 개인 소유(groupId=null)로 저장")
-    void create_alwaysSavesAsPersonalOwnership() {
+    @DisplayName("create는 shareToGroup=false면 개인 소유(groupId=null)로 저장")
+    void create_shareToGroupFalse_savesAsPersonal() {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        FinanceAccount result = accountService.create(userId, groupId, command());
+        FinanceAccount result = accountService.create(userId, false, command());
 
         assertThat(result.groupId()).isNull();
         assertThat(result.userId()).isEqualTo(userId);
         assertThat(result.name()).isEqualTo("카카오뱅크");
-        verifyNoInteractions(financeGroupPort); // create는 그룹 조회 없이 항상 개인 소유로 저장
+    }
+
+    @Test
+    @DisplayName("create는 shareToGroup=true면 등록자의 현재 그룹 소유로 저장")
+    void create_shareToGroupTrue_savesAsGroupOwned() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        FinanceAccount result = accountService.create(userId, true, command());
+
+        assertThat(result.groupId()).isEqualTo(groupId);
+        assertThat(result.userId()).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName("create는 shareToGroup=true인데 무그룹 유저면 IllegalStateException")
+    void create_shareToGroupTrue_noGroup_throwsIllegalState() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> accountService.create(userId, true, command()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("소속된 그룹이 없습니다");
+
+        verify(accountPort, never()).save(any());
     }
 
     @Test
@@ -127,7 +150,7 @@ class FinanceAccountServiceTest {
     void create_duplicateName_propagatesUntouched() {
         when(accountPort.save(any())).thenThrow(new FinanceAccount.DuplicateNameException("카카오뱅크"));
 
-        assertThatThrownBy(() -> accountService.create(userId, null, command()))
+        assertThatThrownBy(() -> accountService.create(userId, false, command()))
                 .isInstanceOf(FinanceAccount.DuplicateNameException.class)
                 .hasMessageContaining("카카오뱅크");
     }
@@ -150,7 +173,7 @@ class FinanceAccountServiceTest {
     void create_duplicateAccountNo_throwsDuplicateAccountNoException() {
         when(accountPort.existsByAccountNo("5678", null)).thenReturn(true);
 
-        assertThatThrownBy(() -> accountService.create(userId, null, command()))
+        assertThatThrownBy(() -> accountService.create(userId, false, command()))
                 .isInstanceOf(FinanceAccount.DuplicateAccountNoException.class)
                 .hasMessageContaining("5678");
 

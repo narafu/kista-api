@@ -88,7 +88,7 @@ class FinanceCategoryControllerTest {
         UUID savedId = UUID.randomUUID();
         FinanceCategory saved = new FinanceCategory(savedId, null, null, USER_ID,
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
-        when(categoryUseCase.create(any(), any(), any(FinanceCategoryCommand.class))).thenReturn(saved);
+        when(categoryUseCase.create(any(), anyBoolean(), any(FinanceCategoryCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/categories")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,6 +96,28 @@ class FinanceCategoryControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/finance/categories/" + savedId));
+
+        // shareToGroup 미지정이면 기본값 false로 usecase에 전달
+        verify(categoryUseCase).create(eq(USER_ID), eq(false), any(FinanceCategoryCommand.class));
+    }
+
+    @Test
+    void create_withShareToGroupTrue_forwardsFlag() throws Exception {
+        UUID savedId = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        FinanceCategory saved = new FinanceCategory(savedId, groupId, null, USER_ID,
+                FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
+        when(categoryUseCase.create(any(), anyBoolean(), any(FinanceCategoryCommand.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/finance/categories")
+                        .param("shareToGroup", "true")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EXPENSE\",\"name\":\"식비\",\"sortOrder\":0}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.groupId").value(groupId.toString()));
+
+        verify(categoryUseCase).create(eq(USER_ID), eq(true), any(FinanceCategoryCommand.class));
     }
 
     @Test
