@@ -3,7 +3,6 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.trading.application.event.BatchInterruptedEvent;
 import com.kista.trading.application.event.CycleCompletedEvent;
-import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.event.MarketClosedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;

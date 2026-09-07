@@ -6,7 +6,6 @@ import com.kista.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.trading.domain.model.StrategySeedPreview;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
