@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -82,9 +83,9 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     }
 
     private boolean isIdentical(PrivacyTradeBaseEntity base, FidaOrderCommand command) {
-        if (base.getCurrentCycleStart().compareTo(command.currentCycleStart()) != 0) return false;
-        if (base.getCurrentCycleRealizedPnl().compareTo(command.currentCycleRealizedPnl()) != 0) return false;
-        if (!bigDecimalEquals(base.getAvgPrice(), command.avgPrice())) return false;
+        if (!sameMoney(base.getCurrentCycleStart(), command.currentCycleStart())) return false;
+        if (!sameMoney(base.getCurrentCycleRealizedPnl(), command.currentCycleRealizedPnl())) return false;
+        if (!sameMoney(base.getAvgPrice(), command.avgPrice())) return false;
         if (base.getHoldings() != command.holdings()) return false;
 
         // 주문 비교 — 동일한 정렬 기준으로 맞춘 후 순서대로 비교
@@ -100,15 +101,18 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
             if (e.getDirection() != o.direction()) return false;
             if (e.getOrderType() != o.orderType()) return false;
             if (!Objects.equals(e.getQuantity(), o.quantity())) return false;
-            if (e.getPrice().compareTo(o.price()) != 0) return false;
+            if (!sameMoney(e.getPrice(), o.price())) return false;
         }
         return true;
     }
 
-    private static boolean bigDecimalEquals(BigDecimal a, BigDecimal b) {
+    // 금액 컬럼은 전부 numeric(12,2) — Postgres가 저장 시 소수 3자리 이상을 HALF_UP 반올림한다.
+    // 멱등 비교도 동일 스케일로 정규화해야 FIDA가 재계산한 평단(예: 115.318)이 저장값(115.32)과
+    // 어긋나 409를 내는 오탐을 막는다.
+    private static boolean sameMoney(BigDecimal a, BigDecimal b) {
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
-        return a.compareTo(b) == 0;
+        return a.setScale(2, RoundingMode.HALF_UP).compareTo(b.setScale(2, RoundingMode.HALF_UP)) == 0;
     }
 
     @Override
