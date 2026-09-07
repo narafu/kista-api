@@ -49,7 +49,10 @@ FK 선언: 반드시 명시적 이름 사용
   CREATE TABLE xxx (...);
   INSERT INTO xxx SELECT ... FROM xxx_old;
   DROP TABLE xxx_old;
-  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (현재는 V1__init.sql에 스쿼시되어 예시로 참고할 별도 파일 없음 — constraints.md "테이블 재생성 패턴 FK 제약명 주의" 참고)
+  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (현재는 V1__init.sql에 스쿼시되어 예시로 참고할 별도 파일 없음)
+
+실제 제약명 확인: SELECT conname FROM pg_constraint WHERE conrelid = '<table>'::regclass AND contype = 'f';
+PK 인덱스도 Postgres가 자동 리네임(t_pkey → t_old_pkey) — RENAME 후 수동 ALTER INDEX t_pkey ... 호출 시 "relation does not exist" 오류 (운영 배포 실패 사례, commit 6fdc65d). 별도 ALTER INDEX 불필요, 새 테이블 CREATE 시 자동으로 새 t_pkey 생성됨
 
 ## 5. 검증
 

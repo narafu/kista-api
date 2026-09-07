@@ -22,6 +22,20 @@
 - **Redis는 자체 호스팅**(kista-infra 레포의 `docker-compose.yml`의 `redis` 서비스, AOF 영속성) — Fly.io는 다중 인스턴스 가능성 때문에 외부 공유 Redis(Upstash)가 필수였지만, OCI는 단일 인스턴스라 로컬 Redis 하나로 "모든 운영 인스턴스가 같은 Redis를 봐야 함" 제약이 자동 충족됨. `REDIS_URL`은 `docker-compose.yml`에 `redis://redis:6379`로 하드코딩되어 있어 `.env` 설정 불필요
 - Fly.io의 기존 Redis("Fly Redis" 애드온, `fly-*-redis.upstash.io`)는 Fly 사설 네트워크(`fdaa::/16`, 6PN 전용) 주소라 **외부에서 접근 불가** — 커트오버 시 이 값을 그대로 재사용하려다 실측(`fly ssh console`로 조회 후 외부에서 접속 시도 → `Network is unreachable`)으로 확인됨. 벤더를 완전히 바꾸는 마이그레이션에서는 Fly Redis를 승계할 수 없다는 뜻이라, 새 Redis(관리형이든 자체 호스팅이든)를 처음부터 새로 구성해야 함
 
+### .env 파일 멀티라인 값 금지
+- JSON 환경변수(예: `FIREBASE_SERVICE_ACCOUNT_JSON`)는 반드시 한 줄로 직렬화 — `.env` 파서는 줄바꿈을 값 끝으로 인식, 첫 줄 이후 무시됨
+- 변환: `python3 -c "import json; content=open('.env.production').read(); start=content.index('KEY=')+4; print(json.dumps(json.loads(content[start:].strip()), separators=(',',':')))"`
+
+### 텔레그램 로컬 테스트
+- `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 — 로컬 `curl .../sendMessage` 테스트 시 VPN 필요
+- 로컬 Docker에서 Telegram 인바운드(callback_query) 동작 불가 — Telegram 서버가 localhost 미접근
+- 로컬 승인: `curl -s -X POST http://localhost:8080/api/auth/dev-approve/<UUID>` (`DevAuthController`, `@Profile("local")` 전용)
+
+### Telegram Webhook 등록
+- `/telegram/webhook` 엔드포인트가 있어도 `setWebhook` API 미호출 시 버튼 클릭(callback_query) 이벤트 미수신
+- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://api.kista-app.com/telegram/webhook"}'`
+- 배포 URL 변경 시 재등록 필요
+
 ### 다중 인스턴스 Toss 토큰 조정
 - 모든 인스턴스의 Toss 계좌·관리자 canonical token은 자체호스팅 Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
 - scope별 20초 Redis owner lease(OAuth RestTemplate 타임아웃 최악 케이스보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.

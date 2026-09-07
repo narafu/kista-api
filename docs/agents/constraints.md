@@ -74,10 +74,6 @@
 ### MetaController (enum SSOT)
 - `GET /api/meta` — enum 메타(label/description 포함) 단일 번들 제공 — UI에서 enum 리터럴 하드코딩 금지
 
-### 파일 인코딩 주의 (BOM)
-- 서브에이전트가 Java 파일 import 수정 시 BOM(`\xef\xbb\xbf`) 삽입 버그 발생 사례 → `compileJava` 즉시 실패
-- 일괄 제거: `grep -rl $'\xef\xbb\xbf' src --include="*.java" | while read f; do sed -i '1s/^\xef\xbb\xbf//' "$f"; done`
-
 ### 수량 변수명 규칙
 - **보유 잔고 수량**: `holdings` (avgPrice와 짝), **주문/체결 수량**: `quantity` (단건 거래)
 - `privacy_trade_base_orders.quantity` — nullable (FIDA 수신 시 수량 미확정 허용)
@@ -205,11 +201,6 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - datasource url/username/password는 반드시 `${DB_URL:...}` 형식 유지 — 하드코딩 시 Docker에서 주입한 `DB_URL=postgres:5432`가 무시되고 `localhost:5432`로 접속 시도
 
 
-### 텔레그램 로컬 테스트
-- `api.telegram.org:443` TCP가 ISP 레벨에서 차단될 수 있음 — 로컬 `curl .../sendMessage` 테스트 시 VPN 필요
-- 로컬 Docker에서 Telegram 인바운드(callback_query) 동작 불가 — Telegram 서버가 localhost 미접근
-- 로컬 승인: `curl -s -X POST http://localhost:8080/api/auth/dev-approve/<UUID>` (`DevAuthController`, `@Profile("local")` 전용)
-
 ### Adapter 내부 중첩 타입 접근 제어자
 - 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
 - 예: `com.kista.broker.adapter.out.kis.KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
@@ -260,11 +251,6 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - **`SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint` 반드시 설정** — 미설정 시 인증 실패가 401 대신 403 반환
 - **`JwtAuthFilter` catch 절은 `Exception`으로** — `JwtException`만 잡으면 NPE·IAE 미처리 → 익명 사용자 → 403
 
-### Telegram Webhook 등록
-- `/telegram/webhook` 엔드포인트가 있어도 `setWebhook` API 미호출 시 버튼 클릭(callback_query) 이벤트 미수신
-- 등록: `curl -X POST "https://api.telegram.org/bot{TOKEN}/setWebhook" -d '{"url":"https://api.kista-app.com/telegram/webhook"}'`
-- 배포 URL 변경 시 재등록 필요
-
 ### @Transactional 내부 외부 시스템 호출 금지
 - RestTemplate(텔레그램, KIS 등)을 `@Transactional` 내부에서 호출 금지 — 롤백 시 취소 불가
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)`
@@ -281,15 +267,6 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)
 - register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
 - `AccountService.update()`는 strategyType 변경 지원 — null 전달 시 기존값 유지, PRIVACY 선택 시 ticker는 SOXL 강제 (register와 동일 규칙)
-
-### 테이블 재생성 패턴 FK 제약명 주의
-- 인라인 `REFERENCES` 대신 `CONSTRAINT 명시_fkey FOREIGN KEY (...)` 형식 사용 — 제약명 충돌(`_fkey1` 숫자 접미사) 방지
-- 실제 제약명 확인: `SELECT conname FROM pg_constraint WHERE conrelid = 'table'::regclass AND contype = 'f';`
-- **PK 인덱스도 Postgres가 자동 리네임**(`t_pkey` → `t_old_pkey`) — RENAME 후 수동 `ALTER INDEX t_pkey ...` 호출 시 "relation does not exist" 오류 (운영 배포 실패 사례, commit 6fdc65d). 별도 ALTER INDEX 불필요, 새 테이블 CREATE 시 자동으로 새 `t_pkey` 생성됨
-
-### .env 파일 멀티라인 값 금지
-- JSON 환경변수(예: `FIREBASE_SERVICE_ACCOUNT_JSON`)는 반드시 한 줄로 직렬화 — `.env` 파서는 줄바꿈을 값 끝으로 인식, 첫 줄 이후 무시됨
-- 변환: `python3 -c "import json; content=open('.env.production').read(); start=content.index('KEY=')+4; print(json.dumps(json.loads(content[start:].strip()), separators=(',',':')))"`
 
 ### FCM 디바이스 토큰 저장 규칙
 - 한 사용자가 같은 플랫폼의 여러 디바이스 토큰을 가질 수 있다. 신규 토큰 저장 시 같은 사용자·플랫폼 토큰을 일괄 삭제하지 않고, 동일 토큰의 기존 소유 레코드만 삭제한 뒤 현재 사용자에게 저장한다
