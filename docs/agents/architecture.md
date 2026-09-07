@@ -164,7 +164,7 @@ com.kista.web/       ← Spring Modulith 앱셸 모듈. `@ApplicationModule(Type
   aop/ErrorLogAspect   ← `NotifyPort.notifyError` AOP 오류 로깅
   config/MetricsConfig ← 메트릭 설정
   dto/                 ← 14개 — web 전용 요청/응답 DTO(TradingCycleRequest/TradingCycleResponse·VrConfigRequest·MetaBundle·EnumMeta·StrategyTypeMeta·TickerMeta·StrategySeedPreviewResponse·StrategyOrdersResponse·CancelOrdersResponse·ExecuteOrdersResponse·NextOrdersResponse·CycleHistoryPageResponse/CycleHistoryResponse(stats 사본과 byte-identical own-type))
-  ── NOTE: `com.kista.web`은 `HexagonalArchitectureTest`의 `..adapter..`/`..application..`/`..domain..` 와일드카드 어디에도 걸리지 않는다(패키지에 그 세그먼트가 없음) — 헥사고날 레이어 규칙의 검사 대상이 아니고 모듈 간 경계는 `ModulithArchitectureTest.verify()`만 policing한다. web엔 잘못 의존할 service 레이어 자체가 없어 현재는 무해하나, 방어적으로 `web → ..application.service..` 금지 규칙을 추가하는 것은 후속 후보
+  ── NOTE: `com.kista.web`은 `HexagonalArchitectureTest`의 `..adapter..`/`..application..`/`..domain..` 와일드카드 어디에도 걸리지 않는다(패키지에 그 세그먼트가 없음) — 나머지 레이어 규칙들의 검사 대상은 아니지만, `web_must_stay_pure_inbound_sink` 규칙이 `web → ..application.service../..adapter.out..` 의존을 직접 금지해 sink 전제를 강제한다(모듈 경계는 `ModulithArchitectureTest.verify()`가 별도로 policing)
 ```
 
 ### Spring Modulith 모듈 구성

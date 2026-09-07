@@ -59,6 +59,21 @@ class HexagonalArchitectureTest {
     }
 
     @Test
+    @DisplayName("web(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
+    void web_must_stay_pure_inbound_sink() {
+        // com.kista.web은 패키지에 adapter/application/domain 세그먼트가 없어
+        // 위 도메인/application.service 규칙 와일드카드에 안 걸린다(미검사 표면) — 이 규칙으로 직접 강제한다.
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.web..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.kista..application.service..",
+                        "com.kista..adapter.out.."
+                );
+        rule.check(classes);
+    }
+
+    @Test
     @DisplayName("도메인은 어떤 외부 레이어도 의존하지 않는다")
     void domain_must_not_depend_on_outer_layers() {
         ArchRule rule = noClasses()
