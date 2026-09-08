@@ -33,6 +33,7 @@
 - `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — 변환 없이 KST 날짜 그대로 전달
 - **`queryFrom = from - 1일`**: 전날 저녁 선접수 주문이 당일 장마감에 체결될 수 있어 1일 앞당겨 조회 후, `filledAt(KST)` 기반 필터링
 - KIS(US 거래일 기준, `UsTradeDates` 변환 필요)와 반대 방향 — 혼용 금지
+- **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙). 과거 변환 누락으로 MOCK/Toss 계좌 확정 종가가 거의 항상 라이브 현재가로 폴백되던 버그 있었음
 
 ### 주의사항
 
