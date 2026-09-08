@@ -43,14 +43,30 @@ class MonthlyClosingControllerTest {
 
     @Test
     void list_returns200() throws Exception {
-        MonthlyClosing closing = new MonthlyClosing(UUID.randomUUID(), UUID.randomUUID(), USER_ID,
+        UUID groupId = UUID.randomUUID();
+        MonthlyClosing closing = new MonthlyClosing(UUID.randomUUID(), groupId, USER_ID,
                 "2026-08", true, Instant.now(), Instant.now());
         when(monthlyClosingUseCase.list(any(), any())).thenReturn(List.of(closing));
 
         mockMvc.perform(get("/api/finance/monthly-closings")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].month").value("2026-08"));
+                .andExpect(jsonPath("$[0].month").value("2026-08"))
+                .andExpect(jsonPath("$[0].groupId").value(groupId.toString()));
+    }
+
+    // 개인 마감 행은 groupId=null이 응답에 명시적으로 실려야 한다(생략 아님) — 클라이언트가
+    // findMyScope union에서 개인/그룹 행을 구분하는 근거
+    @Test
+    void list_personalClosing_groupIdIsNull() throws Exception {
+        MonthlyClosing personal = new MonthlyClosing(UUID.randomUUID(), null, USER_ID,
+                "2026-08", true, Instant.now(), Instant.now());
+        when(monthlyClosingUseCase.list(any(), any())).thenReturn(List.of(personal));
+
+        mockMvc.perform(get("/api/finance/monthly-closings")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].groupId").value(org.hamcrest.Matchers.nullValue()));
     }
 
     // PATCH /{month}로 상태 전이한다 — plan §6에서 구 AssetMonthlyCheck의 PUT을 의도적으로 PATCH로 바꾼 지점.
