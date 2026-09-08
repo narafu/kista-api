@@ -5,6 +5,7 @@ import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.AssetSnapshotCommand;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.Market;
+import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceCategoryPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
@@ -32,7 +33,11 @@ class AssetSnapshotServiceTest {
     @Mock AssetSnapshotPort assetSnapshotPort;
     @Mock FinanceGroupPort financeGroupPort;
     @Mock FinanceCategoryPort financeCategoryPort;
+    @Mock MonthlyClosingGuard monthlyClosingGuard;
     @InjectMocks AssetSnapshotService assetSnapshotService;
+
+    private static final LocalDate CLOSED_DATE = LocalDate.of(2026, 1, 1);   // personalSnapshot의 entryDate
+    private static final LocalDate COMMAND_DATE = LocalDate.of(2026, 2, 1);  // command()의 entryDate
 
     private final UUID userId = UUID.randomUUID();
     private final UUID groupId = UUID.randomUUID();
@@ -294,6 +299,91 @@ class AssetSnapshotServiceTest {
         AssetSnapshot result = assetSnapshotService.unshare(snapshotId, userId);
 
         assertThat(result.groupId()).isNull();
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    // ----- 기록 점검 완료월 쓰기 차단 -----
+
+    @Test
+    @DisplayName("create는 대상 월이 마감됐으면 MonthClosedException")
+    void create_closedMonth_throwsMonthClosed() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        doThrow(new MonthlyClosing.MonthClosedException("2026-02"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(COMMAND_DATE));
+
+        assertThatThrownBy(() -> assetSnapshotService.create(userId, false, command()))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update는 기존 기록이 마감월에 있으면 차단(마감월에서 빼내기 방지)")
+    void update_existingInClosedMonth_throwsMonthClosed() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> assetSnapshotService.update(snapshotId, userId, command()))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update는 대상 월(command)이 마감됐으면 차단(마감월로 넣기 방지)")
+    void update_commandTargetsClosedMonth_throwsMonthClosed() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        doNothing().when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE)); // 기존 기록 월은 정상
+        doThrow(new MonthlyClosing.MonthClosedException("2026-02"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(COMMAND_DATE));
+
+        assertThatThrownBy(() -> assetSnapshotService.update(snapshotId, userId, command()))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("delete는 기록이 마감월에 있으면 차단")
+    void delete_closedMonth_throwsMonthClosed() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> assetSnapshotService.delete(snapshotId, userId))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(assetSnapshotPort, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 기록이 마감월에 있으면 차단")
+    void shareToGroup_closedMonth_throwsMonthClosed() {
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(personalSnapshot());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> assetSnapshotService.shareToGroup(snapshotId, userId))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(assetSnapshotPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 기록이 마감월에 있으면 차단")
+    void unshare_closedMonth_throwsMonthClosed() {
+        AssetSnapshot sharedSnapshot = new AssetSnapshot(snapshotId, groupId, categoryId, accountId, userId,
+                CLOSED_DATE, AssetClass.CASH, Market.DOMESTIC, null, null, 1_000_000L, null);
+        when(assetSnapshotPort.findByIdOrThrow(snapshotId)).thenReturn(sharedSnapshot);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> assetSnapshotService.unshare(snapshotId, userId))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
         verify(assetSnapshotPort, never()).save(any());
     }
 }

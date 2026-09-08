@@ -13,4 +13,7 @@ public interface MonthlyClosingPort {
     MonthlyClosing upsert(UUID groupId, UUID userId, String month, boolean completed);
 
     void deleteByGroupId(UUID groupId); // 그룹 소프트 삭제(탈퇴로 멤버 0) 시 함께 정리
+
+    // 현재 그룹 있으면 그룹 마감, 없으면 개인 마감의 completed 여부. 행 없으면 false.
+    boolean isMonthClosed(UUID currentGroupId, UUID userId, String month);
 }

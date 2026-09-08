@@ -23,4 +23,11 @@ public record MonthlyClosing(
             throw new SecurityException("월간 마감에 대한 접근 권한이 없습니다");
         }
     }
+
+    // 기록 점검 완료(completed=true)된 달에 재무 쓰기(등록/수정/삭제/공유)를 시도하면 던진다 → 409
+    public static class MonthClosedException extends RuntimeException {
+        public MonthClosedException(String month) {
+            super("기록 점검이 완료된 달(" + month + ")입니다. 자산탭 기록 점검에서 완료를 해제한 뒤 다시 시도하세요.");
+        }
+    }
 }

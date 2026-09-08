@@ -7,6 +7,7 @@ import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
+import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.broker.domain.model.kis.KisApiException;
@@ -69,7 +70,8 @@ public class GlobalExceptionHandler {
         Map.entry(FinanceAccount.DuplicateAccountNoException.class,    new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.LinkedAssetSnapshotsException.class,  new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
-        Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict"))
+        Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict")),
+        Map.entry(MonthlyClosing.MonthClosedException.class,           new Mapping(HttpStatus.CONFLICT,           "Conflict"))
     );
 
     // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지

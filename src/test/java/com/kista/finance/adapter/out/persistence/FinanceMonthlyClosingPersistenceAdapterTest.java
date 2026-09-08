@@ -116,6 +116,37 @@ class FinanceMonthlyClosingPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(result).extracting(MonthlyClosing::groupId).containsExactly((UUID) null);
     }
 
+    // ----- isMonthClosed: 현재 그룹 있으면 그룹 마감, 없으면 개인 마감 (either/or) -----
+
+    @Test
+    void isMonthClosed_groupScope_completedTrue_returnsTrue() {
+        adapter.upsert(groupId, userId, "2026-08", true);
+
+        assertThat(adapter.isMonthClosed(groupId, userId, "2026-08")).isTrue();
+    }
+
+    @Test
+    void isMonthClosed_personalScope_completedTrue_returnsTrue() {
+        adapter.upsert(null, userId, "2026-08", true);
+
+        assertThat(adapter.isMonthClosed(null, userId, "2026-08")).isTrue();
+    }
+
+    @Test
+    void isMonthClosed_noRow_returnsFalse() {
+        assertThat(adapter.isMonthClosed(groupId, userId, "2026-08")).isFalse();
+        assertThat(adapter.isMonthClosed(null, userId, "2026-08")).isFalse();
+    }
+
+    @Test
+    void isMonthClosed_completedFalseRow_returnsFalse() {
+        adapter.upsert(groupId, userId, "2026-08", false);
+        adapter.upsert(null, userId, "2026-08", false);
+
+        assertThat(adapter.isMonthClosed(groupId, userId, "2026-08")).isFalse();
+        assertThat(adapter.isMonthClosed(null, userId, "2026-08")).isFalse();
+    }
+
     @Test
     void deleteByGroupId_removesGroupClosings() {
         adapter.upsert(groupId, userId, "2026-08", true);

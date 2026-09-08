@@ -99,4 +99,19 @@ class MonthlyClosingServiceTest {
 
         verify(monthlyClosingPort).upsert(groupId, userId, "2026-08", false);
     }
+
+    // 마감 해제에는 절대 가드가 없어야 한다 — 이미 completed=true인 달도 upsert(completed=false)가 성공해야
+    // 제품이 영구 동결되지 않는다.
+    @Test
+    @DisplayName("이미 마감된 달도 upsert(completed=false)로 해제 가능 — 마감 해제엔 가드 없음")
+    void setCompleted_false_onAlreadyClosedMonth_succeeds() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        MonthlyClosing reopened = new MonthlyClosing(UUID.randomUUID(), groupId, userId, "2026-08", false, null, null);
+        when(monthlyClosingPort.upsert(groupId, userId, "2026-08", false)).thenReturn(reopened);
+
+        MonthlyClosing result = monthlyClosingService.setCompleted(userId, null, "2026-08", false);
+
+        assertThat(result.completed()).isFalse();
+        verify(monthlyClosingPort).upsert(groupId, userId, "2026-08", false);
+    }
 }

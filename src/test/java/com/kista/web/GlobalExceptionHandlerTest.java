@@ -1,6 +1,7 @@
 package com.kista.web;
 
 import com.kista.broker.domain.model.kis.KisApiException;
+import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.admin.application.port.output.AppErrorLogPort;
@@ -18,8 +19,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class GlobalExceptionHandlerTest {
+
+    @Test
+    void monthClosedException_mapsTo409() {
+        AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(appErrorLogPort);
+
+        var detail = handler.handleAll(new MonthlyClosing.MonthClosedException("2026-09"));
+
+        assertThat(detail.getStatus()).isEqualTo(409);
+        verifyNoInteractions(appErrorLogPort);
+    }
 
     @Test
     void asyncRequestNotUsableException_alreadyCommitted_skipsStatusChange() {

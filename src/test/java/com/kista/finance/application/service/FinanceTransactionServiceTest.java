@@ -3,6 +3,7 @@ package com.kista.finance.application.service;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.FinanceTransaction;
 import com.kista.finance.domain.model.FinanceTransactionCommand;
+import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.finance.application.port.output.FinanceCategoryPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
@@ -30,7 +31,11 @@ class FinanceTransactionServiceTest {
     @Mock FinanceTransactionPort transactionPort;
     @Mock FinanceGroupPort financeGroupPort;
     @Mock FinanceCategoryPort financeCategoryPort;
+    @Mock MonthlyClosingGuard monthlyClosingGuard;
     @InjectMocks FinanceTransactionService transactionService;
+
+    private static final LocalDate CLOSED_DATE = LocalDate.of(2026, 1, 15);  // personalTransaction의 transactionDate
+    private static final LocalDate COMMAND_DATE = LocalDate.of(2026, 2, 1);  // command()의 transactionDate
 
     private final UUID userId = UUID.randomUUID();
     private final UUID groupId = UUID.randomUUID();
@@ -262,6 +267,91 @@ class FinanceTransactionServiceTest {
         FinanceTransaction result = transactionService.unshare(transactionId, userId);
 
         assertThat(result.groupId()).isNull();
+        verify(transactionPort, never()).save(any());
+    }
+
+    // ----- 기록 점검 완료월 쓰기 차단 -----
+
+    @Test
+    @DisplayName("create는 대상 월이 마감됐으면 MonthClosedException")
+    void create_closedMonth_throwsMonthClosed() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        doThrow(new MonthlyClosing.MonthClosedException("2026-02"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(COMMAND_DATE));
+
+        assertThatThrownBy(() -> transactionService.create(userId, false, command()))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(transactionPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update는 기존 거래가 마감월에 있으면 차단(마감월에서 빼내기 방지)")
+    void update_existingInClosedMonth_throwsMonthClosed() {
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(personalTransaction());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> transactionService.update(transactionId, userId, command()))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(transactionPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update는 대상 월(command)이 마감됐으면 차단(마감월로 넣기 방지)")
+    void update_commandTargetsClosedMonth_throwsMonthClosed() {
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(personalTransaction());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(usableCategory());
+        doNothing().when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE)); // 기존 거래 월은 정상
+        doThrow(new MonthlyClosing.MonthClosedException("2026-02"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(COMMAND_DATE));
+
+        assertThatThrownBy(() -> transactionService.update(transactionId, userId, command()))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(transactionPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("delete는 거래가 마감월에 있으면 차단")
+    void delete_closedMonth_throwsMonthClosed() {
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(personalTransaction());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> transactionService.delete(transactionId, userId))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(transactionPort, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("shareToGroup은 거래가 마감월에 있으면 차단")
+    void shareToGroup_closedMonth_throwsMonthClosed() {
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(personalTransaction());
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> transactionService.shareToGroup(transactionId, userId))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
+        verify(transactionPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unshare는 거래가 마감월에 있으면 차단")
+    void unshare_closedMonth_throwsMonthClosed() {
+        FinanceTransaction shared = new FinanceTransaction(transactionId, groupId, categoryId, userId,
+                CLOSED_DATE, 50_000L, "점심", null);
+        when(transactionPort.findByIdOrThrow(transactionId)).thenReturn(shared);
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+        doThrow(new MonthlyClosing.MonthClosedException("2026-01"))
+                .when(monthlyClosingGuard).verifyMonthOpen(any(), any(), eq(CLOSED_DATE));
+
+        assertThatThrownBy(() -> transactionService.unshare(transactionId, userId))
+                .isInstanceOf(MonthlyClosing.MonthClosedException.class);
         verify(transactionPort, never()).save(any());
     }
 }

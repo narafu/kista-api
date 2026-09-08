@@ -46,4 +46,15 @@ public class FinanceMonthlyClosingPersistenceAdapter implements MonthlyClosingPo
     public void deleteByGroupId(UUID groupId) {
         jpaRepository.deleteByGroupId(groupId);
     }
+
+    @Override
+    public boolean isMonthClosed(UUID currentGroupId, UUID userId, String month) {
+        // 그룹 있으면 그룹 마감 행, 없으면 개인 마감 행 — either/or (union 아님)
+        return (currentGroupId != null
+                ? jpaRepository.findByGroupIdAndMonth(currentGroupId, month)
+                : jpaRepository.findByUserIdAndGroupIdIsNullAndMonth(userId, month))
+                .map(FinanceMonthlyClosingEntity::toDomain)
+                .map(MonthlyClosing::completed)
+                .orElse(false);
+    }
 }

@@ -5,6 +5,7 @@ import com.kista.finance.domain.model.AssetSnapshotCommand;
 import com.kista.finance.domain.model.BulkFinanceRegisterResult;
 import com.kista.finance.domain.model.FinanceTransactionCommand;
 import com.kista.finance.domain.model.Market;
+import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.usecase.AssetSnapshotUseCase;
 import com.kista.finance.application.usecase.FinanceTransactionUseCase;
@@ -70,6 +71,22 @@ class BulkFinanceRegisterServiceTest {
         assertThat(result.failures()).hasSize(1);
         assertThat(result.failures().get(0)).contains("메모1", "카테고리 없음");
         verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("메모2")));
+    }
+
+    @Test
+    void 마감월_항목은_failures로_수집되고_정상월_항목은_등록된다() {
+        AssetSnapshotCommand closed = asset("마감월자산");
+        AssetSnapshotCommand open = asset("정상월자산");
+
+        doThrow(new MonthlyClosing.MonthClosedException("2026-08"))
+                .when(assetSnapshotUseCase).create(eq(userId), eq(false), argThat(c -> c.memo().equals("마감월자산")));
+
+        BulkFinanceRegisterResult result = service.register(userId, false, List.of(closed, open), List.of());
+
+        assertThat(result.assetSuccessCount()).isEqualTo(1);
+        assertThat(result.failures()).hasSize(1);
+        assertThat(result.failures().get(0)).contains("마감월자산", "기록 점검이 완료된 달");
+        verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("정상월자산")));
     }
 
     @Test
