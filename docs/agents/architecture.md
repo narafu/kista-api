@@ -22,7 +22,8 @@ com.kista.finance/   ← Spring Modulith 이전 모듈(CLOSED) — 가계부 애
   domain/model/      ← AssetSnapshot/FinanceAccount/FinanceBudget/FinanceCategory/FinanceGroup/FinanceTransaction/MonthlyClosing 등 record + Command — "domain" NamedInterface로 공개
   application/usecase/  ← UseCase 인터페이스(9개) — "usecase" NamedInterface로 공개
   application/port/output/ ← *Port 접미사 포트(7개) — "port" NamedInterface로 공개
-  application/service/  ← FinanceAccountService/FinanceBudgetService/FinanceCategoryService/FinanceGroupService/FinanceTransactionService/AssetSnapshotService/BulkFinanceRegisterService/MonthlyClosingService/FinanceRegistrationReminderNotifier — 모두 internal(외부 비공개)
+  application/service/  ← FinanceAccountService/FinanceBudgetService/FinanceCategoryService/FinanceGroupService/FinanceTransactionService/AssetSnapshotService/BulkFinanceRegisterService/MonthlyClosingService/FinanceRegistrationReminderNotifier + MonthlyClosingGuard(package-private) — 모두 internal(외부 비공개)
+    - **마감월 쓰기 차단**: `MonthlyClosing.completed=true`인 달은 자산 스냅샷·거래의 create/update/delete/shareToGroup/unshare를 `MonthClosedException`(409)으로 전면 차단한다. `MonthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, date)`가 SSOT — `AssetSnapshotService`/`FinanceTransactionService` 두 서비스가 주입해 쓴다. update는 기존 날짜+대상 날짜 양방향 검사. 마감 스코프는 `MonthlyClosingPort.isMonthClosed`의 either/or(현재 그룹 있으면 그룹 마감 행, 없으면 개인 마감 행) — `findMyScope`의 union과 다르다(그룹 소속 유저는 개인 소유 record도 그룹 마감으로 판정). `MonthlyClosingService.upsert`(마감 해제)는 절대 가드 대상 아님. bulk 등록은 항목별 try/catch라 마감월 항목만 실패 수집
   adapter/in/web/     ← Finance*Controller/AssetSnapshotController/MonthlyClosingController/AdminFinanceCategoryController(경로만 /api/admin/**, finance 소유 유지) + dto/
   adapter/in/schedule/ ← FinanceRegistrationReminderScheduler
   adapter/out/persistence/ ← Entity + *JpaRepository + *PersistenceAdapter 3종
