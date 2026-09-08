@@ -7,7 +7,7 @@ Spring Modulith 기반 애그리게이트 모듈 구조다. 레거시 최상위 
 
 ```
 common/          ← 공통 유틸리티 (Spring/JPA 독립)
-  UsTradeDates   — KST↔US 거래일 ±1일 변환. 사용 허용 위치: KisTradingApi(KIS API는 US 거래일 기준)·MarketCalendarPersistenceAdapter·KisPriceApi(dailyprice BYMD)뿐 — 도메인·서비스·orders persistence에서 사용 금지 (→ constraints.md "시간 기준 정책")
+  UsTradeDates   — KST↔US 거래일 ±1일 변환. 사용 허용 위치: KisTradingApi(KIS API는 US 거래일 기준)·MarketCalendarPersistenceAdapter·KisPriceApi(dailyprice BYMD)·TossPriceApi(getClosingPrice — Toss 캔들 date는 US 세션일)뿐 — 도메인·서비스·orders persistence에서 사용 금지 (→ constraints.md "시간 기준 정책")
 
 DB 스키마 3분리(kista/finance/reference): kista=순수 매매 도메인(계좌·주문·전략·포지션), finance=가계부, reference=외부 참조·시장 데이터(FIDA PRIVACY 기준 매매표 포함, 전역 공유·비개인 데이터가 기준). 인증/관리자/로그/알림 성격 테이블(users/user_settings/user_notification_prefs/refresh_tokens/broker_tokens/admin_runtime_settings/audit_logs/app_error_logs/fcm_device_tokens/scheduler_locks)은 플랫폼 공통이라 public 유지. 신규 테이블은 이 기준으로 분류해 Entity에 `@Table(schema=...)` 명시(public도 명시 — search_path 첫 스키마가 kista라 생략 시 validate 실패) — nativeQuery/JdbcTemplate/raw SQL은 DB 유저 search_path(`kista, finance, reference, public`)로 unqualified 이름이 자동 해석되므로 스키마 접두사 불필요
 

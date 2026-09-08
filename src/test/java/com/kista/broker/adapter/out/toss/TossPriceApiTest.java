@@ -114,30 +114,34 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("getClosingPrice: 해당 거래일 봉이 있으면 그 봉의 종가 반환 (라이브 현재가 아님)")
-    void getClosingPrice_returnsCandleCloseForTradeDate() {
-        LocalDate tradeDate = LocalDate.of(2026, 8, 21);
-        TossCandle candle = new TossCandle(tradeDate, new BigDecimal("70.00"),
-                new BigDecimal("72.00"), new BigDecimal("69.00"), new BigDecimal("71.05"), 5000L);
-        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(tradeDate), eq(tradeDate)))
+    @DisplayName("getClosingPrice: KST 거래일 D의 확정 종가 = US 세션 D-1 봉의 종가 (라이브 현재가 아님)")
+    void getClosingPrice_returnsUsSessionCloseForKstTradeDate() {
+        // 운영 사례: KST 거래일 09-04 롤오버가 US 09-03 세션(=72.03)이 아닌 라이브 폴백값(71.96)을 썼음
+        LocalDate kstTradeDate = LocalDate.of(2026, 9, 4);
+        LocalDate usSessionDate = LocalDate.of(2026, 9, 3);
+        TossCandle candle = new TossCandle(usSessionDate, new BigDecimal("71.50"),
+                new BigDecimal("72.40"), new BigDecimal("71.10"), new BigDecimal("72.03"), 5000L);
+        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
                 .thenReturn(List.of(candle));
 
-        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, tradeDate);
+        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, kstTradeDate);
 
-        assertThat(result).isEqualByComparingTo("71.05");
+        assertThat(result).isEqualByComparingTo("72.03");
+        verify(tossCandleApi, never()).getCandles(eq("TQQQ"), eq("1d"), eq(kstTradeDate), eq(kstTradeDate));
     }
 
     @Test
-    @DisplayName("getClosingPrice: 해당 거래일 봉이 없으면 현재가로 폴백")
-    void getClosingPrice_noCandleForTradeDate_fallsBackToLivePrice() {
-        LocalDate tradeDate = LocalDate.of(2026, 8, 23); // 휴장일(일요일) — 봉 없음
-        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(tradeDate), eq(tradeDate)))
+    @DisplayName("getClosingPrice: US 세션 봉이 없으면 현재가로 폴백")
+    void getClosingPrice_noCandleForUsSession_fallsBackToLivePrice() {
+        LocalDate kstTradeDate = LocalDate.of(2026, 8, 24); // US 세션 08-23은 토요일 — 봉 없음
+        LocalDate usSessionDate = LocalDate.of(2026, 8, 23);
+        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
                 .thenReturn(List.of());
         var item = new TossPriceApi.PriceItem("TQQQ", "69.09", "USD");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
 
-        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, tradeDate);
+        BigDecimal result = tossPriceApi.getClosingPrice(StrategyTicker.TQQQ, kstTradeDate);
 
         assertThat(result).isEqualByComparingTo("69.09");
     }
