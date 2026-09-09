@@ -1,6 +1,4 @@
-package com.kista.trading.domain.strategy;
-
-import com.kista.trading.domain.model.Strategy;
+package com.kista.matching.domain.strategy;
 
 import java.util.List;
 import java.util.Map;
@@ -22,9 +20,5 @@ public class CycleOrderStrategies {
         CycleOrderStrategy s = byType.get(type);
         if (s == null) throw new IllegalStateException("등록되지 않은 cycleType: " + type);
         return s;
-    }
-
-    public CycleOrderStrategy of(Strategy strategy) {
-        return of(strategy.type());
     }
 }

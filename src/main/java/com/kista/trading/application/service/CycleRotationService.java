@@ -17,7 +17,7 @@ import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.MarginPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

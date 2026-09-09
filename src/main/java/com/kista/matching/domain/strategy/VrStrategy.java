@@ -1,4 +1,4 @@
-package com.kista.trading.domain.strategy;
+package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.VrPosition;

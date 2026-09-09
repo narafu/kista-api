@@ -10,7 +10,7 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

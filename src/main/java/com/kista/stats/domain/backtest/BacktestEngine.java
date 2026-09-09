@@ -10,14 +10,13 @@ import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.matching.domain.model.StrategyVrDetail;
 import com.kista.matching.domain.model.VrPosition;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
-import com.kista.trading.domain.strategy.InfiniteStrategy;
-import com.kista.trading.domain.strategy.PriceCapPolicy;
-import com.kista.trading.domain.strategy.VrStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.InfiniteStrategy;
+import com.kista.matching.domain.strategy.PriceCapPolicy;
+import com.kista.matching.domain.strategy.VrStrategy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -32,9 +31,7 @@ import java.util.Optional;
 import static com.kista.matching.domain.model.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyDefaults;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
@@ -211,7 +208,7 @@ public class BacktestEngine {
                 state.value, command.vrBandWidth(), state.poolLimit, state.poolUsed,
                 prevClose, prevClose, command.vrRecurringAmount());
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                state.balance, syntheticStrategy(command), candle.date(), "backtest", null, null, vrInputs);
+                state.balance, command.ticker(), candle.date(), "backtest", null, null, vrInputs);
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.VR).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
@@ -274,7 +271,7 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext.InfiniteInputs infiniteInputs = new CycleOrderStrategy.PlanContext.InfiniteInputs(
                 state.divisionCount, prevClose, state.starPointPrice(), state.reverseMode, state.isFirstReverseDay);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                state.balance, syntheticStrategy(command), candle.date(), "backtest", infiniteInputs, null, null);
+                state.balance, command.ticker(), candle.date(), "backtest", infiniteInputs, null, null);
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.INFINITE).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
@@ -341,7 +338,7 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(state.initialUsdDeposit, base, prevClose);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
-                state.balance, syntheticStrategy(command), candle.date(), "backtest", null, privacyInputs, null);
+                state.balance, command.ticker(), candle.date(), "backtest", null, privacyInputs, null);
 
         List<PlannedOrder> orders = strategies.of(StrategyType.PRIVACY).plan(ctx)
                 .map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
@@ -370,12 +367,6 @@ public class BacktestEngine {
         }
         replaced.addAll(cappedBuys.subList(cappedIndex, cappedBuys.size()));
         return List.copyOf(replaced);
-    }
-
-    // 백테스트용 합성 전략 — 계좌·PK 없이 타입/종목만 유효한 값으로 채운다(plan()이 type·ticker만 참조)
-    private static Strategy syntheticStrategy(BacktestCommand command) {
-        return new Strategy(null, null, command.type(), StrategyStatus.ACTIVE,
-                command.ticker(), StrategyCycleSeedType.NONE);
     }
 
     // 합성 VR 상세 — 램프 8파라미터는 백테스트 입력으로 받지 않고 운영의 recurringMode 고정값 표(RAMP_DEFAULTS_BY_MODE와 동기화)를 그대로 쓴다

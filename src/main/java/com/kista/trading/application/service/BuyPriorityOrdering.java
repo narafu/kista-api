@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 
 import java.math.BigDecimal;
 import java.util.Comparator;

@@ -1,5 +1,7 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.matching.domain.strategy.ReverseInfiniteStrategy;
+
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderDirection;

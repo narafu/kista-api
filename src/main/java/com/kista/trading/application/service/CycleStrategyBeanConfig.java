@@ -1,19 +1,19 @@
 package com.kista.trading.application.service;
 
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.trading.domain.strategy.InfiniteCreationResolver;
-import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.trading.domain.strategy.InfiniteStrategy;
+import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.matching.domain.strategy.InfiniteStrategy;
 import com.kista.trading.domain.strategy.PrivacyCreationResolver;
-import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.trading.domain.strategy.PrivacyStrategy;
-import com.kista.trading.domain.strategy.ReverseInfiniteStrategy;
+import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.matching.domain.strategy.PrivacyStrategy;
+import com.kista.matching.domain.strategy.ReverseInfiniteStrategy;
 import com.kista.trading.domain.strategy.StrategyCreationResolver;
 import com.kista.trading.domain.strategy.StrategyCreationResolvers;
 import com.kista.trading.domain.strategy.VrCreationResolver;
-import com.kista.trading.domain.strategy.VrCycleOrderStrategy;
-import com.kista.trading.domain.strategy.VrStrategy;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

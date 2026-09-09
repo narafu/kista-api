@@ -16,7 +16,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -383,10 +383,9 @@ class TradingPreviewServiceTest {
 
         PreviewDepositCache depositCache = mock(PreviewDepositCache.class);
         lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));
-        com.kista.trading.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.trading.domain.strategy.CycleOrderStrategies.class);
-        com.kista.trading.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.trading.domain.strategy.CycleOrderStrategy.class);
+        com.kista.matching.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.matching.domain.strategy.CycleOrderStrategies.class);
+        com.kista.matching.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.matching.domain.strategy.CycleOrderStrategy.class);
         lenient().when(cycleOrderStrategies.of(any(StrategyType.class))).thenReturn(orderStrategy);
-        lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
@@ -428,10 +427,9 @@ class TradingPreviewServiceTest {
 
         PreviewDepositCache depositCache = mock(PreviewDepositCache.class);
         lenient().when(depositCache.getUsdDeposit(any(), any())).thenReturn(new BigDecimal("10000.00"));
-        com.kista.trading.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.trading.domain.strategy.CycleOrderStrategies.class);
-        com.kista.trading.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.trading.domain.strategy.CycleOrderStrategy.class);
+        com.kista.matching.domain.strategy.CycleOrderStrategies cycleOrderStrategies = mock(com.kista.matching.domain.strategy.CycleOrderStrategies.class);
+        com.kista.matching.domain.strategy.CycleOrderStrategy orderStrategy = mock(com.kista.matching.domain.strategy.CycleOrderStrategy.class);
         lenient().when(cycleOrderStrategies.of(any(StrategyType.class))).thenReturn(orderStrategy);
-        lenient().when(cycleOrderStrategies.of(any(Strategy.class))).thenReturn(orderStrategy);
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(

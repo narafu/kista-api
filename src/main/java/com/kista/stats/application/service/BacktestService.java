@@ -14,7 +14,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.stats.application.usecase.BacktestUseCase;
 import com.kista.stats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

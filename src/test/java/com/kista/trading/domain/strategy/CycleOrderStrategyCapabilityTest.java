@@ -1,5 +1,9 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,7 +20,7 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(infinite.endsCycleOnLiquidation()).isTrue(); // 기본값 true
         assertThat(infinite.tracksReverseMode()).isTrue();
         assertThat(infinite.requiresRolloverCheck()).isFalse(); // 기본값
-        assertThat(infinite.priceCapMode()).isEqualTo(com.kista.trading.domain.strategy.CycleOrderStrategy.PriceCapMode.INFINITE_POSITION);
+        assertThat(infinite.priceCapMode()).isEqualTo(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION);
         assertThat(infinite.allocationPriority()).isEqualTo(1);
     }
 
@@ -29,7 +33,7 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(privacy.endsCycleOnLiquidation()).isTrue(); // 기본값 true
         assertThat(privacy.tracksReverseMode()).isFalse(); // 기본값
         assertThat(privacy.requiresRolloverCheck()).isFalse(); // 기본값
-        assertThat(privacy.priceCapMode()).isEqualTo(com.kista.trading.domain.strategy.CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE);
+        assertThat(privacy.priceCapMode()).isEqualTo(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE);
         assertThat(privacy.allocationPriority()).isEqualTo(2);
     }
 
@@ -43,7 +47,7 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.endsCycleOnLiquidation()).isFalse(); // VR만 false — 전량 청산 후에도 사이클 유지
         assertThat(vr.tracksReverseMode()).isFalse(); // 기본값
         assertThat(vr.requiresRolloverCheck()).isTrue();
-        assertThat(vr.priceCapMode()).isEqualTo(com.kista.trading.domain.strategy.CycleOrderStrategy.PriceCapMode.VR_POSITION);
+        assertThat(vr.priceCapMode()).isEqualTo(CycleOrderStrategy.PriceCapMode.VR_POSITION);
         assertThat(vr.allocationPriority()).isZero();
     }
 }

@@ -59,6 +59,22 @@ class HexagonalArchitectureTest {
     }
 
     @Test
+    @DisplayName("matching 커널은 sharedkernel·privacy 외 다른 모듈에 의존하지 않는다")
+    void matching_must_not_depend_on_other_modules() {
+        // matching은 주문생성 순수 계산 커널만 담는다는 전제로 outbound를 sharedkernel·privacy로 한정한다
+        // (privacy는 PRIVACY 전략이 FidaPlannedOrder 등 계획 데이터를 읽어야 해 sharedkernel과 별개로 허용).
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.matching..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.kista.finance..", "com.kista.notify..", "com.kista.broker..",
+                        "com.kista.trading..", "com.kista.market..", "com.kista.stats..",
+                        "com.kista.admin..", "com.kista.user..", "com.kista.account..",
+                        "com.kista.web..", "com.kista.platform..", "com.kista.common..");
+        rule.check(classes);
+    }
+
+    @Test
     @DisplayName("web(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
     void web_must_stay_pure_inbound_sink() {
         // com.kista.web은 패키지에 adapter/application/domain 세그먼트가 없어

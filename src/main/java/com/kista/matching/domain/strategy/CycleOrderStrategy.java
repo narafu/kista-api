@@ -1,11 +1,10 @@
-package com.kista.trading.domain.strategy;
+package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.matching.domain.model.VrPosition;
 
 import java.math.BigDecimal;
@@ -14,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 // 전략 패턴 진입점 — TradingService/TradingPreviewService/CycleRotationService 의 switch(strategy.type()) 분기를 다형성으로 대체
 // 각 구현체는 cycleType()으로 자기 타입을 선언하며, 서비스는 Map<StrategyType, CycleOrderStrategy>로 주입받아 사용
@@ -70,7 +70,7 @@ public interface CycleOrderStrategy {
     // label: 로그 식별자 (계좌 닉네임 또는 "preview:<accountId>")
     record PlanContext(
             AccountBalance balance,
-            Strategy strategy,
+            StrategyTicker ticker,  // 거래 종목 — Strategy 전체가 아닌 커널이 실제로 쓰는 값만 주입(matching↔trading 순환 방지)
             LocalDate tradeDate,
             String label,
             InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY·VR은 무시)

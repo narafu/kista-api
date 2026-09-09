@@ -8,6 +8,7 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
+import com.kista.matching.domain.strategy.*;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

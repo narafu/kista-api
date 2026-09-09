@@ -10,8 +10,8 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.trading.application.port.output.StrategyInfiniteDetailPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -95,9 +95,9 @@ class CycleOrderComputer {
                     vrDetail.recurringAmount());
         }
 
-        CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy);
+        CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy.type());
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy, tradeDate, label, infiniteInputs, privacyInputs, vrInputs));
+                balance, strategy.ticker(), tradeDate, label, infiniteInputs, privacyInputs, vrInputs));
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균

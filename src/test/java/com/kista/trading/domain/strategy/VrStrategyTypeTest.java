@@ -1,5 +1,7 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.matching.domain.strategy.VrStrategy;
+
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;

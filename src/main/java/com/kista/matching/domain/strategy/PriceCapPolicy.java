@@ -1,4 +1,4 @@
-package com.kista.trading.domain.strategy;
+package com.kista.matching.domain.strategy;
 
 import java.math.BigDecimal;
 

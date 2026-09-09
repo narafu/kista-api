@@ -1,5 +1,7 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.matching.domain.strategy.PrivacyStrategy;
+
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
