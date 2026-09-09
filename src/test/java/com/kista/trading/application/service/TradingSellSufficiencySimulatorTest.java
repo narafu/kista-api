@@ -5,6 +5,8 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
@@ -52,7 +54,7 @@ class TradingSellSufficiencySimulatorTest {
     }
 
     private Order sellOrder(int quantity, BigDecimal price) {
-        return Order.planned(today, StrategyTicker.SOXL, Order.OrderType.LIMIT, Order.OrderDirection.SELL, quantity, price);
+        return Order.planned(today, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.SELL, quantity, price);
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.application.port.output.OrderPort;
@@ -28,8 +29,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
-import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
+import static com.kista.matching.domain.model.OrderDirection.BUY;
+import static com.kista.matching.domain.model.OrderDirection.SELL;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
@@ -283,10 +284,10 @@ class TradingOrderBudgetAllocator {
         Map<BatchContext, Candidate> sourceCandidates = new LinkedHashMap<>();
         candidates.forEach(candidate -> sourceCandidates.putIfAbsent(candidate.ctx(), candidate));
 
-        Map<BatchContext, EnumSet<Order.OrderDirection>> approvedDirections = new LinkedHashMap<>();
+        Map<BatchContext, EnumSet<OrderDirection>> approvedDirections = new LinkedHashMap<>();
         Stream.concat(sellApproved.stream(), buyApproved.stream())
                 .forEach(candidate -> candidate.orders().forEach(order -> approvedDirections
-                        .computeIfAbsent(candidate.ctx(), ignored -> EnumSet.noneOf(Order.OrderDirection.class))
+                        .computeIfAbsent(candidate.ctx(), ignored -> EnumSet.noneOf(OrderDirection.class))
                         .add(order.direction())));
 
         return Stream.concat(sellApproved.stream(), buyApproved.stream())

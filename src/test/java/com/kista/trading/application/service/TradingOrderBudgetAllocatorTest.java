@@ -5,6 +5,9 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -363,14 +366,14 @@ class TradingOrderBudgetAllocatorTest {
     }
 
     private Order buy(String amount) {
-        return new Order(null, null, null, tradeDate, StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal(amount),
+        return new Order(null, null, null, tradeDate, StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, new BigDecimal(amount),
                 Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order sell(String price, int quantity) {
-        return new Order(null, null, null, tradeDate, StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, quantity, new BigDecimal(price),
+        return new Order(null, null, null, tradeDate, StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderTiming.AT_CLOSE, OrderDirection.SELL, quantity, new BigDecimal(price),
                 Order.OrderStatus.PLANNED, null, null, null);
     }
 }

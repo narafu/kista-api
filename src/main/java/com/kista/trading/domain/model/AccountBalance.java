@@ -1,5 +1,7 @@
 package com.kista.trading.domain.model;
 
+import com.kista.matching.domain.model.OrderDirection;
+
 import com.kista.broker.domain.model.Execution;
 
 import java.math.BigDecimal;
@@ -15,16 +17,16 @@ public record AccountBalance(
     // applyExecutions()가 필요로 하는 최소 형태 — broker의 Execution은 더 이상 이 인터페이스를 구현하지 않는다
     // (모듈 경계상 broker→trading 참조 금지) — 호출부가 아래 of()/listOf()로 값을 복제해 감싼다
     public interface Fill {
-        Order.OrderDirection direction();
+        OrderDirection direction();
         int quantity();
         BigDecimal amountUsd();
 
-        // broker의 Execution 1건 → Fill 매핑 — direction만 broker Direction→trading Order.OrderDirection 변환(값 복제)
+        // broker의 Execution 1건 → Fill 매핑 — direction만 broker Direction→trading OrderDirection 변환(값 복제)
         static Fill of(Execution execution) {
-            Order.OrderDirection direction = execution.direction() == com.kista.broker.domain.model.Direction.BUY
-                    ? Order.OrderDirection.BUY : Order.OrderDirection.SELL;
+            OrderDirection direction = execution.direction() == com.kista.broker.domain.model.Direction.BUY
+                    ? OrderDirection.BUY : OrderDirection.SELL;
             return new Fill() {
-                @Override public Order.OrderDirection direction() { return direction; }
+                @Override public OrderDirection direction() { return direction; }
                 @Override public int quantity() { return execution.quantity(); }
                 @Override public BigDecimal amountUsd() { return execution.amountUsd(); }
             };
@@ -39,7 +41,7 @@ public record AccountBalance(
     // 주문 목록 중 BUY 합계 금액 — isOrderValid/hasSufficientDepositFor/TradingOrderBudgetAllocator 공용
     public static BigDecimal buyTotal(List<Order> orders) {
         return orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -47,7 +49,7 @@ public record AccountBalance(
     // 주문 유효성 검사: 총 매수금액 > 가용잔액 or 총 매도수량 > 보유수량이면 false
     public boolean isOrderValid(List<Order> orders) {
         int totalSellQuantity = orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.SELL)
+                .filter(o -> o.direction() == OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
         return buyTotal(orders).compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
     }
@@ -65,10 +67,10 @@ public record AccountBalance(
     public AccountBalance applyExecutions(List<? extends Fill> executions) {
         if (executions.isEmpty()) return this;
 
-        int buyQuantity = sumQuantity(executions, Order.OrderDirection.BUY);
-        int sellQuantity = sumQuantity(executions, Order.OrderDirection.SELL);
-        BigDecimal buyAmount = sumAmount(executions, Order.OrderDirection.BUY);
-        BigDecimal sellAmount = sumAmount(executions, Order.OrderDirection.SELL);
+        int buyQuantity = sumQuantity(executions, OrderDirection.BUY);
+        int sellQuantity = sumQuantity(executions, OrderDirection.SELL);
+        BigDecimal buyAmount = sumAmount(executions, OrderDirection.BUY);
+        BigDecimal sellAmount = sumAmount(executions, OrderDirection.SELL);
 
         int newHoldings = holdings + buyQuantity - sellQuantity;
         // 매도 후 남은 수량 기준으로 cost basis 산정 — 매도는 평단가에 영향을 주지 않음
@@ -83,13 +85,13 @@ public record AccountBalance(
         return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
     }
 
-    private static int sumQuantity(List<? extends Fill> executions, Order.OrderDirection direction) {
+    private static int sumQuantity(List<? extends Fill> executions, OrderDirection direction) {
         return executions.stream()
                 .filter(e -> e.direction() == direction)
                 .mapToInt(Fill::quantity).sum();
     }
 
-    private static BigDecimal sumAmount(List<? extends Fill> executions, Order.OrderDirection direction) {
+    private static BigDecimal sumAmount(List<? extends Fill> executions, OrderDirection direction) {
         return executions.stream()
                 .filter(e -> e.direction() == direction)
                 .map(Fill::amountUsd)

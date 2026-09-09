@@ -1,6 +1,8 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,8 +65,8 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
     @Test
     void saveAll_persistsAndLoadsOrderLeg() {
-        Order order = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
-                        Order.OrderDirection.BUY, 1, new BigDecimal("22.00"))
+        Order order = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                        OrderDirection.BUY, 1, new BigDecimal("22.00"))
                 .withLeg("INFINITE_EARLY_AVG_BUY");
 
         adapter.saveAll(List.of(Order.plan(order, accountId, cycleId)));

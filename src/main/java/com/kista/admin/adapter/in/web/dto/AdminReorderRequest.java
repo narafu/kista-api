@@ -2,6 +2,8 @@ package com.kista.admin.adapter.in.web.dto;
 
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
@@ -38,9 +40,9 @@ public record AdminReorderRequest(
                 accountId,
                 strategyId,
                 orderId,
-                Order.OrderTiming.valueOf(timing),
+                OrderTiming.valueOf(timing),
                 tradeDate,
-                direction != null ? Order.OrderDirection.valueOf(direction) : null,
+                direction != null ? OrderDirection.valueOf(direction) : null,
                 quantity,
                 price,
                 memo

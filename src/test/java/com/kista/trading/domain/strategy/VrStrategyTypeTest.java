@@ -11,12 +11,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
-import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
-import static com.kista.trading.domain.model.Order.OrderTiming.AT_CLOSE;
-import static com.kista.trading.domain.model.Order.OrderTiming.AT_OPEN;
-import static com.kista.trading.domain.model.Order.OrderType.LOC;
-import static com.kista.trading.domain.model.Order.OrderType.LIMIT;
+import static com.kista.matching.domain.model.OrderDirection.BUY;
+import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.matching.domain.model.OrderTiming.AT_CLOSE;
+import static com.kista.matching.domain.model.OrderTiming.AT_OPEN;
+import static com.kista.matching.domain.model.OrderType.LOC;
+import static com.kista.matching.domain.model.OrderType.LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("VrStrategy 매수·매도 사다리 시나리오 검증")

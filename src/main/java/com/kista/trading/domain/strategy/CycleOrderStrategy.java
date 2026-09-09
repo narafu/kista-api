@@ -1,6 +1,7 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
@@ -59,7 +60,7 @@ public interface CycleOrderStrategy {
     default int allocationPriority() { return 100; }
 
     // 기존 주문만으로 오늘 생성 가능한 주문 슬롯이 모두 점유됐는지 여부
-    default boolean canSkipOrderComputation(List<Order> existingOrders, Set<Order.OrderTiming> creatableTimings) {
+    default boolean canSkipOrderComputation(List<Order> existingOrders, Set<OrderTiming> creatableTimings) {
         return false;
     }
 

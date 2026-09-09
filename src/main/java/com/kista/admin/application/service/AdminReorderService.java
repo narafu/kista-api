@@ -80,7 +80,7 @@ class AdminReorderService implements AdminReorderUseCase {
 
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
-        Order.OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
+        com.kista.matching.domain.model.OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
         LocalDate tradeDate = command.tradeDate() != null ? command.tradeDate() : sourceOrder.tradeDate();
 
         // 1. 원본 상태별 취소 처리
@@ -126,8 +126,8 @@ class AdminReorderService implements AdminReorderUseCase {
     }
 
     // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
-    private PlacementResult placeOrSave(Order newOrder, Account account, Order.OrderTiming timing) {
-        if (timing == Order.OrderTiming.IMMEDIATE) {
+    private PlacementResult placeOrSave(Order newOrder, Account account, com.kista.matching.domain.model.OrderTiming timing) {
+        if (timing == com.kista.matching.domain.model.OrderTiming.IMMEDIATE) {
             BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class);
             try {
                 OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), toDirection(newOrder.direction()),
@@ -146,16 +146,16 @@ class AdminReorderService implements AdminReorderUseCase {
         return new PlacementResult(Order.OrderStatus.PLANNED, null);
     }
 
-    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static Direction toDirection(Order.OrderDirection direction) {
+    // matching OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
         return switch (direction) {
             case BUY -> Direction.BUY;
             case SELL -> Direction.SELL;
         };
     }
 
-    // trading Order.OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
-    private static OrderType toOrderType(Order.OrderType orderType) {
+    // matching OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
+    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
         return switch (orderType) {
             case LOC -> OrderType.LOC;
             case MOC -> OrderType.MOC;
@@ -180,7 +180,7 @@ class AdminReorderService implements AdminReorderUseCase {
     }
 
     private static Map<String, Object> auditPayload(AdminReorderCommand command, Order sourceOrder,
-                                                     Order.OrderDirection direction, int quantity,
+                                                     com.kista.matching.domain.model.OrderDirection direction, int quantity,
                                                      BigDecimal price, Order.OrderStatus resultingStatus) {
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("timing", command.timing().name());

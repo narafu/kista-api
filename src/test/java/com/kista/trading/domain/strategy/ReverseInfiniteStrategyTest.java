@@ -1,6 +1,8 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.ReverseModePosition;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
@@ -57,8 +59,8 @@ class ReverseInfiniteStrategyTest {
         assertThat(orders).hasSize(1);
         Order order = orders.get(0);
         assertThat(order.orderLeg()).isEqualTo("REVERSE_INFINITE_QUOTA_MOC_SELL");
-        assertThat(order.orderType()).isEqualTo(Order.OrderType.MOC);
-        assertThat(order.direction()).isEqualTo(Order.OrderDirection.SELL);
+        assertThat(order.orderType()).isEqualTo(OrderType.MOC);
+        assertThat(order.direction()).isEqualTo(OrderDirection.SELL);
         assertThat(order.quantity()).isEqualTo(10);
     }
 

@@ -4,6 +4,8 @@ import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -480,7 +482,7 @@ class BacktestEngineTest {
         assertThat(firstDay.legs()).containsExactly("REVERSE_INFINITE_MOC_SELL");
         // MOC 매도 수량 = 11주 ÷ (4분할/2) = 5주
         assertThat(firstDay.orders().getFirst().quantity()).isEqualTo(5);
-        assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(Order.OrderType.MOC);
+        assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(OrderType.MOC);
 
         // 8일차: 별지점 = 최근 5거래일 종가(85·80·75·70·65) 평균 = 375 ÷ 5 = 75.00
         Recorded secondDay = recorder.on("2024-01-08");
@@ -668,7 +670,7 @@ class BacktestEngineTest {
                 trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 3, "90"))));
 
         assertThat(recorder.on("2024-01-02"))
-                .filteredOn(o -> o.direction() == Order.OrderDirection.BUY)
+                .filteredOn(o -> o.direction() == OrderDirection.BUY)
                 .extracting(Order::quantity)
                 .containsExactly(3);
     }
@@ -749,7 +751,7 @@ class BacktestEngineTest {
 
         // 2일차: 보유 1주 전량을 잔량 매도로 내보낸다
         assertThat(recorder.on("2024-01-03")).singleElement()
-                .satisfies(o -> assertThat(o.direction()).isEqualTo(Order.OrderDirection.SELL),
+                .satisfies(o -> assertThat(o.direction()).isEqualTo(OrderDirection.SELL),
                         o -> assertThat(o.quantity()).isEqualTo(1));
 
         assertThat(output.cycleCount()).isEqualTo(2);

@@ -2,6 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.VrPosition;
 import com.kista.trading.application.port.output.OrderPort;
@@ -23,7 +24,7 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
-import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
+import static com.kista.matching.domain.model.OrderDirection.BUY;
 import com.kista.sharedkernel.StrategyTicker;
 
 // BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
@@ -173,7 +174,7 @@ class BuyOrderPriceCapper {
     // (PriceCapPolicy.capFor(referencePrice) = referencePrice×1.05)은 사다리의 buyPrice(m) 공식과 무관한
     // 별도 산정식이라 buildCappedBuyOrders(사다리 전용)로 재계산하면 안 된다.
     private static boolean isVrBootstrapShaped(List<Order> buyOrders) {
-        return buyOrders.stream().anyMatch(o -> o.orderType() == Order.OrderType.LOC);
+        return buyOrders.stream().anyMatch(o -> o.orderType() == OrderType.LOC);
     }
 
     // 스코프별 PLANNED BUY 조회 — atOpenOnly=false면 사이클+거래일 전체 PLANNED(AT_CLOSE 접수 경로 기존 계약 유지),

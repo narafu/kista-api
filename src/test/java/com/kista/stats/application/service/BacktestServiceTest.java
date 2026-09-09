@@ -4,6 +4,9 @@ import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestResult;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -413,8 +416,8 @@ class BacktestServiceTest {
     // 지정가 100 매수 1주 — position=null이라 엔진의 캡 재산정 대상에서 제외된다
     private static CycleOrderStrategy.OrderPlan buyOnePlan() {
         Order order = new Order(null, UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2024, 1, 1),
-                StrategyTicker.TQQQ, Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN,
-                Order.OrderDirection.BUY, 1, bd("100"), Order.OrderStatus.PLANNED, null, null, null);
+                StrategyTicker.TQQQ, OrderType.LIMIT, OrderTiming.AT_OPEN,
+                OrderDirection.BUY, 1, bd("100"), Order.OrderStatus.PLANNED, null, null, null);
         return new CycleOrderStrategy.OrderPlan(null, null, List.of(order));
     }
 }

@@ -10,6 +10,7 @@ import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.CycleHistoryPage;
@@ -108,8 +109,8 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO));
     }
 
-    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static com.kista.broker.domain.model.Direction toDirection(Order.OrderDirection direction) {
+    // trading OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static com.kista.broker.domain.model.Direction toDirection(OrderDirection direction) {
         return switch (direction) {
             case BUY -> com.kista.broker.domain.model.Direction.BUY;
             case SELL -> com.kista.broker.domain.model.Direction.SELL;

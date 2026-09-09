@@ -5,6 +5,7 @@ import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.*;
@@ -166,7 +167,7 @@ class TradingService {
         for (BatchContext ctx : contexts) {
             runSafely("plan 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, startPriceSnapshots, privacyBase, today,
-                            EnumSet.of(Order.OrderTiming.AT_CLOSE)))
+                            EnumSet.of(OrderTiming.AT_CLOSE)))
                     .ifPresent(candidates::add);
         }
         SaveAllocationResult result = saveAllocatedOrders(candidates, today);
@@ -249,7 +250,7 @@ class TradingService {
 
     // creatableTimings 필터 후 TradingOrderSlots로 기존 주문과 동일 슬롯을 제외한다 (TradingPreviewService와 공유 기준)
     private List<Order> filterCreatableOrders(List<Order> plannedTemplates, List<Order> existingOrders,
-                                              Set<Order.OrderTiming> creatableTimings) {
+                                              Set<OrderTiming> creatableTimings) {
         List<Order> timingFiltered = plannedTemplates.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
                 .toList();
@@ -259,7 +260,7 @@ class TradingService {
     // 사이클별 후보 수집 — 기존 주문은 보존하고 새 슬롯만 allocator 검증 대상으로 분리한다
     private CyclePlanCandidate collectCycleCandidate(BatchContext ctx,
             Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
-            LocalDate tradeDate, Set<Order.OrderTiming> creatableTimings) {
+            LocalDate tradeDate, Set<OrderTiming> creatableTimings) {
         Strategy strategy = ctx.strategy();
         Account account = ctx.account();
         AccountBalance balance = loadBalance(strategy, account);
@@ -372,7 +373,7 @@ class TradingService {
         for (BatchContext ctx : contexts) {
             runSafely("개장 order 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(),
-                            tradeDate, EnumSet.of(Order.OrderTiming.AT_OPEN)))
+                            tradeDate, EnumSet.of(OrderTiming.AT_OPEN)))
                     .ifPresent(candidates::add);
         }
 

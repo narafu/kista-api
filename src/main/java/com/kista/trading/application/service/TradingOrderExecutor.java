@@ -129,16 +129,16 @@ class TradingOrderExecutor {
         return placed;
     }
 
-    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static Direction toDirection(Order.OrderDirection direction) {
+    // matching OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
         return switch (direction) {
             case BUY -> Direction.BUY;
             case SELL -> Direction.SELL;
         };
     }
 
-    // trading Order.OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
-    private static OrderType toOrderType(Order.OrderType orderType) {
+    // matching OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
+    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
         return switch (orderType) {
             case LOC -> OrderType.LOC;
             case MOC -> OrderType.MOC;

@@ -1,6 +1,8 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.ReverseModePosition;
@@ -54,7 +56,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public int allocationPriority() { return 1; }
 
     @Override
-    public boolean canSkipOrderComputation(List<Order> existingOrders, Set<Order.OrderTiming> creatableTimings) {
+    public boolean canSkipOrderComputation(List<Order> existingOrders, Set<OrderTiming> creatableTimings) {
         List<Order> targetOrders = existingOrders.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
                 .toList();
@@ -62,9 +64,9 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         if (!targetOrders.isEmpty()
                 && targetOrders.stream().allMatch(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
                 && creatableTimings.stream().allMatch(timing -> targetOrders.stream()
-                        .anyMatch(order -> order.timing() == timing && order.direction() == Order.OrderDirection.BUY)
+                        .anyMatch(order -> order.timing() == timing && order.direction() == OrderDirection.BUY)
                         && targetOrders.stream().anyMatch(order -> order.timing() == timing
-                                && order.direction() == Order.OrderDirection.SELL))) {
+                                && order.direction() == OrderDirection.SELL))) {
             return true;
         }
 
@@ -75,14 +77,14 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 .collect(Collectors.toSet());
         if (concreteSlots.isEmpty()) return false;
 
-        boolean hasAtOpenTiming = creatableTimings.contains(Order.OrderTiming.AT_OPEN);
-        boolean hasAtCloseTiming = creatableTimings.contains(Order.OrderTiming.AT_CLOSE);
+        boolean hasAtOpenTiming = creatableTimings.contains(OrderTiming.AT_OPEN);
+        boolean hasAtCloseTiming = creatableTimings.contains(OrderTiming.AT_CLOSE);
         boolean atOpenComplete = !hasAtOpenTiming;
 
         Set<String> atCloseLegs = existingOrders.stream()
-                .filter(order -> hasAtCloseTiming && order.timing() == Order.OrderTiming.AT_CLOSE)
+                .filter(order -> hasAtCloseTiming && order.timing() == OrderTiming.AT_CLOSE)
                 .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
-                .filter(order -> order.direction() == Order.OrderDirection.BUY)
+                .filter(order -> order.direction() == OrderDirection.BUY)
                 .map(Order::orderLeg)
                 .collect(Collectors.toSet());
 
@@ -96,20 +98,20 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 && (earlyComplete || earlyMergedComplete || lateComplete);
         boolean atCloseComplete = !hasAtCloseTiming
                 || correctionComplete
-                || (hasSlot(concreteSlots, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, "REVERSE_INFINITE_LOC_BUY")
-                        && hasSlot(concreteSlots, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, "REVERSE_INFINITE_LOC_SELL"));
+                || (hasSlot(concreteSlots, OrderTiming.AT_CLOSE, OrderDirection.BUY, "REVERSE_INFINITE_LOC_BUY")
+                        && hasSlot(concreteSlots, OrderTiming.AT_CLOSE, OrderDirection.SELL, "REVERSE_INFINITE_LOC_SELL"));
 
         return atOpenComplete && atCloseComplete;
     }
 
-    private boolean hasSlot(Set<ExistingLegSlot> slots, Order.OrderTiming timing,
-                            Order.OrderDirection direction, String orderLeg) {
+    private boolean hasSlot(Set<ExistingLegSlot> slots, OrderTiming timing,
+                            OrderDirection direction, String orderLeg) {
         return slots.contains(new ExistingLegSlot(timing, direction, orderLeg));
     }
 
     private record ExistingLegSlot(
-            Order.OrderTiming timing,
-            Order.OrderDirection direction,
+            OrderTiming timing,
+            OrderDirection direction,
             String orderLeg
     ) {
         static ExistingLegSlot of(Order order) {

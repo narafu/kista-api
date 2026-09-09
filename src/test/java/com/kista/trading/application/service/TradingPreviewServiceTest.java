@@ -5,6 +5,9 @@ import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -80,8 +83,8 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsOrdersWithoutCompetition_whenPlanHasNoBuyOrders() {
-        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -113,8 +116,8 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_returnsSellSufficiencyNull_whenPlanHasNoSellOrders() {
-        Order buyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
+        Order buyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.BUY, 5, new BigDecimal("20.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -127,8 +130,8 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_callsSellSufficiencySimulator_whenPlanHasSellOrders() {
-        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -147,13 +150,13 @@ class TradingPreviewServiceTest {
     // sellSufficiencySimulator가 "이미 접수된 수량 + 그걸 다시 계산한 수량"을 이중으로 합산하지 않는다.
     @Test
     void preview_excludesAlreadyPlacedSellLeg_fromSellSufficiencyRequiredQuantity() {
-        Order existingSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
+        Order existingSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 22, new BigDecimal("60.00"), OrderTiming.AT_OPEN);
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingSell));
 
-        Order recomputedSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN);
+        Order recomputedSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 22, new BigDecimal("60.00"), OrderTiming.AT_OPEN);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(recomputedSell));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -167,15 +170,15 @@ class TradingPreviewServiceTest {
     // 일부만 이미 접수된 경우 — 신규 leg만 sellSufficiencySimulator에 전달돼야 한다
     @Test
     void preview_passesOnlyNewSellLeg_whenPlanHasBothExistingAndNewSellOrders() {
-        Order existingSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
+        Order existingSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 22, new BigDecimal("60.00"), OrderTiming.AT_OPEN, "LEG_A");
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingSell));
 
-        Order sameRecomputedSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 22, new BigDecimal("60.00"), Order.OrderTiming.AT_OPEN, "LEG_A");
-        Order newSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 5, new BigDecimal("61.00"), Order.OrderTiming.AT_OPEN, "LEG_B");
+        Order sameRecomputedSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 22, new BigDecimal("60.00"), OrderTiming.AT_OPEN, "LEG_A");
+        Order newSell = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 5, new BigDecimal("61.00"), OrderTiming.AT_OPEN, "LEG_B");
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sameRecomputedSell, newSell));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -191,8 +194,8 @@ class TradingPreviewServiceTest {
 
     @Test
     void preview_callsCompetitionSimulator_whenPlanHasBuyOrders() {
-        Order buyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 5, new BigDecimal("20.00"));
+        Order buyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.BUY, 5, new BigDecimal("20.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -209,16 +212,16 @@ class TradingPreviewServiceTest {
     @Test
     void preview_propagatesNonZeroOtherStrategiesPlannedBuyUsd_toSimulator() {
         // 이 전략의 사이클에 이미 존재하는 당일 PLANNED BUY (수량 5 @ 10.00 = 50.00)
-        Order existingBuyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 5, new BigDecimal("10.00"));
+        Order existingBuyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.BUY, 5, new BigDecimal("10.00"));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(existingBuyOrder));
         // 계좌 전체 당일 PLANNED BUY 합계 300.00 (타 전략분 포함)
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any()))
                 .thenReturn(new BigDecimal("300.00"));
 
-        Order newBuyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 2, new BigDecimal("20.00"));
+        Order newBuyOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.BUY, 2, new BigDecimal("20.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(newBuyOrder));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -268,8 +271,8 @@ class TradingPreviewServiceTest {
 
     @Test
     void previewBatch_returnsPreviewPerStrategy_keyedByStrategyId() {
-        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
@@ -293,8 +296,8 @@ class TradingPreviewServiceTest {
 
     @Test
     void previewBatch_fetchesPrevClosesOnceInBulk_andPassesCacheToPlanBuilder() {
-        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        Order sellOrder = Order.planned(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("25.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
@@ -326,8 +329,8 @@ class TradingPreviewServiceTest {
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
                     new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
             cyclesById.put(s.id(), cycle);
-            Order sellOrder = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LIMIT,
-                    Order.OrderDirection.SELL, 3, new BigDecimal("25.00"));
+            Order sellOrder = Order.planned(LocalDate.now(), s.ticker(), OrderType.LIMIT,
+                    OrderDirection.SELL, 3, new BigDecimal("25.00"));
             CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
             when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -369,8 +372,8 @@ class TradingPreviewServiceTest {
                     new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
             cycles.put(s.id(), cycle);
 
-            Order buy = Order.planned(LocalDate.now(), s.ticker(), Order.OrderType.LOC,
-                    Order.OrderDirection.BUY, 1, new BigDecimal("10.00"));
+            Order buy = Order.planned(LocalDate.now(), s.ticker(), OrderType.LOC,
+                    OrderDirection.BUY, 1, new BigDecimal("10.00"));
             CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buy));
             when(planBuilder.build(eq(s), eq(ACCOUNT), eq(cycle), any(), anyString(), any()))
                     .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));
@@ -416,8 +419,8 @@ class TradingPreviewServiceTest {
         Map<UUID, StrategyCycle> cycles = Map.of(started.id(), startedCycle, notStarted.id(), notStartedCycle);
         when(strategyCyclePort.findLatestByStrategyIds(List.of(started.id(), notStarted.id()))).thenReturn(cycles);
 
-        Order buy = Order.planned(LocalDate.now(), started.ticker(), Order.OrderType.LOC,
-                Order.OrderDirection.BUY, 1, new BigDecimal("10.00"));
+        Order buy = Order.planned(LocalDate.now(), started.ticker(), OrderType.LOC,
+                OrderDirection.BUY, 1, new BigDecimal("10.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of(buy));
         when(planBuilder.build(eq(started), eq(ACCOUNT), eq(startedCycle), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(plan, null));

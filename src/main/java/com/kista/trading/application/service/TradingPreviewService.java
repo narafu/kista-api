@@ -4,6 +4,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.Strategy;
@@ -149,7 +150,7 @@ class TradingPreviewService {
                 ? precomputedTotalAccountPlannedBuy
                 : orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
@@ -170,7 +171,7 @@ class TradingPreviewService {
 
         // 오늘자 계획에 BUY가 있을 때만 계좌 내 예산 경쟁 시뮬레이션 수행
         List<Order> buyOrders = plan.orders().stream()
-                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+                .filter(o -> o.direction() == OrderDirection.BUY)
                 .toList();
         BuyCompetitionPreview competition = buyOrders.isEmpty()
                 ? null
@@ -184,7 +185,7 @@ class TradingPreviewService {
         // 이미 반영하므로, 신규 필요분에서는 기존 주문과 겹치는 슬롯을 제외해야 이중 계산되지 않는다
         // (TradingService.filterCreatableOrders와 동일 기준 — TradingOrderSlots 공유).
         List<Order> newSellOrders = TradingOrderSlots.excludeExisting(
-                plan.orders().stream().filter(o -> o.direction() == Order.OrderDirection.SELL).toList(),
+                plan.orders().stream().filter(o -> o.direction() == OrderDirection.SELL).toList(),
                 todayOrders);
         SellSufficiencyPreview sellSufficiency = newSellOrders.isEmpty()
                 ? null

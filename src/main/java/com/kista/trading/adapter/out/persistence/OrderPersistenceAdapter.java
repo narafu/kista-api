@@ -1,6 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import lombok.AccessLevel;
@@ -152,7 +153,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     public List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // AT_OPEN + PLANNED 주문만 조회 — 개장 시 즉시 선접수 대상
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndTimingAndStatus(
-                strategyCycleId, tradeDate, Order.OrderTiming.AT_OPEN, Order.OrderStatus.PLANNED));
+                strategyCycleId, tradeDate, OrderTiming.AT_OPEN, Order.OrderStatus.PLANNED));
     }
 
     @Override

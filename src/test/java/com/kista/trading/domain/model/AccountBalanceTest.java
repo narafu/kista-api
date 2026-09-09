@@ -3,6 +3,8 @@ package com.kista.trading.domain.model;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
@@ -103,13 +105,13 @@ class AccountBalanceTest {
 
         // 전략 계산용 PLANNED BUY 주문 헬퍼
         private Order buyOrder(int qty, String price) {
-            return Order.planned(DATE, TICKER, Order.OrderType.LOC, Order.OrderDirection.BUY,
+            return Order.planned(DATE, TICKER, OrderType.LOC, OrderDirection.BUY,
                     qty, new BigDecimal(price));
         }
 
         // SELL 주문 헬퍼 (BUY 없는 케이스 검증용)
         private Order sellOrder(int qty, String price) {
-            return Order.planned(DATE, TICKER, Order.OrderType.LOC, Order.OrderDirection.SELL,
+            return Order.planned(DATE, TICKER, OrderType.LOC, OrderDirection.SELL,
                     qty, new BigDecimal(price));
         }
 

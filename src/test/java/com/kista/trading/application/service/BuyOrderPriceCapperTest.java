@@ -3,6 +3,9 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.sharedkernel.StrategyTicker;
@@ -66,29 +69,29 @@ class BuyOrderPriceCapperTest {
     }
 
     private Order buy(String price, int quantity) {
-        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order buy(String price, int quantity, String orderLeg) {
-        return Order.planned(TODAY, StrategyTicker.SOXL, Order.OrderType.LOC, Order.OrderDirection.BUY,
+        return Order.planned(TODAY, StrategyTicker.SOXL, OrderType.LOC, OrderDirection.BUY,
                 quantity, new BigDecimal(price), orderLeg);
     }
 
     private Order sell(String price, int quantity) {
-        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     // VR 사다리 BUY/SELL은 항상 LIMIT+AT_OPEN(ticker=TQQQ) — bootstrap(LOC+AT_CLOSE)과 구분하기 위해 별도 헬퍼로 생성
     private Order vrLadderBuy(String price, int quantity) {
-        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, Order.OrderType.LIMIT,
-                Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, OrderType.LIMIT,
+                OrderTiming.AT_OPEN, OrderDirection.BUY, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order vrLadderSell(String price, int quantity) {
-        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, Order.OrderType.LIMIT,
-                Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, OrderType.LIMIT,
+                OrderTiming.AT_OPEN, OrderDirection.SELL, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     @Test
@@ -223,8 +226,8 @@ class BuyOrderPriceCapperTest {
         // referencePrice=100.00×1.05=105.00 — VrStrategy가 실제로 생성하는 bootstrap 주문 그대로 사용
         Order bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, StrategyTicker.TQQQ,
                 new BigDecimal("100.00"), null, TODAY).getFirst();
-        assertThat(bootstrapBuy.orderType()).isEqualTo(Order.OrderType.LOC); // 픽스처 전제 확인
-        assertThat(bootstrapBuy.timing()).isEqualTo(Order.OrderTiming.AT_CLOSE);
+        assertThat(bootstrapBuy.orderType()).isEqualTo(OrderType.LOC); // 픽스처 전제 확인
+        assertThat(bootstrapBuy.timing()).isEqualTo(OrderTiming.AT_CLOSE);
         assertThat(bootstrapBuy.price()).isEqualByComparingTo("105.00");
 
         // currentPrice=90.00 → cap=94.50 < 105.00(bootstrap 가격) → cap 로직이 트리거되는 조건
@@ -235,8 +238,8 @@ class BuyOrderPriceCapperTest {
         // 가드가 없었다면 value=0 → lowerBand=0 → 사다리 전부 0원으로 재계산돼 qty=19 LIMIT/AT_OPEN 주문으로
         // 뭉개졌을 것이다 — bootstrap 주문이 원본 그대로 보존되는지 확인
         assertThat(prepared).containsExactly(bootstrapBuy);
-        assertThat(prepared.getFirst().orderType()).isEqualTo(Order.OrderType.LOC);
-        assertThat(prepared.getFirst().timing()).isEqualTo(Order.OrderTiming.AT_CLOSE);
+        assertThat(prepared.getFirst().orderType()).isEqualTo(OrderType.LOC);
+        assertThat(prepared.getFirst().timing()).isEqualTo(OrderTiming.AT_CLOSE);
         assertThat(prepared.getFirst().price()).isEqualByComparingTo("105.00");
     }
 

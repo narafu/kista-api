@@ -6,6 +6,9 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.domain.model.User;
@@ -144,8 +147,8 @@ class ManualTradingServiceTest {
     void execute_insufficientSellHoldings_throwsManualTradingException() {
         // SELL 15주 계획, live holdings=10 → 보유수량 부족 → ManualTradingException
         Order sellOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN,
-                Order.OrderDirection.SELL, 15, new BigDecimal("22.00"),
+                OrderType.LOC, OrderTiming.AT_OPEN,
+                OrderDirection.SELL, 15, new BigDecimal("22.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder));
@@ -165,8 +168,8 @@ class ManualTradingServiceTest {
         // 브로커 API 실패는 4xx(ManualTradingException)로 승격되지만, GlobalExceptionHandler가
         // 4xx는 app_error_logs에 남기지 않으므로 서비스가 직접 TradingErrorEvent를 발행해야 함
         Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN,
-                Order.OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                OrderType.LOC, OrderTiming.AT_OPEN,
+                OrderDirection.BUY, 1, new BigDecimal("22.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyOrder));
@@ -182,8 +185,8 @@ class ManualTradingServiceTest {
     @Test
     void execute_existingReservedSellExceedsAvailable_rejects() {
         Order sellOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_OPEN,
-                Order.OrderDirection.SELL, 3, new BigDecimal("22.00"),
+                OrderType.LOC, OrderTiming.AT_OPEN,
+                OrderDirection.SELL, 3, new BigDecimal("22.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder));
@@ -206,12 +209,12 @@ class ManualTradingServiceTest {
     void execute_sufficientBalance_savesOrders() {
         // BUY 1주, live 충분(usdDeposit=$10,000, holdings=10) → saveAll 호출, 주문 반환
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE,
-                Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
-                StrategyTicker.SOXL, Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE,
-                Order.OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate));
@@ -255,18 +258,18 @@ class ManualTradingServiceTest {
 
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문 (BUY 1주 + SELL 1주)
         Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
                 1, new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
         Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
         UUID vrBuyId = UUID.randomUUID();
         UUID vrSellId = UUID.randomUUID();
         Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.BUY,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
                 1, new BigDecimal("22.00"), Order.OrderStatus.PLANNED, null, null, null);
         Order vrSellPlanned = new Order(vrSellId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
 
         when(strategyPort.findByIdOrThrow(vrStrat.id())).thenReturn(vrStrat);
@@ -308,7 +311,7 @@ class ManualTradingServiceTest {
         verify(orderPort).sumFilledBuyAmountByCycleId(fx.vrCycle().id());
         // LIMIT + AT_OPEN 주문이 저장됨
         verify(orderPort).saveAll(argThat(orders -> orders.stream().allMatch(o ->
-                o.orderType() == Order.OrderType.LIMIT && o.timing() == Order.OrderTiming.AT_OPEN)));
+                o.orderType() == OrderType.LIMIT && o.timing() == OrderTiming.AT_OPEN)));
         // 최종 반환 주문 확인
         assertThat(result).hasSize(2);
     }

@@ -2,6 +2,9 @@ package com.kista.admin.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.user.domain.model.User;
 import com.kista.account.application.port.output.AccountPort;
@@ -60,7 +63,7 @@ class AdminSelectionChainTest {
     // account/strategy 소속과 무관한 임의 계좌의 주문
     private Order order(UUID orderAccountId) {
         return new Order(UUID.randomUUID(), orderAccountId, UUID.randomUUID(), LocalDate.now(),
-                StrategyTicker.SOXL, Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
+                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 10, BigDecimal.TEN, Order.OrderStatus.PLANNED, null, null, null);
     }
 

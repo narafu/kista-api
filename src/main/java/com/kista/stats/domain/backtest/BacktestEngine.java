@@ -5,6 +5,7 @@ import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.InfinitePosition;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
+import static com.kista.matching.domain.model.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
@@ -225,7 +226,7 @@ public class BacktestEngine {
         List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         if (buys.isEmpty()) return orders;
         // bootstrap 배치(LOC)는 사다리 공식과 무관한 별도 산정가라 재산정 대상이 아니다 — BuyOrderPriceCapper.isVrBootstrapShaped와 동일 판정
-        if (buys.stream().anyMatch(o -> o.orderType() == Order.OrderType.LOC)) return orders;
+        if (buys.stream().anyMatch(o -> o.orderType() == OrderType.LOC)) return orders;
 
         BigDecimal cap = PriceCapPolicy.capFor(prevClose);
         if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;

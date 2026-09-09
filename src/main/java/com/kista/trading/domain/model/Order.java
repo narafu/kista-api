@@ -1,5 +1,8 @@
 package com.kista.trading.domain.model;
 
+import com.kista.matching.domain.model.OrderDirection;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
@@ -35,23 +38,6 @@ public record Order(
 
     public Order {
         if (orderLeg == null || orderLeg.isBlank()) orderLeg = UNKNOWN_LEG;
-    }
-
-    public enum OrderType {
-        LOC,   // Limit On Close: 종가 지정가 주문
-        MOC,   // Market On Close: 종가 시장가 주문
-        LIMIT  // 일반 지정가 주문
-    }
-
-    public enum OrderTiming {
-        AT_CLOSE,   // 마감 배치(04:30 KST)에 접수 — 기본값
-        AT_OPEN,    // 개장 시점(22:30 KST)에 선접수
-        IMMEDIATE   // 관리자 재주문 즉시 접수 (정규장 중에만 사용)
-    }
-
-    public enum OrderDirection {
-        BUY,
-        SELL
     }
 
     public enum OrderStatus {

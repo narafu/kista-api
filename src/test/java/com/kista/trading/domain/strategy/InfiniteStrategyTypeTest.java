@@ -11,9 +11,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
-import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
-import static com.kista.trading.domain.model.Order.OrderType.*;
+import static com.kista.matching.domain.model.OrderDirection.BUY;
+import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.matching.domain.model.OrderType.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("InfiniteStrategy 매매 변수 계산 검증")

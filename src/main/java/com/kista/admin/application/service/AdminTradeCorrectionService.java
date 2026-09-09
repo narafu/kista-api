@@ -7,6 +7,8 @@ import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -103,7 +105,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
 
     // SELL 수량이 현재 holdings를 초과하는지 검증
     private static void validateSellQuantity(AdminManualTradeCorrectionCommand.Fill fill, AccountBalance balance) {
-        if (fill.direction() == Order.OrderDirection.SELL && fill.quantity() > balance.holdings()) {
+        if (fill.direction() == OrderDirection.SELL && fill.quantity() > balance.holdings()) {
             throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
         }
     }
@@ -112,7 +114,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     private static Order toManualOrder(AdminManualTradeCorrectionCommand.Fill fill, Account account,
                                        StrategyCycle currentCycle, Strategy strategy) {
         return Order.filledManual(account.id(), currentCycle.id(), fill.tradeDate(),
-                strategy.ticker(), Order.OrderTiming.AT_CLOSE, fill.direction(),
+                strategy.ticker(), OrderTiming.AT_CLOSE, fill.direction(),
                 fill.quantity(), fill.price(), fill.externalOrderId());
     }
 
@@ -126,8 +128,8 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
         return updated;
     }
 
-    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static com.kista.broker.domain.model.Direction toDirection(Order.OrderDirection direction) {
+    // trading OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static com.kista.broker.domain.model.Direction toDirection(OrderDirection direction) {
         return switch (direction) {
             case BUY -> com.kista.broker.domain.model.Direction.BUY;
             case SELL -> com.kista.broker.domain.model.Direction.SELL;

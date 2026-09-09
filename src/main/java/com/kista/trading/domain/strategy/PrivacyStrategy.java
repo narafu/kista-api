@@ -1,5 +1,6 @@
 package com.kista.trading.domain.strategy;
 
+import com.kista.matching.domain.model.OrderType;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
@@ -17,9 +18,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static com.kista.trading.domain.model.Order.OrderDirection.BUY;
-import static com.kista.trading.domain.model.Order.OrderDirection.SELL;
-import static com.kista.trading.domain.model.Order.OrderTiming.AT_CLOSE;
+import static com.kista.matching.domain.model.OrderDirection.BUY;
+import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.matching.domain.model.OrderTiming.AT_CLOSE;
 
 @Slf4j
 public class PrivacyStrategy {
@@ -39,7 +40,7 @@ public class PrivacyStrategy {
 
         // BUY/SELL 분리 — BUY null은 skip, SELL null은 단 1개만 허용
         for (PrivacyTrade t : privacyTradeBase.trades()) {
-            // privacy enum 비교 — trading Order.OrderDirection.BUY(static import)와 별개
+            // privacy enum 비교 — matching OrderDirection.BUY(static import)와 별개
             if (t.direction() == PrivacyOrderDirection.BUY) {
                 if (t.quantity() == null) {
                     log.warn("[PRIVACY] BUY 수량 미정 건너뜀: ticker={}, price={}", t.ticker(), t.price());
@@ -228,21 +229,21 @@ public class PrivacyStrategy {
         }
     }
 
-    // privacy 자체 소유 주문유형 → trading Order.OrderType 매핑.
+    // privacy 자체 소유 주문유형 → matching OrderType 매핑.
     // 두 enum의 상수명이 byte-identical(LOC/MOC/LIMIT)이라는 계약에 의존 — PrivacyOrderType 주석 참고.
-    private static Order.OrderType toTradingType(PrivacyOrderType type) {
-        return Order.OrderType.valueOf(type.name());
+    private static OrderType toTradingType(PrivacyOrderType type) {
+        return OrderType.valueOf(type.name());
     }
 
     // BUY 주문 quantity 조정을 위한 가변 컨테이너 (record 불가 — quantity 변경 필요)
     private static class BuyEntry {
         final BigDecimal price;
         BigDecimal quantity; // 배수 적용 실수 — 최종 Order 생성 시에만 버림 적용
-        final Order.OrderType orderType;
+        final OrderType orderType;
         final LocalDate tradeDate;
         final StrategyTicker ticker;
 
-        BuyEntry(BigDecimal price, BigDecimal quantity, Order.OrderType orderType, LocalDate tradeDate, StrategyTicker ticker) {
+        BuyEntry(BigDecimal price, BigDecimal quantity, OrderType orderType, LocalDate tradeDate, StrategyTicker ticker) {
             this.price = price;
             this.quantity = quantity;
             this.orderType = orderType;

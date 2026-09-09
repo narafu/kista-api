@@ -7,6 +7,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.user.domain.model.User;
@@ -144,7 +145,7 @@ class ManualTradingService {
     // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
     private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<Order> orders) {
         int newSellTotal = orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.SELL)
+                .filter(o -> o.direction() == OrderDirection.SELL)
                 .mapToInt(Order::quantity).sum();
         int sellableQty = registry.require(account.toBrokerRef(), SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account.toBrokerRef()).quantity();
         int reservedSellTotal = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(

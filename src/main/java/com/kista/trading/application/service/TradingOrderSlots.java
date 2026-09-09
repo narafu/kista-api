@@ -1,6 +1,8 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 
 import java.util.List;
 import java.util.Set;
@@ -13,13 +15,13 @@ import java.util.stream.Collectors;
 // package-private — application/service/trading 패키지 전용
 final class TradingOrderSlots {
 
-    private record ConcreteSlot(Order.OrderTiming timing, Order.OrderDirection direction, String orderLeg) {
+    private record ConcreteSlot(OrderTiming timing, OrderDirection direction, String orderLeg) {
         static ConcreteSlot of(Order order) {
             return new ConcreteSlot(order.timing(), order.direction(), order.orderLeg());
         }
     }
 
-    private record LegacySlot(Order.OrderTiming timing, Order.OrderDirection direction) {
+    private record LegacySlot(OrderTiming timing, OrderDirection direction) {
         static LegacySlot of(Order order) {
             return new LegacySlot(order.timing(), order.direction());
         }

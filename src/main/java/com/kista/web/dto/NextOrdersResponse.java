@@ -3,6 +3,8 @@ package com.kista.web.dto;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -76,9 +78,9 @@ public record NextOrdersResponse(
             @Schema(description = "거래 종목")
             StrategyTicker ticker,              // 거래 종목
             @Schema(description = "주문 유형", example = "LOC")
-            Order.OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
+            OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
             @Schema(description = "매수/매도 방향", example = "BUY")
-            Order.OrderDirection direction, // 매수/매도 방향
+            OrderDirection direction, // 매수/매도 방향
             @Schema(description = "주문 수량")
             int quantity,               // 주문 수량
             @Schema(description = "주문 가격 (LOC/MOC는 참고용)")

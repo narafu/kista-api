@@ -2,6 +2,9 @@ package com.kista.trading.adapter.out.persistence;
 
 import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -40,15 +43,15 @@ class OrderEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 10)
-    private Order.OrderType orderType; // VARCHAR, 네이티브 PostgreSQL ENUM 아님
+    private OrderType orderType; // VARCHAR, 네이티브 PostgreSQL ENUM 아님
 
     @Enumerated(EnumType.STRING)
     @Column(name = "timing", nullable = false, length = 20)
-    private Order.OrderTiming timing; // AT_CLOSE(마감 배치) / AT_OPEN(개장 선접수)
+    private OrderTiming timing; // AT_CLOSE(마감 배치) / AT_OPEN(개장 선접수)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 5)
-    private Order.OrderDirection direction;
+    private OrderDirection direction;
 
     @Column(name = "order_leg", nullable = false, length = 50)
     private String orderLeg = Order.UNKNOWN_LEG; // 전략 주문 다리 식별자

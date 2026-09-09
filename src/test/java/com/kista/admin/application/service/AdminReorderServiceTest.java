@@ -6,6 +6,9 @@ import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -90,10 +93,10 @@ class AdminReorderServiceTest {
     void reorder_fromPlanned_cancelsThenSavesPlanned() {
         stubCommon(plannedOrder());
 
-        AdminReorderResult result = reorder(command(Order.OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
+        AdminReorderResult result = reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
         verify(orderPort).markCancelled(ORDER_ID);
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, Order.OrderTiming.AT_CLOSE));
+        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
         assertThat(result.originalStatus()).isEqualTo(Order.OrderStatus.PLANNED);
         assertThat(result.resultingStatus()).isEqualTo(Order.OrderStatus.PLANNED);
     }
@@ -103,31 +106,31 @@ class AdminReorderServiceTest {
         stubCommon(placedOrder());
         when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
 
-        reorder(command(Order.OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
+        reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
         verify(brokerOrderCorrectionPort).cancel(new CancelInstruction(placedOrder().ticker(), placedOrder().externalOrderId()), account().toBrokerRef()); // 증권사 취소
         verify(orderPort).markCancelled(ORDER_ID);
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, Order.OrderTiming.AT_CLOSE));
+        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
     }
 
     @Test
     void reorder_fromFilled_noCancel_savesPlanned() {
         stubCommon(filledOrder());
 
-        reorder(command(Order.OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
+        reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
 
         verify(orderPort, never()).markCancelled(any()); // 체결 주문 취소 없음
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, Order.OrderTiming.AT_OPEN));
+        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_OPEN));
     }
 
     @Test
     void reorder_fromFailed_noCancel_savesPlanned() {
         stubCommon(failedOrder());
 
-        reorder(command(Order.OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
+        reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
 
         verify(orderPort, never()).markCancelled(any());
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, Order.OrderTiming.AT_OPEN));
+        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_OPEN));
     }
 
     // --- IMMEDIATE 접수 ---
@@ -138,9 +141,9 @@ class AdminReorderServiceTest {
         when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
         when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-1"));
 
-        AdminReorderResult result = reorder(command(Order.OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
+        AdminReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
 
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLACED, Order.OrderTiming.IMMEDIATE));
+        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLACED, OrderTiming.IMMEDIATE));
         assertThat(result.resultingStatus()).isEqualTo(Order.OrderStatus.PLACED);
         assertThat(result.newOrderExternalId()).isEqualTo("NEW-EXT-1");
     }
@@ -151,9 +154,9 @@ class AdminReorderServiceTest {
         when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
         when(brokerOrderCorrectionPort.place(any(), any())).thenThrow(new RuntimeException("증권사 오류"));
 
-        AdminReorderResult result = reorder(command(Order.OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
+        AdminReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
 
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.FAILED, Order.OrderTiming.IMMEDIATE));
+        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.FAILED, OrderTiming.IMMEDIATE));
         assertThat(result.resultingStatus()).isEqualTo(Order.OrderStatus.FAILED);
     }
 
@@ -163,7 +166,7 @@ class AdminReorderServiceTest {
     void reorder_immediateWhenClosed_throwsIllegalArgument() {
         stubCommon(plannedOrder());
 
-        assertThatThrownBy(() -> reorder(command(Order.OrderTiming.IMMEDIATE), NOW_AFTER_CLOSE))
+        assertThatThrownBy(() -> reorder(command(OrderTiming.IMMEDIATE), NOW_AFTER_CLOSE))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("IMMEDIATE");
     }
@@ -173,7 +176,7 @@ class AdminReorderServiceTest {
         stubCommon(plannedOrder());
 
         // NOW_DURING_MARKET = 정규장 중 → AT_OPEN 불가 (개장 이후)
-        assertThatThrownBy(() -> reorder(command(Order.OrderTiming.AT_OPEN), NOW_DURING_MARKET))
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_OPEN), NOW_DURING_MARKET))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("AT_OPEN");
     }
@@ -182,7 +185,7 @@ class AdminReorderServiceTest {
     void reorder_allTimingsWhenClosed_allThrow() {
         stubCommon(plannedOrder());
 
-        for (Order.OrderTiming timing : Order.OrderTiming.values()) {
+        for (OrderTiming timing : OrderTiming.values()) {
             assertThatThrownBy(() -> reorder(command(timing), NOW_AFTER_CLOSE))
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -199,7 +202,7 @@ class AdminReorderServiceTest {
         when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(plannedOrder()));
         when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
 
-        assertThatThrownBy(() -> reorder(command(Order.OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("휴장일");
     }
@@ -220,7 +223,7 @@ class AdminReorderServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static java.util.List<Order> argOrdersMatch(Order.OrderStatus status, Order.OrderTiming timing) {
+    private static java.util.List<Order> argOrdersMatch(Order.OrderStatus status, OrderTiming timing) {
         return org.mockito.ArgumentMatchers.argThat(orders ->
                 ((java.util.List<Order>) orders).size() == 1
                 && ((java.util.List<Order>) orders).get(0).status() == status
@@ -248,29 +251,29 @@ class AdminReorderServiceTest {
 
     private Order plannedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private Order placedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), Order.OrderStatus.PLACED, "PLACED-1", null, null);
     }
 
     private Order filledOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 2,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 2,
                 new BigDecimal("236.54"), Order.OrderStatus.FILLED, "FILLED-1", 2, new BigDecimal("236.54"));
     }
 
     private Order failedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                Order.OrderType.LIMIT, Order.OrderTiming.AT_OPEN, Order.OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), Order.OrderStatus.FAILED, null, null, null);
     }
 
-    private AdminReorderCommand command(Order.OrderTiming timing) {
+    private AdminReorderCommand command(OrderTiming timing) {
         return new AdminReorderCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
                 timing,

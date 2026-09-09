@@ -3,6 +3,8 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
@@ -64,7 +66,7 @@ class TradingBuyCompetitionSimulatorTest {
     }
 
     private Order buyOrder(StrategyTicker ticker, int quantity, BigDecimal price) {
-        return Order.planned(today, ticker, Order.OrderType.LOC, Order.OrderDirection.BUY, quantity, price);
+        return Order.planned(today, ticker, OrderType.LOC, OrderDirection.BUY, quantity, price);
     }
 
     @Test
