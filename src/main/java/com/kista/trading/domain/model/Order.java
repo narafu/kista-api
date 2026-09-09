@@ -3,6 +3,7 @@ package com.kista.trading.domain.model;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
@@ -55,6 +56,18 @@ public record Order(
                 template.orderType(), template.timing(), template.direction(), template.orderLeg(), template.quantity(),
                 template.price(), OrderStatus.PLANNED, null, null, null);
 
+    }
+
+    // 커널 계획 주문 → 특정 계좌·사이클 PLANNED Order 승격 (dormant — Task 4 파이프라인 전환 시 사용)
+    public static Order fromPlanned(PlannedOrder p, UUID accountId, UUID strategyCycleId) {
+        return new Order(null, accountId, strategyCycleId, p.tradeDate(), p.ticker(), p.orderType(),
+                p.timing(), p.direction(), p.orderLeg(), p.quantity(), p.price(),
+                OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 영속 Order → 계획 주문 강등 (사후 가격 캡 재산정 시 커널에 재입력, dormant)
+    public PlannedOrder toPlanned() {
+        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, quantity, price);
     }
 
     // 전략 계산용 PLANNED 템플릿 주문 — AT_CLOSE 기본값 (매수·PRIVACY 등 대부분)
