@@ -3,6 +3,7 @@ package com.kista.notify.adapter.in.telegram;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.stats.application.usecase.PortfolioUseCase;
+import com.kista.user.application.usecase.TelegramApprovalUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class TelegramBotServiceTest {
     @Mock TelegramApiClient apiClient;
     @Mock PortfolioUseCase portfolioUseCase;
     @Mock UserUseCase userUseCase;
+    @Mock TelegramApprovalUseCase telegramApprovalUseCase;
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
@@ -37,7 +39,7 @@ class TelegramBotServiceTest {
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase, userUseCase);
+        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase, userUseCase, telegramApprovalUseCase);
         // adminChatId로 userId 조회 — status/history 명령에서만 사용, 다른 테스트에서는 미호출
         lenient().when(userUseCase.findUserIdByTelegramChatId(String.valueOf(CHAT_ID))).thenReturn(Optional.of(USER_ID));
     }
@@ -46,6 +48,12 @@ class TelegramBotServiceTest {
         return new TelegramUpdate(1L,
                 new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), text),
                 null);
+    }
+
+    private TelegramUpdate callbackUpdate(String data) {
+        return new TelegramUpdate(1L, null,
+                new TelegramUpdate.CallbackQuery("cb-1", data,
+                        new TelegramUpdate.Message(1L, new TelegramUpdate.Chat(CHAT_ID), null)));
     }
 
     @Test
@@ -120,6 +128,34 @@ class TelegramBotServiceTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(apiClient).sendMessage(any(), captor.capture());
         assertThat(captor.getValue()).contains("/help");
+    }
+
+    @Test
+    void approve_callback_delegates_to_telegram_approval_usecase() {
+        sut.handle(callbackUpdate("approve:" + USER_ID));
+
+        verify(telegramApprovalUseCase).handle(TelegramApprovalUseCase.Action.APPROVE, USER_ID);
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture());
+        assertThat(captor.getValue()).contains("승인 완료").contains(USER_ID.toString());
+    }
+
+    @Test
+    void reject_callback_delegates_to_telegram_approval_usecase() {
+        sut.handle(callbackUpdate("reject:" + USER_ID));
+
+        verify(telegramApprovalUseCase).handle(TelegramApprovalUseCase.Action.REJECT, USER_ID);
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture());
+        assertThat(captor.getValue()).contains("거절 완료").contains(USER_ID.toString());
+    }
+
+    @Test
+    void unknown_callback_action_is_ignored() {
+        sut.handle(callbackUpdate("unknown:" + USER_ID));
+
+        verifyNoInteractions(telegramApprovalUseCase);
+        verify(apiClient, never()).sendMessage(any(), any());
     }
 
 }
