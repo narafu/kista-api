@@ -1,11 +1,5 @@
-package com.kista.trading.domain.model;
+package com.kista.matching.domain.model;
 
-import com.kista.broker.domain.model.Direction;
-import com.kista.broker.domain.model.Execution;
-import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderType;
-import com.kista.matching.domain.model.OrderDirection;
-import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,36 +17,29 @@ class AccountBalanceTest {
     private static final LocalDate DATE = LocalDate.of(2026, 1, 1);
     private static final StrategyTicker TICKER = StrategyTicker.SOXL;
 
-    private static Execution buy(int qty, String price) {
-        BigDecimal p = new BigDecimal(price);
-        return new Execution(DATE, TICKER, Direction.BUY, qty, p,
-                p.multiply(BigDecimal.valueOf(qty)), null);
+    // matching은 broker를 참조하지 않는다 — Fill을 익명 클래스로 직접 구현(broker Execution 미경유)
+    private static AccountBalance.Fill buy(int qty, String price) {
+        return fill(OrderDirection.BUY, qty, price);
     }
 
-    private static Execution sell(int qty, String price) {
-        BigDecimal p = new BigDecimal(price);
-        return new Execution(DATE, TICKER, Direction.SELL, qty, p,
-                p.multiply(BigDecimal.valueOf(qty)), null);
+    private static AccountBalance.Fill sell(int qty, String price) {
+        return fill(OrderDirection.SELL, qty, price);
     }
 
-    // broker Execution → AccountBalance.Fill 매핑 (본체 Fill.of/listOf 삭제됨 — 테스트 전용 인라인 헬퍼)
-    private static List<AccountBalance.Fill> fills(List<Execution> executions) {
-        return executions.stream()
-                .<AccountBalance.Fill>map(e -> new AccountBalance.Fill() {
-                    @Override public OrderDirection direction() {
-                        return e.direction() == Direction.BUY ? OrderDirection.BUY : OrderDirection.SELL;
-                    }
-                    @Override public int quantity() { return e.quantity(); }
-                    @Override public BigDecimal amountUsd() { return e.amountUsd(); }
-                })
-                .toList();
+    private static AccountBalance.Fill fill(OrderDirection direction, int qty, String price) {
+        BigDecimal amount = new BigDecimal(price).multiply(BigDecimal.valueOf(qty));
+        return new AccountBalance.Fill() {
+            @Override public OrderDirection direction() { return direction; }
+            @Override public int quantity() { return qty; }
+            @Override public BigDecimal amountUsd() { return amount; }
+        };
     }
 
     @Test
     @DisplayName("빈 체결 목록 — 잔고 그대로 반환")
     void emptyExecutions_returnsUnchanged() {
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("5000"));
-        AccountBalance result = balance.applyExecutions(fills(List.of()));
+        AccountBalance result = balance.applyExecutions(List.of());
         assertThat(result).isEqualTo(balance);
     }
 
@@ -61,7 +48,7 @@ class AccountBalanceTest {
     void pureBuy_weightsAvgPrice() {
         // holdings=100 @ $25, 추가 매수 50주 @ $30
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("10000"));
-        AccountBalance result = balance.applyExecutions(fills(List.of(buy(50, "30.00"))));
+        AccountBalance result = balance.applyExecutions(List.of(buy(50, "30.00")));
 
         // (100*25 + 50*30) / 150 = 4000 / 150 = 26.6667
         assertThat(result.holdings()).isEqualTo(150);
@@ -73,7 +60,7 @@ class AccountBalanceTest {
     void partialSell_avgPriceUnchanged() {
         // holdings=200 @ $25, 100주 매도 — 평단가 $25 유지
         AccountBalance balance = new AccountBalance(200, new BigDecimal("25.00"), new BigDecimal("1000"));
-        AccountBalance result = balance.applyExecutions(fills(List.of(sell(100, "30.00"))));
+        AccountBalance result = balance.applyExecutions(List.of(sell(100, "30.00")));
 
         assertThat(result.holdings()).isEqualTo(100);
         assertThat(result.avgPrice()).isEqualByComparingTo("25.0000");
@@ -83,7 +70,7 @@ class AccountBalanceTest {
     @DisplayName("전량 매도 — 평단가 null")
     void fullSell_avgPriceNull() {
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("1000"));
-        AccountBalance result = balance.applyExecutions(fills(List.of(sell(100, "30.00"))));
+        AccountBalance result = balance.applyExecutions(List.of(sell(100, "30.00")));
 
         assertThat(result.holdings()).isZero();
         assertThat(result.avgPrice()).isNull();
@@ -96,7 +83,7 @@ class AccountBalanceTest {
         // 매도 후: 50주 @ $25 (cost=$1250)
         // 매수 후: (1250 + 30*30) / 80 = (1250+900)/80 = 26.875
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("5000"));
-        AccountBalance result = balance.applyExecutions(fills(List.of(sell(50, "30.00"), buy(30, "30.00"))));
+        AccountBalance result = balance.applyExecutions(List.of(sell(50, "30.00"), buy(30, "30.00")));
 
         assertThat(result.holdings()).isEqualTo(80);
         assertThat(result.avgPrice()).isEqualByComparingTo("26.8750");
@@ -106,7 +93,7 @@ class AccountBalanceTest {
     @DisplayName("holdings=0에서 매수 시작 — avgPrice = 매수 단가")
     void startFromZero_avgPriceIsFirstBuy() {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
-        AccountBalance result = balance.applyExecutions(fills(List.of(buy(100, "25.00"))));
+        AccountBalance result = balance.applyExecutions(List.of(buy(100, "25.00")));
 
         assertThat(result.holdings()).isEqualTo(100);
         assertThat(result.avgPrice()).isEqualByComparingTo("25.0000");

@@ -1,4 +1,4 @@
-package com.kista.trading.domain.model;
+package com.kista.matching.domain.model;
 
 import com.kista.matching.domain.model.ReverseModePosition;
 import com.kista.sharedkernel.StrategyTicker;
