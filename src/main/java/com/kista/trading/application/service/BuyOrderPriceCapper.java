@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.VrPosition;
@@ -25,7 +25,7 @@ import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.BUY;
 import com.kista.sharedkernel.StrategyTicker;
 
 // BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장

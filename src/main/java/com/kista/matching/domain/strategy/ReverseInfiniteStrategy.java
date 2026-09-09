@@ -10,10 +10,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
-import static com.kista.matching.domain.model.OrderDirection.SELL;
-import static com.kista.matching.domain.model.OrderType.LOC;
-import static com.kista.matching.domain.model.OrderType.MOC;
+import static com.kista.sharedkernel.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.SELL;
+import static com.kista.sharedkernel.OrderType.LOC;
+import static com.kista.sharedkernel.OrderType.MOC;
 
 // 리버스모드(소진 후) 전략 — 별지점 기준 분할 매도 + 쿼터 매수
 @Slf4j

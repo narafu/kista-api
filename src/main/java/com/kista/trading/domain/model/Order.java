@@ -1,8 +1,8 @@
 package com.kista.trading.domain.model;
 
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.StrategyTicker;
 

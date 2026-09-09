@@ -3,6 +3,8 @@ package com.kista.broker.adapter.out.mock;
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.*;
 import com.kista.sharedkernel.Broker;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
@@ -170,7 +172,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
     // 순수 3줄 판정이라 포트 우회보다 저비용 복제로 판단(PersistenceSupport/DstInfo 부분 복제와 동일 기준, 변경 금지)
     private static boolean fills(PlacedOrderView order, BigDecimal closingPrice) {
         if (order.orderType() == OrderType.MOC) return true;
-        return order.direction() == Direction.BUY
+        return order.direction() == OrderDirection.BUY
                 ? closingPrice.compareTo(order.price()) <= 0
                 : closingPrice.compareTo(order.price()) >= 0;
     }

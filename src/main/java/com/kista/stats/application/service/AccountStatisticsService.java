@@ -10,7 +10,7 @@ import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.CycleHistoryPage;
@@ -83,7 +83,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                     return new DailyTransaction(
                             o.tradeDate().toString(),
                             null,
-                            toDirection(o.direction()),
+                            o.direction(),
                             o.ticker(),
                             o.ticker().name(),
                             qty,
@@ -97,24 +97,16 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                 .toList();
 
         BigDecimal buyTotal = items.stream()
-                .filter(t -> t.direction() == com.kista.broker.domain.model.Direction.BUY)
+                .filter(t -> t.direction() == OrderDirection.BUY)
                 .map(DailyTransaction::tradeAmountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal sellTotal = items.stream()
-                .filter(t -> t.direction() == com.kista.broker.domain.model.Direction.SELL)
+                .filter(t -> t.direction() == OrderDirection.SELL)
                 .map(DailyTransaction::tradeAmountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new DailyTransactionResult(items,
                 new DailyTransactionSummary(buyTotal, sellTotal, BigDecimal.ZERO, BigDecimal.ZERO));
-    }
-
-    // trading OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static com.kista.broker.domain.model.Direction toDirection(OrderDirection direction) {
-        return switch (direction) {
-            case BUY -> com.kista.broker.domain.model.Direction.BUY;
-            case SELL -> com.kista.broker.domain.model.Direction.SELL;
-        };
     }
 
     // 전략 생성 화면 티커 목록 가격 — 최소 시드 산정 기준(전일종가)과 동일 소스로 통일

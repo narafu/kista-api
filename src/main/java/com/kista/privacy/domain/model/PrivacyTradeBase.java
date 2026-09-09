@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
 
 public record PrivacyTradeBase(
@@ -22,8 +24,8 @@ public record PrivacyTradeBase(
     public record PrivacyTrade(
             LocalDate tradeDate,             // 거래일
             StrategyTicker ticker,          // 거래 종목
-            PrivacyOrderType orderType,      // 주문 유형 (LOC/MOC/LIMIT)
-            PrivacyOrderDirection direction, // 매수/매도 방향
+            OrderType orderType,      // 주문 유형 (LOC/MOC/LIMIT)
+            OrderDirection direction, // 매수/매도 방향
             Integer quantity,                // 주문 수량(nullable)
             BigDecimal price                 // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
     ) {

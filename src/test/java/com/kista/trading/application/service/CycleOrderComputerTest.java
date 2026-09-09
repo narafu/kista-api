@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;

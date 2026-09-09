@@ -5,9 +5,9 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -16,7 +16,6 @@ import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
@@ -109,13 +108,7 @@ class TradingOrderExecutorTest {
 
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
-        Direction direction = order.direction() == OrderDirection.BUY ? Direction.BUY : Direction.SELL;
-        com.kista.broker.domain.model.OrderType orderType = switch (order.orderType()) {
-            case LOC -> com.kista.broker.domain.model.OrderType.LOC;
-            case MOC -> com.kista.broker.domain.model.OrderType.MOC;
-            case LIMIT -> com.kista.broker.domain.model.OrderType.LIMIT;
-        };
-        return new OrderInstruction(order.ticker(), direction, orderType, order.quantity(), order.price());
+        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price());
     }
 
     @Test

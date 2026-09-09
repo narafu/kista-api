@@ -6,9 +6,9 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
@@ -22,7 +22,6 @@ import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.Direction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.application.port.output.ExecutionPort;
 import com.kista.support.DomainFixtures;
@@ -121,7 +120,7 @@ class TradingReporterTest {
 
     private static Execution buyExecution(String externalOrderId, int quantity, String price) {
         BigDecimal p = new BigDecimal(price);
-        return new Execution(TODAY, StrategyTicker.SOXL, Direction.BUY,
+        return new Execution(TODAY, StrategyTicker.SOXL, OrderDirection.BUY,
                 quantity, p, p.multiply(BigDecimal.valueOf(quantity)), externalOrderId);
     }
 

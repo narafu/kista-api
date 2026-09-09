@@ -4,7 +4,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.Execution;
 import com.kista.user.domain.model.User;
 import com.kista.notify.domain.model.TradeEventView;
@@ -42,7 +42,7 @@ class TradingReportNotifier {
 
         // 체결 건별 SSE 실시간 알림 — 알림 설정과 무관하게 항상 발송
         for (Execution e : event.executions()) {
-            TradeEventView tradeEvent = e.direction() == Direction.SELL
+            TradeEventView tradeEvent = e.direction() == OrderDirection.SELL
                     ? TradeEventView.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname())
                     : TradeEventView.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), account.nickname());
             realtimeNotificationPort.notifyTrade(user.id(), tradeEvent);

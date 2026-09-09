@@ -33,15 +33,14 @@
 **포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·admin 구현)/`StrategyCreationPolicyPort`(trading 정의·admin 구현)/`ActiveStrategyCountPort`(user 정의·trading 구현)/`MockSimulationDataPort`(broker 정의·trading 구현).
 
 **(b) 외부 계약 분리로 의도적 허용된 복제** (원장에 남는 것):
-- broker `Direction`/`OrderType`/`PriceSnapshot`/`BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(`com.kista.broker.domain.model`, matching 동명 타입과 값 집합만 동일): KIS/Toss wire payload에 묶임. broker는 matching 타입을 포트 시그니처에 직접 쓰지 않고 trading 호출부가 양방향 변환한다(`LiveBalancePort`/`BrokerOrderCorrectionPort` 등). 근거가 된 순환: `broker↔trading`/`notify↔trading`/`broker→trading→notify→broker`
-- privacy `PrivacyOrderType`/`PrivacyOrderDirection`/`FidaPlannedOrder`(`com.kista.privacy.domain.model`, 상수명 byte-identical): FIDA 피드 + `privacy_trade_base_orders.order_type` 컬럼에 묶임. `PrivacyStrategy`(matching)가 `matching.domain.model.OrderType.valueOf(name())`으로 매핑. `PrivacyService`의 notify 직접 호출은 `PrivacyAlertRaisedEvent` 발행으로 전환(`privacy→notify→trading→privacy` 전이 순환 해소)
-- matching `OrderDirection`/`OrderType`(`com.kista.matching.domain.model`, `orders.order_type`/`orders.direction` 컬럼에 묶임 — trading의 `Order`가 이 값을 참조하고 `OrderStatus`만 별도 nested enum으로 유지)도 동일 사유로 broker/privacy 사본과 별개 유지. **#1로 커널 어휘가 `com.kista.matching.domain.model`로 이동(`Order`는 이를 참조). privacy `PrivacyOrderType/Direction`·broker `Direction/OrderType` sharedkernel 승격 재판정은 #2 — advisor 판단상 matching 잔류가 영구 정답일 수 있음(커널 출력 알파벳 ≠ sharedkernel 정체성 어휘).**
+- broker `PriceSnapshot`/`BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(`com.kista.broker.domain.model`): KIS/Toss wire payload 요청/응답 형태에 묶임. 근거가 된 순환: `broker↔trading`/`notify↔trading`/`broker→trading→notify→broker`
 - DTO 삼중/이중복제: `TossCandleResponse`(market/stats/web), `CycleHistoryPageResponse`/`CycleHistoryResponse`(stats/web) — 각기 다른 HTTP 엔드포인트의 JSON 응답 계약. 통합 시 한 모듈의 엔드포인트 필드 추가가 다른 모듈 응답 스키마에 전이됨
 
 **narrowing projection** (own-type이되 값 복제가 아니라 애그리게이트 축소 노출 — 별도 트랙):
 - `BrokerAccountRef`(broker, `Account`의 자격증명 투영): `Account→BrokerAccountRef` 변환은 `Account.toBrokerRef()` 1곳이 전담. `SellableQuantity`/`BrokerCredentialException`/`BrokerRateLimitException`(broker)도 account 원본의 동일 사유 복제
 - `StrategyRefLite`(broker, `MockSimulationDataPort` 확장용 초경량 뷰)
 - `StrategyCreationRequest`(trading.domain.strategy, 원시값 5개): 리졸버 4종이 19필드 `RegisterStrategyCommand` 전체 대신 실제로 쓰는 필드만 받는 ISP 좁히기 — 모듈 경계용이 아니라 순수 인터페이스 설계라 strategyconfig 병합(아래) 이후에도 계속 유지
+- `FidaPlannedOrder`(privacy.domain.model, 원시값 4필드): `trading.domain.model.Order`(15필드) 대신 FIDA가 실제로 보내고 privacy가 실제로 읽는 필드만 받는 ISP 좁히기 — 필드 타입은 `sharedkernel.OrderDirection`/`OrderType`(아래 "정리된 항목" 참고)
 
 ### strategyconfig 모듈 병합 (2026-09-07)
 옛 `com.kista.strategyconfig`(계좌별 영속 전략 설정, 11번째 이전 모듈)를 `com.kista.trading`으로 병합했다. own-type 재검토 과정에서 두 모듈이 서로 다른 애그리게이트를 표방했지만 실제 결합은 강한 단방향(`strategyconfig→trading` 13참조, `trading→strategyconfig` 0 — 주석 2줄뿐)이었고, strategyconfig의 유일한 외부 소비자(admin/stats/web)가 전부 이미 trading을 단방향 참조하고 있어 병합해도 새 순환이 생기지 않음을 실측으로 확인한 뒤 진행했다(admin↔user/account가 전이 순환을 만들지 않는지도 사전 확인 — `user→trading`/`account→trading` 0건).
@@ -58,6 +57,7 @@
 - 옛 "strategyconfig↔admin 사례"(`AdminCycleStrategySummary` ↔ strategyconfig `StrategySummary`): byte-identical 쌍둥이 + 죽은 import였다 — 2026-09-07 `AdminCycleStrategySummary` 삭제, admin이 `StrategySummary`를 직접 소비
 - 옛 "notify↔trading 사례"(`TradeEventView`): 원본 `trading.domain.model.TradeEvent`는 own-type 신설 후 소비자가 사라져 삭제됨(2026-09 이전, 이번 재검토에서 고아 스캔으로 재확인 — 잔존 고아 0건)
 - 옛 "trading↔strategy-config 사례"(`StrategyRef`/`StrategyLookupPort`/`StrategyPausePort`): strategyconfig 모듈이 trading으로 병합되며 우회 장치 자체가 불필요해져 삭제 — 아래 "strategyconfig 모듈 병합" 참고. `StrategyCreationRequest`는 모듈 경계용이 아니라 순수 ISP 좁히기라 병합 후에도 유지(narrowing projection 목록 참고)
+- 옛 "매수/매도 방향·주문유형 3중 복제 사례"(broker `Direction`/`OrderType` ↔ privacy `PrivacyOrderDirection`/`PrivacyOrderType` ↔ matching `OrderDirection`/`OrderType`): KIS/Toss wire 매핑은 어댑터 코드(`KisOrderApi.resolveOrderDvsn` 등)가 switch/if로 담당할 뿐 enum 값 집합 자체엔 외부 계약이 실려있지 않아 (b) 정당화가 성립하지 않았다 — 2026-09-09 `com.kista.sharedkernel.OrderDirection`/`OrderType`으로 승격, 세 벌 복제(matching own 포함) 전부 삭제. `PrivacyStrategy.toTradingType()`(byte-identical 상수명 계약에 의존하던 `valueOf(name())` 매핑 브릿지)과 broker/trading 곳곳의 `toDirection()`/`toOrderType()` 변환 헬퍼도 타입이 하나로 합쳐지며 항등 함수가 되어 전부 소멸
 
 신규 broker/notify/privacy 포트 추가 시 이 게이트를 먼저 통과할 것 — (a)(b) 어느 쪽도 아니면 복제하지 말고 sharedkernel 승격 또는 소유권 이동을 먼저 검토한다.
 

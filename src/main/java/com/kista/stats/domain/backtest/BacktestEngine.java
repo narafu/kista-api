@@ -5,8 +5,8 @@ import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderType;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderType;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
@@ -421,10 +421,7 @@ public class BacktestEngine {
             // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
             List<AccountBalance.Fill> fills = executions.stream()
                     .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
-                        @Override public OrderDirection direction() {
-                            return e.direction() == com.kista.broker.domain.model.Direction.BUY
-                                    ? OrderDirection.BUY : OrderDirection.SELL;
-                        }
+                        @Override public OrderDirection direction() { return e.direction(); }
                         @Override public int quantity() { return e.quantity(); }
                         @Override public BigDecimal amountUsd() { return e.amountUsd(); }
                     })
@@ -457,7 +454,7 @@ public class BacktestEngine {
             if (executions.isEmpty()) return;
             super.applyFills(executions);
             poolUsed = poolUsed.add(executions.stream()
-                    .filter(e -> e.direction() == com.kista.broker.domain.model.Direction.BUY)
+                    .filter(e -> e.direction() == OrderDirection.BUY)
                     .map(Execution::amountUsd)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
         }

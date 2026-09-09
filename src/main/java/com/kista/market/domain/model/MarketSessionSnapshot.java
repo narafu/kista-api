@@ -8,7 +8,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 // 현재 미국 시장 세션(수동 실행 가능 여부) 계산 — trading.domain.model.DstInfo.currentSession()/isDst()의
-// 서브셋을 자체 소유로 복제(모듈 경계상 공유 불가, market↔trading 순환 방지 — broker의 Direction/OrderType과
+// 서브셋을 자체 소유로 복제(모듈 경계상 공유 불가, market↔trading 순환 방지 — broker의 PriceSnapshot과
 // 동일 패턴). DST 판정·시각 상수는 DstInfo와 반드시 동기화 유지 — 자동 동기화 장치 없음, 사람이 양쪽 다 고쳐야 함.
 public record MarketSessionSnapshot(boolean isDst, MarketSession session) {
 

@@ -4,8 +4,8 @@ import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
 import com.kista.privacy.domain.model.PrivacyDates;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
@@ -78,9 +78,9 @@ class PrivacyTradePersistenceAdapterTest {
         base.setAvgPrice(new BigDecimal("115.32"));
         base.setHoldings(16);
         base.getOrders().addAll(List.of(
-                order(base, PrivacyOrderDirection.BUY, "114.97", 8),
-                order(base, PrivacyOrderDirection.BUY, "118.57", 8),
-                order(base, PrivacyOrderDirection.SELL, "119.30", 8)));
+                order(base, OrderDirection.BUY, "114.97", 8),
+                order(base, OrderDirection.BUY, "118.57", 8),
+                order(base, OrderDirection.SELL, "119.30", 8)));
 
         when(baseRepository.findByReleaseDateAndTicker(releaseDate, StrategyTicker.SOXL))
                 .thenReturn(Optional.of(base));
@@ -92,9 +92,9 @@ class PrivacyTradePersistenceAdapterTest {
                 new BigDecimal("14467.674"), new BigDecimal("-251.284"),
                 new BigDecimal("115.318"), 16,
                 List.of(
-                        new FidaPlannedOrder(PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, 8, new BigDecimal("114.97")),
-                        new FidaPlannedOrder(PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, 8, new BigDecimal("118.57")),
-                        new FidaPlannedOrder(PrivacyOrderDirection.SELL, PrivacyOrderType.LIMIT, 8, new BigDecimal("119.30"))));
+                        new FidaPlannedOrder(OrderDirection.BUY, OrderType.LIMIT, 8, new BigDecimal("114.97")),
+                        new FidaPlannedOrder(OrderDirection.BUY, OrderType.LIMIT, 8, new BigDecimal("118.57")),
+                        new FidaPlannedOrder(OrderDirection.SELL, OrderType.LIMIT, 8, new BigDecimal("119.30"))));
 
         var result = adapter.saveBaseWithOrders(command); // 409 던지지 않음
 
@@ -103,11 +103,11 @@ class PrivacyTradePersistenceAdapterTest {
         verify(baseRepository, never()).save(any());
     }
 
-    private static PrivacyTradeBaseOrderEntity order(PrivacyTradeBaseEntity base, PrivacyOrderDirection dir, String price, int qty) {
+    private static PrivacyTradeBaseOrderEntity order(PrivacyTradeBaseEntity base, OrderDirection dir, String price, int qty) {
         PrivacyTradeBaseOrderEntity o = new PrivacyTradeBaseOrderEntity();
         o.setPrivacyBase(base);
         o.setDirection(dir);
-        o.setOrderType(PrivacyOrderType.LIMIT);
+        o.setOrderType(OrderType.LIMIT);
         o.setPrice(new BigDecimal(price));
         o.setQuantity(qty);
         return o;

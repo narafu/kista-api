@@ -2,8 +2,8 @@ package com.kista.privacy.application.service;
 
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.privacy.application.event.PrivacyAlertRaisedEvent;
@@ -86,8 +86,8 @@ class PrivacyServiceTest {
                 LocalDate.of(2026, 6, 30), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 4,
                 List.of(
-                        new FidaPlannedOrder(PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, 2, new BigDecimal("234.46")),
-                        new FidaPlannedOrder(PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, 2, new BigDecimal("233.84"))));
+                        new FidaPlannedOrder(OrderDirection.BUY, OrderType.LIMIT, 2, new BigDecimal("234.46")),
+                        new FidaPlannedOrder(OrderDirection.BUY, OrderType.LIMIT, 2, new BigDecimal("233.84"))));
 
         when(validationService.inspect(any(FidaOrderCommand.class)))
                 .thenReturn(PrivacyTradeValidationReport.warning("MISSING_SELL", "SELL 주문이 없습니다"));
@@ -107,7 +107,7 @@ class PrivacyServiceTest {
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.of(2026, 6, 30), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 2,
-                List.of(new FidaPlannedOrder(PrivacyOrderDirection.SELL, PrivacyOrderType.LIMIT, 4, new BigDecimal("236.54"))));
+                List.of(new FidaPlannedOrder(OrderDirection.SELL, OrderType.LIMIT, 4, new BigDecimal("236.54"))));
 
         when(validationService.inspect(any(FidaOrderCommand.class)))
                 .thenReturn(PrivacyTradeValidationReport.blocking("EXPLICIT_SELL_EXCEEDS_HOLDINGS", "매도 수량 초과"));

@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web.dto;
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 

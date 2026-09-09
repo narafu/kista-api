@@ -2,11 +2,9 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.Direction;
 import com.kista.trading.domain.model.Order;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.domain.model.OrderType;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.matching.domain.model.VrPosition;
@@ -97,8 +95,8 @@ class TradingOrderExecutor {
                 break;
             }
             Order p = orders.get(i);
-            OrderInstruction instruction = new OrderInstruction(p.ticker(), toDirection(p.direction()),
-                    toOrderType(p.orderType()), p.quantity(), p.price());
+            OrderInstruction instruction = new OrderInstruction(p.ticker(), p.direction(),
+                    p.orderType(), p.quantity(), p.price());
             OrderResult result;
             try {
                 result = registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class).place(instruction, account.toBrokerRef());
@@ -127,23 +125,6 @@ class TradingOrderExecutor {
             }
         }
         return placed;
-    }
-
-    // matching OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
-        return switch (direction) {
-            case BUY -> Direction.BUY;
-            case SELL -> Direction.SELL;
-        };
-    }
-
-    // matching OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
-    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
-        return switch (orderType) {
-            case LOC -> OrderType.LOC;
-            case MOC -> OrderType.MOC;
-            case LIMIT -> OrderType.LIMIT;
-        };
     }
 
     // 일시적 DB 오류 흡수 — 1초 후 1회 재시도, 2차 실패는 호출측으로 전파

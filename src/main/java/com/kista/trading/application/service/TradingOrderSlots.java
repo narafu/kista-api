@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 
 import java.util.List;
 import java.util.Set;

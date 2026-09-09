@@ -1,4 +1,5 @@
 package com.kista.broker.domain.model;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
@@ -6,7 +7,7 @@ import java.math.BigDecimal;
 public record DailyTransaction(
         String tradeDate,                    // 매매일자 (trad_dt)
         String settlementDate,               // 결제일자 (sttl_dt) — Toss 미제공 시 null
-        Direction direction,                 // 매도/매수 방향 (sll_buy_dvsn_cd: 01=매도, 02=매수)
+        OrderDirection direction,            // 매도/매수 방향 (sll_buy_dvsn_cd: 01=매도, 02=매수)
         StrategyTicker ticker,                       // 종목코드 (pdno)
         String symbolName,                   // 종목명 (ovrs_item_name)
         int quantity,                        // 체결수량 (ccld_qty)

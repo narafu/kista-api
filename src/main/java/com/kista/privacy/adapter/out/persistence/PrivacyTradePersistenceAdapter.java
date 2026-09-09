@@ -2,6 +2,7 @@ package com.kista.privacy.adapter.out.persistence;
 
 import com.kista.common.TimeZones;
 import com.kista.privacy.domain.model.*;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +23,10 @@ import java.util.function.Function;
 class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
 
     // BUY → SELL, BUY는 price 내림차순, SELL은 price 오름차순 (제네릭 헬퍼 — 도메인/엔티티 공용)
-    private static <T> Comparator<T> orderSort(Function<T, PrivacyOrderDirection> dirFn,
+    private static <T> Comparator<T> orderSort(Function<T, OrderDirection> dirFn,
                                                Function<T, BigDecimal> priceFn) {
-        return Comparator.<T, Integer>comparing(t -> dirFn.apply(t) == PrivacyOrderDirection.BUY ? 0 : 1)
-                .thenComparing((a, b) -> dirFn.apply(a) == PrivacyOrderDirection.BUY
+        return Comparator.<T, Integer>comparing(t -> dirFn.apply(t) == OrderDirection.BUY ? 0 : 1)
+                .thenComparing((a, b) -> dirFn.apply(a) == OrderDirection.BUY
                         ? priceFn.apply(b).compareTo(priceFn.apply(a))
                         : priceFn.apply(a).compareTo(priceFn.apply(b)));
     }

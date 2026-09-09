@@ -7,7 +7,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
@@ -18,7 +18,6 @@ import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.Direction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.application.port.output.ExecutionPort;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +63,7 @@ class TradingReporter {
         List<AccountBalance.Fill> fills = executions.stream()
                 .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
                     @Override public OrderDirection direction() {
-                        return e.direction() == Direction.BUY ? OrderDirection.BUY : OrderDirection.SELL;
+                        return e.direction() == OrderDirection.BUY ? OrderDirection.BUY : OrderDirection.SELL;
                     }
                     @Override public int quantity() { return e.quantity(); }
                     @Override public BigDecimal amountUsd() { return e.amountUsd(); }
@@ -148,11 +147,11 @@ class TradingReporter {
 
     private TradingReport buildReport(LocalDate today, StrategyType strategyType, StrategyTicker ticker, List<Execution> executions) {
         BigDecimal totalBought = executions.stream()
-                .filter(e -> e.direction() == Direction.BUY)
+                .filter(e -> e.direction() == OrderDirection.BUY)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalSold = executions.stream()
-                .filter(e -> e.direction() == Direction.SELL)
+                .filter(e -> e.direction() == OrderDirection.SELL)
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, strategyType, ticker, totalBought, totalSold);

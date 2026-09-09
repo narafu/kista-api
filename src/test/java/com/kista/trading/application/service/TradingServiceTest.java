@@ -12,15 +12,14 @@ import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
@@ -131,13 +130,7 @@ class TradingServiceTest {
 
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
-        Direction direction = order.direction() == OrderDirection.BUY ? Direction.BUY : Direction.SELL;
-        com.kista.broker.domain.model.OrderType orderType = switch (order.orderType()) {
-            case LOC -> com.kista.broker.domain.model.OrderType.LOC;
-            case MOC -> com.kista.broker.domain.model.OrderType.MOC;
-            case LIMIT -> com.kista.broker.domain.model.OrderType.LIMIT;
-        };
-        return new OrderInstruction(order.ticker(), direction, orderType, order.quantity(), order.price());
+        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price());
     }
 
     @BeforeEach
@@ -355,7 +348,7 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001", null, null);
         Execution buyExecution = new Execution(LocalDate.now(), StrategyTicker.SOXL,
-                Direction.BUY, 1, executionPrice, executionAmount, "ORD-001");
+                OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
 
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))

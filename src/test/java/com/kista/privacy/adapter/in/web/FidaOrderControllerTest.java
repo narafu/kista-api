@@ -6,8 +6,8 @@ import com.kista.user.adapter.in.web.security.JwtAuthFilter;
 import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.user.application.usecase.BlacklistUseCase;
@@ -84,7 +84,7 @@ class FidaOrderControllerTest {
     void placeFidaOrder_buy_with_null_quantity_returns_400() throws Exception {
         // BUY 주문에 quantity=null — "남은 전부"는 SELL 전용
         FidaPlannedOrder buyNullQuantity = new FidaPlannedOrder(
-                PrivacyOrderDirection.BUY, PrivacyOrderType.LIMIT, null, new BigDecimal("22.00"));
+                OrderDirection.BUY, OrderType.LIMIT, null, new BigDecimal("22.00"));
         FidaOrderCommand req = new FidaOrderCommand(
                 LocalDate.now(), StrategyTicker.SOXL, new BigDecimal("500.00"),
                 BigDecimal.ZERO, new BigDecimal("25.50"), 10, List.of(buyNullQuantity));

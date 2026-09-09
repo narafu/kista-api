@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.broker.domain.model.Direction;
-import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
@@ -60,17 +60,17 @@ class KisResponseParserTest {
     // parseDirection: "01"→SELL, 나머지→BUY
     @Test
     void parseDirection_01_returnsSell() {
-        assertThat(KisResponseParser.parseDirection("01")).isEqualTo(Direction.SELL);
+        assertThat(KisResponseParser.parseDirection("01")).isEqualTo(OrderDirection.SELL);
     }
 
     @Test
     void parseDirection_02_returnsBuy() {
-        assertThat(KisResponseParser.parseDirection("02")).isEqualTo(Direction.BUY);
+        assertThat(KisResponseParser.parseDirection("02")).isEqualTo(OrderDirection.BUY);
     }
 
     @Test
     void parseDirection_unknown_returnsBuy() {
-        assertThat(KisResponseParser.parseDirection("99")).isEqualTo(Direction.BUY);
+        assertThat(KisResponseParser.parseDirection("99")).isEqualTo(OrderDirection.BUY);
     }
 
     // formatPrice: MOC→"0", LOC/LIMIT→소수 2자리

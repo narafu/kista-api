@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.application.port.output.OrderPort;
@@ -29,8 +29,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
-import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.sharedkernel.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.SELL;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 

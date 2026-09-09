@@ -1,7 +1,7 @@
 package com.kista.privacy.application.service;
 
 import com.kista.privacy.domain.model.FidaOrderCommand;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;
@@ -29,7 +29,7 @@ class PrivacyTradeValidationService implements PrivacyTradeValidationUseCase {
     private PrivacyTradeValidationReport inspect(int holdings, List<OrderLine> orders) {
         List<PrivacyTradeValidationReport.Issue> issues = new ArrayList<>();
         List<OrderLine> sellOrders = orders.stream()
-                .filter(o -> o.direction() == PrivacyOrderDirection.SELL)
+                .filter(o -> o.direction() == OrderDirection.SELL)
                 .toList();
         long nullSellCount = sellOrders.stream().filter(o -> o.quantity() == null).count();
         int explicitSellQuantity = sellOrders.stream()
@@ -74,7 +74,7 @@ class PrivacyTradeValidationService implements PrivacyTradeValidationUseCase {
 
     // 검증에 필요한 최소 주문 필드만 추출한 내부 표현
     private record OrderLine(
-            PrivacyOrderDirection direction,
+            OrderDirection direction,
             Integer quantity
     ) {
     }

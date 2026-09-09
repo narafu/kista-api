@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -26,7 +26,7 @@ class KisOrderApi {
     private final KisExchangeRegistry exchangeRegistry;
 
     public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
-        String trId = instruction.direction() == Direction.BUY ? BUY_TR_ID : SELL_TR_ID;
+        String trId = instruction.direction() == OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
         String acntPrdtCd = acctParts[1];
@@ -97,8 +97,8 @@ class KisOrderApi {
     }
 
     // KIS SLL_TYPE 파라미터: 매도=00, 매수="" (빈 문자열) — 옛 trading OrderDirection.kisSllType()에 있던 KIS 전용 인코딩을 broker로 이동
-    private static String kisSllType(Direction direction) {
-        return direction == Direction.SELL ? "00" : "";
+    private static String kisSllType(OrderDirection direction) {
+        return direction == OrderDirection.SELL ? "00" : "";
     }
 
     // accountNo = "74420614-01" → [CANO, ACNT_PRDT_CD] 분리 (KisHttpClient 공용 헬퍼 위임)

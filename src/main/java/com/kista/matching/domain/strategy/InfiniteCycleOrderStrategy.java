@@ -2,7 +2,7 @@ package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.ReverseModePosition;

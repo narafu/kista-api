@@ -3,8 +3,8 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.strategy.PrivacyStrategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.matching.domain.model.AccountBalance;
@@ -17,8 +17,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
-import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.sharedkernel.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.SELL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -42,15 +42,15 @@ class PrivacyStrategyTest {
     }
 
     private static PrivacyTrade buy(int quantity, String price) {
-        return new PrivacyTrade(DATE, TICKER, PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, quantity, new BigDecimal(price));
+        return new PrivacyTrade(DATE, TICKER, OrderType.LOC, OrderDirection.BUY, quantity, new BigDecimal(price));
     }
 
     private static PrivacyTrade sell(int quantity, String price) {
-        return new PrivacyTrade(DATE, TICKER, PrivacyOrderType.LIMIT, PrivacyOrderDirection.SELL, quantity, new BigDecimal(price));
+        return new PrivacyTrade(DATE, TICKER, OrderType.LIMIT, OrderDirection.SELL, quantity, new BigDecimal(price));
     }
 
     private static PrivacyTrade sellNull(String price) {
-        return new PrivacyTrade(DATE, TICKER, PrivacyOrderType.LIMIT, PrivacyOrderDirection.SELL, null, new BigDecimal(price));
+        return new PrivacyTrade(DATE, TICKER, OrderType.LIMIT, OrderDirection.SELL, null, new BigDecimal(price));
     }
 
     @Test
@@ -164,7 +164,7 @@ class PrivacyStrategyTest {
     @Test
     @DisplayName("quantity null trade — 필터링되어 결과에 미포함")
     void nullQuantityFiltered() {
-        PrivacyTrade nullQuantity = new PrivacyTrade(DATE, TICKER, PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, null, new BigDecimal("10"));
+        PrivacyTrade nullQuantity = new PrivacyTrade(DATE, TICKER, OrderType.LOC, OrderDirection.BUY, null, new BigDecimal("10"));
         PrivacyTradeBase base = base(100, List.of(nullQuantity, buy(80, "9"), sell(50, "12")));
         List<PlannedOrder> orders = strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base);
 

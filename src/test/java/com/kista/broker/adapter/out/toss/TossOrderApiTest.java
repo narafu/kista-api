@@ -2,11 +2,11 @@ package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
@@ -176,7 +176,7 @@ class TossOrderApiTest {
         assertThat(e.quantity()).isEqualTo(3);
         assertThat(e.price()).isEqualByComparingTo("25.50");
         assertThat(e.amountUsd()).isEqualByComparingTo("76.50");
-        assertThat(e.direction()).isEqualTo(Direction.BUY);
+        assertThat(e.direction()).isEqualTo(OrderDirection.BUY);
         assertThat(e.externalOrderId()).isEqualTo("oid-1");
         assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
     }
@@ -217,7 +217,7 @@ class TossOrderApiTest {
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).direction()).isEqualTo(Direction.SELL);
+        assertThat(result.get(0).direction()).isEqualTo(OrderDirection.SELL);
         assertThat(result.get(0).quantity()).isEqualTo(2);
     }
 
@@ -244,14 +244,14 @@ class TossOrderApiTest {
     // --- helpers ---
 
     private OrderInstruction locBuyInstruction() {
-        return new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LOC, 2, new BigDecimal("25.50"));
+        return new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LOC, 2, new BigDecimal("25.50"));
     }
 
     private OrderInstruction mocSellInstruction() {
-        return new OrderInstruction(StrategyTicker.SOXL, Direction.SELL, OrderType.MOC, 1, BigDecimal.ZERO);
+        return new OrderInstruction(StrategyTicker.SOXL, OrderDirection.SELL, OrderType.MOC, 1, BigDecimal.ZERO);
     }
 
     private OrderInstruction limitBuyInstruction() {
-        return new OrderInstruction(StrategyTicker.SOXL, Direction.BUY, OrderType.LIMIT, 1, new BigDecimal("25.00"));
+        return new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LIMIT, 1, new BigDecimal("25.00"));
     }
 }

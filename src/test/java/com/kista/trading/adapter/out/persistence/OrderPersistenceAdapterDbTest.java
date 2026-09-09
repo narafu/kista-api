@@ -2,8 +2,8 @@ package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderType;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderType;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;

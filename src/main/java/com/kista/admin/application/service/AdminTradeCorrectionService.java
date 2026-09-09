@@ -8,7 +8,7 @@ import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -123,27 +123,16 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     private AccountBalance applyFillAndSnapshot(AdminManualTradeCorrectionCommand.Fill fill, Strategy strategy,
                                                 AccountBalance balance, StrategyCycle currentCycle) {
         Execution execution = Execution.ofManualFill(fill.tradeDate(), strategy.ticker(),
-                toDirection(fill.direction()), fill.quantity(), fill.price(), fill.externalOrderId());
+                fill.direction(), fill.quantity(), fill.price(), fill.externalOrderId());
         // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
         AccountBalance.Fill f = new AccountBalance.Fill() {
-            @Override public OrderDirection direction() {
-                return execution.direction() == com.kista.broker.domain.model.Direction.BUY
-                        ? OrderDirection.BUY : OrderDirection.SELL;
-            }
+            @Override public OrderDirection direction() { return execution.direction(); }
             @Override public int quantity() { return execution.quantity(); }
             @Override public BigDecimal amountUsd() { return execution.amountUsd(); }
         };
         AccountBalance updated = balance.applyExecutions(List.of(f));
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
         return updated;
-    }
-
-    // trading OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static com.kista.broker.domain.model.Direction toDirection(OrderDirection direction) {
-        return switch (direction) {
-            case BUY -> com.kista.broker.domain.model.Direction.BUY;
-            case SELL -> com.kista.broker.domain.model.Direction.SELL;
-        };
     }
 
     private AdminTradeCorrectionResult buildResult(User user, Account account, Strategy strategy,

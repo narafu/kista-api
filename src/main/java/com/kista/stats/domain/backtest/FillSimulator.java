@@ -1,9 +1,8 @@
 package com.kista.stats.domain.backtest;
 
-import com.kista.matching.domain.model.OrderDirection;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import com.kista.stats.domain.model.backtest.DailyCandle;
-import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.PlannedOrder;
 
@@ -36,18 +35,10 @@ public final class FillSimulator {
         for (PlannedOrder order : pendingOrders) {
             if (!fillsOhlc(order, candle)) continue;
             BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? order.price() : candle.close();
-            executions.add(Execution.ofManualFill(candle.date(), order.ticker(), toDirection(order.direction()),
+            executions.add(Execution.ofManualFill(candle.date(), order.ticker(), order.direction(),
                     order.quantity(), fillPrice, order.orderLeg()));
         }
         return executions;
-    }
-
-    // matching OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static Direction toDirection(OrderDirection direction) {
-        return switch (direction) {
-            case BUY -> Direction.BUY;
-            case SELL -> Direction.SELL;
-        };
     }
 
     // 주문타입별 OHLC 체결 조건 — LIMIT만 저가/고가 터치, 나머지(MOC/LOC)는 종가 기준

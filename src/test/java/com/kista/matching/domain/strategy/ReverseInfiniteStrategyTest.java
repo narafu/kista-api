@@ -3,8 +3,8 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.strategy.ReverseInfiniteStrategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderType;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderType;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.ReverseModePosition;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;

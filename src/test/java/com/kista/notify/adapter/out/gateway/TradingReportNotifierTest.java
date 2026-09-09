@@ -4,7 +4,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.Execution;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.TradingReport;
@@ -47,12 +47,12 @@ class TradingReportNotifierTest {
             TODAY, StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("100.00"), new BigDecimal("50.00"));
 
     private static Execution buyExecution() {
-        return new Execution(TODAY, StrategyTicker.SOXL, Direction.BUY,
+        return new Execution(TODAY, StrategyTicker.SOXL, OrderDirection.BUY,
                 3, new BigDecimal("20.00"), new BigDecimal("60.00"), "E-BUY");
     }
 
     private static Execution sellExecution() {
-        return new Execution(TODAY, StrategyTicker.SOXL, Direction.SELL,
+        return new Execution(TODAY, StrategyTicker.SOXL, OrderDirection.SELL,
                 2, new BigDecimal("21.00"), new BigDecimal("42.00"), "E-SELL");
     }
 

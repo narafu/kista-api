@@ -2,9 +2,9 @@ package com.kista.admin.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.user.domain.model.User;
 import com.kista.account.application.port.output.AccountPort;

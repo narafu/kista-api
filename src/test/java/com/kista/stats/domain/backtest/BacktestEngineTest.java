@@ -4,10 +4,8 @@ import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderType;
-import com.kista.matching.domain.model.OrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderType;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.matching.domain.model.AccountBalance;
@@ -648,7 +646,7 @@ class BacktestEngineTest {
     }
 
     // 가격은 문자열 생성자로 — 배수·캡 결과가 소수 자리 없이 그대로 드러나게 한다
-    private static PrivacyTrade trade(String date, PrivacyOrderType orderType, PrivacyOrderDirection direction,
+    private static PrivacyTrade trade(String date, OrderType orderType, OrderDirection direction,
                                       Integer quantity, String price) {
         return new PrivacyTrade(LocalDate.parse(date), StrategyTicker.SOXL, orderType, direction,
                 quantity, new BigDecimal(price));
@@ -667,7 +665,7 @@ class BacktestEngineTest {
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
                 flat("2024-01-02", 100)
         ), privacyCommandWithPosition("0", 5, "70"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 5,
-                trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 3, "90"))));
+                trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))));
 
         assertThat(recorder.on("2024-01-02"))
                 .filteredOn(o -> o.direction() == OrderDirection.BUY)
@@ -686,7 +684,7 @@ class BacktestEngineTest {
                 flat("2024-01-03", 90),
                 flat("2024-01-04", 80)
         ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
-                trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 3, "90"))));
+                trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))));
 
         // 1일차: 기준표 있음 → BUY 6주 @90 (전일종가가 없어 캡은 미적용)
         assertThat(recorder.on("2024-01-02")).singleElement()
@@ -714,7 +712,7 @@ class BacktestEngineTest {
         // base.holdings=0이라 보유 보정(diff)이 0 — 순수하게 multiple = initialUsdDeposit ÷ currentCycleStart만 검증한다
         // currentCycleStart=500 기준: seed 1000 → 배수 2.00 → 3주×2 = 6주 / seed 2000 → 배수 4.00 → 3주×4 = 12주
         Map<LocalDate, PrivacyTradeBase> bases = Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
-                trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 3, "90")));
+                trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90")));
         List<DailyCandle> candles = List.of(flat("2024-01-02", 100));
 
         RecordingPrivacy single = new RecordingPrivacy();
@@ -743,11 +741,11 @@ class BacktestEngineTest {
                 flat("2024-01-04", 60)
         ), privacyCommand("1000"), Map.of(
                 LocalDate.parse("2024-01-02"), privacyBase("1000", 0,
-                        trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, "100")),
+                        trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 1, "100")),
                 LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
-                        trade("2024-01-03", PrivacyOrderType.LOC, PrivacyOrderDirection.SELL, null, "50")),
+                        trade("2024-01-03", OrderType.LOC, OrderDirection.SELL, null, "50")),
                 LocalDate.parse("2024-01-04"), privacyBase("96", 0,
-                        trade("2024-01-04", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 10, "60"))));
+                        trade("2024-01-04", OrderType.LOC, OrderDirection.BUY, 10, "60"))));
 
         // 2일차: 보유 1주 전량을 잔량 매도로 내보낸다
         assertThat(recorder.on("2024-01-03")).singleElement()
@@ -775,8 +773,8 @@ class BacktestEngineTest {
                 flat("2024-01-03", 100),
                 candle("2024-01-04", 100, 110, 40, 100)
         ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
-                trade("2024-01-03", PrivacyOrderType.LIMIT, PrivacyOrderDirection.BUY, 1, "200"),
-                trade("2024-01-03", PrivacyOrderType.LIMIT, PrivacyOrderDirection.BUY, 1, "50"))));
+                trade("2024-01-03", OrderType.LIMIT, OrderDirection.BUY, 1, "200"),
+                trade("2024-01-03", OrderType.LIMIT, OrderDirection.BUY, 1, "50"))));
 
         // 캡 보정 전 원본 — 배수 1.00이라 수량은 둘 다 1주, 가격은 기준표 그대로(BUY는 고가 우선 정렬)
         assertThat(recorder.on("2024-01-03")).satisfiesExactly(
@@ -801,7 +799,7 @@ class BacktestEngineTest {
         // 유일한 기준표 날의 주문은 LOC BUY @1 — 종가 100에서는 체결되지 않아 잔고에 영향을 주지 않는다
         BacktestEngine.Output output = privacyEngine(new RecordingPrivacy()).run(candles, privacyCommand("1000"),
                 Map.of(LocalDate.parse("2024-01-21"), privacyBase("1000", 0,
-                        trade("2024-01-21", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, "1"))));
+                        trade("2024-01-21", OrderType.LOC, OrderDirection.BUY, 1, "1"))));
 
         assertThat(output.warnings()).containsExactly(
                 "기준 매매표 없음: 2024-01-01~2024-01-20, 총 20일",   // 구간이 끝나는 기준표 수신일에 flush
@@ -821,13 +819,13 @@ class BacktestEngineTest {
                 flat("2024-01-05", 100)
         ), privacyCommand("1000"), Map.of(
                 LocalDate.parse("2024-01-02"), privacyBase("1000", 100,
-                        trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, "100")),
+                        trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 1, "100")),
                 LocalDate.parse("2024-01-03"), privacyBase("1000", 250,
-                        trade("2024-01-03", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, "100")),
+                        trade("2024-01-03", OrderType.LOC, OrderDirection.BUY, 1, "100")),
                 LocalDate.parse("2024-01-04"), privacyBase("1000", 400,
-                        trade("2024-01-04", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, "100")),
+                        trade("2024-01-04", OrderType.LOC, OrderDirection.BUY, 1, "100")),
                 LocalDate.parse("2024-01-05"), privacyBase("1000", 550,
-                        trade("2024-01-05", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, "100"))));
+                        trade("2024-01-05", OrderType.LOC, OrderDirection.BUY, 1, "100"))));
 
         // 01-02 주문: diff=100-0=100 → 101주@100=10,100.0 → 01-03 체결, 예수금 1000-10100.0=-9100.0 → 0 클램프(플로어 1일차)
         // 01-03 주문: diff=250-101=149 → 150주@100=15,000.0 → 01-04 체결, 0-15000.0=-15000.0 → 0 클램프(플로어 2일차, 최대부족액 15000.0)

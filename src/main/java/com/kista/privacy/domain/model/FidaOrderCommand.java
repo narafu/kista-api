@@ -1,6 +1,7 @@
 package com.kista.privacy.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +26,7 @@ public record FidaOrderCommand(
     @AssertTrue(message = "BUY 주문의 quantity는 null일 수 없습니다")
     public boolean isBuyQuantityValid() {
         return orders == null || orders.stream()
-                .filter(o -> o.direction() == PrivacyOrderDirection.BUY)
+                .filter(o -> o.direction() == OrderDirection.BUY)
                 .allMatch(o -> o.quantity() != null);
     }
 }

@@ -8,12 +8,12 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
-import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.sharedkernel.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.SELL;
 import static com.kista.matching.domain.model.OrderTiming.AT_CLOSE;
 import static com.kista.matching.domain.model.OrderTiming.AT_OPEN;
-import static com.kista.matching.domain.model.OrderType.LOC;
-import static com.kista.matching.domain.model.OrderType.LIMIT;
+import static com.kista.sharedkernel.OrderType.LOC;
+import static com.kista.sharedkernel.OrderType.LIMIT;
 import com.kista.sharedkernel.StrategyTicker;
 
 // VR(밸류리밸런싱) 전략 — 매수·매도 사다리 주문 생성

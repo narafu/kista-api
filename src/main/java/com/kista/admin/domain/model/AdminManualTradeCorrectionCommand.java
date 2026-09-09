@@ -1,7 +1,7 @@
 package com.kista.admin.domain.model;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

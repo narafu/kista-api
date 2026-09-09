@@ -5,7 +5,7 @@ import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.Strategy;

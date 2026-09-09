@@ -1,8 +1,6 @@
 package com.kista.trading.adapter.out;
 
 import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.broker.domain.model.Direction;
-import com.kista.broker.domain.model.OrderType;
 import com.kista.broker.domain.model.PlacedOrderView;
 import com.kista.broker.domain.model.PositionView;
 import com.kista.broker.domain.model.StrategyRefLite;
@@ -58,26 +56,11 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
     }
 
     private static PlacedOrderView toPlacedOrderView(Order order) {
-        return new PlacedOrderView(toDirection(order.direction()), toOrderType(order.orderType()),
+        return new PlacedOrderView(order.direction(), order.orderType(),
                 order.quantity(), order.price(), order.externalOrderId());
     }
 
     private static PositionView toPositionView(CyclePosition position) {
         return new PositionView(position.holdings(), position.avgPrice(), position.usdDeposit());
-    }
-
-    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
-        return switch (direction) {
-            case BUY -> Direction.BUY;
-            case SELL -> Direction.SELL;
-        };
-    }
-
-    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
-        return switch (orderType) {
-            case LOC -> OrderType.LOC;
-            case MOC -> OrderType.MOC;
-            case LIMIT -> OrderType.LIMIT;
-        };
     }
 }

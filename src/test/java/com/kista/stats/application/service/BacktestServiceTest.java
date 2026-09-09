@@ -4,11 +4,9 @@ import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestResult;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.matching.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
-import com.kista.matching.domain.model.OrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.stats.application.port.output.HistoricalCandlePort;
@@ -410,7 +408,7 @@ class BacktestServiceTest {
     private static PrivacyTradeBase baseFor(LocalDate tradeDate) {
         return new PrivacyTradeBase(UUID.randomUUID(), bd("100"), 0, bd("100"),
                 List.of(new PrivacyTradeBase.PrivacyTrade(tradeDate, StrategyTicker.SOXL,
-                        PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 1, bd("100"))));
+                        OrderType.LOC, OrderDirection.BUY, 1, bd("100"))));
     }
 
     // 지정가 100 매수 1주 — position=null이라 엔진의 캡 재산정 대상에서 제외된다

@@ -20,10 +20,10 @@ import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,7 +80,7 @@ class AdminReorderService implements AdminReorderUseCase {
 
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
-        com.kista.matching.domain.model.OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
+        OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
         LocalDate tradeDate = command.tradeDate() != null ? command.tradeDate() : sourceOrder.tradeDate();
 
         // 1. 원본 상태별 취소 처리
@@ -130,8 +130,8 @@ class AdminReorderService implements AdminReorderUseCase {
         if (timing == com.kista.matching.domain.model.OrderTiming.IMMEDIATE) {
             BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class);
             try {
-                OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), toDirection(newOrder.direction()),
-                        toOrderType(newOrder.orderType()), newOrder.quantity(), newOrder.price());
+                OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), newOrder.direction(),
+                        newOrder.orderType(), newOrder.quantity(), newOrder.price());
                 OrderResult result = broker.place(instruction, account.toBrokerRef());
                 Order placed = newOrder.withPlaced(result.externalOrderId());
                 orderPort.saveAll(List.of(placed));
@@ -144,23 +144,6 @@ class AdminReorderService implements AdminReorderUseCase {
         }
         orderPort.saveAll(List.of(newOrder));
         return new PlacementResult(Order.OrderStatus.PLANNED, null);
-    }
-
-    // matching OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
-        return switch (direction) {
-            case BUY -> Direction.BUY;
-            case SELL -> Direction.SELL;
-        };
-    }
-
-    // matching OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
-    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
-        return switch (orderType) {
-            case LOC -> OrderType.LOC;
-            case MOC -> OrderType.MOC;
-            case LIMIT -> OrderType.LIMIT;
-        };
     }
 
     private record PlacementResult(Order.OrderStatus status, String externalOrderId) {}
@@ -180,7 +163,7 @@ class AdminReorderService implements AdminReorderUseCase {
     }
 
     private static Map<String, Object> auditPayload(AdminReorderCommand command, Order sourceOrder,
-                                                     com.kista.matching.domain.model.OrderDirection direction, int quantity,
+                                                     OrderDirection direction, int quantity,
                                                      BigDecimal price, Order.OrderStatus resultingStatus) {
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("timing", command.timing().name());

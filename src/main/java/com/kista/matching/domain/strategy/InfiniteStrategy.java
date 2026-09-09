@@ -9,10 +9,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.kista.matching.domain.model.OrderDirection.BUY;
-import static com.kista.matching.domain.model.OrderDirection.SELL;
+import static com.kista.sharedkernel.OrderDirection.BUY;
+import static com.kista.sharedkernel.OrderDirection.SELL;
 import static com.kista.matching.domain.model.OrderTiming.AT_OPEN;
-import static com.kista.matching.domain.model.OrderType.*;
+import static com.kista.sharedkernel.OrderType.*;
 
 public class InfiniteStrategy {
 

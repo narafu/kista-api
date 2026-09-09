@@ -1,8 +1,8 @@
 package com.kista.privacy.adapter.out.persistence;
 
 import com.kista.platform.persistence.BaseCreatedAtEntity;
-import com.kista.privacy.domain.model.PrivacyOrderDirection;
-import com.kista.privacy.domain.model.PrivacyOrderType;
+import com.kista.sharedkernel.OrderDirection;
+import com.kista.sharedkernel.OrderType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -30,11 +30,11 @@ class PrivacyTradeBaseOrderEntity extends BaseCreatedAtEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 5)
-    private PrivacyOrderDirection direction;    // BUY / SELL
+    private OrderDirection direction;    // BUY / SELL
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
-    private PrivacyOrderType orderType;         // LOC / MOC / LIMIT
+    private OrderType orderType;         // LOC / MOC / LIMIT
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;

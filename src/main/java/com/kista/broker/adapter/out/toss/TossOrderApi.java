@@ -3,11 +3,11 @@ package com.kista.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.Direction;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.domain.model.OrderType;
+import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
@@ -134,7 +134,7 @@ class TossOrderApi {
         // queryFrom~to로 넓게 조회했으므로 체결일이 요청 범위(from~to) 밖이면 제외
         if (tradeDate.isBefore(from) || tradeDate.isAfter(to)) return Optional.empty();
 
-        Direction direction = "BUY".equals(order.side()) ? Direction.BUY : Direction.SELL;
+        OrderDirection direction = "BUY".equals(order.side()) ? OrderDirection.BUY : OrderDirection.SELL;
 
         return Optional.of(new Execution(tradeDate, ticker, direction, filledQuantity, price, amountUsd, order.orderId()));
     }

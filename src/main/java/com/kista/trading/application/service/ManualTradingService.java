@@ -7,7 +7,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
-import com.kista.matching.domain.model.OrderDirection;
+import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
