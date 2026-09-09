@@ -96,7 +96,7 @@ class KisOrderApi {
         kisHttpClient.post(CANCEL_TR_ID, CANCEL_PATH, account, body, Void.class);
     }
 
-    // KIS SLL_TYPE 파라미터: 매도=00, 매수="" (빈 문자열) — trading.Order.OrderDirection.kisSllType()에 있던 KIS 전용 인코딩을 broker로 이동
+    // KIS SLL_TYPE 파라미터: 매도=00, 매수="" (빈 문자열) — 옛 trading OrderDirection.kisSllType()에 있던 KIS 전용 인코딩을 broker로 이동
     private static String kisSllType(Direction direction) {
         return direction == Direction.SELL ? "00" : "";
     }

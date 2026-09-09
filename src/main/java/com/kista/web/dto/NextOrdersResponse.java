@@ -3,8 +3,11 @@ package com.kista.web.dto;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -76,15 +79,15 @@ public record NextOrdersResponse(
             @Schema(description = "거래 종목")
             StrategyTicker ticker,              // 거래 종목
             @Schema(description = "주문 유형", example = "LOC")
-            Order.OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
+            OrderType orderType,  // 주문 유형 (LOC/MOC/LIMIT)
             @Schema(description = "매수/매도 방향", example = "BUY")
-            Order.OrderDirection direction, // 매수/매도 방향
+            OrderDirection direction, // 매수/매도 방향
             @Schema(description = "주문 수량")
             int quantity,               // 주문 수량
             @Schema(description = "주문 가격 (LOC/MOC는 참고용)")
             BigDecimal price            // 주문 가격 (LOC/MOC는 참고용)
     ) {
-        public static OrderItem from(Order o) {
+        public static OrderItem from(PlannedOrder o) {
             return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.quantity(), o.price());
         }
     }

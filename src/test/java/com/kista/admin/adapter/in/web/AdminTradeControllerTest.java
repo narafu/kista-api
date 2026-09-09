@@ -7,6 +7,9 @@ import com.kista.user.adapter.in.web.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
@@ -124,9 +127,9 @@ class AdminTradeControllerTest {
                         cycleId,
                         LocalDate.of(2026, 7, 1),
                         StrategyTicker.SOXL,
-                        Order.OrderType.LIMIT,
-                        Order.OrderTiming.AT_OPEN,
-                        Order.OrderDirection.SELL,
+                        OrderType.LIMIT,
+                        OrderTiming.AT_OPEN,
+                        OrderDirection.SELL,
                         2,
                         new BigDecimal("267.37"),
                         Order.OrderStatus.PLACED,

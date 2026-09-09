@@ -3,6 +3,10 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 
-// 전략이 계산한 템플릿(Order)을 PLANNED 상태 + 신규 PK(null) + 호출 계좌 FK로 변환해 일괄 저장하는지 검증
+// 커널이 산출한 계획 주문(PlannedOrder)을 PLANNED 상태 + 신규 PK(null) + 호출 계좌 FK로 승격해 일괄 저장하는지 검증
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TradingOrderPlanner 단위 테스트")
 class TradingOrderPlannerTest {
@@ -38,17 +42,16 @@ class TradingOrderPlannerTest {
 
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 
-    private Order template(Order.OrderDirection direction, String price, int quantity) {
-        // 전략이 만든 템플릿은 id/accountId/strategyCycleId/status/externalOrderId가 비어있음 (계좌 귀속 전)
-        return new Order(null, null, null, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+    private PlannedOrder template(OrderDirection direction, String price, int quantity) {
+        // 전략이 만든 계획 주문 — 계좌 귀속 전이라 계좌·사이클·생명주기 상태를 갖지 않는다
+        return PlannedOrder.of(TODAY, StrategyTicker.SOXL, OrderType.LOC, direction, quantity, new BigDecimal(price));
     }
 
     @Test
     @DisplayName("템플릿을 PLANNED 상태 + 신규 PK + 계좌 FK로 변환해 일괄 저장")
     void savePlannedOrders_convertsTemplatesAndSavesAll() {
-        Order buyTemplate = template(Order.OrderDirection.BUY, "50.00", 10).withLeg("INFINITE_BUY_01");
-        Order sellTemplate = template(Order.OrderDirection.SELL, "60.00", 5);
+        PlannedOrder buyTemplate = template(OrderDirection.BUY, "50.00", 10).withLeg("INFINITE_BUY_01");
+        PlannedOrder sellTemplate = template(OrderDirection.SELL, "60.00", 5);
 
         new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(buyTemplate, sellTemplate), ACCOUNT, STRATEGY_CYCLE_ID);
 
@@ -62,14 +65,14 @@ class TradingOrderPlannerTest {
         assertThat(savedBuy.strategyCycleId()).isEqualTo(STRATEGY_CYCLE_ID);
         assertThat(savedBuy.status()).isEqualTo(Order.OrderStatus.PLANNED);
         assertThat(savedBuy.externalOrderId()).isNull();
-        assertThat(savedBuy.direction()).isEqualTo(Order.OrderDirection.BUY);
+        assertThat(savedBuy.direction()).isEqualTo(OrderDirection.BUY);
         assertThat(savedBuy.orderLeg()).isEqualTo("INFINITE_BUY_01");
         assertThat(savedBuy.quantity()).isEqualTo(10);
         assertThat(savedBuy.price()).isEqualByComparingTo("50.00");
 
         Order savedSell = saved.get(1);
         assertThat(savedSell.accountId()).isEqualTo(ACCOUNT.id());
-        assertThat(savedSell.direction()).isEqualTo(Order.OrderDirection.SELL);
+        assertThat(savedSell.direction()).isEqualTo(OrderDirection.SELL);
         assertThat(savedSell.quantity()).isEqualTo(5);
     }
 

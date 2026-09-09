@@ -4,6 +4,9 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
@@ -279,7 +282,7 @@ class OrderCancelServiceTest {
     @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
     void cancelOrder_notPlaced_throwsIllegalStateException() {
         Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.FILLED, "ORD_99", null, null);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
@@ -328,13 +331,13 @@ class OrderCancelServiceTest {
 
     private Order placedOrder(UUID id, String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     private Order plannedOrder(UUID id) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 Order.OrderStatus.PLANNED, null, null, null);
     }
 }

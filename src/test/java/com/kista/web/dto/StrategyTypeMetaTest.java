@@ -1,10 +1,10 @@
 package com.kista.web.dto;
 
 import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.trading.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

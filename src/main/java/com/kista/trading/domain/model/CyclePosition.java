@@ -1,5 +1,7 @@
 package com.kista.trading.domain.model;
 
+import com.kista.matching.domain.model.AccountBalance;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;

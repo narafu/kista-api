@@ -7,14 +7,16 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
+import com.kista.matching.domain.model.*;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -142,10 +144,10 @@ class ManualTradingService {
     }
 
     // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
-    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<Order> orders) {
+    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<PlannedOrder> orders) {
         int newSellTotal = orders.stream()
-                .filter(o -> o.direction() == Order.OrderDirection.SELL)
-                .mapToInt(Order::quantity).sum();
+                .filter(o -> o.direction() == OrderDirection.SELL)
+                .mapToInt(PlannedOrder::quantity).sum();
         int sellableQty = registry.require(account.toBrokerRef(), SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account.toBrokerRef()).quantity();
         int reservedSellTotal = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
                 account.id(), tradeDate, strategy.ticker());

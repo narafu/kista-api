@@ -3,23 +3,25 @@ package com.kista.stats.domain.backtest;
 import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
-import com.kista.trading.domain.model.AccountBalance;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.AccountBalance;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
-import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.trading.domain.strategy.InfiniteStrategy;
-import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.trading.domain.strategy.PrivacyStrategy;
-import com.kista.trading.domain.strategy.ReverseInfiniteStrategy;
-import com.kista.trading.domain.strategy.VrCycleOrderStrategy;
-import com.kista.trading.domain.strategy.VrStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.matching.domain.strategy.InfiniteStrategy;
+import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.matching.domain.strategy.PrivacyStrategy;
+import com.kista.matching.domain.strategy.ReverseInfiniteStrategy;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrStrategy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -290,11 +292,11 @@ class BacktestEngineTest {
     private record Recorded(
             CycleOrderStrategy.PlanContext.InfiniteInputs inputs, // 엔진이 조립한 리버스모드·별지점·전일종가
             AccountBalance balance,                               // 체결 반영 후 잔고
-            List<Order> orders                                    // 캡 보정 전 전략 원본 주문
+            List<PlannedOrder> orders                                    // 캡 보정 전 전략 원본 주문
     ) {
         // 주문 다리 식별자 목록 — 전반/후반/리버스 패턴 판별용
         List<String> legs() {
-            return orders.stream().map(Order::orderLeg).toList();
+            return orders.stream().map(PlannedOrder::orderLeg).toList();
         }
 
         // 전략 계산 시점 포지션 재구성 — currentRound/전후반 판정을 직접 단언하기 위함
@@ -480,7 +482,7 @@ class BacktestEngineTest {
         assertThat(firstDay.legs()).containsExactly("REVERSE_INFINITE_MOC_SELL");
         // MOC 매도 수량 = 11주 ÷ (4분할/2) = 5주
         assertThat(firstDay.orders().getFirst().quantity()).isEqualTo(5);
-        assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(Order.OrderType.MOC);
+        assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(OrderType.MOC);
 
         // 8일차: 별지점 = 최근 5거래일 종가(85·80·75·70·65) 평균 = 375 ÷ 5 = 75.00
         Recorded secondDay = recorder.on("2024-01-08");
@@ -604,7 +606,7 @@ class BacktestEngineTest {
     // 기준 매매표가 없는 날도 엔진이 plan()을 호출하므로 "그날 주문이 비었다"까지 직접 단언할 수 있다
     private static final class RecordingPrivacy extends PrivacyCycleOrderStrategy {
 
-        private final Map<LocalDate, List<Order>> byDate = new LinkedHashMap<>();
+        private final Map<LocalDate, List<PlannedOrder>> byDate = new LinkedHashMap<>();
 
         RecordingPrivacy() {
             super(new PrivacyStrategy());
@@ -617,8 +619,8 @@ class BacktestEngineTest {
             return result;
         }
 
-        List<Order> on(String date) {
-            List<Order> orders = byDate.get(LocalDate.parse(date));
+        List<PlannedOrder> on(String date) {
+            List<PlannedOrder> orders = byDate.get(LocalDate.parse(date));
             assertThat(orders).as("%s plan() 호출 기록", date).isNotNull();
             return orders;
         }
@@ -668,8 +670,8 @@ class BacktestEngineTest {
                 trade("2024-01-02", PrivacyOrderType.LOC, PrivacyOrderDirection.BUY, 3, "90"))));
 
         assertThat(recorder.on("2024-01-02"))
-                .filteredOn(o -> o.direction() == Order.OrderDirection.BUY)
-                .extracting(Order::quantity)
+                .filteredOn(o -> o.direction() == OrderDirection.BUY)
+                .extracting(PlannedOrder::quantity)
                 .containsExactly(3);
     }
 
@@ -749,7 +751,7 @@ class BacktestEngineTest {
 
         // 2일차: 보유 1주 전량을 잔량 매도로 내보낸다
         assertThat(recorder.on("2024-01-03")).singleElement()
-                .satisfies(o -> assertThat(o.direction()).isEqualTo(Order.OrderDirection.SELL),
+                .satisfies(o -> assertThat(o.direction()).isEqualTo(OrderDirection.SELL),
                         o -> assertThat(o.quantity()).isEqualTo(1));
 
         assertThat(output.cycleCount()).isEqualTo(2);

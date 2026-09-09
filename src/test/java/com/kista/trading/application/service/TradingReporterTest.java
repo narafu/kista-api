@@ -6,7 +6,10 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -103,7 +106,7 @@ class TradingReporterTest {
     // PLACED 주문 픽스처 — id·externalOrderId 지정 (KIS 계좌/사이클 기준)
     private static Order placedOrder(UUID id, String externalOrderId, int quantity) {
         return new Order(id, ACCOUNT.id(), CYCLE.id(), TODAY, StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 quantity, new BigDecimal("20.00"), Order.OrderStatus.PLACED,
                 externalOrderId, null, null);
     }
@@ -111,7 +114,7 @@ class TradingReporterTest {
     // PLACED 주문 픽스처 — Toss 계좌/사이클 기준 (취소 로직 테스트 전용)
     private static Order tossPlacedOrder(UUID id, String externalOrderId, int quantity) {
         return new Order(id, TOSS_ACCOUNT.id(), TOSS_CYCLE.id(), TODAY, StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 quantity, new BigDecimal("20.00"), Order.OrderStatus.PLACED,
                 externalOrderId, null, null);
     }

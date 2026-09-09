@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

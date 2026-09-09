@@ -4,14 +4,15 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -55,13 +56,13 @@ class TradingBuyCompetitionSimulator {
                          Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId) {}
 
     BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
-                                    List<Order> currentBuyOrders, LocalDate today,
+                                    List<PlannedOrder> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd) {
         return simulate(currentStrategy, account, currentCycle, currentBuyOrders, today, otherStrategiesPlannedBuyUsd, null);
     }
 
     BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
-                                    List<Order> currentBuyOrders, LocalDate today,
+                                    List<PlannedOrder> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd, BatchContext context) {
         BigDecimal requiredForThis = AccountBalance.buyTotal(currentBuyOrders);
 

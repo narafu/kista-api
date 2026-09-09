@@ -7,14 +7,14 @@ import com.kista.trading.domain.model.Order;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.domain.model.OrderType;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.VrPosition;
+import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -129,16 +129,16 @@ class TradingOrderExecutor {
         return placed;
     }
 
-    // trading Order.OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
-    private static Direction toDirection(Order.OrderDirection direction) {
+    // matching OrderDirection → broker Direction (값 1:1 대응, enum 이름 동일)
+    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
         return switch (direction) {
             case BUY -> Direction.BUY;
             case SELL -> Direction.SELL;
         };
     }
 
-    // trading Order.OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
-    private static OrderType toOrderType(Order.OrderType orderType) {
+    // matching OrderType → broker OrderType (값 1:1 대응, enum 이름 동일)
+    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
         return switch (orderType) {
             case LOC -> OrderType.LOC;
             case MOC -> OrderType.MOC;

@@ -5,22 +5,24 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.AccountBalance;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
+import com.kista.matching.domain.model.AccountBalance;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.trading.domain.model.VrPosition;
+import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.domain.model.Direction;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.domain.model.OrderType;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.trading.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.trading.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -96,9 +98,9 @@ class TradingOrderExecutorTest {
         return new TradingOrderExecutor(orderPort, registry, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES);
     }
 
-    private Order planned(UUID id, Order.OrderDirection direction, String price, int quantity) {
-        return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, Order.OrderType.LOC,
-                Order.OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
+    private Order planned(UUID id, OrderDirection direction, String price, int quantity) {
+        return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), Order.OrderStatus.PLANNED, null, null, null);
     }
 
     private OrderResult brokerResult(String externalOrderId) {
@@ -107,11 +109,11 @@ class TradingOrderExecutorTest {
 
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
-        Direction direction = order.direction() == Order.OrderDirection.BUY ? Direction.BUY : Direction.SELL;
-        OrderType orderType = switch (order.orderType()) {
-            case LOC -> OrderType.LOC;
-            case MOC -> OrderType.MOC;
-            case LIMIT -> OrderType.LIMIT;
+        Direction direction = order.direction() == OrderDirection.BUY ? Direction.BUY : Direction.SELL;
+        com.kista.broker.domain.model.OrderType orderType = switch (order.orderType()) {
+            case LOC -> com.kista.broker.domain.model.OrderType.LOC;
+            case MOC -> com.kista.broker.domain.model.OrderType.MOC;
+            case LIMIT -> com.kista.broker.domain.model.OrderType.LIMIT;
         };
         return new OrderInstruction(order.ticker(), direction, orderType, order.quantity(), order.price());
     }
@@ -120,7 +122,7 @@ class TradingOrderExecutorTest {
     @DisplayName("currentPrice·position 모두 있으면 매수 가격 보정 후 접수")
     void placeOrders_withPriceAndPosition_capsBeforePlacing() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-001"));
 
@@ -138,7 +140,7 @@ class TradingOrderExecutorTest {
     @DisplayName("currentPrice가 없으면 가격 보정 생략 (수동 선행 주문 그대로 접수)")
     void placeOrders_withoutCurrentPrice_skipsCapping() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-002"));
 
@@ -151,7 +153,7 @@ class TradingOrderExecutorTest {
     @DisplayName("PRIVACY + position 없음 → INFINITE 보정 생략 후 PRIVACY 캡 적용")
     void placeOrders_privacyWithoutPosition_appliesPrivacyCap() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-003"));
 
@@ -167,7 +169,7 @@ class TradingOrderExecutorTest {
     @DisplayName("VR + vrPosition 없음 → post-hoc 캡 미적용 (재계산 skip 케이스)")
     void placeOrders_vrWithoutVrPosition_skipsAllCaps() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-001"));
 
@@ -183,7 +185,7 @@ class TradingOrderExecutorTest {
     @DisplayName("VR + vrPosition 있음 → 접수 전 VR 매수 사다리 가격 보정(capVrIfNeeded) 호출")
     void placeOrders_vrWithVrPosition_appliesVrCap() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-002"));
 
@@ -213,7 +215,7 @@ class TradingOrderExecutorTest {
     @DisplayName("VR + vrPosition 있음 → AT_OPEN 접수 전 VR 매수 사다리 가격 보정(capVrIfNeededAtOpen) 호출")
     void placeAtOpenOrders_vrWithVrPosition_appliesVrCapAtOpenScope() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "60.00", 1);
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-OPEN-001"));
 
@@ -232,7 +234,7 @@ class TradingOrderExecutorTest {
     @DisplayName("AT_OPEN + currentPrice 없으면 가격 보정 생략")
     void placeAtOpenOrders_withoutCurrentPrice_skipsCapping() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-VR-OPEN-002"));
 
@@ -245,7 +247,7 @@ class TradingOrderExecutorTest {
     @DisplayName("INFINITE + position 있음 → AT_OPEN 스코프 보정(capIfNeededAtOpen) 호출")
     void placeAtOpenOrders_infiniteWithPosition_appliesInfiniteCapAtOpenScope() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-INF-OPEN-001"));
 
@@ -259,7 +261,7 @@ class TradingOrderExecutorTest {
     @DisplayName("PRIVACY → AT_OPEN 스코프 보정(capPrivacyIfNeededAtOpen) 호출")
     void placeAtOpenOrders_privacy_appliesPrivacyCapAtOpenScope() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.SELL, "60.00", 5);
+        Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-PRIV-OPEN-001"));
 
@@ -285,8 +287,8 @@ class TradingOrderExecutorTest {
     @DisplayName("복수 계획 주문을 순서대로 접수하고 각각 PLACED 마킹")
     void placeOrders_multiplePlannedOrders_placesAllInOrder() {
         UUID id1 = UUID.randomUUID(), id2 = UUID.randomUUID();
-        Order order1 = planned(id1, Order.OrderDirection.BUY, "50.00", 10);
-        Order order2 = planned(id2, Order.OrderDirection.SELL, "60.00", 5);
+        Order order1 = planned(id1, OrderDirection.BUY, "50.00", 10);
+        Order order2 = planned(id2, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(order1, order2));
         when(brokerPort.place(eq(instructionOf(order1)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-101"));
         when(brokerPort.place(eq(instructionOf(order2)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-102"));
@@ -306,7 +308,7 @@ class TradingOrderExecutorTest {
     @DisplayName("markPlaced 1차 실패 시 1회 재시도 후 성공하면 정상 처리")
     void placeOrders_markPlacedFailsOnce_retriesAndSucceeds() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-201"));
         doThrow(new RuntimeException("일시적 DB 오류")).doNothing()
@@ -323,7 +325,7 @@ class TradingOrderExecutorTest {
     @DisplayName("markPlaced 재시도도 실패하면 DB 불일치 알림 발송")
     void placeOrders_markPlacedFailsTwice_notifiesInconsistency() {
         UUID orderId = UUID.randomUUID();
-        Order plannedOrder = planned(orderId, Order.OrderDirection.BUY, "50.00", 10);
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "50.00", 10);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-202"));
         doThrow(new RuntimeException("DB down")).when(orderPort).markPlaced(orderId, "KIS-202");

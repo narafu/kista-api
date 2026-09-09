@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
-Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finance·notify·broker·trading·market·privacy·stats·admin·user·account 10개 애그리게이트 이전 완료(strategyconfig는 2026-09-07 trading으로 병합) + 레거시 `adapter`/`application` shim 해소로 `com.kista.web`(앱셸 CLOSED sink)·`com.kista.platform`(인프라 leaf OPEN) 신설, `common`만 잔존 shim. `ApplicationModules.verify()` GREEN).
+Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finance·notify·broker·trading·matching·market·privacy·stats·admin·user·account 11개 애그리게이트 이전 완료(strategyconfig는 2026-09-07 trading으로 병합, matching은 주문생성 커널 추출로 신설) + 레거시 `adapter`/`application` shim 해소로 `com.kista.web`(앱셸 CLOSED sink)·`com.kista.platform`(인프라 leaf OPEN) 신설, `common`만 잔존 shim. `ApplicationModules.verify()` GREEN).
 
 이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
 

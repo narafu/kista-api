@@ -14,7 +14,7 @@ import com.kista.trading.application.event.MarketClosedEvent;
 import com.kista.trading.application.event.MarketCloseEvent;
 import com.kista.trading.application.event.MarketOpenEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

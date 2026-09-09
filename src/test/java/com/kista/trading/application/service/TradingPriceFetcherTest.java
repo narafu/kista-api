@@ -62,7 +62,7 @@ class TradingPriceFetcherTest {
         when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), account.toBrokerRef())).thenReturn(bulkResult);
         when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(null);
 
-        Map<StrategyTicker, com.kista.trading.domain.model.PriceSnapshot> result =
+        Map<StrategyTicker, com.kista.matching.domain.model.PriceSnapshot> result =
                 priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account);
 
         assertThat(result).doesNotContainKey(StrategyTicker.SOXL);

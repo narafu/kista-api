@@ -6,6 +6,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -79,7 +80,7 @@ class AdminTradeCorrectionServiceTest {
         AdminManualTradeCorrectionCommand command = new AdminManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new AdminManualTradeCorrectionCommand.Fill(
-                        LocalDate.of(2026, 7, 1), Order.OrderDirection.SELL, 2,
+                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
                         new BigDecimal("267.37"), "MANUAL-1", "manual correction")));
 
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
@@ -119,7 +120,7 @@ class AdminTradeCorrectionServiceTest {
         AdminManualTradeCorrectionCommand command = new AdminManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new AdminManualTradeCorrectionCommand.Fill(
-                        LocalDate.of(2026, 7, 1), Order.OrderDirection.SELL, 3,
+                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 3,
                         new BigDecimal("267.37"), null, null)));
 
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);

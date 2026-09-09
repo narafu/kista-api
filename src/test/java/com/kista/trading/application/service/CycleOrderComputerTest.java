@@ -1,10 +1,13 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
+import com.kista.matching.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
+import com.kista.matching.domain.strategy.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -264,8 +267,8 @@ class CycleOrderComputerTest {
         assertThat(planOpt).isPresent();
         // vrPosition도 함께 실려 있어야 BuyOrderPriceCapper(VR_POSITION)의 접수 전 보정이 가능하다
         assertThat(planOpt.get().vrPosition()).isNotNull();
-        List<Order> buyOrders = planOpt.get().orders().stream()
-                .filter(o -> o.direction() == Order.OrderDirection.BUY)
+        List<PlannedOrder> buyOrders = planOpt.get().orders().stream()
+                .filter(o -> o.direction() == OrderDirection.BUY)
                 .toList();
         // holdings=1이므로 매수 주문이 생성됨
         assertThat(buyOrders).isNotEmpty();

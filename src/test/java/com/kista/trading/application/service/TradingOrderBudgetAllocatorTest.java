@@ -4,7 +4,10 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -13,8 +16,8 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -277,9 +280,9 @@ class TradingOrderBudgetAllocatorTest {
         when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("1000.00")));
 
-        Order firstBuy = buy("100.00");
-        Order sell = sell("25.00", 3);
-        Order secondBuy = buy("200.00");
+        PlannedOrder firstBuy = buy("100.00");
+        PlannedOrder sell = sell("25.00", 3);
+        PlannedOrder secondBuy = buy("200.00");
         TradingOrderBudgetAllocator.Candidate candidate = candidate(
                 StrategyType.INFINITE, firstBuy, sell, secondBuy);
 
@@ -295,10 +298,10 @@ class TradingOrderBudgetAllocatorTest {
         when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("150.00")));
 
-        Order firstBuy = buy("100.00");
-        Order firstSell = sell("25.00", 3);
-        Order secondBuy = buy("100.00");
-        Order secondSell = sell("26.00", 2);
+        PlannedOrder firstBuy = buy("100.00");
+        PlannedOrder firstSell = sell("25.00", 3);
+        PlannedOrder secondBuy = buy("100.00");
+        PlannedOrder secondSell = sell("26.00", 2);
         TradingOrderBudgetAllocator.Candidate candidate = candidate(
                 StrategyType.INFINITE, firstBuy, firstSell, secondBuy, secondSell);
 
@@ -347,12 +350,12 @@ class TradingOrderBudgetAllocatorTest {
         return candidate(type, buy(buyAmount));
     }
 
-    private TradingOrderBudgetAllocator.Candidate candidate(StrategyType type, Order... orders) {
+    private TradingOrderBudgetAllocator.Candidate candidate(StrategyType type, PlannedOrder... orders) {
         return candidate(UUID.randomUUID(), UUID.randomUUID(), type, orders);
     }
 
     private TradingOrderBudgetAllocator.Candidate candidate(UUID strategyId, UUID cycleId, StrategyType type,
-                                                             Order... orders) {
+                                                             PlannedOrder... orders) {
         Strategy strategy = new Strategy(strategyId, account.id(), type,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategy.id(), UUID.randomUUID(),
@@ -362,15 +365,13 @@ class TradingOrderBudgetAllocatorTest {
                 List.of(orders));
     }
 
-    private Order buy(String amount) {
-        return new Order(null, null, null, tradeDate, StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 1, new BigDecimal(amount),
-                Order.OrderStatus.PLANNED, null, null, null);
+    private PlannedOrder buy(String amount) {
+        return PlannedOrder.of(tradeDate, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.BUY,
+                1, new BigDecimal(amount), OrderTiming.AT_CLOSE);
     }
 
-    private Order sell(String price, int quantity) {
-        return new Order(null, null, null, tradeDate, StrategyTicker.SOXL, Order.OrderType.LIMIT,
-                Order.OrderTiming.AT_CLOSE, Order.OrderDirection.SELL, quantity, new BigDecimal(price),
-                Order.OrderStatus.PLANNED, null, null, null);
+    private PlannedOrder sell(String price, int quantity) {
+        return PlannedOrder.of(tradeDate, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.SELL,
+                quantity, new BigDecimal(price), OrderTiming.AT_CLOSE);
     }
 }

@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.trading.domain.model.StrategyVrDetail;
+import com.kista.matching.domain.model.StrategyVrDetail;
 import com.kista.trading.domain.model.VrSummary;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;

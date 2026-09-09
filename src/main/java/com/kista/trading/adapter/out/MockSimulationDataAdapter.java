@@ -66,14 +66,14 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
         return new PositionView(position.holdings(), position.avgPrice(), position.usdDeposit());
     }
 
-    private static Direction toDirection(Order.OrderDirection direction) {
+    private static Direction toDirection(com.kista.matching.domain.model.OrderDirection direction) {
         return switch (direction) {
             case BUY -> Direction.BUY;
             case SELL -> Direction.SELL;
         };
     }
 
-    private static OrderType toOrderType(Order.OrderType orderType) {
+    private static OrderType toOrderType(com.kista.matching.domain.model.OrderType orderType) {
         return switch (orderType) {
             case LOC -> OrderType.LOC;
             case MOC -> OrderType.MOC;

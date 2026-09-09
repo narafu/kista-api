@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.broker.domain.model.toss.TossApiException;
@@ -28,8 +28,8 @@ class TradingSellSufficiencySimulator {
     private final BrokerAdapterRegistry registry; // live 판매가능수량 조회
     private final OrderPort orderPort;             // 동일 계좌·종목·거래일 기존 예약 SELL 수량 조회
 
-    SellSufficiencyPreview simulate(Strategy strategy, Account account, List<Order> sellOrders, LocalDate tradeDate) {
-        int requiredQuantity = sellOrders.stream().mapToInt(Order::quantity).sum();
+    SellSufficiencyPreview simulate(Strategy strategy, Account account, List<PlannedOrder> sellOrders, LocalDate tradeDate) {
+        int requiredQuantity = sellOrders.stream().mapToInt(PlannedOrder::quantity).sum();
 
         int sellableQuantity;
         try {

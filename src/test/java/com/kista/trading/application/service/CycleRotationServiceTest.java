@@ -15,6 +15,7 @@ import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.MarginPort;
 import com.kista.trading.domain.strategy.*;
+import com.kista.matching.domain.strategy.*;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.support.DomainFixtures;

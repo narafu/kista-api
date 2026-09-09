@@ -4,16 +4,16 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.broker.application.port.output.BrokerPricePort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
-import com.kista.trading.domain.strategy.VrCycleOrderStrategy;
-import com.kista.trading.domain.strategy.VrStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrStrategy;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ class StrategyOrderPlanBuilderTest {
     @BeforeEach
     void setUp() {
         builder = new StrategyOrderPlanBuilder(balanceLoader, registry, privacyTradePort, orderComputer, cycleOrderStrategies);
-        lenient().when(cycleOrderStrategies.of(strategy)).thenReturn(orderStrategy);
+        lenient().when(cycleOrderStrategies.of(strategy.type())).thenReturn(orderStrategy);
         lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 
@@ -102,7 +102,7 @@ class StrategyOrderPlanBuilderTest {
         AccountBalance balance = new AccountBalance(0, BigDecimal.ZERO, new BigDecimal("1000.00"));
         CycleOrderStrategy vrOrderStrategy = new VrCycleOrderStrategy(new VrStrategy());
 
-        when(cycleOrderStrategies.of(vrStrategy)).thenReturn(vrOrderStrategy);
+        when(cycleOrderStrategies.of(vrStrategy.type())).thenReturn(vrOrderStrategy);
         when(balanceLoader.tryLoadBalance(vrStrategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));

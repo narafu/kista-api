@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.trading.domain.model.StrategyVrDetail;
+import com.kista.matching.domain.model.StrategyVrDetail;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

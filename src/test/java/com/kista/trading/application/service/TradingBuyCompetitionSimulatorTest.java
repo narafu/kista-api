@@ -3,14 +3,17 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,8 +66,8 @@ class TradingBuyCompetitionSimulatorTest {
         lenient().when(vrOrderStrategy.allocationPriority()).thenReturn(0);
     }
 
-    private Order buyOrder(StrategyTicker ticker, int quantity, BigDecimal price) {
-        return Order.planned(today, ticker, Order.OrderType.LOC, Order.OrderDirection.BUY, quantity, price);
+    private PlannedOrder buyOrder(StrategyTicker ticker, int quantity, BigDecimal price) {
+        return PlannedOrder.of(today, ticker, OrderType.LOC, OrderDirection.BUY, quantity, price);
     }
 
     @Test
@@ -72,7 +75,7 @@ class TradingBuyCompetitionSimulatorTest {
         when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -97,8 +100,8 @@ class TradingBuyCompetitionSimulatorTest {
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
         when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(vrCycle));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today))
-                .thenReturn(List.of(buyOrder(StrategyTicker.TQQQ, 1, new BigDecimal("50.00"))));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
+                .thenReturn(List.of(Order.fromPlanned(buyOrder(StrategyTicker.TQQQ, 1, new BigDecimal("50.00")), null, null)));
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, new BigDecimal("50.00"));
@@ -124,7 +127,7 @@ class TradingBuyCompetitionSimulatorTest {
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(vrPlan, null));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -149,7 +152,7 @@ class TradingBuyCompetitionSimulatorTest {
         when(orderPort.findPlannedOrPlacedByCycleAndDate(vrCycle.id(), today)).thenReturn(List.of());
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenThrow(new IllegalStateException("가격 조회 실패"));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -174,7 +177,7 @@ class TradingBuyCompetitionSimulatorTest {
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(null,
                         com.kista.trading.domain.model.NextOrdersPreview.SkipReason.NO_CYCLE_HISTORY));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -200,7 +203,7 @@ class TradingBuyCompetitionSimulatorTest {
                 .thenReturn(new BigDecimal("1000.00"));
         when(planBuilder.build(eq(vrStrategy), eq(account), eq(vrCycle), eq(today), anyString()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(vrPlan, null));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00"))); // 200 USD
 
         // planResultsByStrategyId에 vrStrategy 항목이 없는 BatchContext (사전 계산 실패 상황 재현)
         TradingBuyCompetitionSimulator.BatchContext context = new TradingBuyCompetitionSimulator.BatchContext(
@@ -227,7 +230,7 @@ class TradingBuyCompetitionSimulatorTest {
         when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenReturn(new BigDecimal("1000.00"));
         when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, pausedVr));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
@@ -241,7 +244,7 @@ class TradingBuyCompetitionSimulatorTest {
     void simulate_returnsUnavailablePreview_whenLiveBalanceFetchFails() {
         when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
-        List<Order> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
 
         BuyCompetitionPreview result = simulator.simulate(
                 currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);

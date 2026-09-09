@@ -6,6 +6,8 @@ import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
+import com.kista.matching.domain.model.AccountBalance;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.Order;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
@@ -57,8 +59,18 @@ class TradingReporter {
         List<Execution> executions = registry.require(account.toBrokerRef(), ExecutionPort.class).getExecutions(today, today, strategy.ticker(), account.toBrokerRef());
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
-        // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로) — broker Execution → Fill 매핑 경유
-        AccountBalance postBalance = balance.applyExecutions(AccountBalance.Fill.listOf(executions));
+        // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
+        // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
+        List<AccountBalance.Fill> fills = executions.stream()
+                .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
+                    @Override public OrderDirection direction() {
+                        return e.direction() == Direction.BUY ? OrderDirection.BUY : OrderDirection.SELL;
+                    }
+                    @Override public int quantity() { return e.quantity(); }
+                    @Override public BigDecimal amountUsd() { return e.amountUsd(); }
+                })
+                .toList();
+        AccountBalance postBalance = balance.applyExecutions(fills);
         cyclePositionPersistor.saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
 
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)

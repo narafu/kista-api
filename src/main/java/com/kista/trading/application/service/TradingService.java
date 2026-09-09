@@ -5,16 +5,19 @@ import com.kista.common.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.*;
+import com.kista.matching.domain.model.*;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.trading.application.port.output.*;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
-import com.kista.trading.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.trading.application.event.BatchInterruptedEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.event.MarketClosedEvent;
@@ -77,7 +80,7 @@ class TradingService {
     // 전략 계산 결과 중 신규 생성 가능한 주문만 allocator에 전달하기 위한 후보
     private record CyclePlanCandidate(
             CycleState state,
-            List<Order> creatableOrders,
+            List<PlannedOrder> creatableOrders,
             boolean hasExistingOrders
     ) {}
 
@@ -166,7 +169,7 @@ class TradingService {
         for (BatchContext ctx : contexts) {
             runSafely("plan 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, startPriceSnapshots, privacyBase, today,
-                            EnumSet.of(Order.OrderTiming.AT_CLOSE)))
+                            EnumSet.of(OrderTiming.AT_CLOSE)))
                     .ifPresent(candidates::add);
         }
         SaveAllocationResult result = saveAllocatedOrders(candidates, today);
@@ -248,9 +251,9 @@ class TradingService {
     }
 
     // creatableTimings 필터 후 TradingOrderSlots로 기존 주문과 동일 슬롯을 제외한다 (TradingPreviewService와 공유 기준)
-    private List<Order> filterCreatableOrders(List<Order> plannedTemplates, List<Order> existingOrders,
-                                              Set<Order.OrderTiming> creatableTimings) {
-        List<Order> timingFiltered = plannedTemplates.stream()
+    private List<PlannedOrder> filterCreatableOrders(List<PlannedOrder> plannedTemplates, List<Order> existingOrders,
+                                              Set<OrderTiming> creatableTimings) {
+        List<PlannedOrder> timingFiltered = plannedTemplates.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
                 .toList();
         return TradingOrderSlots.excludeExisting(timingFiltered, existingOrders);
@@ -259,7 +262,7 @@ class TradingService {
     // 사이클별 후보 수집 — 기존 주문은 보존하고 새 슬롯만 allocator 검증 대상으로 분리한다
     private CyclePlanCandidate collectCycleCandidate(BatchContext ctx,
             Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
-            LocalDate tradeDate, Set<Order.OrderTiming> creatableTimings) {
+            LocalDate tradeDate, Set<OrderTiming> creatableTimings) {
         Strategy strategy = ctx.strategy();
         Account account = ctx.account();
         AccountBalance balance = loadBalance(strategy, account);
@@ -269,7 +272,8 @@ class TradingService {
         List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate);
         CycleOrderStrategy strategyHandler = cycleOrderStrategies.of(strategy.type());
         if (!existingOrders.isEmpty()
-                && strategyHandler.canSkipOrderComputation(existingOrders, creatableTimings)) {
+                && strategyHandler.canSkipOrderComputation(
+                        existingOrders.stream().map(Order::toPlanned).toList(), creatableTimings)) {
             CycleState existingState = buildCycleStateFromExistingOrders(
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), false);
             return new CyclePlanCandidate(existingState, List.of(), true);
@@ -285,20 +289,20 @@ class TradingService {
         }
 
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
-        List<Order> preparedOrders = priceCapper.prepareForAllocation(
+        List<PlannedOrder> preparedOrders = priceCapper.prepareForAllocation(
                 planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
                 cycleOrderStrategies.of(strategy.type()).priceCapMode(), tradeDate);
         validateConcreteOrderLegs(strategy, preparedOrders);
-        List<Order> creatableOrders = filterCreatableOrders(
+        List<PlannedOrder> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
         CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
         return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty());
     }
 
-    private void validateConcreteOrderLegs(Strategy strategy, List<Order> orders) {
-        List<Order> unknownLegOrders = orders.stream()
-                .filter(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
+    private void validateConcreteOrderLegs(Strategy strategy, List<PlannedOrder> orders) {
+        List<PlannedOrder> unknownLegOrders = orders.stream()
+                .filter(order -> PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 .toList();
         if (!unknownLegOrders.isEmpty()) {
             throw new IllegalStateException("전략 주문 leg 누락: strategyType="
@@ -372,7 +376,7 @@ class TradingService {
         for (BatchContext ctx : contexts) {
             runSafely("개장 order 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(),
-                            tradeDate, EnumSet.of(Order.OrderTiming.AT_OPEN)))
+                            tradeDate, EnumSet.of(OrderTiming.AT_OPEN)))
                     .ifPresent(candidates::add);
         }
 

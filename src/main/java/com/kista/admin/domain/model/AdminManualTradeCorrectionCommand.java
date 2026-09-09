@@ -1,6 +1,7 @@
 package com.kista.admin.domain.model;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderDirection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,7 +17,7 @@ public record AdminManualTradeCorrectionCommand(
 ) {
     public record Fill(
             LocalDate tradeDate,   // KST 거래일
-            Order.OrderDirection direction,
+            OrderDirection direction,
             int quantity,
             BigDecimal price,
             String externalOrderId,

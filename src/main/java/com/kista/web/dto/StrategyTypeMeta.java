@@ -1,7 +1,7 @@
 package com.kista.web.dto;
 
 import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;

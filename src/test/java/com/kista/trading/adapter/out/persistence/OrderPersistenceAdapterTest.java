@@ -1,6 +1,9 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +44,7 @@ class OrderPersistenceAdapterTest {
     @Test
     void saveAll_delegatesToRepository() {
         Order order = new Order(null, ACCOUNT_ID, STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL,
-                Order.OrderType.LOC, Order.OrderTiming.AT_CLOSE, Order.OrderDirection.BUY, 5, PRICE,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, PRICE,
                 Order.OrderStatus.PLANNED, null, null, null);
 
         adapter.saveAll(List.of(order));
@@ -57,8 +60,8 @@ class OrderPersistenceAdapterTest {
         entity.setStrategyCycleId(STRATEGY_CYCLE_ID);
         entity.setTradeDate(TODAY); // DB도 KST 저장
         entity.setTicker(StrategyTicker.SOXL);
-        entity.setOrderType(Order.OrderType.LOC);
-        entity.setDirection(Order.OrderDirection.BUY);
+        entity.setOrderType(OrderType.LOC);
+        entity.setDirection(OrderDirection.BUY);
         entity.setQuantity(5);
         entity.setPrice(PRICE);
         entity.setStatus(Order.OrderStatus.PLANNED);
