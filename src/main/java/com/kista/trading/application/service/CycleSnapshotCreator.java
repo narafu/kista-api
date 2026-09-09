@@ -6,7 +6,7 @@ import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.trading.domain.model.StrategyVersion;
-import com.kista.trading.domain.model.StrategyVrDetail;
+import com.kista.matching.domain.model.StrategyVrDetail;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyCycleVrPort;

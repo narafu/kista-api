@@ -1,6 +1,6 @@
 package com.kista.trading.application.port.output;
 
-import com.kista.trading.domain.model.StrategyVrDetail;
+import com.kista.matching.domain.model.StrategyVrDetail;
 
 import java.util.Collection;
 import java.util.Map;

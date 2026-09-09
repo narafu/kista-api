@@ -11,7 +11,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
-import com.kista.trading.domain.model.StrategyVrDetail;
+import com.kista.matching.domain.model.StrategyVrDetail;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
 import com.kista.account.application.port.output.AccountPort;

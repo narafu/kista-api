@@ -1,8 +1,8 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.InfinitePosition;
-import com.kista.trading.domain.model.ReverseModePosition;
+import com.kista.matching.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.ReverseModePosition;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;

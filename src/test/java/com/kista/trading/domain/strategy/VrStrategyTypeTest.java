@@ -3,7 +3,7 @@ package com.kista.trading.domain.strategy;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.trading.domain.model.VrPosition;
+import com.kista.matching.domain.model.VrPosition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

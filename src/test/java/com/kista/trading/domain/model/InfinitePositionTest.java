@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.sharedkernel.StrategyTicker;
 
 import org.junit.jupiter.api.DisplayName;

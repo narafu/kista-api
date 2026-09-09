@@ -1,8 +1,9 @@
-package com.kista.trading.domain.model;
+package com.kista.matching.domain.model;
 
 import java.math.BigDecimal;
 
 import static java.math.RoundingMode.HALF_UP;
+import com.kista.trading.domain.model.AccountBalance; // Task 4에서 matching으로 재이동 예정
 
 // VR 전략 주문 계산에 필요한 입력값 묶음 — 한 사이클·하루의 포지션 스냅샷
 public record VrPosition(

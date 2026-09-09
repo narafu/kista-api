@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import com.kista.matching.domain.model.StrategyVrDetail;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 // StrategyVrDetail.gradientAt(long)/poolLimitRateAt(long) 경과주수 기반 램프 공식 검증 (constraints.md "VR 공식" 후속)

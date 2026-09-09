@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.PriceSnapshot;
+import com.kista.matching.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.port.output.BrokerPricePort;

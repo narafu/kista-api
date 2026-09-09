@@ -3,7 +3,7 @@ package com.kista.trading.domain.strategy;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderDirection;
-import com.kista.trading.domain.model.ReverseModePosition;
+import com.kista.matching.domain.model.ReverseModePosition;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

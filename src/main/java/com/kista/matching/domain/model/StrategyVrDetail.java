@@ -1,4 +1,4 @@
-package com.kista.trading.domain.model;
+package com.kista.matching.domain.model;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

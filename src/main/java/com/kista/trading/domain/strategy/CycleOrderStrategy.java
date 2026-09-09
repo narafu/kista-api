@@ -4,9 +4,9 @@ import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.AccountBalance;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.VrPosition;
+import com.kista.matching.domain.model.VrPosition;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

@@ -1,4 +1,4 @@
-package com.kista.trading.domain.model;
+package com.kista.matching.domain.model;
 
 
 import java.math.BigDecimal;
@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.trading.domain.model.AccountBalance; // Task 4에서 matching으로 재이동 예정
+import com.kista.trading.domain.model.TradingSnapshot; // toSnapshot() 반환타입 — 브리프 누락분, 후속 태스크 정리 대상
 
 public record InfinitePosition(
         AccountBalance balance,

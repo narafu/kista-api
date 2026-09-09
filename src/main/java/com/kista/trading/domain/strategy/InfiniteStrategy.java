@@ -1,7 +1,7 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.InfinitePosition;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
