@@ -108,7 +108,7 @@
 
 ### User nested enum 패턴 — sharedkernel 이관 완료 (2026-09-01 정정)
 - ~~`User.UserRole`/`UserStatus`/`NotificationChannel` — 독립 enum 파일 금지, `User` record 내 nested enum~~ **폐기**: user 모듈 CLOSED 전환 시 `com.kista.sharedkernel.{UserRole,UserStatus,NotificationChannel}` 독립 타입으로 이관 완료(Strategy 4종보다 먼저 이관됨 — Strategy.Ticker/Type/Status/CycleSeedType도 이후 동일 패키지로 합류 완료(커밋 a81e76eb, 위 "Account ↔ Strategy 분리" 참고)). DB `@Enumerated(STRING)` 컬럼 상수명은 byte-identical 유지.
-- `Account.Broker`(TOSS/KIS/MOCK)도 `com.kista.sharedkernel.Broker`로 이관 완료 — broker의 `BrokerAccountRef.Broker` byte-identical 복제도 함께 삭제(BrokerAccountRef record만 자격증명 투영 own-type으로 존속). 이로써 여러 CLOSED 모듈이 **같은 값을 공유**하기 위해 nested로 두던 enum은 전부 sharedkernel로 모였다 — 단 각 모듈이 순환 해소를 위해 **의도적으로 복제 소유**하는 enum(broker `Direction`/`OrderType`, privacy `PrivacyOrderDirection`/`PrivacyOrderType`, trading `RecurringMode`)은 sharedkernel 통합 대상이 아니다(공유하지 않으려고 만든 타입이라 모으면 디커플링이 되돌아간다).
+- `Account.Broker`(TOSS/KIS/MOCK)도 `com.kista.sharedkernel.Broker`로 이관 완료 — broker의 `BrokerAccountRef.Broker` byte-identical 복제도 함께 삭제(BrokerAccountRef record만 자격증명 투영 own-type으로 존속). 이로써 여러 CLOSED 모듈이 **같은 값을 공유**하기 위해 nested로 두던 enum은 전부 sharedkernel로 모였다 — 순환 해소를 위해 의도적으로 복제 소유하는 enum(trading `RecurringMode` 등)은 여전히 sharedkernel 통합 대상이 아니다(공유하지 않으려고 만든 타입이라 모으면 디커플링이 되돌아간다). 단 broker `Direction`/`OrderType`·privacy `PrivacyOrderDirection`/`PrivacyOrderType`는 이 원칙의 예외였다가 2026-09-09 own-type 게이트 재판정으로 재분류됨 — wire 포맷이 enum 값 자체엔 실려있지 않아 "외부 계약 분리" 근거가 실제로는 성립하지 않았음이 드러나 `sharedkernel.OrderDirection`/`OrderType`으로 승격, 6개 복제본(matching 자체 소유분 2개 포함) 소멸.
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수, `User`에 유지) — 서비스/컨트롤러에서 직접 하드코딩 금지
 
 ### 도메인 Command 명명 규칙
