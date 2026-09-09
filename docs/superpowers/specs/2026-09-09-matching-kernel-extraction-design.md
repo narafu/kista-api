@@ -130,8 +130,9 @@ public record PlannedOrder(
 - compact 생성자: `orderLeg`가 null/blank면 `UNKNOWN_LEG` (현 `Order` 규칙 그대로)
 - witther **`withPrice(BigDecimal)`** — `PriceCapMode.PRIVACY_SIMPLE` 캡 보정에서
   `BuyOrderPriceCapper`가 in-memory로 사용
-- **`PlannedOrder.from(Order)`** demotion 정적 팩토리 — `BuyOrderPriceCapper`의 사후 보정 경로
-  (`capIfNeeded`/`capIfNeededAtOpen`)가 DB에서 조회한 영속 `Order`를
+- **`Order.toPlanned()`** demotion — `PlannedOrder`는 `matching → trading` 금지라 `Order`를 볼 수 없으므로
+  강등은 `Order`(trading 소유)의 인스턴스 메서드가 `PlannedOrder`를 반환한다. `BuyOrderPriceCapper`의
+  사후 보정 경로(`capIfNeeded`/`capIfNeededAtOpen`)가 DB에서 조회한 영속 `Order`를
   `InfiniteStrategy.buildCappedBuyOrders(position, tradeDate, List<PlannedOrder> buyOrders, cap)`에
   넘길 때 호출부에서 변환. (검증 결과: 커널은 입력 주문에서 `price`/`orderType`/`orderLeg`만 읽고
   `id`/`status`는 보지 않음 — demotion으로 안전하게 축소됨)
@@ -144,6 +145,7 @@ public record PlannedOrder(
   `CycleOrderComputer.compute()` → `BuyOrderPriceCapper.prepareForAllocation()` →
   `TradingOrderBudgetAllocator.allocate()` (`Candidate.orders`) → `TradingBuyCompetitionSimulator` →
   `TradingPreviewService`
+- 승격은 `Order.fromPlanned(PlannedOrder, UUID accountId, UUID strategyCycleId)` 정적 팩토리 (trading 소유)
 - **승격 지점은 단 하나**: `TradingOrderPlanner.savePlannedOrders(List<PlannedOrder> templates,
   Account account, UUID strategyCycleId)`가 `Order.fromPlanned(t, account.id(), strategyCycleId)`로
   매핑 후 `orderPort.saveAll(...)`. 호출부 4곳(`TradingService`, `ManualTradingService`,
