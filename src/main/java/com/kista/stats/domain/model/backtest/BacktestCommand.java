@@ -1,7 +1,5 @@
 package com.kista.stats.domain.model.backtest;
 
-import com.kista.trading.domain.model.Strategy;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.kista.sharedkernel.StrategyType;
