@@ -1,7 +1,7 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.matching.domain.model.VrPosition;
 import org.junit.jupiter.api.DisplayName;
@@ -52,15 +52,15 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 new BigDecimal("7500.00"), BigDecimal.ZERO, 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
-        Order buy = orders.getFirst();
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        PlannedOrder buy = orders.getFirst();
 
         assertThat(orders).hasSize(1);
         assertThat(buy.orderType()).isEqualTo(LOC);
         assertThat(buy.timing()).isEqualTo(AT_CLOSE);
         assertThat(buy.price()).isEqualByComparingTo("105.00"); // 100.00 × 1.05
         assertThat(buy.quantity()).isEqualTo(71); // floor(7500/105.00)
-        assertThat(orders).extracting(Order::orderLeg)
+        assertThat(orders).extracting(PlannedOrder::orderLeg)
                 .containsExactly("VR_BUY_01");
     }
 
@@ -72,8 +72,8 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 new BigDecimal("7500.00"), new BigDecimal("5000.00"), 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
-        Order buy = orders.getFirst();
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        PlannedOrder buy = orders.getFirst();
 
         assertThat(buy.price()).isEqualByComparingTo("105.00");
         assertThat(buy.quantity()).isEqualTo(23); // floor((7500-5000)/105.00)
@@ -87,7 +87,7 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 new BigDecimal("7500.00"), new BigDecimal("7500.00"), 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
 
         assertThat(orders).isEmpty();
     }
@@ -100,7 +100,7 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 new BigDecimal("7500.00"), BigDecimal.ZERO, 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         assertThat(orders).isEmpty();
     }
@@ -113,7 +113,7 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 new BigDecimal("7500.00"), BigDecimal.ZERO, 200);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
 
         assertThat(orders).isEmpty();
     }
@@ -128,8 +128,8 @@ class VrStrategyTypeTest {
                 balance, new BigDecimal("10000"), new BigDecimal("15.00"),
                 new BigDecimal("1000.00"), BigDecimal.ZERO, 0);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
-        Order buy = orders.getFirst();
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        PlannedOrder buy = orders.getFirst();
 
         // 사다리 가격(8500)이 아니라 bootstrap 캡 가격(100×1.05=105.00) — 예산(1000) 내에서 매수
         assertThat(orders).hasSize(1);
@@ -150,9 +150,9 @@ class VrStrategyTypeTest {
         VrPosition position = pos(1, new BigDecimal("128.83"), new BigDecimal("174.05"),
                 new BigDecimal("15.00"), new BigDecimal("128.83"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("69.09"), null, TODAY);
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
-        List<Order> sells = orders.stream().filter(o -> o.direction() == SELL).toList();
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("69.09"), null, TODAY);
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> sells = orders.stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(buys).hasSize(1);
         assertThat(buys.getFirst().orderType()).isEqualTo(LOC);
@@ -172,7 +172,7 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 new BigDecimal("150.00"), BigDecimal.ZERO, 100);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("69.09"), null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("69.09"), null, TODAY);
 
         assertThat(orders).isEmpty();
     }
@@ -185,8 +185,8 @@ class VrStrategyTypeTest {
                 balance, BigDecimal.ZERO, new BigDecimal("15.00"),
                 BigDecimal.ZERO, BigDecimal.ZERO, 200);
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
-        Order buy = orders.getFirst();
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, new BigDecimal("100.00"), null, TODAY);
+        PlannedOrder buy = orders.getFirst();
 
         assertThat(orders).hasSize(1);
         assertThat(buy.price()).isEqualByComparingTo("105.00");
@@ -203,7 +203,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(1, new BigDecimal("1000.00"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), BigDecimal.ZERO);
 
-        List<Order> buys = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+        List<PlannedOrder> buys = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         assertThat(buys).hasSize(1);
@@ -221,7 +221,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("5000"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         assertThat(orders).isNotEmpty();
         assertThat(orders).allMatch(o -> o.orderType() == LIMIT);
@@ -244,12 +244,12 @@ class VrStrategyTypeTest {
         VrPosition position = pos(0, new BigDecimal("9000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("8500.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
         // 매도 없음
         assertThat(orders).noneMatch(o -> o.direction() == SELL);
         // m=2 시작 (buyPrice(2) = 8500/1 = 8500)
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         assertThat(buys).isNotEmpty();
         assertThat(buys.getFirst().price()).isEqualByComparingTo("8500.00");
         assertThat(buys.getFirst().quantity()).isEqualTo(1);
@@ -266,9 +266,9 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("2000.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         assertThat(buys).hasSize(1);
         assertThat(buys.getFirst().price()).isEqualByComparingTo("1700.00");
     }
@@ -279,10 +279,10 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("3200.00"));
 
-        List<Order> buyOrders = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+        List<PlannedOrder> buyOrders = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
-        assertThat(buyOrders).extracting(Order::orderLeg)
+        assertThat(buyOrders).extracting(PlannedOrder::orderLeg)
                 .containsExactly("VR_BUY_01", "VR_BUY_02");
     }
 
@@ -297,9 +297,9 @@ class VrStrategyTypeTest {
         VrPosition position = pos(5, new BigDecimal("1500"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("10000.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         // 첫 단가(1700) > pool(1500) → 매수 없음
         assertThat(buys).isEmpty();
     }
@@ -319,10 +319,10 @@ class VrStrategyTypeTest {
         VrPosition position = pos(3, new BigDecimal("5000"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), new BigDecimal("2000.00"));
 
-        List<Order> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TQQQ, null, null, TODAY);
 
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
-        List<Order> sells = orders.stream().filter(o -> o.direction() == SELL).toList();
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> sells = orders.stream().filter(o -> o.direction() == SELL).toList();
 
         // 매도는 정확히 holdings(3)개 단
         assertThat(sells).hasSize(3);
@@ -330,7 +330,7 @@ class VrStrategyTypeTest {
         assertThat(sells.get(1).price()).isEqualByComparingTo("550.00");
         assertThat(sells.get(2).price()).isEqualByComparingTo("1100.00");
         assertThat(sells).allMatch(o -> o.quantity() == 1);
-        assertThat(sells).extracting(Order::orderLeg)
+        assertThat(sells).extracting(PlannedOrder::orderLeg)
                 .containsExactly("VR_SELL_01", "VR_SELL_02", "VR_SELL_03");
 
         // 매수는 1주씩
@@ -349,7 +349,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(25, new BigDecimal("10000"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), new BigDecimal("10000.00"));
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+        List<PlannedOrder> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(sells).hasSize(20);
@@ -366,7 +366,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(20, new BigDecimal("10000"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), new BigDecimal("10000.00"));
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+        List<PlannedOrder> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(sells).hasSize(20);
@@ -385,7 +385,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(1, new BigDecimal("100000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("100000.00"));
 
-        List<Order> buys = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+        List<PlannedOrder> buys = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         // 캡이 있었다면(예: currentPrice=500 → cap=525) 525로 클램프됐겠지만, 이제는 원가 8500 그대로 나온다
@@ -401,7 +401,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(0, new BigDecimal("9000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("8500.00"));
 
-        List<Order> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
+        List<PlannedOrder> sells = strategy.buildOrders(position, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == SELL).toList();
 
         assertThat(sells).isEmpty();
@@ -421,9 +421,9 @@ class VrStrategyTypeTest {
         VrPosition partial = pos(5, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("5000.00"), new BigDecimal("4000.00"));
 
-        List<Order> fullBuys = strategy.buildOrders(full, TQQQ, null, null, TODAY)
+        List<PlannedOrder> fullBuys = strategy.buildOrders(full, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
-        List<Order> partialBuys = strategy.buildOrders(partial, TQQQ, null, null, TODAY)
+        List<PlannedOrder> partialBuys = strategy.buildOrders(partial, TQQQ, null, null, TODAY)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         // poolUsed가 클수록 사용 가능 예산이 줄어 매수 단 수 감소
@@ -448,7 +448,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(1, new BigDecimal("1200"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("1200.00"));
 
-        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("525.00"))
+        List<PlannedOrder> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("525.00"))
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         // 2개 rung이 같은 cap 가격 → 병합 → 1건, qty=2
@@ -468,7 +468,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(1, new BigDecimal("1000.00"), new BigDecimal("1000"),
                 new BigDecimal("10.00"), BigDecimal.ZERO);
 
-        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("1000.00"))
+        List<PlannedOrder> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("1000.00"))
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         assertThat(buys).hasSize(1);
@@ -488,7 +488,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(10, new BigDecimal("5000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("5000.00"));
 
-        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("1050.00"))
+        List<PlannedOrder> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, new BigDecimal("1050.00"))
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         // 각 rung 가격이 다르므로 병합 없음 — 첫 두 단 가격 확인
@@ -504,7 +504,7 @@ class VrStrategyTypeTest {
         VrPosition position = pos(1, new BigDecimal("10000"), new BigDecimal("10000"),
                 new BigDecimal("15.00"), new BigDecimal("10000.00"));
 
-        List<Order> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, null)
+        List<PlannedOrder> buys = strategy.buildCappedBuyOrders(position, TQQQ, TODAY, null)
                 .stream().filter(o -> o.direction() == BUY).toList();
 
         // buyPrice(1) = 8500/1 = 8500.00 (캡 미적용)

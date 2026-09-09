@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.matching.domain.model.ReverseModePosition;
@@ -27,9 +27,9 @@ class ReverseInfiniteStrategyTest {
                 100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), true);
 
-        List<Order> orders = strategy.buildFirstDayOrders(position, TODAY);
+        List<PlannedOrder> orders = strategy.buildFirstDayOrders(position, TODAY);
 
-        assertThat(orders).extracting(Order::orderLeg)
+        assertThat(orders).extracting(PlannedOrder::orderLeg)
                 .containsExactly("REVERSE_INFINITE_MOC_SELL");
     }
 
@@ -40,9 +40,9 @@ class ReverseInfiniteStrategyTest {
                 100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
-        List<Order> orders = strategy.buildOrders(position, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
-        assertThat(orders).extracting(Order::orderLeg)
+        assertThat(orders).extracting(PlannedOrder::orderLeg)
                 .containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
     }
 
@@ -54,10 +54,10 @@ class ReverseInfiniteStrategyTest {
                 100, new BigDecimal("10.00"), new BigDecimal("3.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
-        List<Order> orders = strategy.buildOrders(position, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(1);
-        Order order = orders.get(0);
+        PlannedOrder order = orders.get(0);
         assertThat(order.orderLeg()).isEqualTo("REVERSE_INFINITE_QUOTA_MOC_SELL");
         assertThat(order.orderType()).isEqualTo(OrderType.MOC);
         assertThat(order.direction()).isEqualTo(OrderDirection.SELL);
@@ -72,7 +72,7 @@ class ReverseInfiniteStrategyTest {
                 5, new BigDecimal("10.00"), new BigDecimal("3.00"),
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
-        List<Order> orders = strategy.buildOrders(position, TODAY);
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).isEmpty();
     }

@@ -266,7 +266,7 @@ class CycleOrderComputerTest {
         assertThat(planOpt).isPresent();
         // vrPosition도 함께 실려 있어야 BuyOrderPriceCapper(VR_POSITION)의 접수 전 보정이 가능하다
         assertThat(planOpt.get().vrPosition()).isNotNull();
-        List<Order> buyOrders = planOpt.get().orders().stream()
+        List<PlannedOrder> buyOrders = planOpt.get().orders().stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .toList();
         // holdings=1이므로 매수 주문이 생성됨

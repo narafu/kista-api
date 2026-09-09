@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.VrPosition;
 
 import java.math.BigDecimal;
@@ -29,7 +29,7 @@ public class VrStrategy {
     // referencePrice: bootstrap·캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체 가능
     // livePrice: 과거 SELL bootstrap 전용 파라미터 — case1(V만 있음) 폐기로 현재 미사용, 시그니처는 호출부 영향 최소화를 위해 유지
     // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
-    public List<Order> buildOrders(VrPosition position, StrategyTicker ticker,
+    public List<PlannedOrder> buildOrders(VrPosition position, StrategyTicker ticker,
                                    BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
         if (position.holdings() == 0 && needsBootstrap(position)) {
             return buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate);
@@ -43,13 +43,13 @@ public class VrStrategy {
             return List.of();
         }
 
-        List<Order> orders = new ArrayList<>();
+        List<PlannedOrder> orders = new ArrayList<>();
         // buildBuyLadder의 break 조건을 여기서 재유도하지 않고, 실제로 사다리를 만들어본 뒤 결과가
         // 비었으면(holdings>0인데 첫 유효 단조차 예산 초과) bootstrap으로 대체한다 — 사다리 판정 기준은
         // buildBuyLadder 한 곳만 SSOT로 유지. nextValue()가 holdings와 무관하게 V를 계속 키우는 드리프트
         // 상태에서 정상 사다리로는 영원히 매수가 불가능하므로 예산 내 캡 가격 bootstrap으로 전환한다.
         // 매도 사다리는 이 드리프트와 무관하게 그대로 유지한다.
-        List<Order> ladderBuys = buildBuyOrders(position, ticker, tradeDate);
+        List<PlannedOrder> ladderBuys = buildBuyOrders(position, ticker, tradeDate);
         if (position.holdings() > 0 && ladderBuys.isEmpty()) {
             orders.addAll(buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate));
         } else {
@@ -91,7 +91,7 @@ public class VrStrategy {
     // 호출측(needsBootstrap)이 이미 진입 조건을 보장하므로 여기서는 referencePrice 유효성·잔여예산만 확인한다
     // poolUsed는 실제 체결 금액 기준(orderPort.sumFilledBuyAmountByCycleId)이라 하루 주문이 부분/전액 체결되든
     // 미체결이든 다음날 자동으로 정확한 잔여예산이 재계산된다 — 별도 "며칠째"인지 추적 불필요
-    private List<Order> buildBootstrapBuyOrders(VrPosition position, StrategyTicker ticker,
+    private List<PlannedOrder> buildBootstrapBuyOrders(VrPosition position, StrategyTicker ticker,
                                                  BigDecimal referencePrice, LocalDate tradeDate) {
         if (referencePrice == null || referencePrice.signum() <= 0) return List.of();
         BigDecimal remaining = remainingBudget(position);
@@ -99,13 +99,13 @@ public class VrStrategy {
         BigDecimal price = PriceCapPolicy.capFor(referencePrice);
         int quantity = remaining.divide(price, 0, java.math.RoundingMode.DOWN).intValue();
         if (quantity <= 0) return List.of();
-        return List.of(Order.planned(tradeDate, ticker, LOC, BUY, quantity, price, AT_CLOSE,
-                Order.leg("VR_BUY", 1)));
+        return List.of(PlannedOrder.of(tradeDate, ticker, LOC, BUY, quantity, price, AT_CLOSE,
+                PlannedOrder.leg("VR_BUY", 1)));
     }
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
     // 생성 시점 가격 캡은 적용하지 않는다(cap=null) — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 buildCappedBuyOrders로 재산정
-    private List<Order> buildBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate) {
+    private List<PlannedOrder> buildBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate) {
         return buildBuyLadder(position, ticker, tradeDate, null);
     }
 
@@ -115,17 +115,17 @@ public class VrStrategy {
     // 호출하면 안 된다. bootstrap은 value=0인 경우이므로 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이
     // 무의미해지고, bootstrap 자체의 캡 가격이 통째로 손실된다. 호출측(BuyOrderPriceCapper)이
     // orderType(LOC vs LIMIT)으로 bootstrap 배치를 가려내 이 함수 호출 자체를 막는다.
-    public List<Order> buildCappedBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate, BigDecimal cap) {
+    public List<PlannedOrder> buildCappedBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate, BigDecimal cap) {
         return buildBuyLadder(position, ticker, tradeDate, cap);
     }
 
     // 매수 사다리 공통 생성 로직 — cap이 null이면 원가 그대로(계획 생성), 비-null이면 캡 적용(접수 전 보정)
-    private List<Order> buildBuyLadder(VrPosition position, StrategyTicker ticker, LocalDate tradeDate, BigDecimal cap) {
+    private List<PlannedOrder> buildBuyLadder(VrPosition position, StrategyTicker ticker, LocalDate tradeDate, BigDecimal cap) {
         // pool 사용 가능 잔여액 — remainingBudget()으로 bootstrap과 동일 기준(governanceLimit·pool 이중 상한)을 공유한다.
         // 두 경로가 각자 상한을 계산하면 한쪽만 고친 뒤 다른 쪽이 방치되는 drift가 재발할 수 있어 단일 계산으로 통일했다.
         BigDecimal poolBudget = remainingBudget(position);
 
-        List<Order> rawBuys = new ArrayList<>();
+        List<PlannedOrder> rawBuys = new ArrayList<>();
         BigDecimal cumBuyAmount = BigDecimal.ZERO;
 
         for (int m = 1; m <= MAX_RUNGS; m++) {
@@ -144,7 +144,7 @@ public class VrStrategy {
             // poolBudget(governanceLimit·pool 중 더 작은 값) 초과 시 이후 단 전량 제외
             if (cumBuyAmount.add(price).compareTo(poolBudget) > 0) break;
 
-            rawBuys.add(Order.planned(tradeDate, ticker, LIMIT, BUY, 1, price, AT_OPEN));
+            rawBuys.add(PlannedOrder.of(tradeDate, ticker, LIMIT, BUY, 1, price, AT_OPEN));
             cumBuyAmount = cumBuyAmount.add(price);
         }
 
@@ -153,40 +153,40 @@ public class VrStrategy {
     }
 
     // 연속 동일 가격 BUY 주문 병합 — 1주×N → N주 1건
-    private List<Order> mergeSamePriceOrders(List<Order> rawBuys, StrategyTicker ticker,
+    private List<PlannedOrder> mergeSamePriceOrders(List<PlannedOrder> rawBuys, StrategyTicker ticker,
                                              LocalDate tradeDate) {
         if (rawBuys.isEmpty()) return List.of();
 
-        List<Order> merged = new ArrayList<>();
+        List<PlannedOrder> merged = new ArrayList<>();
         BigDecimal currentPrice = rawBuys.getFirst().price();
         int currentQty = 0;
 
-        for (Order o : rawBuys) {
+        for (PlannedOrder o : rawBuys) {
             if (o.price().compareTo(currentPrice) == 0) {
                 // 같은 가격이면 수량 누적
                 currentQty += o.quantity();
             } else {
                 // 가격 전환 시 이전 그룹 확정
-                merged.add(Order.planned(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN,
-                        Order.leg("VR_BUY", merged.size() + 1)));
+                merged.add(PlannedOrder.of(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN,
+                        PlannedOrder.leg("VR_BUY", merged.size() + 1)));
                 currentPrice = o.price();
                 currentQty = o.quantity();
             }
         }
         // 마지막 그룹 추가
-        merged.add(Order.planned(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN,
-                Order.leg("VR_BUY", merged.size() + 1)));
+        merged.add(PlannedOrder.of(tradeDate, ticker, LIMIT, BUY, currentQty, currentPrice, AT_OPEN,
+                PlannedOrder.leg("VR_BUY", merged.size() + 1)));
         return merged;
     }
 
     // 매도 사다리 생성 — 최대 MAX_RUNGS단, 1주씩 (holdings>MAX_RUNGS이면 마지막 단에 잔여 전량)
-    private List<Order> buildSellOrders(VrPosition position, StrategyTicker ticker,
+    private List<PlannedOrder> buildSellOrders(VrPosition position, StrategyTicker ticker,
                                         LocalDate tradeDate) {
         // holdings=0이면 매도 없음
         if (position.holdings() == 0) return List.of();
 
         int maxS = Math.min(MAX_RUNGS, position.holdings());
-        List<Order> sells = new ArrayList<>();
+        List<PlannedOrder> sells = new ArrayList<>();
 
         for (int s = 1; s <= maxS; s++) {
             BigDecimal price = position.sellPrice(s);
@@ -194,8 +194,8 @@ public class VrStrategy {
             int quantity = (position.holdings() > MAX_RUNGS && s == MAX_RUNGS)
                     ? position.holdings() - (MAX_RUNGS - 1)
                     : 1;
-            sells.add(Order.planned(tradeDate, ticker, LIMIT, SELL, quantity, price, AT_OPEN,
-                    Order.leg("VR_SELL", s)));
+            sells.add(PlannedOrder.of(tradeDate, ticker, LIMIT, SELL, quantity, price, AT_OPEN,
+                    PlannedOrder.leg("VR_SELL", s)));
         }
         return sells;
     }

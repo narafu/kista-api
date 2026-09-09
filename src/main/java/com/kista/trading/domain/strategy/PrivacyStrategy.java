@@ -1,12 +1,12 @@
 package com.kista.trading.domain.strategy;
 
 import com.kista.matching.domain.model.OrderType;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,7 +26,7 @@ import static com.kista.matching.domain.model.OrderTiming.AT_CLOSE;
 public class PrivacyStrategy {
 
     // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출
-    public List<Order> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
+    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
         if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
             throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
         }
@@ -46,7 +46,7 @@ public class PrivacyStrategy {
                     log.warn("[PRIVACY] BUY 수량 미정 건너뜀: ticker={}, price={}", t.ticker(), t.price());
                     continue;
                 }
-                // 배수 적용 — 버림은 Order 생성 직전에만 (중간 버림 시 소수점 배수에서 수량 손실 발생)
+                // 배수 적용 — 버림은 PlannedOrder 생성 직전에만 (중간 버림 시 소수점 배수에서 수량 손실 발생)
                 BigDecimal qty = BigDecimal.valueOf(t.quantity()).multiply(multiple);
                 buyEntries.add(new BuyEntry(t.price(), qty, toTradingType(t.orderType()), t.tradeDate(), t.ticker()));
             } else {
@@ -82,52 +82,52 @@ public class PrivacyStrategy {
         }
 
         // BUY (버림 후 quantity>0만) + SELL 합쳐 반환
-        List<Order> buyOrders = new ArrayList<>();
+        List<PlannedOrder> buyOrders = new ArrayList<>();
         for (BuyEntry e : buyEntries) {
             int qty = e.quantity.setScale(0, RoundingMode.DOWN).intValue();
             if (qty > 0) {
-                buyOrders.add(Order.planned(e.tradeDate, e.ticker, e.orderType, BUY, qty, e.price, AT_CLOSE));
+                buyOrders.add(PlannedOrder.of(e.tradeDate, e.ticker, e.orderType, BUY, qty, e.price, AT_CLOSE));
             }
         }
         buyOrders = assignSequentialLegs(sortOrdersForStableLegs(buyOrders), "PRIVACY_BUY");
-        List<Order> sellOrders = assignSequentialLegs(
+        List<PlannedOrder> sellOrders = assignSequentialLegs(
                 sortOrdersForStableLegs(buildSellOrders(explicitSells, nullSellTemplate, balance, multiple)), "PRIVACY_SELL");
         return Stream.concat(buyOrders.stream(), sellOrders.stream()).toList();
     }
 
-    private List<Order> sortOrdersForStableLegs(List<Order> orders) {
+    private List<PlannedOrder> sortOrdersForStableLegs(List<PlannedOrder> orders) {
         return orders.stream()
                 .sorted(Comparator
-                        .comparing(Order::direction)
-                        .thenComparing((Order order) -> order.direction() == BUY
+                        .comparing(PlannedOrder::direction)
+                        .thenComparing((PlannedOrder order) -> order.direction() == BUY
                                 ? order.price().negate()
                                 : order.price())
-                        .thenComparing(Order::orderType)
-                        .thenComparing(Order::quantity, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .thenComparing(PlannedOrder::orderType)
+                        .thenComparing(PlannedOrder::quantity, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
     }
 
-    private List<Order> assignSequentialLegs(List<Order> orders, String prefix) {
-        List<Order> result = new ArrayList<>();
+    private List<PlannedOrder> assignSequentialLegs(List<PlannedOrder> orders, String prefix) {
+        List<PlannedOrder> result = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {
-            result.add(orders.get(i).withLeg(Order.leg(prefix, i + 1)));
+            result.add(orders.get(i).withLeg(PlannedOrder.leg(prefix, i + 1)));
         }
         return result;
     }
 
-    // 명시 SELL + null SELL("잔량 전부") 합산하여 Order 리스트 반환
-    private List<Order> buildSellOrders(List<PrivacyTrade> explicit, PrivacyTrade nullTemplate,
+    // 명시 SELL + null SELL("잔량 전부") 합산하여 PlannedOrder 리스트 반환
+    private List<PlannedOrder> buildSellOrders(List<PrivacyTrade> explicit, PrivacyTrade nullTemplate,
                                         AccountBalance balance, BigDecimal multiple) {
         // 명시 SELL — 버림 전 실수 수량 보존 (fraction 보정을 위해)
         List<BigDecimal> rawQtys = explicit.stream()
                 .map(t -> BigDecimal.valueOf(t.quantity()).multiply(multiple))
                 .toList();
 
-        List<Order> result = new ArrayList<>();
+        List<PlannedOrder> result = new ArrayList<>();
         for (int i = 0; i < explicit.size(); i++) {
             PrivacyTrade t = explicit.get(i);
             int qty = rawQtys.get(i).setScale(0, RoundingMode.DOWN).intValue();
-            result.add(Order.planned(t.tradeDate(), t.ticker(), toTradingType(t.orderType()), SELL, qty, t.price(), AT_CLOSE));
+            result.add(PlannedOrder.of(t.tradeDate(), t.ticker(), toTradingType(t.orderType()), SELL, qty, t.price(), AT_CLOSE));
         }
 
         // null SELL 없는 경우만 fraction 보정 — null SELL이 있으면 remaining이 자동 흡수
@@ -144,8 +144,8 @@ public class PrivacyStrategy {
                         maxIdx = i;
                     }
                 }
-                Order max = result.get(maxIdx);
-                result.set(maxIdx, Order.planned(
+                PlannedOrder max = result.get(maxIdx);
+                result.set(maxIdx, PlannedOrder.of(
                         max.tradeDate(), max.ticker(), max.orderType(), SELL,
                         max.quantity() + bonus, max.price(), AT_CLOSE));
                 log.info("[PRIVACY] SELL 버림 보정: totalFraction={}, bonus={}", totalFraction, bonus);
@@ -163,28 +163,28 @@ public class PrivacyStrategy {
         if (nullTemplate == null) return result;
 
         // null SELL = balance.holdings() - 명시 SELL 합 (음수면 제외)
-        int sumExplicit = result.stream().mapToInt(Order::quantity).sum();
+        int sumExplicit = result.stream().mapToInt(PlannedOrder::quantity).sum();
         int remaining = balance.holdings() - sumExplicit;
         if (remaining <= 0) {
             log.warn("[PRIVACY] 잔량 매도 SELL 제외 — 명시 SELL 합이 잔량 이상: balance={}, sumExplicit={}",
                     balance.holdings(), sumExplicit);
             return result;
         }
-        result.add(Order.planned(nullTemplate.tradeDate(), nullTemplate.ticker(),
+        result.add(PlannedOrder.of(nullTemplate.tradeDate(), nullTemplate.ticker(),
                 toTradingType(nullTemplate.orderType()), SELL, remaining, nullTemplate.price(), AT_CLOSE));
         return result;
     }
 
     // SELL 합계가 실제 보유수량을 초과하면 가장 싼 SELL부터 차례로 차감 — 0이 된 leg는 제외
-    private List<Order> capSellQuantitiesToHoldings(List<Order> sells, int holdings) {
-        int totalQty = sells.stream().mapToInt(Order::quantity).sum();
+    private List<PlannedOrder> capSellQuantitiesToHoldings(List<PlannedOrder> sells, int holdings) {
+        int totalQty = sells.stream().mapToInt(PlannedOrder::quantity).sum();
         int excess = totalQty - holdings;
         if (excess <= 0) return sells;
 
         log.warn("[PRIVACY] SELL 합계가 보유수량 초과 — 가장 싼 SELL부터 차감: totalQty={}, holdings={}, excess={}",
                 totalQty, holdings, excess);
 
-        int[] quantities = sells.stream().mapToInt(Order::quantity).toArray();
+        int[] quantities = sells.stream().mapToInt(PlannedOrder::quantity).toArray();
         List<Integer> cheapestFirst = java.util.stream.IntStream.range(0, sells.size()).boxed()
                 .sorted(Comparator.comparing(i -> sells.get(i).price()))
                 .toList();
@@ -197,7 +197,7 @@ public class PrivacyStrategy {
             remaining -= take;
         }
 
-        List<Order> capped = new ArrayList<>();
+        List<PlannedOrder> capped = new ArrayList<>();
         for (int i = 0; i < sells.size(); i++) {
             if (quantities[i] > 0) {
                 capped.add(quantities[i] == sells.get(i).quantity() ? sells.get(i) : sells.get(i).withQuantity(quantities[i]));
@@ -238,7 +238,7 @@ public class PrivacyStrategy {
     // BUY 주문 quantity 조정을 위한 가변 컨테이너 (record 불가 — quantity 변경 필요)
     private static class BuyEntry {
         final BigDecimal price;
-        BigDecimal quantity; // 배수 적용 실수 — 최종 Order 생성 시에만 버림 적용
+        BigDecimal quantity; // 배수 적용 실수 — 최종 PlannedOrder 생성 시에만 버림 적용
         final OrderType orderType;
         final LocalDate tradeDate;
         final StrategyTicker ticker;

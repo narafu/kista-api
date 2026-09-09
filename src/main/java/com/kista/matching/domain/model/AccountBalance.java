@@ -1,8 +1,4 @@
-package com.kista.trading.domain.model;
-
-import com.kista.matching.domain.model.OrderDirection;
-
-import com.kista.broker.domain.model.Execution;
+package com.kista.matching.domain.model;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,49 +10,25 @@ public record AccountBalance(
         BigDecimal avgPrice,  // 평균 매입가 (holdings==0이면 null)
         BigDecimal usdDeposit // 통합주문가능금액 (USD, 환전 여부 무관 — TTTC2101R itgr_ord_psbl_amt)
 ) {
-    // applyExecutions()가 필요로 하는 최소 형태 — broker의 Execution은 더 이상 이 인터페이스를 구현하지 않는다
-    // (모듈 경계상 broker→trading 참조 금지) — 호출부가 아래 of()/listOf()로 값을 복제해 감싼다
+    // applyExecutions()가 필요로 하는 최소 형태 — broker의 Execution은 이 인터페이스를 구현하지 않는다
+    // (matching은 broker를 참조하지 않는다) — 호출부가 Execution→Fill로 값을 복제해 감싼다 (인라인 3곳)
     public interface Fill {
         OrderDirection direction();
         int quantity();
         BigDecimal amountUsd();
-
-        // broker의 Execution 1건 → Fill 매핑 — direction만 broker Direction→trading OrderDirection 변환(값 복제)
-        static Fill of(Execution execution) {
-            OrderDirection direction = execution.direction() == com.kista.broker.domain.model.Direction.BUY
-                    ? OrderDirection.BUY : OrderDirection.SELL;
-            return new Fill() {
-                @Override public OrderDirection direction() { return direction; }
-                @Override public int quantity() { return execution.quantity(); }
-                @Override public BigDecimal amountUsd() { return execution.amountUsd(); }
-            };
-        }
-
-        // broker의 Execution 목록 → Fill 목록 매핑 — applyExecutions(List<? extends Fill>) 호출부 공용
-        static List<Fill> listOf(List<Execution> executions) {
-            return executions.stream().map(Fill::of).toList();
-        }
     }
 
-    // 주문 목록 중 BUY 합계 금액 — isOrderValid/hasSufficientDepositFor/TradingOrderBudgetAllocator 공용
-    public static BigDecimal buyTotal(List<Order> orders) {
+    // 주문 목록 중 BUY 합계 금액 — hasSufficientDepositFor/TradingOrderBudgetAllocator 공용
+    public static BigDecimal buyTotal(List<PlannedOrder> orders) {
         return orders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    // 주문 유효성 검사: 총 매수금액 > 가용잔액 or 총 매도수량 > 보유수량이면 false
-    public boolean isOrderValid(List<Order> orders) {
-        int totalSellQuantity = orders.stream()
-                .filter(o -> o.direction() == OrderDirection.SELL)
-                .mapToInt(Order::quantity).sum();
-        return buyTotal(orders).compareTo(usdDeposit) <= 0 && totalSellQuantity <= holdings;
-    }
-
     // 수동 실행용 예수금 검증: 신규 BUY 합계 ≤ (live usdDeposit − 타 전략 당일 PLANNED BUY 합계)
-    // 배치 스케쥴러의 isOrderValid()와 달리 타 전략 점유분 차감 포함 — ManualTradingService 전용
-    public boolean hasSufficientDepositFor(List<Order> orders, BigDecimal otherStrategyBuyTotal) {
+    // 배치 스케쥴러 경로와 달리 타 전략 점유분 차감 포함 — ManualTradingService 전용
+    public boolean hasSufficientDepositFor(List<PlannedOrder> orders, BigDecimal otherStrategyBuyTotal) {
         BigDecimal newBuyTotal = buyTotal(orders);
         if (newBuyTotal.compareTo(BigDecimal.ZERO) <= 0) return true; // BUY 없으면 통과
         BigDecimal available = usdDeposit().subtract(otherStrategyBuyTotal);

@@ -9,7 +9,7 @@ import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.OrderDirection;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -27,6 +27,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -123,7 +124,16 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                                                 AccountBalance balance, StrategyCycle currentCycle) {
         Execution execution = Execution.ofManualFill(fill.tradeDate(), strategy.ticker(),
                 toDirection(fill.direction()), fill.quantity(), fill.price(), fill.externalOrderId());
-        AccountBalance updated = balance.applyExecutions(List.of(AccountBalance.Fill.of(execution)));
+        // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
+        AccountBalance.Fill f = new AccountBalance.Fill() {
+            @Override public OrderDirection direction() {
+                return execution.direction() == com.kista.broker.domain.model.Direction.BUY
+                        ? OrderDirection.BUY : OrderDirection.SELL;
+            }
+            @Override public int quantity() { return execution.quantity(); }
+            @Override public BigDecimal amountUsd() { return execution.amountUsd(); }
+        };
+        AccountBalance updated = balance.applyExecutions(List.of(f));
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
         return updated;
     }

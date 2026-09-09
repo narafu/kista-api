@@ -5,7 +5,7 @@ import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.privacy.application.port.output.PrivacyTradePort;

@@ -60,4 +60,14 @@ public record PlannedOrder(
     public PlannedOrder withPrice(BigDecimal newPrice) {
         return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, quantity, newPrice);
     }
+
+    // 전략 주문 다리 식별자만 교체 — PrivacyStrategy의 순차 leg 부여(assignSequentialLegs)에 사용
+    public PlannedOrder withLeg(String newLeg) {
+        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, newLeg, quantity, price);
+    }
+
+    // 수량만 교체 — 보유수량 캡 보정 재계산(PrivacyStrategy.capSellQuantitiesToHoldings)에 사용
+    public PlannedOrder withQuantity(int newQuantity) {
+        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, newQuantity, price);
+    }
 }

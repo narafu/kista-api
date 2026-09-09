@@ -1,6 +1,7 @@
 package com.kista.trading.domain.model;
 
 import com.kista.matching.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.PlannedOrder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -9,7 +10,7 @@ import java.util.List;
 public record NextOrdersPreview(
         LocalDate tradeDate,
         InfinitePosition position,                       // PRIVACY/skip 시 null
-        List<Order> orders,                              // NO_CYCLE_HISTORY/NO_PRIVACY_BASE skip 시 빈 리스트
+        List<PlannedOrder> orders,                        // NO_CYCLE_HISTORY/NO_PRIVACY_BASE skip 시 빈 리스트
         SkipReason skipReason,                           // 정상이면 null
         List<Order> todayOrders,                          // 오늘 이미 등록된 PLANNED·PLACED 주문 (없으면 빈 리스트) — DTO(NextOrdersResponse.todayOrders)와 이름 통일
         BigDecimal otherStrategiesPlannedBuyUsd,          // 계좌 내 타 전략 당일 PLANNED BUY 합계

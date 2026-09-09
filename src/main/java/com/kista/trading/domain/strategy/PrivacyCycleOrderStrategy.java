@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +41,7 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
             return Optional.empty();
         }
         // initialUsdDeposit은 PlanContext에서 직접 수신 (StrategyCycle에서 출처)
-        List<Order> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialUsdDeposit(), inputs.privacyBase());
+        List<PlannedOrder> orders = privacyStrategy.buildOrders(ctx.balance(), inputs.initialUsdDeposit(), inputs.privacyBase());
         return Optional.of(new OrderPlan(null, null, orders));
     }
 

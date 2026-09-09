@@ -1,6 +1,6 @@
 package com.kista.trading.application.event;
 
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 
 import java.util.UUID;
 import com.kista.sharedkernel.StrategyType;

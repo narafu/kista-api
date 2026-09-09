@@ -2,9 +2,9 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderDirection;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.domain.model.BrokerBalance;
@@ -45,7 +45,7 @@ class TradingOrderBudgetAllocator {
     private final TradingParallelRunner parallelRunner;         // 계좌별 브로커 선조회 병렬 실행
 
     // Allocation input for one strategy cycle; orders may include BUY, SELL, or both.
-    record Candidate(BatchContext ctx, List<Order> orders) {}
+    record Candidate(BatchContext ctx, List<PlannedOrder> orders) {}
 
     // Approved contains only approved directions per candidate; rejected lists are direction-specific.
     record Allocation(List<Candidate> approved, List<Candidate> rejectedBuy, List<Candidate> rejectedSell) {}
@@ -102,7 +102,7 @@ class TradingOrderBudgetAllocator {
             Set<StrategyTicker> sellTickers = accountCandidates.stream()
                     .flatMap(candidate -> candidate.orders().stream())
                     .filter(order -> order.direction() == SELL)
-                    .map(Order::ticker)
+                    .map(PlannedOrder::ticker)
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
             Map<StrategyTicker, Integer> sellableByTicker = new LinkedHashMap<>();
             for (StrategyTicker ticker : sellTickers) {
@@ -144,10 +144,10 @@ class TradingOrderBudgetAllocator {
     private SellAllocation allocateSells(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
         Map<AccountTicker, List<SellRequest>> requestsByAccountTicker = new LinkedHashMap<>();
         for (Candidate candidate : candidates) {
-            Map<StrategyTicker, List<Order>> sellsByTicker = candidate.orders().stream()
+            Map<StrategyTicker, List<PlannedOrder>> sellsByTicker = candidate.orders().stream()
                     .filter(order -> order.direction() == SELL)
                     .collect(java.util.stream.Collectors.groupingBy(
-                            Order::ticker, LinkedHashMap::new, java.util.stream.Collectors.toList()));
+                            PlannedOrder::ticker, LinkedHashMap::new, java.util.stream.Collectors.toList()));
             sellsByTicker.forEach((ticker, sells) -> requestsByAccountTicker
                     .computeIfAbsent(new AccountTicker(candidate.ctx().account().id(), ticker), ignored -> new ArrayList<>())
                     .add(new SellRequest(candidate, sells)));
@@ -197,7 +197,7 @@ class TradingOrderBudgetAllocator {
     private BuyAllocation allocateBuysByAccount(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
         Map<UUID, List<Candidate>> candidatesByAccount = new LinkedHashMap<>();
         for (Candidate candidate : candidates) {
-            List<Order> buys = candidate.orders().stream().filter(order -> order.direction() == BUY).toList();
+            List<PlannedOrder> buys = candidate.orders().stream().filter(order -> order.direction() == BUY).toList();
             if (!buys.isEmpty()) {
                 candidatesByAccount.computeIfAbsent(candidate.ctx().account().id(), ignored -> new ArrayList<>())
                         .add(new Candidate(candidate.ctx(), buys));
@@ -266,12 +266,12 @@ class TradingOrderBudgetAllocator {
         return cycleOrderStrategies.of(type).allocationPriority();
     }
 
-    private BigDecimal buyTotal(List<Order> orders) {
+    private BigDecimal buyTotal(List<PlannedOrder> orders) {
         return AccountBalance.buyTotal(orders);
     }
 
-    private int sellTotal(List<Order> orders) {
-        return orders.stream().mapToInt(Order::quantity).sum();
+    private int sellTotal(List<PlannedOrder> orders) {
+        return orders.stream().mapToInt(PlannedOrder::quantity).sum();
     }
 
     private BigDecimal remainingDeposit(AccountBalance live, BigDecimal reservedBuy, BigDecimal allocatedInBatch) {
@@ -302,7 +302,7 @@ class TradingOrderBudgetAllocator {
 
     private record AccountTicker(UUID accountId, StrategyTicker ticker) {}
 
-    private record SellRequest(Candidate candidate, List<Order> orders) {}
+    private record SellRequest(Candidate candidate, List<PlannedOrder> orders) {}
 
     private record SellAllocation(List<Candidate> approved, List<Candidate> rejected) {}
 

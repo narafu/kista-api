@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.OrderDirection;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;

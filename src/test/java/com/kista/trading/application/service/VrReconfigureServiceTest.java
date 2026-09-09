@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.domain.model.ReconfigureVrCommand;

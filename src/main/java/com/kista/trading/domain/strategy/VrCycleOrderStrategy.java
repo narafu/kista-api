@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.VrPosition;
 import lombok.RequiredArgsConstructor;
@@ -63,7 +63,7 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
         );
         StrategyTicker ticker = ctx.strategy().ticker(); // 거래 종목 (strategy에서 결정)
         // referencePrice: bootstrap·캡 판정 공용 기준가(전일종가 대체 허용)
-        List<Order> orders = vrStrategy.buildOrders(position, ticker, inputs.referencePrice(), inputs.currentPrice(), ctx.tradeDate());
+        List<PlannedOrder> orders = vrStrategy.buildOrders(position, ticker, inputs.referencePrice(), inputs.currentPrice(), ctx.tradeDate());
         log.info("[{}] VR 전략 계산: holdings={}, value={}, lowerBand={}, upperBand={}, orders={}",
                 ctx.label(), position.holdings(), position.value(),
                 position.lowerBand(), position.upperBand(), orders.size());

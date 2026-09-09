@@ -144,10 +144,10 @@ class ManualTradingService {
     }
 
     // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
-    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<Order> orders) {
+    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<PlannedOrder> orders) {
         int newSellTotal = orders.stream()
                 .filter(o -> o.direction() == OrderDirection.SELL)
-                .mapToInt(Order::quantity).sum();
+                .mapToInt(PlannedOrder::quantity).sum();
         int sellableQty = registry.require(account.toBrokerRef(), SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account.toBrokerRef()).quantity();
         int reservedSellTotal = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
                 account.id(), tradeDate, strategy.ticker());

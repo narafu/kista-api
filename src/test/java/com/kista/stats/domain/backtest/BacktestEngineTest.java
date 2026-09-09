@@ -3,14 +3,14 @@ package com.kista.stats.domain.backtest;
 import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderDirection;
 import com.kista.privacy.domain.model.PrivacyOrderType;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.strategy.CycleOrderStrategies;
@@ -292,11 +292,11 @@ class BacktestEngineTest {
     private record Recorded(
             CycleOrderStrategy.PlanContext.InfiniteInputs inputs, // 엔진이 조립한 리버스모드·별지점·전일종가
             AccountBalance balance,                               // 체결 반영 후 잔고
-            List<Order> orders                                    // 캡 보정 전 전략 원본 주문
+            List<PlannedOrder> orders                                    // 캡 보정 전 전략 원본 주문
     ) {
         // 주문 다리 식별자 목록 — 전반/후반/리버스 패턴 판별용
         List<String> legs() {
-            return orders.stream().map(Order::orderLeg).toList();
+            return orders.stream().map(PlannedOrder::orderLeg).toList();
         }
 
         // 전략 계산 시점 포지션 재구성 — currentRound/전후반 판정을 직접 단언하기 위함
@@ -606,7 +606,7 @@ class BacktestEngineTest {
     // 기준 매매표가 없는 날도 엔진이 plan()을 호출하므로 "그날 주문이 비었다"까지 직접 단언할 수 있다
     private static final class RecordingPrivacy extends PrivacyCycleOrderStrategy {
 
-        private final Map<LocalDate, List<Order>> byDate = new LinkedHashMap<>();
+        private final Map<LocalDate, List<PlannedOrder>> byDate = new LinkedHashMap<>();
 
         RecordingPrivacy() {
             super(new PrivacyStrategy());
@@ -619,8 +619,8 @@ class BacktestEngineTest {
             return result;
         }
 
-        List<Order> on(String date) {
-            List<Order> orders = byDate.get(LocalDate.parse(date));
+        List<PlannedOrder> on(String date) {
+            List<PlannedOrder> orders = byDate.get(LocalDate.parse(date));
             assertThat(orders).as("%s plan() 호출 기록", date).isNotNull();
             return orders;
         }
@@ -671,7 +671,7 @@ class BacktestEngineTest {
 
         assertThat(recorder.on("2024-01-02"))
                 .filteredOn(o -> o.direction() == OrderDirection.BUY)
-                .extracting(Order::quantity)
+                .extracting(PlannedOrder::quantity)
                 .containsExactly(3);
     }
 

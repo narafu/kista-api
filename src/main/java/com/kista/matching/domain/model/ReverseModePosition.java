@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.trading.domain.model.AccountBalance; // Task 4에서 matching으로 재이동 예정
 
 // 리버스모드(소진 후) 포지션 — 소진 발동 이후 사이클에서 별지점 기준 매수/매도 계산
 public record ReverseModePosition(

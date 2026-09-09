@@ -1,9 +1,9 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderTiming;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.matching.domain.model.VrPosition;
@@ -60,7 +60,8 @@ public interface CycleOrderStrategy {
     default int allocationPriority() { return 100; }
 
     // 기존 주문만으로 오늘 생성 가능한 주문 슬롯이 모두 점유됐는지 여부
-    default boolean canSkipOrderComputation(List<Order> existingOrders, Set<OrderTiming> creatableTimings) {
+    // existingOrders: 호출부(TradingService)가 영속 Order를 Order::toPlanned로 강등해 전달한다
+    default boolean canSkipOrderComputation(List<PlannedOrder> existingOrders, Set<OrderTiming> creatableTimings) {
         return false;
     }
 
@@ -122,5 +123,5 @@ public interface CycleOrderStrategy {
 
     // 전략 계산 결과 — position은 INFINITE만 non-null, vrPosition은 VR만 non-null
     // (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존 — BuyOrderPriceCapper 접수 전 보정에 재사용)
-    record OrderPlan(InfinitePosition position, VrPosition vrPosition, List<Order> orders) {}
+    record OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders) {}
 }

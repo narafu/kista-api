@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.application.port.output.CyclePositionPort;

@@ -4,10 +4,11 @@ import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestPoint;
 import com.kista.stats.domain.model.backtest.DailyCandle;
 import com.kista.broker.domain.model.Execution;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.matching.domain.model.StrategyVrDetail;
@@ -89,7 +90,7 @@ public class BacktestEngine {
     // 전략별 하루 처리 콜백 — 체결·자산 기록이 끝난 뒤 호출돼 "내일 체결 대상" 주문을 반환한다
     @FunctionalInterface
     private interface DayPlanner {
-        List<Order> planFor(DailyCandle candle, BigDecimal prevClose);
+        List<PlannedOrder> planFor(DailyCandle candle, BigDecimal prevClose);
     }
 
     // 전략 무관 일봉 루프 — look-ahead 불변조건(어제 주문만 오늘 체결 / prevClose는 루프 최하단 갱신)을 여기 한 곳에서만 관리한다
@@ -97,7 +98,7 @@ public class BacktestEngine {
     private Output runDays(List<DailyCandle> candles, LocalDate tradingStart, DayState state,
                            List<String> warnings, DayPlanner planner) {
         List<BacktestPoint> points = new ArrayList<>();
-        List<Order> pending = List.of(); // 어제 생성한 주문 — 오늘 캔들로 체결 판정
+        List<PlannedOrder> pending = List.of(); // 어제 생성한 주문 — 오늘 캔들로 체결 판정
         BigDecimal prevClose = null;     // 전일 종가 — referencePrice·캡 기준가 공용
         // 예수금 플로어 연속 발동구간 커서 — VR valueHoldWarned·PRIVACY 결측요약과 동일 취지로 일별 경고 폭주를 막는다
         LocalDate floorFrom = null;
@@ -204,7 +205,7 @@ public class BacktestEngine {
     }
 
     // 오늘 주문 생성 — PlanContext 조립 후 기존 VrCycleOrderStrategy.plan()에 위임
-    private List<Order> planVrOrders(VrState state, BacktestCommand command, DailyCandle candle, BigDecimal prevClose) {
+    private List<PlannedOrder> planVrOrders(VrState state, BacktestCommand command, DailyCandle candle, BigDecimal prevClose) {
         // referencePrice·currentPrice 모두 전일 종가로 채운다 — 백테스트엔 장중 재조회 현재가가 없다(알려진 근사)
         CycleOrderStrategy.PlanContext.VrInputs vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
                 state.value, command.vrBandWidth(), state.poolLimit, state.poolUsed,
@@ -213,17 +214,17 @@ public class BacktestEngine {
                 state.balance, syntheticStrategy(command), candle.date(), "backtest", null, null, vrInputs);
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.VR).plan(ctx);
-        List<Order> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
+        List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // 캡 재산정에는 plan()이 이미 조립해 실어 보낸 VrPosition을 그대로 재사용한다(운영 BuyOrderPriceCapper와 동일 계약)
         return applyVrBuyCap(orders, prevClose,
                 plan.map(CycleOrderStrategy.OrderPlan::vrPosition).orElse(null), command.ticker(), candle.date());
     }
 
     // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(VR_POSITION)와 동일 규칙, 현재가 대용으로 전일 종가 사용
-    private List<Order> applyVrBuyCap(List<Order> orders, BigDecimal prevClose, VrPosition position,
+    private List<PlannedOrder> applyVrBuyCap(List<PlannedOrder> orders, BigDecimal prevClose, VrPosition position,
                                       StrategyTicker ticker, LocalDate tradeDate) {
         if (prevClose == null || position == null) return orders;
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         if (buys.isEmpty()) return orders;
         // bootstrap 배치(LOC)는 사다리 공식과 무관한 별도 산정가라 재산정 대상이 아니다 — BuyOrderPriceCapper.isVrBootstrapShaped와 동일 판정
         if (buys.stream().anyMatch(o -> o.orderType() == OrderType.LOC)) return orders;
@@ -245,7 +246,7 @@ public class BacktestEngine {
     }
 
     // INFINITE 하루 처리 — 순서 고정: 별지점 윈도우 갱신 → 리버스모드 전이 → 사이클 종료 판정 → 주문 생성
-    private List<Order> planInfiniteDay(InfiniteState state, BacktestCommand command, DailyCandle candle,
+    private List<PlannedOrder> planInfiniteDay(InfiniteState state, BacktestCommand command, DailyCandle candle,
                                         BigDecimal prevClose, List<String> warnings) {
         // 오늘 종가는 리버스모드 여부와 무관하게 매일 윈도우에 쌓는다(사이클 스코프 — 종료 시 함께 비워짐)
         state.pushClose(candle.close());
@@ -262,7 +263,7 @@ public class BacktestEngine {
     }
 
     // 오늘 주문 생성 — PlanContext 조립 후 기존 InfiniteCycleOrderStrategy.plan()에 위임
-    private List<Order> planInfiniteOrders(InfiniteState state, BacktestCommand command, DailyCandle candle,
+    private List<PlannedOrder> planInfiniteOrders(InfiniteState state, BacktestCommand command, DailyCandle candle,
                                            BigDecimal prevClose, List<String> warnings) {
         // 0회차(holdings=0)에 전일종가가 없으면 운영 planNormalMode()가 예외를 던진다 — 호출 전에 방어하고 그날만 주문을 생략한다
         if (state.balance.holdings() == 0 && prevClose == null) {
@@ -276,17 +277,17 @@ public class BacktestEngine {
                 state.balance, syntheticStrategy(command), candle.date(), "backtest", infiniteInputs, null, null);
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.INFINITE).plan(ctx);
-        List<Order> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
+        List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         // 리버스모드면 position이 null — 운영 BuyOrderPriceCapper와 동일하게 캡 재산정 대상에서 제외된다
         return applyInfiniteBuyCap(orders, prevClose,
                 plan.map(CycleOrderStrategy.OrderPlan::position).orElse(null), candle.date());
     }
 
     // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(INFINITE_POSITION)와 동일 규칙, 현재가 대용으로 전일 종가 사용
-    private List<Order> applyInfiniteBuyCap(List<Order> orders, BigDecimal prevClose, InfinitePosition position,
+    private List<PlannedOrder> applyInfiniteBuyCap(List<PlannedOrder> orders, BigDecimal prevClose, InfinitePosition position,
                                             LocalDate tradeDate) {
         if (prevClose == null || position == null) return orders;
-        List<Order> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
+        List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == BUY).toList();
         if (buys.isEmpty()) return orders;
 
         BigDecimal cap = PriceCapPolicy.capFor(prevClose);
@@ -311,7 +312,7 @@ public class BacktestEngine {
     }
 
     // PRIVACY 하루 처리 — 사이클 종료 판정(endsCycleOnLiquidation=true, 리버스모드 없음) 후 주문 생성
-    private List<Order> planPrivacyDay(PrivacyState state, BacktestCommand command,
+    private List<PlannedOrder> planPrivacyDay(PrivacyState state, BacktestCommand command,
                                        Map<LocalDate, PrivacyTradeBase> privacyBases, DailyCandle candle,
                                        BigDecimal prevClose, List<String> warnings) {
         // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클 개장 자산 기준이어야 한다
@@ -327,7 +328,7 @@ public class BacktestEngine {
 
     // 오늘 주문 생성 — PlanContext 조립 후 기존 PrivacyCycleOrderStrategy.plan()에 위임
     // 배수(multiple = initialUsdDeposit ÷ currentCycleStart)는 PrivacyStrategy가 내부에서 산출한다 — 여기서 재계산하지 않는다
-    private List<Order> planPrivacyOrders(PrivacyState state, BacktestCommand command,
+    private List<PlannedOrder> planPrivacyOrders(PrivacyState state, BacktestCommand command,
                                           Map<LocalDate, PrivacyTradeBase> privacyBases, DailyCandle candle,
                                           BigDecimal prevClose, List<String> warnings) {
         PrivacyTradeBase base = privacyBases.get(candle.date()); // 없으면 null — plan()이 스스로 Optional.empty()를 낸다
@@ -342,14 +343,14 @@ public class BacktestEngine {
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, syntheticStrategy(command), candle.date(), "backtest", null, privacyInputs, null);
 
-        List<Order> orders = strategies.of(StrategyType.PRIVACY).plan(ctx)
+        List<PlannedOrder> orders = strategies.of(StrategyType.PRIVACY).plan(ctx)
                 .map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
         return applyPrivacyBuyCap(orders, prevClose);
     }
 
     // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(PRIVACY_SIMPLE)와 동일 규칙
     // cap 초과 BUY만 가격을 cap으로 치환하고 수량은 건드리지 않는다 (VR/INFINITE와 달리 재산정 자체가 없다)
-    private static List<Order> applyPrivacyBuyCap(List<Order> orders, BigDecimal prevClose) {
+    private static List<PlannedOrder> applyPrivacyBuyCap(List<PlannedOrder> orders, BigDecimal prevClose) {
         if (prevClose == null || orders.isEmpty()) return orders;
         BigDecimal cap = PriceCapPolicy.capFor(prevClose);
         return orders.stream()
@@ -360,10 +361,10 @@ public class BacktestEngine {
     // --- 전략 공통 헬퍼 ---
 
     // 재산정 BUY가 원래 BUY 자리를 채우고 남는 보정 BUY는 뒤에 붙인다 — SELL은 원래 상대 순서 그대로 유지
-    private static List<Order> replaceBuysPreservingOrder(List<Order> orders, List<Order> cappedBuys) {
-        List<Order> replaced = new ArrayList<>(orders.size() + cappedBuys.size());
+    private static List<PlannedOrder> replaceBuysPreservingOrder(List<PlannedOrder> orders, List<PlannedOrder> cappedBuys) {
+        List<PlannedOrder> replaced = new ArrayList<>(orders.size() + cappedBuys.size());
         int cappedIndex = 0;
-        for (Order order : orders) {
+        for (PlannedOrder order : orders) {
             if (order.direction() != BUY) replaced.add(order);
             else if (cappedIndex < cappedBuys.size()) replaced.add(cappedBuys.get(cappedIndex++));
         }
@@ -426,7 +427,18 @@ public class BacktestEngine {
         // 체결 반영 — 잔고·체결건수 갱신
         void applyFills(List<Execution> executions) {
             if (executions.isEmpty()) return;
-            balance = balance.applyExecutions(AccountBalance.Fill.listOf(executions));
+            // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
+            List<AccountBalance.Fill> fills = executions.stream()
+                    .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
+                        @Override public OrderDirection direction() {
+                            return e.direction() == com.kista.broker.domain.model.Direction.BUY
+                                    ? OrderDirection.BUY : OrderDirection.SELL;
+                        }
+                        @Override public int quantity() { return e.quantity(); }
+                        @Override public BigDecimal amountUsd() { return e.amountUsd(); }
+                    })
+                    .toList();
+            balance = balance.applyExecutions(fills);
             tradeCount += executions.size();
         }
     }

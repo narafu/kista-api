@@ -2,6 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.trading.application.port.output.OrderPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,10 +20,10 @@ class TradingOrderPlanner {
 
     private final OrderPort orderPort;
 
-    // 이미 계산된 templates를 orders에 PLANNED 상태로 저장
-    void savePlannedOrders(List<Order> templates, Account account, UUID strategyCycleId) {
+    // 이미 계산된 templates(커널 산출 PlannedOrder)를 특정 계좌·사이클의 PLANNED Order로 승격해 저장 — 유일한 승격 지점
+    void savePlannedOrders(List<PlannedOrder> templates, Account account, UUID strategyCycleId) {
         List<Order> planned = templates.stream()
-                .map(o -> Order.plan(o, account.id(), strategyCycleId))
+                .map(o -> Order.fromPlanned(o, account.id(), strategyCycleId))
                 .toList();
         orderPort.saveAll(planned);
         log.info("[{}] 계획 주문 {}건 저장 (PLANNED)", account.nickname(), planned.size());

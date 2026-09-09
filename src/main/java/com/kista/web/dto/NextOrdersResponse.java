@@ -3,6 +3,7 @@ package com.kista.web.dto;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
@@ -86,7 +87,7 @@ public record NextOrdersResponse(
             @Schema(description = "주문 가격 (LOC/MOC는 참고용)")
             BigDecimal price            // 주문 가격 (LOC/MOC는 참고용)
     ) {
-        public static OrderItem from(Order o) {
+        public static OrderItem from(PlannedOrder o) {
             return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.quantity(), o.price());
         }
     }

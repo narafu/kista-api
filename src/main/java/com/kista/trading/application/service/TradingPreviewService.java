@@ -4,6 +4,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.DstInfo;
@@ -170,7 +171,7 @@ class TradingPreviewService {
         CycleOrderStrategy.OrderPlan plan = result.plan();
 
         // 오늘자 계획에 BUY가 있을 때만 계좌 내 예산 경쟁 시뮬레이션 수행
-        List<Order> buyOrders = plan.orders().stream()
+        List<PlannedOrder> buyOrders = plan.orders().stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .toList();
         BuyCompetitionPreview competition = buyOrders.isEmpty()
@@ -184,7 +185,7 @@ class TradingPreviewService {
         // 다시 제시한다. 그 몫은 sellSufficiencySimulator가 reservedQuantity로 DB에서 별도 조회해
         // 이미 반영하므로, 신규 필요분에서는 기존 주문과 겹치는 슬롯을 제외해야 이중 계산되지 않는다
         // (TradingService.filterCreatableOrders와 동일 기준 — TradingOrderSlots 공유).
-        List<Order> newSellOrders = TradingOrderSlots.excludeExisting(
+        List<PlannedOrder> newSellOrders = TradingOrderSlots.excludeExisting(
                 plan.orders().stream().filter(o -> o.direction() == OrderDirection.SELL).toList(),
                 todayOrders);
         SellSufficiencyPreview sellSufficiency = newSellOrders.isEmpty()

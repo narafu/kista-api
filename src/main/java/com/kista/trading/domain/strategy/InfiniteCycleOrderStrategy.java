@@ -1,6 +1,6 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -56,13 +56,13 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public int allocationPriority() { return 1; }
 
     @Override
-    public boolean canSkipOrderComputation(List<Order> existingOrders, Set<OrderTiming> creatableTimings) {
-        List<Order> targetOrders = existingOrders.stream()
+    public boolean canSkipOrderComputation(List<PlannedOrder> existingOrders, Set<OrderTiming> creatableTimings) {
+        List<PlannedOrder> targetOrders = existingOrders.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
                 .toList();
         // 리버스모드 여부는 계산 전에는 알 수 없으므로 legacy 주문은 양 방향이 모두 있어야만 전체 슬롯을 점유한다.
         if (!targetOrders.isEmpty()
-                && targetOrders.stream().allMatch(order -> Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                && targetOrders.stream().allMatch(order -> PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 && creatableTimings.stream().allMatch(timing -> targetOrders.stream()
                         .anyMatch(order -> order.timing() == timing && order.direction() == OrderDirection.BUY)
                         && targetOrders.stream().anyMatch(order -> order.timing() == timing
@@ -72,7 +72,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
         Set<ExistingLegSlot> concreteSlots = existingOrders.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
-                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .filter(order -> !PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 .map(ExistingLegSlot::of)
                 .collect(Collectors.toSet());
         if (concreteSlots.isEmpty()) return false;
@@ -83,9 +83,9 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
         Set<String> atCloseLegs = existingOrders.stream()
                 .filter(order -> hasAtCloseTiming && order.timing() == OrderTiming.AT_CLOSE)
-                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .filter(order -> !PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 .filter(order -> order.direction() == OrderDirection.BUY)
-                .map(Order::orderLeg)
+                .map(PlannedOrder::orderLeg)
                 .collect(Collectors.toSet());
 
         boolean earlyComplete = atCloseLegs.contains("INFINITE_EARLY_AVG_BUY")
@@ -114,7 +114,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
             OrderDirection direction,
             String orderLeg
     ) {
-        static ExistingLegSlot of(Order order) {
+        static ExistingLegSlot of(PlannedOrder order) {
             return new ExistingLegSlot(order.timing(), order.direction(), order.orderLeg());
         }
     }
@@ -137,7 +137,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         }
         int divisionCount = inputs.divisionCount() != null ? inputs.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
         InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.strategy().ticker(), inputs.prevClosePrice(), divisionCount);
-        List<Order> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
+        List<PlannedOrder> orders = infiniteStrategy.buildOrders(position, ctx.tradeDate());
         log.info("[{}] 전략 계산(일반모드): priceOffsetRate={}, currentRound={}, unitAmount={}, orders={}",
                 ctx.label(), position.priceOffsetRate(), position.currentRound(),
                 position.unitAmount(), orders.size());
@@ -156,7 +156,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 inputs.isFirstReverseDay()
         );
 
-        List<Order> orders = position.isFirstDay()
+        List<PlannedOrder> orders = position.isFirstDay()
                 ? reverseStrategy.buildFirstDayOrders(position, ctx.tradeDate())
                 : reverseStrategy.buildOrders(position, ctx.tradeDate());
 

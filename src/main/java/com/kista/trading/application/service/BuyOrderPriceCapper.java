@@ -3,6 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderType;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.port.output.OrderPort;
@@ -44,13 +45,13 @@ class BuyOrderPriceCapper {
 
     // 신규 후보의 최종 BUY를 allocator 입력 전에 계산하며 영속화는 수행하지 않는다
     // ticker: VR 전용 — VrPosition은 ticker를 보유하지 않아 별도 전달 필요 (INFINITE_POSITION/PRIVACY_SIMPLE은 무시)
-    List<Order> prepareForAllocation(List<Order> orders, BigDecimal currentPrice, InfinitePosition position,
+    List<PlannedOrder> prepareForAllocation(List<PlannedOrder> orders, BigDecimal currentPrice, InfinitePosition position,
                                      VrPosition vrPosition, StrategyTicker ticker,
                                      CycleOrderStrategy.PriceCapMode mode, LocalDate tradeDate) {
         if (mode == null || mode == CycleOrderStrategy.PriceCapMode.NONE || currentPrice == null) return orders;
 
         BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
-        List<Order> buyOrders = orders.stream().filter(order -> order.direction() == BUY).toList();
+        List<PlannedOrder> buyOrders = orders.stream().filter(order -> order.direction() == BUY).toList();
         if (buyOrders.stream().noneMatch(order -> order.price().compareTo(cap) > 0)) return orders;
 
         if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
@@ -64,20 +65,20 @@ class BuyOrderPriceCapper {
             if (vrPosition == null) return orders;
             // bootstrap 주문(LOC+AT_CLOSE)은 사다리 재산정(buildCappedBuyOrders) 대상이 아니다 — 아래 isVrBootstrapShaped() 참고
             if (isVrBootstrapShaped(buyOrders)) return orders;
-            List<Order> cappedBuys = vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
+            List<PlannedOrder> cappedBuys = vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
             return replaceBuysPreservingOrder(orders, cappedBuys);
         }
         if (position == null) return orders;
 
-        List<Order> cappedBuys = infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
+        List<PlannedOrder> cappedBuys = infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
         return replaceBuysPreservingOrder(orders, cappedBuys);
     }
 
     // 재산정 BUY는 원래 BUY 슬롯을 채우고, 추가 correction BUY는 기존 상대 순서 뒤에 붙인다
-    private List<Order> replaceBuysPreservingOrder(List<Order> orders, List<Order> cappedBuys) {
-        List<Order> prepared = new ArrayList<>(orders.size() + cappedBuys.size());
+    private List<PlannedOrder> replaceBuysPreservingOrder(List<PlannedOrder> orders, List<PlannedOrder> cappedBuys) {
+        List<PlannedOrder> prepared = new ArrayList<>(orders.size() + cappedBuys.size());
         int cappedBuyIndex = 0;
-        for (Order order : orders) {
+        for (PlannedOrder order : orders) {
             if (order.direction() != BUY) {
                 prepared.add(order);
             } else if (cappedBuyIndex < cappedBuys.size()) {
@@ -111,11 +112,11 @@ class BuyOrderPriceCapper {
         if (exceeding.isEmpty()) return;
 
         log.info("[{}] PRIVACY BUY 가격 보정 필요 — cap={}, 초과 주문: {}", account.nickname(), cap, describeOrders(exceeding));
-        // cap 초과 주문만 CANCELLED 처리 → cap 가격으로 재저장
+        // cap 초과 주문만 CANCELLED 처리 → cap 가격으로 재저장 (강등 후 in-memory 가격 치환)
         exceeding.forEach(o -> orderPort.markCancelled(o.id()));
-        List<Order> corrected = exceeding.stream().map(o -> o.withPrice(cap)).toList();
+        List<PlannedOrder> corrected = exceeding.stream().map(o -> o.toPlanned().withPrice(cap)).toList();
         orderPlanner.savePlannedOrders(corrected, account, strategyCycleId);
-        log.info("[{}] PRIVACY BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describeOrders(corrected));
+        log.info("[{}] PRIVACY BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describePlannedOrders(corrected));
     }
 
     // INFINITE 전용: position 기반 수량 재산정 + 보정 주문 포함
@@ -150,7 +151,7 @@ class BuyOrderPriceCapper {
         List<Order> buyOrders = loadBuyOrders(strategyCycleId, today, false);
         applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
                 (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, today, cap),
-                BuyOrderPriceCapper::isVrBootstrapShaped);
+                BuyOrderPriceCapper::isVrBootstrapShapedPersisted);
     }
 
     // VR 전용 AT_OPEN 스코프: 사다리(LIMIT+AT_OPEN) BUY만 조회해 보정한다 — 개장 스케쥴러 선접수·개장 후 수동실행 경로 전용
@@ -162,7 +163,7 @@ class BuyOrderPriceCapper {
         List<Order> buyOrders = loadBuyOrders(strategyCycleId, tradeDate, true);
         applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
                 (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap),
-                BuyOrderPriceCapper::isVrBootstrapShaped);
+                BuyOrderPriceCapper::isVrBootstrapShapedPersisted);
     }
 
     // VR bootstrap 주문(LOC+AT_CLOSE)인지 판별 — 이 함수는 buyOrders(BUY만 필터링된 목록)만 검사한다.
@@ -173,7 +174,12 @@ class BuyOrderPriceCapper {
     // 뜻이다(SELL이 섞여 있어도 무관 — 이 함수는 BUY만 본다). bootstrap 가격
     // (PriceCapPolicy.capFor(referencePrice) = referencePrice×1.05)은 사다리의 buyPrice(m) 공식과 무관한
     // 별도 산정식이라 buildCappedBuyOrders(사다리 전용)로 재계산하면 안 된다.
-    private static boolean isVrBootstrapShaped(List<Order> buyOrders) {
+    private static boolean isVrBootstrapShaped(List<PlannedOrder> buyOrders) {
+        return buyOrders.stream().anyMatch(o -> o.orderType() == OrderType.LOC);
+    }
+
+    // applyCapIfNeeded skipIf 콜백은 영속 List<Order>를 받는다 — 강등은 applyCapIfNeeded 내부에서 수행
+    private static boolean isVrBootstrapShapedPersisted(List<Order> buyOrders) {
         return buyOrders.stream().anyMatch(o -> o.orderType() == OrderType.LOC);
     }
 
@@ -189,16 +195,17 @@ class BuyOrderPriceCapper {
     // 공통 cap 적용 골격 (skip 조건 없음) — INFINITE_POSITION/PRIVACY_SIMPLE 등 기본 경로
     private void applyCapIfNeeded(Account account, UUID strategyCycleId, List<Order> buyOrders,
                                   BigDecimal currentPrice,
-                                  BiFunction<List<Order>, BigDecimal, List<Order>> correctFn) {
+                                  BiFunction<List<PlannedOrder>, BigDecimal, List<PlannedOrder>> correctFn) {
         applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice, correctFn, orders -> false);
     }
 
     // 공통 cap 적용 골격: skip 대상 여부 확인 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
-    // buyOrders: 호출측이 스코프(전체 PLANNED vs AT_OPEN 전용)를 결정해 미리 조회한 목록
-    // skipIf: 조회된 buyOrders가 이 correctFn의 재산정 대상이 아니면 true (예: VR bootstrap 주문)
+    // buyOrders: 호출측이 스코프(전체 PLANNED vs AT_OPEN 전용)를 결정해 미리 조회한 영속 목록
+    // skipIf: 조회된 buyOrders(영속)가 이 correctFn의 재산정 대상이 아니면 true (예: VR bootstrap 주문)
+    // correctFn은 커널(InfiniteStrategy/VrStrategy)에 위임하므로 강등한 List<PlannedOrder>를 받는다
     private void applyCapIfNeeded(Account account, UUID strategyCycleId, List<Order> buyOrders,
                                   BigDecimal currentPrice,
-                                  BiFunction<List<Order>, BigDecimal, List<Order>> correctFn,
+                                  BiFunction<List<PlannedOrder>, BigDecimal, List<PlannedOrder>> correctFn,
                                   Predicate<List<Order>> skipIf) {
         if (buyOrders.isEmpty()) return;
         if (skipIf.test(buyOrders)) {
@@ -211,20 +218,25 @@ class BuyOrderPriceCapper {
 
         log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap, describeOrders(buyOrders));
 
-        List<Order> newBuys = correctFn.apply(buyOrders, cap);
+        List<PlannedOrder> plannedBuyOrders = buyOrders.stream().map(Order::toPlanned).toList();
+        List<PlannedOrder> newBuys = correctFn.apply(plannedBuyOrders, cap);
 
-        // 기존 BUY PLANNED CANCELLED 처리 → 보정된 BUY 재저장
+        // 기존 BUY PLANNED CANCELLED 처리(강등 전 원본 목록에서 id 읽음) → 보정된 BUY 재저장
         buyOrders.forEach(o -> orderPort.markCancelled(o.id()));
         if (newBuys.isEmpty()) {
             log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
             return;
         }
         orderPlanner.savePlannedOrders(newBuys, account, strategyCycleId);
-        log.info("[{}] BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describeOrders(newBuys));
+        log.info("[{}] BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describePlannedOrders(newBuys));
     }
 
     // 주문 목록을 "가격×수량" 형식으로 표현 — 가격 보정 전후 로그용
     private static String describeOrders(List<Order> orders) {
+        return orders.stream().map(o -> o.price() + "×" + o.quantity()).toList().toString();
+    }
+
+    private static String describePlannedOrders(List<PlannedOrder> orders) {
         return orders.stream().map(o -> o.price() + "×" + o.quantity()).toList().toString();
     }
 }

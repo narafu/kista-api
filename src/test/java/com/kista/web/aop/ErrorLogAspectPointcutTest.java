@@ -1,7 +1,7 @@
 package com.kista.web.aop;
 
 import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.notify.application.port.output.NotifyPort;

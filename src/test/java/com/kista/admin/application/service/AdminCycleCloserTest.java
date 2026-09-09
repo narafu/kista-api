@@ -1,6 +1,6 @@
 package com.kista.admin.application.service;
 
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.application.port.output.StrategyCyclePort;

@@ -3,7 +3,7 @@ package com.kista.stats.application.service;
 import com.kista.stats.domain.model.backtest.BacktestCommand;
 import com.kista.stats.domain.model.backtest.BacktestResult;
 import com.kista.stats.domain.model.backtest.DailyCandle;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.OrderDirection;
@@ -415,9 +415,8 @@ class BacktestServiceTest {
 
     // 지정가 100 매수 1주 — position=null이라 엔진의 캡 재산정 대상에서 제외된다
     private static CycleOrderStrategy.OrderPlan buyOnePlan() {
-        Order order = new Order(null, UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2024, 1, 1),
-                StrategyTicker.TQQQ, OrderType.LIMIT, OrderTiming.AT_OPEN,
-                OrderDirection.BUY, 1, bd("100"), Order.OrderStatus.PLANNED, null, null, null);
+        PlannedOrder order = PlannedOrder.of(LocalDate.of(2024, 1, 1), StrategyTicker.TQQQ, OrderType.LIMIT,
+                OrderDirection.BUY, 1, bd("100"), OrderTiming.AT_OPEN);
         return new CycleOrderStrategy.OrderPlan(null, null, List.of(order));
     }
 }

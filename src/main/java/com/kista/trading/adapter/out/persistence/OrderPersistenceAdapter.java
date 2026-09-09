@@ -208,7 +208,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         e.setTiming(o.timing());
         e.setDirection(o.direction());
         e.setOrderLeg(o.orderLeg());
-        e.setQuantity(o.quantity()); // quantity는 모든 저장 경로에서 non-null 보장 (Order.planned/withPrice 팩토리 int 파라미터)
+        e.setQuantity(o.quantity()); // quantity는 모든 저장 경로에서 non-null 보장 (Order.fromPlanned/withPrice 팩토리 int 파라미터)
         e.setPrice(o.price());
         e.setStatus(o.status());
         e.setExternalOrderId(o.externalOrderId());

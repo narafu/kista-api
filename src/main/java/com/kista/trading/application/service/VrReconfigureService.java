@@ -6,7 +6,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.common.CycleLookups;
 import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.AccountBalance;
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.ReconfigureVrCommand;

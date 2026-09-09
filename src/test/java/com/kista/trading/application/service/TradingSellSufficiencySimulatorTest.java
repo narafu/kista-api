@@ -4,7 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.SellableQuantity;
-import com.kista.trading.domain.model.Order;
+import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.OrderType;
 import com.kista.matching.domain.model.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
@@ -53,8 +53,8 @@ class TradingSellSufficiencySimulatorTest {
         lenient().when(registry.require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class))).thenReturn(sellableQuantityPort);
     }
 
-    private Order sellOrder(int quantity, BigDecimal price) {
-        return Order.planned(today, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.SELL, quantity, price);
+    private PlannedOrder sellOrder(int quantity, BigDecimal price) {
+        return PlannedOrder.of(today, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.SELL, quantity, price);
     }
 
     @Test
@@ -63,7 +63,7 @@ class TradingSellSufficiencySimulatorTest {
                 .thenReturn(new SellableQuantity("SOXL", 10));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(2);
-        List<Order> sellOrders = List.of(sellOrder(5, new BigDecimal("25.00")));
+        List<PlannedOrder> sellOrders = List.of(sellOrder(5, new BigDecimal("25.00")));
 
         SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
 
@@ -80,7 +80,7 @@ class TradingSellSufficiencySimulatorTest {
                 .thenReturn(new SellableQuantity("SOXL", 2));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
-        List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
+        List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
         SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
 
@@ -95,7 +95,7 @@ class TradingSellSufficiencySimulatorTest {
                 .thenReturn(new SellableQuantity("SOXL", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(3);
-        List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
+        List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
         SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
 
@@ -109,7 +109,7 @@ class TradingSellSufficiencySimulatorTest {
                 .thenReturn(new SellableQuantity("SOXL", 20));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
-        List<Order> sellOrders = List.of(
+        List<PlannedOrder> sellOrders = List.of(
                 sellOrder(4, new BigDecimal("25.00")),
                 sellOrder(6, new BigDecimal("26.00")));
 
@@ -123,7 +123,7 @@ class TradingSellSufficiencySimulatorTest {
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
         when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
-        List<Order> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
+        List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
         SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
 

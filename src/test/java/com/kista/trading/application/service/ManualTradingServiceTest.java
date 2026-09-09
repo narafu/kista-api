@@ -152,7 +152,7 @@ class ManualTradingServiceTest {
                 OrderDirection.SELL, 15, new BigDecimal("22.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(sellOrder));
+                .thenReturn(List.of(sellOrder.toPlanned()));
         // live holdings=10, sellable=10 < SELL 15주
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
@@ -173,7 +173,7 @@ class ManualTradingServiceTest {
                 OrderDirection.BUY, 1, new BigDecimal("22.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(buyOrder));
+                .thenReturn(List.of(buyOrder.toPlanned()));
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenThrow(new RuntimeException("Toss API 오류"));
 
@@ -190,7 +190,7 @@ class ManualTradingServiceTest {
                 OrderDirection.SELL, 3, new BigDecimal("22.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(sellOrder));
+                .thenReturn(List.of(sellOrder.toPlanned()));
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
@@ -218,7 +218,7 @@ class ManualTradingServiceTest {
                 OrderDirection.BUY, 1, new BigDecimal("20.00"),
                 Order.OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(buyTemplate));
+                .thenReturn(List.of(buyTemplate.toPlanned()));
         // live 잔고 충분: usdDeposit=$10,000 > BUY $20
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
@@ -288,7 +288,7 @@ class ManualTradingServiceTest {
         // buildOrders: LIMIT + AT_OPEN 주문 반환 — 수동실행은 currentPrice=null 전달하지만
         // setUp()의 전역 kisPricePort 스텁이 SOXL 전일종가 20.00을 반환 → referencePrice=20.00(대체), currentPrice(live)=null
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(new BigDecimal("20.00")), isNull(), any()))
-                .thenReturn(List.of(vrBuyTemplate, vrSellTemplate));
+                .thenReturn(List.of(vrBuyTemplate.toPlanned(), vrSellTemplate.toPlanned()));
         // live 잔고 검증 — BUY $22 << usdDeposit $10,000
         when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
