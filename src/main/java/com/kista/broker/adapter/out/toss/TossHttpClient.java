@@ -32,35 +32,24 @@ class TossHttpClient {
 
     // 계좌 컨텍스트 API용 — X-Tossinvest-Account 헤더 포함 (주문·잔고·매수가능금액)
     public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
-        return executeGet(path, account, params, responseType, true);
+        return get(path, account, params, ParameterizedTypeReference.forType(responseType));
     }
 
     // 계좌 헤더 불필요 API용 — 시세 조회·환율 등 (개별 계좌 토큰 사용)
     public <T> T getNoAccountHeader(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
-        return executeGet(path, account, params, responseType, false);
+        return getNoAccountHeader(path, account, params, ParameterizedTypeReference.forType(responseType));
     }
 
     // 공통 API용 — 관리자 토큰 사용, 계좌 컨텍스트 불필요 (시세·환율·캔들·시장정보)
     public <T> T getCommon(String path, MultiValueMap<String, String> params, Class<T> responseType) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                tossAuthApi::recoverAdminToken,
-                token -> {
-                    HttpHeaders headers = buildAdminHeaders(token);
-                    return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
-                });
+        return getCommon(path, params, ParameterizedTypeReference.forType(responseType));
     }
 
     public <T> T post(String path, BrokerAccountRef account, Object body, Class<T> responseType) {
-        return executeWithRetry(account, path, token -> tossRestClient.post()
-                .uri(baseUrl + path)
-                .headers(h -> h.addAll(buildHeaders(account, token)))
-                .body(body)
-                .retrieve()
-                .body(responseType));
+        return post(path, account, body, ParameterizedTypeReference.forType(responseType));
     }
 
-    // ParameterizedTypeReference 오버로드 — 제네릭 래퍼 타입(TossResult<T> 등) 역직렬화용
+    // ParameterizedTypeReference 오버로드 — 실제 HTTP 호출 로직 본체, Class<T> 오버로드가 위임
 
     // 계좌 컨텍스트 API용 (ParameterizedTypeReference 버전)
     public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
@@ -105,15 +94,6 @@ class TossHttpClient {
     }
 
     // ── private helpers ────────────────────────────────────────────────────────
-
-    private <T> T executeGet(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
-                              Class<T> responseType, boolean withAccountHeader) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
-        return executeWithRetry(account, path, token -> {
-            HttpHeaders headers = withAccountHeader ? buildHeaders(account, token) : buildHeadersNoAccount(token);
-            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
-        });
-    }
 
     // 401 재시도 시 백오프 간격(ms) — 재발급 직후 토큰이 Toss 리소스 서버에 즉시 반영되지 않는 경우 대응
     private static final long RETRY_BACKOFF_MILLIS = 300;
