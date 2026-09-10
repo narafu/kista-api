@@ -5,6 +5,7 @@ import com.kista.privacy.domain.model.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface PrivacyTradePort {
     // FIDA 수신 데이터를 기준 매매표(base) + 주문 명세(orders)로 저장
@@ -19,4 +20,13 @@ public interface PrivacyTradePort {
 
     // 관리자 조회 — release_date(KST 발행일 원본) >= fromReleaseDate 인 기준 매매표를 주문 명세 포함, 발행일 내림차순 반환
     List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromReleaseDate);
+
+    // 관리자 단건 조회 — 없으면 NoSuchElementException(→404)
+    PrivacyTradeBaseView findByIdOrThrow(UUID id);
+
+    // 관리자 수동 보정 — 마스터 필드(기준가·실현손익·평단가·보유수량) 전체 교체
+    PrivacyTradeBaseView updateBase(UUID id, PrivacyBaseUpdateCommand command);
+
+    // 관리자 수동 보정 — 개별 주문 가격·수량 교체 (BUY 주문의 quantity=null은 IllegalArgumentException)
+    PrivacyTradeBaseView updateOrder(UUID baseId, UUID orderId, PrivacyOrderUpdateCommand command);
 }

@@ -14,8 +14,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Component
@@ -151,6 +153,43 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         return baseRepository.findBasesFromReleaseDate(fromReleaseDate).stream()
                 .map(this::toView)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PrivacyTradeBaseView findByIdOrThrow(UUID id) {
+        return baseRepository.findById(id)
+                .map(this::toView)
+                .orElseThrow(() -> new NoSuchElementException("PRIVACY 기준 매매표를 찾을 수 없습니다: " + id));
+    }
+
+    @Override
+    @Transactional
+    public PrivacyTradeBaseView updateBase(UUID id, PrivacyBaseUpdateCommand command) {
+        PrivacyTradeBaseEntity base = baseRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("PRIVACY 기준 매매표를 찾을 수 없습니다: " + id));
+        base.setCurrentCycleStart(command.currentCycleStart());
+        base.setCurrentCycleRealizedPnl(command.currentCycleRealizedPnl());
+        base.setAvgPrice(command.avgPrice());
+        base.setHoldings(command.holdings());
+        return toView(base);
+    }
+
+    @Override
+    @Transactional
+    public PrivacyTradeBaseView updateOrder(UUID baseId, UUID orderId, PrivacyOrderUpdateCommand command) {
+        PrivacyTradeBaseEntity base = baseRepository.findById(baseId)
+                .orElseThrow(() -> new NoSuchElementException("PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId));
+        PrivacyTradeBaseOrderEntity order = base.getOrders().stream()
+                .filter(o -> o.getId().equals(orderId))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("주문 명세를 찾을 수 없습니다: " + orderId));
+        if (order.getDirection() == OrderDirection.BUY && command.quantity() == null) {
+            throw new IllegalArgumentException("BUY 주문의 quantity는 null일 수 없습니다");
+        }
+        order.setPrice(command.price());
+        order.setQuantity(command.quantity());
+        return toView(base);
     }
 
     // 엔티티 → 조회 뷰 변환 (관리자 표시용 — 발행일 원본 그대로, 이제 예외가 아니라 규칙)
