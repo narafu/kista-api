@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
 import com.kista.market.application.port.output.MarketCalendarPort;
