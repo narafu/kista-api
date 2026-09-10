@@ -176,7 +176,7 @@ class TradingServiceTest {
         lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class));
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, eventPublisher);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, eventPublisher, privacyTradePort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, eventPublisher, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
@@ -222,7 +222,7 @@ class TradingServiceTest {
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
-                orderPort, privacyTradePort, strategyCyclePort,
+                orderPort, strategyCyclePort,
                 balanceLoader, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
                 marketEventNotifier, budgetAllocator, priceCapper, cycleStrategies,

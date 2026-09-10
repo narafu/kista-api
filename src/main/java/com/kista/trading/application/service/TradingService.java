@@ -50,7 +50,6 @@ class TradingService {
     private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final ApplicationEventPublisher eventPublisher;    // 관리자·사용자 알림 이벤트 발행 (오류·휴장·잔고부족)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
-    private final PrivacyTradePort privacyTradePort;
     private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
     private final TradingBalanceLoader balanceLoader;          // 잔고 로드 헬퍼 — KIS·Toss 모두 DB 이력(cycle_position)
     private final CycleOrderComputer orderComputer;            // 전략 계산 + 주문 유효성 검증 공통부
@@ -66,7 +65,7 @@ class TradingService {
     private final TradingBatchGuard batchGuard;                 // 전략별 단계 실행 격리 가드
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
-    private record CycleState(
+    record CycleState(
             BatchContext ctx,
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
@@ -87,14 +86,6 @@ class TradingService {
 
     // 예산 배정 후 실제 저장된 컨텍스트만 다음 단계 진입 대상으로 사용한다
     private record SaveAllocationResult(Set<BatchContext> savedContexts) {}
-
-    // 배치 시작 시점 가격·기준표 조회 결과 — executeBatch/placeOpenOrders 공통 (조회 대상 날짜만 다름)
-    private record PriceContext(
-            List<StrategyTicker> cycleTickers,
-            Account priceAccount,
-            Map<StrategyTicker, PriceSnapshot> startPriceSnapshots,
-            PrivacyTradeBase privacyBase
-    ) {}
 
     void execute(Strategy strategy, Account account, User user) throws InterruptedException {
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
@@ -129,7 +120,7 @@ class TradingService {
         }
 
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
-        PriceContext priceCtx = loadPriceContext(contexts, today);
+        TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(contexts, today);
 
         // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<CycleState> states = planAll(contexts, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
@@ -189,7 +180,7 @@ class TradingService {
         // 주문 시각 대기 직후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
         // states 수집 시점(startPrice)은 waitFor("주문 시각") 대기 시간만큼 stale할 수 있어
         // BUY cap 판단은 여기서 재조회한 최신가를 우선 사용한다 — ticker당 1회 조회(여러 전략 공유 무관)
-        Map<StrategyTicker, BigDecimal> placementPrices = reloadPlacementPrices(states);
+        Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(states);
         // groupKey=계좌 id — 같은 계좌 내 사이클끼리만 동시 상한 공유, 다른 계좌는 완전 병렬
         List<TradingParallelRunner.Task<CyclePlacedState>> tasks = states.stream()
                 .map(state -> new TradingParallelRunner.Task<CyclePlacedState>(
@@ -348,7 +339,7 @@ class TradingService {
         if (contexts.isEmpty()) return;
 
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
-        PriceContext priceCtx = loadPriceContext(contexts, tradeDate);
+        TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(contexts, tradeDate);
 
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상
         try {
@@ -382,7 +373,7 @@ class TradingService {
         if (!placeableStates.isEmpty()) {
             // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
             // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
-            Map<StrategyTicker, BigDecimal> placementPrices = reloadPlacementPrices(placeableStates);
+            Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(placeableStates);
             for (CycleState state : placeableStates) {
                 batchGuard.runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
                     BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
@@ -474,43 +465,6 @@ class TradingService {
             throw e;
         }
         log.info("{} 도달", label);
-    }
-
-    // 증권사 접수 직전 ticker별 현재가 일괄 재조회 — TradingPriceFetcher.fetchPrices가 ticker당 1회 배치 조회를 보장
-    // prevClose는 필요 없으므로(cap 판단은 현재가만 사용) fetchPriceSnapshots가 아닌 fetchPrices 사용
-    private Map<StrategyTicker, BigDecimal> reloadPlacementPrices(List<CycleState> states) {
-        List<StrategyTicker> tickers = states.stream()
-                .map(state -> state.ctx().strategy().ticker())
-                .distinct().toList();
-        Account priceAccount = selectPriceAccount(states.stream().map(CycleState::ctx).toList());
-        return priceFetcher.fetchPrices(tickers, priceAccount);
-    }
-
-    // 가격 조회에 사용할 계좌 선택 — Toss 계좌가 있으면 우선 사용 (토스 시세 API 일관성)
-    private Account selectPriceAccount(List<BatchContext> contexts) {
-        return contexts.stream()
-                .map(BatchContext::account)
-                .filter(a -> a.broker() == Broker.TOSS)
-                .findFirst()
-                .orElseGet(() -> contexts.getFirst().account());
-    }
-
-    // 배치 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 — executeBatch/placeOpenOrders 공통
-    // date: executeBatch는 today(당일), placeOpenOrders는 tradeDate(익일 US 거래일)
-    private PriceContext loadPriceContext(List<BatchContext> contexts, LocalDate date) {
-        List<StrategyTicker> cycleTickers = contexts.stream()
-                .map(c -> c.strategy().ticker())
-                .distinct().toList();
-        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
-        Map<StrategyTicker, PriceSnapshot> startPriceSnapshots = priceFetcher.fetchPriceSnapshots(cycleTickers, priceAccount);
-
-        // 기준 매매표 조회 (PRIVACY)
-        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
-        PrivacyTradeBase privacyBase = hasPrivacy
-                ? privacyTradePort.findTodayTrade(date).orElse(null)
-                : null;
-
-        return new PriceContext(cycleTickers, priceAccount, startPriceSnapshots, privacyBase);
     }
 
     // false 반환 시 알림 발송 후 executeBatch에서 조기 반환
