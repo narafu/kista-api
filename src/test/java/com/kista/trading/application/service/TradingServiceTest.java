@@ -176,7 +176,7 @@ class TradingServiceTest {
         lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class));
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, eventPublisher);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, eventPublisher, privacyTradePort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, eventPublisher, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
@@ -219,13 +219,17 @@ class TradingServiceTest {
         MarketEventNotifier marketEventNotifier = new MarketEventNotifier(userPort, userSettingsPort, eventPublisher);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
                 tradingRegistry, orderPort, cycleStrategies, new TradingParallelRunner(0));
+        TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
+        TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
+                orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
+                budgetAllocator, balanceLoader, eventPublisher, batchGuard);
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
-                orderPort, privacyTradePort, strategyCyclePort,
-                balanceLoader, orderComputer, orderPlanner,
+                orderPort, strategyCyclePort,
                 priceFetcher, orderExecutor, reporter,
-                marketEventNotifier, budgetAllocator, priceCapper, cycleStrategies,
-                new TradingParallelRunner(0)); // 순차 모드 — 기존 테스트 결정성 보존
+                marketEventNotifier,
+                new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
+                batchGuard, candidatePlanner);
     }
 
     @Test

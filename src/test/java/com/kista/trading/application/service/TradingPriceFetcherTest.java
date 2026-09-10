@@ -4,6 +4,7 @@ import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,12 +33,13 @@ class TradingPriceFetcherTest {
     @Mock BrokerAdapterRegistry registry;
     @Mock BrokerPricePort pricePort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock PrivacyTradePort privacyTradePort;
     TradingPriceFetcher priceFetcher;
     Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
     @BeforeEach
     void setUp() {
-        priceFetcher = new TradingPriceFetcher(registry, eventPublisher);
+        priceFetcher = new TradingPriceFetcher(registry, eventPublisher, privacyTradePort);
         doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 

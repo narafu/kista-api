@@ -54,11 +54,12 @@ class StrategySeedPreviewServiceTest {
                 new InfiniteCycleOrderStrategy(null, null),
                 new PrivacyCycleOrderStrategy(null)
         ));
-        // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지 12개는 미사용이라 null
+        // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지는 미사용이라 null
+        StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
+                accountPort, null, null, null, cycleStrategies, privacyTradePort, registry);
         service = new StrategyService(
                 null, null, null, null, null, null, null,
-                accountPort, null, registry, null, null, null,
-                null, cycleStrategies, privacyTradePort);
+                accountPort, null, historyQueryService);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
         account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);

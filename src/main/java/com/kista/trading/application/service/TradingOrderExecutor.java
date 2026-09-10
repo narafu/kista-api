@@ -42,16 +42,7 @@ class TradingOrderExecutor {
     // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)
     List<Order> placeAtOpenOrders(LocalDate tradeDate, Account account, UUID strategyCycleId,
                                   BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
-        if (currentPrice != null) {
-            CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
-            if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
-                buyOrderPriceCapper.capIfNeededAtOpen(tradeDate, account, strategyCycleId, currentPrice, position);
-            } else if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
-                buyOrderPriceCapper.capPrivacyIfNeededAtOpen(tradeDate, account, strategyCycleId, currentPrice);
-            } else if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION && vrPosition != null) {
-                buyOrderPriceCapper.capVrIfNeededAtOpen(tradeDate, account, strategyCycleId, currentPrice, vrPosition, strategy.ticker());
-            }
-        }
+        applyCap(true, tradeDate, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(strategyCycleId, tradeDate);
         if (atOpenOrders.isEmpty()) {
             log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
@@ -67,20 +58,37 @@ class TradingOrderExecutor {
     // VR_POSITION이어도 vrPosition이 null(재계산 skip 케이스)이면 캡 미적용 — 동일 원칙
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
-        if (currentPrice != null) {
-            CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
-            if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
-                buyOrderPriceCapper.capIfNeeded(today, account, strategyCycleId, currentPrice, position);
-            } else if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
-                buyOrderPriceCapper.capPrivacyIfNeeded(today, account, strategyCycleId, currentPrice);
-            } else if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION && vrPosition != null) {
-                buyOrderPriceCapper.capVrIfNeeded(today, account, strategyCycleId, currentPrice, vrPosition, strategy.ticker());
-            }
-        }
+        applyCap(false, today, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
         List<Order> placed = placeEach(planned, account);
         log.info("[{}] 주문 {}건 접수 (성공/{} 시도)", account.nickname(), placed.size(), planned.size());
         return placed;
+    }
+
+    // AT_OPEN/AT_CLOSE 공용 BUY 가격 캡 디스패치 — atOpen에 따라 BuyOrderPriceCapper의 AtOpen 오버로드만 갈아탄다
+    private void applyCap(boolean atOpen, LocalDate date, Account account, UUID strategyCycleId,
+                          BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+        if (currentPrice == null) return;
+        CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
+        if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position != null) {
+            if (atOpen) {
+                buyOrderPriceCapper.capIfNeededAtOpen(date, account, strategyCycleId, currentPrice, position);
+            } else {
+                buyOrderPriceCapper.capIfNeeded(date, account, strategyCycleId, currentPrice, position);
+            }
+        } else if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
+            if (atOpen) {
+                buyOrderPriceCapper.capPrivacyIfNeededAtOpen(date, account, strategyCycleId, currentPrice);
+            } else {
+                buyOrderPriceCapper.capPrivacyIfNeeded(date, account, strategyCycleId, currentPrice);
+            }
+        } else if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION && vrPosition != null) {
+            if (atOpen) {
+                buyOrderPriceCapper.capVrIfNeededAtOpen(date, account, strategyCycleId, currentPrice, vrPosition, strategy.ticker());
+            } else {
+                buyOrderPriceCapper.capVrIfNeeded(date, account, strategyCycleId, currentPrice, vrPosition, strategy.ticker());
+            }
+        }
     }
 
     // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)

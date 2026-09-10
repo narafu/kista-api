@@ -102,7 +102,7 @@ class StrategyServiceTest {
 
     @BeforeEach
     void setUp() {
-        strategyService = new StrategyService(
+        StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
                 strategyVersionPort,
                 strategyInfiniteDetailPort,
@@ -116,12 +116,24 @@ class StrategyServiceTest {
                 userSettingsPort,
                 strategyCreationPolicyPort,
                 new StrategyCreationResolvers(List.of(
-                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())),
-                orderPort,
+                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())));
+        StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
+                accountPort, strategyPort, cyclePositionPort, orderPort,
                 new com.kista.matching.domain.strategy.CycleOrderStrategies(List.of(
                         new com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
                         new com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy(null))),
-                privacyTradePort);
+                privacyTradePort, registry);
+        strategyService = new StrategyService(
+                strategyPort,
+                strategyVersionPort,
+                strategyInfiniteDetailPort,
+                vrStrategyLifecycle,
+                strategyCyclePort,
+                cyclePositionPort,
+                cyclePositionInfiniteDetailPort,
+                accountPort,
+                creationService,
+                historyQueryService);
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));
         }

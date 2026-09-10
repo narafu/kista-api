@@ -115,7 +115,7 @@ class ManualTradingServiceTest {
         // LiveBalancePort: 필드 mock 직접 연결
         doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(LiveBalancePort.class));
 
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry, eventPublisher);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry, eventPublisher, privacyTradePort);
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 userPort, privacyTradePort, priceFetcher, balanceLoader,
