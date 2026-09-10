@@ -1,4 +1,4 @@
-package com.kista.web.config;
+package com.kista.platform.metrics;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 // Micrometer core에 프로세스 RSS 바인더가 없어 /proc/self/status를 직접 파싱해 노출 (Fly.io 컨테이너 OOMKill 위험 감지용)
+// 다른 kista 모듈에 대한 의존이 없는 순수 인프라 관심사 — platform 소유
 @Configuration
 class MetricsConfig {
 

@@ -16,7 +16,7 @@ domain/          ← (레거시 최상위 com.kista.domain 패키지 자체가 �
 application/        ← (레거시 최상위 com.kista.application 패키지 자체가 소멸 — package-info까지 삭제됨. 아래는 이전 이력)
   usecase/       ← (비어 소멸 — 마지막 잔류였던 MarketUseCase가 com.kista.market.application.usecase로 이전됨. 각 모듈의 usecase는 해당 모듈 절 참고)
   port/output/   ← (소멸 — 마지막 잔류였던 RealtimeNotificationPort가 com.kista.notify.application.port.output으로 이전돼 notify "port" NamedInterface에 합류(SSE 레지스트리와 함께 이동). HeartbeatPort는 그 전에 com.kista.trading.application.port.output으로 이전됨. 각 모듈의 port는 해당 모듈 절 참고)
-  MetricsConfig  ← (소멸 — com.kista.web.config로 이전됨)
+  MetricsConfig  ← (소멸 — com.kista.web.config로 이전됨, 이후 2026-09-10 캐치올 정리로 com.kista.platform.metrics로 재이전)
   service/       ← (폐지됨 — 레거시 최상위 application/service 디렉토리 자체가 소멸, 전부 각 모듈로 이전 완료: broker는 com.kista.broker.application.service로, trading은 com.kista.trading.application.service로, market은 com.kista.market.application.service로, privacy는 com.kista.privacy.application.service로, stats/backtest/portfolio는 com.kista.stats.application.service로, admin/settings(RuntimeSettings 계열)는 com.kista.admin.application.service로, user/auth는 com.kista.user.application.service로, account는 com.kista.account.application.service로, strategy(Strategy 애그리게이트)는 com.kista.strategyconfig.application.service로 이전됨)
   event/         ← (폐지됨 — 사용자 승인/거부/재신청/신규가입/탈퇴 이벤트 5종은 com.kista.user.application.event로 이전, "event" NamedInterface로 공개. 사이클 종료/신규시작·매매리포트·주문취소실패 등 매매 관련 이벤트는 com.kista.trading.application.event로 이전됨) 전부 Spring Modulith Event Publication Registry로 추적됨(`event_publication` 테이블, 재기동 시 미완료 이벤트 자동 재시도) — 리스너 annotation은 기존 @TransactionalEventListener 그대로, User/Account를 담던 이벤트는 평문 비밀값이 DB에 저장되지 않도록 ID(userId/accountId)만 담고 리스너가 UserPort/AccountPort로 재조회한다
 

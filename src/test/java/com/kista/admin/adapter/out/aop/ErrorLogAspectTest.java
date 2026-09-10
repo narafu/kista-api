@@ -1,4 +1,4 @@
-package com.kista.web.aop;
+package com.kista.admin.adapter.out.aop;
 
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.aspectj.lang.ProceedingJoinPoint;

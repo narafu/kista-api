@@ -3,5 +3,7 @@
 // notify 직접 호출 0건이라 event NamedInterface 없음. 스케쥴러 수동 트리거 컨트롤러(옛 AdminSchedulerController)는
 // com.kista.web으로 이전됨(2-role 배포에서 kista-scheduler 전용이 되며 admin 소유일 이유가 없어짐) — admin은
 // adapter NamedInterface도 없음.
+// adapter/out/aop/ErrorLogAspect는 2026-09-10 com.kista.web에서 이관(옛 web 캐치올 정리) — 자체 포트
+// (AppErrorLogPort)만 소비하고 notify는 문자열 포인트컷이라 컴파일 의존 없음, internal 유지.
 @org.springframework.modulith.ApplicationModule
 package com.kista.admin;

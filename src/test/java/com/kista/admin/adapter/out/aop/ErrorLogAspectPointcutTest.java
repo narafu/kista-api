@@ -1,4 +1,4 @@
-package com.kista.web.aop;
+package com.kista.admin.adapter.out.aop;
 
 import com.kista.account.domain.model.Account;
 import com.kista.matching.domain.model.AccountBalance;

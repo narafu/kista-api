@@ -1,4 +1,4 @@
-package com.kista.web.aop;
+package com.kista.admin.adapter.out.aop;
 
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +9,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
 
 // NotifyPort.notifyError() 호출을 가로채 오류를 DB에 자동 저장한 뒤 원래 호출(텔레그램 발송)을 진행
+// 포인트컷은 문자열 표현식이라 notify 모듈에 컴파일 의존 없음 — admin 자체 포트(AppErrorLogPort)만 소비
 @Slf4j
 @Aspect
 @Component
