@@ -9,7 +9,9 @@ import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
 
 // NotifyPort.notifyError() 호출을 가로채 오류를 DB에 자동 저장한 뒤 원래 호출(텔레그램 발송)을 진행
-// 포인트컷은 문자열 표현식이라 notify 모듈에 컴파일 의존 없음 — admin 자체 포트(AppErrorLogPort)만 소비
+// 포인트컷은 문자열 표현식이라 컴파일 의존은 없지만, admin→notify 의존 자체는 실재함 — 정적 분석(ArchUnit/
+// ApplicationModules.verify())에 안 보이는 런타임 의존이다. notify 쪽에 admin으로의 엣지가 생기면
+// verify()가 못 잡는 순환이 생길 수 있음(현재는 양방향 참조 0건 확인됨, admin package-info 참고)
 @Slf4j
 @Aspect
 @Component
