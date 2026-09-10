@@ -49,11 +49,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         if (response == null) {
             throw new IllegalStateException("KB Land 주택 벤치마크 API 응답이 비어있음");
         }
-        // resultCode 검증을 먼저 수행 — 실패 시 body가 비어있는 게 정상이라 body 검증보다 우선한다.
-        if (response.dataHeader() == null || !"10000".equals(response.dataHeader().resultCode())) {
-            throw new IllegalStateException("KB Land 주택 벤치마크 API 오류: resultCode="
-                    + (response.dataHeader() == null ? null : response.dataHeader().resultCode()));
-        }
+        validateResultCode(response.dataHeader(), "KB Land 주택 벤치마크");
         if (response.dataBody() == null || response.dataBody().data() == null) {
             throw new IllegalStateException("KB Land 주택 벤치마크 API 응답이 비어있음");
         }
@@ -87,11 +83,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         if (response == null) {
             throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 응답이 비어있음");
         }
-        // resultCode 검증을 먼저 수행 — 실패 시 body가 비어있는 게 정상이라 body 검증보다 우선한다.
-        if (response.dataHeader() == null || !"10000".equals(response.dataHeader().resultCode())) {
-            throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 오류: resultCode="
-                    + (response.dataHeader() == null ? null : response.dataHeader().resultCode()));
-        }
+        validateResultCode(response.dataHeader(), "KB Land 주간 아파트 매매가격지수");
         if (response.dataBody() == null || response.dataBody().data() == null) {
             throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 응답이 비어있음");
         }
@@ -201,6 +193,14 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
                 && monthlyPrice.fourthQuintilePrice() != null
                 && monthlyPrice.fifthQuintilePrice() != null
                 && monthlyPrice.fifthQuintileRatio() != null;
+    }
+
+    // resultCode 검증 — 실패 시 body가 비어있는 게 정상이라 body 검증보다 우선 수행한다.
+    private void validateResultCode(KbLandHeader header, String apiLabel) {
+        if (header == null || !"10000".equals(header.resultCode())) {
+            throw new IllegalStateException(apiLabel + " API 오류: resultCode="
+                    + (header == null ? null : header.resultCode()));
+        }
     }
 
     // KB Land 공통 응답 래퍼
