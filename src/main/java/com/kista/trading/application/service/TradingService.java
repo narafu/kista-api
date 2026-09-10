@@ -6,6 +6,7 @@ import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.OrderTiming;
 import com.kista.matching.domain.model.PlannedOrder;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.*;

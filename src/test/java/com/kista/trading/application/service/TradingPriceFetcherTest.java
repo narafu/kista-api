@@ -58,11 +58,11 @@ class TradingPriceFetcherTest {
     @DisplayName("fetchPriceSnapshots: bulk·단건 fallback 모두 null이면 NPE 없이 결과에서 제외")
     void fetchPriceSnapshots_bothNull_excludedFromResultWithoutThrowing() {
         Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> bulkResult = new HashMap<>();
-        bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(TradingPriceFetcher.java:44-45 NPE 회귀 방지)
+        bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(null 값 제외 회귀 방지)
         when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), account.toBrokerRef())).thenReturn(bulkResult);
         when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(null);
 
-        Map<StrategyTicker, com.kista.matching.domain.model.PriceSnapshot> result =
+        Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> result =
                 priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account);
 
         assertThat(result).doesNotContainKey(StrategyTicker.SOXL);

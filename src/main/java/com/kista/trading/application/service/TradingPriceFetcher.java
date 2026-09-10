@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
-import com.kista.matching.domain.model.PriceSnapshot;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -37,16 +37,12 @@ class TradingPriceFetcher {
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
     Map<StrategyTicker, PriceSnapshot> fetchPriceSnapshots(List<StrategyTicker> tickers, Account account) {
-        Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> brokerSnapshots = fetchWithFallback(tickers, account, "스냅샷",
+        Map<StrategyTicker, PriceSnapshot> snapshots = fetchWithFallback(tickers, account, "스냅샷",
                 (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPriceSnapshots(t, acc.toBrokerRef()),
                 (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPriceSnapshot(t, acc.toBrokerRef()));
-        // broker 소유 PriceSnapshot(2필드 복제 타입) → trading 소유 PriceSnapshot 매핑 — 필드 구성 동일, 타입만 다름
-        // snap==null(일괄+단건 fallback 모두 실패)이면 그대로 배제 — 호출부(collectCycleCandidate 등)가 맵에 키 부재를 이미 null-tolerant하게 처리함
-        Map<StrategyTicker, PriceSnapshot> result = new HashMap<>();
-        brokerSnapshots.forEach((ticker, snap) -> {
-            if (snap != null) result.put(ticker, new PriceSnapshot(snap.current(), snap.prevClose()));
-        });
-        return result;
+        // snap==null(일괄+단건 fallback 모두 실패)인 종목은 제외 — 호출부(collectCycleCandidate 등)가 맵에 키 부재를 이미 null-tolerant하게 처리함
+        snapshots.entrySet().removeIf(entry -> entry.getValue() == null);
+        return snapshots;
     }
 
     // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회

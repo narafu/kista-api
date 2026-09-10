@@ -2,6 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerBalance;
+import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
