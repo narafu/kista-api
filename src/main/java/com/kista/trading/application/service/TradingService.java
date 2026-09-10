@@ -63,6 +63,7 @@ class TradingService {
     private final BuyOrderPriceCapper priceCapper;             // 신규 후보 BUY 가격 cap 계산 (영속화 없음)
     private final CycleOrderStrategies cycleOrderStrategies;   // 전략별 BUY 가격 cap 방식 조회
     private final TradingParallelRunner parallelRunner;        // 계좌별 동시 상한 내 사이클 병렬 실행
+    private final TradingBatchGuard batchGuard;                 // 전략별 단계 실행 격리 가드
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
     private record CycleState(
@@ -143,7 +144,7 @@ class TradingService {
         try {
             waitFor("주문 시각", dst.waitUntilOrderTime(), dst);
         } catch (InterruptedException e) {
-            notifyBatchInterrupted(states.stream().map(CycleState::ctx).toList());
+            batchGuard.notifyBatchInterrupted(states.stream().map(CycleState::ctx).toList());
             throw e;
         }
 
@@ -167,7 +168,7 @@ class TradingService {
                                       PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            runSafely("plan 후보 생성", ctx,
+            batchGuard.runSafely("plan 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, startPriceSnapshots, privacyBase, today,
                             EnumSet.of(OrderTiming.AT_CLOSE)))
                     .ifPresent(candidates::add);
@@ -193,7 +194,7 @@ class TradingService {
         List<TradingParallelRunner.Task<CyclePlacedState>> tasks = states.stream()
                 .map(state -> new TradingParallelRunner.Task<CyclePlacedState>(
                         state.ctx().account().id(),
-                        () -> runSafely("증권사 접수", state.ctx(), () -> {
+                        () -> batchGuard.runSafely("증권사 접수", state.ctx(), () -> {
                             // 재조회 실패(해당 ticker 누락 또는 null)일 때만 시작가로 폴백
                             BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
                                     .orElse(state.startPrice());
@@ -221,7 +222,7 @@ class TradingService {
         List<TradingParallelRunner.Task<Void>> tasks = placedStates.stream()
                 .map(ps -> new TradingParallelRunner.Task<Void>(
                         ps.state().ctx().account().id(),
-                        () -> runSafely("recordAndNotify", ps.state().ctx(), () -> {
+                        () -> batchGuard.runSafely("recordAndNotify", ps.state().ctx(), () -> {
                             reporter.recordAndNotify(today, ps.state().ctx(), ps.state().balance(),
                                     closingPrices.get(ps.state().ctx().strategy().ticker()),
                                     ps.mainOrders(), ps.state().privacyBase());
@@ -237,17 +238,6 @@ class TradingService {
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
         return balance;
-    }
-
-    // 인터럽트 시점에 아직 증권사 접수가 안 된 전략들에게 알림 (증권사 접수 완료된 전략은 대상 아님)
-    private void notifyBatchInterrupted(List<BatchContext> contexts) {
-        contexts.forEach(ctx -> {
-            try {
-                eventPublisher.publishEvent(new BatchInterruptedEvent(ctx.user().id(), ctx.account().id()));
-            } catch (Exception notifyEx) {
-                log.warn("[strategyId={}] 인터럽트 알림 발송 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
-            }
-        });
     }
 
     // creatableTimings 필터 후 TradingOrderSlots로 기존 주문과 동일 슬롯을 제외한다 (TradingPreviewService와 공유 기준)
@@ -364,7 +354,7 @@ class TradingService {
         try {
             waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
         } catch (InterruptedException e) {
-            notifyBatchInterrupted(contexts);
+            batchGuard.notifyBatchInterrupted(contexts);
             throw e;
         }
         marketEventNotifier.notifyMarketOpen();
@@ -374,7 +364,7 @@ class TradingService {
         // 재평가되지 않는 stale-cap 문제를 막기 위해, AT_CLOSE 계산·캡·예산배정·접수는 close 스케쥴러가 전담한다
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            runSafely("개장 order 후보 생성", ctx,
+            batchGuard.runSafely("개장 order 후보 생성", ctx,
                     () -> collectCycleCandidate(ctx, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(),
                             tradeDate, EnumSet.of(OrderTiming.AT_OPEN)))
                     .ifPresent(candidates::add);
@@ -394,7 +384,7 @@ class TradingService {
             // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
             Map<StrategyTicker, BigDecimal> placementPrices = reloadPlacementPrices(placeableStates);
             for (CycleState state : placeableStates) {
-                runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
+                batchGuard.runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
                     BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
                             .orElse(state.startPrice());
                     placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
@@ -430,7 +420,7 @@ class TradingService {
         for (List<TradingOrderBudgetAllocator.Candidate> accountCandidates : candidatesByAccount.values()) {
             BatchContext firstContext = accountCandidates.getFirst().ctx();
             UUID accountId = firstContext.account().id();
-            Optional<TradingOrderBudgetAllocator.Allocation> allocation = runSafely("계좌 주문 예산 배정", firstContext,
+            Optional<TradingOrderBudgetAllocator.Allocation> allocation = batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
                     () -> budgetAllocator.allocate(accountCandidates, tradeDate, liveQuotes.require(accountId)));
             if (allocation.isPresent()) {
                 allocations.add(allocation.get());
@@ -439,7 +429,7 @@ class TradingService {
 
         for (TradingOrderBudgetAllocator.Allocation allocation : allocations) {
             for (TradingOrderBudgetAllocator.Candidate approved : allocation.approved()) {
-                Optional<BatchContext> saved = runSafely("계획 주문 저장", approved.ctx(), () -> {
+                Optional<BatchContext> saved = batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
                     orderPlanner.savePlannedOrders(
                             approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
                     return approved.ctx();
@@ -454,7 +444,7 @@ class TradingService {
                     .map(TradingOrderBudgetAllocator.Candidate::ctx)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             for (BatchContext ctx : rejectedContexts) {
-                runSafely("예수금 부족 알림", ctx, () -> {
+                batchGuard.runSafely("예수금 부족 알림", ctx, () -> {
                         eventPublisher.publishEvent(new InsufficientBalanceEvent(
                                 ctx.user().id(), ctx.account().id(), null, ctx.strategy().ticker(), ctx.strategy().type()));
                         return null;
@@ -544,34 +534,4 @@ class TradingService {
         }).toList();
     }
 
-    // 전략별 단계 실행 — 예외 발생 시 로그 + 관리자 + 사용자 알림 후 Optional.empty() 반환 (격리 실행)
-    @FunctionalInterface
-    private interface ThrowingSupplier<T> {
-        T get() throws Exception;
-    }
-
-    private <T> Optional<T> runSafely(String phase, BatchContext ctx, ThrowingSupplier<T> supplier) throws InterruptedException {
-        try {
-            return Optional.ofNullable(supplier.get());
-        } catch (InterruptedException e) {
-            throw e; // InterruptedException은 삼키지 않음
-        } catch (Exception e) {
-            log.error("[strategyId={}] {} 오류: {}", ctx.strategy().id(), phase, e.getMessage(), e);
-            notifyErrorSafely(ctx, e);
-            return Optional.empty();
-        }
-    }
-
-    private void notifyErrorSafely(BatchContext ctx, Exception e) {
-        try {
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-        } catch (Exception notifyEx) {
-            log.warn("[strategyId={}] 관리자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
-        }
-        try {
-            eventPublisher.publishEvent(new TradingErrorEvent(ctx.user().id(), e.getMessage()));
-        } catch (Exception notifyEx) {
-            log.warn("[strategyId={}] 사용자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
-        }
-    }
 }

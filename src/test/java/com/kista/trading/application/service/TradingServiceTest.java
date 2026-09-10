@@ -219,13 +219,15 @@ class TradingServiceTest {
         MarketEventNotifier marketEventNotifier = new MarketEventNotifier(userPort, userSettingsPort, eventPublisher);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
                 tradingRegistry, orderPort, cycleStrategies, new TradingParallelRunner(0));
+        TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
                 orderPort, privacyTradePort, strategyCyclePort,
                 balanceLoader, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
                 marketEventNotifier, budgetAllocator, priceCapper, cycleStrategies,
-                new TradingParallelRunner(0)); // 순차 모드 — 기존 테스트 결정성 보존
+                new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
+                batchGuard);
     }
 
     @Test
