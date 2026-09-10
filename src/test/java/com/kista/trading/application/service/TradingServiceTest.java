@@ -220,14 +220,16 @@ class TradingServiceTest {
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
                 tradingRegistry, orderPort, cycleStrategies, new TradingParallelRunner(0));
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
+        TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
+                orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
+                budgetAllocator, balanceLoader, eventPublisher, batchGuard);
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
                 orderPort, strategyCyclePort,
-                balanceLoader, orderComputer, orderPlanner,
                 priceFetcher, orderExecutor, reporter,
-                marketEventNotifier, budgetAllocator, priceCapper, cycleStrategies,
+                marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
-                batchGuard);
+                batchGuard, candidatePlanner);
     }
 
     @Test

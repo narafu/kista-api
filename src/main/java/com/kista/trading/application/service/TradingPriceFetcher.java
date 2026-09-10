@@ -61,11 +61,11 @@ class TradingPriceFetcher {
 
     // 증권사 접수 직전 ticker별 현재가 일괄 재조회 — fetchPrices가 ticker당 1회 배치 조회를 보장
     // prevClose는 필요 없으므로(cap 판단은 현재가만 사용) fetchPriceSnapshots가 아닌 fetchPrices 사용
-    Map<StrategyTicker, BigDecimal> reloadPlacementPrices(List<TradingService.CycleState> states) {
+    Map<StrategyTicker, BigDecimal> reloadPlacementPrices(List<TradingCandidatePlanner.CycleState> states) {
         List<StrategyTicker> tickers = states.stream()
                 .map(state -> state.ctx().strategy().ticker())
                 .distinct().toList();
-        Account priceAccount = selectPriceAccount(states.stream().map(TradingService.CycleState::ctx).toList());
+        Account priceAccount = selectPriceAccount(states.stream().map(TradingCandidatePlanner.CycleState::ctx).toList());
         return fetchPrices(tickers, priceAccount);
     }
 
