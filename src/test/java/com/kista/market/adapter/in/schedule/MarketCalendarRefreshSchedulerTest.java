@@ -10,7 +10,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Duration;
 import java.time.LocalDate;
 
-import static com.kista.common.TimeZones.KST;
+import static com.kista.sharedkernel.TimeZones.KST;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;

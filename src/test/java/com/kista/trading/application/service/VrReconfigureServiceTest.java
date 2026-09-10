@@ -121,7 +121,7 @@ class VrReconfigureServiceTest {
         lenient().when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(pricePort);
         lenient().when(pricePort.getPrice(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(currentPrice);
         lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
-        lenient().when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(currentCycle));
+        lenient().when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);
         lenient().when(strategyVrDetailPort.findByStrategyVersionId(strategyVersionId)).thenReturn(Optional.of(currentDetail));
         lenient().when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(currentCycleVr));
         lenient().when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.of(latestPosition));

@@ -1,8 +1,7 @@
 package com.kista.admin.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.common.CycleLookups;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.admin.domain.model.AdminReorderResult;
@@ -69,7 +68,7 @@ class AdminReorderService implements AdminReorderUseCase {
         User user = sel.user();
         Account account = sel.account();
         Strategy strategy = sel.strategy();
-        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         Order sourceOrder = orderPort.findById(command.orderId())
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + command.orderId()));
 

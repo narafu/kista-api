@@ -1,6 +1,6 @@
 package com.kista.admin.application.service;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;

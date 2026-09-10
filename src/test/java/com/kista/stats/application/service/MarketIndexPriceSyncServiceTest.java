@@ -64,7 +64,7 @@ class MarketIndexPriceSyncServiceTest {
 
     @Test
     void syncAndSave_alreadyUpToDate_doesNotCallFeed() {
-        LocalDate today = LocalDate.now(com.kista.common.TimeZones.KST);
+        LocalDate today = LocalDate.now(com.kista.sharedkernel.TimeZones.KST);
         when(indexPricePort.findMaxTradeDate(anyString())).thenReturn(Optional.of(today.plusDays(1)));
 
         service.syncAndSave();

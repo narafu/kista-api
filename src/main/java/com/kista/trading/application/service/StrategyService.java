@@ -2,8 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
-import com.kista.common.CycleLookups;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.*;
@@ -446,7 +445,7 @@ class StrategyService implements StrategyUseCase {
         if (newSeed.signum() <= 0) {
             throw new IllegalArgumentException("시드는 0보다 커야 합니다");
         }
-        StrategyCycle cycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategyId);
+        StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 

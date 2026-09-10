@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
 import com.kista.privacy.domain.model.PrivacyDates;

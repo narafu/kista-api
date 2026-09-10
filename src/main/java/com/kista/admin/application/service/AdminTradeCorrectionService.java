@@ -1,7 +1,6 @@
 package com.kista.admin.application.service;
 
 import com.kista.trading.application.event.CycleEndedEvent;
-import com.kista.common.CycleLookups;
 import com.kista.account.domain.model.Account;
 import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
@@ -57,7 +56,7 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
         User user = sel.user();
         Account account = sel.account();
         Strategy strategy = sel.strategy();
-        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
         if (currentCycle.endDate() != null) {

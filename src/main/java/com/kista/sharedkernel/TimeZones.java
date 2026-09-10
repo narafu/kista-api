@@ -1,4 +1,4 @@
-package com.kista.common;
+package com.kista.sharedkernel;
 
 import java.time.ZoneId;
 

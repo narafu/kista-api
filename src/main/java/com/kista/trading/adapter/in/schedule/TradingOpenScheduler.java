@@ -2,7 +2,7 @@ package com.kista.trading.adapter.in.schedule;
 
 import com.kista.platform.scheduling.SchedulerJobRunner;
 import com.kista.platform.scheduling.SchedulerLockService;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.Strategy;

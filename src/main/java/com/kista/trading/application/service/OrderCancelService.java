@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.common.CycleLookups;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
@@ -46,7 +45,7 @@ class OrderCancelService {
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
 
         // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리
-        var currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+        var currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
 
         // ManualTradingService와 동일 날짜 기준 사용 (KST 04:00 이후면 +1일 = 수동 실행 tradeDate)
         LocalDate tradeDate = DstInfo.nextTradeDate();

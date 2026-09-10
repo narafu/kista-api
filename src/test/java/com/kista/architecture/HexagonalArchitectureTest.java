@@ -45,16 +45,36 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("platform은 common 외 다른 com.kista 모듈에 의존하지 않는다 — 인프라 leaf 불변식")
+    @DisplayName("platform은 다른 com.kista 모듈에 의존하지 않는다 — 인프라 leaf 불변식")
     void platform_must_not_depend_on_other_modules() {
-        // platform은 persistence base·crypto·scheduler 골격 등 순수 인프라만 담는다는 전제로 OPEN 선언됨 —
+        // platform은 persistence base·crypto·스케쥴러 골격 등 순수 인프라만 담는다는 전제로 OPEN 선언됨 —
         // 이 패키지가 다른 애그리게이트 모듈을 참조하는 순간 인프라 leaf 전제가 깨진다 (sharedkernel과 동일 강제).
+        // com.kista.common 소멸(모듈 경계 재구성 #3)로 예외 절도 함께 제거 — 이제 sharedkernel과 완전히 동일한 outbound-zero.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista.platform..")
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
-                                .and(resideOutsideOfPackage("com.kista.platform.."))
-                                .and(resideOutsideOfPackage("com.kista.common..")));
+                                .and(resideOutsideOfPackage("com.kista.platform..")));
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("UsTradeDates는 4개 KIS/Toss/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
+    void usTradeDates_must_only_be_used_by_allowlisted_adapters() {
+        // constraints.md "시간 기준 정책" allowlist를 실제로 강제 — US 거래일 변환은 이 4개 어댑터 내부
+        // 전용, 도메인·서비스·orders persistence에서 사용 금지. 클래스 단위 allowlist(메서드 단위 아님) —
+        // TossPriceApi는 getClosingPrice 메서드만 실사용하지만 메서드 단위 강제는 ArchUnit 복잡도
+        // 대비 이득이 낮음. ClassFileImporter가 테스트 클래스도 import하므로(DoNotIncludeTests 미지정),
+        // 향후 어댑터 테스트가 기대값 계산에 UsTradeDates를 직접 쓰면 이 규칙이 함께 걸린다 —
+        // 그때는 allowlist에 추가할지 검토할 것.
+        ArchRule rule = noClasses()
+                .that().resideOutsideOfPackage("com.kista.sharedkernel..")
+                .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisTradingApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisPriceApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.toss.TossPriceApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.market.adapter.out.persistence.calendar.MarketCalendarPersistenceAdapter")
+                .should().dependOnClassesThat()
+                .haveFullyQualifiedName("com.kista.sharedkernel.UsTradeDates");
         rule.check(classes);
     }
 
@@ -70,7 +90,7 @@ class HexagonalArchitectureTest {
                         "com.kista.finance..", "com.kista.notify..", "com.kista.broker..",
                         "com.kista.trading..", "com.kista.market..", "com.kista.stats..",
                         "com.kista.admin..", "com.kista.user..", "com.kista.account..",
-                        "com.kista.web..", "com.kista.platform..", "com.kista.common..");
+                        "com.kista.web..", "com.kista.platform..");
         rule.check(classes);
     }
 

@@ -131,7 +131,7 @@ class ManualTradingServiceTest {
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         // requireOwnedAccount는 default 메서드 — mock이 override하므로 직접 stub
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
-        lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(CYCLE));
+        lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(CYCLE);
         lenient().when(userPort.findByIdOrThrow(ACCOUNT.userId())).thenReturn(USER);
         lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
         lenient().when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(HISTORY));
@@ -275,7 +275,7 @@ class ManualTradingServiceTest {
                 1, new BigDecimal("25.00"), Order.OrderStatus.PLANNED, null, null, null);
 
         when(strategyPort.findByIdOrThrow(vrStrat.id())).thenReturn(vrStrat);
-        when(strategyCyclePort.findLatestByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrCycle));
+        when(strategyCyclePort.requireLatestByStrategyId(vrStrat.id())).thenReturn(vrCycle);
         // 1번째 호출: 이중 실행 방지 가드 → 빈 목록, 2번째 호출: 최종 반환 → 저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(vrCycle.id()), any()))
                 .thenReturn(List.of(), List.of(vrBuyPlanned, vrSellPlanned));

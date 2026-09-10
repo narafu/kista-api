@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.common.CycleLookups;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradingException;
@@ -63,7 +62,7 @@ class ManualTradingService {
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
 
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
-        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
 
         // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
         LocalDate today = DstInfo.nextTradeDate();

@@ -1,6 +1,6 @@
 package com.kista.market.application.service;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.market.domain.model.FearGreedSnapshot;
 import com.kista.market.application.usecase.GetFearGreedUseCase;
 import com.kista.market.application.port.output.FearGreedSnapshotPort;

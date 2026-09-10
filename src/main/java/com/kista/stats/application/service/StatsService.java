@@ -1,6 +1,6 @@
 package com.kista.stats.application.service;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.stats.domain.model.*;

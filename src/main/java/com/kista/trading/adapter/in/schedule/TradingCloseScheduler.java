@@ -2,7 +2,7 @@ package com.kista.trading.adapter.in.schedule;
 
 import com.kista.platform.scheduling.SchedulerJobRunner;
 import com.kista.platform.scheduling.SchedulerLockService;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.port.output.HeartbeatPort;
 import com.kista.trading.application.port.output.StrategyPort;

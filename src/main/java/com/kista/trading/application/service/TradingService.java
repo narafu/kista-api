@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.common.CycleLookups;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
@@ -97,7 +96,7 @@ class TradingService {
 
     void execute(Strategy strategy, Account account, User user) throws InterruptedException {
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
-        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)));
     }
 
@@ -336,7 +335,7 @@ class TradingService {
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
     void execute(Strategy strategy, Account account, User user, DstInfo dst) throws InterruptedException {
-        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategy.id());
+        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, user)), dst);
     }
 

@@ -1,6 +1,6 @@
 package com.kista.trading.domain.model;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 
 import java.time.*;
 

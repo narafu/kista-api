@@ -87,7 +87,7 @@ class AdminTradeCorrectionServiceTest {
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
         when(strategyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cycle));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
         when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
 
         AdminTradeCorrectionResult result = service.correctManualFills(ADMIN_ID, command);
@@ -126,7 +126,7 @@ class AdminTradeCorrectionServiceTest {
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cycle));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
         when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
 
         assertThatThrownBy(() -> service.correctManualFills(ADMIN_ID, command))

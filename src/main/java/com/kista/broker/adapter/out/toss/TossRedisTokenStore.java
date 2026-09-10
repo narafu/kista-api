@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
-import com.kista.common.Sha256;
+import com.kista.platform.crypto.Sha256;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.HashOperations;

@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.privacy.domain.model.*;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.StrategyTicker;

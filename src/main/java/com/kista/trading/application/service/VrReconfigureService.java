@@ -4,7 +4,6 @@ import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
-import com.kista.common.CycleLookups;
 import com.kista.account.domain.model.Account;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
@@ -64,7 +63,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         }
 
         // 현재 사이클·버전 상세·사이클 상세·최신 포지션 조회 (모두 조회 전용 — 검증을 외부 호출보다 먼저 끝내기 위해 앞으로 이동)
-        StrategyCycle currentCycle = CycleLookups.requireLatestCycle(strategyCyclePort, strategyId);
+        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         StrategyVrDetail currentDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                 .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세 없음: strategyId=" + strategyId));
         StrategyCycleVrDetail currentCycleVr = strategyCycleVrPort.findByCycleId(currentCycle.id())

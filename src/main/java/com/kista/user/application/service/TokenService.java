@@ -1,6 +1,6 @@
 package com.kista.user.application.service;
 
-import com.kista.common.Sha256;
+import com.kista.platform.crypto.Sha256;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.user.domain.auth.RefreshToken;
 import com.kista.user.domain.auth.TokenConstants;

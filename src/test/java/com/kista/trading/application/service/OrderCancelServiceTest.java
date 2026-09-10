@@ -100,7 +100,7 @@ class OrderCancelServiceTest {
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
         when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of(plannedOrder));
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
@@ -124,7 +124,7 @@ class OrderCancelServiceTest {
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
@@ -153,7 +153,7 @@ class OrderCancelServiceTest {
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of(order1, order2));
         // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
@@ -175,7 +175,7 @@ class OrderCancelServiceTest {
     void cancelByCycle_noPlacedOrders() {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
         when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
                 .thenReturn(List.of());
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))

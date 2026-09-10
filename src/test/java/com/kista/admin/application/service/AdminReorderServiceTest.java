@@ -198,7 +198,7 @@ class AdminReorderServiceTest {
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user());
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cycle()));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle());
         when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(plannedOrder()));
         when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
 
@@ -217,7 +217,7 @@ class AdminReorderServiceTest {
         when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user());
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cycle()));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle());
         when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(order));
         when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(true);
     }

@@ -8,7 +8,7 @@ import com.kista.trading.application.event.MarketClosedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.broker.domain.model.BrokerBalance;
@@ -244,7 +244,7 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, startPrice, Order.OrderStatus.PLACED, "ORD-001", null, null);
 
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
         // 접수 직전 재조회 — 시작가와 동일값으로 스텁해 기존 캡 판단 결과를 그대로 유지
@@ -316,7 +316,7 @@ class TradingServiceTest {
     @Test
     void execute_marketClosed_notifiesAndSkipsTrading() throws InterruptedException {
         // 휴장 확인이 executeBatch() 최상단으로 이동 → 가격 조회 전 조기 반환
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
 
         service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
@@ -350,7 +350,7 @@ class TradingServiceTest {
         Execution buyExecution = new Execution(LocalDate.now(), StrategyTicker.SOXL,
                 OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
 
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00")))); // 시작가+전일종가
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF)))
@@ -1565,7 +1565,7 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, plannedBuyPrice, Order.OrderStatus.PLACED, "ORD-REFRESH", null, null);
 
-        when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))

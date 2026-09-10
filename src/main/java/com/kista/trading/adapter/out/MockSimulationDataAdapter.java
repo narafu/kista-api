@@ -5,7 +5,6 @@ import com.kista.broker.domain.model.PlacedOrderView;
 import com.kista.broker.domain.model.PositionView;
 import com.kista.broker.domain.model.StrategyRefLite;
 import com.kista.broker.application.port.output.MockSimulationDataPort;
-import com.kista.common.CycleLookups;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.application.port.output.CyclePositionPort;
@@ -40,7 +39,7 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
 
     @Override
     public UUID findActiveCycleId(UUID strategyId) {
-        return CycleLookups.requireLatestCycle(strategyCyclePort, strategyId).id();
+        return strategyCyclePort.requireLatestByStrategyId(strategyId).id();
     }
 
     @Override

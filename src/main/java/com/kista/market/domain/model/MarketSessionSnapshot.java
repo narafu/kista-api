@@ -1,6 +1,6 @@
 package com.kista.market.domain.model;
 
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;

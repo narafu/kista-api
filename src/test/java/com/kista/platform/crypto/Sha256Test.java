@@ -1,4 +1,4 @@
-package com.kista.common;
+package com.kista.platform.crypto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

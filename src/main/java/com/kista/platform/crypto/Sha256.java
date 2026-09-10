@@ -1,4 +1,4 @@
-package com.kista.common;
+package com.kista.platform.crypto;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

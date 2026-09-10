@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.common.UsTradeDates;
+import com.kista.sharedkernel.UsTradeDates;
 import com.kista.broker.domain.model.*;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.sharedkernel.StrategyTicker;

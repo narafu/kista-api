@@ -2,7 +2,7 @@ package com.kista.market.adapter.in.schedule;
 
 import com.kista.platform.scheduling.SchedulerJobRunner;
 import com.kista.platform.scheduling.SchedulerLockService;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.market.application.port.output.MarketCalendarRefreshPort;
 import com.kista.market.application.port.output.MarketHolidayStorePort;
 import lombok.RequiredArgsConstructor;

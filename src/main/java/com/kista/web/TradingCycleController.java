@@ -1,7 +1,7 @@
 package com.kista.web;
 
 import com.kista.web.dto.*;
-import com.kista.common.TimeZones;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
