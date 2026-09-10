@@ -440,20 +440,9 @@ class StatsService implements UserStatsUseCase {
 
     private static void validateComparisonRequest(
             BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
-        if (scope == null) {
-            throw new IllegalArgumentException("scope은 필수입니다");
-        }
-        if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
-            throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
-        }
-        if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
-            throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
-        }
+        validateScopeAndRange(scope, strategyId, from, to);
         if (regionCode == null || regionCode.isBlank()) {
             throw new IllegalArgumentException("regionCode는 비어있을 수 없습니다");
-        }
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
         }
     }
 

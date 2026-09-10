@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -29,21 +30,20 @@ class FearGreedService implements FetchFearGreedUseCase {
     @Override
     public void fetchAndSave(Instant snapshotDate) {
         // CRYPTO와 CNN을 독립 처리 — 한쪽 실패가 다른쪽 저장을 롤백하지 않도록
-        try {
-            CryptoFearGreedPort.CryptoFearGreedData crypto = cryptoFearGreedPort.fetch();
-            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CRYPTO, snapshotDate, crypto.value(), crypto.rating()));
-            log.info("CRYPTO 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})", snapshotDate, crypto.value(), crypto.rating());
-        } catch (Exception e) {
-            log.error("CRYPTO 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
-            eventPublisher.publishEvent(new FearGreedFetchFailedEvent(e.getMessage()));
-        }
+        fetchAndSaveSource(SOURCE_CRYPTO, snapshotDate,
+                () -> { var d = cryptoFearGreedPort.fetch(); return FearGreedSnapshot.of(SOURCE_CRYPTO, snapshotDate, d.value(), d.rating()); });
+        fetchAndSaveSource(SOURCE_CNN, snapshotDate,
+                () -> { var d = cnnFearGreedPort.fetch(); return FearGreedSnapshot.of(SOURCE_CNN, snapshotDate, d.value(), d.rating()); });
+    }
 
+    private void fetchAndSaveSource(String source, Instant snapshotDate, Supplier<FearGreedSnapshot> fetcher) {
         try {
-            CnnFearGreedPort.CnnFearGreedData cnn = cnnFearGreedPort.fetch();
-            fearGreedSnapshotPort.save(FearGreedSnapshot.of(SOURCE_CNN, snapshotDate, cnn.value(), cnn.rating()));
-            log.info("CNN 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})", snapshotDate, cnn.value(), cnn.rating());
+            FearGreedSnapshot snapshot = fetcher.get();
+            fearGreedSnapshotPort.save(snapshot);
+            log.info("{} 공포탐욕지수 저장 (snapshotDate={}, value={}, rating={})",
+                    source, snapshotDate, snapshot.value(), snapshot.rating());
         } catch (Exception e) {
-            log.error("CNN 공포탐욕지수 수집 실패: {}", e.getMessage(), e);
+            log.error("{} 공포탐욕지수 수집 실패: {}", source, e.getMessage(), e);
             eventPublisher.publishEvent(new FearGreedFetchFailedEvent(e.getMessage()));
         }
     }
