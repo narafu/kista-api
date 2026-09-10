@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -99,24 +98,9 @@ class FinanceGroupService implements FinanceGroupUseCase {
         if (!isSelf && !isOwner) {
             throw new SecurityException("본인 또는 그룹 소유자만 멤버를 제거할 수 있습니다");
         }
-        financeGroupPort.softDeleteMembership(groupId, targetUserId);
-
-        List<FinanceGroupMember> remaining = financeGroupPort.findActiveMembers(groupId).stream()
-                .filter(m -> !m.userId().equals(targetUserId))
-                .toList();
-        if (remaining.isEmpty()) {
-            // 마지막 멤버가 나가면 그룹은 아무도 초대할 수 없는 고아 상태가 된다 — 회원 탈퇴 시
-            // UserCascadeDeleter가 적용하는 것과 같은 규칙(활성 멤버 0명 → 그룹도 소프트 삭제)을 여기서도 맞춘다.
-            financeGroupPort.softDelete(groupId);
-        } else if (isOwner && remaining.stream().noneMatch(m -> m.role() == FinanceGroup.MemberRole.OWNER)) {
-            // OWNER가 나갔는데 남은 멤버 중 OWNER가 없으면 아무도 다시 초대할 수 없는 그룹이 된다 —
-            // 가장 먼저 합류한 남은 멤버를 새 OWNER로 승격한다.
-            FinanceGroupMember successor = remaining.stream()
-                    .min(Comparator.comparing(FinanceGroupMember::joinedAt))
-                    .orElseThrow();
-            financeGroupPort.updateMemberRole(groupId, successor.userId(), FinanceGroup.MemberRole.OWNER);
-            log.info("그룹 OWNER 승격: groupId={}, newOwner={}", groupId, successor.userId());
-        }
+        // 마지막 멤버가 나가면 그룹은 아무도 초대할 수 없는 고아 상태가 된다 — 회원 탈퇴 시
+        // UserCascadeListener가 적용하는 것과 같은 규칙(활성 멤버 0명 → 그룹도 소프트 삭제, OWNER 승계)을 재사용한다.
+        GroupMembershipSupport.removeMemberAndHandleSuccession(financeGroupPort, groupId, targetUserId);
         log.info("그룹 이탈: groupId={}, targetUserId={}, actorUserId={}", groupId, targetUserId, userId);
     }
 }

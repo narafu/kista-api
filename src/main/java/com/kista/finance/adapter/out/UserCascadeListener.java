@@ -7,16 +7,13 @@ import com.kista.finance.application.port.output.FinanceBudgetPort;
 import com.kista.finance.application.port.output.FinanceCategoryPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
-import com.kista.finance.domain.model.FinanceGroup;
-import com.kista.finance.domain.model.FinanceGroupMember;
+import com.kista.finance.application.service.GroupMembershipSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.Comparator;
 
 // 사용자 탈퇴 cascade — finance 소유 재무 기록(userId 축) + 그룹 멤버십 정리를 독립적으로 처리.
 // UserCascadeDeleter가 직접 6개 포트를 호출하던 것을 이벤트 구독으로 전환(user↔finance 순환 해소).
@@ -50,21 +47,10 @@ public class UserCascadeListener {
         financeBudgetPort.deleteByUserId(userId);
 
         // 그룹 멤버십 정리 — 이 사용자가 속한 모든 그룹(개인 그룹 포함)에서 멤버십을 소프트 삭제하고,
-        // 그 결과 활성 멤버가 0명이 된 그룹은 그룹 자체도 소프트 삭제한다.
+        // 그 결과 활성 멤버가 0명이 된 그룹은 그룹 자체도 소프트 삭제, OWNER였으면 승계까지 처리한다
+        // (FinanceGroupService.leaveGroup과 동일 규칙 — GroupMembershipSupport로 공유).
         for (var group : financeGroupPort.findByMemberUserId(userId)) {
-            boolean wasOwner = financeGroupPort.findRole(group.id(), userId)
-                    .filter(role -> role == FinanceGroup.MemberRole.OWNER)
-                    .isPresent();
-            financeGroupPort.softDeleteMembership(group.id(), userId);
-            var remaining = financeGroupPort.findActiveMembers(group.id());
-            if (remaining.isEmpty()) {
-                financeGroupPort.softDelete(group.id());
-            } else if (wasOwner && remaining.stream().noneMatch(m -> m.role() == FinanceGroup.MemberRole.OWNER)) {
-                FinanceGroupMember successor = remaining.stream()
-                        .min(Comparator.comparing(FinanceGroupMember::joinedAt))
-                        .orElseThrow();
-                financeGroupPort.updateMemberRole(group.id(), successor.userId(), FinanceGroup.MemberRole.OWNER);
-            }
+            GroupMembershipSupport.removeMemberAndHandleSuccession(financeGroupPort, group.id(), userId);
         }
     }
 }
