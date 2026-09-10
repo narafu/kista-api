@@ -30,13 +30,15 @@
 - **(a) 순환 불가피**: 통합하면 모듈 순환이 생기고, 소유권 이동으로도 끊을 수 없다.
 - **(b) 외부 계약 분리**: 두 값 집합이 각기 다른 외부 계약(증권사 wire 포맷, DB 컬럼, 업스트림 피드, HTTP 응답 스키마)에 묶여 독립적으로 버전이 오를 수 있다.
 
+**(b) 주장 시 증거 의무**: "외부 계약에 묶여있다"는 서술만으로는 통과 못 한다 — 그 값이 실제로 wire 포맷 변환 코드(어댑터의 switch/if 매핑, 예: `KisOrderApi.resolveOrderDvsn` 류)에서 소비되는지 grep으로 확인하고 그 파일:라인을 근거로 남길 것. `OrderDirection`/`OrderType` 3중복제 사례(2026-09-09 재분류) — "KIS/Toss wire 포맷이 실려있다"고 서술만 하고 실측을 안 해서, 실제로는 enum 값 자체엔 계약이 없고 매핑은 어댑터 코드가 담당한다는 사실이 나중에야 드러나 뒤늦게 sharedkernel로 승격·복제본 삭제됐다. 새 own-type 복제·게이트 판정을 문서에 적을 때는 이 확인을 거치지 않은 "~로 보인다/추정된다" 식 단정을 넣지 말 것.
+
 **포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·admin 구현)/`StrategyCreationPolicyPort`(trading 정의·admin 구현)/`ActiveStrategyCountPort`(user 정의·trading 구현)/`MockSimulationDataPort`(broker 정의·trading 구현).
 
 **(b) 외부 계약 분리로 의도적 허용된 복제** (원장에 남는 것):
 - DTO 이중복제: `TossCandleResponse`(market/stats), `CycleHistoryPageResponse`/`CycleHistoryResponse`(stats/trading — 2026-09-10 web→trading 컨트롤러 이관으로 페어 이동) — 각기 다른 HTTP 엔드포인트의 JSON 응답 계약. 통합 시 한 모듈의 엔드포인트 필드 추가가 다른 모듈 응답 스키마에 전이됨
 
 **단일 소유 포트 시그니처 타입** (쌍둥이 없음 — own-type 게이트 대상 아님, 참고용 기록):
-- broker `BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(`com.kista.broker.domain.model`): broker↔trading 간 `LiveBalancePort`/`BrokerOrderCorrectionPort.place()/cancel()` 요청·응답 shape. 복제본 없음 — trading이 직접 소비. broker↔trading 순환은 이 타입들이 아니라 `BrokerAccountRef`(아래)로 끊는다
+- broker `BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(`com.kista.broker.domain.model`): broker↔trading 간 `LiveBalancePort`/`BrokerOrderCorrectionPort.place()/cancel()` 요청·응답 shape. 복제본 없음 — trading이 직접 소비. `OrderInstruction`/`OrderResult`는 `AdminReorderService`(재정렬 시 브로커 재주문)도 직접 소비 — admin↔broker CLOSED-CLOSED 참조, 순환은 미발생. admin이 관리자 지정 수량·가격으로 `BrokerOrderCorrectionPort.place()`를 직접 호출해 `TradingOrderBudgetAllocator`/`BuyOrderPriceCapper`를 거치지 않는다(관리자 수동 정정 도구라 의도적으로 보이나 별도 확인·합의된 바는 없음) — own-type 우회는 불필요. broker↔trading 순환은 이 타입들이 아니라 `BrokerAccountRef`(아래)로 끊는다
 - broker `PriceSnapshot`: `BrokerPricePort` 반환 타입. 과거 `matching.domain.model.PriceSnapshot` 쌍둥이가 있었으나(커널 계산 입력용이라 주장) 실측 결과 커널 코드는 `BigDecimal` 스칼라만 받고 이 타입은 trading 3개 서비스만 소비하는 오배치 고아였음 — 2026-09-10 matching 사본 삭제, `TradingPriceFetcher` 항등 매핑 제거, `prevCloseOrNull` 헬퍼는 broker판에 통합. 현재 broker 단독 소유
 
 **narrowing projection** (own-type이되 값 복제가 아니라 애그리게이트 축소 노출 — 별도 트랙):
