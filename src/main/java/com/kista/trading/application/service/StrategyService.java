@@ -1,19 +1,11 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.sharedkernel.TimeZones;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*; import com.kista.trading.domain.model.*;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.port.output.StrategyPort; import com.kista.trading.application.port.output.*;
-import com.kista.broker.application.port.output.BrokerPricePort;
-import com.kista.privacy.application.port.output.PrivacyTradePort;
-import com.kista.privacy.domain.model.PrivacyCurrentBase;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,11 +41,8 @@ class StrategyService implements StrategyUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final AccountPort accountPort;
-    private final BrokerAdapterRegistry registry;                   // 시드 미리보기 — MarginPort / LiveBalancePort 경유
-    private final OrderPort orderPort;                              // 전략별 주문 내역 조회
-    private final CycleOrderStrategies cycleStrategies;             // 시드 미리보기 — 전략 타입별 minRequiredDeposit
-    private final PrivacyTradePort privacyTradePort;               // 시드 미리보기 — PRIVACY 기준 매매표
     private final StrategyCreationService creationService;         // 신규 전략 등록 전용
+    private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -279,77 +268,26 @@ class StrategyService implements StrategyUseCase {
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────
 
-    // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
-    // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
             StrategyType type, StrategyTicker ticker, int divisionCount) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-
-        // 1단계: 전략 타입별 capability 로드
-        CycleOrderStrategy strategy = cycleStrategies.of(type);
-
-        // 2단계: PRIVACY 기준 매매표 조회 — 미리보기는 전일 DB trade_date를 잡지 않도록 스케쥴러 조회와 분리
-        PrivacyCurrentBase currentBase = strategy.requiresPrivacyBase()
-                ? privacyTradePort.findSeedPreviewBase().orElse(null)
-                : null;
-        if (strategy.requiresPrivacyBase() && currentBase == null) {
-            return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
-        }
-        // PrivacyCycleOrderStrategy.minRequiredDeposit()은 currentCycleStart만 사용 — avgPrice 접근 없음
-        PrivacyTradeBase privacyBase = currentBase != null
-                ? new PrivacyTradeBase(null, null, 0, currentBase.currentCycleStart(), List.of())
-                : null;
-
-        // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
-        BigDecimal price = strategy.requiresPrivacyBase()
-                ? null
-                : registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrevClose(ticker, account.toBrokerRef());
-        BigDecimal basePrice = strategy.requiresPrivacyBase()
-                ? privacyBase.currentCycleStart()
-                : price;
-        BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyBase, divisionCount);
-
-        return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null);
+        return historyQueryService.strategySeedPreview(accountId, requesterId, type, ticker, divisionCount);
     }
 
-    // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
     @Override
     @Transactional(readOnly = true)
     public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                           LocalDate from, LocalDate to,
                                           Instant cursor, int size) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        Instant fromInstant = resolveHistoryFrom(from);
-        Instant effectiveCursor = cursor != null ? cursor : resolveHistoryTo(to);
-        List<CyclePositionHistoryEntry> raw =
-                cyclePositionPort.findByStrategyIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
-        boolean hasMore = raw.size() > size;
-        List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
-        Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
-        return new CycleHistoryPage(items, nextCursor, hasMore);
+        return historyQueryService.getByStrategy(strategyId, requesterId, from, to, cursor, size);
     }
 
-    // 전략(사이클) 기준 기간 내 주문 내역 조회 — 사용자 전략 상세 화면용
     @Override
     @Transactional(readOnly = true)
     public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return orderPort.findByStrategyId(strategyId, from, to);
-    }
-
-    // 이력 조회 커서 경계 — KST 자정 (stats getByAccount와 동일 규칙, 모듈 경계라 헬퍼 중복 유지)
-    private Instant resolveHistoryFrom(LocalDate from) {
-        return from != null ? from.atStartOfDay(TimeZones.KST).toInstant() : Instant.EPOCH;
-    }
-
-    private Instant resolveHistoryTo(LocalDate to) {
-        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
-        return resolved.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // to 당일 포함
+        return historyQueryService.getOrdersByStrategy(strategyId, requesterId, from, to);
     }
 
 }
