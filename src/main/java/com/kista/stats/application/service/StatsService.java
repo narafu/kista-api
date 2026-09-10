@@ -346,38 +346,38 @@ class StatsService implements UserStatsUseCase {
 
     @Override
     public List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode) {
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
-        }
-        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
-        LocalDate effectiveFrom = from != null ? from : EARLIEST_BENCHMARK_DATE;
+        EffectiveRange range = EffectiveRange.of(from, to);
         // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
         String effectiveRegionCode = (regionCode != null && !regionCode.isBlank()) ? regionCode : SEOUL_REGION_CODE;
         return housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
-                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, effectiveRegionCode, effectiveFrom, effectiveTo);
+                HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE, effectiveRegionCode, range.from(), range.to());
     }
 
     @Override
     public List<HousingPriceIndex> getHousingPriceIndexSeries(LocalDate from, LocalDate to, String regionCode) {
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
-        }
-        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
-        LocalDate effectiveFrom = from != null ? from : EARLIEST_BENCHMARK_DATE;
+        EffectiveRange range = EffectiveRange.of(from, to);
         // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
         String effectiveRegionCode = (regionCode != null && !regionCode.isBlank()) ? regionCode : SEOUL_REGION_CODE;
         return housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
-                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, effectiveRegionCode, effectiveFrom, effectiveTo);
+                HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, effectiveRegionCode, range.from(), range.to());
     }
 
     @Override
     public List<IndexPrice> getEtfPriceSeries(LocalDate from, LocalDate to, EtfBenchmarkSymbol symbol) {
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+        EffectiveRange range = EffectiveRange.of(from, to);
+        return indexPricePort.findBySymbolAndRange(symbol.name(), range.from(), range.to());
+    }
+
+    // from/to 널가드+기본값 적용 — from>to면 예외, 미지정 시 [EARLIEST_BENCHMARK_DATE, 오늘 KST]로 채운다
+    private record EffectiveRange(LocalDate from, LocalDate to) {
+        static EffectiveRange of(LocalDate from, LocalDate to) {
+            if (from != null && to != null && from.isAfter(to)) {
+                throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+            }
+            return new EffectiveRange(
+                    from != null ? from : EARLIEST_BENCHMARK_DATE,
+                    to != null ? to : LocalDate.now(TimeZones.KST));
         }
-        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
-        LocalDate effectiveFrom = from != null ? from : EARLIEST_BENCHMARK_DATE;
-        return indexPricePort.findBySymbolAndRange(symbol.name(), effectiveFrom, effectiveTo);
     }
 
     @Override

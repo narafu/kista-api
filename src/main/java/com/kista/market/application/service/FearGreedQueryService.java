@@ -12,7 +12,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,11 +28,12 @@ class FearGreedQueryService implements GetFearGreedUseCase {
         List<FearGreedSnapshot> snapshots = fearGreedSnapshotPort.findBySourceSince(source, since);
 
         // KST 일자별 최신 1건만 남겨 일봉 기준으로 응답
-        Map<LocalDate, FearGreedSnapshot> latestByDate = new LinkedHashMap<>();
-        for (FearGreedSnapshot snapshot : snapshots) {
-            LocalDate kstDate = snapshot.snapshotDate().atZone(TimeZones.KST).toLocalDate();
-            latestByDate.put(kstDate, snapshot);
-        }
-        return List.copyOf(latestByDate.values());
+        return List.copyOf(snapshots.stream()
+                .collect(Collectors.toMap(
+                        s -> s.snapshotDate().atZone(TimeZones.KST).toLocalDate(),
+                        s -> s,
+                        (existing, latest) -> latest,
+                        LinkedHashMap::new))
+                .values());
     }
 }

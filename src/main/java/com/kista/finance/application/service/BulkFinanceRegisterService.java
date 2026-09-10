@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 // 항목별 독립 처리 — AssetSnapshotService/FinanceTransactionService의 create()가 이미 자체 트랜잭션 경계라
 // 여기서 전체를 하나의 @Transactional로 묶지 않는다. 한 항목 실패가 나머지 항목 등록을 막지 않기 위함.
@@ -41,27 +43,26 @@ class BulkFinanceRegisterService implements BulkFinanceRegisterUseCase {
         }
 
         List<String> failures = new ArrayList<>();
-        int assetSuccess = 0;
-        int txSuccess = 0;
-
-        for (AssetSnapshotCommand command : assets) {
-            try {
-                assetSnapshotUseCase.create(userId, shareToGroup, command);
-                assetSuccess++;
-            } catch (Exception e) {
-                failures.add("자산(" + command.memo() + "): " + e.getMessage());
-            }
-        }
-
-        for (FinanceTransactionCommand command : transactions) {
-            try {
-                financeTransactionUseCase.create(userId, shareToGroup, command);
-                txSuccess++;
-            } catch (Exception e) {
-                failures.add("거래(" + command.memo() + "): " + e.getMessage());
-            }
-        }
+        int assetSuccess = processAll(assets, c -> assetSnapshotUseCase.create(userId, shareToGroup, c),
+                AssetSnapshotCommand::memo, "자산", failures);
+        int txSuccess = processAll(transactions, c -> financeTransactionUseCase.create(userId, shareToGroup, c),
+                FinanceTransactionCommand::memo, "거래", failures);
 
         return new BulkFinanceRegisterResult(assetSuccess, txSuccess, failures);
+    }
+
+    // 항목별 독립 처리 — 하나 실패해도 나머지는 계속 진행하고 실패 사유만 수집
+    private <T> int processAll(List<T> items, Consumer<T> create, Function<T, String> labelOf,
+                                String kind, List<String> failures) {
+        int success = 0;
+        for (T item : items) {
+            try {
+                create.accept(item);
+                success++;
+            } catch (Exception e) {
+                failures.add(kind + "(" + labelOf.apply(item) + "): " + e.getMessage());
+            }
+        }
+        return success;
     }
 }

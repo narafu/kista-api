@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
@@ -67,38 +68,32 @@ public class MetaController {
     }
 
     private List<EnumMeta> getStrategyStatusList() {
-        return Arrays.stream(StrategyStatus.values())
-                .map(s -> new EnumMeta(s.name(), s.getLabel(), null))
-                .toList();
+        return toEnumMeta(StrategyStatus.values(), StrategyStatus::getLabel);
     }
 
     private List<EnumMeta> getCycleSeedTypeList() {
-        return Arrays.stream(StrategyCycleSeedType.values())
-                .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
-                .toList();
+        return toEnumMeta(StrategyCycleSeedType.values(), StrategyCycleSeedType::getLabel);
     }
 
     private List<EnumMeta> getAssetClassList() {
-        return Arrays.stream(AssetClass.values())
-                .map(c -> new EnumMeta(c.name(), c.getLabel(), null))
-                .toList();
+        return toEnumMeta(AssetClass.values(), AssetClass::getLabel);
     }
 
     private List<EnumMeta> getMarketList() {
-        return Arrays.stream(Market.values())
-                .map(m -> new EnumMeta(m.name(), m.getLabel(), null))
-                .toList();
+        return toEnumMeta(Market.values(), Market::getLabel);
     }
 
     private List<EnumMeta> getFinanceAccountTypeList() {
-        return Arrays.stream(FinanceAccount.Type.values())
-                .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
-                .toList();
+        return toEnumMeta(FinanceAccount.Type.values(), FinanceAccount.Type::getLabel);
     }
 
     private List<EnumMeta> getFinanceCategoryTypeList() {
-        return Arrays.stream(FinanceCategory.Type.values())
-                .map(t -> new EnumMeta(t.name(), t.getLabel(), null))
+        return toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel);
+    }
+
+    private static <E extends Enum<E>> List<EnumMeta> toEnumMeta(E[] values, Function<E, String> label) {
+        return Arrays.stream(values)
+                .map(v -> new EnumMeta(v.name(), label.apply(v), null))
                 .toList();
     }
 }

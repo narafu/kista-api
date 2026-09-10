@@ -22,6 +22,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class TelegramBotService {
 
+    private static final String NOT_LINKED_MSG = "텔레그램 Chat ID가 계정과 연결되지 않았습니다.";
+
     @Value("${telegram.chat-id:}")
     private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramApiClient apiClient;
@@ -38,7 +40,7 @@ class TelegramBotService {
         long chatId = update.message().chat().id();
         String text = update.message().text().trim();
 
-        if (!String.valueOf(chatId).equals(adminChatId)) {
+        if (isUnauthorized(chatId)) {
             log.warn("Unauthorized webhook from chatId={}", chatId);
             return;
         }
@@ -54,7 +56,7 @@ class TelegramBotService {
         apiClient.answerCallbackQuery(callbackQuery.id());
 
         long chatId = callbackQuery.message().chat().id();
-        if (!String.valueOf(chatId).equals(adminChatId)) {
+        if (isUnauthorized(chatId)) {
             log.warn("Unauthorized callback_query from chatId={}", chatId);
             return;
         }
@@ -131,7 +133,7 @@ class TelegramBotService {
                         return "포트폴리오 데이터가 없습니다.";
                     }
                 })
-                .orElse("텔레그램 Chat ID가 계정과 연결되지 않았습니다.");
+                .orElse(NOT_LINKED_MSG);
     }
 
     private String buildHistoryMessage(int days) {
@@ -147,7 +149,7 @@ class TelegramBotService {
                             h.tradeDate(), h.direction(), h.orderType(), h.quantity(), h.price())));
                     return sb.toString().trim();
                 })
-                .orElse("텔레그램 Chat ID가 계정과 연결되지 않았습니다.");
+                .orElse(NOT_LINKED_MSG);
     }
 
     private int parseHistoryDays(String text) {
@@ -156,5 +158,9 @@ class TelegramBotService {
             try { return Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
         }
         return 7;
+    }
+
+    private boolean isUnauthorized(long chatId) {
+        return !String.valueOf(chatId).equals(adminChatId);
     }
 }
