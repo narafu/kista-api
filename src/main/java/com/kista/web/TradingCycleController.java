@@ -2,7 +2,6 @@ package com.kista.web;
 
 import com.kista.web.dto.*;
 import com.kista.sharedkernel.TimeZones;
-import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
@@ -31,8 +30,7 @@ import com.kista.sharedkernel.StrategyTicker;
 @Slf4j
 public class TradingCycleController {
 
-    private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume
-    private final AccountStatisticsUseCase accountStatistics;   // 사이클 이력 조회
+    private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
     private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
 
@@ -169,7 +167,7 @@ public class TradingCycleController {
             @RequestParam StrategyTicker ticker,
             @RequestParam(defaultValue = "20") int divisionCount) {
         return StrategySeedPreviewResponse.from(
-                accountStatistics.strategySeedPreview(accountId, userId, type, ticker, divisionCount));
+                tradingCycle.strategySeedPreview(accountId, userId, type, ticker, divisionCount));
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
@@ -184,7 +182,7 @@ public class TradingCycleController {
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
-                accountStatistics.getByStrategy(
+                tradingCycle.getByStrategy(
                         strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
     }
 
@@ -199,6 +197,6 @@ public class TradingCycleController {
         LocalDate resolvedFrom = from != null ? from : LocalDate.now(TimeZones.KST).minusDays(30);
         LocalDate resolvedTo = to != null ? to : LocalDate.now(TimeZones.KST);
         return StrategyOrdersResponse.from(
-                accountStatistics.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
+                tradingCycle.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
     }
 }

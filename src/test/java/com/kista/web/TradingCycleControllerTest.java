@@ -8,7 +8,6 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyDetail;
 import com.kista.trading.domain.model.RegisterStrategyCommand;
 import com.kista.trading.domain.model.StrategySeedPreview;
-import com.kista.stats.application.usecase.AccountStatisticsUseCase;
 import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
@@ -57,7 +56,6 @@ class TradingCycleControllerTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean StrategyUseCase tradingCycle;
-    @MockitoBean AccountStatisticsUseCase accountStatistics;
     @MockitoBean TradingExecutionUseCase tradingExecution;
     @MockitoBean VrReconfigureUseCase vrReconfigure;
 
@@ -167,7 +165,7 @@ class TradingCycleControllerTest {
     @Test
     void strategyHistory_returns_page_with_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(accountStatistics.getByStrategy(eq(CYCLE_ID), any(), any(), any(), isNull(), eq(50)))
+        when(tradingCycle.getByStrategy(eq(CYCLE_ID), any(), any(), any(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -181,7 +179,7 @@ class TradingCycleControllerTest {
     @Test
     void strategyHistory_returns_page_without_date_params() throws Exception {
         var page = new CycleHistoryPage(List.of(), null, false);
-        when(accountStatistics.getByStrategy(eq(CYCLE_ID), any(), isNull(), isNull(), isNull(), eq(50)))
+        when(tradingCycle.getByStrategy(eq(CYCLE_ID), any(), isNull(), isNull(), isNull(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -249,7 +247,7 @@ class TradingCycleControllerTest {
     void strategyHistory_returns_nextCursor_when_hasMore() throws Exception {
         Instant cursor = Instant.parse("2024-06-01T00:00:00Z");
         var page = new CycleHistoryPage(List.of(), cursor, true);
-        when(accountStatistics.getByStrategy(eq(CYCLE_ID), any(), any(), any(), any(), eq(50)))
+        when(tradingCycle.getByStrategy(eq(CYCLE_ID), any(), any(), any(), any(), eq(50)))
                 .thenReturn(page);
 
         mockMvc.perform(get("/api/trading-cycles/{id}/history", CYCLE_ID)
@@ -285,7 +283,7 @@ class TradingCycleControllerTest {
     @Test
     void seedPreview_returns200_with_minSeed() throws Exception {
         var preview = new StrategySeedPreview("SOXL", new BigDecimal("30.00"), new BigDecimal("1320.00"), null);
-        when(accountStatistics.strategySeedPreview(eq(ACCOUNT_ID), any(),
+        when(tradingCycle.strategySeedPreview(eq(ACCOUNT_ID), any(),
                 eq(StrategyType.INFINITE), eq(StrategyTicker.SOXL), eq(20)))
                 .thenReturn(preview);
 

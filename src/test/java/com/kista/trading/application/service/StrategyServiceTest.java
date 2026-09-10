@@ -71,6 +71,8 @@ class StrategyServiceTest {
     @Mock BrokerPricePort brokerPricePort;                  // 중간부터 시작 — 등록 시점 시장가(전일종가) 조회
     @Mock UserSettingsPort userSettingsPort;
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort; // 신규 전략 생성 설정 조회
+    @Mock OrderPort orderPort;                                   // 전략별 주문 내역 조회
+    @Mock com.kista.privacy.application.port.output.PrivacyTradePort privacyTradePort; // 시드 미리보기 PRIVACY 기준표
 
     private StrategyService strategyService;
 
@@ -114,7 +116,12 @@ class StrategyServiceTest {
                 userSettingsPort,
                 strategyCreationPolicyPort,
                 new StrategyCreationResolvers(List.of(
-                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())));
+                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())),
+                orderPort,
+                new com.kista.matching.domain.strategy.CycleOrderStrategies(List.of(
+                        new com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
+                        new com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy(null))),
+                privacyTradePort);
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));
         }
