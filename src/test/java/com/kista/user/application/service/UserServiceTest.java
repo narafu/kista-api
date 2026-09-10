@@ -50,19 +50,15 @@ class UserServiceTest {
     @Mock BlacklistPort blacklistPort;
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock ApprovalPolicyPort approvalPolicyPort;
-    @Mock ObjectProvider<ApprovalPolicyPort> approvalPolicyPortProvider;
     @Mock ObjectProvider<UserUseCase> userUseCaseProvider;
     @Mock FinanceGroupPort financeGroupPort; // 가입 시 개인 그룹 부트스트랩
 
     UserService userService;
 
-    // 두 ObjectProvider<T> 필드가 제네릭 소거로 동일한 raw 타입이 되어 @InjectMocks의 타입 기반
-    // 자동 주입이 모호해진다(실제로 서로 바뀌어 주입되어 ClassCastException 발생) — 생성자 직접 호출로 명시 주입한다.
     @BeforeEach
     void setUpRuntimeSettings() {
         userService = new UserService(userPort, userCascadeDeleter, eventPublisher, bootstrapProps,
-                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPortProvider, userUseCaseProvider);
-        lenient().when(approvalPolicyPortProvider.getObject()).thenReturn(approvalPolicyPort);
+                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPort, userUseCaseProvider);
         lenient().when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(true);
         lenient().when(userUseCaseProvider.getObject()).thenReturn(userService);
     }

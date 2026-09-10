@@ -42,10 +42,7 @@ class UserService implements UserUseCase {
     private final KakaoOAuthPort kakaoOAuthPort;           // 카카오 OAuth 토큰 교환 + 사용자 정보 조회
     private final BlacklistPort blacklistPort;              // 거절 즉시 AT 차단
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
-    // ObjectProvider로 지연 조회 — admin RuntimeSettingsService가 ApprovalPolicyPort를 구현하면서
-    // 동시에 UserUseCase(본 클래스)에 의존해 순환 빈 참조가 발생하므로, 생성 시점 즉시 주입 대신
-    // 실제 호출 시점에 조회해 순환을 끊는다(userUseCaseProvider와 동일한 지연 조회 패턴).
-    private final ObjectProvider<ApprovalPolicyPort> approvalPolicyPortProvider;
+    private final ApprovalPolicyPort approvalPolicyPort; // 승인설정 조회 (admin RuntimeSettingsService가 구현, 포트 역전)
     private final ObjectProvider<UserUseCase> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
 
     @Override
@@ -104,7 +101,7 @@ class UserService implements UserUseCase {
             // 잠금 조회 필수 — 관리자의 승인설정 OFF 전환(RuntimeSettingsService.updateSettings)과 같은 행을
             // 잠가 직렬화해야, 전환 중 INSERT된 PENDING 사용자가 전환 시점의 일괄 활성화에서 누락되지 않는다
             // (RuntimeSettingsApprovalConcurrencyIT로 검증됨). 처리량보다 "PENDING 누락 없음" 보장이 우선.
-            boolean approvalRequired = approvalPolicyPortProvider.getObject().approvalRequiredForUpdate();
+            boolean approvalRequired = approvalPolicyPort.approvalRequiredForUpdate();
             UserStatus status = isAdminSeed || !approvalRequired
                     ? UserStatus.ACTIVE
                     : UserStatus.PENDING;
@@ -148,7 +145,7 @@ class UserService implements UserUseCase {
         User user = userPort.findByIdOrThrow(userId);
         Instant now = Instant.now();
         // register()와 동일한 이유로 잠금 조회 필수 — 관리자의 승인설정 전환과 직렬화한다.
-        boolean approvalRequired = approvalPolicyPortProvider.getObject().approvalRequiredForUpdate();
+        boolean approvalRequired = approvalPolicyPort.approvalRequiredForUpdate();
 
         // 상태별 쿨다운 검증
         switch (user.status()) {

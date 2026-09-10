@@ -3,18 +3,17 @@ package com.kista.admin.application.service;
 import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.user.domain.model.User;
+import com.kista.user.application.event.ApprovalRequirementDisabledEvent;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
-import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.account.application.port.output.BrokerEnabledPort;
 import com.kista.user.application.port.output.ApprovalPolicyPort;
-import com.kista.user.application.port.output.UserPort;
 import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.sharedkernel.StrategyCreationSettings;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,7 +21,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserStatus;
 import com.kista.sharedkernel.StrategyType;
 
 @Service
@@ -32,9 +30,8 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
         StrategyCreationPolicyPort {
 
     private final RuntimeSettingsPort settingsPort; // 런타임 설정 영속화 포트
-    private final UserPort userPort; // 승인 대기 사용자 조회 포트
-    private final UserUseCase userUseCase; // 기존 승인 이벤트를 보존하는 사용자 유스케이스
     private final AuditLogPort auditLogPort; // 관리자 설정 변경 감사 로그 포트
+    private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
 
     @Override
     @Transactional(readOnly = true)
@@ -76,11 +73,10 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
         // 검증 완료된 전체 설정을 단일 저장 호출로 반영한다.
         RuntimeSettings saved = settingsPort.save(effective);
 
-        // 승인 설정을 끄는 순간의 PENDING 사용자만 기존 승인 흐름으로 활성화한다.
+        // 승인 설정을 끄는 순간 PENDING 사용자 일괄 승인이 필요 — admin↔user 빈 순환을 피하려
+        // UserUseCase를 직접 호출하지 않고 커밋 후 이벤트로 위임한다(user 모듈이 구독해 처리).
         if (previous.approvalRequired() && !saved.approvalRequired()) {
-            userPort.findAllByStatus(UserStatus.PENDING).stream()
-                    .map(User::id)
-                    .forEach(userUseCase::approve);
+            eventPublisher.publishEvent(new ApprovalRequirementDisabledEvent());
         }
 
         auditLogPort.log(adminId, "RUNTIME_SETTINGS_UPDATE", "RUNTIME_SETTINGS", null, diff(previous, saved));

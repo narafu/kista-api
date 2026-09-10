@@ -3,18 +3,17 @@ package com.kista.admin.application.service;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
+import com.kista.user.application.event.ApprovalRequirementDisabledEvent;
 import com.kista.sharedkernel.Broker;
-import com.kista.user.domain.model.User;
-import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.RuntimeSettingsPort;
-import com.kista.user.application.port.output.UserPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,22 +23,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.StrategyDefaults;
 import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class RuntimeSettingsServiceTest {
 
     @Mock RuntimeSettingsPort settingsPort; // 설정 저장소 대역
-    @Mock UserPort userPort; // 승인 대기 사용자 조회 대역
-    @Mock UserUseCase userUseCase; // 기존 사용자 승인 흐름 대역
     @Mock AuditLogPort auditLogPort; // 감사 로그 대역
+    @Mock ApplicationEventPublisher eventPublisher; // 커밋 후 이벤트 발행 대역
 
     private RuntimeSettingsService service; // 테스트 대상
 
     @BeforeEach
     void setUp() {
-        service = new RuntimeSettingsService(settingsPort, userPort, userUseCase, auditLogPort);
+        service = new RuntimeSettingsService(settingsPort, auditLogPort, eventPublisher);
     }
 
     @Test
@@ -51,21 +47,17 @@ class RuntimeSettingsServiceTest {
     }
 
     @Test
-    void updateSettings_whenApprovalTurnsOff_savesOnceAndApprovesOnlyPendingUsers() {
+    void updateSettings_whenApprovalTurnsOff_savesOnceAndPublishesApprovalDisabledEvent() {
         UUID adminId = UUID.randomUUID();
-        User pending = user(UserStatus.PENDING);
         RuntimeSettings previous = RuntimeSettings.defaults();
         RuntimeSettings updated = new RuntimeSettings(false, previous.brokers(), previous.strategies());
         when(settingsPort.loadForUpdate()).thenReturn(previous);
         when(settingsPort.save(updated)).thenReturn(updated);
-        when(userPort.findAllByStatus(UserStatus.PENDING)).thenReturn(List.of(pending));
 
         assertThat(service.updateSettings(adminId, updated, true)).isEqualTo(updated);
 
         verify(settingsPort, times(1)).save(updated);
-        verify(userPort).findAllByStatus(UserStatus.PENDING);
-        verify(userUseCase).approve(pending.id());
-        verify(userPort, never()).findAllByStatus(UserStatus.REJECTED);
+        verify(eventPublisher).publishEvent(any(ApprovalRequirementDisabledEvent.class));
         verify(auditLogPort).log(eq(adminId), eq("RUNTIME_SETTINGS_UPDATE"), eq("RUNTIME_SETTINGS"),
                 isNull(), anyMap());
     }
@@ -135,12 +127,7 @@ class RuntimeSettingsServiceTest {
 
         service.updateSettings(adminId, disabled, true);
 
-        verifyNoInteractions(userPort, userUseCase);
-    }
-
-    private User user(UserStatus status) {
-        return new User(UUID.randomUUID(), "kakao", "nickname", null, status, UserRole.USER,
-                null, null, null, null, null, User.DEFAULT_CHANNEL);
+        verifyNoInteractions(eventPublisher);
     }
 
     private RuntimeSettings settingsWithApprovalRequired(boolean approvalRequired) {
