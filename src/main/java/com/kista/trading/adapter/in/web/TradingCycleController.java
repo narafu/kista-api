@@ -1,6 +1,6 @@
-package com.kista.web;
+package com.kista.trading.adapter.in.web;
 
-import com.kista.web.dto.*;
+import com.kista.trading.adapter.in.web.dto.*;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;

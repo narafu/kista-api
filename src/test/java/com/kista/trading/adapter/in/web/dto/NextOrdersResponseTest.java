@@ -1,4 +1,4 @@
-package com.kista.web.dto;
+package com.kista.trading.adapter.in.web.dto;
 
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;

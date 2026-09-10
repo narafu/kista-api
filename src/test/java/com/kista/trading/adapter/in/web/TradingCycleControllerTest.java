@@ -1,4 +1,4 @@
-package com.kista.web;
+package com.kista.trading.adapter.in.web;
 
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.trading.domain.model.CancelResult;

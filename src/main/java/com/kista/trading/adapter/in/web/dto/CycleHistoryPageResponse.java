@@ -1,4 +1,4 @@
-package com.kista.web.dto;
+package com.kista.trading.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.trading.domain.model.CycleHistoryPage;

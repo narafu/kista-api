@@ -1,4 +1,4 @@
-package com.kista.web.dto;
+package com.kista.trading.adapter.in.web.dto;
 
 import com.kista.trading.domain.model.StrategySeedPreview;
 import io.swagger.v3.oas.annotations.media.Schema;
