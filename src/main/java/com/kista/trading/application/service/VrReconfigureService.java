@@ -86,7 +86,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : currentDetail.poolLimitFloor();
 
         // 램프 파라미터 + 자본 주입 형태(주식 수·단가·예수금 부호) 검증 — 외부 브로커 호출(가격 조회·주문 취소) 이전에 전부 완료
-        validateRampParams(intervalWeeks, bandWidth, initialGradient, gGraceWeeks, gStepWeeks, gMax,
+        VrRampValidator.validateRampParams(intervalWeeks, bandWidth, initialGradient, gGraceWeeks, gStepWeeks, gMax,
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
 
         // 자본 주입/인출 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
@@ -97,9 +97,11 @@ class VrReconfigureService implements VrReconfigureUseCase {
                 () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrice(strategy.ticker(), account.toBrokerRef()));
         BigDecimal newValue = computeNewValue(cmd, currentCycleVr, currentPrice);
 
-        // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(StrategyService.validateVrCommand)과 동일 규칙,
+        // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(StrategyCreationService.validateVrCommand)과 동일 규칙,
         // 재설정으로 recurringAmount를 인출식으로 바꾸는 경우도 동일하게 검증되도록 재적용
-        validateWithdrawalSufficiency(recurringAmount, intervalWeeks, newValue.add(postBalance.usdDeposit()));
+        // 재설정은 override 개념이 없어 gate·required 양쪽에 같은 값을 넘긴다
+        BigDecimal totalAssets = newValue.add(postBalance.usdDeposit());
+        VrRampValidator.validateWithdrawalSufficiency(recurringAmount, intervalWeeks, totalAssets, totalAssets);
 
         // 램프 시계 — 전략 최초 사이클 startDate 기준 경과 주수 (재설정해도 리셋하지 않음)
         LocalDate firstStart = strategyCyclePort.findFirstByStrategyId(strategyId)
@@ -195,64 +197,4 @@ class VrReconfigureService implements VrReconfigureUseCase {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    // StrategyService.validateVrCommand의 램프 검증 규칙과 동일 정책 — 패키지가 달라(strategy↔trading) private 메서드 재사용 불가하므로 재구현
-    private void validateRampParams(int intervalWeeks, BigDecimal bandWidth,
-                                     int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
-                                     BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks, BigDecimal poolLimitFloor) {
-        if (intervalWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
-        }
-        if (bandWidth == null || bandWidth.signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 밴드 폭(bandWidth)은 0보다 커야 합니다");
-        }
-        if (initialGradient <= 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 gradient(initialGradient)는 0보다 커야 합니다");
-        }
-        if (gStepWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 gradient 스텝 주기(gStepWeeks)는 0 이상이어야 합니다");
-        }
-        if (gGraceWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 gradient 유예 주수(gGraceWeeks)는 0 이상이어야 합니다");
-        }
-        // gStepWeeks=0은 gradient 램프 비활성화 — 이때 gMax는 계산에 사용되지 않으므로 0을 허용
-        if (gStepWeeks > 0 && gMax < initialGradient) {
-            throw new IllegalArgumentException("VR 전략의 gradient 상한(gMax)은 initialGradient 이상이어야 합니다");
-        }
-        if (pStepWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 poolLimitRate 스텝 주기(pStepWeeks)는 0 이상이어야 합니다");
-        }
-        if (pGraceWeeks < 0) {
-            throw new IllegalArgumentException("VR 전략의 poolLimitRate 유예 주수(pGraceWeeks)는 0 이상이어야 합니다");
-        }
-        if (initialPoolLimitRate.compareTo(BigDecimal.ONE) > 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 poolLimitRate(initialPoolLimitRate)는 1 이하여야 합니다");
-        }
-        // poolLimitFloor 범위는 pStepWeeks와 무관하게 항상 검증 — DB CHECK(pool_limit_floor <= initial_pool_limit_rate)와
-        // 어긋나는 값이 여기서 걸러지지 않으면 INSERT 시 매핑되지 않은 DataIntegrityViolationException → 500으로 새는 것을 방지
-        if (poolLimitFloor == null || poolLimitFloor.signum() < 0 || poolLimitFloor.compareTo(initialPoolLimitRate) > 0) {
-            throw new IllegalArgumentException(
-                    "VR 전략의 poolLimitRate 하한(poolLimitFloor)은 0 이상 initialPoolLimitRate 이하여야 합니다");
-        }
-        // pStepWeeks=0은 poolLimitRate 램프 비활성화(항상 initialPoolLimitRate 유지) — 이때는 poolLimitFloor=0도 허용
-        if (pStepWeeks > 0 && poolLimitFloor.signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 poolLimitRate 램프는 poolLimitFloor가 0보다 커야 합니다");
-        }
-    }
-
-    // 인출식(recurringAmount<0) 최소자산 검증 — StrategyService.validateVrCommand와 동일 규칙(constraints.md "VR 공식").
-    // 재설정으로 recurringAmount를 새로 인출식으로 바꾸거나 인출액을 키우는 경우에도 등록 시점과 동일하게 재검증한다.
-    private void validateWithdrawalSufficiency(int recurringAmount, int intervalWeeks, BigDecimal totalAssets) {
-        if (recurringAmount <= 0 && totalAssets.signum() <= 0) {
-            throw new IllegalArgumentException("VR 거치식/인출식은 V값과 예수금 합이 0보다 커야 합니다");
-        }
-        if (recurringAmount < 0) {
-            BigDecimal required = BigDecimal.valueOf(Math.abs((long) recurringAmount))
-                    .multiply(BigDecimal.valueOf(100))
-                    .multiply(BigDecimal.valueOf(4))
-                    .divide(BigDecimal.valueOf(intervalWeeks), 2, RoundingMode.HALF_UP);
-            if (totalAssets.compareTo(required) < 0) {
-                throw new IllegalArgumentException("인출식 VR 전략의 자산은 " + required + " 이상이어야 합니다");
-            }
-        }
-    }
 }
