@@ -2,7 +2,7 @@ package com.kista.user.adapter.out.persistence.user;
 
 import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

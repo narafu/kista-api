@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.trading.application.event.MarketCloseEvent;
 import com.kista.trading.application.event.MarketOpenEvent;

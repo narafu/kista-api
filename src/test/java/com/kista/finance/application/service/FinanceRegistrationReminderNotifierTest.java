@@ -5,7 +5,7 @@ import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;

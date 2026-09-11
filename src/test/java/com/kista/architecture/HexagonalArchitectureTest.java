@@ -68,13 +68,13 @@ class HexagonalArchitectureTest {
         // 향후 어댑터 테스트가 기대값 계산에 UsTradeDates를 직접 쓰면 이 규칙이 함께 걸린다 —
         // 그때는 allowlist에 추가할지 검토할 것.
         ArchRule rule = noClasses()
-                .that().resideOutsideOfPackage("com.kista.sharedkernel..")
+                .that().doNotHaveFullyQualifiedName("com.kista.platform.time.UsTradeDates")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.toss.TossPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.market.adapter.out.persistence.calendar.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
-                .haveFullyQualifiedName("com.kista.sharedkernel.UsTradeDates");
+                .haveFullyQualifiedName("com.kista.platform.time.UsTradeDates");
         rule.check(classes);
     }
 

@@ -1,7 +1,7 @@
 package com.kista.user.application.service;
 
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.user.application.usecase.UserProfileUseCase;
 import com.kista.user.application.port.output.TelegramBotInfoPort;
 import com.kista.user.application.port.output.UserPort;

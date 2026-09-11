@@ -4,7 +4,7 @@ import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.MulticastMessage;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;

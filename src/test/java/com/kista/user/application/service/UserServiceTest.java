@@ -6,7 +6,7 @@ import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.finance.application.port.output.*;

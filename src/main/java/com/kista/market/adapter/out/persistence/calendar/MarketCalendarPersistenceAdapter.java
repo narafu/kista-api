@@ -1,6 +1,6 @@
 package com.kista.market.adapter.out.persistence.calendar;
 
-import com.kista.sharedkernel.UsTradeDates;
+import com.kista.platform.time.UsTradeDates;
 import com.kista.market.application.port.output.MarketCalendarPort;
 import com.kista.market.application.port.output.MarketHolidayStorePort;
 import lombok.RequiredArgsConstructor;

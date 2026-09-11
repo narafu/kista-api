@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.PrevCloseCache;
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.sharedkernel.TimeZones;
-import com.kista.sharedkernel.UsTradeDates;
+import com.kista.platform.time.UsTradeDates;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossCandle;

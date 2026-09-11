@@ -1,4 +1,5 @@
-// 전역 인프라 leaf — persistence base entity, 대칭키 암호화, 스케쥴러 공통 골격.
+// 전역 인프라 leaf — persistence base entity, 대칭키 암호화, 스케쥴러 공통 골격,
+// US 거래일 변환 유틸(time.UsTradeDates — 어댑터 allowlist로 사용처 강제, HexagonalArchitectureTest 참고).
 // Spring/JPA 바인딩이 있어 sharedkernel(순수 JDK)과 분리한다. Type.OPEN이되
 // HexagonalArchitectureTest.platform_must_not_depend_on_other_modules가 outbound-zero를 강제한다
 // — sharedkernel과 동일하게 "OPEN은 outbound-zero를 증명할 때만 안전" 원칙.

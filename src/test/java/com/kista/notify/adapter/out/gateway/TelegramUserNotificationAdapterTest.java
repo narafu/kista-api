@@ -5,7 +5,7 @@ import com.kista.user.application.port.output.UserPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

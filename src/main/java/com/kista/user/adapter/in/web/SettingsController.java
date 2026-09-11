@@ -7,7 +7,7 @@ import com.kista.user.adapter.in.web.dto.NotificationPrefRequest;
 import com.kista.user.adapter.in.web.dto.StrategySuggestionsRequest;
 import com.kista.user.adapter.in.web.dto.TelegramUpdateRequest;
 import com.kista.sharedkernel.NotificationType;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
 import com.kista.user.application.usecase.UpdateNotificationPrefUseCase;

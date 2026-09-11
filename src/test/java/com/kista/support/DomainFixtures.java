@@ -3,7 +3,7 @@ package com.kista.support;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.user.domain.model.NotificationChannel;
 
 import java.time.Instant;
 import java.util.UUID;
