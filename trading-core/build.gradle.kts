@@ -74,6 +74,10 @@ dependencies {
     testImplementation(libs.spring.security.test) // SecurityMockMvcRequestPostProcessors
 }
 
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    archiveFileName.set("trading-core.jar")
+}
+
 tasks.named<Test>("test") {
     workingDir = rootProject.projectDir
     useJUnitPlatform {

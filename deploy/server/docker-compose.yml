@@ -12,6 +12,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       SCHEDULER_ENABLED: "false"
       REDIS_URL: redis://redis:6379  # kista-infra가 소유하는 data_net의 redis alias — depends_on 미사용 (Spring Data Redis lazy connection)
+      INTERNAL_API_BASE_URL: http://kista-trading:8080  # admin→trading-core 내부 API(AdminTradingSchedulerController/TradingCommandHttpAdapter/AccountQueryHttpAdapter 등) — shared_net 내부 DNS
       JAVA_OPTS: ${JAVA_OPTS:--Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
       - "8080"
@@ -55,6 +56,48 @@ services:
       - data_net     # postgres/redis
     stop_grace_period: 200s   # 매매 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + rethrow → 락 해제 시도 시간 확보 목적(잠정값, 최초 배포 실측 후 조정 — spring.task.scheduling.shutdown.await-termination 미설정 상태라 보장은 아님. application-prod.yml의 spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 실제로 쓰이지 않을 가능성 있음 — 최초 배포 시 실측 확인)
     mem_limit: 2048m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]
+      interval: 30s
+      timeout: 10s
+      start_period: 180s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # trading-core role — 4a단계로 분리된 매매 실행 프로세스(trading-cycles/accounts/stats/backtest/
+  # dashboard/toss-statistics/statistics/order 8개 엔드포인트 + 매매 배치 스케쥴러 TradingOpen/CloseScheduler·
+  # MarketCalendarRefreshScheduler). kista-api/kista-scheduler처럼 2-role로 더 쪼개지 않는다 —
+  # TradingSchedulerInternalController(수동 트리거)가 scheduler.enabled 게이팅 없이 항상 노출돼
+  # HTTP-only role을 따로 두면 배치 실행 경로가 두 프로세스로 갈라져 scheduler_locks 경합이 상시화된다.
+  # 같은 이유로 apply_trading_guard=true(server-deploy.yml) — 배포 중 재기동이 sleep 중인 매매 스레드를 죽일 수 있음
+  kista-trading:
+    image: ${KISTA_API_IMAGE:?KISTA_API_IMAGE is required}
+    container_name: kista-trading
+    env_file:
+      - .env
+    environment:
+      APP_JAR: trading-core.jar
+      SPRING_PROFILES_ACTIVE: prod
+      SCHEDULER_ENABLED: "true"
+      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "false"  # EPR 재발행 소유자는 kista-scheduler 단독 유지 — 여기서 true면 재기동마다 매매 이벤트 중복 발행
+      REDIS_URL: redis://redis:6379
+      INTERNAL_API_BASE_URL: http://kista-api:8080
+      # 매매 배치(scheduler)+8개 컨트롤러 HTTP 트래픽 겸용 — kista-scheduler보다 약간 크게
+      JAVA_OPTS: "-Xmx2048m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize=80m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+    expose:
+      - "8080"
+    networks:
+      - shared_net   # Caddy 라우팅(trading-cycles/accounts/stats/backtest 등) + kista-api의 내부 API 호출 대상
+      - data_net
+    stop_grace_period: 200s   # 매매 배치 인터럽트 대응 — kista-scheduler와 동일 근거
+    mem_limit: 2816m         # kista-api(4096m)+kista-scheduler(2048m)+이 컨테이너=8960m, OCI 12GB 인스턴스 기준 여유 ~3GB뿐
+                              # (postgres/redis/prometheus/grafana는 kista-infra 소유) — kista-scheduler는 매매 배치가
+                              # 이 컨테이너로 이동해 부하가 가벼워졌으니 최초 배포 실측 후 kista-scheduler mem_limit 축소 검토
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/liveness"]

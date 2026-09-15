@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       service:
-        description: 'docker compose 서비스명 (kista-api | kista-scheduler)'
+        description: 'docker compose 서비스명 (kista-api | kista-scheduler | kista-trading)'
         required: true
         type: string
       apply_trading_guard:
@@ -90,14 +90,14 @@ jobs:
             set -e
             cd "${DEPLOY_PATH}"
 
-            # deploy-api / deploy-scheduler 잡이 동시에 같은 디렉토리에서 compose 파일 교체·pull·up 하므로 직렬화
+            # deploy-api / deploy-scheduler / deploy-trading 잡이 동시에 같은 디렉토리에서 compose 파일 교체·pull·up 하므로 직렬화
             exec 200>"${DEPLOY_PATH}/.deploy.lock"
             flock 200
 
             # 락 안에서만 스테이징 파일을 실제 경로로 원자적 교체
             mv "docker-compose.yml.${SERVICE}" docker-compose.yml
 
-            for key in DB_URL DB_USERNAME DB_PASSWORD JWT_SIGNING_KEY AES_ENCRYPTION_KEY KAKAO_CLIENT_ID CORS_ALLOWED_ORIGINS TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID API_DOMAIN; do
+            for key in DB_URL DB_USERNAME DB_PASSWORD JWT_SIGNING_KEY AES_ENCRYPTION_KEY INTERNAL_API_TOKEN KAKAO_CLIENT_ID CORS_ALLOWED_ORIGINS TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID API_DOMAIN; do
               grep -q "^${key}=" .env || { echo "::error::필수 환경변수 누락: ${key}"; exit 1; }
             done
 

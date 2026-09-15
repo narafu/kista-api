@@ -109,3 +109,14 @@ jobs:
       apply_trading_guard: true
       force: ${{ github.event.inputs.force || 'false' }}
     secrets: inherit
+
+  deploy-trading:
+    name: Deploy Trading
+    needs: build
+    uses: ./.github/workflows/_deploy-role.yml
+    with:
+      image: ${{ needs.build.outputs.image }}
+      service: kista-trading
+      apply_trading_guard: true
+      force: ${{ github.event.inputs.force || 'false' }}
+    secrets: inherit

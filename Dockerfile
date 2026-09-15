@@ -8,11 +8,16 @@ ENV JAVA_TOOL_OPTIONS="-Xmx768m"
 # Gradle Wrapper 및 의존성 레이어 캐싱 (소스 변경 없을 때 재사용)
 COPY gradle/ gradle/
 COPY gradlew settings.gradle.kts build.gradle.kts lombok.config ./
+COPY trading-core/build.gradle.kts trading-core/build.gradle.kts
+COPY shared/build.gradle.kts shared/build.gradle.kts
 RUN ./gradlew dependencies --no-daemon -q || true
 
-# 소스 복사 및 JAR 빌드
+# 소스 복사 및 JAR 빌드 — root(app.jar) + trading-core(trading-core.jar) 두 아티팩트 모두 생성
+# (kista-trading 컨테이너는 이 이미지에서 APP_JAR=trading-core.jar 로 같은 이미지를 재사용)
 COPY src/ src/
-RUN ./gradlew clean bootJar --no-daemon -x test
+COPY trading-core/src/ trading-core/src/
+COPY shared/src/ shared/src/
+RUN ./gradlew clean bootJar :trading-core:bootJar --no-daemon -x test
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine AS runtime
@@ -23,6 +28,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 COPY --from=builder /workspace/build/libs/app.jar app.jar
+COPY --from=builder /workspace/trading-core/build/libs/trading-core.jar trading-core.jar
 
 # JVM 옵션: 컨테이너 2GB 기준 메모리 분배
 # Heap 768m + Metaspace 256m + CodeCache 64m + OS/스택/네이티브 메모리 여유 확보
@@ -40,4 +46,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
   CMD wget -qO- http://localhost:8080/actuator/health || exit 1
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar ${APP_JAR:-app.jar}"]
