@@ -23,7 +23,7 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finan
 
 빌드·실행·테스트 명령어는 `docs/agents/commands.md`(자동 로드) 참고.
 
-필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`)
+필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`), `INTERNAL_API_BASE_URL` (admin→trading-core 내부 HTTP 호출 base URL, 기본값 `http://localhost:8080` — 이 기본값은 `application.yml`의 `server.port: 8080`과 우연히 일치하는 값이라 포트를 바꾸면 이 변수도 같이 갱신해야 함)
 
 로컬 환경: `src/main/resources/application-local.yml` (.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 설정 필수
 

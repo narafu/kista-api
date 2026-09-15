@@ -24,7 +24,7 @@
 **Files:**
 - Create: `src/main/java/com/kista/trading/domain/model/TradingUserProfile.java`
 - Create: `src/main/java/com/kista/trading/application/port/output/TradingUserProfilePort.java`
-- Create: `src/main/java/com/kista/user/application/service/TradingUserProfileAdapter.java` (package-private, `user` 모듈이 구현)
+- Create: `src/main/java/com/kista/web/trading/TradingUserProfileAdapter.java` (package-private) — **주의: 초안은 `com.kista.user.application.service`를 지목했으나 실측(`ApplicationModules.verify()`)으로 기각됨.** `trading`이 이미 `ActiveStrategyCountAdapter`로 `user→trading` 역전을 갖고 있어, `user`가 `TradingUserProfilePort`를 구현하면 양방향 순환이 되어 Spring Modulith가 무조건 거부한다(`Cycle detected: Slice trading -> Slice user -> Slice trading`, allowlist 없음). `com.kista.web`은 NamedInterface 0개의 순수 싱크 모듈로 이미 trading·user 양쪽에 의존하므로 유일하게 순환 없이 이 어댑터를 호스팅할 수 있다.
 - Modify: `src/main/java/com/kista/trading/domain/model/BatchContext.java` — `User user` → `TradingUserProfile userProfile`
 - Modify: `src/main/java/com/kista/trading/application/usecase/TradingExecutionUseCase.java`, `TradingExecutionFacade.java`, `TradingService.java` — `User` 파라미터 타입 교체
 - Modify: `src/main/java/com/kista/trading/application/service/MarketEventNotifier.java`, `ManualTradingService.java`, `CycleRotationService.java`, `StrategyCreationService.java`, `TradingReporter.java`, `VrReconfigureService.java` — `UserPort`/`UserSettingsPort`/`User`/`UserSettings` 참조를 `TradingUserProfilePort`/`TradingUserProfile`로 교체
@@ -32,7 +32,7 @@
 - Test: 각 수정 클래스의 기존 `*Test.java`(신규 테스트 파일 없음 — 기존 mock 타입을 `TradingUserProfile`로 교체)
 
 **Interfaces:**
-- Produces: `TradingUserProfile(UUID userId, String telegramBotToken, String telegramChatId, Map<NotificationType, NotificationChannel> notificationPrefs, boolean balanceCheckEnabled)` — record. `TradingUserProfilePort`: `Optional<TradingUserProfile> findByUserId(UUID)`, `Map<UUID, TradingUserProfile> findAllByUserIds(List<UUID>)`(배치 조회, `BatchContextFactory`의 N+1 방지 패턴 유지).
+- Produces (실제 반영값 — 초안 대비 정정): `TradingUserProfile(UUID userId, Map<NotificationType, Boolean> notificationPrefs, boolean balanceCheckEnabled)` — record(텔레그램 필드는 아무 소비자도 없어 최종 리뷰에서 제거됨, `notificationPrefs`는 `UserSettings.notificationPrefs()`와 동일 shape인 `Map<NotificationType, Boolean>`이 맞다 — `NotificationChannel`이 아니다). `TradingUserProfilePort`: `Optional<TradingUserProfile> findByUserId(UUID)`, `Map<UUID, TradingUserProfile> findAllByUserIds(List<UUID>)`(배치 조회, `BatchContextFactory`의 N+1 방지 패턴 유지) + `List<TradingUserProfile> findAllActive()`(구현 중 `MarketEventNotifier`가 필요로 해 추가됨).
 - Consumes: 없음(이 태스크가 경계의 출발점).
 
 이건 "실패하는 테스트 → 구현" TDD가 아니라 **타입 치환 리팩토링**이다 — 순서를 지켜라: 포트/타입 정의 → user 쪽 구현 → trading 쪽 소비자 전환 → 컴파일 에러 0.
@@ -59,6 +59,7 @@ public record TradingUserProfile(
 ) {
 }
 ```
+(초안 코드 — 최종 리뷰에서 정정됨: 텔레그램 필드 2개는 소비자가 없어 삭제, `notificationPrefs`는 `Map<NotificationType, Boolean>`이 맞다(`NotificationChannel` 아님) — 실제 시그니처는 위 Interfaces 섹션 참고)
 
 ```java
 // src/main/java/com/kista/trading/application/port/output/TradingUserProfilePort.java
@@ -76,14 +77,15 @@ public interface TradingUserProfilePort {
     Map<UUID, TradingUserProfile> findAllByUserIds(List<UUID> userIds);
 }
 ```
+(초안 코드 — 실제로는 `findAllActive()`가 3번째 메서드로 추가됨, 위 Interfaces 섹션 참고)
 
-주의: `NotificationChannel`은 architecture.md 기준 `com.kista.user.domain.model` 소유 독립 파일이다(sharedkernel 미포함). import를 `com.kista.user.domain.model.NotificationChannel`로 정정하라 — 이 record가 user 타입 하나(enum)를 참조하는 건 값 타입 재사용이라 문제없다(포트 역전은 서비스/애그리게이트 참조를 끊는 것이지 sharedkernel급 enum까지 금지하는 게 아니다). `NotificationType`은 실제로 sharedkernel 소속이 맞는지 `grep -n "enum NotificationType" -r src/main/java`로 확인 후 import 경로를 확정한다.
+주의: `NotificationChannel`은 architecture.md 기준 `com.kista.user.domain.model` 소유 독립 파일이다(sharedkernel 미포함). import를 `com.kista.user.domain.model.NotificationChannel`로 정정하라 — 이 record가 user 타입 하나(enum)를 참조하는 건 값 타입 재사용이라 문제없다(포트 역전은 서비스/애그리게이트 참조를 끊는 것이지 sharedkernel급 enum까지 금지하는 게 아니다). `NotificationType`은 실제로 sharedkernel 소속이 맞는지 `grep -n "enum NotificationType" -r src/main/java`로 확인 후 import 경로를 확정한다. (실측 결과 이 문단 자체가 기각됨: `notificationPrefs`는 `NotificationChannel`이 아니라 `UserSettings.notificationPrefs()`와 동일한 `Map<NotificationType, Boolean>`으로 최종 구현됨 — 텔레그램 필드는 전부 삭제)
 
-- [ ] **Step 2: user 모듈에 `TradingUserProfilePort` 구현체를 작성한다**
+- [ ] **Step 2: `com.kista.web`에 `TradingUserProfilePort` 구현체를 작성한다 (user 모듈이 아님 — 위 Files 섹션의 정정 사유 참고)**
 
 ```java
-// src/main/java/com/kista/user/application/service/TradingUserProfileAdapter.java
-package com.kista.user.application.service;
+// src/main/java/com/kista/web/trading/TradingUserProfileAdapter.java
+package com.kista.web.trading;
 
 import com.kista.trading.application.port.output.TradingUserProfilePort;
 import com.kista.trading.domain.model.TradingUserProfile;
@@ -141,7 +143,7 @@ Expected: BUILD SUCCESSFUL (trading은 아직 옛 `User` 타입을 쓰고 있어
 
 - [ ] **Step 5: 나머지 8개 파일(`TradingExecutionUseCase`, `TradingExecutionFacade`, `TradingService`, `MarketEventNotifier`, `ManualTradingService`, `CycleRotationService`, `StrategyCreationService`, `TradingReporter`, `VrReconfigureService`)을 같은 패턴으로 전환한다**
 
-각 파일에서 `import com.kista.user.*` 삭제 → `TradingUserProfile`/`TradingUserProfilePort` import로 교체. `UserSettings.balanceCheckEnabled()` 호출은 `TradingUserProfile.balanceCheckEnabled()`로, 텔레그램 발송용 `user.telegramBotToken()`은 `userProfile.telegramBotToken()`으로.
+각 파일에서 `import com.kista.user.*` 삭제 → `TradingUserProfile`/`TradingUserProfilePort` import로 교체. `UserSettings.balanceCheckEnabled()` 호출은 `TradingUserProfile.balanceCheckEnabled()`로. (초안은 텔레그램 발송용 `user.telegramBotToken()`도 `userProfile.telegramBotToken()`으로 옮기는 걸 전제했으나, 실제로는 그 필드를 읽는 소비자가 없어 최종 리뷰에서 `TradingUserProfile`에서 텔레그램 필드 자체가 삭제됨)
 
 - [ ] **Step 6: `grep -rn "import com.kista.user\." src/main/java/com/kista/trading`로 잔여 참조가 0인지 확인한다**
 
@@ -297,6 +299,12 @@ dependencies {
 
     implementation("org.apache.httpcomponents.client5:httpclient5") // broker KIS/Toss HTTP 클라이언트
 
+    // 웹 레이어(Task 5에서 실측 발견 — privacy.adapter.in.web.FidaOrderController가 필요로 함, Task 6/7의 account/trading 컨트롤러도 동일하게 필요)
+    implementation(libs.spring.boot.starter.web)
+    implementation(libs.springdoc.openapi.webmvc.ui)
+    // Task 6에서 실측 발견 — account.AccountController가 @AuthenticationPrincipal(spring-security-core) 사용
+    implementation(libs.spring.boot.starter.security)
+
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
     testCompileOnly(libs.lombok)
@@ -318,7 +326,13 @@ tasks.named<Test>("test") {
 }
 ```
 
-`alias(libs.plugins.spring.boot)`는 넣지 않는다 — `:trading-core`는 `bootJar`를 만들지 않는 라이브러리 서브프로젝트다(`java` 플러그인만).
+**정정(Task 4 실행 중 실측으로 뒤집힘 — 수동 BOM import는 Spring Boot 플러그인이 해주는 JUnit Platform 버전 정렬을 대체하지 못해 `NoSuchMethodError`가 남):** `alias(libs.plugins.spring.boot)`는 그대로 적용한다(의존성 버전관리·JUnit 정렬용, root와 동일). 대신 `bootJar` 산출을 막기 위해 아래 태스크 설정을 추가한다:
+```kotlin
+tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
+    enabled = false
+}
+```
+"`:trading-core`는 bootJar를 만들지 않는 라이브러리 서브프로젝트다"라는 목적 자체는 유지 — 달성 수단만 "플러그인 미적용"에서 "플러그인 적용 + bootJar 태스크 비활성화"로 바뀐다. 이게 Gradle 멀티모듈 Spring Boot 프로젝트의 표준 관용구.
 
 - [ ] **Step 3: 루트 `build.gradle.kts`에 `:trading-core` 의존 추가**
 
@@ -424,6 +438,8 @@ git commit -m "refactor(build): privacy·matching을 trading-core로 이동"
 
 `account`가 `broker`(`BrokerConnectionTesters`)에 의존하므로 같은 태스크로 묶는다.
 
+**정정(Task 6 실행 중 실측으로 발견):** `src/test/java/com/kista/support/`(DataJpaTestBase/DomainFixtures/WebMvcTestSupport)는 루트에 남는 테스트 91개와 trading-core로 옮겨지는 테스트 양쪽 다 참조하는 진짜 공유 인프라라 어느 한쪽 git mv 대상에도 넣을 수 없다. 해결: 루트에 `java-test-fixtures` 플러그인 적용, 이 3파일을 `src/test/java/...` → `src/testFixtures/java/...`로 이동(패키지명 불변), `trading-core/build.gradle.kts`에 `testImplementation(testFixtures(project(":")))` 추가 — 양쪽 다 동일 소스 공유. Task 7(trading 테스트 이동)도 이 설정을 그대로 재사용한다(추가 조치 불필요).
+
 - [ ] **Step 1: 디렉터리 이동**
 
 ```bash
@@ -464,6 +480,8 @@ git commit -m "refactor(build): broker·account를 trading-core로 이동"
 - Test: 대응 `src/test/java/com/kista/{marketcalendar,trading}/**`
 
 가장 큰 덩어리이자 마지막 — 앞선 6개 태스크가 전부 끝나야 `trading`의 의존(account/broker/matching/platform/privacy/sharedkernel/marketcalendar)이 전부 `:trading-core` 안에 있게 된다.
+
+**정정(Task 7 실행 중 실측으로 발견 — Task 1이 남긴 구멍):** Task 1은 `trading→user` 결합을 전부 끊지 않고 3개 파일(`ActiveStrategyCountAdapter`, `UserCascadeListener`, `StrategyUserCascadeListener`)을 "허용된 예외"로 남겼다 — 당시엔 단일 Gradle 프로젝트라 Modulith 단방향 의존으로 문제없었다. 이제 `trading`이 실제로 `:trading-core`로 물리 이동하면 root(`:api`)가 이미 `:trading-core`에 의존하는 상태에서 trading-core가 root 소유 `user`를 참조하면 진짜 Gradle 순환이 된다. 해결: (1) `UserDeletedEvent`(순수 `record(UUID)`)를 `com.kista.sharedkernel`로 승격, 발행처(`UserCascadeDeleter`)·구독처(finance/notify/trading 전부) import 경로 갱신. (2) `ActiveStrategyCountAdapter`를 Task 1과 동일 패턴으로 `com.kista.web.trading`으로 이동(`ActiveStrategyCountPort` 인터페이스는 user 소유 유지).
 
 - [ ] **Step 1: 디렉터리 이동**
 
