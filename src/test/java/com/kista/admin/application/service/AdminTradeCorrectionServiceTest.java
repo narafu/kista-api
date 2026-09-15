@@ -1,141 +1,66 @@
 package com.kista.admin.application.service;
 
-import com.kista.sharedkernel.Broker;
-import com.kista.trading.application.event.CycleEndedEvent;
-import com.kista.account.domain.model.Account;
+import com.kista.admin.application.port.output.AuditLogPort;
+import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
-import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.OrderDirection;
-import com.kista.trading.domain.model.CyclePosition;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.user.domain.model.User;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.trading.application.port.output.CyclePositionPort;
-import com.kista.trading.application.port.output.OrderPort;
-import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.user.application.port.output.UserPort;
-import com.kista.support.DomainFixtures;
+import com.kista.sharedkernel.StrategyStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 
+// 실제 수동 체결 보정 로직은 trading-core로 이관됨 — 이 테스트는 포트 위임과 감사 로그 호출만 검증
 @ExtendWith(MockitoExtension.class)
 class AdminTradeCorrectionServiceTest {
 
-    @Mock UserPort userPort;
-    @Mock AccountPort accountPort;
-    @Mock StrategyPort strategyPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock CyclePositionPort cyclePositionPort;
-    @Mock OrderPort orderPort;
+    @Mock TradingCommandPort tradingCommandPort;
     @Mock AuditLogPort auditLogPort;
-    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks AdminTradeCorrectionService service;
 
-    private static final UUID ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    private static final UUID USER_ID = UUID.randomUUID();
-    private static final UUID ACCOUNT_ID = UUID.randomUUID();
+    private static final UUID ADMIN_ID    = UUID.randomUUID();
+    private static final UUID USER_ID     = UUID.randomUUID();
+    private static final UUID ACCOUNT_ID  = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
-    private static final UUID CYCLE_ID = UUID.randomUUID();
-    private static final UUID VERSION_ID = UUID.randomUUID();
 
     @Test
-    void correctManualFills_liquidatingSell_savesFilledOrdersAndPausesStrategy() {
-        User user = DomainFixtures.activeUserWithTelegram(USER_ID);
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
-        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
-        StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
-                null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
-        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
-                new BigDecimal("266.65"), new BigDecimal("223.41"), 2, Instant.now(), null);
+    void correctManualFills_요청을_포트로_그대로_전달하고_응답을_되돌리고_감사로그를_남긴다() {
         AdminManualTradeCorrectionCommand command = new AdminManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new AdminManualTradeCorrectionCommand.Fill(
                         LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
                         new BigDecimal("267.37"), "MANUAL-1", "manual correction")));
+        AdminTradeCorrectionResult result = new AdminTradeCorrectionResult(
+                USER_ID, ACCOUNT_ID, STRATEGY_ID, 1, 0,
+                new BigDecimal("266.65"), new BigDecimal("7200.05"),
+                StrategyStatus.PAUSED, true, LocalDate.of(2026, 7, 1));
+        when(tradingCommandPort.correctManualFills(any())).thenReturn(result);
 
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
-        when(strategyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
-        when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
+        AdminTradeCorrectionResult response = service.correctManualFills(ADMIN_ID, command);
 
-        AdminTradeCorrectionResult result = service.correctManualFills(ADMIN_ID, command);
+        ArgumentCaptor<AdminManualTradeCorrectionCommand> captor = ArgumentCaptor.forClass(AdminManualTradeCorrectionCommand.class);
+        verify(tradingCommandPort).correctManualFills(captor.capture());
+        AdminManualTradeCorrectionCommand sent = captor.getValue();
+        assertThat(sent).isEqualTo(command);
 
-        assertThat(result.processedCount()).isEqualTo(1);
-        assertThat(result.finalHoldings()).isZero();
-        assertThat(result.strategyStatus()).isEqualTo(StrategyStatus.PAUSED);
-        verify(orderPort).saveAll(any());
-        verify(strategyCyclePort).markEnded(CYCLE_ID, new BigDecimal("7200.05"), LocalDate.of(2026, 7, 1));
-        verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == StrategyStatus.PAUSED));
-        // 청산 발생 → 사이클 종료 이벤트 발행
-        verify(eventPublisher).publishEvent(any(CycleEndedEvent.class));
+        assertThat(response).isEqualTo(result);
 
-        ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
-        verify(cyclePositionPort).save(captor.capture());
-        assertThat(captor.getValue().holdings()).isZero();
-        assertThat(captor.getValue().usdDeposit()).isEqualByComparingTo("7200.05");
-    }
-
-    @Test
-    void correctManualFills_sellQuantityGreaterThanHoldings_throws() {
-        User user = DomainFixtures.activeUserWithTelegram(USER_ID);
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
-        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
-                null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
-        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
-                new BigDecimal("266.65"), new BigDecimal("223.41"), 2, Instant.now(), null);
-        AdminManualTradeCorrectionCommand command = new AdminManualTradeCorrectionCommand(
-                USER_ID, ACCOUNT_ID, STRATEGY_ID,
-                List.of(new AdminManualTradeCorrectionCommand.Fill(
-                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 3,
-                        new BigDecimal("267.37"), null, null)));
-
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
-        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
-        when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
-
-        assertThatThrownBy(() -> service.correctManualFills(ADMIN_ID, command))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("SELL quantity");
-
-        verify(orderPort, never()).saveAll(any());
-        verify(cyclePositionPort, never()).save(any());
-        // 청산 미발생 — 사이클 종료 이벤트 미발행
-        verify(eventPublisher, never()).publishEvent(any(CycleEndedEvent.class));
+        verify(auditLogPort).log(eq(ADMIN_ID), eq("TRADE_MANUAL_CORRECTION"), eq("STRATEGY"), eq(STRATEGY_ID), any(Map.class));
     }
 }

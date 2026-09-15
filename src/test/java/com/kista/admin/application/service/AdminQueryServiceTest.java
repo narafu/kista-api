@@ -1,15 +1,10 @@
 package com.kista.admin.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.admin.domain.model.AdminAccountView;
 import com.kista.admin.domain.model.AdminStats;
 import com.kista.sharedkernel.Broker;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.admin.application.port.output.*;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.trading.application.port.output.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,20 +25,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import com.kista.sharedkernel.UserStatus;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class AdminQueryServiceTest {
 
     @Mock UserPort userPort;
-    @Mock AccountPort accountPort;
-    @Mock OrderPort orderPort;
+    @Mock AccountQueryPort accountQueryPort;
     @Mock AuditLogPort auditLogPort;
-    @Mock StrategyPort strategyPort;
-    @Mock PrivacyTradePort privacyTradePort;
+    @Mock TradingQueryPort tradingQueryPort;
+    @Mock PrivacyQueryPort privacyQueryPort;
 
     @InjectMocks AdminQueryService service;
 
@@ -54,7 +44,7 @@ class AdminQueryServiceTest {
         byStatus.put(UserStatus.ACTIVE, 10L);
         byStatus.put(UserStatus.REJECTED, 2L);
         when(userPort.countGroupByStatus()).thenReturn(byStatus);
-        when(accountPort.countAll()).thenReturn(7L);
+        when(accountQueryPort.countAll()).thenReturn(7L);
 
         AdminStats result = service.getStats();
 
@@ -68,7 +58,7 @@ class AdminQueryServiceTest {
         Map<UserStatus, Long> byStatus = new EnumMap<>(UserStatus.class);
         byStatus.put(UserStatus.ACTIVE, 5L);
         when(userPort.countGroupByStatus()).thenReturn(byStatus);
-        when(accountPort.countAll()).thenReturn(0L);
+        when(accountQueryPort.countAll()).thenReturn(0L);
 
         AdminStats result = service.getStats();
 
@@ -77,65 +67,59 @@ class AdminQueryServiceTest {
 
     @Test
     void listPrivacyBases_null이면_EPOCH부터_조회() {
-        when(privacyTradePort.findBasesFromTradeDate(LocalDate.EPOCH)).thenReturn(List.of());
+        when(privacyQueryPort.findBasesFromTradeDate(LocalDate.EPOCH)).thenReturn(List.of());
 
         service.listPrivacyBases(null);
 
         ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
-        org.mockito.Mockito.verify(privacyTradePort).findBasesFromTradeDate(captor.capture());
+        verify(privacyQueryPort).findBasesFromTradeDate(captor.capture());
         assertThat(captor.getValue()).isEqualTo(LocalDate.EPOCH);
     }
 
     @Test
     void listPrivacyBases_30일이면_KST_30일전_발행분부터_조회() {
-        when(privacyTradePort.findBasesFromTradeDate(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
+        when(privacyQueryPort.findBasesFromTradeDate(org.mockito.ArgumentMatchers.any())).thenReturn(List.of());
 
         service.listPrivacyBases(30);
 
         LocalDate expected = LocalDate.now().minusDays(30);
         ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
-        org.mockito.Mockito.verify(privacyTradePort).findBasesFromTradeDate(captor.capture());
+        verify(privacyQueryPort).findBasesFromTradeDate(captor.capture());
         assertThat(captor.getValue()).isEqualTo(expected);
     }
 
     @Test
-    void listStrategyOrders_계좌ID가_일치하면_전략과_거래일로_주문을_조회한다() {
+    void listStrategyOrders_포트로_위임한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
         LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
-        when(orderPort.findByStrategyId(strategyId, tradeDate, tradeDate)).thenReturn(List.of());
+        when(tradingQueryPort.findStrategyOrders(accountId, strategyId, tradeDate)).thenReturn(List.of());
 
         service.listStrategyOrders(accountId, strategyId, tradeDate);
 
-        verify(orderPort).findByStrategyId(strategyId, tradeDate, tradeDate);
+        verify(tradingQueryPort).findStrategyOrders(accountId, strategyId, tradeDate);
     }
 
     @Test
-    void listStrategyOrders_다른_계좌의_전략이면_예외() {
+    void listStrategyOrders_소유권_불일치는_포트가_던진_예외를_그대로_전파한다() {
+        // 소유권 검증은 trading-core 내부 컨트롤러로 이전됨 — TradingQueryHttpAdapter가
+        // 404 응답을 NoSuchElementException으로 되돌려 던지고, 여기서는 그대로 전파만 확인
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID otherAccountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
         LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(tradingQueryPort.findStrategyOrders(accountId, strategyId, tradeDate))
+                .thenThrow(new NoSuchElementException("전략이 해당 계좌에 속하지 않습니다"));
 
-        // 경로의 accountId와 전략의 실제 accountId 불일치 → 404 매핑용 NoSuchElementException
-        assertThatThrownBy(() -> service.listStrategyOrders(otherAccountId, strategyId, tradeDate))
+        assertThatThrownBy(() -> service.listStrategyOrders(accountId, strategyId, tradeDate))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
-    void listStrategyTradeDates_계좌ID가_일치하면_거래일_목록을_반환한다() {
+    void listStrategyTradeDates_포트로_위임한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
-        when(orderPort.findTradeDatesByStrategyId(strategyId)).thenReturn(List.of(LocalDate.of(2026, 7, 1)));
+        when(tradingQueryPort.findStrategyTradeDates(accountId, strategyId))
+                .thenReturn(List.of(LocalDate.of(2026, 7, 1)));
 
         List<LocalDate> result = service.listStrategyTradeDates(accountId, strategyId);
 
@@ -143,29 +127,25 @@ class AdminQueryServiceTest {
     }
 
     @Test
-    void listStrategyTradeDates_다른_계좌의_전략이면_예외() {
+    void findAccount_ID로_단일_계좌를_조회한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID otherAccountId = UUID.fromString("00000000-0000-0000-0000-000000000099");
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        AdminAccountView account = new AdminAccountView(accountId, UUID.randomUUID(), "74420614", Broker.KIS, null);
+        when(accountQueryPort.findById(accountId)).thenReturn(Optional.of(account));
 
-        // 경로의 accountId와 전략의 실제 accountId 불일치 → 404 매핑용 NoSuchElementException
-        assertThatThrownBy(() -> service.listStrategyTradeDates(otherAccountId, strategyId))
-                .isInstanceOf(NoSuchElementException.class);
+        Optional<AdminAccountView> result = service.findAccount(accountId);
+
+        assertThat(result).isPresent().contains(account);
+        verify(accountQueryPort).findById(accountId);
     }
 
     @Test
-    void findAccount_ID로_단일_계좌를_조회한다() {
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        Account account = new Account(accountId, UUID.randomUUID(), "test", "74420614",
-                null, null, "01", Broker.KIS, null);
-        when(accountPort.findById(accountId)).thenReturn(Optional.of(account));
+    void listAccounts_포트로_위임한다() {
+        LocalDate from = LocalDate.of(2026, 7, 1);
+        LocalDate to = LocalDate.of(2026, 7, 31);
+        when(accountQueryPort.findAll(from, to)).thenReturn(List.of());
 
-        Optional<Account> result = service.findAccount(accountId);
+        service.listAccounts(from, to);
 
-        assertThat(result).isPresent().contains(account);
-        verify(accountPort).findById(accountId);
+        verify(accountQueryPort).findAll(from, to);
     }
 }

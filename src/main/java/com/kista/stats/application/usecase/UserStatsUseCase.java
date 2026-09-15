@@ -1,32 +1,18 @@
 package com.kista.stats.application.usecase;
 
-import com.kista.stats.domain.model.CyclePerformancePage;
 import com.kista.stats.domain.model.BenchmarkScope;
-import com.kista.stats.domain.model.EquityCurve;
 import com.kista.stats.domain.model.EtfBenchmarkSymbol;
 import com.kista.stats.domain.model.HousingBenchmarkComparison;
 import com.kista.stats.domain.model.HousingBenchmarkPrice;
 import com.kista.stats.domain.model.HousingBenchmarkRegion;
 import com.kista.stats.domain.model.HousingPriceIndex;
 import com.kista.stats.domain.model.IndexPrice;
-import com.kista.stats.domain.model.StatsSummary;
-import com.kista.trading.domain.model.Strategy;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
 
 public interface UserStatsUseCase {
-    StatsSummary getSummary(UUID userId);
-
-    // from/to null 허용 (null이면 전체/오늘)
-    EquityCurve getEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to);
-
-    // type null이면 전체
-    CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, Instant cursor, int size);
-
     HousingBenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             String regionCode, LocalDate from, LocalDate to);

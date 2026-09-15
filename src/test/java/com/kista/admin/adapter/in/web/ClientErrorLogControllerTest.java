@@ -1,9 +1,9 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -32,7 +32,7 @@ class ClientErrorLogControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort;
 
     @Test
     void log_isPublicAndReturns204() throws Exception {

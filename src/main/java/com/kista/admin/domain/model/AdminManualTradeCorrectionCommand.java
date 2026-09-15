@@ -1,6 +1,5 @@
 package com.kista.admin.domain.model;
 
-import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.OrderDirection;
 
 import java.math.BigDecimal;

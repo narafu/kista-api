@@ -1,6 +1,5 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.trading.domain.model.Strategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 import com.kista.sharedkernel.StrategyStatus;
 

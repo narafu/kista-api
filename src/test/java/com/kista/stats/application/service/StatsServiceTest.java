@@ -1,19 +1,8 @@
 package com.kista.stats.application.service;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
 import com.kista.stats.domain.model.*;
-import com.kista.trading.domain.model.CyclePosition;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.broker.domain.model.toss.TossExchangeRate;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.stats.application.port.output.*;
-import com.kista.trading.application.port.output.*;
-import com.kista.broker.application.port.output.ExchangeRatePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,12 +12,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,74 +22,56 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 
+// Task 5 이후: StatsService는 accountPort/strategyPort/strategyCyclePort/cyclePositionPort를 직접
+// 호출하지 않고 investmentPointsPort(HTTP 경유)로부터 InvestmentPoint 시리즈를 받는다. 소유권 검증·
+// MOCK 계좌 필터링·MonthlyReturnCalculator 배선 등은 trading-core의 InvestmentPointsQueryService로
+// 이전됐고 그쪽 테스트(InvestmentPointsQueryServiceTest)가 커버한다 — 여기서는 StatsService 자신의
+// 책임(KB 조사일 as-of 스냅, ETF 거래일 보정, 캐시∥환율 병렬 조회, 검증 fast-fail)만 검증한다.
 @ExtendWith(MockitoExtension.class)
 class StatsServiceTest {
 
-    @Mock AccountPort accountPort;
-    @Mock StrategyPort strategyPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock CyclePositionPort cyclePositionPort;
+    @Mock InvestmentPointsPort investmentPointsPort;
     @Mock HousingBenchmarkPricePort housingBenchmarkPricePort;
     @Mock HousingPriceIndexPort housingPriceIndexPort;
-    @Mock ExchangeRatePort exchangeRatePort;
+    @Mock CurrentExchangeRatePort currentExchangeRatePort;
     @Mock IndexPricePort indexPricePort;
     // getOrCompute가 null을 반환하지 않도록 mock이 아닌 실제 캐시 인스턴스 사용 (@InjectMocks가 생성자로 주입)
     @Spy StatsResultCache statsResultCache = new StatsResultCache();
     @InjectMocks StatsService statsService;
 
     private static final UUID USER_ID = UUID.randomUUID();
-    private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
-    private static final UUID PRIVACY_STRATEGY_ID = UUID.randomUUID();
     private static final LocalDate FROM = LocalDate.of(2026, 1, 1);
     private static final LocalDate TO = LocalDate.of(2026, 2, 28);
 
-    private static final Strategy STRATEGY = new Strategy(
-            STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ACTIVE,
-            StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-    private static final Strategy PRIVACY_STRATEGY = new Strategy(
-            PRIVACY_STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
-            StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+    private static final StrategyRef STRATEGY = new StrategyRef(
+            STRATEGY_ID, StrategyType.INFINITE, StrategyTicker.SOXL);
 
-    // Account는 record(final) — mock(Account.class) 대신 실제 인스턴스 생성 (AccountServiceTest 패턴)
-    private static Account testAccount() {
-        return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
-                "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null);
+    private static InvestmentPoint point(String date, String index) {
+        return new InvestmentPoint(LocalDate.parse(date), new BigDecimal(index), null);
     }
 
-    private void stubUserWithStrategy() {
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
+    private void stubPortfolioWeekly(List<InvestmentPoint> points, LocalDate from, LocalDate to) {
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
+                any(), any(), eq(BenchmarkGranularity.WEEKLY)))
+                .thenReturn(new InvestmentPointsPort.Result(points, from, to, null));
     }
 
-    private static StrategyCycle closedCycle(String start, String end, String startDate, String endDate) {
-        return new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
-                new BigDecimal(start), new BigDecimal(end),
-                LocalDate.parse(startDate), LocalDate.parse(endDate),
-                Instant.parse(startDate + "T00:00:00Z"), null);
+    private void stubStrategyWeekly(List<InvestmentPoint> points, LocalDate from, LocalDate to) {
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
+                any(), any(), eq(BenchmarkGranularity.WEEKLY)))
+                .thenReturn(new InvestmentPointsPort.Result(points, from, to, STRATEGY));
     }
 
-    private static StrategyCycle activeCycle(String start, String startDate) {
-        return new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
-                new BigDecimal(start), null, LocalDate.parse(startDate), null,
-                Instant.parse(startDate + "T00:00:00Z"), null);
-    }
-
-    private static StrategyCycle activeCycle(UUID strategyId, String start, String startDate) {
-        return new StrategyCycle(UUID.randomUUID(), strategyId, null,
-                new BigDecimal(start), null, LocalDate.parse(startDate), null,
-                Instant.parse(startDate + "T00:00:00Z"), null);
-    }
-
-    // holdings=0 스냅샷 — 자산 = usdDeposit
-    private static CyclePosition depositSnapshot(UUID cycleId, String deposit, String createdAt) {
-        return new CyclePosition(UUID.randomUUID(), cycleId, new BigDecimal(deposit),
-                null, null, 0, Instant.parse(createdAt), null);
+    // 첫 KB 조사일(01-05)~마지막(02-23)까지 이어지는 단순 포트폴리오 투자 시리즈 + KB 지수 스텁
+    private void stubWeeklyPortfolioComparison(String startValue, String endValue) {
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", startValue),
+                point("2026-02-23", endValue)), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
+                anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
     }
 
     private static HousingBenchmarkPrice benchmarkPrice(
@@ -114,7 +82,7 @@ class StatsServiceTest {
                 "1100000000", "서울", month,
                 new BigDecimal(first), new BigDecimal(second), new BigDecimal(third),
                 new BigDecimal(fourth), new BigDecimal(fifth), new BigDecimal("6.5"),
-                LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z"));
+                LocalDate.of(2026, 2, 15), java.time.Instant.parse("2026-02-16T00:00:00Z"));
     }
 
     private static List<HousingBenchmarkPrice> benchmarkPrices() {
@@ -127,7 +95,7 @@ class StatsServiceTest {
         return new HousingPriceIndex(
                 HousingPriceIndex.SOURCE_KBLAND, HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
                 "1100000000", "서울", baseDate, new BigDecimal(value),
-                LocalDate.of(2026, 2, 15), Instant.parse("2026-02-16T00:00:00Z"));
+                LocalDate.of(2026, 2, 15), java.time.Instant.parse("2026-02-16T00:00:00Z"));
     }
 
     private static List<HousingPriceIndex> weeklyIndices() {
@@ -136,316 +104,17 @@ class StatsServiceTest {
                 weeklyIndex(LocalDate.of(2026, 2, 23), "400"));
     }
 
-    private StrategyCycle stubWeeklyPortfolioComparison(String startValue, String endValue) {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), startValue, "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), endValue, "2026-02-23T01:00:00Z")));
-        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
-                anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
-        return cycle;
-    }
-
-    @Test
-    void 종료_사이클_실현손익과_승률을_집계한다() {
-        stubUserWithStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
-                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31"), // +100, 30일
-                closedCycle("1000.00", "950.00", "2026-02-01", "2026-02-11")));  // -50, 10일
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("50.00");
-        StrategyTypeStats infinite = summary.byType().get(0);
-        assertThat(infinite.type()).isEqualTo(StrategyType.INFINITE);
-        assertThat(infinite.closedCycleCount()).isEqualTo(2);
-        assertThat(infinite.winRate()).isEqualByComparingTo("0.5");
-        assertThat(infinite.avgDurationDays()).isEqualByComparingTo("20.0");
-    }
-
-    @Test
-    void 진행_중_사이클은_최신_스냅샷으로_미실현손익을_계산한다() {
-        stubUserWithStrategy();
-        StrategyCycle active = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
-                new BigDecimal("1000.00"), null, LocalDate.parse("2026-06-01"), null,
-                Instant.parse("2026-06-01T00:00:00Z"), null);
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
-        // 자산 = 500 + 10 × 55.00 = 1050 → 미실현 +50
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(active.id()))).thenReturn(Map.of(active.id(),
-                new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("500.00"),
-                        new BigDecimal("55.00"), new BigDecimal("50.00"), 10, Instant.now(), null)));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("50.00");
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("1000.00");
-    }
-
-    @Test
-    void 레거시_VR_진행_사이클은_개장_포지션_총자산으로_원금과_미실현손익을_복원한다() {
-        UUID vrStrategyId = UUID.randomUUID();
-        Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
-                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(
-                UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1000.00"), null,
-                LocalDate.of(2026, 6, 1), null, Instant.parse("2026-06-01T00:00:00Z"), null);
-        CyclePosition opening = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
-                new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
-        CyclePosition latest = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("800.00"),
-                new BigDecimal("180.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), opening));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), latest));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("1600.00");
-        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
-        assertThat(summary.byType()).singleElement().satisfies(stats -> {
-            assertThat(stats.type()).isEqualTo(StrategyType.VR);
-            assertThat(stats.unrealizedPnl()).isEqualByComparingTo("100.00");
-        });
-    }
-
-    @Test
-    void 레거시_VR_개장_보유분에_종가가_없으면_저장된_startAmount를_유지한다() {
-        UUID vrStrategyId = UUID.randomUUID();
-        Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
-                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(
-                UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1500.00"), null,
-                LocalDate.of(2026, 6, 1), null, Instant.parse("2026-06-01T00:00:00Z"), null);
-        CyclePosition openingWithoutClosingPrice = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
-                null, new BigDecimal("80.00"), 5, Instant.now(), null);
-        CyclePosition latest = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("900.00"),
-                new BigDecimal("140.00"), new BigDecimal("80.00"), 5, Instant.now(), null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id())))
-                .thenReturn(Map.of(cycle.id(), openingWithoutClosingPrice));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), latest));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("1500.00");
-        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
-    }
-
-    @Test
-    void 레거시_VR_종료_사이클은_개장_포지션_총자산으로_실현손익과_성과를_복원한다() {
-        UUID vrStrategyId = UUID.randomUUID();
-        Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
-                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(
-                UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1000.00"), new BigDecimal("1800.00"),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
-                Instant.parse("2026-01-01T00:00:00Z"), null);
-        CyclePosition opening = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
-                new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), opening));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-        CyclePerformance performance = statsService
-                .getCyclePerformances(USER_ID, StrategyType.VR, null, 10)
-                .items().getFirst();
-
-        assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("200.00");
-        assertThat(summary.byType()).singleElement().satisfies(stats ->
-                assertThat(stats.avgReturnRate()).isEqualByComparingTo("0.1250"));
-        assertThat(performance.startAmount()).isEqualByComparingTo("1600.00");
-        assertThat(performance.endAmount()).isEqualByComparingTo("1800.00");
-        assertThat(performance.pnl()).isEqualByComparingTo("200.00");
-        assertThat(performance.returnRate()).isEqualByComparingTo("0.1250");
-    }
-
-    @Test
-    void equity_curve는_같은_날_같은_사이클의_최신_스냅샷만_합산한다() {
-        stubUserWithStrategy();
-        StrategyCycle active = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
-                new BigDecimal("1000.00"), null, LocalDate.parse("2026-06-01"), null,
-                Instant.parse("2026-06-01T00:00:00Z"), null);
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
-        // KST 2026-06-02 (UTC 06-01 20:00 / 06-01 20:30) 스냅샷 2건 — 최신 건만 반영
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("900.00"),
-                        new BigDecimal("10.00"), null, 5, Instant.parse("2026-06-01T20:00:00Z"), null),
-                new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("800.00"),
-                        new BigDecimal("10.00"), null, 20, Instant.parse("2026-06-01T20:30:00Z"), null)));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).hasSize(1);
-        assertThat(curve.points().get(0).date()).isEqualTo(LocalDate.parse("2026-06-02"));
-        // 800 + 20 × 10.00 = 1000
-        assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1000.00");
-        assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1000.00");
-    }
-
-    @Test
-    void equity_curve는_전략_type으로_사이클을_필터링한다() {
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID)))
-                .thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY, PRIVACY_STRATEGY)));
-        StrategyCycle infinite = activeCycle(STRATEGY_ID, "1000.00", "2026-06-01");
-        StrategyCycle privacy = activeCycle(PRIVACY_STRATEGY_ID, "2000.00", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(infinite, privacy));
-        // type=PRIVACY 필터 시 DB 조회 자체가 privacy 사이클 ID로 좁혀지므로 infinite 스냅샷은 stub하지 않는다
-        when(cyclePositionPort.findByCycleIdsAndRange(eq(Set.of(privacy.id())), any(), any())).thenReturn(List.of(
-                depositSnapshot(privacy.id(), "2300.00", "2026-06-02T01:00:00Z")));
-
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, StrategyType.PRIVACY,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).hasSize(1);
-        assertThat(curve.points().getFirst().date()).isEqualTo(LocalDate.parse("2026-06-02"));
-        assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("2300.00");
-        assertThat(curve.points().getFirst().principal()).isEqualByComparingTo("2000.00");
-    }
-
-    @Test
-    void 사이클_성과_목록은_커서로_페이지네이션한다() {
-        stubUserWithStrategy();
-        StrategyCycle c1 = closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31");
-        StrategyCycle c2 = closedCycle("1000.00", "1200.00", "2026-02-01", "2026-02-28");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
-
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 1);
-
-        assertThat(page.items()).hasSize(1);
-        assertThat(page.items().get(0).startDate()).isEqualTo(LocalDate.parse("2026-02-01")); // 최신순
-        assertThat(page.hasMore()).isTrue();
-        assertThat(page.nextCursor()).isEqualTo(c2.createdAt());
-    }
-
-    @Test
-    void startAmount가_0인_종료_사이클은_수익률을_null로_처리한다() {
-        stubUserWithStrategy();
-        // VR 적립식: startAmount=0 사이클이 정상 존재 (등록·롤오버 종료 모두 가능)
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
-                closedCycle("0.00", "500.00", "2026-01-01", "2026-01-31")));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        StrategyTypeStats stats = summary.byType().get(0);
-        assertThat(stats.closedCycleCount()).isEqualTo(1);
-        assertThat(stats.winRate()).isEqualByComparingTo("1"); // 승률·실현손익은 전체 closed 기준 유지
-        assertThat(stats.avgReturnRate()).isNull(); // 0-start만 있으면 평균 수익률 없음
-        assertThat(stats.realizedPnl()).isEqualByComparingTo("500.00");
-
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
-
-        assertThat(page.items().get(0).pnl()).isEqualByComparingTo("500.00");
-        assertThat(page.items().get(0).returnRate()).isNull();
-    }
-
-    @Test
-    void 사이클_성과_목록은_커서_이후_항목만_반환한다() {
-        stubUserWithStrategy();
-        StrategyCycle c1 = closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31");
-        StrategyCycle c2 = closedCycle("1000.00", "1200.00", "2026-02-01", "2026-02-28");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
-
-        // 1페이지 마지막 커서(c2.createdAt) 이후 → createdAt < cursor인 c1만
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, c2.createdAt(), 10);
-
-        assertThat(page.items()).hasSize(1);
-        assertThat(page.items().get(0).cycleId()).isEqualTo(c1.id());
-        assertThat(page.hasMore()).isFalse();
-        assertThat(page.nextCursor()).isNull();
-    }
-
-    @Test
-    void equityCurve_조회_경계는_KST_자정() {
-        stubUserWithStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of());
-        ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
-
-        statsService.getEquityCurve(USER_ID, null, null, LocalDate.of(2026, 7, 18));
-
-        // to=2026-07-18 → toInstant = 2026-07-19T00:00 KST = 2026-07-18T15:00:00Z
-        verify(cyclePositionPort).findByCycleIdsAndRange(any(), any(), toCaptor.capture());
-        assertThat(toCaptor.getValue())
-                .isEqualTo(LocalDate.of(2026, 7, 19).atStartOfDay(TimeZones.KST).toInstant());
-    }
-
-    @Test
-    void equity_curve는_스냅샷이_없는_날_직전_스냅샷을_carry_forward한다() {
-        stubUserWithStrategy();
-        StrategyCycle a = activeCycle("1000.00", "2026-06-01");
-        StrategyCycle b = activeCycle("2000.00", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(a, b));
-        // A는 KST 06-01·06-02 스냅샷, B는 06-01만 → 06-02 포인트에 B의 06-01 값이 carry-forward
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                depositSnapshot(a.id(), "1000.00", "2026-06-01T01:00:00Z"),
-                depositSnapshot(b.id(), "2000.00", "2026-06-01T02:00:00Z"),
-                depositSnapshot(a.id(), "1100.00", "2026-06-02T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).hasSize(2);
-        assertThat(curve.points().get(1).date()).isEqualTo(LocalDate.parse("2026-06-02"));
-        // A 06-02(1100) + B 06-01 carry-forward(2000)
-        assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("3100.00");
-        assertThat(curve.points().get(1).principal()).isEqualByComparingTo("3000.00");
-    }
-
-    @Test
-    void equity_curve는_종료일이_지난_사이클을_자산과_원금에서_제외한다() {
-        stubUserWithStrategy();
-        StrategyCycle ended = closedCycle("1000.00", "1200.00", "2026-05-01", "2026-06-01");
-        StrategyCycle active = activeCycle("500.00", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(ended, active));
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                depositSnapshot(ended.id(), "1200.00", "2026-06-01T01:00:00Z"),
-                depositSnapshot(active.id(), "500.00", "2026-06-01T02:00:00Z"),
-                depositSnapshot(active.id(), "550.00", "2026-06-02T01:00:00Z")));
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).hasSize(2);
-        // 06-01: 종료 사이클 포함 (endDate 당일까지 유효)
-        assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1700.00");
-        assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1500.00");
-        // 06-02: endDate(06-01) 경과 → 종료 사이클 제외
-        assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("550.00");
-        assertThat(curve.points().get(1).principal()).isEqualByComparingTo("500.00");
-    }
-
     @Test
     void 포트폴리오와_아파트_지수를_첫_KB_조사일_100으로_비교한다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "184.20", "2026-02-23T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-02-23", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
                 weeklyIndex(LocalDate.of(2026, 1, 5), "100"),
                 weeklyIndex(LocalDate.of(2026, 2, 23), "400")));
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
-                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
@@ -475,23 +144,20 @@ class StatsServiceTest {
         verify(housingPriceIndexPort).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
                 "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-        verify(exchangeRatePort, times(1)).getExchangeRate();
+        verify(currentExchangeRatePort, times(1)).getMidRate();
     }
 
     @Test
     void 구간이_90일_이상이면_연환산_수익률을_계산한다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "184.20", "2026-05-04T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-05-04", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 5, 4));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
                 weeklyIndex(LocalDate.of(2026, 1, 5), "100"),
                 weeklyIndex(LocalDate.of(2026, 5, 4), "400")));
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
-                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
@@ -507,12 +173,9 @@ class StatsServiceTest {
 
     @Test
     void KB_결측_주가_있어도_구간_수익률이_비지_않는다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "110.00", "2026-02-16T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-02-16", "110.00")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 16));
         // 2026-01-12 조사 주가 KB 결측으로 비어 있어 1/5 -> 2/16으로 3주 이상 건너뛴다
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
@@ -535,19 +198,13 @@ class StatsServiceTest {
 
     @Test
     void 조사일과_정확히_일치하지_않는_투자_스냅샷은_직전_값으로_carry_back된다() {
-        stubUserWithStrategy();
-        // 투자 스냅샷은 01-09(금)와 01-13(화) 두 시점에 있고, 01-12(월)에는 holdings>0인데
-        // closingPrice가 없어 평가 불가능한 스냅샷을 둔다 — MonthlyReturnCalculator.assetOf()가
-        // null을 반환해 그날은 투자지수 시계열에서 통째로 빠지므로, KB 조사일 01-12는
-        // investmentByDate에 정확히 일치하는 키가 없는 상태에서 floorEntry의 진짜 carry-back
-        // 경로(직전 01-11의 값)를 타게 된다.
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-09");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-09T01:00:00Z"),
-                new CyclePosition(UUID.randomUUID(), cycle.id(), new BigDecimal("999.00"),
-                        null, new BigDecimal("50.00"), 1, Instant.parse("2026-01-12T01:00:00Z"), null),
-                depositSnapshot(cycle.id(), "110.00", "2026-01-13T01:00:00Z")));
+        // 투자 시리즈는 01-09(100)와 01-13(110) 두 시점만 있다 — 01-12는 트레이딩 측
+        // MonthlyReturnCalculator가 평가 불가능(closingPrice 없음)으로 판단해 시리즈에서 빠진
+        // 상태를 그대로 반영한다. KB 조사일 01-12는 investmentByDate에 정확히 일치하는 키가
+        // 없어 floorEntry의 진짜 carry-back 경로(직전 01-09의 값)를 타게 된다.
+        stubPortfolioWeekly(List.of(
+                point("2026-01-09", "100.00"),
+                point("2026-01-13", "110.00")), LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 13));
         // KB 조사일은 01-09/01-12/01-13 — 01-12는 두 투자 스냅샷 사이에 끼어 정확히 일치하지 않는다
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
@@ -561,7 +218,7 @@ class StatsServiceTest {
 
         assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 12), LocalDate.of(2026, 1, 13));
-        // 01-12는 아직 01-13 스냅샷(110)이 오지 않았으므로 직전 01-09/01-11 값(100)을 그대로 이어받는다
+        // 01-12는 아직 01-13 스냅샷(110)이 오지 않았으므로 직전 01-09 값(100)을 그대로 이어받는다
         assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("100.0");
         // 01-13에서야 비로소 값이 갱신된다
         assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("110.0");
@@ -569,16 +226,13 @@ class StatsServiceTest {
 
     @Test
     void 투자_종료_이후_조사일은_지수_고정_없이_스킵된다() {
-        stubUserWithStrategy();
-        // 사이클이 01-13에 종료되고 이후 재등록이 없다 — 01-20/01-27 조사일은
+        // 투자가 01-13에 종료되고 이후 재등록이 없다 — 01-20/01-27 조사일은
         // investmentByDate의 마지막 키(01-13)보다 뒤라 floorEntry가 01-13 값을
         // 그대로 반환해버리면 투자지수가 고정된 채 벤치마크만 계속 움직이는
         // 착시가 생긴다. 가드가 없으면 이 두 조사일도 결과에 포함된다.
-        StrategyCycle cycle = closedCycle("100.00", "110.00", "2026-01-09", "2026-01-13");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-09T01:00:00Z"),
-                depositSnapshot(cycle.id(), "110.00", "2026-01-13T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-09", "100.00"),
+                point("2026-01-13", "110.00")), LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 27));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
                 weeklyIndex(LocalDate.of(2026, 1, 9), "100"),
@@ -598,23 +252,20 @@ class StatsServiceTest {
 
     @Test
     void 아파트_벤치마크는_지정된_regionCode의_지수를_조회하고_지역명을_동적으로_채운다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "184.20", "2026-02-23T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-02-23", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 eq(HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX), eq("2600000000"), any(), any()))
                 .thenReturn(List.of(
                         new HousingPriceIndex(HousingPriceIndex.SOURCE_KBLAND,
                                 HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
                                 "2600000000", "부산", LocalDate.of(2026, 1, 5), new BigDecimal("100"),
-                                null, Instant.parse("2026-02-16T00:00:00Z")),
+                                null, java.time.Instant.parse("2026-02-16T00:00:00Z")),
                         new HousingPriceIndex(HousingPriceIndex.SOURCE_KBLAND,
                                 HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX,
                                 "2600000000", "부산", LocalDate.of(2026, 2, 23), new BigDecimal("110"),
-                                null, Instant.parse("2026-02-16T00:00:00Z"))));
+                                null, java.time.Instant.parse("2026-02-16T00:00:00Z"))));
 
         HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "2600000000",
@@ -629,38 +280,10 @@ class StatsServiceTest {
     }
 
     @Test
-    void 벤치마크_전체_포트폴리오는_모의계좌를_제외한다() {
-        UUID mockAccountId = UUID.randomUUID();
-        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        ArgumentCaptor<Set<UUID>> strategyIdsCaptor = ArgumentCaptor.forClass(Set.class);
-        when(strategyCyclePort.findByStrategyIds(strategyIdsCaptor.capture())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "184.20", "2026-02-23T01:00:00Z")));
-        when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
-                anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
-
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
-                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-
-        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
-        assertThat(strategyIdsCaptor.getValue()).containsExactly(STRATEGY_ID);
-        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
-    }
-
-    @Test
     void 투자_시작_전_KB_조사일은_스킵하고_이후_조사일부터_비교한다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-02-02");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-02-02T01:00:00Z"),
-                depositSnapshot(cycle.id(), "110.00", "2026-02-23T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-02-02", "100.00"),
+                point("2026-02-23", "110.00")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         // 1/5 조사일은 투자 시작(2/2) 이전이라 as-of 값이 없어 스킵된다
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
@@ -678,13 +301,10 @@ class StatsServiceTest {
 
     @Test
     void 주간_지수의_고점_대비_최대낙폭을_계산한다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "80.00", "2026-01-19T01:00:00Z"),
-                depositSnapshot(cycle.id(), "120.00", "2026-02-02T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-01-19", "80.00"),
+                point("2026-02-02", "120.00")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 2));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
                 weeklyIndex(LocalDate.of(2026, 1, 5), "100"),
@@ -701,14 +321,9 @@ class StatsServiceTest {
 
     @Test
     void 소유한_개별_전략만_조회하고_전략_메타데이터를_반환한다() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount());
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
-                .thenReturn(List.of(
-                        depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                        depositSnapshot(cycle.id(), "110.00", "2026-02-23T01:00:00Z")));
+        stubStrategyWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-02-23", "110.00")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
 
@@ -719,23 +334,28 @@ class StatsServiceTest {
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
         assertThat(result.strategy().type()).isEqualTo(StrategyType.INFINITE);
         assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.SOXL);
-        verify(cyclePositionPort).findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any());
-        verify(cyclePositionPort, never()).findByUserAndRange(any(), any(), any());
+        verify(investmentPointsPort).fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
+                any(), any(), eq(BenchmarkGranularity.WEEKLY));
     }
 
+    // Task 5 boundary 이전에는 authorizeIfStrategyScope가 병렬 실행(본체∥환율) 전에 소유권을
+    // 동기적으로 검증해 인가 실패 시 환율 API 호출 자체를 막았다. 이제 소유권 검증은
+    // investmentPointsPort.fetch() 내부(trading 쪽 HTTP 호출)로 이동해, 병렬 실행이 이미 시작된
+    // 뒤에야 실패가 드러난다 — invokeAll()이 두 잡을 모두 실행 완료할 때까지 기다리므로 인가 실패여도
+    // 환율 조회가 이미 낭비 호출된다. fast-fail 회귀 확인용 테스트.
     @Test
-    void 소유하지_않은_전략은_포지션을_읽기_전에_거부한다() {
-        UUID otherUserId = UUID.randomUUID();
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(new Account(
-                ACCOUNT_ID, otherUserId, "타인계좌", "1", "key", "secret", null,
-                Broker.KIS, null));
+    void 소유하지_않은_전략은_예외를_전파하되_환율_병렬_호출은_낭비된다() {
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
+                any(), any(), eq(BenchmarkGranularity.WEEKLY)))
+                .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, "1100000000", FROM, TO))
                 .isInstanceOf(SecurityException.class);
 
-        verifyNoInteractions(cyclePositionPort, housingPriceIndexPort, exchangeRatePort);
+        verify(currentExchangeRatePort, times(1)).getMidRate();
     }
 
     @Test
@@ -744,15 +364,12 @@ class StatsServiceTest {
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", TO, FROM))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verifyNoInteractions(accountPort, strategyPort, strategyCyclePort,
-                cyclePositionPort, housingPriceIndexPort, exchangeRatePort);
+        verifyNoInteractions(investmentPointsPort, housingPriceIndexPort, currentExchangeRatePort);
     }
 
     @Test
     void 투자_데이터가_없으면_NO_INVESTMENT_DATA를_반환한다() {
-        stubUserWithStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of());
+        stubPortfolioWeekly(List.of(), FROM, TO);
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
 
@@ -762,7 +379,7 @@ class StatsServiceTest {
         assertThat(result.points()).isEmpty();
         assertThat(result.summary()).isNull();
         assertThat(result.emptyReason()).isEqualTo("NO_INVESTMENT_DATA");
-        verify(exchangeRatePort).getExchangeRate();
+        verify(currentExchangeRatePort).getMidRate();
     }
 
     @Test
@@ -784,9 +401,9 @@ class StatsServiceTest {
     @Test
     void 환율_예외는_완성된_비교_결과에서_환율만_null로_격리한다() {
         stubWeeklyPortfolioComparison("100.00", "184.20");
-        when(exchangeRatePort.getExchangeRate())
-                .thenReturn(new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")))
-                .thenThrow(new TossApiException("환율 조회 실패", null));
+        when(currentExchangeRatePort.getMidRate())
+                .thenReturn(new BigDecimal("1365.20"))
+                .thenThrow(new IllegalStateException("환율 조회 실패"));
 
         HousingBenchmarkComparison success = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
@@ -801,7 +418,7 @@ class StatsServiceTest {
         assertThat(isolated.summary()).isEqualTo(success.summary());
         assertThat(isolated.benchmark()).isEqualTo(success.benchmark());
         assertThat(isolated.emptyReason()).isEqualTo(success.emptyReason());
-        verify(exchangeRatePort, times(2)).getExchangeRate();
+        verify(currentExchangeRatePort, times(2)).getMidRate();
     }
 
     @Test
@@ -972,17 +589,6 @@ class StatsServiceTest {
 
     // ── ETF 벤치마크 비교 ────────────────────────────────────────────────────
 
-    private StrategyCycle stubEtfInvestment(String januaryValue, String februaryValue) {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
-                depositSnapshot(cycle.id(), januaryValue, "2026-01-31T01:00:00Z"),
-                depositSnapshot(cycle.id(), februaryValue, "2026-02-28T01:00:00Z")));
-        return cycle;
-    }
-
     private static List<IndexPrice> spyPrices() {
         return List.of(
                 new IndexPrice("SPY", LocalDate.of(2026, 1, 30), new BigDecimal("400.00")),
@@ -991,22 +597,21 @@ class StatsServiceTest {
 
     @Test
     void ETF_벤치마크_비교는_다운샘플링_없이_거래일별_교집합으로_비교한다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
         // IndexPrice.tradeDate는 US 거래일 원본이라 StatsService가 KST로 +1일 보정한다.
-        // 투자 스냅샷은 그 보정된 KST 날짜(1/6, 1/7, 2/28)에 맞춰 배치한다.
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
-                depositSnapshot(cycle.id(), "102.00", "2026-01-07T01:00:00Z"),
-                depositSnapshot(cycle.id(), "184.20", "2026-02-28T01:00:00Z")));
+        // 투자 시리즈는 그 보정된 KST 날짜(1/6, 1/7, 2/28)에 맞춰 배치한다.
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
+                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                .thenReturn(new InvestmentPointsPort.Result(List.of(
+                        point("2026-01-06", "100.00"),
+                        point("2026-01-07", "102.00"),
+                        point("2026-02-28", "184.20")), FROM, TO, null));
         List<IndexPrice> prices = List.of(
                 new IndexPrice("SPY", LocalDate.of(2026, 1, 5), new BigDecimal("400.00")),
                 new IndexPrice("SPY", LocalDate.of(2026, 1, 6), new BigDecimal("404.00")),
                 new IndexPrice("SPY", LocalDate.of(2026, 2, 27), new BigDecimal("440.00")));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(prices);
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
-                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
@@ -1043,14 +648,13 @@ class StatsServiceTest {
     @Test
     void ETF_비교는_이번_달이_아직_끝나지_않아도_아파트처럼_지난달로_clamp하지_않는다() {
         LocalDate today = LocalDate.now(TimeZones.KST);
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", today.toString());
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", today.atStartOfDay(TimeZones.KST).toInstant().toString())));
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
+                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                .thenReturn(new InvestmentPointsPort.Result(
+                        List.of(point(today.toString(), "100.00")), today, today, null));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
-                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, null, null);
@@ -1063,7 +667,11 @@ class StatsServiceTest {
 
     @Test
     void ETF_가격_데이터가_없으면_INSUFFICIENT_COMMON_MONTHS를_반환한다() {
-        stubEtfInvestment("100.00", "184.20");
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
+                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                .thenReturn(new InvestmentPointsPort.Result(List.of(
+                        point("2026-01-31", "100.00"),
+                        point("2026-02-28", "184.20")), FROM, TO, null));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
 
         HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
@@ -1076,37 +684,32 @@ class StatsServiceTest {
 
     @Test
     void ETF_비교도_소유한_개별_전략만_조회하고_전략_메타데이터를_반환한다() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount());
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
-                .thenReturn(List.of(
-                        depositSnapshot(cycle.id(), "100.00", "2026-01-01T01:00:00Z"),
-                        depositSnapshot(cycle.id(), "110.00", "2026-02-28T01:00:00Z")));
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
+                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                .thenReturn(new InvestmentPointsPort.Result(List.of(
+                        point("2026-01-31", "100.00"),
+                        point("2026-02-28", "110.00")), FROM, TO, STRATEGY));
         when(indexPricePort.findBySymbolAndRange(eq("QQQ"), any(), any())).thenReturn(spyPrices());
 
         HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.QQQ, FROM, TO);
 
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
-        verify(cyclePositionPort).findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any());
-        verify(cyclePositionPort, never()).findByUserAndRange(any(), any(), any());
+        verify(investmentPointsPort).fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
+                any(), any(), eq(BenchmarkGranularity.DAILY));
     }
 
     @Test
-    void ETF_비교도_소유하지_않은_전략은_포지션을_읽기_전에_거부한다() {
-        UUID otherUserId = UUID.randomUUID();
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(new Account(
-                ACCOUNT_ID, otherUserId, "타인계좌", "1", "key", "secret", null,
-                Broker.KIS, null));
+    void ETF_비교도_소유하지_않은_전략은_예외를_그대로_전파한다() {
+        when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
+                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
 
         assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.SPY, FROM, TO))
                 .isInstanceOf(SecurityException.class);
 
-        verifyNoInteractions(cyclePositionPort, indexPricePort, exchangeRatePort);
+        verifyNoInteractions(indexPricePort);
     }
 
     @Test
@@ -1115,20 +718,18 @@ class StatsServiceTest {
                 USER_ID, BenchmarkScope.STRATEGY, null, EtfBenchmarkSymbol.SPY, FROM, TO))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verifyNoInteractions(accountPort, strategyPort, strategyCyclePort,
-                cyclePositionPort, housingBenchmarkPricePort, exchangeRatePort, indexPricePort);
+        verifyNoInteractions(investmentPointsPort, housingBenchmarkPricePort, currentExchangeRatePort, indexPricePort);
     }
 
     @Test
     void 누락되거나_0_이하인_현재_환율은_null로_격리한다() {
         stubWeeklyPortfolioComparison("100.00", "184.20");
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
                 null,
-                new TossExchangeRate(new BigDecimal("1370.00"), null),
-                new TossExchangeRate(BigDecimal.ZERO, BigDecimal.ZERO),
-                new TossExchangeRate(new BigDecimal("-1"), new BigDecimal("-1")));
+                BigDecimal.ZERO,
+                new BigDecimal("-1"));
 
-        for (int invocation = 0; invocation < 4; invocation++) {
+        for (int invocation = 0; invocation < 3; invocation++) {
             HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                     USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                     LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
@@ -1136,100 +737,7 @@ class StatsServiceTest {
             assertThat(result.points()).isNotEmpty();
         }
 
-        verify(exchangeRatePort, times(4)).getExchangeRate();
-    }
-
-    @Test
-    void 요약_전략유형비교는_모의계좌_사이클을_제외한다() {
-        UUID mockAccountId = UUID.randomUUID();
-        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
-                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("100.00");
-        assertThat(summary.byType()).hasSize(1);
-        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
-    }
-
-    @Test
-    void 누적자산추이는_모의계좌_사이클을_제외한다() {
-        UUID mockAccountId = UUID.randomUUID();
-        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
-        StrategyCycle active = activeCycle("1000.00", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
-
-        EquityCurve curve = statsService.getEquityCurve(
-                USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).hasSize(1);
-        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(mockAccountId)));
-    }
-
-    @Test
-    void 사이클_성과_목록은_모의계좌_사이클도_포함한다() {
-        UUID mockAccountId = UUID.randomUUID();
-        Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
-        UUID mockStrategyId = UUID.randomUUID();
-        Strategy mockStrategy = new Strategy(mockStrategyId, mockAccountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategyId, null,
-                new BigDecimal("500.00"), new BigDecimal("600.00"),
-                LocalDate.parse("2026-01-01"), LocalDate.parse("2026-01-31"),
-                Instant.parse("2026-01-01T00:00:00Z"), null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
-        // 사이클 성과 목록(excludeMock=false)은 모의계좌 포함 전체 accountIds로 배치 조회한다
-        when(strategyPort.findByAccountIds(argThat(ids ->
-                ids.contains(ACCOUNT_ID) && ids.contains(mockAccountId))))
-                .thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY), mockAccountId, List.of(mockStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(mockCycle));
-
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
-
-        assertThat(page.items()).extracting(CyclePerformance::accountId).containsExactly(mockAccountId);
-    }
-
-    // ── 결과 캐시(TTL 5분) ───────────────────────────────────────────────────
-
-    @Test
-    void getSummary는_TTL_내_재조회시_캐시를_반환하고_DB를_다시_조회하지_않는다() {
-        stubUserWithStrategy();
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
-                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
-
-        StatsSummary first = statsService.getSummary(USER_ID);
-        StatsSummary second = statsService.getSummary(USER_ID);
-
-        assertThat(second).isEqualTo(first);
-        verify(accountPort, times(1)).findByUserId(USER_ID);
-        verify(strategyCyclePort, times(1)).findByStrategyIds(any());
-    }
-
-    @Test
-    void getEquityCurve는_파라미터별로_캐시_키가_분리된다() {
-        stubUserWithStrategy();
-        StrategyCycle active = activeCycle("1000.00", "2026-06-01");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
-
-        // 같은 파라미터 2회 → 캐시 1회 조회
-        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-        // to가 다른 호출 → 별도 캐시 키로 재조회
-        statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-31"));
-
-        verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
+        verify(currentExchangeRatePort, times(3)).getMidRate();
     }
 
     // ── 벤치마크 비교 캐시(TTL 10분) + 환율 병렬 조회 ───────────────────────────
@@ -1237,8 +745,8 @@ class StatsServiceTest {
     @Test
     void 벤치마크_비교는_같은_파라미터_재조회시_본체는_캐시하고_환율은_매번_재조회한다() {
         stubWeeklyPortfolioComparison("100.00", "184.20");
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
-                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         HousingBenchmarkComparison first = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
@@ -1248,39 +756,36 @@ class StatsServiceTest {
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(second.points()).isEqualTo(first.points());
-        // 본체(DB) 조회는 캐시 hit이라 1회만 — cyclePositionPort/housingPriceIndexPort 둘 다 검증
-        verify(cyclePositionPort, times(1)).findByUserAndRange(any(), any(), any());
+        // 본체(HTTP+DB) 조회는 캐시 hit이라 1회만 — investmentPointsPort/housingPriceIndexPort 둘 다 검증
+        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), any(), any(), any());
         verify(housingPriceIndexPort, times(1)).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any());
         // 환율은 캐시 대상이 아니라 응답마다 후결합 재조회
-        verify(exchangeRatePort, times(2)).getExchangeRate();
+        verify(currentExchangeRatePort, times(2)).getMidRate();
     }
 
     @Test
     void 벤치마크_비교는_regionCode가_다르면_별도_캐시_키로_본체를_재계산한다() {
         stubWeeklyPortfolioComparison("100.00", "184.20");
-        when(exchangeRatePort.getExchangeRate()).thenReturn(
-                new TossExchangeRate(new BigDecimal("1370.00"), new BigDecimal("1365.20")));
+        when(currentExchangeRatePort.getMidRate()).thenReturn(
+                new BigDecimal("1365.20"));
 
         statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
                 "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
                 "2600000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
-        // regionCode가 캐시 키에 포함되므로 본체(DB)가 각각 다시 조회된다
-        verify(cyclePositionPort, times(2)).findByUserAndRange(any(), any(), any());
+        // regionCode가 캐시 키에 포함되므로 본체(HTTP+DB)가 각각 다시 조회된다
+        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any(), any());
         verify(housingPriceIndexPort, times(2)).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any());
     }
 
     @Test
     void 벤치마크_본체_계산_실패는_병렬_래핑_없이_원본_예외를_그대로_전파한다() {
-        stubUserWithStrategy();
-        StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
-                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
-                depositSnapshot(cycle.id(), "184.20", "2026-02-23T01:00:00Z")));
+        stubPortfolioWeekly(List.of(
+                point("2026-01-05", "100.00"),
+                point("2026-02-23", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
         RuntimeException boom = new IllegalStateException("벤치마크 조회 실패");
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenThrow(boom);

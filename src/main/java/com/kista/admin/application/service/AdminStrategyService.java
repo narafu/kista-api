@@ -1,50 +1,35 @@
 package com.kista.admin.application.service;
 
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminStrategyUseCase;
-import com.kista.account.application.port.output.AccountPort;
 import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.trading.application.port.output.StrategyPort;
+import com.kista.admin.application.port.output.TradingCommandPort;
+import com.kista.sharedkernel.StrategyStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyStatus;
 
+// @Transactional 제거됨 — tradingCommandPort.updateStrategyStatus()가 HTTP 어댑터(내부 API 호출)라
+// 순수 HTTP 위임이 됐고, "@Transactional 내부 외부 시스템 호출 금지" 규칙(constraints.md)과도 부합하지 않는다.
 @Service
 @RequiredArgsConstructor
-@Transactional
 class AdminStrategyService implements AdminStrategyUseCase {
 
-    private final StrategyPort strategyPort;
-    private final AccountPort accountPort;
+    private final TradingCommandPort tradingCommandPort;
     private final AuditLogPort auditLogPort;
 
     @Override
     public void pauseStrategy(UUID adminId, UUID accountId, UUID strategyId) {
-        Strategy strategy = requireOwnedByAccount(accountId, strategyId);
-        strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
+        tradingCommandPort.updateStrategyStatus(accountId, strategyId, StrategyStatus.PAUSED);
         auditLogPort.log(adminId, "STRATEGY_PAUSE", "STRATEGY", strategyId,
                 Map.of("accountId", accountId.toString()));
     }
 
     @Override
     public void resumeStrategy(UUID adminId, UUID accountId, UUID strategyId) {
-        Strategy strategy = requireOwnedByAccount(accountId, strategyId);
-        strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
+        tradingCommandPort.updateStrategyStatus(accountId, strategyId, StrategyStatus.ACTIVE);
         auditLogPort.log(adminId, "STRATEGY_RESUME", "STRATEGY", strategyId,
                 Map.of("accountId", accountId.toString()));
-    }
-
-    private Strategy requireOwnedByAccount(UUID accountId, UUID strategyId) {
-        Account account = accountPort.findByIdOrThrow(accountId);
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        if (!strategy.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("strategy가 account에 속하지 않습니다");
-        }
-        return strategy;
     }
 }

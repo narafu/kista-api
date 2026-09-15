@@ -6,17 +6,15 @@ import com.kista.admin.adapter.in.web.dto.AdminReorderResponse;
 import com.kista.admin.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.admin.adapter.in.web.dto.AdminTradeResponse;
 import com.kista.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
-import com.kista.sharedkernel.TimeZones;
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.StrategySummary;
+import com.kista.admin.domain.model.AdminAccountView;
+import com.kista.admin.domain.model.AdminOrderView;
+import com.kista.admin.domain.model.AdminStrategySummary;
 import com.kista.user.domain.model.AdminUserView;
-import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.DstInfo;
+import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.market.application.port.output.MarketCalendarPort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -51,7 +49,7 @@ public class AdminTradeController {
     private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
     private final AdminTradeCorrectionUseCase adminTradeCorrection; // 관리자 수동 체결 보정
     private final AdminReorderUseCase adminReorder;                 // 관리자 재주문
-    private final MarketCalendarPort marketCalendarPort;            // 휴장일 판정
+    private final TradingCommandPort tradingCommandPort;            // 재주문 시점 가용성 조회(개장 여부 판정 포함)
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @Operation(summary = "전체 거래 내역 조회", description = "일괄 조회로 N+1을 방지합니다. from/to로 기간 필터링 가능합니다.")
@@ -76,19 +74,19 @@ public class AdminTradeController {
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        List<Order> orders = adminQuery.listStrategyOrders(accountId, strategyId, tradeDate).stream()
+        List<AdminOrderView> orders = adminQuery.listStrategyOrders(accountId, strategyId, tradeDate).stream()
                 .filter(order -> accountId.equals(order.accountId()))
                 .toList();
         if (orders.isEmpty()) return List.of();
         // 단일 계좌만 조회 — 전체 풀스캔 불필요
-        Account account = adminQuery.findAccount(accountId)
+        AdminAccountView account = adminQuery.findAccount(accountId)
                 .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
         AdminUserView user = adminUser.findUser(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + account.userId()));
-        Map<UUID, Account> accountMap = Map.of(accountId, account);
+        Map<UUID, AdminAccountView> accountMap = Map.of(accountId, account);
         Map<UUID, AdminUserView> userMap = Map.of(account.userId(), user);
-        Set<UUID> cycleIds = orders.stream().map(Order::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, StrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Set<UUID> cycleIds = orders.stream().map(AdminOrderView::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, AdminStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap)).toList();
     }
 
@@ -106,10 +104,8 @@ public class AdminTradeController {
     @Operation(summary = "재주문 시점 가용성 조회", description = "UI 주문시점 셀렉터의 disable 여부 판단에 사용합니다.")
     @GetMapping("/trades/reorder-timing")
     public ReorderTimingAvailabilityResponse getReorderTiming() {
-        if (!marketCalendarPort.isMarketOpen(java.time.LocalDate.now(TimeZones.KST))) {
-            return new ReorderTimingAvailabilityResponse(false, false, false);
-        }
-        return ReorderTimingAvailabilityResponse.from(DstInfo.calculate().reorderTimingAvailability());
+        // 개장 여부 판정은 trading-core 쪽 내부 API 구현부(MarketCalendarPort.isMarketOpen)로 이관됨
+        return ReorderTimingAvailabilityResponse.from(tradingCommandPort.reorderTimingAvailability());
     }
 
     @Operation(summary = "관리자 재주문")
@@ -120,21 +116,21 @@ public class AdminTradeController {
         return AdminReorderResponse.from(adminReorder.reorder(adminId, request.toCommand()));
     }
 
-    // accountId → Account 전체 매핑 (N+1 방지용 일괄 조회)
-    private Map<UUID, Account> buildAccountMap() {
+    // accountId → AdminAccountView 전체 매핑 (N+1 방지용 일괄 조회)
+    private Map<UUID, AdminAccountView> buildAccountMap() {
         return adminQuery.listAccounts(null, null).stream()
-                .collect(Collectors.toMap(Account::id, Function.identity()));
+                .collect(Collectors.toMap(AdminAccountView::id, Function.identity()));
     }
 
     // 주문 목록 → AdminTradeResponse 목록 변환 (accountMap/userMap/strategyTypeMap 공통 조립)
-    private List<AdminTradeResponse> toResponses(List<Order> orders) {
-        Map<UUID, Account> accountMap = buildAccountMap();
+    private List<AdminTradeResponse> toResponses(List<AdminOrderView> orders) {
+        Map<UUID, AdminAccountView> accountMap = buildAccountMap();
         Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
         Set<UUID> cycleIds = orders.stream()
-                .map(Order::strategyCycleId)
+                .map(AdminOrderView::strategyCycleId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<UUID, StrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Map<UUID, AdminStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream()
                 .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap))
                 .toList();

@@ -1,287 +1,75 @@
 package com.kista.admin.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.OrderStatus;
+import com.kista.admin.application.port.output.AuditLogPort;
+import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.admin.domain.model.AdminReorderResult;
-import com.kista.sharedkernel.Broker;
-import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.OrderType;
-import com.kista.matching.domain.model.OrderTiming;
+import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
-import com.kista.trading.domain.model.DstInfo;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.user.domain.model.User;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.market.application.port.output.MarketCalendarPort;
-import com.kista.trading.application.port.output.OrderPort;
-import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.user.application.port.output.UserPort;
-import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.broker.domain.model.OrderResult;
-import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
 
+// 실제 재주문 로직은 trading-core로 이관됨 — 이 테스트는 포트 위임과 감사 로그 호출만 검증
 @ExtendWith(MockitoExtension.class)
 class AdminReorderServiceTest {
 
-    @Mock UserPort userPort;
-    @Mock AccountPort accountPort;
-    @Mock StrategyPort strategyPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock OrderPort orderPort;
+    @Mock TradingCommandPort tradingCommandPort;
     @Mock AuditLogPort auditLogPort;
-    @Mock BrokerAdapterRegistry brokerAdapterRegistry;
-    @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
-    @Mock MarketCalendarPort marketCalendarPort;
 
     @InjectMocks AdminReorderService service;
 
-    private static final UUID ADMIN_ID   = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
-    private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
-    private static final UUID STRATEGY_ID = UUID.fromString("00000000-0000-0000-0000-000000000030");
-    private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000040");
-    private static final UUID ORDER_ID   = UUID.fromString("00000000-0000-0000-0000-000000000050");
-
-    // 시장 단계별 테스트 상수 (DST=true 기준, 미국 EDT)
-    // marketOpen = 22:30 KST = 13:30 UTC
-    // marketClose = 05:00 KST = 20:00 UTC (전날)
-    // BLOCKED = [05:00, 17:00) KST = [20:00 UTC D-1, 08:00 UTC D)
-
-    // 개장 전 (DIRECT 시간대, 19:00 KST = 10:00 UTC — before 22:30 open)
-    private static final DstInfo DST_FOR_TEST = new DstInfo(true,
-            Instant.parse("2026-07-02T19:30:00Z"),  // orderAt (무관)
-            Instant.parse("2026-07-02T20:10:00Z"),  // postClose (무관)
-            Instant.parse("2026-07-01T13:30:00Z")); // marketOpen = 22:30 KST July 1
-    private static final Instant NOW_BEFORE_OPEN = Instant.parse("2026-07-01T10:00:00Z"); // 19:00 KST July 1
-
-    // 정규장 중 (DIRECT 시간대, 02:00 KST July 2 = 17:00 UTC July 1 — after 22:30 open)
-    private static final Instant NOW_DURING_MARKET = Instant.parse("2026-07-01T17:00:00Z"); // 02:00 KST July 2
-
-    // 장 마감 후 (BLOCKED, 07:00 KST July 2 = 22:00 UTC July 1 — between close 05:00 and premarket 17:00 KST)
-    private static final Instant NOW_AFTER_CLOSE = Instant.parse("2026-07-01T22:00:00Z"); // 07:00 KST July 2
-
-    // --- 상태별 취소 + PLANNED 저장 ---
+    private static final UUID ADMIN_ID    = UUID.randomUUID();
+    private static final UUID USER_ID     = UUID.randomUUID();
+    private static final UUID ACCOUNT_ID  = UUID.randomUUID();
+    private static final UUID STRATEGY_ID = UUID.randomUUID();
+    private static final UUID ORDER_ID    = UUID.randomUUID();
 
     @Test
-    void reorder_fromPlanned_cancelsThenSavesPlanned() {
-        stubCommon(plannedOrder());
-
-        AdminReorderResult result = reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
-
-        verify(orderPort).markCancelled(ORDER_ID);
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
-        assertThat(result.originalStatus()).isEqualTo(Order.OrderStatus.PLANNED);
-        assertThat(result.resultingStatus()).isEqualTo(Order.OrderStatus.PLANNED);
-    }
-
-    @Test
-    void reorder_fromPlaced_cancelsBrokerThenSavesPlanned() {
-        stubCommon(placedOrder());
-        when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
-
-        reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
-
-        verify(brokerOrderCorrectionPort).cancel(new CancelInstruction(placedOrder().ticker(), placedOrder().externalOrderId()), account().toBrokerRef()); // 증권사 취소
-        verify(orderPort).markCancelled(ORDER_ID);
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
-    }
-
-    @Test
-    void reorder_fromFilled_noCancel_savesPlanned() {
-        stubCommon(filledOrder());
-
-        reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
-
-        verify(orderPort, never()).markCancelled(any()); // 체결 주문 취소 없음
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_OPEN));
-    }
-
-    @Test
-    void reorder_fromFailed_noCancel_savesPlanned() {
-        stubCommon(failedOrder());
-
-        reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
-
-        verify(orderPort, never()).markCancelled(any());
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLANNED, OrderTiming.AT_OPEN));
-    }
-
-    // --- IMMEDIATE 접수 ---
-
-    @Test
-    void reorder_immediate_success_savesPlaced() {
-        stubCommon(plannedOrder());
-        when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
-        when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-1"));
-
-        AdminReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
-
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.PLACED, OrderTiming.IMMEDIATE));
-        assertThat(result.resultingStatus()).isEqualTo(Order.OrderStatus.PLACED);
-        assertThat(result.newOrderExternalId()).isEqualTo("NEW-EXT-1");
-    }
-
-    @Test
-    void reorder_immediate_brokerError_savesFailed() {
-        stubCommon(plannedOrder());
-        when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
-        when(brokerOrderCorrectionPort.place(any(), any())).thenThrow(new RuntimeException("증권사 오류"));
-
-        AdminReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
-
-        verify(orderPort).saveAll(argOrdersMatch(Order.OrderStatus.FAILED, OrderTiming.IMMEDIATE));
-        assertThat(result.resultingStatus()).isEqualTo(Order.OrderStatus.FAILED);
-    }
-
-    // --- 시점 가용성 검증 ---
-
-    @Test
-    void reorder_immediateWhenClosed_throwsIllegalArgument() {
-        stubCommon(plannedOrder());
-
-        assertThatThrownBy(() -> reorder(command(OrderTiming.IMMEDIATE), NOW_AFTER_CLOSE))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("IMMEDIATE");
-    }
-
-    @Test
-    void reorder_atOpenAfterMarketOpen_throwsIllegalArgument() {
-        stubCommon(plannedOrder());
-
-        // NOW_DURING_MARKET = 정규장 중 → AT_OPEN 불가 (개장 이후)
-        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_OPEN), NOW_DURING_MARKET))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("AT_OPEN");
-    }
-
-    @Test
-    void reorder_allTimingsWhenClosed_allThrow() {
-        stubCommon(plannedOrder());
-
-        for (OrderTiming timing : OrderTiming.values()) {
-            assertThatThrownBy(() -> reorder(command(timing), NOW_AFTER_CLOSE))
-                    .isInstanceOf(IllegalArgumentException.class);
-        }
-    }
-
-    // --- 휴장일 가드 ---
-
-    @Test
-    void reorder_onMarketHoliday_throwsIllegalArgument() {
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user());
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
-        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle());
-        when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(plannedOrder()));
-        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
-
-        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("휴장일");
-    }
-
-    // --- 헬퍼 ---
-
-    private AdminReorderResult reorder(AdminReorderCommand command, Instant now) {
-        return service.reorder(ADMIN_ID, command, DST_FOR_TEST, now);
-    }
-
-    private void stubCommon(Order order) {
-        when(userPort.findByIdOrThrow(USER_ID)).thenReturn(user());
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
-        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle());
-        when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(order));
-        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(true);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static java.util.List<Order> argOrdersMatch(Order.OrderStatus status, OrderTiming timing) {
-        return org.mockito.ArgumentMatchers.argThat(orders ->
-                ((java.util.List<Order>) orders).size() == 1
-                && ((java.util.List<Order>) orders).get(0).status() == status
-                && ((java.util.List<Order>) orders).get(0).timing() == timing);
-    }
-
-    private User user() {
-        return DomainFixtures.activeUserWithTelegram(USER_ID);
-    }
-
-    private Account account() {
-        return new Account(ACCOUNT_ID, USER_ID, "Toss", "1234-56", "app", "secret", "seq-1",
-                Broker.TOSS, null);
-    }
-
-    private Strategy strategy() {
-        return new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
-    }
-
-    private StrategyCycle cycle() {
-        return new StrategyCycle(CYCLE_ID, STRATEGY_ID, UUID.randomUUID(), new BigDecimal("6989.00"),
-                null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
-    }
-
-    private Order plannedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
-                new BigDecimal("236.54"), Order.OrderStatus.PLANNED, null, null, null);
-    }
-
-    private Order placedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
-                new BigDecimal("236.54"), Order.OrderStatus.PLACED, "PLACED-1", null, null);
-    }
-
-    private Order filledOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 2,
-                new BigDecimal("236.54"), Order.OrderStatus.FILLED, "FILLED-1", 2, new BigDecimal("236.54"));
-    }
-
-    private Order failedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
-                new BigDecimal("236.54"), Order.OrderStatus.FAILED, null, null, null);
-    }
-
-    private AdminReorderCommand command(OrderTiming timing) {
-        return new AdminReorderCommand(
+    void reorder_요청을_포트로_그대로_전달하고_응답을_되돌리고_감사로그를_남긴다() {
+        AdminReorderCommand command = new AdminReorderCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
-                timing,
-                LocalDate.of(2026, 7, 1),
-                null,
-                2,
-                new BigDecimal("250.00"),
-                "reorder memo"
-        );
+                OrderTiming.AT_CLOSE, LocalDate.of(2026, 7, 1), OrderDirection.SELL,
+                2, new BigDecimal("250.00"), "reorder memo");
+        AdminReorderResult result = new AdminReorderResult(USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
+                OrderStatus.PLANNED, OrderStatus.PLANNED, null,
+                new BigDecimal("236.54"), 1, OrderDirection.SELL);
+        when(tradingCommandPort.reorder(any())).thenReturn(result);
+
+        AdminReorderResult response = service.reorder(ADMIN_ID, command);
+
+        ArgumentCaptor<AdminReorderCommand> captor = ArgumentCaptor.forClass(AdminReorderCommand.class);
+        verify(tradingCommandPort).reorder(captor.capture());
+        AdminReorderCommand sent = captor.getValue();
+        assertThat(sent).isEqualTo(command);
+
+        assertThat(response).isEqualTo(result);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(auditLogPort).log(eq(ADMIN_ID), eq("REORDER"), eq("ORDER"), eq(ORDER_ID), payloadCaptor.capture());
+        Map<String, Object> payload = payloadCaptor.getValue();
+        // 실제 브로커 주문을 유발하는 감사 대상이므로 원본/변경 주문 내역이 전부 남아야 한다
+        assertThat(payload.get("oldStatus")).isEqualTo("PLANNED");
+        assertThat(payload.get("oldPrice")).isEqualTo("236.54");
+        assertThat(payload.get("oldQuantity")).isEqualTo(1);
+        assertThat(payload.get("newDirection")).isEqualTo("SELL");
+        assertThat(payload.get("newPrice")).isEqualTo("250.00");
+        assertThat(payload.get("newQuantity")).isEqualTo(2);
     }
 }

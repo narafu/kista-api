@@ -1,9 +1,9 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
+import com.kista.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -34,7 +34,7 @@ class AdminPingControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean
     private JwtDecoder jwtDecoder; // JwtDecoderConfig의 실제 빈 생성 방지 + JwtAuthFilter 의존성 주입용
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");

@@ -1,8 +1,5 @@
 package com.kista.admin.adapter.out.aop;
 
-import com.kista.account.domain.model.Account;
-import com.kista.matching.domain.model.AccountBalance;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.notify.application.port.output.NotifyPort;
 import org.junit.jupiter.api.Test;
@@ -47,7 +44,7 @@ class ErrorLogAspectPointcutTest {
         NotifyPort notifyPort() {
             return new NotifyPort() {
                 @Override public void notifyMarketClosed() {}
-                @Override public void notifyInsufficientBalance(Account account, AccountBalance b, StrategyTicker ticker) {}
+                @Override public void notifyInsufficientBalance(int holdings, java.math.BigDecimal usdDeposit, StrategyTicker ticker) {}
                 @Override public void notifyError(Exception e) {} // 실제 발송 없이 포인트컷 매칭만 검증
                 @Override public void notifyInfo(String message) {}
             };

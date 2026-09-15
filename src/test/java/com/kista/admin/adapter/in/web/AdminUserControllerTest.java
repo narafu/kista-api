@@ -1,12 +1,12 @@
 package com.kista.admin.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -43,7 +43,7 @@ class AdminUserControllerTest {
     @Autowired ObjectMapper objectMapper;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;         // JwtDecoderConfig 실제 빈 생성 방지
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AdminUserUseCase adminUser;    // 컨트롤러 의존성 주입용
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");

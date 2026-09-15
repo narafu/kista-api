@@ -5,6 +5,7 @@ import com.kista.stats.domain.model.BenchmarkAssetType;
 import com.kista.stats.domain.model.HousingBenchmarkComparison;
 import com.kista.stats.domain.model.HousingBenchmarkPoint;
 import com.kista.stats.domain.model.PerformanceComparisonSummary;
+import com.kista.stats.domain.model.StrategyRef;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -89,7 +90,7 @@ public record HousingBenchmarkComparisonResponse(
     ) {}
 
     public static HousingBenchmarkComparisonResponse from(HousingBenchmarkComparison comparison) {
-        HousingBenchmarkComparison.StrategyInfo strategy = comparison.strategy();
+        StrategyRef strategy = comparison.strategy();
         HousingBenchmarkComparison.Benchmark benchmark = comparison.benchmark();
         HousingBenchmarkComparison.Period period = comparison.period();
         var rate = comparison.currentExchangeRate();

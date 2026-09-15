@@ -6,8 +6,8 @@ import com.kista.stats.domain.model.HousingBenchmarkComparison;
 import com.kista.stats.domain.model.HousingBenchmarkPoint;
 import com.kista.stats.domain.model.InvestmentPoint;
 import com.kista.stats.domain.model.PerformanceComparisonSummary;
-import com.kista.stats.domain.model.ReturnMetrics;
-import com.kista.trading.domain.model.Strategy;
+import com.kista.sharedkernel.ReturnMetrics;
+import com.kista.stats.domain.model.StrategyRef;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,17 +28,13 @@ final class HousingBenchmarkComparisonBuilder {
 
     HousingBenchmarkComparison build(
             BenchmarkScope scope,
-            Strategy strategy,
+            StrategyRef strategy,
             HousingBenchmarkComparison.Benchmark benchmark,
             List<InvestmentPoint> investmentPoints,
             Map<LocalDate, BigDecimal> benchmarkPrices,
             BenchmarkGranularity granularity) {
-        HousingBenchmarkComparison.StrategyInfo strategyInfo = strategy == null ? null
-                : new HousingBenchmarkComparison.StrategyInfo(
-                        strategy.id(), strategy.type(), strategy.ticker());
-
         if (investmentPoints.isEmpty()) {
-            return empty(scope, strategyInfo, benchmark, "NO_INVESTMENT_DATA");
+            return empty(scope, strategy, benchmark, "NO_INVESTMENT_DATA");
         }
 
         Map<LocalDate, InvestmentPoint> investmentByDate = investmentPoints.stream()
@@ -51,14 +47,14 @@ final class HousingBenchmarkComparisonBuilder {
                 .collect(Collectors.toSet()));
 
         if (commonDates.size() < 2) {
-            return empty(scope, strategyInfo, benchmark, "INSUFFICIENT_COMMON_MONTHS");
+            return empty(scope, strategy, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
         LocalDate firstDate = commonDates.getFirst();
         BigDecimal firstInvestmentIndex = investmentByDate.get(firstDate).investmentIndexUsd();
         BigDecimal firstBenchmarkPrice = benchmarkPrices.get(firstDate);
         if (firstInvestmentIndex == null || firstInvestmentIndex.signum() <= 0) {
-            return empty(scope, strategyInfo, benchmark, "INSUFFICIENT_COMMON_MONTHS");
+            return empty(scope, strategy, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
         List<HousingBenchmarkPoint> points = new ArrayList<>();
@@ -106,7 +102,7 @@ final class HousingBenchmarkComparisonBuilder {
 
         return new HousingBenchmarkComparison(
                 scope,
-                strategyInfo,
+                strategy,
                 benchmark,
                 new HousingBenchmarkComparison.Period(
                         firstDate, points.getLast().baseDate(), points.size()),
@@ -118,7 +114,7 @@ final class HousingBenchmarkComparisonBuilder {
 
     private static HousingBenchmarkComparison empty(
             BenchmarkScope scope,
-            HousingBenchmarkComparison.StrategyInfo strategy,
+            StrategyRef strategy,
             HousingBenchmarkComparison.Benchmark benchmark,
             String reason) {
         return new HousingBenchmarkComparison(

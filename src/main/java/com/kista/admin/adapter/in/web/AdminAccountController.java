@@ -3,9 +3,9 @@ package com.kista.admin.adapter.in.web;
 import com.kista.admin.adapter.in.web.dto.AdminAccountResponse;
 import com.kista.admin.adapter.in.web.dto.AdminStrategyResponse;
 import com.kista.admin.adapter.in.web.dto.StrategyStatusRequest;
-import com.kista.account.domain.model.Account;
+import com.kista.admin.domain.model.AdminAccountView;
 import com.kista.user.domain.model.AdminUserView;
-import com.kista.trading.domain.model.Strategy;
+import com.kista.admin.domain.model.AdminStrategyView;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminStrategyUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
@@ -47,9 +47,9 @@ public class AdminAccountController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
-        List<Account> accounts = adminQuery.listAccounts(from, to);
-        Set<UUID> accountIds = accounts.stream().map(Account::id).collect(Collectors.toSet());
-        Map<UUID, List<Strategy>> strategyMap = adminQuery.listStrategiesByAccountIds(accountIds);
+        List<AdminAccountView> accounts = adminQuery.listAccounts(from, to);
+        Set<UUID> accountIds = accounts.stream().map(AdminAccountView::id).collect(Collectors.toSet());
+        Map<UUID, List<AdminStrategyView>> strategyMap = adminQuery.listStrategiesByAccountIds(accountIds);
         return accounts.stream()
                 .map(a -> AdminAccountResponse.from(a, userMap.get(a.userId()), strategyMap.getOrDefault(a.id(), List.of())))
                 .toList();

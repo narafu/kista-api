@@ -1,22 +1,23 @@
 package com.kista.admin.adapter.in.web;
 
+import com.kista.sharedkernel.OrderStatus;
 import com.kista.sharedkernel.Broker;
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminReorderResult;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
-import com.kista.trading.domain.model.Order;
+import com.kista.admin.domain.model.AdminOrderView;
 import com.kista.sharedkernel.OrderType;
-import com.kista.matching.domain.model.OrderTiming;
+import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.user.application.usecase.BlacklistUseCase;
-import com.kista.market.application.port.output.MarketCalendarPort;
+import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.admin.application.port.output.TradingCommandPort;
+import com.kista.admin.domain.model.AdminReorderTimingAvailability;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -57,12 +58,12 @@ class AdminTradeControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AdminTradeCorrectionUseCase adminTradeCorrection;
     @MockitoBean AdminReorderUseCase adminReorder;
-    @MockitoBean MarketCalendarPort marketCalendarPort;
+    @MockitoBean TradingCommandPort tradingCommandPort;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -99,14 +100,10 @@ class AdminTradeControllerTest {
         UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
         // 단일 계좌/사용자 조회 — 전체 풀스캔 대신 findAccount/findUser 사용
         when(adminQuery.findAccount(accountId)).thenReturn(Optional.of(
-                new com.kista.account.domain.model.Account(
+                new com.kista.admin.domain.model.AdminAccountView(
                         accountId,
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
-                        "toss-main",
                         "1234-56",
-                        null,
-                        null,
-                        null,
                         Broker.TOSS,
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
@@ -121,7 +118,7 @@ class AdminTradeControllerTest {
                 )
         ));
         when(adminQuery.listStrategyOrders(accountId, strategyId, LocalDate.of(2026, 7, 1))).thenReturn(List.of(
-                new Order(
+                new AdminOrderView(
                         UUID.fromString("00000000-0000-0000-0000-000000000050"),
                         accountId,
                         cycleId,
@@ -130,9 +127,10 @@ class AdminTradeControllerTest {
                         OrderType.LIMIT,
                         OrderTiming.AT_OPEN,
                         OrderDirection.SELL,
+                        "SELL_01",
                         2,
                         new BigDecimal("267.37"),
-                        Order.OrderStatus.PLACED,
+                        OrderStatus.PLACED,
                         "BROKER-1",
                         null,
                         null
@@ -141,7 +139,7 @@ class AdminTradeControllerTest {
         when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId)))
                 .thenReturn(java.util.Map.of(
                         cycleId,
-                        new com.kista.trading.domain.model.StrategySummary(strategyId, StrategyType.PRIVACY)
+                        new com.kista.admin.domain.model.AdminStrategySummary(strategyId, StrategyType.PRIVACY)
                 ));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)
@@ -263,9 +261,12 @@ class AdminTradeControllerTest {
                         UUID.fromString("00000000-0000-0000-0000-000000000020"),
                         UUID.fromString("00000000-0000-0000-0000-000000000030"),
                         UUID.fromString("00000000-0000-0000-0000-000000000050"),
-                        Order.OrderStatus.PLANNED,
-                        Order.OrderStatus.PLANNED,
-                        null
+                        OrderStatus.PLANNED,
+                        OrderStatus.PLANNED,
+                        null,
+                        new BigDecimal("236.54"),
+                        1,
+                        OrderDirection.SELL
                 ));
 
         mockMvc.perform(post("/api/admin/trades/reorders")
@@ -279,7 +280,9 @@ class AdminTradeControllerTest {
 
     @Test
     void getReorderTiming_adminRole_tradingDay_returnsTimingFlags() throws Exception {
-        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        // 개장 여부 판정은 trading-core 내부 API 구현부로 이관됨 — 컨트롤러는 포트 결과를 그대로 반환
+        when(tradingCommandPort.reorderTimingAvailability())
+                .thenReturn(new AdminReorderTimingAvailability(true, true, false));
 
         mockMvc.perform(get("/api/admin/trades/reorder-timing")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -291,7 +294,9 @@ class AdminTradeControllerTest {
 
     @Test
     void getReorderTiming_adminRole_holiday_returnsAllFalse() throws Exception {
-        when(marketCalendarPort.isMarketOpen(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        // 비개장일 판정도 trading-core 쪽에서 이미 반영된 결과를 그대로 전달
+        when(tradingCommandPort.reorderTimingAvailability())
+                .thenReturn(new AdminReorderTimingAvailability(false, false, false));
 
         mockMvc.perform(get("/api/admin/trades/reorder-timing")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -301,3 +306,4 @@ class AdminTradeControllerTest {
                 .andExpect(jsonPath("$.immediate").value(false));
     }
 }
+

@@ -1,7 +1,5 @@
 package com.kista.admin.domain.model;
 
-import com.kista.trading.domain.model.Strategy;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;

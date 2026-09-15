@@ -1,13 +1,13 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
-import com.kista.trading.domain.model.Strategy;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
+import com.kista.admin.domain.model.AdminStrategyView;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminStrategyUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -43,7 +43,7 @@ class AdminAccountControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AdminStrategyUseCase adminStrategy;
@@ -79,7 +79,7 @@ class AdminAccountControllerTest {
     void listStrategiesByAccount_adminRole_returns200() throws Exception {
         UUID accountId = UUID.randomUUID();
         when(adminQuery.listStrategies(accountId)).thenReturn(List.of(
-                new Strategy(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                new AdminStrategyView(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                         StrategyTicker.SOXL, StrategyCycleSeedType.MAX)));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies", accountId)

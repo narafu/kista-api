@@ -3,6 +3,7 @@ package com.kista.stats.adapter.in.web.dto;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.stats.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
+import com.kista.trading.stats.adapter.in.web.dto.EquityCurveResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;

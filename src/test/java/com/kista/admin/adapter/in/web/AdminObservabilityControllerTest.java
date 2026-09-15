@@ -1,13 +1,13 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminAnomalies;
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -39,7 +39,7 @@ class AdminObservabilityControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AppErrorLogPort appErrorLogPort; // GlobalExceptionHandler 의존성

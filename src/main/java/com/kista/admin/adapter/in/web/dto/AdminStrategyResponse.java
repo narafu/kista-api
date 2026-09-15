@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.trading.domain.model.Strategy;
+import com.kista.admin.domain.model.AdminStrategyView;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
@@ -18,7 +18,7 @@ public record AdminStrategyResponse(
         @Schema(description = "사이클 종료 후 재등록 정책", example = "NONE")
         String cycleSeedType
 ) {
-    public static AdminStrategyResponse from(Strategy strategy) {
+    public static AdminStrategyResponse from(AdminStrategyView strategy) {
         return new AdminStrategyResponse(
                 strategy.id(),
                 strategy.type().name(),

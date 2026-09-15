@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.account.domain.model.Account;
-import com.kista.account.domain.model.AccountNumberMasker;
+import com.kista.admin.domain.model.AdminAccountView;
+import com.kista.sharedkernel.AccountNumberMasker;
 import com.kista.user.domain.model.AdminUserView;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -23,7 +23,7 @@ public record AdminAccountItem(
         @Schema(description = "브로커 코드", example = "KIS")
         String broker
 ) {
-    public static AdminAccountItem from(Account a, Map<UUID, AdminUserView> userMap) {
+    public static AdminAccountItem from(AdminAccountView a, Map<UUID, AdminUserView> userMap) {
         AdminUserView user = a.userId() != null ? userMap.get(a.userId()) : null;
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
         return new AdminAccountItem(

@@ -1,16 +1,11 @@
 package com.kista.stats.domain.model;
 
-import com.kista.trading.domain.model.Strategy;
-
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
 
 public record HousingBenchmarkComparison(
         BenchmarkScope scope,
-        StrategyInfo strategy,
+        StrategyRef strategy,
         Benchmark benchmark,
         Period period,
         PerformanceComparisonSummary summary,
@@ -18,8 +13,6 @@ public record HousingBenchmarkComparison(
         CurrentExchangeRate currentExchangeRate,
         String emptyReason
 ) {
-    public record StrategyInfo(UUID id, StrategyType type, StrategyTicker ticker) {}
-
     public record Benchmark(
             BenchmarkAssetType assetType,
             String regionCode,   // HOUSING 전용, ETF면 null

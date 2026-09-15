@@ -2,15 +2,14 @@ package com.kista.admin.application.service;
 
 import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.trading.domain.model.Strategy;
 import com.kista.user.application.event.ApprovalRequirementDisabledEvent;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.RuntimeSettingsPort;
-import com.kista.account.application.port.output.BrokerEnabledPort;
+import com.kista.sharedkernel.port.BrokerEnabledPort;
 import com.kista.user.application.port.output.ApprovalPolicyPort;
-import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
+import com.kista.sharedkernel.port.StrategyCreationPolicyPort;
 import com.kista.sharedkernel.StrategyCreationSettings;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;

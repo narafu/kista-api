@@ -1,181 +1,53 @@
 package com.kista.admin.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.sharedkernel.TimeZones;
-import com.kista.account.domain.model.Account;
+import com.kista.admin.application.port.output.AuditLogPort;
+import com.kista.admin.application.port.output.TradingCommandPort;
+import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.domain.model.AdminReorderCommand;
 import com.kista.admin.domain.model.AdminReorderResult;
-import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.DstInfo;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.user.domain.model.User;
-import com.kista.admin.application.usecase.AdminReorderUseCase;
-import com.kista.account.application.port.output.AccountPort;
-import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.market.application.port.output.MarketCalendarPort;
-import com.kista.trading.application.port.output.OrderPort;
-import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.user.application.port.output.UserPort;
-import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.broker.domain.model.OrderInstruction;
-import com.kista.broker.domain.model.OrderResult;
-import com.kista.sharedkernel.OrderType;
-import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-@Slf4j
+// 관리자 재주문 접수/취소 — 실제 로직은 trading-core 내부 API로 이관됨, 여기는 요청/응답 전달 + 감사 로그만 담당
 @Service
 @RequiredArgsConstructor
-@Transactional
 class AdminReorderService implements AdminReorderUseCase {
 
     private static final String AUDIT_ACTION = "REORDER"; // 감사 로그 액션 코드
     private static final String AUDIT_TARGET_TYPE = "ORDER";
 
-    private final UserPort userPort;
-    private final AccountPort accountPort;
-    private final StrategyPort strategyPort;
-    private final StrategyCyclePort strategyCyclePort;
-    private final OrderPort orderPort;
+    private final TradingCommandPort tradingCommandPort;
     private final AuditLogPort auditLogPort;
-    private final BrokerAdapterRegistry brokerAdapterRegistry;
-    private final MarketCalendarPort marketCalendarPort;
 
     @Override
     public AdminReorderResult reorder(UUID adminId, AdminReorderCommand command) {
-        DstInfo dst = DstInfo.calculate();
-        return reorder(adminId, command, dst, Instant.now());
+        AdminReorderResult result = tradingCommandPort.reorder(command);
+
+        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, result.sourceOrderId(),
+                auditPayload(command, result));
+
+        return result;
     }
 
-    // 테스트 주입용 — DstInfo + 판정 시각 직접 지정
-    AdminReorderResult reorder(UUID adminId, AdminReorderCommand command, DstInfo dst, Instant now) {
-        AdminSelectionChain.Selection sel = AdminSelectionChain.resolveAndValidate(
-                userPort, accountPort, strategyPort, command.userId(), command.accountId(), command.strategyId());
-        User user = sel.user();
-        Account account = sel.account();
-        Strategy strategy = sel.strategy();
-        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
-        Order sourceOrder = orderPort.findById(command.orderId())
-                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + command.orderId()));
-
-        AdminSelectionChain.validate(user, account, strategy, sourceOrder);
-        if (!sourceOrder.strategyCycleId().equals(currentCycle.id())) {
-            throw new IllegalArgumentException("현재 전략 사이클 주문만 재주문할 수 있습니다");
-        }
-
-        BigDecimal price = requirePrice(command);
-        int quantity = requireQuantity(command);
-        OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
-        LocalDate tradeDate = command.tradeDate() != null ? command.tradeDate() : sourceOrder.tradeDate();
-
-        // 1. 원본 상태별 취소 처리
-        cancelIfNeeded(sourceOrder, account);
-
-        // 2. 주문시점 가용성 서버 측 재검증 (UI disable 우회 방지)
-        if (!marketCalendarPort.isMarketOpen(LocalDate.now(TimeZones.KST))) {
-            throw new IllegalArgumentException("휴장일에는 재주문할 수 없습니다");
-        }
-        DstInfo.ReorderTimingAvailability avail = dst.reorderTimingAvailabilityAt(now);
-        boolean timingOk = switch (command.timing()) {
-            case AT_OPEN -> avail.atOpen();
-            case AT_CLOSE -> avail.atClose();
-            case IMMEDIATE -> avail.immediate();
-        };
-        if (!timingOk) {
-            throw new IllegalArgumentException("현재 시장 단계에서 " + command.timing() + " 접수가 불가합니다");
-        }
-
-        // 3. 재주문 생성 — timing에 따라 PLANNED 저장 또는 즉시 증권사 접수
-        Order newOrder = Order.reorder(sourceOrder, tradeDate, direction, quantity, price, command.timing());
-        PlacementResult placement = placeOrSave(newOrder, account, command.timing());
-
-        // 4. 감사 로그
-        auditLogPort.log(adminId, AUDIT_ACTION, AUDIT_TARGET_TYPE, sourceOrder.id(),
-                auditPayload(command, sourceOrder, direction, quantity, price, placement.status()));
-
-        return new AdminReorderResult(command.userId(), command.accountId(), command.strategyId(),
-                sourceOrder.id(), sourceOrder.status(), placement.status(), placement.externalOrderId());
-    }
-
-    // 원본 상태에 따라 취소 처리 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED
-    private void cancelIfNeeded(Order order, Account account) {
-        switch (order.status()) {
-            case PLANNED -> orderPort.markCancelled(order.id());
-            case PLACED -> {
-                brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
-                orderPort.markCancelled(order.id());
-            }
-            default -> {} // FILLED/PARTIALLY_FILLED/FAILED/CANCELLED: 이미 종료 상태, no-op
-        }
-    }
-
-    // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
-    private PlacementResult placeOrSave(Order newOrder, Account account, com.kista.matching.domain.model.OrderTiming timing) {
-        if (timing == com.kista.matching.domain.model.OrderTiming.IMMEDIATE) {
-            BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class);
-            try {
-                OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), newOrder.direction(),
-                        newOrder.orderType(), newOrder.quantity(), newOrder.price());
-                OrderResult result = broker.place(instruction, account.toBrokerRef());
-                Order placed = newOrder.withPlaced(result.externalOrderId());
-                orderPort.saveAll(List.of(placed));
-                return new PlacementResult(Order.OrderStatus.PLACED, placed.externalOrderId());
-            } catch (Exception e) {
-                log.warn("재주문 즉시 접수 실패 — FAILED 기록: error={}", e.getMessage());
-                orderPort.saveAll(List.of(newOrder.withFailed()));
-                return new PlacementResult(Order.OrderStatus.FAILED, null);
-            }
-        }
-        orderPort.saveAll(List.of(newOrder));
-        return new PlacementResult(Order.OrderStatus.PLANNED, null);
-    }
-
-    private record PlacementResult(Order.OrderStatus status, String externalOrderId) {}
-
-    private static BigDecimal requirePrice(AdminReorderCommand command) {
-        if (command.price() == null || command.price().signum() <= 0) {
-            throw new IllegalArgumentException("price는 양수여야 합니다");
-        }
-        return command.price();
-    }
-
-    private static int requireQuantity(AdminReorderCommand command) {
-        if (command.quantity() == null || command.quantity() <= 0) {
-            throw new IllegalArgumentException("quantity는 양수여야 합니다");
-        }
-        return command.quantity();
-    }
-
-    private static Map<String, Object> auditPayload(AdminReorderCommand command, Order sourceOrder,
-                                                     OrderDirection direction, int quantity,
-                                                     BigDecimal price, Order.OrderStatus resultingStatus) {
+    // 실제 브로커 주문을 유발하는 감사 대상 액션이므로 원본/변경 주문 내역을 전부 기록한다
+    // (oldStatus 키명은 리팩토링 전 감사 로그 레코드와 호환 유지 위해 그대로 존치)
+    private static Map<String, Object> auditPayload(AdminReorderCommand command, AdminReorderResult result) {
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("timing", command.timing().name());
         payload.put("strategyId", command.strategyId().toString());
         payload.put("accountId", command.accountId().toString());
-        payload.put("orderId", sourceOrder.id().toString());
-        payload.put("oldStatus", sourceOrder.status().name());
-        payload.put("oldPrice", sourceOrder.price().toPlainString());
-        payload.put("oldQuantity", sourceOrder.quantity());
-        payload.put("newDirection", direction.name());
-        payload.put("newPrice", price.toPlainString());
-        payload.put("newQuantity", quantity);
-        payload.put("resultingStatus", resultingStatus.name());
+        payload.put("orderId", result.sourceOrderId().toString());
+        payload.put("oldStatus", result.originalStatus().name());
+        payload.put("oldPrice", result.oldPrice().toPlainString());
+        payload.put("oldQuantity", result.oldQuantity());
+        payload.put("newDirection", result.newDirection().name());
+        payload.put("newPrice", command.price().toPlainString());
+        payload.put("newQuantity", command.quantity());
+        payload.put("resultingStatus", result.resultingStatus().name());
         if (command.memo() != null && !command.memo().isBlank()) {
             payload.put("memo", command.memo());
         }
