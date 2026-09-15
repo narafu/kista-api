@@ -59,37 +59,59 @@
 - 로컬 Redis로 `trade.event` pub/sub 왕복 확인(trading-core 발행 → root `TradeStreamController` SSE로 수신).
 - `ApplicationModules.verify()` GREEN 유지.
 
-## 4b단계 — DB 분리 + 컷오버 (컷오버 이후 되돌릴 수 없음)
+## 4b단계 — DB 분리 + 컷오버
 
 DB가 실제로 갈라지면 `user_notify_profile` 동기화가 더 이상 "같은 테이블 직접 읽기"로 해결되지 않는다 — root가 쓴 변경을 trading DB의 복제본에 반영할 방법이 필요하다. 이 시점에 원 설계의 Redis Stream 2종을 배선한다.
 
-### Redis Stream 2종 (내구성 필요 — 4b에서만 신설)
+4b는 리스크 프로파일이 다른 두 하위 단계로 나눈다 — **4b-1(되돌릴 수 있음, 실트래픽 관측 가능)**과 **4b-2(컷오버, 되돌릴 수 없음)**. 스트림 배선을 컷오버와 한 배포로 묶으면 신규 배선 결함과 돌이킬 수 없는 DB 전환 리스크가 뒤섞인다 — 분리하면 스트림은 공유 DB 위에서 실제 가입·승인·설정변경 트래픽으로 먼저 검증한 뒤, 컷오버는 이미 검증된 스트림 위에서만 진행한다.
+
+### 사전 확인 완료 (구현 착수 전 실측, 2026-09-16)
+- **root의 trading-core 직접 의존 0건**: `KistaApplication.scanBasePackages`가 이미 trading-core 소유 패키지(trading/matching/broker/account/privacy/marketcalendar) 전부를 스캔 범위에서 제외하고 있고, root 소스 전체에 `com.kista.{trading,account,broker,privacy,marketcalendar}.application.port`/`com.kista.matching.*` import가 0건이다 — architecture.md의 "AdminQueryService accountPort 잔존" 서술은 4a 작업 중 이미 해소된 stale 기록. 컷오버 시 root 쪽 스캔 범위·엔티티 참조를 건드릴 필요 없음.
+- **event_publication 테이블은 신규 베이스라인에 반드시 포함**: trading-core `application.yml`엔 `spring.modulith.events.jdbc.schema-initialization` 설정이 없다(기본값 비활성화) — 지금은 root Flyway(V21)가 만든 물리 테이블 1개를 두 프로세스가 공유해서 동작할 뿐, trading DB가 분리되면 이 테이블이 trading DB에 없으면 EPR 자체가 죽는다. 신규 baseline에 V21과 동일 DDL로 포함(15개 매매 테이블 + 이 1개 = 16개).
+- **search_path는 이미 해결됨**: trading-core datasource가 이미 Hikari `connection-init-sql: "SET search_path TO kista, finance, reference, public"`로 설정돼 있다 — 신규 DB에 스키마(`kista`/`reference`/`public`)만 만들면 됨, ALTER ROLE 불필요.
+- **trading DB 이관 대상 16개 테이블 확정**(schema): `kista.accounts`/`kista.strategy`/`kista.strategy_version`/`kista.strategy_infinite_version`/`kista.strategy_vr_version`/`kista.strategy_cycle`/`kista.strategy_cycle_vr`/`kista.cycle_position`/`kista.cycle_position_infinite`/`kista.orders`/`kista.user_notify_profile`/`public.broker_tokens`/`public.event_publication`/`reference.privacy_trade_bases`/`reference.privacy_trade_base_orders`/`reference.us_market_holidays`. `public.scheduler_locks`는 `:shared` 소유 인프라 테이블이라 양쪽 DB 각자 보유(테이블 자체는 신규 생성, 데이터 이관 대상 아님).
+
+### Redis Stream 2종 (내구성 필요)
 | 스트림 | 발행 | 구독 | 내구성 |
 |---|---|---|---|
-| `user.deleted` | api | trading | 필수(누락 시 계좌·전략 cascade 삭제 누락) — consumer group + XACK, 미처리 시 `XAUTOCLAIM` 복구 |
-| `user.notify-profile.changed` | api | trading | 필수(누락 시 복제본 drift, 무증상) — 위와 동일 |
+| `stream:user.deleted` | api | trading | 필수(누락 시 계좌·전략 cascade 삭제 누락) — consumer group `trading-core` + XACK, 미처리 시 `XAUTOCLAIM`(유휴 60초 임계값)으로 매 스케쥴러 tick마다 복구 |
+| `stream:user.notify-profile.changed` | api | trading | 필수(누락 시 복제본 drift, 무증상) — 위와 동일 메커니즘 |
 
-추가 안전망으로 `user_notify_profile`은 주기적(예: 일 1회) reconciliation 배치(`users` 카운트/`updated_at` vs 복제본 비교, drift 시 관리자 알림)를 둔다 — 스트림 복구 로직을 완벽하게 만드는 것보다 싼 보험. (`trade.event` pub/sub은 4a에서 이미 배선 완료 — 4b에서 변경 없음, DB 분리와 무관.)
+- 발행 지점: 기존 로컬 이벤트 발행 지점(`UserCascadeDeleter`, `UserNotifyProfilePublisher`) 그대로 유지하고, 리스너만 로컬 `@TransactionalEventListener` → Redis Stream publish adapter로 교체.
+- MAXLEN 트림(예: ~10000)으로 무한 누적 방지 — 트림 이후 유실 가능성은 컷오버 이후 reconciliation 배치가 보완(아래 참고).
+- Redis 인스턴스: 기존 `kista-redis` 컨테이너 재사용(신규 스트림 키만 추가) — TossRedisTokenStore 등 이미 공용 인프라로 쓰는 중이라 신규 의존 없음.
+- 배포 순서: **`kista-api`(발행자)를 먼저 배포**해야 한다 — constraints.md의 2-role 배포 순서 제약과 동일 원리(발행이 api 경로에만 있어 반대 순서면 trading이 구버전 상태에서 신규 스트림에 아무도 안 쓴 채로 얼마간 무증상 drift 발생).
+- `trade.event` pub/sub은 4a에서 이미 배선 완료 — 4b에서 변경 없음, DB 분리와 무관.
 
-### DB 컷오버
-- trading DB용 Flyway 베이스라인 신규 작성(V1__init.sql 복사 불가, 스쿼시된 이력이므로 새로 씀).
-- `accounts → users(id)` FK는 **새 베이스라인에서 애초에 선언하지 않는다**(마이그레이션으로 드롭하는 게 아니라 처음부터 없는 상태로 생성).
-- `pg_dump --table`로 매매 테이블 데이터 이관.
-- 컷오버 창: 토요일 주간(매매 22:30~04:30 MON–SAT 바깥).
-- **롤백 윈도 = 1주일**: 컷오버 후 1주일간 kista-api DB에 매매 테이블을 남겨두고 관측만 한다. 이 기간이 사실상 유일한 롤백 수단이다. 1주일 뒤 정상 확인되면 contract 마이그레이션으로 kista-api DB에서 매매 테이블 drop.
+### 4b-1 게이트 (되돌릴 수 있음)
+- 스트림 배포 후 실트래픽(가입·승인·설정변경·탈퇴)으로 며칠간 왕복 관측 — trading-core `user_notify_profile` 갱신이 정상 반영되는지 로그로 확인.
+- 문제 발견 시 리스너를 로컬 이벤트로 되돌리는 롤백 가능(DB는 아직 공유 상태이므로 물리 데이터 손실 없음).
 
-### 4b 게이트
+### 4b-2 — DB 컷오버 (되돌릴 수 없음)
+- 신규 trading DB: 같은 OCI 인스턴스에 신규 postgres 컨테이너(`kista-trading-postgres`) — docker-compose 서비스 추가, kista-infra 조율 필요.
+- 스키마 부트스트랩: `CREATE SCHEMA kista/reference` (public은 기본 존재) — search_path는 위에서 확인한 대로 이미 설정됨.
+- trading DB용 Flyway 베이스라인 `trading-core/src/main/resources/db/migration-trading/V1__init.sql` 신규 작성 — 위 16개 테이블 DDL을 root V1/V21/V22/V23에서 그대로 가져오되 `accounts.user_id → users(id)` FK는 **선언하지 않는다**(컬럼은 유지, 참조 무결성만 제외). 인덱스·제약조건은 원본과 동일하게(orders 관련 인덱스 포함).
+- 데이터 이관(`pg_dump --table`, FK 의존 순서 고려 — 예: accounts → strategy → strategy_version/strategy_cycle → cycle_position/orders 순, 시퀀스 있는 테이블은 이관 후 `setval` 보정):
+  - 15개 매매 테이블은 전체 복사.
+  - `event_publication`은 **전체 복사 금지** — `listener_id LIKE 'com.kista.trading.%'` 등 trading-core 리스너 대상 row만 필터링해 이관(현재 물리 테이블 1개를 두 프로세스가 공유 중이라 root 리스너 행이 섞여 있음). 컷오버 직전 `completion_date IS NULL` 미완료 row를 양쪽 리스너 기준으로 먼저 확인.
+- 컷오버 창: 토요일 주간(매매 22:30~04:30 MON–SAT 바깥). 실행은 사용자 수동 SSH 런북(스크립트+체크리스트만 준비, 이 세션이 직접 실행하지 않음).
+- **롤백 윈도 = 1주일**: 컷오버 후 1주일간 kista-api DB에 매매 테이블을 남겨두고 관측만 한다. 단 이 창이 경과할수록 롤백 비용이 커진다 — 되돌리려면 그 사이 trading DB에 쌓인 매매 데이터를 역방향 pg_dump로 다시 api DB에 합쳐야 하고, 경과 시간에 비례해 손실·정합성 검증 부담이 커진다. 1주일 뒤 정상 확인되면 contract 마이그레이션으로 kista-api DB에서 16개 테이블 drop.
+
+### 4b-2 게이트
 - 스테이징 컷오버 리허설 1회(별도 태스크로 분리, 프로덕션 컷오버와 겹치지 않음).
 - 컷오버 후 첫 매매 사이클(개장·마감) 정상 관측(로그+heartbeat+텔레그램 리포트).
-- 데이터 정합성: 이관 전후 `orders`/`cycle_position` 건수 일치.
+- 데이터 정합성: 이관 전후 `orders`/`cycle_position` 건수 일치, `event_publication` 필터 이관 건수와 원본 조건 카운트 일치.
 - 1주일 관측 기간 종료 후 drop 마이그레이션 배포.
 
+### reconciliation 배치 (컷오버 이후 별도 배포로 축소)
+`user_notify_profile` 주기적(예: 일 1회) drift 점검(`users`/`user_settings` 카운트·`updated_at` 대조, drift 시 관리자 알림)은 컷오버에 태우지 않는다 — trading-core→root 방향 신규 내부 HTTP 호출이 필요한데, 현재 내부 API 어댑터는 전부 root→trading-core 단방향이라(`AccountQueryHttpAdapter` 등) 역방향 배선(Caddy 라우팅, RestClient 빈, bare path 함정 재확인)이 별도 검증을 요구한다. 4b-2 컷오버 완료 후 별도 태스크로 진행.
+
 ## 미해결/후속
-- kista-trading이 실제로 별도 컨테이너 이미지인지, 같은 이미지에서 역할만 다른 시작 커맨드인지는 kista-infra 작업 시점에 결정(도커 이미지 자체를 `:trading-core` 전용으로 빌드하는 것과 동일 선상 — Dockerfile 분기 필요).
-- kista-ui의 정확한 8개(또는 그 이상) trading 소유 route.ts 목록은 구현 착수 시 `:trading-core` adapter/in/web 컨트롤러 전수 확인으로 확정.
+- kista-ui의 정확한 trading 소유 route.ts 목록·kista-trading 컨테이너 배포 배선은 4a에서 이미 확정·배포 완료(`f631ba52`, kista-ui `f639a8b`, kista-infra `3822dba`) — 4b는 이 위에서 진행.
 - FCM 매매 알림은 원 설계 기본안대로 확정: `fcm_device_tokens`가 `users` FK라 kista-api 잔류, trading은 `UserPushNotificationRequestedEvent`만 발행.
-- root에서 `UserNotificationPort`의 남은 소비자가 정말 0인지(즉 인터페이스 자체를 삭제해도 되는지, 아니면 finance 등 다른 소비자가 숨어 있는지)는 구현 착수 시 전수 grep으로 확정.
+- root `UserNotificationPort`의 남은 소비자는 `FinanceRegistrationReminderNotifier` 1건뿐(실측 확인) — finance 알림용으로 의도된 잔존, 인터페이스 삭제 대상 아님.
 
 ## 테스트
-- 4a: `./gradlew test` 전체 + 로컬 2-jar 기동 스모크(보안 스택·kista-ui 라우팅·`trade.event` pub/sub 왕복 포함, 위 게이트 참고).
-- 4b: 스테이징 리허설 1회 → 토요일 주간 실행. 컷오버 전/후 `orders`/`cycle_position` 건수 비교 스크립트.
+- 4a: `./gradlew test` 전체 + 로컬 2-jar 기동 스모크(보안 스택·kista-ui 라우팅·`trade.event` pub/sub 왕복 포함, 위 게이트 참고) — 완료.
+- 4b-1: 스트림 배포 후 실트래픽 관측(별도 테스트 스위트 없음, 로그·DB 상태 확인).
+- 4b-2: 스테이징 리허설 1회 → 토요일 주간 실행. 컷오버 전/후 `orders`/`cycle_position`/`event_publication`(필터 기준) 건수 비교 스크립트.
