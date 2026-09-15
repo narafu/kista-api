@@ -1,4 +1,4 @@
-package com.kista.user.adapter.in.web.security;
+package com.kista.platform.security;
 
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.ECKey;

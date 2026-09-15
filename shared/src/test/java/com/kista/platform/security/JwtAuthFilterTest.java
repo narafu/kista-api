@@ -1,6 +1,5 @@
-package com.kista.user.adapter.in.web.security;
+package com.kista.platform.security;
 
-import com.kista.user.application.usecase.BlacklistUseCase;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 
@@ -11,7 +10,7 @@ class JwtAuthFilterTest {
 
     @Test
     void shouldNotFilterAsyncDispatch_returnsFalse() {
-        JwtAuthFilter filter = new JwtAuthFilter(mock(JwtDecoder.class), mock(BlacklistUseCase.class));
+        JwtAuthFilter filter = new JwtAuthFilter(mock(JwtDecoder.class), mock(TokenBlacklistPort.class));
 
         assertThat(filter.shouldNotFilterAsyncDispatch()).isFalse();
     }

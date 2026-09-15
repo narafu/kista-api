@@ -1,4 +1,4 @@
-package com.kista.user.adapter.in.web.security;
+package com.kista.platform.security;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,5 @@
-package com.kista.user.adapter.in.web.security;
+package com.kista.platform.security;
 
-import com.kista.user.application.usecase.BlacklistUseCase;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,7 +24,7 @@ import java.util.UUID;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtDecoder jwtDecoder;
-    private final BlacklistUseCase blacklistUseCase; // Redis 블랙리스트 체크 (adapter.in → application.usecase)
+    private final TokenBlacklistPort tokenBlacklistPort; // Redis 블랙리스트 체크 (포트 역전 — user/trading 각자 구현)
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -39,7 +38,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 // jti 블랙리스트 체크 (로그아웃된 AT) → userId 블랙리스트 체크 (탈퇴/거절)
                 String jti = jwt.getId();
-                if ((jti != null && blacklistUseCase.isJtiBlacklisted(jti)) || blacklistUseCase.isBlacklisted(userId)) {
+                if ((jti != null && tokenBlacklistPort.isJtiBlacklisted(jti)) || tokenBlacklistPort.isBlacklisted(userId)) {
                     log.debug("블랙리스트 차단: userId={}, jti={}", userId, jti);
                     // ASYNC(SSE 타임아웃) 재디스패치 시 응답이 이미 커밋돼 있으면 getWriter() 호출이 IllegalStateException을 던짐
                     if (!response.isCommitted()) {
@@ -52,7 +51,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 // role 변경 이전 발급 AT 차단 — 강등/승격 즉시 반영 (UI refresh가 DB role로 새 AT 발급)
                 // iat 없는 구버전 AT는 발급 시점 확인 불가 → 보수적으로 차단
-                java.time.Instant roleChangedAt = blacklistUseCase.roleChangedAt(userId);
+                java.time.Instant roleChangedAt = tokenBlacklistPort.roleChangedAt(userId);
                 if (roleChangedAt != null
                         && (jwt.getIssuedAt() == null || jwt.getIssuedAt().isBefore(roleChangedAt))) {
                     log.debug("stale role AT 차단: userId={}, iat={}, roleChangedAt={}", userId, jwt.getIssuedAt(), roleChangedAt);
