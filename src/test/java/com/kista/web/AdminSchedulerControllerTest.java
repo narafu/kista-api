@@ -2,12 +2,10 @@ package com.kista.web;
 
 import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
-import com.kista.trading.adapter.in.schedule.TradingCloseScheduler;
-import com.kista.trading.adapter.in.schedule.TradingOpenScheduler;
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -28,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // 스케쥴러 빈이 정상 등록된 상태(kista-scheduler role)에서의 수동 트리거 API 검증
+// trading 개장/마감 트리거 케이스는 AdminTradingSchedulerControllerTest로 이관됨
 @WebMvcTest(AdminSchedulerController.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
@@ -39,36 +38,13 @@ class AdminSchedulerControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean
     private JwtDecoder jwtDecoder; // JwtDecoderConfig의 실제 빈 생성 방지 + JwtAuthFilter 의존성 주입용
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
 
-    @MockitoBean private TradingOpenScheduler openScheduler;
-    @MockitoBean private TradingCloseScheduler closeScheduler;
     @MockitoBean private KbLandHousingBenchmarkScheduler kbLandScheduler;
     @MockitoBean private KbLandPriceIndexScheduler kbLandPriceIndexScheduler;
 
     private static final java.util.UUID ADMIN_UUID = DEV_ADMIN_UUID;
     private static final java.util.UUID USER_UUID = DEV_USER_UUID;
-
-    @Test
-    void triggerOpen_adminToken_returns202AndRunsScheduler() throws Exception {
-        mockMvc.perform(post("/api/admin/scheduler/open")
-                        .with(csrf())
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isAccepted());
-
-        // 가상 스레드에서 비동기 실행되므로 timeout으로 대기 후 검증
-        verify(openScheduler, timeout(2000)).runNow();
-    }
-
-    @Test
-    void triggerClose_adminToken_returns202AndRunsScheduler() throws Exception {
-        mockMvc.perform(post("/api/admin/scheduler/close")
-                        .with(csrf())
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isAccepted());
-
-        verify(closeScheduler, timeout(2000)).runNow();
-    }
 
     @Test
     void triggerKbLandHousingBenchmark_adminToken_returns202AndRunsScheduler() throws Exception {
@@ -101,8 +77,8 @@ class AdminSchedulerControllerTest {
     }
 
     @Test
-    void triggerOpen_userToken_returns403() throws Exception {
-        mockMvc.perform(post("/api/admin/scheduler/open")
+    void triggerKbLandHousingBenchmark_userToken_returns403() throws Exception {
+        mockMvc.perform(post("/api/admin/scheduler/kbland-housing-benchmark")
                         .with(csrf())
                         .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isForbidden());

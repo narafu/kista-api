@@ -1,9 +1,6 @@
 package com.kista.web;
 
-import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.finance.domain.model.MonthlyClosing;
-import com.kista.trading.domain.model.ManualTradingException;
-import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.catalina.connector.ClientAbortException;
@@ -68,30 +65,6 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void handleAll_mapped4xxWithKisApiExceptionCause_savesErrorLog() {
-        AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(appErrorLogPort);
-        KisApiException cause = new KisApiException("초당 거래건수를 초과하였습니다", null);
-        ManualTradingException ex = new ManualTradingException("증권사 API 조회에 실패했습니다", cause);
-
-        handler.handleAll(ex);
-
-        verify(appErrorLogPort).save(any(Exception.class), anyString());
-    }
-
-    @Test
-    void handleAll_mapped4xxWithTossApiExceptionCause_savesErrorLog() {
-        AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(appErrorLogPort);
-        TossApiException cause = new TossApiException("invalid-token", null);
-        ManualTradingException ex = new ManualTradingException("증권사 API 조회에 실패했습니다", cause);
-
-        handler.handleAll(ex);
-
-        verify(appErrorLogPort).save(any(Exception.class), anyString());
-    }
-
-    @Test
     void noResourceFoundException_mapsTo404_withoutErrorLog() {
         AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
         GlobalExceptionHandler handler = new GlobalExceptionHandler(appErrorLogPort);
@@ -144,7 +117,7 @@ class GlobalExceptionHandlerTest {
     void handleAll_mapped4xxWithoutSystemCause_doesNotSaveErrorLog() {
         AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
         GlobalExceptionHandler handler = new GlobalExceptionHandler(appErrorLogPort);
-        ManualTradingException ex = new ManualTradingException("예수금이 부족합니다");
+        IllegalArgumentException ex = new IllegalArgumentException("예수금이 부족합니다");
 
         handler.handleAll(ex);
 

@@ -1,11 +1,11 @@
 package com.kista.finance.adapter.in.web;
 
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.FinanceCategoryCommand;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.finance.application.usecase.FinanceCategoryUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class AdminFinanceCategoryControllerTest {
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean FinanceCategoryUseCase categoryUseCase;
 
     @Test

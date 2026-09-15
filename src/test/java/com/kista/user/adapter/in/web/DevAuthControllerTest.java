@@ -1,8 +1,8 @@
 package com.kista.user.adapter.in.web;
 
 import com.kista.user.adapter.in.web.security.*;
+import com.kista.platform.security.*;
 import com.kista.user.domain.model.User;
-import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.user.application.usecase.TokenUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.UserPort;
@@ -47,7 +47,7 @@ class DevAuthControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;         // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort;         // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserUseCase userUseCase;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean UserPort userPort;

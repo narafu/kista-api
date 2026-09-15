@@ -25,6 +25,7 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
 
     private final UserSettingsPort userSettingsPort;
     private final ActiveStrategyCountPort activeStrategyCountPort;
+    private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core 캐시 동기화 이벤트 발행
 
     @Override
     public UserSettings getByUserId(UUID userId) {
@@ -39,8 +40,10 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
         // 기존 prefs에 변경 항목만 덮어씀
         Map<NotificationType, Boolean> updatedPrefs = new HashMap<>(current.notificationPrefs());
         updatedPrefs.put(command.type(), command.enabled());
-        userSettingsPort.save(current.withNotificationPrefs(updatedPrefs));
+        UserSettings updated = current.withNotificationPrefs(updatedPrefs);
+        userSettingsPort.save(updated);
         log.info("알림 설정 변경: userId={}, type={}, enabled={}", command.userId(), command.type(), command.enabled());
+        userNotifyProfilePublisher.publishSettingsChanged(updated);
     }
 
     @Override
@@ -48,8 +51,10 @@ class UserSettingsService implements GetUserSettingsQuery, UpdateNotificationPre
     public void update(UpdateBalanceCheckCommand command) {
         UserSettings current = getByUserId(command.userId());
         boolean previous = current.balanceCheckEnabled();
-        userSettingsPort.save(current.withBalanceCheckEnabled(command.enabled()));
+        UserSettings updated = current.withBalanceCheckEnabled(command.enabled());
+        userSettingsPort.save(updated);
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", command.userId(), previous, command.enabled());
+        userNotifyProfilePublisher.publishSettingsChanged(updated);
 
         // 활성 전략 수 계산 — 잔고검증 전환 시 경고 로그 출력
         long activeCount = activeStrategyCountPort.countActiveByUserId(command.userId());

@@ -1,10 +1,5 @@
 package com.kista.web.dto;
 
-import com.kista.trading.domain.model.Strategy;
-import com.kista.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,18 +9,10 @@ import com.kista.sharedkernel.StrategyType;
 
 class StrategyTypeMetaTest {
 
-    private CycleOrderStrategies strategies() {
-        return new CycleOrderStrategies(List.of(
-                new InfiniteCycleOrderStrategy(null, null),
-                new PrivacyCycleOrderStrategy(null),
-                new VrCycleOrderStrategy(null)
-        ));
-    }
-
     @Test
     void infinite_meta_has_capabilities() {
-        var s = strategies().of(StrategyType.INFINITE);
-        var meta = StrategyTypeMeta.from(StrategyType.INFINITE, s);
+        var capability = new StrategyCapability(false, true, List.of(20, 30, 40));
+        var meta = StrategyTypeMeta.from(StrategyType.INFINITE, capability);
         assertThat(meta.requiresPrivacyBase()).isFalse();
         assertThat(meta.tickerFixed()).isFalse();        // INFINITE: availableTickers > 1
         assertThat(meta.supportsReverseMode()).isTrue();
@@ -34,8 +21,8 @@ class StrategyTypeMetaTest {
 
     @Test
     void privacy_meta_has_capabilities() {
-        var s = strategies().of(StrategyType.PRIVACY);
-        var meta = StrategyTypeMeta.from(StrategyType.PRIVACY, s);
+        var capability = new StrategyCapability(true, false, List.of());
+        var meta = StrategyTypeMeta.from(StrategyType.PRIVACY, capability);
         assertThat(meta.requiresPrivacyBase()).isTrue();
         assertThat(meta.tickerFixed()).isTrue();          // PRIVACY: SOXL 단일
         assertThat(meta.supportsReverseMode()).isFalse();
@@ -44,8 +31,8 @@ class StrategyTypeMetaTest {
 
     @Test
     void vr_meta_has_capabilities() {
-        var s = strategies().of(StrategyType.VR);
-        var meta = StrategyTypeMeta.from(StrategyType.VR, s);
+        var capability = new StrategyCapability(false, false, List.of());
+        var meta = StrategyTypeMeta.from(StrategyType.VR, capability);
         assertThat(meta.code()).isEqualTo("VR");
         assertThat(meta.availableTickers()).containsExactly("TQQQ"); // VR: TQQQ 단일
         assertThat(meta.tickerFixed()).isTrue();                     // 단일 ticker → 고정

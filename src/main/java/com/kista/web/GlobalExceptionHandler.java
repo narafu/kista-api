@@ -1,8 +1,8 @@
 package com.kista.web;
 
-import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.BrokerCredentialException;
-import com.kista.broker.domain.model.BrokerRateLimitException;
+import com.kista.admin.domain.model.AdminBrokerCredentialException;
+import com.kista.admin.domain.model.AdminBrokerRateLimitException;
+import com.kista.admin.domain.model.AdminPrivacyTradeConflictException;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceCategory;
@@ -10,11 +10,6 @@ import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
-import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.trading.domain.model.ManualTradingException;
-import com.kista.trading.domain.model.OrderCancelException;
-import com.kista.privacy.domain.model.PrivacyTradeConflictException;
-import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -52,8 +47,12 @@ public class GlobalExceptionHandler {
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
         Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
         Map.entry(SecurityException.class,                         new Mapping(HttpStatus.FORBIDDEN,              "Access Denied")),
-        Map.entry(BrokerCredentialException.class,                  new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
-        Map.entry(BrokerRateLimitException.class,                   new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
+        // broker.domain.model.BrokerCredentialException/BrokerRateLimitException 원본은
+        // trading-core 네이티브 컨트롤러(AccountController 등)에서만 던져지므로 trading-core 소유
+        // com.kista.trading.adapter.in.web.TradingExceptionHandler로 이관됨 — 아래는 admin이
+        // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
+        Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
+        Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
         Map.entry(IllegalStateException.class,                     new Mapping(HttpStatus.BAD_REQUEST,            "Invalid State")),
         Map.entry(NoSuchElementException.class,                    new Mapping(HttpStatus.NOT_FOUND,              "Resource Not Found")),
         Map.entry(IllegalArgumentException.class,                  new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Request")),
@@ -64,10 +63,10 @@ public class GlobalExceptionHandler {
         Map.entry(HttpMessageNotReadableException.class,           new Mapping(HttpStatus.BAD_REQUEST,            "Malformed Request")),
         // 존재하지 않는 정적 리소스·경로(취약점 스캐너의 /actuator/** probe 등) — 매핑 없으면 catch-all이 500 + saveErrorLog로 처리해 로그·app_error_logs 오염
         Map.entry(NoResourceFoundException.class,                  new Mapping(HttpStatus.NOT_FOUND,              "Not Found")),
-        Map.entry(Account.DuplicateAccountException.class,         new Mapping(HttpStatus.CONFLICT,               "Conflict")),
-        Map.entry(ManualTradingException.class,                    new Mapping(HttpStatus.CONFLICT,               "Conflict")),
-        Map.entry(OrderCancelException.class,                      new Mapping(HttpStatus.CONFLICT,               "Conflict")),
-        Map.entry(PrivacyTradeConflictException.class,             new Mapping(HttpStatus.CONFLICT,               "Conflict")),
+        // Account.DuplicateAccountException/ManualTradingException/OrderCancelException/
+        // PrivacyTradeConflictException(trading-core 소유 원본)은 TradingExceptionHandler로 이관됨 —
+        // 아래는 admin이 PrivacyQueryHttpAdapter(내부 API 409 응답 복원)에서 던지는 own-type만 남는다
+        Map.entry(AdminPrivacyTradeConflictException.class,            new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceBudget.OverlappingPeriodException.class,      new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.DuplicateNameException.class,         new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.DuplicateAccountNoException.class,    new Mapping(HttpStatus.CONFLICT,           "Conflict")),
@@ -126,20 +125,8 @@ public class GlobalExceptionHandler {
     }
 
     // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────
-
-    @ExceptionHandler(KisApiException.class)
-    public ProblemDetail handleKisApiException(KisApiException ex) {
-        saveErrorLog(ex);
-        log.error("KIS API 오류: {}", ex.getMessage(), ex);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "KIS API Error", ex.getMessage());
-    }
-
-    @ExceptionHandler(TossApiException.class)
-    public ProblemDetail handleTossApiException(TossApiException ex) {
-        saveErrorLog(ex);
-        log.error("Toss API 오류: {}", ex.getMessage(), ex);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Toss API Error", ex.getMessage());
-    }
+    // KisApiException/TossApiException(trading-core 소유) 핸들러는 TradingExceptionHandler로 이관됐다 —
+    // app_error_logs 저장은 POST /api/internal/errors(ErrorLogInternalController)로 위임
 
     // catch-all — MAPPINGS 테이블 우선 조회, 매핑 있으면 4xx 응답(saveErrorLog 없음) / 없으면 500 처리
     @ExceptionHandler(Exception.class)
@@ -153,10 +140,6 @@ public class GlobalExceptionHandler {
         // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용
         Mapping m = resolveMapping(ex);
         if (m != null) {
-            // 4xx 예외라도 원인이 실제 브로커 API 실패(BrokerCallGuard.wrap 등이 감싼 경우 포함)면 기록 — 그 외 4xx는 saveErrorLog 없이 응답
-            if (ex.getCause() instanceof KisApiException || ex.getCause() instanceof TossApiException) {
-                saveErrorLog(ex);
-            }
             return problem(m.status(), m.title(), ex.getMessage());
         }
         // 매핑 없는 미처리 예외 — saveErrorLog + log.error + 500

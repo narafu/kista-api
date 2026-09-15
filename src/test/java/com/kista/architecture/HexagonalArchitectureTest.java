@@ -72,7 +72,7 @@ class HexagonalArchitectureTest {
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.toss.TossPriceApi")
-                .and().doNotHaveFullyQualifiedName("com.kista.market.adapter.out.persistence.calendar.MarketCalendarPersistenceAdapter")
+                .and().doNotHaveFullyQualifiedName("com.kista.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
                 .haveFullyQualifiedName("com.kista.platform.time.UsTradeDates");
         rule.check(classes);

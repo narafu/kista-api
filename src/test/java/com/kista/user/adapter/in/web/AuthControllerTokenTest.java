@@ -1,10 +1,10 @@
 package com.kista.user.adapter.in.web;
 
 import com.kista.user.adapter.in.web.security.*;
+import com.kista.platform.security.*;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.user.domain.auth.TokenRefreshResult;
 import com.kista.user.domain.model.User;
-import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.user.application.usecase.GetUserSettingsQuery;
 import com.kista.user.application.usecase.TokenUseCase;
 import com.kista.user.application.usecase.UserUseCase;
@@ -48,7 +48,7 @@ class AuthControllerTokenTest {
     @MockitoBean TokenUseCase tokenUseCase;
     @MockitoBean JwtIssuerService jwtIssuerService;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort;
     @MockitoBean GetUserSettingsQuery getUserSettingsQuery;
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -111,8 +111,8 @@ class AuthControllerTokenTest {
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
         given(jwtDecoder.decode(anyString())).willReturn(jwt);
-        given(blacklistUseCase.isJtiBlacklisted(jti)).willReturn(true); // jti 블랙리스트 hit
-        given(blacklistUseCase.isBlacklisted(any())).willReturn(false);
+        given(tokenBlacklistPort.isJtiBlacklisted(jti)).willReturn(true); // jti 블랙리스트 hit
+        given(tokenBlacklistPort.isBlacklisted(any())).willReturn(false);
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer test-at"))
@@ -133,8 +133,8 @@ class AuthControllerTokenTest {
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
         given(jwtDecoder.decode(anyString())).willReturn(jwt);
-        given(blacklistUseCase.isJtiBlacklisted(jti)).willReturn(false); // jti 정상
-        given(blacklistUseCase.isBlacklisted(USER_ID)).willReturn(true); // userId 블랙리스트 hit
+        given(tokenBlacklistPort.isJtiBlacklisted(jti)).willReturn(false); // jti 정상
+        given(tokenBlacklistPort.isBlacklisted(USER_ID)).willReturn(true); // userId 블랙리스트 hit
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer test-at"))
@@ -154,7 +154,7 @@ class AuthControllerTokenTest {
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .build();
         given(jwtDecoder.decode(anyString())).willReturn(jwt);
-        given(blacklistUseCase.isBlacklisted(USER_ID)).willReturn(true); // userId 블랙리스트 hit
+        given(tokenBlacklistPort.isBlacklisted(USER_ID)).willReturn(true); // userId 블랙리스트 hit
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer test-at"))

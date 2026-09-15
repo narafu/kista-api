@@ -117,6 +117,7 @@ cors:
 internal:
   api:
     token: ${INTERNAL_API_TOKEN:}
+    base-url: ${INTERNAL_API_BASE_URL:http://localhost:8081} # 이 프로세스가 나가는 내부 API 호출 대상(trading-core) — 예전엔 자기 자신(단일 프로세스) 기본값이었으나 4a 분리 이후 trading-core 기본 포트(8081)로 정정
 
 alpaca:
   base-url: https://paper-api.alpaca.markets

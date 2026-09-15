@@ -1,7 +1,6 @@
 package com.kista.user.application.service;
 
-import com.kista.user.application.event.UserDeletedEvent;
-import com.kista.account.application.port.output.AccountPort;
+import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.RefreshTokenPort;
 import com.kista.user.application.port.output.UserPort;
@@ -24,7 +23,6 @@ import static org.mockito.Mockito.verify;
 @DisplayName("UserCascadeDeleter 단위 테스트")
 class UserCascadeDeleterTest {
 
-    @Mock AccountPort accountPort;
     @Mock UserPort userPort;
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock BlacklistPort blacklistPort;
@@ -33,13 +31,12 @@ class UserCascadeDeleterTest {
     @InjectMocks UserCascadeDeleter deleter;
 
     @Test
-    @DisplayName("account는 직접 소프트 삭제하고, 나머지 cascade는 UserDeletedEvent로 위임한다")
+    @DisplayName("자기 소유 데이터만 직접 정리하고, 계좌를 포함한 모든 cascade는 UserDeletedEvent로 위임한다")
     void deleteCascade_softDeletesAndPublishesEvent() {
         UUID userId = UUID.randomUUID();
 
         deleter.deleteCascade(userId);
 
-        verify(accountPort).deleteByUserId(userId);
         verify(userPort).delete(userId);
         verify(refreshTokenPort).deleteAllByUserId(userId);
         verify(blacklistPort).add(eq(userId), any(Duration.class));

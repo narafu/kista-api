@@ -20,20 +20,23 @@ class UserProfileService implements UserProfileUseCase {
 
     private final UserPort userPort;
     private final TelegramBotInfoPort telegramBotInfoPort; // 봇 토큰 검증 + username 취득
+    private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core 복제본 동기화(텔레그램 포함)
 
     @Override
     public void updateTelegram(UUID userId, String botToken, String chatId) {
         // botToken 유효성 검증 + username 취득 (실패 시 IllegalArgumentException)
         String botUsername = telegramBotInfoPort.getUsername(botToken);
         User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withTelegram(botToken, chatId, botUsername));
+        User saved = userPort.save(user.withTelegram(botToken, chatId, botUsername));
+        userNotifyProfilePublisher.publishStatusChanged(saved);
         log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
     }
 
     @Override
     public void removeTelegram(UUID userId) {
         User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withTelegram(null, null, null));
+        User saved = userPort.save(user.withTelegram(null, null, null));
+        userNotifyProfilePublisher.publishStatusChanged(saved);
         log.info("텔레그램 설정 해제: userId={}", userId);
     }
 

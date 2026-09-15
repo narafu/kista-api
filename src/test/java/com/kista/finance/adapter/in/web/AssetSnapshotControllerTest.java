@@ -7,7 +7,7 @@ import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.Market;
 import com.kista.finance.application.usecase.AssetSnapshotUseCase;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.finance.application.port.output.FinanceAccountPort;
 import com.kista.finance.application.port.output.FinanceCategoryPort;
@@ -45,7 +45,7 @@ class AssetSnapshotControllerTest {
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AssetSnapshotUseCase assetSnapshotUseCase;
     @MockitoBean FinanceCategoryPort financeCategoryPort;
     @MockitoBean FinanceAccountPort financeAccountPort;

@@ -20,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +28,7 @@ class UserSettingsServiceTest {
 
     @Mock UserSettingsPort userSettingsPort;
     @Mock ActiveStrategyCountPort activeStrategyCountPort;
+    @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
     @InjectMocks UserSettingsService service;
 
     private final UUID USER_ID = UUID.randomUUID();
@@ -77,5 +79,38 @@ class UserSettingsServiceTest {
         service.update(new UpdateStrategySuggestionsCommand(USER_ID, List.of("커스텀전략")));
 
         verify(userSettingsPort).save(argThat(s -> s.strategySuggestions().equals(List.of("커스텀전략"))));
+    }
+    @Test
+    void updateNotificationPref_변경_시_UserNotifyProfileChangedEvent_발행을_위임한다() {
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+
+        service.update(new UpdateNotificationPrefCommand(USER_ID, NotificationType.TRADING_ALERT, false));
+
+        // 저장된 값 그대로가 trading-core 복제본으로 전달돼야 한다
+        verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s ->
+                s.userId().equals(USER_ID) && !s.isNotificationEnabled(NotificationType.TRADING_ALERT)));
+    }
+
+    @Test
+    void updateBalanceCheck_변경_시_UserNotifyProfileChangedEvent_발행을_위임한다() {
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+        when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenReturn(0L);
+
+        service.update(new UpdateBalanceCheckCommand(USER_ID, false));
+
+        verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s ->
+                s.userId().equals(USER_ID) && !s.balanceCheckEnabled()));
+    }
+
+    @Test
+    void updateStrategySuggestions는_프로필_대상_필드가_아니라_발행하지_않는다() {
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+
+        service.update(new UpdateStrategySuggestionsCommand(USER_ID, List.of("커스텀전략")));
+
+        verifyNoInteractions(userNotifyProfilePublisher);
     }
 }

@@ -4,7 +4,7 @@ import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
 import com.kista.user.domain.model.User;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
@@ -43,7 +43,7 @@ class FinanceGroupControllerTest {
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean FinanceGroupUseCase groupUseCase;
     @MockitoBean UserUseCase userUseCase;
 

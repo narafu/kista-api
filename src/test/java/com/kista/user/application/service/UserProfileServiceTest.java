@@ -25,6 +25,7 @@ class UserProfileServiceTest {
 
     @Mock UserPort userPort;
     @Mock TelegramBotInfoPort telegramBotInfoPort;
+    @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
 
     @InjectMocks UserProfileService userProfileService;
 
@@ -44,6 +45,7 @@ class UserProfileServiceTest {
 
         verify(userPort).save(argThat(u -> "bot-token".equals(u.telegramBotToken())
                 && "chat-1".equals(u.telegramChatId())));
+        verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> "bot-token".equals(u.telegramBotToken())));
     }
 
     @Test
@@ -56,6 +58,7 @@ class UserProfileServiceTest {
         userProfileService.removeTelegram(userId);
 
         verify(userPort).save(argThat(u -> u.telegramBotToken() == null && u.telegramChatId() == null));
+        verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> u.telegramBotToken() == null));
     }
 
     @Test

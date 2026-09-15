@@ -44,6 +44,8 @@ class UserService implements UserUseCase {
     private final RefreshTokenPort refreshTokenPort;        // RT 삭제 (탈퇴/거절 시 전체 세션 종료)
     private final ApprovalPolicyPort approvalPolicyPort; // 승인설정 조회 (admin RuntimeSettingsService가 구현, 포트 역전)
     private final ObjectProvider<UserUseCase> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
+    private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core user_notify_profile 캐시 동기화
+    private final AdminSeedPromoter adminSeedPromoter; // ADMIN seed promote 트랜잭션 경계 (login()이 NOT_SUPPORTED라 분리)
 
     @Override
     @Transactional(readOnly = true)
@@ -78,9 +80,11 @@ class UserService implements UserUseCase {
                     .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + kakaoUser.kakaoId()));
         }
         // ADMIN seed인데 아직 USER이면 idempotent promote (seed 목록 사후 추가 케이스 포함)
+        // register()와 같은 이유로 별도 빈 경유 — 이 메서드는 NOT_SUPPORTED라 여기서 직접 저장하면
+        // 복제본 동기화 이벤트가 트랜잭션 밖에서 발행돼 재시도 없이 유실될 수 있다(AdminSeedPromoter 주석 참고)
         if (bootstrapProps.isAdmin(user.kakaoId()) && user.role() != UserRole.ADMIN) {
             log.info("기존 사용자 ADMIN promote: kakaoId={}", user.kakaoId());
-            user = userPort.save(user.withStatus(UserStatus.ACTIVE).withRole(UserRole.ADMIN));
+            user = adminSeedPromoter.promote(user);
         }
         // 카카오 이메일과 다르면 동기화 — 매 로그인마다 이미 조회하는 kakaoUser.email() 재사용 (추가 API 호출 없음)
         if (kakaoUser.email() != null && !kakaoUser.email().equals(user.email())) {
@@ -111,6 +115,7 @@ class UserService implements UserUseCase {
             log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
             eventPublisher.publishEvent(new NewUserRegisteredEvent(saved.id()));
+            userNotifyProfilePublisher.publishStatusChanged(saved);
             return saved;
         });
     }
@@ -123,6 +128,7 @@ class UserService implements UserUseCase {
         log.info("사용자 승인: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
         eventPublisher.publishEvent(new UserApprovedEvent(updated.id()));
+        userNotifyProfilePublisher.publishStatusChanged(updated);
     }
 
     @Override
@@ -136,6 +142,7 @@ class UserService implements UserUseCase {
         log.info("사용자 거절: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
         eventPublisher.publishEvent(new UserRejectedEvent(updated.id()));
+        userNotifyProfilePublisher.publishStatusChanged(updated);
         blacklistPort.add(userId, REJECT_BLACKLIST_TTL); // 거절 즉시 AT 차단
         refreshTokenPort.deleteAllByUserId(userId); // RT 전체 삭제 (거절된 사용자 세션 종료)
     }
@@ -168,6 +175,7 @@ class UserService implements UserUseCase {
         } else {
             eventPublisher.publishEvent(new UserApprovedEvent(updated.id()));
         }
+        userNotifyProfilePublisher.publishStatusChanged(updated);
     }
 
     // 쿨다운 미경과 시 CooldownException 발생 — PENDING/REJECTED 공통 판정

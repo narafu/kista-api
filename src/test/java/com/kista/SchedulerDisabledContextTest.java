@@ -1,7 +1,7 @@
 package com.kista;
 
 import com.kista.market.adapter.in.schedule.FearGreedScheduler;
-import com.kista.market.adapter.in.schedule.MarketCalendarRefreshScheduler;
+import com.kista.marketcalendar.adapter.in.schedule.MarketCalendarRefreshScheduler;
 import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
 import com.kista.stats.adapter.in.schedule.MarketIndexPriceSyncScheduler;

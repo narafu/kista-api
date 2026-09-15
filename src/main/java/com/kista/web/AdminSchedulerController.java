@@ -2,8 +2,6 @@ package com.kista.web;
 
 import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
-import com.kista.trading.adapter.in.schedule.TradingCloseScheduler;
-import com.kista.trading.adapter.in.schedule.TradingOpenScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +14,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 // 2-role 배포에서 kista-scheduler에만 유효 — kista-api role(scheduler.enabled=false)에서는
-// 참조하는 4개 스케쥴러 빈과 동일 게이트로 이 컨트롤러 빈 자체가 등록되지 않는다(오라우팅 시 404)
+// 참조하는 2개 KbLand 스케쥴러 빈과 동일 게이트로 이 컨트롤러 빈 자체가 등록되지 않는다(오라우팅 시 404).
+// trading 개장/마감 트리거는 admin.adapter.in.web.AdminTradingSchedulerController(내부 API 호출)로 분리됨 —
+// 같은 "/api/admin/scheduler" prefix를 공유하지만 하위 경로가 겹치지 않아 라우팅 충돌 없이 공존한다
+// (이 컨트롤러: /kbland-*, 신규 컨트롤러: /open, /close)
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/scheduler")
@@ -25,9 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Admin", description = "관리자 API")
 public class AdminSchedulerController {
 
-    // 컨트롤러 빈이 존재하면 동일 게이트로 4개 스케쥴러 빈도 항상 함께 존재 — null 체크 불필요
-    private final TradingOpenScheduler openScheduler;
-    private final TradingCloseScheduler closeScheduler;
+    // 컨트롤러 빈이 존재하면 동일 게이트로 2개 스케쥴러 빈도 항상 함께 존재 — null 체크 불필요
     private final KbLandHousingBenchmarkScheduler kbLandScheduler;
     private final KbLandPriceIndexScheduler kbLandPriceIndexScheduler;
 
@@ -35,7 +34,7 @@ public class AdminSchedulerController {
         void run() throws InterruptedException;
     }
 
-    // 5개 트리거 엔드포인트 공통 골격 — 백그라운드 가상 스레드 실행 + 인터럽트/예외 처리
+    // 3개 트리거 엔드포인트 공통 골격 — 백그라운드 가상 스레드 실행 + 인터럽트/예외 처리
     private void triggerAsync(String label, InterruptibleAction action) {
         Thread.ofVirtual().start(() -> {
             try {
@@ -47,22 +46,6 @@ public class AdminSchedulerController {
                 log.error("{} 수동 트리거 오류: {}", label, e.getMessage(), e);
             }
         });
-    }
-
-    // 개장 스케쥴러 수동 트리거 — 개장 대기 없이 즉시 실행, 202 반환 후 백그라운드 실행
-    @Operation(summary = "개장 스케쥴러 수동 트리거", description = "개장 대기 없이 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
-    @PostMapping("/open")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public void triggerOpen() {
-        triggerAsync("개장 스케쥴러", openScheduler::runNow);
-    }
-
-    // 마감 스케쥴러 수동 트리거 — 주문 대기 없이 즉시 실행, 202 반환 후 백그라운드 실행
-    @Operation(summary = "마감 스케쥴러 수동 트리거", description = "주문 대기 없이 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
-    @PostMapping("/close")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public void triggerClose() {
-        triggerAsync("마감 스케쥴러", closeScheduler::runNow);
     }
 
     // KB Land 주택 벤치마크 스케쥴러 수동 트리거 — 수동으로 즉시 실행, 202 반환 후 백그라운드 실행

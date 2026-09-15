@@ -1,22 +1,24 @@
 package com.kista.web;
 
-import com.kista.trading.domain.model.Strategy;
-import com.kista.user.application.usecase.BlacklistUseCase;
-import com.kista.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.web.dto.StrategyCapability;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.mockito.Answers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.RestClient;
+
+import java.util.List;
 
 import static com.kista.support.WebMvcTestSupport.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -34,17 +36,17 @@ class MetaControllerTest {
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean CycleOrderStrategies cycleStrategies;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean(answers = Answers.RETURNS_DEEP_STUBS) RestClient internalApiRestClient;
 
     @BeforeEach
     void setUp() {
-        var infinite = new InfiniteCycleOrderStrategy(null, null);
-        var privacy = new PrivacyCycleOrderStrategy(null);
-        var vr = new VrCycleOrderStrategy(null);
-        when(cycleStrategies.of(StrategyType.INFINITE)).thenReturn(infinite);
-        when(cycleStrategies.of(StrategyType.PRIVACY)).thenReturn(privacy);
-        when(cycleStrategies.of(StrategyType.VR)).thenReturn(vr);
+        var capability = new StrategyCapability(false, true, List.of(20, 30, 40));
+        when(internalApiRestClient.get()
+                .uri(anyString(), any(Object[].class))
+                .retrieve()
+                .body(StrategyCapability.class))
+                .thenReturn(capability);
     }
 
     @Test

@@ -82,6 +82,8 @@ public class DevAuthController {
         if (admin.role() != UserRole.ADMIN) {
             admin = userPort.save(admin.withStatus(UserStatus.ACTIVE).withRole(UserRole.ADMIN));
         }
+        // user_notify_profile 캐시 동기화 겸용 — approve()가 상태 변경 이벤트를 발행하는 유일한 공개 경로다
+        userUseCase.approve(admin.id());
         // RT 발급 후 HttpOnly 쿠키 설정
         String rawRt = tokenUseCase.issueRefreshToken(admin.id(), request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());

@@ -1,5 +1,6 @@
 plugins {
     java
+    `java-test-fixtures`
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.mgmt)
 }
@@ -31,6 +32,8 @@ dependencyManagement {
 }
 
 dependencies {
+    implementation(project(":shared"))
+
     // Spring Boot Core
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.data.jpa)
@@ -79,6 +82,7 @@ dependencies {
     testAnnotationProcessor(libs.lombok)
 
     // Testing
+    testImplementation(project(":trading-core")) // 메인 src는 runtimeOnly로 컴파일 경계 차단, 테스트 소스는 기존대로 trading-core 타입 직접 참조 유지(testImplementation은 implementation을 더 이상 상속하지 않음)
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.security.test)
     testImplementation(libs.spring.boot.starter.security.test)
@@ -97,6 +101,20 @@ dependencies {
     // Spring Modulith 테스트 지원 (ApplicationModuleTest) + 모듈 구조 다이어그램 생성
     testImplementation(libs.spring.modulith.starter.test)
     testImplementation(libs.spring.modulith.docs)
+    // InvestmentPointsHttpAdapter 등 내부 API HTTP 어댑터 테스트용 (버전 카탈로그 미등록 — 단일 사용처라 직접 좌표 지정)
+    testImplementation("com.squareup.okhttp3:mockwebserver3:5.0.0")
+
+    // testFixtures 소스셋 지원 — DataJpaTestBase 등 컴파일에 필요
+    testFixturesImplementation(project(":trading-core")) // Account 등 trading-core 도메인 모델 접근 필수 (User는 root 자체 testFixtures→main 암묵 의존으로 별도)
+    testFixturesImplementation(project(":shared")) // sharedkernel 등 :shared 서브프로젝트로 분리된 공용 어휘 접근 필수
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa)
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa.test)
+    testFixturesImplementation(libs.spring.boot.starter.webmvc.test)
+    testFixturesImplementation(libs.spring.boot.starter.security)
+    testFixturesImplementation(libs.spring.security.test)
+    testFixturesImplementation(libs.spring.modulith.starter.core)
+    testFixturesImplementation(libs.spring.modulith.starter.test)
+    testFixturesImplementation(libs.lombok)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

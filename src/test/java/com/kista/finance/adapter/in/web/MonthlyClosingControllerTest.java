@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.in.web;
 
 import com.kista.finance.domain.model.MonthlyClosing;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.finance.application.usecase.MonthlyClosingUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ class MonthlyClosingControllerTest {
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean MonthlyClosingUseCase monthlyClosingUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");

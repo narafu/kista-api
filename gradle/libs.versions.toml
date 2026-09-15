@@ -64,6 +64,12 @@ testcontainers-postgresql      = { module = "org.testcontainers:postgresql", ver
 # Firebase
 firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
 
+# Jackson 2 — Boot 4 기본/관리 Jackson은 3(tools.jackson)이지만 일부 코드가 Jackson 2 API를 직접 사용, 버전은 Boot BOM 관리
+jackson-databind                = { module = "com.fasterxml.jackson.core:jackson-databind" }
+
+# Apache HttpClient 5 — 버전은 Boot BOM 관리
+httpclient5                     = { module = "org.apache.httpcomponents.client5:httpclient5" }
+
 # Spring Modulith
 spring-modulith-bom            = { module = "org.springframework.modulith:spring-modulith-bom", version.ref = "spring-modulith" }
 spring-modulith-starter-core   = { module = "org.springframework.modulith:spring-modulith-starter-core" }

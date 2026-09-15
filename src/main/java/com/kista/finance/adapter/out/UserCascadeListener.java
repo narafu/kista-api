@@ -1,6 +1,6 @@
 package com.kista.finance.adapter.out;
 
-import com.kista.user.application.event.UserDeletedEvent;
+import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceAccountPort;
 import com.kista.finance.application.port.output.FinanceBudgetPort;

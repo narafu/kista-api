@@ -51,6 +51,8 @@ class UserServiceTest {
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock ApprovalPolicyPort approvalPolicyPort;
     @Mock ObjectProvider<UserUseCase> userUseCaseProvider;
+    @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
+    @Mock AdminSeedPromoter adminSeedPromoter;
     @Mock FinanceGroupPort financeGroupPort; // 가입 시 개인 그룹 부트스트랩
 
     UserService userService;
@@ -58,7 +60,8 @@ class UserServiceTest {
     @BeforeEach
     void setUpRuntimeSettings() {
         userService = new UserService(userPort, userCascadeDeleter, eventPublisher, bootstrapProps,
-                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPort, userUseCaseProvider);
+                kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPort, userUseCaseProvider,
+                userNotifyProfilePublisher, adminSeedPromoter);
         lenient().when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(true);
         lenient().when(userUseCaseProvider.getObject()).thenReturn(userService);
     }
@@ -447,6 +450,36 @@ class UserServiceTest {
         assertThat(result).isEqualTo(existingUser);
         verify(userPort, never()).save(any()); // 기존 사용자 → 저장 없음
         verify(eventPublisher, never()).publishEvent(any()); // 이벤트 발행 없음
+    }
+
+    @Test
+    @DisplayName("ADMIN seed promote는 login() 안에서 직접 저장하지 않고 AdminSeedPromoter(트랜잭션 경계)로 위임한다")
+    void login_adminSeedPromote_delegatesToTransactionalPromoter() {
+        // given: login()은 @Transactional(NOT_SUPPORTED)라 여기서 직접 save+발행하면 복제본 동기화
+        // 이벤트가 트랜잭션 밖에서 나가 재시도 없이 유실될 수 있다 — 별도 빈 경유가 계약이다
+        String code = "auth-code";
+        String redirectUri = "https://example.com/callback";
+        String kakaoId = "kakao-admin-seed";
+        String accessToken = "kakao-access-token";
+        UUID existingId = UUID.randomUUID();
+        User plainUser = new User(existingId, kakaoId, "승격대상", null, UserStatus.PENDING, UserRole.USER,
+                null, null, null, null, null, NotificationChannel.TELEGRAM);
+        User promoted = plainUser.withStatus(UserStatus.ACTIVE).withRole(UserRole.ADMIN);
+
+        when(kakaoOAuthPort.exchangeCodeForToken(code, redirectUri)).thenReturn(accessToken);
+        when(kakaoOAuthPort.getUserInfo(accessToken)).thenReturn(new KakaoOAuthPort.KakaoUserInfo(kakaoId, "승격대상", null));
+        when(bootstrapProps.isAdmin(kakaoId)).thenReturn(true);
+        when(userPort.findByKakaoId(kakaoId)).thenReturn(Optional.of(plainUser));
+        when(adminSeedPromoter.promote(plainUser)).thenReturn(promoted);
+
+        // when
+        User result = userService.login(code, redirectUri);
+
+        // then
+        assertThat(result.role()).isEqualTo(UserRole.ADMIN);
+        verify(adminSeedPromoter).promote(plainUser);
+        verify(userPort, never()).save(any());                      // login()이 직접 저장하지 않는다
+        verifyNoInteractions(userNotifyProfilePublisher);           // 발행도 promoter 안에서만 일어난다
     }
 
     @Test

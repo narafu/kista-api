@@ -1,7 +1,5 @@
 package com.kista.web.dto;
 
-import com.kista.trading.domain.model.Strategy;
-import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
@@ -23,14 +21,14 @@ public record StrategyTypeMeta(
         @Schema(description = "분할 수 옵션 (빈 목록이면 분할 개념 없음)")
         List<Integer> divisionCounts   // 분할 수 옵션 — 빈 목록이면 분할 개념 없음
 ) {
-    public static StrategyTypeMeta from(StrategyType t, CycleOrderStrategy strategy) {
+    public static StrategyTypeMeta from(StrategyType t, StrategyCapability capability) {
         List<String> tickers = t.availableTickers().stream().map(Enum::name).toList();
         return new StrategyTypeMeta(
                 t.name(), t.getDescription(), tickers,
-                strategy.requiresPrivacyBase(),
+                capability.requiresPrivacyBase(),
                 tickers.size() == 1,
-                strategy.supportsReverseMode(),
-                strategy.availableDivisionCounts()
+                capability.supportsReverseMode(),
+                capability.divisionCounts()
         );
     }
 }

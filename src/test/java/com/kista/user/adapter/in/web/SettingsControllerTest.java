@@ -2,7 +2,7 @@ package com.kista.user.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.user.domain.model.NotificationChannel;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.user.application.usecase.UpdateBalanceCheckUseCase;
 import com.kista.user.application.usecase.UpdateNotificationPrefUseCase;
 import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase;
@@ -37,7 +37,7 @@ class SettingsControllerTest {
     @Autowired ObjectMapper objectMapper;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserProfileUseCase userProfileUseCase;
     @MockitoBean UpdateBalanceCheckUseCase updateBalanceCheckUseCase;
     @MockitoBean UpdateNotificationPrefUseCase updateNotificationPrefUseCase;
