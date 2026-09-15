@@ -1,0 +1,60 @@
+package com.kista.trading.stats.application.service;
+
+import com.kista.broker.application.service.BrokerAdapterRegistry;
+import com.kista.account.domain.model.Account;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.broker.domain.model.toss.*;
+import com.kista.trading.stats.application.usecase.TossStatisticsUseCase;
+import com.kista.account.application.port.output.AccountPort;
+import com.kista.broker.application.port.output.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+class TossStatisticsService implements TossStatisticsUseCase {
+
+    private final AccountPort accountPort;
+    private final BrokerAdapterRegistry registry;
+
+    @Override
+    public List<TossCandle> getCandles(UUID accountId, UUID requesterId, StrategyTicker ticker, String interval,
+                                       LocalDate from, LocalDate to) {
+        Account account = requireAccount(accountId, requesterId);
+        return registry.require(account.toBrokerRef(), CandlePort.class).getCandles(ticker.name(), interval, from, to);
+    }
+
+    @Override
+    public TossStockInfo getStockInfo(UUID accountId, UUID requesterId, StrategyTicker ticker) {
+        Account account = requireAccount(accountId, requesterId);
+        return registry.require(account.toBrokerRef(), StockInfoPort.class).getStockInfo(ticker);
+    }
+
+    @Override
+    public TossExchangeRate getExchangeRate(UUID accountId, UUID requesterId) {
+        Account account = requireAccount(accountId, requesterId);
+        return registry.require(account.toBrokerRef(), ExchangeRatePort.class).getExchangeRate();
+    }
+
+    @Override
+    public List<TossMarketSession> getMarketCalendar(UUID accountId, UUID requesterId,
+                                                     LocalDate from, LocalDate to) {
+        Account account = requireAccount(accountId, requesterId);
+        return registry.require(account.toBrokerRef(), BrokerMarketCalendarPort.class).getMarketCalendar(from, to);
+    }
+
+    @Override
+    public List<TossAccountInfo> getAccountList(UUID accountId, UUID requesterId) {
+        Account account = requireAccount(accountId, requesterId);
+        return registry.require(account.toBrokerRef(), BrokerAccountPort.class).getAccountList(account.toBrokerRef());
+    }
+
+    // 소유권 검증 — KIS 계좌로 Toss 전용 기능 호출 시 registry.require()에서 IllegalArgumentException → 400
+    private Account requireAccount(UUID accountId, UUID requesterId) {
+        return accountPort.requireOwnedAccount(accountId, requesterId);
+    }
+}

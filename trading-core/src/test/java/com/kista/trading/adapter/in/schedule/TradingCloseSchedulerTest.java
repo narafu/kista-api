@@ -1,0 +1,170 @@
+package com.kista.trading.adapter.in.schedule;
+
+import com.kista.platform.scheduling.SchedulerJobRunner;
+import com.kista.platform.scheduling.SchedulerLifecycleEvent;
+import com.kista.platform.scheduling.SchedulerLockService;
+import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.BatchContext;
+import com.kista.trading.domain.model.Strategy;
+import com.kista.trading.domain.model.StrategyCycle;
+import com.kista.trading.domain.model.TradingUserProfile;
+import com.kista.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.trading.application.port.output.HeartbeatPort;
+import com.kista.trading.application.port.output.StrategyPort;
+import com.kista.support.DomainFixtures;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.stubbing.Answer;
+import org.springframework.context.ApplicationEventPublisher;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.*;
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyStatus;
+import com.kista.sharedkernel.StrategyTicker;
+import com.kista.sharedkernel.StrategyCycleSeedType;
+
+@ExtendWith(MockitoExtension.class)
+class TradingCloseSchedulerTest {
+
+    @Mock TradingExecutionUseCase useCase;
+    @Mock StrategyPort strategyPort;
+    @Mock SchedulerLockService schedulerLockService;
+    @Mock BatchContextFactory contextFactory;
+    @Mock ApplicationEventPublisher events;
+    @Mock HeartbeatPort heartbeatPort;
+
+    TradingCloseScheduler scheduler;
+
+    private static final UUID USER_ID    = UUID.randomUUID();
+    private static final UUID ACCOUNT_ID = UUID.randomUUID();
+    private static final UUID CYCLE_ID   = UUID.randomUUID();
+
+    private Account mockAccount() {
+        return DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+    }
+
+    private Strategy mockStrategy() {
+        return new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+    }
+
+    private StrategyCycle mockStrategyCycle(UUID strategyId) {
+        return new StrategyCycle(UUID.randomUUID(), strategyId, new BigDecimal("1000.00"),
+                null, LocalDate.now(), null, Instant.now(), null);
+    }
+
+    private TradingUserProfile mockUser() {
+        return DomainFixtures.tradingUserProfile(USER_ID);
+    }
+
+    @BeforeEach
+    void setUp() throws InterruptedException {
+        // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
+        SchedulerJobRunner jobRunner = new SchedulerJobRunner(events);
+        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort);
+
+        lenient().doAnswer((Answer<Boolean>) invocation -> {
+            SchedulerLockService.LockedTask task = invocation.getArgument(2);
+            try {
+                task.run();
+                return true;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw e;
+            }
+        }).when(schedulerLockService).tryRun(any(), any(), any());
+    }
+
+    @Test
+    void run_callsExecuteBatchWithAllContexts() throws InterruptedException {
+        Strategy strategy = mockStrategy();
+        StrategyCycle cycle = mockStrategyCycle(strategy.id());
+        Account account = mockAccount();
+        TradingUserProfile user = mockUser();
+        BatchContext context = new BatchContext(strategy, cycle, account, user);
+
+        when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
+        when(contextFactory.buildAll(List.of(strategy))).thenReturn(List.of(context));
+
+        scheduler.run();
+
+        verify(useCase).executeBatch(List.of(context));
+        verify(heartbeatPort).pingClose();
+    }
+
+    @Test
+    void run_noActiveStrategies_callsExecuteBatchWithEmptyList() throws InterruptedException {
+        when(strategyPort.findAllActive()).thenReturn(List.of());
+        when(contextFactory.buildAll(List.of())).thenReturn(List.of());
+
+        scheduler.run();
+
+        verify(useCase).executeBatch(List.of());
+        verify(heartbeatPort).pingClose();
+    }
+
+    @Test
+    void run_interruptedException_restoresInterruptFlag() throws InterruptedException {
+        Strategy strategy = mockStrategy();
+        BatchContext context = new BatchContext(strategy, mockStrategyCycle(strategy.id()), mockAccount(), mockUser());
+
+        when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
+        when(contextFactory.buildAll(any())).thenReturn(List.of(context));
+        doAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            throw new InterruptedException("interrupted");
+        }).when(useCase).executeBatch(anyList());
+
+        try {
+            scheduler.run();
+        } catch (InterruptedException e) {
+            // 인터럽트 플래그 복원 확인
+        }
+
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        Thread.interrupted(); // 플래그 초기화
+        verify(heartbeatPort, never()).pingClose(); // 인터럽트 시 핑 도달 안 함
+    }
+
+    @Test
+    void run_executeBatchException_publishesFailedLifecycleEvent() throws InterruptedException {
+        Strategy strategy = mockStrategy();
+        BatchContext context = new BatchContext(strategy, mockStrategyCycle(strategy.id()), mockAccount(), mockUser());
+        RuntimeException ex = new RuntimeException("KIS API 호출 실패");
+
+        when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
+        when(contextFactory.buildAll(any())).thenReturn(List.of(context));
+        doThrow(ex).when(useCase).executeBatch(any());
+
+        scheduler.run();
+
+        // notify 직접 호출 대신 FAILED 생명주기 이벤트 발행 — 이벤트는 예외 identity가 아닌 message만 담는다
+        ArgumentCaptor<SchedulerLifecycleEvent> captor = ArgumentCaptor.forClass(SchedulerLifecycleEvent.class);
+        verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
+        assertThat(captor.getAllValues().get(1).phase()).isEqualTo(SchedulerLifecycleEvent.Phase.FAILED);
+        assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("KIS API 호출 실패");
+        verify(heartbeatPort).pingClose(); // jobRunner가 RuntimeException을 삼키므로 runLocked는 정상 종료 — 핑 도달
+    }
+
+    @Test
+    void run_lockNotAcquired_skipsSchedulerBody() throws InterruptedException {
+        doReturn(false).when(schedulerLockService).tryRun(any(), any(), any());
+
+        scheduler.run();
+
+        verifyNoInteractions(strategyPort, contextFactory, useCase, events, heartbeatPort);
+    }
+}

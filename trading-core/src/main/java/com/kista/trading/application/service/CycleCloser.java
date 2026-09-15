@@ -1,0 +1,31 @@
+package com.kista.trading.application.service;
+
+import com.kista.matching.domain.model.AccountBalance;
+import com.kista.trading.domain.model.Strategy;
+import com.kista.trading.domain.model.StrategyCycle;
+import com.kista.trading.application.port.output.StrategyCyclePort;
+import com.kista.trading.application.port.output.StrategyPort;
+
+import java.time.LocalDate;
+import com.kista.sharedkernel.StrategyStatus;
+
+// 보정 서비스 공용 — holdings 소진(==0) 시 사이클 종료 + 전략 PAUSED 처리
+final class CycleCloser {
+
+    private CycleCloser() {}
+
+    // holdings==0이면 사이클 종료 후 갱신된 전략 상태 반환, 아니면 원본 그대로
+    static CycleEndResult closeIfExhausted(StrategyCyclePort strategyCyclePort, StrategyPort strategyPort,
+                                           Strategy strategy, StrategyCycle currentCycle,
+                                           AccountBalance balance, LocalDate tradeDate) {
+        if (balance.holdings() == 0) {
+            strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), tradeDate);
+            Strategy updated = strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
+            return new CycleEndResult(updated, true, tradeDate);
+        }
+        return new CycleEndResult(strategy, false, null);
+    }
+
+    // 사이클 종료 여부와 갱신된 전략 상태를 함께 반환하는 값 객체
+    record CycleEndResult(Strategy strategy, boolean ended, LocalDate endDate) {}
+}
