@@ -1263,7 +1263,7 @@ EOF
 - Consumes: 없음(프론트 전용)
 - Produces: `TRADING_API_BASE_URL` env var(로컬 `.env.local`/배포 환경변수)
 
-- [ ] **Step 1: `shared/lib/env.ts`에 trading base URL 추가**
+- [x] **Step 1: `shared/lib/env.ts`에 trading base URL 추가**
 
 ```typescript
 export function getTradingApiBaseUrl(): string {
@@ -1273,7 +1273,7 @@ export function getTradingApiBaseUrl(): string {
 }
 ```
 
-- [ ] **Step 2: `createProxyRoute.ts`에 `target` 옵션 추가**
+- [x] **Step 2: `createProxyRoute.ts`에 `target` 옵션 추가**
 
 ```typescript
 export type CreateProxyRouteOptions = {
@@ -1287,7 +1287,7 @@ const baseUrl = opts.target === 'trading' ? getTradingApiBaseUrl() : getApiBaseU
 const url = `${baseUrl}${opts.basePath}${subPath}${request.nextUrl.search}`
 ```
 
-- [ ] **Step 3: 8개 route.ts에 `target: 'trading'` 추가**
+- [ ] **Step 3: 8개 route.ts에 `target: 'trading'` 추가** — accounts/backtest/orders/stats/trading-cycles 5개 파일 확인 완료(catch-all이 dashboard/toss-statistics/statistics 커버). 단 **`/api/daily-trades`(DashboardController 소유, trading-core 이관됨) 누락 확인** — `app/api/daily-trades/route.ts`가 accounts 하위 경로가 아닌 독립 top-level이라 8개 이관 목록에서 빠졌고 여전히 `getApiBaseUrl()`(root) 사용 중. kista-ui 레포에서 `target: 'trading'` 추가 필요
 
 각 파일의 `createProxyRoute({ basePath: '/api/...' })` 호출에 `target: 'trading'` 추가. 예:
 
@@ -1331,7 +1331,7 @@ EOF
 
 **Files:** 없음(검증 전용 태스크)
 
-- [ ] **Step 1: 전체 테스트 스위트 1회**
+- [x] **Step 1: 전체 테스트 스위트 1회**
 
 Run: `./gradlew test`
 Expected: BUILD SUCCESSFUL(사전 존재 무관 결함 있으면 사용자에게 별도 보고, 이 플랜 범위 밖 이슈로 취급)
@@ -1339,12 +1339,12 @@ Expected: BUILD SUCCESSFUL(사전 존재 무관 결함 있으면 사용자에게
 Run: `./gradlew :trading-core:test`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 2: `ApplicationModules.verify()` 확인**
+- [x] **Step 2: `ApplicationModules.verify()` 확인**
 
 Run: `./gradlew test --tests 'com.kista.architecture.*'`
 Expected: PASS (모듈 경계·레이어 규칙 전부 GREEN)
 
-- [ ] **Step 3: 로컬 DB 기동 + 두 jar 동시 기동**
+- [x] **Step 3: 로컬 DB 기동 + 두 jar 동시 기동**
 
 ```bash
 docker compose up -d postgres redis
@@ -1355,7 +1355,7 @@ DB_URL=... DB_USERNAME=... DB_PASSWORD=... JWT_SIGNING_KEY=... INTERNAL_API_TOKE
 
 (실제 값은 `application-local.yml`/`.env` 참고 — DB_URL 등은 같은 로컬 postgres를 가리켜야 함, 4a는 아직 1 DB)
 
-- [ ] **Step 4: 인증 스택 검증**
+- [x] **Step 4: 인증 스택 검증**
 
 ```bash
 curl -i http://localhost:8081/api/internal/trading/scheduler/open -H "X-Internal-Token: wrong"
@@ -1366,7 +1366,7 @@ curl -i http://localhost:8081/api/trading-cycles -H "Authorization: Bearer $TOKE
 # 기대: 200 (또는 빈 배열 — 인증 자체는 통과해야 함)
 ```
 
-- [ ] **Step 5: `trade.event` pub/sub 왕복 확인**
+- [x] **Step 5: `trade.event` pub/sub 왕복 확인**
 
 로컬 Redis CLI로 수동 발행 후 root SSE 연결에서 수신되는지 확인:
 ```bash
@@ -1374,11 +1374,9 @@ redis-cli PUBLISH trade.event '{"userId":"<test-uuid>","event":{"type":"BUY","ti
 ```
 (kista-ui 또는 curl로 `/api/trades/stream` SSE 연결해두고 위 명령 실행, 이벤트 수신 로그 확인)
 
-- [ ] **Step 6: kista-ui 로컬 기동해 전체 플로우 확인**
+- [ ] **Step 6: kista-ui 로컬 기동해 전체 플로우 확인** — HTTP 레벨(curl+dev-token)로 accounts/trading-cycles/stats/backtest 8081 정상 라우팅 확인됨(별도 세션). 실브라우저 클릭 로그인만 미검증(확장 미연결)
 
-`TRADING_API_BASE_URL=http://localhost:8081 API_BASE_URL=http://localhost:8080 npm run dev`(kista-ui 레포) — 로그인 → 계좌 조회 → 전략 조회 → 매매 사이클 조회 전 구간 브라우저로 확인.
-
-- [ ] **Step 7: 두 프로세스 종료, 최종 커밋 없음(검증 전용 태스크) — 문제 발견 시 해당 태스크로 돌아가 수정**
+- [x] **Step 7: 두 프로세스 종료, 최종 커밋 없음(검증 전용 태스크) — 문제 발견 시 해당 태스크로 돌아가 수정**
 
 ---
 
