@@ -1,11 +1,11 @@
 package com.kista.market.adapter.in.web;
 
-import com.kista.user.adapter.in.web.security.InternalTokenAuthFilter;
-import com.kista.user.adapter.in.web.security.JwtAuthFilter;
-import com.kista.user.adapter.in.web.security.SecurityConfig;
+import com.kista.platform.security.InternalTokenAuthFilter;
+import com.kista.platform.security.JwtAuthFilter;
+import com.kista.platform.security.SecurityConfig;
 import com.kista.market.domain.model.FearGreedRating;
 import com.kista.market.domain.model.FearGreedSnapshot;
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.market.application.usecase.GetFearGreedUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -41,7 +41,7 @@ class FearGreedControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean GetFearGreedUseCase getFearGreedUseCase;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
 
     private static final UUID USER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

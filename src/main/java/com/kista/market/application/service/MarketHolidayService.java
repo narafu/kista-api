@@ -1,9 +1,9 @@
 package com.kista.market.application.service;
 
-import com.kista.broker.domain.model.toss.TossCandle;
+import com.kista.market.application.port.output.CandleQueryPort;
+import com.kista.market.application.port.output.MarketCalendarQueryPort;
 import com.kista.market.application.usecase.MarketUseCase;
-import com.kista.market.application.port.output.MarketCalendarPort;
-import com.kista.broker.application.port.output.CandlePort;
+import com.kista.market.domain.model.TossDailyCandle;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,16 +14,16 @@ import java.util.List;
 @RequiredArgsConstructor
 class MarketHolidayService implements MarketUseCase {
 
-    private final MarketCalendarPort marketCalendarPort; // 휴장일 조회 (읽기 전용)
-    private final CandlePort candlePort;                 // Toss 캔들 조회 (broker capability)
+    private final MarketCalendarQueryPort marketCalendarQueryPort; // 휴장일 조회 (marketcalendar 내부API)
+    private final CandleQueryPort candleQueryPort;                 // Toss 캔들 조회 (broker 내부API)
 
     @Override
     public List<LocalDate> getMonthlyHolidays(int year, int month) {
-        return marketCalendarPort.findHolidaysForMonth(year, month);
+        return marketCalendarQueryPort.findHolidaysForMonth(year, month);
     }
 
     @Override
-    public List<TossCandle> getDailyCandles(String symbol, int count) {
-        return candlePort.getLatestCandles(symbol, "1d", count);
+    public List<TossDailyCandle> getDailyCandles(String symbol, int count) {
+        return candleQueryPort.latestDailyCandles(symbol, count);
     }
 }

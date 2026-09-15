@@ -1,6 +1,6 @@
 package com.kista.market.adapter.in.web.dto;
 
-import com.kista.broker.domain.model.toss.TossCandle;
+import com.kista.market.domain.model.TossDailyCandle;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -21,11 +21,11 @@ public record TossCandleResponse(
     @Schema(description = "거래량")
     long volume        // 거래량
 ) {
-    public static TossCandleResponse from(TossCandle c) {
+    public static TossCandleResponse from(TossDailyCandle c) {
         return new TossCandleResponse(c.date(), c.open(), c.high(), c.low(), c.close(), c.volume());
     }
 
-    public static List<TossCandleResponse> fromList(List<TossCandle> candles) {
+    public static List<TossCandleResponse> fromList(List<TossDailyCandle> candles) {
         return candles.stream().map(TossCandleResponse::from).toList();
     }
 }

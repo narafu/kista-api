@@ -2,7 +2,7 @@ package com.kista.market.adapter.in.web;
 
 import com.kista.market.adapter.in.web.dto.MarketSessionResponse;
 import com.kista.market.adapter.in.web.dto.TossCandleResponse;
-import com.kista.market.domain.model.MarketSessionSnapshot;
+import com.kista.market.application.port.output.MarketCalendarQueryPort;
 import com.kista.market.application.usecase.MarketUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,6 +28,7 @@ public class MarketHolidayController {
     private static final CacheControl HOLIDAYS_CACHE = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
 
     private final MarketUseCase marketUseCase;
+    private final MarketCalendarQueryPort marketCalendarQueryPort;
 
     @Operation(summary = "월별 미국 시장 휴장일 조회")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -53,8 +54,8 @@ public class MarketHolidayController {
     @ApiResponse(responseCode = "200", description = "세션 조회 성공")
     @GetMapping("/session")
     public MarketSessionResponse getSession() {
-        MarketSessionSnapshot snapshot = MarketSessionSnapshot.now();
-        return new MarketSessionResponse(snapshot.session().name(), snapshot.isDst());
+        var session = marketCalendarQueryPort.currentSession();
+        return new MarketSessionResponse(session.session().name(), session.isDst());
     }
 
     @Operation(summary = "종목 일봉 캔들 조회 (최대 200개, 계좌 무관 공용 시세)")

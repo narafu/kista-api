@@ -1,6 +1,6 @@
 package com.kista.market.application.usecase;
 
-import com.kista.broker.domain.model.toss.TossCandle;
+import com.kista.market.domain.model.TossDailyCandle;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -10,5 +10,5 @@ public interface MarketUseCase {
     List<LocalDate> getMonthlyHolidays(int year, int month);
 
     // 일봉만 지원 — count는 1~200으로 clamp
-    List<TossCandle> getDailyCandles(String symbol, int count);
+    List<TossDailyCandle> getDailyCandles(String symbol, int count);
 }
