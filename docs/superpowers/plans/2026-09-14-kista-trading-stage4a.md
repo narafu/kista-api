@@ -1384,3 +1384,14 @@ redis-cli PUBLISH trade.event '{"userId":"<test-uuid>","event":{"type":"BUY","ti
 - Spec 4a 절의 모든 항목(보안 스택 이관/자체 bootJar/kista-ui 라우팅/notify 이관/user_notify_profile 확장/trade.event)에 대응 태스크 있음 — Task 1,2,3 / 9 / 5,6,7 / 4 / 8.
 - Task 5→6 사이 의도적 컴파일 실패 구간은 하나의 논리적 커밋 단위로 묶어 bisect 안전성 확보하도록 명시함.
 - Task 7 Step 5의 "틀렸다" 노트는 플레이스홀더가 아니라 실제 다음 태스크로의 인계 지점 — Task 8이 이를 완성함.
+
+---
+
+## 최종 기록 (2026-09-16)
+
+- Task 1~9 전부 완료. Task 10 Step 1~5,7 실행 완료(Step 6은 HTTP 레벨 검증만, 실브라우저 클릭 로그인 미검증).
+- `worktree-kista-trading-gradle-split` 브랜치(de693b5c~f631ba52, 10개 커밋)를 `main`에 fast-forward 병합 완료(로컬만, origin push는 아직 안 함).
+- 배포 배선(Dockerfile 2-jar 빌드, `deploy/server/docker-compose.yml`의 `kista-trading` 서비스, `server-deploy.yml`의 `deploy-trading` job, `_deploy-role.yml`의 `INTERNAL_API_TOKEN` 필수키) 추가 완료 — `f631ba52`.
+- kista-ui 레포: 8개 엔드포인트 라우팅 분기 + daily-trades 누락분(`f639a8b`) 커밋 완료(별도 세션).
+- kista-infra 레포: Caddy 라우팅 배선(`3822dba`) 완료(별도 세션) — bare path(트레일링 슬래시 없음) 매칭 함정 발견·수정 이력 있음(named matcher로 해결).
+- **배포 전 미확인 블로커**: `docs/agents/docker-infra.md`의 "이벤트 클래스 패키지 이동 배포 전 필수 체크" — 이번 병합으로 `com.kista.trading.application.event.*`(12개)·`com.kista.privacy.application.event.PrivacyAlertRaisedEvent`가 `com.kista.sharedkernel.*`로 처음 이관되어 운영에 배포된다(현재 운영 이미지는 구 패키지 기준). 배포 전 운영 DB `event_publication`에 구 패키지 FQCN의 미완료(`completion_date IS NULL`) row가 있는지 반드시 확인·정리해야 함(`docker-infra.md` SQL 참고) — 이 세션은 운영 서버 SSH 접근 권한이 없어 미실행. kista-infra 세션 또는 사용자가 직접 확인 필요.
