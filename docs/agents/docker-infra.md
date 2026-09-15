@@ -11,6 +11,14 @@
 - `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → SSH로 서버에 배포 (매매 시간대 가드는 `deploy-scheduler` 잡에만 적용 — 아래 참고)
 - **2-role 배포 (2026-09-04~)**: 같은 GHCR 이미지를 컨테이너 2개로 띄운다 — `kista-api`(HTTP, `scheduler.enabled=false`, 매매 가드 없이 잦은 배포)와 `kista-scheduler`(`SCHEDULER_ENABLED=true`, 매매 배치 실행, 매매 시간대 배포 가드 유지). `server-deploy.yml`은 `verify`·`build` 후 `deploy-api`·`deploy-scheduler` 두 독립 잡(`_deploy-role.yml` 재사용 워크플로)을 호출한다. 매매 시간대에 push하면 `deploy-api`는 통과, `deploy-scheduler`만 `exit 1` — 장 마감 후 Actions에서 해당 잡만 Re-run. EPR 미완료 이벤트 재발행 소유자는 `kista-scheduler` 단독(`application-prod.yml`이 API role은 `false`, 스케쥴러 컨테이너가 env로 `true`) — 양쪽 재발행 시 중복 알림 방지. 수동 트리거(`/api/admin/scheduler/*`)는 Caddy가 `kista-scheduler`로 라우팅(kista-infra 레포). 또한 `deploy-api`·`deploy-scheduler` 두 잡이 각각 `production` GitHub 환경을 참조하므로, `production`에 protection rule(필수 리뷰어·wait timer)을 걸면 push 1건당 승인이 2회 필요해진다 — 현재는 protection rule 없음.
 - **Flyway 마이그레이션 backward-compat 필수**: 2-role은 독립 배포라 `kista-scheduler`가 이전 이미지로 새 스키마를 물 수 있다. 컬럼 추가는 nullable/DEFAULT, 드롭·리네임은 두 배포로 나눠 코드가 참조를 먼저 끊는다(expand/contract). 이 조건을 못 지키는 마이그레이션은 두 role을 같은 커밋에서 함께 배포
+- **이벤트 클래스 패키지 이동 배포 전 필수 체크(`event_publication` 정리)**: Modulith EPR은 이벤트를 FQCN으로 저장하고 재기동 republish 시 그 이름으로 클래스를 resolve한다 — 이벤트 클래스를 다른 패키지로 옮기는 커밋(예: Task17의 trading/privacy 이벤트 12개 → `com.kista.sharedkernel.*` 이관)을 배포하기 직전, 옛 패키지로 남아있는 미완료 row가 있는지 반드시 확인한다. 남아있으면 배포 후 매 재기동마다 `ClassNotFoundException`으로 반복 실패하며 자연 치유되지 않는다.
+  ```sql
+  -- 배포 직전 서버 DB에서 실행 (옛 FQCN을 실제 이관 대상으로 치환)
+  SELECT count(*) FROM event_publication WHERE completion_date IS NULL AND event_type LIKE '<옛 패키지>.%';
+  -- 0건이 아니면 배포 전 삭제(재시도 포기 — 해당 미완료 알림은 유실됨을 배포 공지에 명시)
+  DELETE FROM event_publication WHERE completion_date IS NULL AND event_type LIKE '<옛 패키지>.%';
+  ```
+  `completion_date`를 임의로 채워 "완료"로 위장하는 방식은 리스너 실행 없이 완료 처리되므로 금지 — 삭제(재시도 포기)로 처리할 것. 상세 배경은 `constraints.md`의 "이벤트 클래스 패키지 이동은 event_publication에 ClassNotFoundException을 남긴다" 참고
 - 배포 파일: `deploy/server/docker-compose.yml`(kista-api + kista-scheduler 2-role — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
 - `kista-infra`(private, `/opt/kista-infra/`) 레포가 caddy(양 도메인 리버스 프록시)·postgres·redis·백업 cron을 전담한다. `shared_net`(caddy↔kista-api/kista-ui)·`data_net`(postgres·redis↔kista-api만, kista-ui 미가입) 두 개의 external Docker 네트워크로 앱↔인프라 경계를 분리한다. **인스턴스 재편·컷오버 완료(2026-08-07)** — kista-api-server(A)가 caddy·postgres·redis·kista-api·kista-ui를 모두 올인원으로 호스팅, kista-ui-server는 삭제됨, DB는 Supabase에서 자체호스팅 postgres(`postgres:5432/kistadb`)로 이관 완료. fida-server만 별도 유지.
 - **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
