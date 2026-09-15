@@ -33,6 +33,17 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # notify Redis Pub/Sub 이관(ec3cec1e) 이후 ApplicationContextLoadTest 등 컨텍스트 로드 테스트가
+      # RedisMessageListenerContainer 빈 생성 시 연결을 시도한다 — ci.yml과 동일 패턴으로 추가(로컬은 이미 떠 있어 누락이 안 드러났었음)
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4.9.0
