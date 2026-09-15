@@ -1,5 +1,6 @@
 package com.kista.admin.application.usecase;
 
+import com.kista.user.application.usecase.UserSyncBackfillUseCase;
 import com.kista.user.domain.model.AdminUserView;
 
 import java.time.LocalDate;
@@ -20,4 +21,7 @@ public interface AdminUserUseCase {
 
     // 단일 사용자 뷰 조회 — listStrategyOrders 전용 (전체 조회 후 ID 필터)
     Optional<AdminUserView> findUser(UUID userId);
+
+    // 4a 배포 이후 root-trading 이벤트 유실 드리프트 일회성 복구 트리거 (감사 로그 포함)
+    UserSyncBackfillUseCase.BackfillResult runUserSyncBackfill(UUID adminId);
 }

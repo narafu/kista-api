@@ -3,6 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.admin.adapter.in.web.dto.AdminRoleRequest;
 import com.kista.admin.adapter.in.web.dto.AdminStatusRequest;
 import com.kista.admin.adapter.in.web.dto.AdminUserResponse;
+import com.kista.user.application.usecase.UserSyncBackfillUseCase;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -71,6 +73,14 @@ public class AdminUserController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteUser(@PathVariable UUID userId, @AuthenticationPrincipal UUID adminId) {
         adminUser.deleteUser(adminId, userId);
+    }
+
+    // 4a 배포 이후 root-trading 이벤트 유실 드리프트 일회성 복구 트리거 — 재실행해도 멱등
+    @Operation(summary = "사용자 동기화 드리프트 일회성 복구")
+    @PostMapping("/sync-backfill")
+    public ResponseEntity<UserSyncBackfillUseCase.BackfillResult> backfillUserSync(
+            @AuthenticationPrincipal UUID adminId) {
+        return ResponseEntity.ok(adminUser.runUserSyncBackfill(adminId));
     }
 
 }

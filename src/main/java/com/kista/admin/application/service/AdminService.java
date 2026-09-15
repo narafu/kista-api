@@ -6,6 +6,7 @@ import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import com.kista.user.application.usecase.UserUseCase;
+import com.kista.user.application.usecase.UserSyncBackfillUseCase;
 import com.kista.user.application.port.output.AdminUserViewPort;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.user.application.port.output.BlacklistPort;
@@ -35,6 +36,7 @@ class AdminService implements AdminUserUseCase {
     private final UserUseCase userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
     private final BlacklistPort blacklistPort;           // role 변경 시 stale AT 무효화 기록
+    private final UserSyncBackfillUseCase userSyncBackfillUseCase; // 4a 이후 드리프트 일회성 복구
 
     @Override
     @Transactional(readOnly = true)
@@ -110,5 +112,15 @@ class AdminService implements AdminUserUseCase {
     public Optional<AdminUserView> findUser(UUID userId) {
         // 단건 조회 — 전체 풀스캔 대신 ID 기반 직접 조회
         return adminUserViewPort.findById(userId);
+    }
+
+    @Override
+    public UserSyncBackfillUseCase.BackfillResult runUserSyncBackfill(UUID adminId) {
+        var result = userSyncBackfillUseCase.runOnce();
+        log.info("관리자 사용자 동기화 드리프트 복구: adminId={}, cascadeRepublished={}, profileBackfilled={}",
+                adminId, result.cascadeRepublished(), result.profileBackfilled());
+        auditLogPort.log(adminId, "USER_SYNC_BACKFILL", "USER", null,
+                Map.of("cascadeRepublished", result.cascadeRepublished(), "profileBackfilled", result.profileBackfilled()));
+        return result;
     }
 }

@@ -3,6 +3,7 @@ package com.kista.admin.application.service;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.UserUseCase;
+import com.kista.user.application.usecase.UserSyncBackfillUseCase;
 import com.kista.user.application.port.output.AdminUserViewPort;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.user.application.port.output.BlacklistPort;
@@ -39,6 +40,7 @@ class AdminServiceTest {
     @Mock UserUseCase userUseCase;
     @Mock AuditLogPort auditLogPort;
     @Mock BlacklistPort blacklistPort;
+    @Mock UserSyncBackfillUseCase userSyncBackfillUseCase;
 
     @InjectMocks AdminService adminService;
 
