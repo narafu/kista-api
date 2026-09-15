@@ -82,6 +82,7 @@ services:
       - .env
     environment:
       APP_JAR: trading-core.jar
+      SERVER_PORT: "8080"  # trading-core 기본값은 8081(로컬 2-프로세스 동시 기동용) — 컨테이너 expose/healthcheck는 8080 고정이라 반드시 override 필요
       SPRING_PROFILES_ACTIVE: prod
       SCHEDULER_ENABLED: "true"
       SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "false"  # EPR 재발행 소유자는 kista-scheduler 단독 유지 — 여기서 true면 재기동마다 매매 이벤트 중복 발행

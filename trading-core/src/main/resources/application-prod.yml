@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: false
+  lifecycle:
+    timeout-per-shutdown-phase: 30s  # docker stop_grace_period 200s와 쌍으로 관리(root application-prod.yml과 동일 관례)
+
+management:
+  health:
+    probes:
+      enabled: true  # /actuator/health/liveness + /actuator/health/readiness 활성화 — healthcheck가 이 경로를 쓴다
+  endpoint:
+    health:
+      show-details: never
+  otlp:
+    metrics:
+      export:
+        enabled: ${GRAFANA_CLOUD_OTLP_ENABLED:false}
+        url: ${GRAFANA_CLOUD_OTLP_ENDPOINT:}
+        headers:
+          Authorization: ${GRAFANA_CLOUD_OTLP_AUTH_HEADER:}
+        step: 60s
+
+logging:
+  level:
+    root: WARN
+    com.kista: INFO
