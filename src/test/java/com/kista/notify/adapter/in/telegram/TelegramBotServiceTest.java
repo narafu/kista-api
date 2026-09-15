@@ -1,8 +1,7 @@
 package com.kista.notify.adapter.in.telegram;
 
-import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.stats.application.usecase.PortfolioUseCase;
+import com.kista.notify.application.port.output.PortfolioQueryPort;
 import com.kista.user.application.usecase.TelegramApprovalUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -29,7 +27,7 @@ import static org.mockito.Mockito.*;
 class TelegramBotServiceTest {
 
     @Mock TelegramApiClient apiClient;
-    @Mock PortfolioUseCase portfolioUseCase;
+    @Mock PortfolioQueryPort portfolioQueryPort;
     @Mock UserUseCase userUseCase;
     @Mock TelegramApprovalUseCase telegramApprovalUseCase;
 
@@ -39,7 +37,7 @@ class TelegramBotServiceTest {
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioUseCase, userUseCase, telegramApprovalUseCase);
+        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioQueryPort, userUseCase, telegramApprovalUseCase);
         // adminChatId로 userId 조회 — status/history 명령에서만 사용, 다른 테스트에서는 미호출
         lenient().when(userUseCase.findUserIdByTelegramChatId(String.valueOf(CHAT_ID))).thenReturn(Optional.of(USER_ID));
     }
@@ -66,11 +64,10 @@ class TelegramBotServiceTest {
 
     @Test
     void status_command_returns_portfolio_info() {
-        CyclePositionHistoryEntry snap = new CyclePositionHistoryEntry(
-                UUID.randomUUID(), StrategyTicker.SOXL,
-                new BigDecimal("1000.00"), new BigDecimal("26.00"),
-                new BigDecimal("25.0000"), 100, Instant.now());
-        when(portfolioUseCase.getCurrent(any())).thenReturn(snap);
+        PortfolioQueryPort.PortfolioCurrentView snap = new PortfolioQueryPort.PortfolioCurrentView(
+                StrategyTicker.SOXL, 100, new BigDecimal("25.0000"),
+                new BigDecimal("1000.00"), new BigDecimal("26.00"));
+        when(portfolioQueryPort.getCurrent(any())).thenReturn(snap);
 
         sut.handle(update("/status"));
 
@@ -81,7 +78,7 @@ class TelegramBotServiceTest {
 
     @Test
     void status_when_no_snapshot_returns_fallback_message() {
-        when(portfolioUseCase.getCurrent(any())).thenThrow(new NoSuchElementException());
+        when(portfolioQueryPort.getCurrent(any())).thenThrow(new NoSuchElementException());
 
         sut.handle(update("/status"));
 
@@ -92,11 +89,11 @@ class TelegramBotServiceTest {
 
     @Test
     void history_command_with_days_delegates_to_usecase() {
-        when(portfolioUseCase.getHistory(any(), any(), any(), eq(StrategyTicker.SOXL))).thenReturn(List.of());
+        when(portfolioQueryPort.getHistory(any(), any(), any(), eq(StrategyTicker.SOXL))).thenReturn(List.of());
 
         sut.handle(update("/history 14"));
 
-        verify(portfolioUseCase).getHistory(
+        verify(portfolioQueryPort).getHistory(
                 eq(USER_ID), eq(LocalDate.now().minusDays(14)), eq(LocalDate.now()), eq(StrategyTicker.SOXL));
     }
 

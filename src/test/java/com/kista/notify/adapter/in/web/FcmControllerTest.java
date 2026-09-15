@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.in.web;
 
-import com.kista.user.application.usecase.BlacklistUseCase;
+import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -32,7 +32,7 @@ class FcmControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean FcmDeviceTokenPort fcmDeviceTokenPort;
     @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean BlacklistUseCase blacklistUseCase; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
 
     static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 

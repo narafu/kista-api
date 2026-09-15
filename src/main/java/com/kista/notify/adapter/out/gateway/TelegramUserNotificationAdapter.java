@@ -5,9 +5,6 @@ import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +17,6 @@ import java.util.List;
 import java.util.Map;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Component
@@ -93,74 +88,6 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
             text += String.format("\n사유: %s", user.rejectReason());
         }
         sendIfLinked(user, text);
-    }
-
-    @Override
-    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
-        String text = String.format(
-                "🔄 <b>사이클 종료</b> — %s%n"
-                + "[%s] %s 사이클이 완료되었습니다.%n"
-                + "다음 사이클 정책: %s",
-                account.nickname(),
-                strategy.type().name(), strategy.ticker().name(),
-                strategy.cycleSeedType().name());
-        sendIfLinked(user, text);
-    }
-
-    @Override
-    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
-        String text = String.format(
-                "🚀 <b>새 사이클 시작</b> — %s%n"
-                + "[%s] %s 사이클이 시작되었습니다.%n"
-                + "시드: $%.2f",
-                account.nickname(),
-                strategy.type().name(), strategy.ticker().name(),
-                initialUsdDeposit);
-        sendIfLinked(user, text);
-    }
-
-    @Override
-    public void notifyInsufficientBalance(User user, Account account, StrategyType strategyType, StrategyTicker ticker) {
-        String text = String.format(
-                "⚠️ <b>예수금 부족</b> — %s%n"
-                + "[%s] %s 장 마감 전 예수금 확인 바랍니다.",
-                account.nickname(), strategyType.name(), ticker.name());
-        sendIfLinked(user, text);
-    }
-
-    @Override
-    public void notifyTradingReport(User user, Account account, TradingReport r) {
-        String text = String.format(
-                "<b>매매 결산[%s]</b> — %s%n"
-                + "[%s] %s 매수: $%.2f | 매도: $%.2f",
-                r.date(), account.nickname(),
-                r.strategyType().name(), r.ticker().name(),
-                r.totalBoughtUsd(), r.totalSoldUsd());
-        sendIfLinked(user, text);
-    }
-
-    @Override
-    public void notifyError(User user, Exception e) {
-        sendIfLinked(user, String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage()));
-    }
-
-    @Override
-    public void notifyBatchInterrupted(User user, Account account) {
-        String text = String.format(
-                "⏸️ <b>매매 일시 중단</b> — %s%n"
-                + "시스템 재배포로 오늘 매매가 일시 중단됐습니다. 잠시 후 자동 재시도되거나, 필요 시 관리자에게 문의해주세요.",
-                account.nickname());
-        sendIfLinked(user, text);
-    }
-
-    @Override
-    public void notifyMarketOpen(User user) {
-        sendIfLinked(user, "🟢 미국 장이 열렸습니다.");
-    }
-
-    @Override
-    public void notifyMarketClose(User user) {
-        sendIfLinked(user, "🔴 미국 장이 마감되었습니다.");
     }
 
     @Override

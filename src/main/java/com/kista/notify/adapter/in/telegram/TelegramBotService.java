@@ -1,10 +1,8 @@
 package com.kista.notify.adapter.in.telegram;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.trading.domain.model.Order;
-import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.stats.application.usecase.PortfolioUseCase;
+import com.kista.notify.application.port.output.PortfolioQueryPort;
 import com.kista.user.application.usecase.TelegramApprovalUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +25,7 @@ class TelegramBotService {
     @Value("${telegram.chat-id:}")
     private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramApiClient apiClient;
-    private final PortfolioUseCase portfolioUseCase;
+    private final PortfolioQueryPort portfolioQueryPort;
     private final UserUseCase userUseCase; // /status, /history 명령의 chatId→userId 조회 전용
     private final TelegramApprovalUseCase telegramApprovalUseCase; // 관리자 승인/거절 명령 위임
     void handle(TelegramUpdate update) {
@@ -119,7 +117,7 @@ class TelegramBotService {
         return userUseCase.findUserIdByTelegramChatId(adminChatId)
                 .map(userId -> {
                     try {
-                        CyclePositionHistoryEntry s = portfolioUseCase.getCurrent(userId);
+                        PortfolioQueryPort.PortfolioCurrentView s = portfolioQueryPort.getCurrent(userId);
                         // closingPrice가 null이면 평가액 0으로 처리
                         double marketValue = s.closingPrice() != null
                                 ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
@@ -142,7 +140,7 @@ class TelegramBotService {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
         return userUseCase.findUserIdByTelegramChatId(adminChatId)
                 .map(userId -> {
-                    List<Order> list = portfolioUseCase.getHistory(userId, from, to, StrategyTicker.SOXL);
+                    List<PortfolioQueryPort.PortfolioOrderView> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
                     StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
                     list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",

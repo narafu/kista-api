@@ -4,9 +4,6 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
@@ -17,8 +14,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Component
@@ -49,61 +44,13 @@ public class FcmAdapter implements UserNotificationPort {
     }
 
     @Override
-    public void notifyCycleCompleted(User user, Account account, Strategy strategy) {
-        String body = String.format("[%s] %s %s 사이클 완료",
-                account.nickname(), strategy.type().name(), strategy.ticker().name());
-        send(user.id(), "사이클 종료", body);
-    }
-
-    @Override
-    public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal initialUsdDeposit) {
-        String body = String.format("[%s] %s %s — 시드 $%.2f",
-                account.nickname(), strategy.type().name(), strategy.ticker().name(), initialUsdDeposit);
-        send(user.id(), "새 사이클 시작", body);
-    }
-
-    @Override
-    public void notifyTradingReport(User user, Account account, TradingReport report) {
-        String body = String.format("[%s] %s 매수 $%.2f / 매도 $%.2f",
-                report.strategyType().name(), report.ticker().name(),
-                report.totalBoughtUsd(), report.totalSoldUsd());
-        send(user.id(), "매매 결산 — " + account.nickname(), body);
-    }
-
-    @Override
-    public void notifyInsufficientBalance(User user, Account account, StrategyType strategyType, StrategyTicker ticker) {
-        String body = String.format("[%s] %s 장 마감 전 예수금 확인 바랍니다.", strategyType.name(), ticker.name());
-        send(user.id(), "⚠️ 예수금 부족 — " + account.nickname(), body);
-    }
-
-    @Override
-    public void notifyError(User user, Exception e) {
-        send(user.id(), "⚠️ 매매 오류 발생", e.getMessage());
-    }
-
-    @Override
-    public void notifyBatchInterrupted(User user, Account account) {
-        String body = String.format("[%s] 시스템 재배포로 오늘 매매가 일시 중단됐습니다.", account.nickname());
-        send(user.id(), "⏸️ 매매 일시 중단", body);
-    }
-
-    @Override
-    public void notifyMarketOpen(User user) {
-        send(user.id(), "KISTA 알림", "🟢 미국 장이 열렸습니다.");
-    }
-
-    @Override
-    public void notifyMarketClose(User user) {
-        send(user.id(), "KISTA 알림", "🔴 미국 장이 마감되었습니다.");
-    }
-
-    @Override
     public void notifyFinanceRegistrationReminder(User user, String month) {
         send(user.id(), "가계부 등록을 아직 안 하셨어요",
                 month + " 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
     }
 
-    private void send(UUID userId, String title, String body) {
+    // package-private — PushNotificationRelayListener(같은 패키지)가 trading-core 위임 발송에 재사용
+    void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             return;
         }

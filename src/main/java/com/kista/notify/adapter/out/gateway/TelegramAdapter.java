@@ -1,12 +1,12 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.account.domain.model.Account;
-import com.kista.matching.domain.model.AccountBalance;
 import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import com.kista.sharedkernel.StrategyTicker;
+
+import java.math.BigDecimal;
 
 @Slf4j
 @Component
@@ -22,9 +22,9 @@ public class TelegramAdapter implements NotifyPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(Account account, AccountBalance b, StrategyTicker ticker) {
+    public void notifyInsufficientBalance(int holdings, BigDecimal usdDeposit, StrategyTicker ticker) {
         send(String.format("잔고 부족: %s %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
-                ticker.name(), b.holdings(), b.usdDeposit()));
+                ticker.name(), holdings, usdDeposit));
     }
 
     @Override

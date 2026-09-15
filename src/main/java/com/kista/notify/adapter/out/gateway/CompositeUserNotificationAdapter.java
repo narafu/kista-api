@@ -1,8 +1,5 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -10,8 +7,6 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.function.Consumer;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
 
 @Primary
 @Component
@@ -33,17 +28,9 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
     }
 
     // 사용자 알림 — notificationChannel에 따라 라우팅
-    @Override public void notifyApproved(User user)                                                     { route(user, p -> p.notifyApproved(user)); }
-    @Override public void notifyRejected(User user)                                                     { route(user, p -> p.notifyRejected(user)); }
-    @Override public void notifyCycleCompleted(User user, Account account, Strategy strategy)           { route(user, p -> p.notifyCycleCompleted(user, account, strategy)); }
-    @Override public void notifyNewCycleStarted(User user, Account account, Strategy strategy, java.math.BigDecimal d) { route(user, p -> p.notifyNewCycleStarted(user, account, strategy, d)); }
-    @Override public void notifyTradingReport(User user, Account account, TradingReport report)         { route(user, p -> p.notifyTradingReport(user, account, report)); }
-    @Override public void notifyInsufficientBalance(User user, Account account, StrategyType t, StrategyTicker k) { route(user, p -> p.notifyInsufficientBalance(user, account, t, k)); }
-    @Override public void notifyError(User user, Exception e)                                           { route(user, p -> p.notifyError(user, e)); }
-    @Override public void notifyBatchInterrupted(User user, Account account)                        { route(user, p -> p.notifyBatchInterrupted(user, account)); }
-    @Override public void notifyMarketOpen(User user)                                                   { route(user, p -> p.notifyMarketOpen(user)); }
-    @Override public void notifyMarketClose(User user)                                                  { route(user, p -> p.notifyMarketClose(user)); }
-    @Override public void notifyFinanceRegistrationReminder(User user, String month)                     { route(user, p -> p.notifyFinanceRegistrationReminder(user, month)); }
+    @Override public void notifyApproved(User user)                                     { route(user, p -> p.notifyApproved(user)); }
+    @Override public void notifyRejected(User user)                                     { route(user, p -> p.notifyRejected(user)); }
+    @Override public void notifyFinanceRegistrationReminder(User user, String month)    { route(user, p -> p.notifyFinanceRegistrationReminder(user, month)); }
 
     // notificationChannel 기반 어댑터 라우팅 — Telegram/FCM 순서 고정
     private void route(User user, Consumer<UserNotificationPort> action) {

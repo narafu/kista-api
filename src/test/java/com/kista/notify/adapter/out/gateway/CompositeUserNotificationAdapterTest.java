@@ -1,7 +1,5 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.model.NotificationChannel;
 import com.kista.support.DomainFixtures;
@@ -11,14 +9,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class CompositeUserNotificationAdapterTest {
@@ -36,47 +30,6 @@ class CompositeUserNotificationAdapterTest {
     // 테스트용 User 생성 헬퍼
     static User userWith(NotificationChannel channel) {
         return DomainFixtures.activeUser(UUID.randomUUID(), channel);
-    }
-
-    // 테스트용 TradingReport 생성 헬퍼
-    static TradingReport report() {
-        return new TradingReport(LocalDate.now(), StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("500.00"), new BigDecimal("200.00"));
-    }
-
-    @Test
-    void telegramChannel_routesToTelegramOnly() {
-        User user = userWith(NotificationChannel.TELEGRAM);
-        Account account = mock(Account.class);
-        TradingReport r = report();
-
-        composite.notifyTradingReport(user, account, r);
-
-        verify(telegram).notifyTradingReport(user, account, r);
-        verify(fcm, never()).notifyTradingReport(any(), any(), any());
-    }
-
-    @Test
-    void fcmChannel_routesToFcmOnly() {
-        User user = userWith(NotificationChannel.FCM);
-        Account account = mock(Account.class);
-        TradingReport r = report();
-
-        composite.notifyTradingReport(user, account, r);
-
-        verify(fcm).notifyTradingReport(user, account, r);
-        verify(telegram, never()).notifyTradingReport(any(), any(), any());
-    }
-
-    @Test
-    void allChannel_routesToBoth() {
-        User user = userWith(NotificationChannel.ALL);
-        Account account = mock(Account.class);
-        TradingReport r = report();
-
-        composite.notifyTradingReport(user, account, r);
-
-        verify(telegram).notifyTradingReport(user, account, r);
-        verify(fcm).notifyTradingReport(user, account, r);
     }
 
     @Test
@@ -110,16 +63,5 @@ class CompositeUserNotificationAdapterTest {
 
         verify(telegram).notifyRejected(user);
         verify(fcm).notifyRejected(user);
-    }
-
-    @Test
-    void notifyBatchInterrupted_allChannel_routesToBoth() {
-        User user = userWith(NotificationChannel.ALL);
-        Account account = mock(Account.class);
-
-        composite.notifyBatchInterrupted(user, account);
-
-        verify(telegram).notifyBatchInterrupted(user, account);
-        verify(fcm).notifyBatchInterrupted(user, account);
     }
 }

@@ -2,10 +2,7 @@ package com.kista.notify.adapter.out.gateway;
 
 import com.kista.user.application.event.NewUserRegisteredEvent;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.account.domain.model.Account;
-import com.kista.trading.domain.model.TradingReport;
 import com.kista.user.domain.model.User;
-import com.kista.user.domain.model.NotificationChannel;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,8 +13,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClient;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -28,8 +23,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramUserNotificationAdapterTest {
@@ -48,38 +41,6 @@ class TelegramUserNotificationAdapterTest {
     void setUp() {
         TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
         adapter = new TelegramUserNotificationAdapter(httpClient, PROPS, userPort);
-    }
-
-    @Test
-    void notifyTradingReport_withUserBot_sendsToUserChatId() {
-        User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789");
-        Account account = mock(Account.class);
-        when(account.nickname()).thenReturn("SOXL계좌");
-
-        adapter.notifyTradingReport(user, account, buildTestReport());
-
-        verify(restClient.post()).uri(contains("/botuser-bot-token/sendMessage"));
-    }
-
-    @Test
-    void notifyTradingReport_noUserBot_skips() {
-        User user = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.TELEGRAM);
-        Account account = mock(Account.class);
-
-        adapter.notifyTradingReport(user, account, buildTestReport());
-
-        verifyNoInteractions(restClient);
-    }
-
-    @Test
-    void notifyBatchInterrupted_withUserBot_sendsToUserChatId() {
-        User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789");
-        Account account = mock(Account.class);
-        when(account.nickname()).thenReturn("SOXL계좌");
-
-        adapter.notifyBatchInterrupted(user, account);
-
-        verify(restClient.post()).uri(contains("/botuser-bot-token/sendMessage"));
     }
 
     @Test
@@ -170,10 +131,5 @@ class TelegramUserNotificationAdapterTest {
                 .isInstanceOf(NoSuchElementException.class);
 
         verifyNoInteractions(restClient);
-    }
-
-    // TradingReport 생성 헬퍼
-    private TradingReport buildTestReport() {
-        return new TradingReport(LocalDate.of(2024, 6, 15), StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("66.00"), new BigDecimal("35.00"));
     }
 }

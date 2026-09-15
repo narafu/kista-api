@@ -2,7 +2,13 @@ package com.kista.notify.domain.model;
 
 import java.time.Instant;
 
-// trading.domain.model.TradeEvent의 notify 소유 own-type 투영 — SSE 알림 포트 시그니처가 trading 타입을 직접 참조하지 않도록 분리
+// 실시간 매매 SSE 알림(RealtimeNotificationPort.notifyTrade)의 wire DTO — RedisTradeEventSubscriber가
+// trading-core의 Redis 발행분을 이 타입으로 역직렬화해 TradeSseEmitterRegistry에 전달한다.
+// trading-core의 com.kista.trading.notify.domain.model.TradeEventView와 필드 shape byte-identical
+// own-type 복제 — Gradle 컴파일 경계상 root가 trading-core 타입을 import할 수 없어(순환 불가피,
+// constraints.md "모듈 경계 own-type" (a) 근거) 발행측·구독측이 각자 own-type을 들고 JSON 계약으로만
+// 동기화한다. Task17 TradeLegSummary(sharedkernel, 이벤트 payload용 Execution narrowing)와는 별개 타입 —
+// 혼동 금지
 public record TradeEventView(
     Kind kind,
     String ticker,

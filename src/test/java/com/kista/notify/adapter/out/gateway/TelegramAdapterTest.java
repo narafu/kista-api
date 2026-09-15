@@ -1,8 +1,5 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
-import com.kista.matching.domain.model.AccountBalance;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,7 +11,6 @@ import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -41,13 +37,6 @@ class TelegramAdapterTest {
         adapter = new TelegramAdapter(httpClient, PROPS);
     }
 
-    // Account 10개 필드 생성자
-    private Account account(UUID userId, String nickname) {
-        return new Account(UUID.randomUUID(), userId, nickname,
-                "74420614", "key", "secret", null,
-                Broker.KIS, null);
-    }
-
     @Test
     void notifyMarketClosed_sendsCorrectUrl() {
         adapter.notifyMarketClosed();
@@ -69,12 +58,8 @@ class TelegramAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_bodyContainsQuantityAndAmount() {
-        AccountBalance balance = new AccountBalance(0, BigDecimal.ZERO,
-                new BigDecimal("5.00")); // usdDeposit=5.00
-
-        Account acc = account(UUID.randomUUID(), "테스트");
         ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
-        adapter.notifyInsufficientBalance(acc, balance, StrategyTicker.SOXL);
+        adapter.notifyInsufficientBalance(0, new BigDecimal("5.00"), StrategyTicker.SOXL);
 
         verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
         String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
