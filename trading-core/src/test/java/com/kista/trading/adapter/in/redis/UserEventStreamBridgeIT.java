@@ -47,7 +47,7 @@ class UserEventStreamBridgeIT {
     @Test
     void handleUserDeletedRecord_republishesLocallyAndAcks() {
         ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
-        UserEventStreamBridge bridge = new UserEventStreamBridge(redisTemplate, new ObjectMapper(), eventPublisher);
+        UserEventStreamBridge bridge = new UserEventStreamBridge(redisTemplate, new ObjectMapper(), new UserEventRepublisher(eventPublisher));
         UUID userId = UUID.randomUUID();
         redisTemplate.<String, String>opsForStream().createGroup(RedisStreamConfig.USER_DELETED_STREAM,
                 org.springframework.data.redis.connection.stream.ReadOffset.from("0"), RedisStreamConfig.TRADING_CONSUMER_GROUP);
