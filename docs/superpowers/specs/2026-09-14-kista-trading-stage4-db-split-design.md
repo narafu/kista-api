@@ -65,6 +65,8 @@ DB가 실제로 갈라지면 `user_notify_profile` 동기화가 더 이상 "같�
 
 4b는 리스크 프로파일이 다른 두 하위 단계로 나눈다 — **4b-1(되돌릴 수 있음, 실트래픽 관측 가능)**과 **4b-2(컷오버, 되돌릴 수 없음)**. 스트림 배선을 컷오버와 한 배포로 묶으면 신규 배선 결함과 돌이킬 수 없는 DB 전환 리스크가 뒤섞인다 — 분리하면 스트림은 공유 DB 위에서 실제 가입·승인·설정변경 트래픽으로 먼저 검증한 뒤, 컷오버는 이미 검증된 스트림 위에서만 진행한다.
 
+**4b-2 보류 결정 (2026-09-16)**: root/trading 분리 목적은 4a(프로세스·컴파일 경계 분리)+4b-1(Redis Stream 이벤트 동기화)로 이미 달성됨 — 물리 DB까지 쪼개는 4b-2의 한계효용은 장애/자원/백업 격리뿐이며 이는 애초 목적(애플리케이션 레벨 분리)에 없었다. 플랜은 `docs/superpowers/plans/2026-09-16-kista-trading-stage4b2.md`에 준비돼 있으나 실행하지 않기로 결정 — DB는 스키마 분리(kista/finance/reference) 상태로 유지. 필요 재발생 시(별도 인스턴스 이전, 진짜 장애 격리 요구 등) 그 플랜을 재사용.
+
 ### 사전 확인 완료 (구현 착수 전 실측, 2026-09-16)
 - **root의 trading-core 직접 의존 0건**: `KistaApplication.scanBasePackages`가 이미 trading-core 소유 패키지(trading/matching/broker/account/privacy/marketcalendar) 전부를 스캔 범위에서 제외하고 있고, root 소스 전체에 `com.kista.{trading,account,broker,privacy,marketcalendar}.application.port`/`com.kista.matching.*` import가 0건이다 — architecture.md의 "AdminQueryService accountPort 잔존" 서술은 4a 작업 중 이미 해소된 stale 기록. 컷오버 시 root 쪽 스캔 범위·엔티티 참조를 건드릴 필요 없음.
 - **event_publication 테이블은 신규 베이스라인에 반드시 포함**: trading-core `application.yml`엔 `spring.modulith.events.jdbc.schema-initialization` 설정이 없다(기본값 비활성화) — 지금은 root Flyway(V21)가 만든 물리 테이블 1개를 두 프로세스가 공유해서 동작할 뿐, trading DB가 분리되면 이 테이블이 trading DB에 없으면 EPR 자체가 죽는다. 신규 baseline에 V21과 동일 DDL로 포함(15개 매매 테이블 + 이 1개 = 16개).
