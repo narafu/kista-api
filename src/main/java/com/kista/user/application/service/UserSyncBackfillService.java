@@ -33,15 +33,17 @@ class UserSyncBackfillService implements UserSyncBackfillUseCase {
     @Override
     @Transactional
     public BackfillResult runOnce() {
-        // 소프트 삭제됐지만 cascade 이벤트를 받은 적 없는 사용자 — UserDeletedEvent 재발행(idempotent)
+        // 소프트 삭제됐지만 cascade 이벤트를 받은 적 없는 사용자 — UserDeletedEvent 재발행(idempotent).
+        // 4a 배포(2026-09-16 아침) 이후로 범위 제한 — 이전 탈퇴자는 이미 정상 처리됐으므로
+        // 재발행 시 관리자 알림만 중복 발송됨(범위 제한 이후엔 매번 같은 대상만 재발행돼 idempotent 서술이 다시 참)
         List<UUID> deletedUserIds = jdbcTemplate.queryForList(
-                "SELECT id FROM users WHERE deleted_at IS NOT NULL", UUID.class);
+                "SELECT id FROM users WHERE deleted_at IS NOT NULL AND deleted_at >= '2026-09-16 07:00:00+09'", UUID.class);
         deletedUserIds.forEach(id -> eventPublisher.publishEvent(new UserDeletedEvent(id)));
 
-        // 활성 사용자인데 trading-core 복제본이 없는 경우 — UserNotifyProfileChangedEvent 발행(upsert)
+        // 활성 사용자 전체 재동기화 — 프로필 행이 없는 경우뿐 아니라 4a 배포 이후 상태/설정이 바뀐
+        // 사용자(승인, 알림 설정 변경 등)도 놓치지 않도록 NOT EXISTS 제한 없이 전체 대상. upsert라 재갱신 안전
         List<UUID> driftUserIds = jdbcTemplate.queryForList(
-                "SELECT id FROM users u WHERE u.deleted_at IS NULL AND NOT EXISTS " +
-                        "(SELECT 1 FROM kista.user_notify_profile p WHERE p.user_id = u.id)", UUID.class);
+                "SELECT id FROM users WHERE deleted_at IS NULL", UUID.class);
         int backfilled = 0;
         for (UUID userId : driftUserIds) {
             User user = userPort.findById(userId).orElse(null);

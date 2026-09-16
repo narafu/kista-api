@@ -35,11 +35,10 @@ class UserSyncBackfillServiceTest {
     void runOnce_republishesDeletedUsersAndBackfillsMissingProfiles() {
         UUID deletedUserId = UUID.randomUUID();
         UUID driftUserId = UUID.randomUUID();
-        when(jdbcTemplate.queryForList("SELECT id FROM users WHERE deleted_at IS NOT NULL", UUID.class))
-                .thenReturn(List.of(deletedUserId));
         when(jdbcTemplate.queryForList(
-                "SELECT id FROM users u WHERE u.deleted_at IS NULL AND NOT EXISTS " +
-                        "(SELECT 1 FROM kista.user_notify_profile p WHERE p.user_id = u.id)", UUID.class))
+                "SELECT id FROM users WHERE deleted_at IS NOT NULL AND deleted_at >= '2026-09-16 07:00:00+09'", UUID.class))
+                .thenReturn(List.of(deletedUserId));
+        when(jdbcTemplate.queryForList("SELECT id FROM users WHERE deleted_at IS NULL", UUID.class))
                 .thenReturn(List.of(driftUserId));
         User driftUser = DomainFixtures.userWithStatus(driftUserId, UserStatus.ACTIVE);
         when(userPort.findById(driftUserId)).thenReturn(Optional.of(driftUser));

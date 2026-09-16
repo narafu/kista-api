@@ -32,25 +32,33 @@ public class UserEventStreamConsumerConfig implements DisposableBean {
     private final String consumerName = "trading-core-" + UUID.randomUUID();
     private StreamMessageListenerContainer<String, MapRecord<String, String, String>> container;
 
+    // Redis 미기동/일시 장애로 그룹 생성·구독이 실패해도 trading-core 부팅 자체는 막지 않는다 —
+    // @PostConstruct에서 예외가 rethrow되면 ApplicationContext 로딩이 실패해 매매 프로세스 전체가
+    // 못 뜬다. 컨슈머가 결국 못 떠도 Task5의 드리프트 복구 스케쥴러(5분 주기)가 있어 완전한 무한
+    // 침묵은 아니다 — 로그는 남긴다.
     @PostConstruct
     void start() {
-        ensureGroup(RedisStreamConfig.USER_DELETED_STREAM);
-        ensureGroup(RedisStreamConfig.USER_NOTIFY_PROFILE_CHANGED_STREAM);
+        try {
+            ensureGroup(RedisStreamConfig.USER_DELETED_STREAM);
+            ensureGroup(RedisStreamConfig.USER_NOTIFY_PROFILE_CHANGED_STREAM);
 
-        var options = StreamMessageListenerContainer.StreamMessageListenerContainerOptions
-                .builder()
-                .pollTimeout(Duration.ofSeconds(2))
-                .build();
-        container = StreamMessageListenerContainer.create(connectionFactory, options);
+            var options = StreamMessageListenerContainer.StreamMessageListenerContainerOptions
+                    .builder()
+                    .pollTimeout(Duration.ofSeconds(2))
+                    .build();
+            container = StreamMessageListenerContainer.create(connectionFactory, options);
 
-        container.receive(Consumer.from(RedisStreamConfig.TRADING_CONSUMER_GROUP, consumerName),
-                StreamOffset.create(RedisStreamConfig.USER_DELETED_STREAM, ReadOffset.lastConsumed()),
-                bridge::handleUserDeletedRecord);
-        container.receive(Consumer.from(RedisStreamConfig.TRADING_CONSUMER_GROUP, consumerName),
-                StreamOffset.create(RedisStreamConfig.USER_NOTIFY_PROFILE_CHANGED_STREAM, ReadOffset.lastConsumed()),
-                bridge::handleProfileChangedRecord);
-        container.start();
-        log.info("Redis Stream 컨슈머 시작 — consumer={}", consumerName);
+            container.receive(Consumer.from(RedisStreamConfig.TRADING_CONSUMER_GROUP, consumerName),
+                    StreamOffset.create(RedisStreamConfig.USER_DELETED_STREAM, ReadOffset.lastConsumed()),
+                    bridge::handleUserDeletedRecord);
+            container.receive(Consumer.from(RedisStreamConfig.TRADING_CONSUMER_GROUP, consumerName),
+                    StreamOffset.create(RedisStreamConfig.USER_NOTIFY_PROFILE_CHANGED_STREAM, ReadOffset.lastConsumed()),
+                    bridge::handleProfileChangedRecord);
+            container.start();
+            log.info("Redis Stream 컨슈머 시작 — consumer={}", consumerName);
+        } catch (Exception e) {
+            log.error("Redis Stream 컨슈머 시작 실패 — 드리프트 복구 스케쥴러가 대신 동기화할 때까지 매매 프로세스는 그대로 기동", e);
+        }
     }
 
     // 스트림이 아직 없으면 MKSTREAM으로 함께 생성, 그룹이 이미 있으면(BUSYGROUP) 무시

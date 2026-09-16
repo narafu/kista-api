@@ -4,6 +4,7 @@ import com.kista.platform.redis.RedisStreamConfig;
 import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.connection.RedisStreamCommands.XAddOptions;
 import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -39,11 +40,13 @@ public class UserEventStreamPublisher {
         add(RedisStreamConfig.USER_NOTIFY_PROFILE_CHANGED_STREAM, event);
     }
 
-    // 이벤트를 JSON payload 1필드로 감싸 XADD — trading-core 구독측(Task 4)이 "payload" 키로 역직렬화한다
+    // 이벤트를 JSON payload 1필드로 감싸 XADD — trading-core 구독측(Task 4)이 "payload" 키로 역직렬화한다.
+    // 텔레그램 봇 토큰 등 평문 payload가 무기한 쌓이지 않도록 MAXLEN 근사 트리밍(최근 1000건 보존)
     private void add(String streamKey, Object event) {
         String payload = objectMapper.writeValueAsString(event);
         redisTemplate.opsForStream().add(StreamRecords.newRecord()
                 .in(streamKey)
-                .ofMap(Collections.singletonMap("payload", payload)));
+                .ofMap(Collections.singletonMap("payload", payload)),
+                XAddOptions.maxlen(1000).approximateTrimming(true));
     }
 }
