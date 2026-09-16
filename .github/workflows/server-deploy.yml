@@ -117,7 +117,7 @@ jobs:
     with:
       image: ${{ needs.build.outputs.image }}
       service: kista-scheduler
-      apply_trading_guard: true
+      apply_trading_guard: false
       force: ${{ github.event.inputs.force || 'false' }}
     secrets: inherit
 

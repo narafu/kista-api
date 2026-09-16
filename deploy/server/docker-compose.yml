@@ -35,7 +35,8 @@ services:
         max-file: "5"
 
   # 스케쥴러 role — kista-api와 동일 이미지, SCHEDULER_ENABLED=true 로 @Scheduled 빈 등록
-  # 매매 배치(sleep·주문 접수)가 이 프로세스에서 실행됨. HTTP는 /api/admin/scheduler/* + actuator 용도로만 기동
+  # 매매 배치는 4a에서 kista-trading으로 이관됨 — 이 프로세스엔 비-매매 스케쥴러(KbLand/finance/user/market)만 남는다.
+  # HTTP는 /api/admin/scheduler/kbland-* + actuator 용도로만 기동
   kista-scheduler:
     image: ${KISTA_API_IMAGE:?KISTA_API_IMAGE is required}
     container_name: kista-scheduler
@@ -44,8 +45,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SCHEDULER_ENABLED: "true"
-      # EPR 미완료 이벤트 재발행 소유자 = 이 컨테이너 단독 (application-prod.yml 은 false)
-      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
+      # 매매 알림 6종 리스너가 4a에서 trading-core로 이관됨 — 이 컨테이너엔 root 자체 이벤트(가입·승인·
+      # KbLand/finance alert 등)만 남아 매매 시간대와 무관. EPR 재발행은 kista-trading이 자기 것으로 소유.
+      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "false"
       REDIS_URL: redis://redis:6379
       # 요청 부하 없는 배치 전용 — 힙 작게. OOM 회피가 중요(OOM-kill 시 scheduler_locks 락 2h 홀드)
       JAVA_OPTS: "-Xmx1536m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
@@ -85,7 +87,8 @@ services:
       SERVER_PORT: "8080"  # trading-core 기본값은 8081(로컬 2-프로세스 동시 기동용) — 컨테이너 expose/healthcheck는 8080 고정이라 반드시 override 필요
       SPRING_PROFILES_ACTIVE: prod
       SCHEDULER_ENABLED: "true"
-      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "false"  # EPR 재발행 소유자는 kista-scheduler 단독 유지 — 여기서 true면 재기동마다 매매 이벤트 중복 발행
+      # 매매 알림 6종 리스너가 4a에서 이 프로세스로 이관됨 — 재기동 시 자기 미완료 매매 이벤트를 자기가 재발행(진짜 소유자)
+      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
       REDIS_URL: redis://redis:6379
       INTERNAL_API_BASE_URL: http://kista-api:8080
       # 매매 배치(scheduler)+8개 컨트롤러 HTTP 트래픽 겸용 — kista-scheduler보다 약간 크게
