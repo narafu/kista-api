@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 // trading-core 전용 부팅 진입점. scanBasePackages는 root(com.kista.user/finance/admin/stats(벤치마크)/market/web)
 // 패키지를 명시적으로 배제하기 위해 trading-core가 실제 소유한 최상위 패키지만 나열한다.
@@ -36,6 +37,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
         "com.kista.broker",
         "com.kista.platform",
 })
+@EnableScheduling
 public class TradingApplication {
     public static void main(String[] args) {
         SpringApplication.run(TradingApplication.class, args);
