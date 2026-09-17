@@ -110,10 +110,10 @@ class CycleRotationServiceTest {
     }
 
     @Test
-    @DisplayName("MAINTAIN — 최소금액 미달 시 재등록 취소 + 잔고부족 알림")
-    void maintain_belowMinRequired_cancelsAndNotifies() {
+    @DisplayName("MAINTAIN — 최소금액 미달이어도 축소된 시드로 재등록 진행 + 잔고부족 알림")
+    void maintain_belowMinRequired_registersAnywayAndNotifies() {
         // minRequired = 22 × 44 = 968 — 기존 500은 미달
-        // actual(600) >= maintainSeed(500) → targetSeed=500, 하지만 500 < minRequired(968) → 잔고부족 알림
+        // actual(600) >= maintainSeed(500) → targetSeed=500, 500 < minRequired(968)이어도 재등록은 차단하지 않음
         BigDecimal deposit = new BigDecimal("500.00");
         Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
@@ -124,7 +124,7 @@ class CycleRotationServiceTest {
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
                 && ACCOUNT.id().equals(ibe.accountId()) && ibe.usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == StrategyTicker.SOXL));
-        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, deposit, PRICE);
     }
 
     @Test
