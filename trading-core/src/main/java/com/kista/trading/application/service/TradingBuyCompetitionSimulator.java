@@ -93,8 +93,8 @@ class TradingBuyCompetitionSimulator {
             StrategyCycle otherCycle = context != null
                     ? context.cyclesByStrategyId().get(other.id())
                     : strategyCyclePort.findLatestByStrategyId(other.id()).orElse(null);
-            if (otherCycle == null) {
-                continue; // 사이클 없는 전략은 경쟁 대상이 될 수 없음
+            if (otherCycle == null || otherCycle.endDate() != null) {
+                continue; // 사이클 없거나 이미 종료된(좀비) 전략은 경쟁 대상이 될 수 없음
             }
             List<Order> otherTodayOrders = context != null
                     ? context.todayOrdersByStrategyId().getOrDefault(other.id(), List.of())

@@ -112,6 +112,30 @@ class TradingBuyCompetitionSimulatorTest {
     }
 
     @Test
+    void simulate_excludesCompetitor_whoseLatestCycleIsEnded() {
+        // 좀비 사이클(청산 후 재등록 실패, endDate 존재) — 실제로 오늘 주문을 낼 수 없으므로 경쟁 대상에서 제외돼야 함
+        Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        StrategyCycle endedCycle = new StrategyCycle(UUID.randomUUID(), vrStrategy.id(), UUID.randomUUID(),
+                new BigDecimal("500.00"), new BigDecimal("450.00"), LocalDate.now().minusDays(5), LocalDate.now(), null, null);
+
+        when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
+                .thenReturn(new BigDecimal("1000.00"));
+        when(strategyPort.findByAccountId(account.id())).thenReturn(List.of(currentStrategy, vrStrategy));
+        when(strategyCyclePort.findLatestByStrategyId(vrStrategy.id())).thenReturn(Optional.of(endedCycle));
+        List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
+
+        BuyCompetitionPreview result = simulator.simulate(
+                currentStrategy, account, currentCycle, buyOrders, today, BigDecimal.ZERO);
+
+        assertThat(result.blockedByHigherPriority()).isEmpty();
+        assertThat(result.uncertainStrategyIds()).isEmpty();
+        assertThat(result.availableDeposit()).isEqualByComparingTo("1000.00");
+        verify(orderPort, never()).findPlannedOrPlacedByCycleAndDate(eq(endedCycle.id()), any());
+        verify(planBuilder, never()).build(eq(vrStrategy), any(), any(), any(), anyString());
+    }
+
+    @Test
     void simulate_blocksCurrentStrategy_whenHigherPriorityCompetitorConsumesBudget() {
         Strategy vrStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
