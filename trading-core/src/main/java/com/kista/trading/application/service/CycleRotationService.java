@@ -1,4 +1,5 @@
 package com.kista.trading.application.service;
+import com.kista.trading.application.service.support.SeedResolutionPolicy;
 
 import com.kista.sharedkernel.NewCycleStartedEvent;
 import com.kista.sharedkernel.TradingErrorEvent;

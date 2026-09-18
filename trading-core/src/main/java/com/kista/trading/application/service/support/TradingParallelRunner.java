@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,19 +19,19 @@ import java.util.concurrent.Semaphore;
 // 사이클 단위 배치 작업을 가상 스레드로 병렬 실행 — 그룹(계좌)별 Semaphore로 브로커 rate limit·Toss 토큰 경합 제어
 @Slf4j
 @Component
-class TradingParallelRunner {
+public class TradingParallelRunner {
 
     private final int maxConcurrentPerGroup; // 그룹별 동시 실행 상한 — 0 이하면 순차 인라인 실행(단위 테스트·긴급 롤백용)
 
-    TradingParallelRunner(@Value("${app.trading.parallel-per-account:2}") int maxConcurrentPerGroup) {
+    public TradingParallelRunner(@Value("${app.trading.parallel-per-account:2}") int maxConcurrentPerGroup) {
         this.maxConcurrentPerGroup = maxConcurrentPerGroup;
     }
 
     // groupKey: 동시 상한을 공유하는 단위(계좌 id) / action: runSafely로 감싼 사이클 작업 — 예외는 action 내부에서 격리되는 것이 계약
-    record Task<T>(Object groupKey, Callable<Optional<T>> action) {}
+    public record Task<T>(Object groupKey, Callable<Optional<T>> action) {}
 
     // 제출 순서대로 결과를 수집한다(Optional.empty 제외) — 기존 순차 for 루프의 결과 순서 계약 유지
-    <T> List<T> runAll(List<Task<T>> tasks) throws InterruptedException {
+    public <T> List<T> runAll(List<Task<T>> tasks) throws InterruptedException {
         if (tasks.isEmpty()) return List.of();
         if (maxConcurrentPerGroup <= 0) return runSequentially(tasks);
 

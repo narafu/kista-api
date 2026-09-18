@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import org.junit.jupiter.api.Test;
 

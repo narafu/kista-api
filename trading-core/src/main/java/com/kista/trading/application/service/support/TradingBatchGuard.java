@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,16 +15,16 @@ import java.util.Optional;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-class TradingBatchGuard {
+public class TradingBatchGuard {
 
     private final ApplicationEventPublisher eventPublisher;
 
     @FunctionalInterface
-    interface ThrowingSupplier<T> {
+    public interface ThrowingSupplier<T> {
         T get() throws Exception;
     }
 
-    <T> Optional<T> runSafely(String phase, BatchContext ctx, ThrowingSupplier<T> supplier) throws InterruptedException {
+    public <T> Optional<T> runSafely(String phase, BatchContext ctx, ThrowingSupplier<T> supplier) throws InterruptedException {
         try {
             return Optional.ofNullable(supplier.get());
         } catch (InterruptedException e) {
@@ -50,7 +50,7 @@ class TradingBatchGuard {
     }
 
     // 인터럽트 시점에 아직 증권사 접수가 안 된 전략들에게 알림 (증권사 접수 완료된 전략은 대상 아님)
-    void notifyBatchInterrupted(List<BatchContext> contexts) {
+    public void notifyBatchInterrupted(List<BatchContext> contexts) {
         contexts.forEach(ctx -> {
             try {
                 eventPublisher.publishEvent(new BatchInterruptedEvent(ctx.userProfile().userId(), ctx.account().id(), ctx.account().nickname()));

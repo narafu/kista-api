@@ -1,4 +1,5 @@
 package com.kista.trading.application.service;
+import com.kista.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;

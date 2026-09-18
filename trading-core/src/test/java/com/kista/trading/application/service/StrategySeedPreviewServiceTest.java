@@ -1,4 +1,5 @@
 package com.kista.trading.application.service;
+import com.kista.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;

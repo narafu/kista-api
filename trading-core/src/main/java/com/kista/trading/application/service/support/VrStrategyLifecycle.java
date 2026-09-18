@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -21,7 +21,7 @@ import java.util.UUID;
 // VR 전략의 버전 상세·사이클 상세 저장과 요약 조립을 담당 — VrStrategyDetailUseCase 구현체
 @Component
 @RequiredArgsConstructor
-class VrStrategyLifecycle implements VrStrategyDetailUseCase {
+public class VrStrategyLifecycle implements VrStrategyDetailUseCase {
 
     private final StrategyVrDetailPort strategyVrDetailPort;
     private final StrategyCycleVrPort strategyCycleVrPort;

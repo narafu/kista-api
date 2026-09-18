@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
@@ -34,7 +34,7 @@ import java.util.UUID;
 // 전략(사이클) 기준 조회 전용 — 시드 미리보기, 거래 이력, 주문 내역 (stats에서 이관됐던 전략 소유 read)
 @Service
 @RequiredArgsConstructor
-class StrategyHistoryQueryService {
+public class StrategyHistoryQueryService {
 
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
@@ -47,7 +47,7 @@ class StrategyHistoryQueryService {
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
     // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    StrategySeedPreview strategySeedPreview(
+    public StrategySeedPreview strategySeedPreview(
             UUID accountId, UUID requesterId,
             StrategyType type, StrategyTicker ticker, int divisionCount) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
@@ -81,7 +81,7 @@ class StrategyHistoryQueryService {
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
     @Transactional(readOnly = true)
-    CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
+    public CycleHistoryPage getByStrategy(UUID strategyId, UUID requesterId,
                                    LocalDate from, LocalDate to,
                                    Instant cursor, int size) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
@@ -98,7 +98,7 @@ class StrategyHistoryQueryService {
 
     // 전략(사이클) 기준 기간 내 주문 내역 조회 — 사용자 전략 상세 화면용
     @Transactional(readOnly = true)
-    List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
+    public List<Order> getOrdersByStrategy(UUID strategyId, UUID requesterId, LocalDate from, LocalDate to) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         return orderPort.findByStrategyId(strategyId, from, to);

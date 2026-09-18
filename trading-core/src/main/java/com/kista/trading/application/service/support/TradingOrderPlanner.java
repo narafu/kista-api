@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
@@ -12,16 +12,15 @@ import java.util.List;
 import java.util.UUID;
 
 // PLANNED 주문 저장 헬퍼 (전략 계산은 CycleOrderStrategy로 이전됨)
-// package-private — application/service 패키지 전용
 @Component
 @RequiredArgsConstructor
 @Slf4j
-class TradingOrderPlanner {
+public class TradingOrderPlanner {
 
     private final OrderPort orderPort;
 
     // 이미 계산된 templates(커널 산출 PlannedOrder)를 특정 계좌·사이클의 PLANNED Order로 승격해 저장 — 유일한 승격 지점
-    void savePlannedOrders(List<PlannedOrder> templates, Account account, UUID strategyCycleId) {
+    public void savePlannedOrders(List<PlannedOrder> templates, Account account, UUID strategyCycleId) {
         List<Order> planned = templates.stream()
                 .map(o -> Order.fromPlanned(o, account.id(), strategyCycleId))
                 .toList();

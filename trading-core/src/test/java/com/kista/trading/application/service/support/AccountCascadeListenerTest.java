@@ -1,4 +1,4 @@
-package com.kista.trading.application.service;
+package com.kista.trading.application.service.support;
 
 import com.kista.account.application.event.AccountDeletedEvent;
 import com.kista.trading.application.port.output.StrategyPort;

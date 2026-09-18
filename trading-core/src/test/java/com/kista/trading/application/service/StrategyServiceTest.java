@@ -1,4 +1,5 @@
 package com.kista.trading.application.service;
+import com.kista.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.sharedkernel.TimeZones;

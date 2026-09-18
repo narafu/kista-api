@@ -1,4 +1,5 @@
 package com.kista.trading.application.service;
+import com.kista.trading.application.service.support.VrStrategyLifecycle;
 
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.CyclePosition;
