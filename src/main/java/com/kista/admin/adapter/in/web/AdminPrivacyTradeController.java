@@ -5,6 +5,7 @@ import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.domain.model.AdminFidaOrderCommand;
 import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
+import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
 import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -14,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -83,6 +85,26 @@ public class AdminPrivacyTradeController {
             @PathVariable UUID orderId,
             @RequestBody @Valid AdminPrivacyOrderUpdateCommand command) {
         return AdminPrivacyBaseResponse.from(adminPrivacyTrade.updateOrder(adminId, baseId, orderId, command));
+    }
+
+    // 주문 명세 추가
+    @Operation(summary = "PRIVACY 주문 명세 추가")
+    @PostMapping("/{baseId}/orders")
+    public AdminPrivacyBaseResponse addOrder(
+            @AuthenticationPrincipal UUID adminId,
+            @PathVariable UUID baseId,
+            @RequestBody @Valid AdminPrivacyOrderAddCommand command) {
+        return AdminPrivacyBaseResponse.from(adminPrivacyTrade.addOrder(adminId, baseId, command));
+    }
+
+    // 주문 명세 삭제 — 마지막 1건은 삭제 불가(400)
+    @Operation(summary = "PRIVACY 주문 명세 삭제")
+    @DeleteMapping("/{baseId}/orders/{orderId}")
+    public AdminPrivacyBaseResponse deleteOrder(
+            @AuthenticationPrincipal UUID adminId,
+            @PathVariable UUID baseId,
+            @PathVariable UUID orderId) {
+        return AdminPrivacyBaseResponse.from(adminPrivacyTrade.deleteOrder(adminId, baseId, orderId));
     }
 
 }

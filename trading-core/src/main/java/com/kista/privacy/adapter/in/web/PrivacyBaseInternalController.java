@@ -2,6 +2,7 @@ package com.kista.privacy.adapter.in.web;
 
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.domain.model.PrivacyBaseUpdateCommand;
+import com.kista.privacy.domain.model.PrivacyOrderAddCommand;
 import com.kista.privacy.domain.model.PrivacyOrderUpdateCommand;
 import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,5 +41,17 @@ public class PrivacyBaseInternalController {
     public PrivacyTradeBaseView updateOrder(@PathVariable UUID baseId, @PathVariable UUID orderId,
                                              @RequestBody @Valid PrivacyOrderUpdateCommand command) {
         return privacyTradePort.updateOrder(baseId, orderId, command);
+    }
+
+    @Operation(summary = "주문 명세 추가", description = "관리자 수동 보정 전용. X-Internal-Token 필수.")
+    @PostMapping("/{baseId}/orders")
+    public PrivacyTradeBaseView addOrder(@PathVariable UUID baseId, @RequestBody @Valid PrivacyOrderAddCommand command) {
+        return privacyTradePort.addOrder(baseId, command);
+    }
+
+    @Operation(summary = "주문 명세 삭제", description = "관리자 수동 보정 전용. 마지막 1건은 삭제 불가(400). X-Internal-Token 필수.")
+    @DeleteMapping("/{baseId}/orders/{orderId}")
+    public PrivacyTradeBaseView deleteOrder(@PathVariable UUID baseId, @PathVariable UUID orderId) {
+        return privacyTradePort.deleteOrder(baseId, orderId);
     }
 }

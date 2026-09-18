@@ -192,6 +192,36 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
         return toView(base);
     }
 
+    @Override
+    @Transactional
+    public PrivacyTradeBaseView addOrder(UUID baseId, PrivacyOrderAddCommand command) {
+        PrivacyTradeBaseEntity base = baseRepository.findById(baseId)
+                .orElseThrow(() -> new NoSuchElementException("PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId));
+        PrivacyTradeBaseOrderEntity order = new PrivacyTradeBaseOrderEntity();
+        order.setPrivacyBase(base);
+        order.setDirection(command.direction());
+        order.setOrderType(command.orderType());
+        order.setPrice(command.price());
+        order.setQuantity(command.quantity());
+        base.getOrders().add(order);
+        return toView(base);
+    }
+
+    @Override
+    @Transactional
+    public PrivacyTradeBaseView deleteOrder(UUID baseId, UUID orderId) {
+        PrivacyTradeBaseEntity base = baseRepository.findById(baseId)
+                .orElseThrow(() -> new NoSuchElementException("PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId));
+        if (base.getOrders().size() <= 1) {
+            throw new IllegalArgumentException("최소 1건의 주문 명세는 남아있어야 합니다");
+        }
+        boolean removed = base.getOrders().removeIf(o -> o.getId().equals(orderId));
+        if (!removed) {
+            throw new NoSuchElementException("주문 명세를 찾을 수 없습니다: " + orderId);
+        }
+        return toView(base);
+    }
+
     // 엔티티 → 조회 뷰 변환 (관리자 표시용 — 발행일 원본 그대로, 이제 예외가 아니라 규칙)
     private PrivacyTradeBaseView toView(PrivacyTradeBaseEntity e) {
         List<PrivacyTradeBaseView.OrderLine> orders = e.getOrders().stream()

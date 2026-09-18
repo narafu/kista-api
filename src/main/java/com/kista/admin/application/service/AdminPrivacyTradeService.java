@@ -5,6 +5,7 @@ import com.kista.admin.application.port.output.PrivacyQueryPort;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.admin.domain.model.AdminFidaOrderCommand;
 import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
+import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
 import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
 import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,26 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
                 Map.of("baseId", baseId.toString(),
                         "price", command.price().toString(),
                         "quantity", String.valueOf(command.quantity())));
+        return updated;
+    }
+
+    @Override
+    public AdminPrivacyTradeBaseView addOrder(UUID adminId, UUID baseId, AdminPrivacyOrderAddCommand command) {
+        AdminPrivacyTradeBaseView updated = privacyQueryPort.addOrder(baseId, command);
+        auditLogPort.log(adminId, "PRIVACY_ORDER_ADD", "PRIVACY_TRADE_BASE_ORDER", baseId,
+                Map.of("baseId", baseId.toString(),
+                        "direction", command.direction().name(),
+                        "orderType", command.orderType().name(),
+                        "price", command.price().toString(),
+                        "quantity", String.valueOf(command.quantity())));
+        return updated;
+    }
+
+    @Override
+    public AdminPrivacyTradeBaseView deleteOrder(UUID adminId, UUID baseId, UUID orderId) {
+        AdminPrivacyTradeBaseView updated = privacyQueryPort.deleteOrder(baseId, orderId);
+        auditLogPort.log(adminId, "PRIVACY_ORDER_DELETE", "PRIVACY_TRADE_BASE_ORDER", orderId,
+                Map.of("baseId", baseId.toString()));
         return updated;
     }
 }

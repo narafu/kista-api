@@ -2,6 +2,7 @@ package com.kista.admin.application.port.output;
 
 import com.kista.admin.domain.model.AdminFidaOrderCommand;
 import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
+import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
 import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
 import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
 
@@ -21,4 +22,8 @@ public interface PrivacyQueryPort {
     AdminPrivacyTradeBaseView updateBase(UUID baseId, AdminPrivacyBaseUpdateCommand command);
 
     AdminPrivacyTradeBaseView updateOrder(UUID baseId, UUID orderId, AdminPrivacyOrderUpdateCommand command);
+
+    AdminPrivacyTradeBaseView addOrder(UUID baseId, AdminPrivacyOrderAddCommand command);
+
+    AdminPrivacyTradeBaseView deleteOrder(UUID baseId, UUID orderId);
 }

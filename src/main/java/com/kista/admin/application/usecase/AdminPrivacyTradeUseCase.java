@@ -2,6 +2,7 @@ package com.kista.admin.application.usecase;
 
 import com.kista.admin.domain.model.AdminFidaOrderCommand;
 import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
+import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
 import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
 import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
 
@@ -17,4 +18,8 @@ public interface AdminPrivacyTradeUseCase {
     AdminPrivacyTradeBaseView updateBase(UUID adminId, UUID baseId, AdminPrivacyBaseUpdateCommand command);
 
     AdminPrivacyTradeBaseView updateOrder(UUID adminId, UUID baseId, UUID orderId, AdminPrivacyOrderUpdateCommand command);
+
+    AdminPrivacyTradeBaseView addOrder(UUID adminId, UUID baseId, AdminPrivacyOrderAddCommand command);
+
+    AdminPrivacyTradeBaseView deleteOrder(UUID adminId, UUID baseId, UUID orderId);
 }

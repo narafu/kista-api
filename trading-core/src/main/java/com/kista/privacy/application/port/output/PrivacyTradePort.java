@@ -29,4 +29,10 @@ public interface PrivacyTradePort {
 
     // 관리자 수동 보정 — 개별 주문 가격·수량 교체 (BUY 주문의 quantity=null은 IllegalArgumentException)
     PrivacyTradeBaseView updateOrder(UUID baseId, UUID orderId, PrivacyOrderUpdateCommand command);
+
+    // 관리자 수동 보정 — 주문 명세 추가
+    PrivacyTradeBaseView addOrder(UUID baseId, PrivacyOrderAddCommand command);
+
+    // 관리자 수동 보정 — 주문 명세 삭제 (마지막 1건 삭제 시 IllegalArgumentException)
+    PrivacyTradeBaseView deleteOrder(UUID baseId, UUID orderId);
 }

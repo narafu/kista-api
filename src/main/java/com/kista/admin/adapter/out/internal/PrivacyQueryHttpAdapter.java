@@ -3,6 +3,7 @@ package com.kista.admin.adapter.out.internal;
 import com.kista.admin.application.port.output.PrivacyQueryPort;
 import com.kista.admin.domain.model.AdminFidaOrderCommand;
 import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
+import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
 import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
 import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
 import com.kista.admin.domain.model.AdminPrivacyTradeConflictException;
@@ -94,6 +95,35 @@ class PrivacyQueryHttpAdapter implements PrivacyQueryPort {
                 })
                 .onStatus(status -> status.value() == 400, (request, resp) -> {
                     throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 주문 명세 수정 요청이 유효하지 않습니다"));
+                })
+                .body(AdminPrivacyTradeBaseView.class);
+    }
+
+    @Override
+    public AdminPrivacyTradeBaseView addOrder(UUID baseId, AdminPrivacyOrderAddCommand command) {
+        return internalApiWriteRestClient.post()
+                .uri("/api/internal/privacy/trade-bases/{baseId}/orders", baseId)
+                .body(command)
+                .retrieve()
+                .onStatus(status -> status.value() == 404, (request, resp) -> {
+                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId));
+                })
+                .onStatus(status -> status.value() == 400, (request, resp) -> {
+                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 주문 명세 추가 요청이 유효하지 않습니다"));
+                })
+                .body(AdminPrivacyTradeBaseView.class);
+    }
+
+    @Override
+    public AdminPrivacyTradeBaseView deleteOrder(UUID baseId, UUID orderId) {
+        return internalApiWriteRestClient.delete()
+                .uri("/api/internal/privacy/trade-bases/{baseId}/orders/{orderId}", baseId, orderId)
+                .retrieve()
+                .onStatus(status -> status.value() == 404, (request, resp) -> {
+                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표 또는 주문 명세를 찾을 수 없습니다: " + orderId));
+                })
+                .onStatus(status -> status.value() == 400, (request, resp) -> {
+                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "최소 1건의 주문 명세는 남아있어야 합니다"));
                 })
                 .body(AdminPrivacyTradeBaseView.class);
     }
