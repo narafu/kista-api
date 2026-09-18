@@ -64,16 +64,18 @@ class CycleRotationService {
         BigDecimal targetSeed = resolveTargetSeed(strategy, actualBalance, maintainSeed, maxSeed);
         if (targetSeed == null) return; // maintainSeed도 부족 — PAUSED 처리 완료
 
-        // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임
+        // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임. 미달이어도 재등록 자체는 차단하지 않고
+        // 정보성 알림만 발행한다(예전엔 여기서 재등록을 취소했으나, 그러면 새 사이클 없이 종료 사이클만 남는
+        // "좀비 사이클" 상태가 되어 BatchContextFactory가 매 배치마다 오류 알림을 반복 발행했다) — cycleSeedType대로
+        // 그대로 등록해 축소된 시드로라도 매매가 이어지게 하고, 부족 여부는 알림으로만 알린다
         int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                 .map(StrategyInfiniteDetail::divisionCount)
                 .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
         BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
-            log.warn("[strategyId={}] 재등록 취소 — 최소금액 미달: {} < {}", strategy.id(), targetSeed, minRequired);
+            log.warn("[strategyId={}] 최소금액 미달 — 축소된 시드로 재등록 진행: {} < {}", strategy.id(), targetSeed, minRequired);
             eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
                     0, targetSeed, strategy.ticker(), null));
-            return;
         }
 
         // 새 StrategyCycle + 시작 스냅샷 원자적 생성 (시드 결정 방식 stamp)
