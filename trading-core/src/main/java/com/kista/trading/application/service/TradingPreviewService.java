@@ -100,6 +100,14 @@ class TradingPreviewService {
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
+            if (cycle.endDate() != null) {
+                // findLatestByStrategyId는 종료 여부 무관 최신 1건 — 청산 후 재등록 실패로 종료된 사이클이
+                // "현재 사이클"로 남아있으면 여기서 걸러야 다음 주문이 잘못 계산되지 않는다.
+                // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
+                planResultsByStrategyId.put(strategy.id(),
+                        new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.CYCLE_ENDED));
+                continue;
+            }
             if (!today.isAfter(cycle.startDate())) {
                 // skip 결과를 캐시에 명시적으로 채워둔다 — 비워두면 경쟁 시뮬레이션이 캐시 미스로 오인해
                 // planBuilder.build()를 직접 재계산하면서 시작예정일 미도래 전략이 정상 주문을 만든 것처럼 취급됨
@@ -156,6 +164,13 @@ class TradingPreviewService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
 
+        // 최신 사이클이 종료됨(endDate 존재) — 청산 후 재등록 실패로 남은 상태. findLatestByStrategyId가
+        // 종료 여부를 안 가리므로 여기서 별도로 걸러야 종료된 사이클 기준 주문이 나가지 않는다.
+        // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
+        if (currentCycle.endDate() != null) {
+            return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.CYCLE_ENDED,
+                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+        }
         // 시작예정일 미도래 사이클은 계획 계산 자체를 건너뛴다 — TradingService.filterScheduledStart와 동일 기준(tradeDate > startDate)
         if (!today.isAfter(currentCycle.startDate())) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED,

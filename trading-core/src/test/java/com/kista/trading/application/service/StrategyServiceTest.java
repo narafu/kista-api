@@ -127,7 +127,9 @@ class StrategyServiceTest {
                 cyclePositionInfiniteDetailPort,
                 accountPort,
                 creationService,
-                historyQueryService);
+                historyQueryService,
+                new CycleSnapshotCreator(
+                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle));
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));
         }
@@ -274,6 +276,50 @@ class StrategyServiceTest {
 
         strategyService.resume(STRATEGY_ID, USER_ID);
 
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+    }
+
+    @Test
+    @DisplayName("resume() 호출 시 최신 사이클이 종료됐으면(endDate 존재) endAmount를 시드로 새 사이클을 재오픈한다")
+    void resume_reopens_ended_cycle_with_end_amount_as_seed() {
+        StrategyCycle endedCycle = new StrategyCycle(
+                CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), new BigDecimal("874.50"),
+                LocalDate.now().minusDays(5), LocalDate.now(), null, null);
+        CyclePosition lastPosition = CyclePosition.tradeSnapshot(CYCLE_ID,
+                new AccountBalance(0, null, new BigDecimal("874.50")), new BigDecimal("103.20"));
+
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(endedCycle));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(lastPosition));
+        when(strategyCyclePort.save(any(StrategyCycle.class)))
+                .thenAnswer(invocation -> {
+                    StrategyCycle c = invocation.getArgument(0);
+                    return new StrategyCycle(UUID.randomUUID(), c.strategyId(), c.strategyVersionId(),
+                            c.startAmount(), c.endAmount(), c.startDate(), c.endDate(), null, null);
+                });
+
+        strategyService.resume(STRATEGY_ID, USER_ID);
+
+        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
+        verify(strategyCyclePort).save(cycleCaptor.capture());
+        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("874.50");
+        verify(cyclePositionPort).save(argThat(p ->
+                p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings() == 0));
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+    }
+
+    @Test
+    @DisplayName("resume() 호출 시 최신 사이클이 아직 진행 중이면(endDate 없음) 사이클을 재오픈하지 않는다")
+    void resume_does_not_reopen_cycle_when_still_open() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE)); // endDate=null
+
+        strategyService.resume(STRATEGY_ID, USER_ID);
+
+        verify(strategyCyclePort, never()).save(any());
+        verify(cyclePositionPort, never()).save(any());
         verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
     }
 

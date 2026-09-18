@@ -43,6 +43,7 @@ class StrategyService implements StrategyUseCase {
     private final AccountPort accountPort;
     private final StrategyCreationService creationService;         // 신규 전략 등록 전용
     private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
+    private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -81,8 +82,29 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("이미 활성화된 전략입니다: " + strategyId);
         }
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        reopenCycleIfEnded(strategy);
         strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
         log.info("전략 재개: strategyId={}", strategyId);
+    }
+
+    // cycleSeedType=NONE 전략은 청산 시 자동 rotation 없이 사이클이 종료된 채로 PAUSED된다(CycleRotationService).
+    // 그 상태에서 status만 ACTIVE로 되돌리면 종료된 사이클(endDate 있음)이 여전히 "최신 사이클"로 남아
+    // BatchContextFactory가 매 배치마다 좀비 사이클로 판정해 skip — 재개가 실제로는 매매를 재개시키지 못한다.
+    // 재개 시점에 종료 사이클의 원장 금액(endAmount)을 그대로 승계한 새 사이클을 열어 이를 방지한다.
+    private void reopenCycleIfEnded(Strategy strategy) {
+        // VR은 endsCycleOnLiquidation()=false라 이 경로로 종료되지 않는다(항상 rollover/재설정이 원자적으로
+        // 대체 사이클을 만든다) — 그 불변식이 깨졌을 때 여기서 VR 상세(strategy_cycle_vr) 없는 사이클을
+        // 만들어버리는 사고를 막기 위해 명시적으로 제외한다
+        if (strategy.isVr()) return;
+        StrategyCycle latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id()).orElse(null);
+        if (latestCycle == null || latestCycle.endDate() == null) return;
+        StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
+                .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
+        BigDecimal closingPrice = cyclePositionPort.findLatestOneByStrategyId(strategy.id())
+                .map(CyclePosition::closingPrice)
+                .orElse(null);
+        cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), latestCycle.endAmount(), closingPrice);
+        log.info("[strategyId={}] 재개 — 종료된 사이클 재오픈: seed={}", strategy.id(), latestCycle.endAmount());
     }
 
     @Override
