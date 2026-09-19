@@ -181,4 +181,52 @@ class CycleRotationServiceTest {
                 && tee.userId() == null));
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("MAX — 증권사 잔고 조회 실패 시 전략 PAUSED (좀비 사이클 방지)")
+    void max_kisLookupFails_pausesStrategy() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(new RuntimeException("KIS 잔고 조회 실패"));
+
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
+
+        verify(strategyPort).pause(strategy.id());
+    }
+
+    @Test
+    @DisplayName("MAX — 재등록 도중 예외 발생 시 전략 PAUSED 후 재throw (좀비 사이클 방지)")
+    void max_createCycleFails_pausesStrategyAndRethrows() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
+        RuntimeException boom = new RuntimeException("사이클 생성 실패");
+        when(cycleSnapshotCreator.createCycleAndSnapshot(eq(strategy.id()), eq(STRATEGY_VERSION_ID), any(), eq(PRICE)))
+                .thenThrow(boom);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
+                .isSameAs(boom);
+
+        verify(strategyPort).pause(strategy.id());
+    }
+
+    @Test
+    @DisplayName("MAX — 사이클 생성 성공 뒤 알림 리스너가 예외를 던져도 전략은 PAUSED되지 않는다")
+    void max_listenerFailsAfterCycleCreated_doesNotPause() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
+        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
+        doThrow(new RuntimeException("리스너 실패")).when(eventPublisher).publishEvent(any(Object.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
+                .hasMessage("리스너 실패");
+
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(eq(strategy.id()), eq(STRATEGY_VERSION_ID), any(), eq(PRICE));
+        verify(strategyPort, never()).pause(any());
+    }
 }

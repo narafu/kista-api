@@ -59,32 +59,49 @@ class CycleRotationService {
         // 잔고검증 정책 — ON: 증권사 실잔고 조회, OFF: 내부 원장만 사용
         SeedResolutionPolicy policy = resolvePolicy(userProfile, account, strategy);
         Optional<BigDecimal> balanceOpt = policy.resolveAvailableBalance(strategy, maintainSeed, maxSeed);
-        if (balanceOpt.isEmpty()) return; // 증권사 조회 실패 — 내부에서 notifyError 완료
+        if (balanceOpt.isEmpty()) {
+            // 증권사 조회 실패 — 내부에서 notifyError 완료. 여기서 PAUSED하지 않으면 사이클은 이미
+            // markEnded로 종료된 채 전략만 ACTIVE로 남아 후속 사이클 없는 좀비 상태가 되고,
+            // BatchContextFactory가 이후 배치마다 동일 경고를 무한 반복한다
+            strategyPort.pause(strategy.id());
+            log.warn("[strategyId={}] 증권사 잔고 조회 실패 → PAUSED (좀비 사이클 방지)", strategy.id());
+            return;
+        }
         BigDecimal actualBalance = balanceOpt.get();
 
         BigDecimal targetSeed = resolveTargetSeed(strategy, actualBalance, maintainSeed, maxSeed);
         if (targetSeed == null) return; // maintainSeed도 부족 — PAUSED 처리 완료
 
-        // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임. 미달이어도 재등록 자체는 차단하지 않고
-        // 정보성 알림만 발행한다(예전엔 여기서 재등록을 취소했으나, 그러면 새 사이클 없이 종료 사이클만 남는
-        // "좀비 사이클" 상태가 되어 BatchContextFactory가 매 배치마다 오류 알림을 반복 발행했다) — cycleSeedType대로
-        // 그대로 등록해 축소된 시드로라도 매매가 이어지게 하고, 부족 여부는 알림으로만 알린다
-        int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
-                .map(StrategyInfiniteDetail::divisionCount)
-                .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
-        BigDecimal minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
+        BigDecimal minRequired;
+        try {
+            // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임. 미달이어도 재등록 자체는 차단하지 않고
+            // 정보성 알림만 발행한다(예전엔 여기서 재등록을 취소했으나, 그러면 새 사이클 없이 종료 사이클만 남는
+            // "좀비 사이클" 상태가 되어 BatchContextFactory가 매 배치마다 오류 알림을 반복 발행했다) — cycleSeedType대로
+            // 그대로 등록해 축소된 시드로라도 매매가 이어지게 하고, 부족 여부는 알림으로만 알린다
+            int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
+                    .map(StrategyInfiniteDetail::divisionCount)
+                    .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
+            minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
+
+            // 새 StrategyCycle + 시작 스냅샷 원자적 생성 (시드 결정 방식 stamp)
+            StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
+                    .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
+            cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), targetSeed, price);
+        } catch (RuntimeException e) {
+            // 재등록 실패 시에도 markEnded는 이미 커밋된 상태 — PAUSED 없이 던지면 전략은 ACTIVE인 채
+            // 후속 사이클 없는 좀비로 남는다. 원래 예외는 그대로 전파해 TradingBatchGuard가 기존대로 알림·격리한다
+            // (알림 이벤트 발행은 이 try 밖 — 사이클 생성 성공 뒤 리스너 예외로 건강한 전략이 PAUSED되지 않도록)
+            strategyPort.pause(strategy.id());
+            log.error("[strategyId={}] 사이클 재등록 실패 → PAUSED (좀비 사이클 방지)", strategy.id(), e);
+            throw e;
+        }
+        log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
+
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 최소금액 미달 — 축소된 시드로 재등록 진행: {} < {}", strategy.id(), targetSeed, minRequired);
             eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
                     0, targetSeed, strategy.ticker(), null));
         }
-
-        // 새 StrategyCycle + 시작 스냅샷 원자적 생성 (시드 결정 방식 stamp)
-        StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
-        StrategyCycle newCycle = cycleSnapshotCreator.createCycleAndSnapshot(
-                strategy.id(), activeVersion.id(), targetSeed, price);
-        log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
         eventPublisher.publishEvent(new NewCycleStartedEvent(userProfile.userId(), account.id(), account.nickname(),
                 strategy.type(), strategy.ticker(), targetSeed)); // 사용자 알림 이벤트
     }
