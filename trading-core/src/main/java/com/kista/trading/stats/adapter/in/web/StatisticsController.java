@@ -43,8 +43,8 @@ public class StatisticsController {
         return PortfolioSummaryResponse.from(accountStatistics.getPresentBalance(accountId, userId));
     }
 
-    // 해외증거금 통화별조회 (TTTC2101R) — USD·KRW만 반환
-    @Operation(summary = "해외증거금 조회", description = "KIS API TTTC2101R — USD·KRW 통화별 통합주문가능금액(예수금) 조회.")
+    // 해외증거금 통화별조회 — 브로커 어댑터 경유(KIS: TTTC2101R / Toss: buying-power), USD·KRW만 반환
+    @Operation(summary = "해외증거금 조회", description = "브로커 어댑터 경유(KIS: TTTC2101R / Toss: buying-power) — USD·KRW 통화별 통합주문가능금액(예수금) 조회.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
