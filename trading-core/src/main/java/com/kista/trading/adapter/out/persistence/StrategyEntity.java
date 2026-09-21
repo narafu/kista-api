@@ -17,7 +17,7 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @Entity
-@Table(name = "strategy", schema = "kista")
+@Table(name = "strategy", schema = "trading")
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)

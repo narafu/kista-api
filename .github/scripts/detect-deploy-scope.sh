@@ -22,9 +22,10 @@ while IFS= read -r f; do
     # trading-core.jar 전용
     trading-core/src/main/*)
       verify=true; trading=true ;;
-    # 스키마 변경 — root(api·scheduler)가 적용하고 trading-core는 ddl-auto: validate로 검증하므로 전부
+    # root 소유 스키마 변경 — root(api·scheduler)만 적용한다. trading은 자체 migration-trading(위 trading-core/src/main/*)을
+    # 소유하고 root 테이블에 의존하지 않는다(서비스별 Flyway 이력 분리)
     src/main/resources/db/migration/*)
-      verify=true; api=true; scheduler=true; trading=true ;;
+      verify=true; api=true; scheduler=true ;;
     # scheduler role에만 등록되는 빈 — kista-api에는 존재하지 않음
     src/main/java/*/adapter/in/schedule/*|src/main/java/com/kista/web/AdminSchedulerController.java)
       verify=true; scheduler=true ;;

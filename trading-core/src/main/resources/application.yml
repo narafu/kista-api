@@ -16,7 +16,7 @@ spring:
       minimum-idle: 2
       connection-timeout: 20000
       pool-name: HikariPool-KistaTrading
-      connection-init-sql: "SET search_path TO kista, finance, reference, public"
+      connection-init-sql: "SET search_path TO trading, trading_ref"   # root 소유 public 테이블 참조 0 — scheduler_locks/event_publication은 trading 사본
 
   jpa:
     open-in-view: false
@@ -31,9 +31,17 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration-trading
-    baseline-on-migrate: false
+    table: flyway_schema_history_trading
+    baseline-on-migrate: false          # 운영 첫 기동에만 SPRING_FLYWAY_BASELINE_ON_MIGRATE=true 로 override(RUNBOOK)
     validate-on-migrate: true
-    default-schema: public
+    default-schema: trading             # 서비스 소유 스키마여야 baseline 판정(비어있음 여부)이 정확하다 — 설계 문서 "실측 근거"
+
+  modulith:
+    events:
+      jdbc:
+        schema: trading                 # trading 전용 event_publication — root(public)와 분리
+        schema-initialization:
+          enabled: false                # 테이블은 baseline V1이 소유
 
   data:
     redis:

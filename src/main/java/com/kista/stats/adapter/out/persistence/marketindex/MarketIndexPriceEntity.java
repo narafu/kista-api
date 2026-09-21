@@ -13,7 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "market_index_prices",
-    schema = "reference",
+    schema = "kista_ref",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_market_index_prices_symbol_date",
         columnNames = {"symbol", "trade_date"}

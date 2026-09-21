@@ -45,9 +45,10 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SCHEDULER_ENABLED: "true"
-      # 매매 알림 6종 리스너가 4a에서 trading-core로 이관됨 — 이 컨테이너엔 root 자체 이벤트(가입·승인·
-      # KbLand/finance alert 등)만 남아 매매 시간대와 무관. EPR 재발행은 kista-trading이 자기 것으로 소유.
-      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "false"
+      # root 소유 event_publication(public)의 재발행 소유자 = kista-scheduler 단독(kista-api는 false — 둘 다 true면 이중 claim).
+      # trading 리스너 행은 trading.event_publication으로 분리돼 kista-trading이 자기 것을 재발행한다.
+      # 이 컨테이너엔 root 자체 이벤트(가입·승인·KbLand/finance alert 등)만 남아 매매 시간대와 무관.
+      SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
       REDIS_URL: redis://redis:6379
       # 요청 부하 없는 배치 전용 — 힙 작게. OOM 회피가 중요(OOM-kill 시 scheduler_locks 락 2h 홀드)
       JAVA_OPTS: "-Xmx1536m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"

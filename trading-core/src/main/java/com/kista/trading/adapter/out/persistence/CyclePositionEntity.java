@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cycle_position", schema = "kista")
+@Table(name = "cycle_position", schema = "trading")
 @SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter(AccessLevel.PACKAGE)

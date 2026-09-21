@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "us_market_holidays", schema = "reference")
+@Table(name = "us_market_holidays", schema = "trading_ref")
 @Getter
 @NoArgsConstructor
 public class UsMarketHolidayEntity extends BaseCreatedAtEntity {

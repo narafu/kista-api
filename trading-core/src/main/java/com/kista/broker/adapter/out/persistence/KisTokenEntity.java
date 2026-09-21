@@ -14,7 +14,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "broker_tokens", schema = "public")
+@Table(name = "broker_tokens", schema = "trading")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

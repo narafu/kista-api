@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "strategy_vr_version", schema = "kista")
+@Table(name = "strategy_vr_version", schema = "trading")
 @Getter
 @Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

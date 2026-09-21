@@ -17,7 +17,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "privacy_trade_bases",
-    schema = "reference",
+    schema = "trading_ref",
     uniqueConstraints = @UniqueConstraint(name = "uq_privacy_trade_bases_release_date_ticker", columnNames = {"release_date", "ticker"})
 )
 @Getter

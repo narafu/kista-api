@@ -14,7 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(
     name = "housing_benchmark_prices",
-    schema = "reference",
+    schema = "kista_ref",
     uniqueConstraints = @UniqueConstraint(
         name = "uq_housing_benchmark_prices_source_metric_region_month",
         columnNames = {"source", "metric_code", "region_code", "base_month"}

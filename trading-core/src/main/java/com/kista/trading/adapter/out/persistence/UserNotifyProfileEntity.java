@@ -16,7 +16,7 @@ import java.util.UUID;
 // BaseAuditEntity/BaseCreatedAtEntity를 상속하지 않고 동기화 시각(updatedAt)만 직접 관리한다.
 // @Id가 할당식(@GeneratedValue 없음)이라 save()가 곧 upsert(merge)다.
 @Entity
-@Table(name = "user_notify_profile", schema = "kista")
+@Table(name = "user_notify_profile", schema = "trading")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
