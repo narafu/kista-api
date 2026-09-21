@@ -16,8 +16,34 @@ permissions:
   packages: write
 
 jobs:
+  # 변경 경로로 배포 범위 판정 — 판정 불가(수동 실행·최초 push·force push로 base 소실)면 전부 true
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      verify: ${{ steps.scope.outputs.verify }}
+      api: ${{ steps.scope.outputs.api }}
+      trading: ${{ steps.scope.outputs.trading }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            printf 'verify=true\napi=true\ntrading=true\n' | tee -a "$GITHUB_OUTPUT"
+          else
+            git diff --name-only "$BEFORE" "$GITHUB_SHA" | bash .github/scripts/detect-deploy-scope.sh | tee -a "$GITHUB_OUTPUT"
+          fi
+
   verify:
     name: Full Test Suite
+    needs: changes
+    if: needs.changes.outputs.verify == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -63,7 +89,8 @@ jobs:
   build:
     name: Build & Push Image
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [changes, verify]
+    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.trading == 'true'
     outputs:
       image: ${{ steps.image.outputs.image }}
       latest: ${{ steps.image.outputs.latest }}
@@ -101,7 +128,8 @@ jobs:
 
   deploy-api:
     name: Deploy API
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.api == 'true'
     uses: ./.github/workflows/_deploy-role.yml
     with:
       image: ${{ needs.build.outputs.image }}
@@ -112,7 +140,8 @@ jobs:
 
   deploy-scheduler:
     name: Deploy Scheduler
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.api == 'true'   # kista-api와 같은 app.jar
     uses: ./.github/workflows/_deploy-role.yml
     with:
       image: ${{ needs.build.outputs.image }}
@@ -123,7 +152,8 @@ jobs:
 
   deploy-trading:
     name: Deploy Trading
-    needs: build
+    needs: [changes, build]
+    if: needs.changes.outputs.trading == 'true'
     uses: ./.github/workflows/_deploy-role.yml
     with:
       image: ${{ needs.build.outputs.image }}
