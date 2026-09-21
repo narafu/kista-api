@@ -16,7 +16,7 @@ Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith(점진 도
 
 ### Gradle 멀티프로젝트
 
-`:trading-core`(매매 실행 도메인 — trading/matching/broker/account/privacy/marketcalendar/sharedkernel/platform)와 루트 `:api`(그 외 전부, `app.jar` 산출) 두 서브프로젝트로 컴파일 경계를 분리한다. 루트가 `:trading-core`를 단방향 의존하며, 배포 산출물은 여전히 `app.jar` 하나다(런타임 분리 아님 — 상세 → `docs/agents/architecture.md` "Gradle 구조").
+`:trading-core`(매매 실행 도메인 — trading/matching/broker/account/privacy/marketcalendar, `trading-core.jar` 산출), `:shared`(sharedkernel/platform — 공용 어휘·인프라 leaf), 루트 `:api`(그 외 전부, `app.jar` 산출) 세 서브프로젝트로 나눈다. `:trading-core`와 `:api`는 둘 다 `:shared`만 의존하고 서로의 main 코드는 참조하지 않으며(HTTP 내부 API·Redis로만 통신), 배포도 `kista-trading`(trading-core.jar) 프로세스가 별도로 뜬다(상세 → `docs/agents/architecture.md` "Gradle 구조").
 
 ### 계층 구조 (Hexagonal Architecture)
 
