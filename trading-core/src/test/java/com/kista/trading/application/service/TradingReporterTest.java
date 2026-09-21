@@ -23,7 +23,7 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.application.port.output.ExecutionPort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,7 +60,7 @@ class TradingReporterTest {
     static final LocalDate TODAY = LocalDate.of(2026, 7, 9);
     static final BigDecimal CLOSE = new BigDecimal("22.00");
 
-    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
@@ -70,12 +70,12 @@ class TradingReporterTest {
             UUID.randomUUID(), STRATEGY.id(), UUID.randomUUID(),
             new BigDecimal("1000.00"), null, TODAY, null, null, null
     );
-    static final TradingUserProfile USER = DomainFixtures.tradingUserProfile(ACCOUNT.userId());
+    static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(ACCOUNT.userId());
     static final BatchContext CTX = new BatchContext(STRATEGY, CYCLE, ACCOUNT, USER);
     static final AccountBalance BALANCE = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 
     // 마감 후 잔여 주문 취소는 Toss 전용(KIS는 정규장 종료 시 자동 취소) — 취소 검증 테스트만 별도 Toss 계좌 사용
-    static final Account TOSS_ACCOUNT = DomainFixtures.tossAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Account TOSS_ACCOUNT = TradingFixtures.tossAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef TOSS_ACCOUNT_REF = TOSS_ACCOUNT.toBrokerRef();
     static final Strategy TOSS_STRATEGY = new Strategy(
             UUID.randomUUID(), TOSS_ACCOUNT.id(), StrategyType.INFINITE,
@@ -85,7 +85,7 @@ class TradingReporterTest {
             UUID.randomUUID(), TOSS_STRATEGY.id(), UUID.randomUUID(),
             new BigDecimal("1000.00"), null, TODAY, null, null, null
     );
-    static final TradingUserProfile TOSS_USER = DomainFixtures.tradingUserProfile(TOSS_ACCOUNT.userId());
+    static final TradingUserProfile TOSS_USER = TradingFixtures.tradingUserProfile(TOSS_ACCOUNT.userId());
     static final BatchContext TOSS_CTX = new BatchContext(TOSS_STRATEGY, TOSS_CYCLE, TOSS_ACCOUNT, TOSS_USER);
 
     @BeforeEach

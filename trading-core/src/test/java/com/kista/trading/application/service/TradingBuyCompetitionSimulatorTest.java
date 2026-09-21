@@ -14,7 +14,7 @@ import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +49,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     TradingBuyCompetitionSimulator simulator;
 
-    Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
 
     Strategy currentStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,

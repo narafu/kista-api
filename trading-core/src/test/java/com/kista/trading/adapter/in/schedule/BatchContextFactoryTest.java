@@ -9,7 +9,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.trading.application.port.output.TradingUserProfilePort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -60,11 +60,11 @@ class BatchContextFactoryTest {
     }
 
     private Account mockAccount(UUID accountId) {
-        return DomainFixtures.kisAccount(accountId, USER_ID);
+        return TradingFixtures.kisAccount(accountId, USER_ID);
     }
 
     private TradingUserProfile mockUserProfile() {
-        return DomainFixtures.tradingUserProfile(USER_ID);
+        return TradingFixtures.tradingUserProfile(USER_ID);
     }
 
     @Test

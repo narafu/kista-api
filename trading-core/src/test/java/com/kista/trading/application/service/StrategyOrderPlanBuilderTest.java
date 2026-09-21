@@ -15,7 +15,7 @@ import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrStrategy;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +51,7 @@ class StrategyOrderPlanBuilderTest {
 
     StrategyOrderPlanBuilder builder;
 
-    Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),

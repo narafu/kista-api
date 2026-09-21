@@ -1,5 +1,6 @@
 plugins {
     java
+    `java-test-fixtures`
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.mgmt)
 }
@@ -69,9 +70,13 @@ dependencies {
     testImplementation(libs.spring.boot.testcontainers)
     testImplementation(libs.testcontainers.junit.jupiter)
     testImplementation(libs.testcontainers.postgresql)
-    testImplementation(project(":")) // trading-core 테스트가 user/admin 소유 보안 테스트 스캐폴딩(SecurityConfig 등)에 역참조 — Stage 3/4에서 보안 모듈 경계 정리 시 해소 대상, Task 8에서 문서화 예정
-    testImplementation(testFixtures(project(":"))) // DataJpaTestBase, WebMvcTestSupport, DomainFixtures
     testImplementation(libs.spring.security.test) // SecurityMockMvcRequestPostProcessors
+
+    // testFixtures — DataJpaTestBase/WebMvcTestSupport/TradingFixtures + application-test.yml (루트 :api도 소비)
+    testFixturesImplementation(project(":shared"))
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa)
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa.test)
+    testFixturesImplementation(libs.spring.boot.starter.security)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

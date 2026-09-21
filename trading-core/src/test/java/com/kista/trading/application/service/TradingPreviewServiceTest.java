@@ -17,7 +17,7 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,7 +56,7 @@ class TradingPreviewServiceTest {
 
     TradingPreviewService service;
 
-    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,

@@ -33,6 +33,26 @@ class GradleModuleBoundaryTest {
                 .check(importedClasses);
     }
 
+    // trading-core 테스트/testFixtures 클래스도 api 전용 모듈을 참조하지 않는지 고정한다 —
+    // 루트가 trading-core testFixtures를 소비하므로 반대 방향 참조가 생기면 테스트 클래스패스 순환이 된다.
+    @Test
+    void tradingCoreTestsMustNotDependOnApiOnlyModules() {
+        var importedClasses = new ClassFileImporter()
+                .importPaths(Path.of("trading-core/build/classes/java/test"),
+                        Path.of("trading-core/build/classes/java/testFixtures"));
+
+        // 디렉토리가 비어있으면(:trading-core:compileTestJava 미실행 등) noClasses()가 공허하게 통과해버리는 걸 방지
+        assertThat(importedClasses).isNotEmpty();
+
+        ArchRuleDefinition.noClasses()
+                .that().resideInAPackage("com.kista..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.kista.user..", "com.kista.admin..", "com.kista.stats..",
+                        "com.kista.finance..", "com.kista.notify..", "com.kista.market..",
+                        "com.kista.web..")
+                .check(importedClasses);
+    }
+
     // :shared(sharedkernel+platform) 서브프로젝트 소스만 스캔해, :trading-core·:api 어느 쪽도
     // 역참조하지 않는지 고정한다 — 3-서브프로젝트 그래프는 shared ← trading-core ← api,
     // shared ← api 단방향만 허용(shared가 leaf). 이 테스트가 실패하면 :shared→:trading-core

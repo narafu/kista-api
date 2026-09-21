@@ -19,7 +19,7 @@ import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,8 +63,8 @@ class TradingOrderBudgetAllocatorTest {
 
     @BeforeEach
     void setUp() {
-        account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-        user = DomainFixtures.tradingUserProfile(account.userId());
+        account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+        user = TradingFixtures.tradingUserProfile(account.userId());
         tradeDate = LocalDate.of(2026, 7, 15);
         when(infiniteCycleOrderStrategy.cycleType()).thenReturn(StrategyType.INFINITE);
         lenient().when(infiniteCycleOrderStrategy.allocationPriority()).thenReturn(1);

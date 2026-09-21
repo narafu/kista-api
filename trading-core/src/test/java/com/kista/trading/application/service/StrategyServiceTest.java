@@ -20,7 +20,7 @@ import com.kista.trading.domain.strategy.InfiniteCreationResolver;
 import com.kista.trading.domain.strategy.PrivacyCreationResolver;
 import com.kista.trading.domain.strategy.StrategyCreationResolvers;
 import com.kista.trading.domain.strategy.VrCreationResolver;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -187,11 +187,11 @@ class StrategyServiceTest {
     }
 
     private Account ownerAccount() {
-        return DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+        return TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
     }
 
     private TradingUserProfile activeUserProfile() {
-        return DomainFixtures.tradingUserProfile(USER_ID);
+        return TradingFixtures.tradingUserProfile(USER_ID);
     }
 
     // RuntimeSettingsService.toTradingSettings()가 매핑을 마친 뒤 반환하는 값과 동일한 trading 소유 타입 픽스처 —

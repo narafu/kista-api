@@ -20,7 +20,7 @@ import com.kista.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,7 +89,7 @@ class VrReconfigureServiceTest {
 
     @BeforeEach
     void setUp() {
-        account = DomainFixtures.kisAccount(accountId, requesterId);
+        account = TradingFixtures.kisAccount(accountId, requesterId);
         vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,

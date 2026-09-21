@@ -26,7 +26,7 @@ import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.trading.domain.strategy.*;
 import com.kista.matching.domain.strategy.*;
 import com.kista.sharedkernel.TradingErrorEvent;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,7 +75,7 @@ class ManualTradingServiceTest {
     ManualTradingService service;
 
     static final UUID REQUESTER_ID = UUID.randomUUID();
-    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
+    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), REQUESTER_ID);
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,

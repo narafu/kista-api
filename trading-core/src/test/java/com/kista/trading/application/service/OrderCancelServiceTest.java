@@ -20,7 +20,7 @@ import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,7 @@ class OrderCancelServiceTest {
 
     @BeforeEach
     void setUp() {
-        ownedAccount = DomainFixtures.kisAccount(accountId, requesterId);
+        ownedAccount = TradingFixtures.kisAccount(accountId, requesterId);
         cycle = new Strategy(cycleId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),

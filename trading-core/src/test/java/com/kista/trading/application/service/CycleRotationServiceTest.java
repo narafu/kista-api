@@ -16,7 +16,7 @@ import com.kista.trading.domain.strategy.*;
 import com.kista.matching.domain.strategy.*;
 import com.kista.sharedkernel.InsufficientBalanceEvent;
 import com.kista.sharedkernel.TradingErrorEvent;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,11 +59,11 @@ class CycleRotationServiceTest {
     static final BigDecimal PRICE = new BigDecimal("22.00");
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
-    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 
     // 잔고검증 ON(기본값) — 증권사 실잔고 경로로 진행
-    static final TradingUserProfile USER = DomainFixtures.tradingUserProfile(ACCOUNT.userId());
+    static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(ACCOUNT.userId());
 
     @BeforeEach
     void setUp() {

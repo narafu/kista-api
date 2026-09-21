@@ -11,7 +11,7 @@ import com.kista.trading.application.port.output.*;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.sharedkernel.TradingErrorEvent;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,10 +64,10 @@ class VrCycleRolloverServiceTest {
     // 10주 보유, 평단가=45.00
     static final AccountBalance POST_BALANCE = new AccountBalance(10, new BigDecimal("45.00"), USD_DEPOSIT);
 
-    static final Account ACCOUNT = DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+    static final Account ACCOUNT = TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 
-    static final TradingUserProfile USER = DomainFixtures.tradingUserProfile(USER_ID);
+    static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(USER_ID);
 
     // 테스트 기준일: 2026-06-01 (기준, 실제 today는 각 테스트에서 지정)
     static final LocalDate CYCLE_START = LocalDate.of(2026, 6, 1);

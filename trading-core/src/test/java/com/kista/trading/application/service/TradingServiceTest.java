@@ -41,7 +41,7 @@ import com.kista.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.trading.domain.strategy.*;
 import com.kista.matching.domain.strategy.*;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -101,7 +101,7 @@ class TradingServiceTest {
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    static final Account ACCOUNT = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
 
     // Strategy + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
@@ -122,7 +122,7 @@ class TradingServiceTest {
     static final CyclePosition LOW_HISTORY = new CyclePosition(
             null, STRATEGY_CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null, null);
 
-    static final TradingUserProfile USER = DomainFixtures.tradingUserProfile(ACCOUNT.userId());
+    static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(ACCOUNT.userId());
 
     private OrderResult brokerResult(String externalOrderId) {
         return new OrderResult(externalOrderId);
@@ -919,8 +919,8 @@ class TradingServiceTest {
         Strategy succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
-        TradingUserProfile failingUser = DomainFixtures.tradingUserProfile(failingAccount.userId());
-        TradingUserProfile succeedingUser = DomainFixtures.tradingUserProfile(succeedingAccount.userId());
+        TradingUserProfile failingUser = TradingFixtures.tradingUserProfile(failingAccount.userId());
+        TradingUserProfile succeedingUser = TradingFixtures.tradingUserProfile(succeedingAccount.userId());
         Order buy = buyTemplate(StrategyTicker.SOXL, "20.00", OrderTiming.AT_CLOSE);
         Order succeedingPlanned = plannedBuy(succeedingAccount, succeedingCycle, "20.00");
         RuntimeException balanceFailure = new RuntimeException("account A balance failure");
@@ -960,8 +960,8 @@ class TradingServiceTest {
         Strategy succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
-        TradingUserProfile failingUser = DomainFixtures.tradingUserProfile(failingAccount.userId());
-        TradingUserProfile succeedingUser = DomainFixtures.tradingUserProfile(succeedingAccount.userId());
+        TradingUserProfile failingUser = TradingFixtures.tradingUserProfile(failingAccount.userId());
+        TradingUserProfile succeedingUser = TradingFixtures.tradingUserProfile(succeedingAccount.userId());
         Order buy = buyTemplate(StrategyTicker.SOXL, "20.00", OrderTiming.AT_CLOSE);
         Order succeedingPlanned = plannedBuy(succeedingAccount, succeedingCycle, "20.00");
         RuntimeException saveFailure = new RuntimeException("account A save failure");
@@ -1004,8 +1004,8 @@ class TradingServiceTest {
         Strategy succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
-        TradingUserProfile failingUser = DomainFixtures.tradingUserProfile(failingAccount.userId());
-        TradingUserProfile succeedingUser = DomainFixtures.tradingUserProfile(succeedingAccount.userId());
+        TradingUserProfile failingUser = TradingFixtures.tradingUserProfile(failingAccount.userId());
+        TradingUserProfile succeedingUser = TradingFixtures.tradingUserProfile(succeedingAccount.userId());
         Order rejectedBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 100, new BigDecimal("500.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_REJECTED_BUY");
@@ -1850,7 +1850,7 @@ class TradingServiceTest {
 
     private Account account(String accountId) {
         UUID id = UUID.fromString(accountId);
-        return DomainFixtures.kisAccount(id, UUID.nameUUIDFromBytes(("user-" + accountId).getBytes()));
+        return TradingFixtures.kisAccount(id, UUID.nameUUIDFromBytes(("user-" + accountId).getBytes()));
     }
 
     private Strategy strategy(Account account) {

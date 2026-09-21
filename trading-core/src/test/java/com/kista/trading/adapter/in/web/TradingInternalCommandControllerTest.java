@@ -12,7 +12,6 @@ import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
 import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -48,7 +47,6 @@ class TradingInternalCommandControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
 
-    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean ReorderUseCase reorderUseCase;

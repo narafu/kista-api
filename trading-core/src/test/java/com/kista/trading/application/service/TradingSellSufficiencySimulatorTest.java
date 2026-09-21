@@ -12,7 +12,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,7 +42,7 @@ class TradingSellSufficiencySimulatorTest {
 
     TradingSellSufficiencySimulator simulator;
 
-    Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
     Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);

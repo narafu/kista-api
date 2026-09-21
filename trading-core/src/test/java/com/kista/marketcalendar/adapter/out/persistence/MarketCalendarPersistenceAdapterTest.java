@@ -1,6 +1,8 @@
 package com.kista.marketcalendar.adapter.out.persistence;
 
 import com.kista.support.DataJpaTestBase;
+import com.kista.support.TradingCoreJpaTestConfig;
+import org.springframework.test.context.ContextConfiguration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -12,6 +14,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 @Import(MarketCalendarPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class MarketCalendarPersistenceAdapterTest extends DataJpaTestBase {

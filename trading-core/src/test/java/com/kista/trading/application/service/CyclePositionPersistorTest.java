@@ -9,7 +9,7 @@ import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
 import com.kista.matching.domain.strategy.*;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,9 +56,9 @@ class CyclePositionPersistorTest {
     static final LocalDate TODAY = LocalDate.of(2026, 6, 29);
     static final BigDecimal PRICE = new BigDecimal("50.00");
 
-    static final Account ACCOUNT = DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+    static final Account ACCOUNT = TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
 
-    static final TradingUserProfile USER = DomainFixtures.tradingUserProfile(USER_ID);
+    static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(USER_ID);
 
     private StrategyCycle cycle(UUID strategyId) {
         return new StrategyCycle(CYCLE_ID, strategyId, VERSION_ID,

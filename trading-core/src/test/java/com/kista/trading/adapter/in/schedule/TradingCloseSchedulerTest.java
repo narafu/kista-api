@@ -11,7 +11,7 @@ import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.port.output.HeartbeatPort;
 import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,7 +53,7 @@ class TradingCloseSchedulerTest {
     private static final UUID CYCLE_ID   = UUID.randomUUID();
 
     private Account mockAccount() {
-        return DomainFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+        return TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
     }
 
     private Strategy mockStrategy() {
@@ -67,7 +67,7 @@ class TradingCloseSchedulerTest {
     }
 
     private TradingUserProfile mockUser() {
-        return DomainFixtures.tradingUserProfile(USER_ID);
+        return TradingFixtures.tradingUserProfile(USER_ID);
     }
 
     @BeforeEach

@@ -9,7 +9,7 @@ import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +44,7 @@ class SelectionChainTest {
     private final UUID strategyId = UUID.randomUUID();
 
     private Account account() {
-        return DomainFixtures.kisAccount(accountId, userId);
+        return TradingFixtures.kisAccount(accountId, userId);
     }
 
     private Strategy strategy() {

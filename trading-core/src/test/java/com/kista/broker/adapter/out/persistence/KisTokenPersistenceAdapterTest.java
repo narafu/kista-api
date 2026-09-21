@@ -1,6 +1,8 @@
 package com.kista.broker.adapter.out.persistence;
 
 import com.kista.support.DataJpaTestBase;
+import com.kista.support.TradingCoreJpaTestConfig;
+import org.springframework.test.context.ContextConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 @Import(KisTokenPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class KisTokenPersistenceAdapterTest extends DataJpaTestBase {

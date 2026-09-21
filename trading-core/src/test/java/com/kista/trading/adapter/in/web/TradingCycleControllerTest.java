@@ -13,7 +13,6 @@ import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
 import com.kista.trading.domain.model.VrSummary;
-import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -52,7 +51,6 @@ class TradingCycleControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean StrategyUseCase tradingCycle;

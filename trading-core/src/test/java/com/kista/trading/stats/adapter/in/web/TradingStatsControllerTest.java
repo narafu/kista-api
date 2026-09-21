@@ -3,7 +3,6 @@ package com.kista.trading.stats.adapter.in.web;
 import com.kista.trading.stats.domain.model.*;
 import com.kista.trading.stats.application.usecase.TradingStatsUseCase;
 import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -35,7 +34,6 @@ import com.kista.sharedkernel.StrategyTicker;
 class TradingStatsControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean AppErrorLogPort appErrorLogPort; // GlobalExceptionHandler 의존성
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean TradingStatsUseCase tradingStats;

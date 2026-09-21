@@ -1,6 +1,5 @@
 package com.kista.trading.stats.adapter.in.web;
 
-import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
@@ -41,7 +40,6 @@ class PortfolioQueryInternalControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean PortfolioUseCase portfolioUseCase;

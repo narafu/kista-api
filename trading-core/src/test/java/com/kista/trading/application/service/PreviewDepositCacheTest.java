@@ -6,7 +6,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.LiveBalancePort;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +33,7 @@ class PreviewDepositCacheTest {
     @Mock LiveBalancePort liveBalancePort;
 
     PreviewDepositCache cache;
-    Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
     @BeforeEach
     void setUp() {

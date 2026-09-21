@@ -1,6 +1,8 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.support.DataJpaTestBase;
+import com.kista.support.TradingCoreJpaTestConfig;
+import org.springframework.test.context.ContextConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 @DisplayName("TossAuthApi Redis canonical token JPA 격리")
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest 컨텍스트·HikariCP 풀 공유 — activeConnections 단언이 병렬 실행 중 다른 테스트와 경합하지 않도록
 class TossAuthApiNoJpaTest extends DataJpaTestBase {

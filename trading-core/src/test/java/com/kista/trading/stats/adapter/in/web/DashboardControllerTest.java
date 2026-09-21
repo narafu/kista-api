@@ -26,7 +26,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.admin.application.port.output.AppErrorLogPort;
 
 @WebMvcTest(DashboardController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -34,7 +33,6 @@ class DashboardControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountStatisticsUseCase accountStatistics;

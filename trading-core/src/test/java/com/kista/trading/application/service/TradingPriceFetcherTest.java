@@ -6,7 +6,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.support.DomainFixtures;
+import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class TradingPriceFetcherTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock PrivacyTradePort privacyTradePort;
     TradingPriceFetcher priceFetcher;
-    Account account = DomainFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
 
     @BeforeEach
     void setUp() {

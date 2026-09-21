@@ -1,6 +1,5 @@
 package com.kista.trading.adapter.in.web;
 
-import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.trading.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.trading.adapter.in.schedule.TradingOpenScheduler;
 import com.kista.platform.security.InternalTokenAuthFilter;
@@ -31,7 +30,6 @@ class TradingSchedulerInternalControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean TradingOpenScheduler openScheduler;
