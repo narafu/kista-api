@@ -18,8 +18,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.Collection;
 
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -64,9 +62,6 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         userId = UUID.randomUUID();
         accountId = UUID.randomUUID();
 
-        jdbcTemplate.update(
-                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
-                userId, "kakao_" + userId, "ACTIVE", "USER");
         jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
@@ -281,16 +276,19 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns
-                WHERE table_name = 'cycle_position_infinite'
+                WHERE table_schema = 'trading' AND table_name = 'cycle_position_infinite'
                 ORDER BY ordinal_position
                 """, String.class))
                 .containsExactly("cycle_position_id", "is_reverse_mode", "created_at", "deleted_at");
 
-        String migration = Files.readString(Path.of("src/main/resources/db/migration/V1__init.sql"));
-
-        assertThat(migration).contains("CREATE TABLE cycle_position_infinite");
-        assertThat(migration).contains("is_reverse_mode   BOOLEAN     NOT NULL");
-        assertThat(migration).contains("deleted_at        TIMESTAMPTZ");
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT column_name || ':' || data_type || ':' || is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'trading' AND table_name = 'cycle_position_infinite'
+                  AND column_name IN ('is_reverse_mode', 'deleted_at')
+                ORDER BY column_name
+                """, String.class))
+                .containsExactly("deleted_at:timestamp with time zone:YES", "is_reverse_mode:boolean:NO");
     }
 
     // ===== findByUserAndRange — raw JDBC로 FK 체인·created_at·deleted_at을 직접 통제 =====
@@ -300,9 +298,6 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     private UUID insertUserAndAccount(boolean deletedAccount) {
         UUID uId = UUID.randomUUID();
         UUID accId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
-                uId, "kakao_" + uId, "ACTIVE", "USER");
         insertAccountForUser(accId, uId, deletedAccount);
         return accId;
     }

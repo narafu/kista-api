@@ -45,9 +45,6 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
         // FK 선행 행: user → account → strategy → strategy_version → strategy_cycle
         jdbcTemplate.update(
-                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
-                userId, "kakao_" + userId, "ACTIVE", "USER");
-        jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
         jdbcTemplate.update(
@@ -166,9 +163,6 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         UUID otherUserAccountId = UUID.randomUUID();
         UUID deletedAccountId = UUID.randomUUID();
 
-        jdbcTemplate.update(
-                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
-                otherUserId, "kakao_" + otherUserId, "ACTIVE", "USER");
         insertAccount(secondAccountId, userId, false);       // 동일 유저 2번째 계좌 — 포함
         insertAccount(otherUserAccountId, otherUserId, false); // 타 유저 계좌 — 제외
         insertAccount(deletedAccountId, userId, true);        // 소프트 삭제 계좌 — 제외

@@ -38,9 +38,6 @@ class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
 
         // broker_tokens.account_id → accounts(id) FK 충족을 위한 선행 삽입
         jdbcTemplate.update(
-                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
-                userId, "kakao_" + userId, "ACTIVE", "USER");
-        jdbcTemplate.update(
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
 
@@ -56,7 +53,6 @@ class KisTokenPersistenceAdapterTest extends DataJpaTestBase {
         }
         jdbcTemplate.update("DELETE FROM broker_tokens WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
-        jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
     }
 
     @Test
