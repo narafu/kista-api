@@ -5,14 +5,26 @@ description: Flyway 마이그레이션 파일 생성 — V1__init.sql 규칙, En
 
 # Flyway Migration 생성 스킬
 
-## 1. 버전 번호 확인
+## 1. 마이그레이션 위치·버전 번호 확인
 
-bash 명령으로 최신 버전 확인 후 +1:
-  ls src/main/resources/db/migration/ | sort -V | tail -3
+마이그레이션은 **테이블을 소유한 서비스의 디렉토리**에 둔다 — 다른 서비스 소유 스키마의 테이블은 참조 금지(FK 포함):
+
+| 소유 스키마 | 소유 서비스 | 마이그레이션 위치 | 이력 테이블 |
+|---|---|---|---|
+| `public` / `finance` / `kista_ref` | root(`:api`) | `src/main/resources/db/migration` | `flyway_schema_history_api` |
+| `trading` / `trading_ref` | `:trading-core` | `trading-core/src/main/resources/db/migration-trading` | `flyway_schema_history_trading` |
+
+테이블→스키마 소유 표는 `docs/agents/architecture.md` "DB 스키마 5분리" 참고. 새 테이블·컬럼 모두 스키마 한정 이름(`trading.orders` 등)으로 쓴다.
+
+bash 명령으로 해당 서비스 디렉토리의 최신 버전 확인 후 +1 (현재 두 디렉토리 모두 `V1__init.sql` baseline만 있음):
+  ls src/main/resources/db/migration/ | sort -V | tail -3                       # root
+  ls trading-core/src/main/resources/db/migration-trading/ | sort -V | tail -3  # trading
 파일명: V{N+1}__<영문_설명>.sql
 
 브랜치/워크트리 간 미머지 마이그레이션 파일이 있으면 버전 번호가 충돌할 수 있다 (2026-08-12 실제 배포 롤백 2회 발생 사례: 병렬 브랜치의 V10 마이그레이션이 서로 다른 파일로 미머지 상태에서 충돌). 로컬 ls뿐 아니라 아래 명령으로 다른 브랜치의 최근 마이그레이션도 함께 확인할 것:
-  git log --all --diff-filter=A -- 'src/main/resources/db/migration/*'
+  git log --all --diff-filter=A -- 'src/main/resources/db/migration/*' 'trading-core/src/main/resources/db/migration-trading/*'
+
+root 마이그레이션은 `kista-api`·`kista-scheduler` 독립 배포 backward-compat(expand/contract)을 지켜야 한다. trading 마이그레이션은 독립 스키마·이력이라 이 제약 밖이다 (→ `docs/agents/constraints.md` Flyway 절).
 
 ## 2. Entity ↔ SQL 크로스체크 (필수)
 
@@ -49,7 +61,7 @@ FK 선언: 반드시 명시적 이름 사용
   CREATE TABLE xxx (...);
   INSERT INTO xxx SELECT ... FROM xxx_old;
   DROP TABLE xxx_old;
-  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (현재는 V1__init.sql에 스쿼시되어 예시로 참고할 별도 파일 없음)
+  -- 인덱스·타 테이블에서 참조하던 FK 재생성 (현재는 서비스별 V1__init.sql에 스쿼시되어 예시로 참고할 별도 파일 없음)
 
 실제 제약명 확인: SELECT conname FROM pg_constraint WHERE conrelid = '<table>'::regclass AND contype = 'f';
 PK 인덱스도 Postgres가 자동 리네임(t_pkey → t_old_pkey) — RENAME 후 수동 ALTER INDEX t_pkey ... 호출 시 "relation does not exist" 오류 (운영 배포 실패 사례, commit 6fdc65d). 별도 ALTER INDEX 불필요, 새 테이블 CREATE 시 자동으로 새 t_pkey 생성됨

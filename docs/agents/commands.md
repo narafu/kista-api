@@ -57,6 +57,7 @@ SPRING_PROFILES_ACTIVE=local java -jar trading-core/build/libs/trading-core-0.0.
 ```bash
 docker compose up -d                                            # PostgreSQL + Redis + Prometheus + Grafana (앱은 IntelliJ 또는 bootRun으로 별도 실행)
 docker compose up -d postgres                                   # DB만 기동
+docker compose down -v                                          # 로컬 DB 초기화(볼륨 삭제) — 스키마 재편 전 옛 레이아웃 DB는 이걸로 재생성(서비스별 baseline이 fresh 적용)
 docker compose build <service> && docker compose up -d --force-recreate <service>
 ```
 

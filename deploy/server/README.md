@@ -148,7 +148,7 @@ docker compose up -d --no-deps kista-api
 docker compose up -d --no-deps kista-scheduler
 ```
 
-**Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요.
+**Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요. **스키마 재편 이행 릴리스는 자동 롤백 불가** — 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 롤백도 옛 스키마명을 기대해 무력화된다. 수동 SSH 런북 `schema-reorg/RUNBOOK.md`(정방향·역방향 SQL)를 따른다. Flyway 이력 테이블은 서비스별로 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)이다.
 
 **이미지 디스크 정리 참고**: 배포 워크플로의 `docker image prune -f`는 dangling(태그 없는) 레이어만 제거한다 — 롤백에 쓰이는 SHA 태그 이미지는 계속 쌓인다. 디스크 압박이 느껴지면 수동으로 `docker image prune -af --filter "until=720h"`(30일 이상 지난 이미지만) 등으로 정리하되, 최근 롤백 후보 몇 개는 남겨둘 것.
 

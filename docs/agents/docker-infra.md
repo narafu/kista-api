@@ -9,9 +9,9 @@
 ### 서버 배포 방식 (현재 OCI)
 - 배포 설정 변경은 커밋으로 끝난 게 아니라 **실제 적용 여부를 반드시 확인**할 것 — 과거 Fly.io 시절 `fly.toml`의 배포 전략 섹션 키가 오타(`[deployment]` — 올바른 키는 `[deploy]`)라 조용히 무시되고 한 번도 적용되지 않은 사고 이력이 있음. 플랫폼은 바뀌었지만 "커밋했다"≠"적용됐다"는 원칙은 현행 OCI 배포에도 동일하게 적용
 - `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → SSH로 서버에 배포 (매매 시간대 가드는 `deploy-trading` 잡에만 적용, 변경 경로 게이팅 — 아래 참고)
-- **변경 경로 게이팅**: `changes` 잡이 `git diff --name-only <push 이전 커밋>..HEAD`를 `.github/scripts/detect-deploy-scope.sh`로 분류해 `verify`/`api`/`scheduler`/`trading` 플래그를 낸다. `trading-core/src/main/**`→`deploy-trading`만, `src/main/**/adapter/in/schedule/*`·`web/AdminSchedulerController.java`(`@ConditionalOnProperty(scheduler.enabled)`라 kista-api role엔 빈이 아예 없는 스케쥴러 전용 파일 — 이 분류의 전제는 `SchedulerDisabledContextTest`(schedule 패키지 빈이 kista-api 컨텍스트에 0개)와 `GradleModuleBoundaryTest`(패키지 밖에서 이 패키지 참조 금지, `AdminSchedulerController` 예외)가 강제한다)→`deploy-scheduler`만, 그 외 `src/main/**`→`deploy-api`+`deploy-scheduler`(같은 `app.jar` — 스케쥴러가 서비스·어댑터를 그대로 호출하므로 공용 코드는 둘 다), `db/migration`·`shared/src/main`·`deploy/**`·`Dockerfile`·빌드 파일·`server-deploy.yml`/`_deploy-role.yml`/스크립트 자체→전부. 테스트 전용 경로(`**/src/test/**`, `**/src/testFixtures/**`)는 jar에 안 들어가므로 `verify`만 돌고 배포는 생략, `docs/**`·`*.md` 등은 전부 생략(green). `workflow_dispatch`·최초 push·force push로 base 소실은 전부 배포. **판정 기준이 "직전 push와의 diff"라 마지막 성공 배포 대비가 아니다** — 가드에 막힌 `deploy-trading`은 그 실행에서 해당 잡만 Re-run 해야 하고, 뒤이은 docs 커밋이 대신 배포해 주지 않는다. 스크립트는 `printf '<경로>\n' | bash .github/scripts/detect-deploy-scope.sh`로 로컬 검증 가능
-- **3-role 배포**: 같은 GHCR 이미지를 컨테이너 3개로 띄운다 — `kista-api`(HTTP, `scheduler.enabled=false`, 가드 없이 잦은 배포)·`kista-scheduler`(`SCHEDULER_ENABLED=true`, 비-매매 스케쥴러 KbLand/finance/user/market, 가드 없음)는 `app.jar`, `kista-trading`(`APP_JAR=trading-core.jar`, 매매 배치 + trading-core HTTP)은 `trading-core.jar`. `server-deploy.yml`은 `changes`·`verify`·`build` 후 `deploy-api`·`deploy-scheduler`·`deploy-trading` 세 독립 잡(`_deploy-role.yml` 재사용 워크플로)을 호출하며 각 잡은 위 게이팅 플래그로 실행 여부가 갈린다. 매매 시간대 가드는 `deploy-trading`에만 있다 — 그 시간대에 trading-core 변경을 push하면 `deploy-trading`만 `exit 1`이고, 장 마감 후 Actions에서 해당 잡만 Re-run. EPR 미완료 이벤트 재발행 소유자는 `kista-trading`(매매 알림 리스너가 trading-core로 이관돼 있고 `REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`가 docker-compose.yml에서 이 컨테이너에 설정됨 — 세부 → constraints.md Git 규칙). 수동 트리거(`/api/admin/scheduler/*`)는 Caddy가 `kista-scheduler`로 라우팅(kista-infra 레포). 또한 세 배포 잡이 각각 `production` GitHub 환경을 참조하므로, `production`에 protection rule(필수 리뷰어·wait timer)을 걸면 push 1건당 승인이 최대 3회 필요해진다 — 현재는 protection rule 없음.
-- **Flyway 마이그레이션 backward-compat 필수**: 2-role은 독립 배포라 `kista-scheduler`가 이전 이미지로 새 스키마를 물 수 있다. 컬럼 추가는 nullable/DEFAULT, 드롭·리네임은 두 배포로 나눠 코드가 참조를 먼저 끊는다(expand/contract). 이 조건을 못 지키는 마이그레이션은 두 role을 같은 커밋에서 함께 배포
+- **변경 경로 게이팅**: `changes` 잡이 `git diff --name-only <push 이전 커밋>..HEAD`를 `.github/scripts/detect-deploy-scope.sh`로 분류해 `verify`/`api`/`scheduler`/`trading` 플래그를 낸다. `trading-core/src/main/**`(trading 소유 `db/migration-trading` 포함)→`deploy-trading`만, `src/main/**/adapter/in/schedule/*`·`web/AdminSchedulerController.java`(`@ConditionalOnProperty(scheduler.enabled)`라 kista-api role엔 빈이 아예 없는 스케쥴러 전용 파일 — 이 분류의 전제는 `SchedulerDisabledContextTest`(schedule 패키지 빈이 kista-api 컨텍스트에 0개)와 `GradleModuleBoundaryTest`(패키지 밖에서 이 패키지 참조 금지, `AdminSchedulerController` 예외)가 강제한다)→`deploy-scheduler`만, 그 외 `src/main/**`→`deploy-api`+`deploy-scheduler`(같은 `app.jar` — 스케쥴러가 서비스·어댑터를 그대로 호출하므로 공용 코드는 둘 다; root 소유 `src/main/resources/db/migration/**`도 여기 해당 — trading은 자체 `migration-trading`을 소유하고 root 테이블에 의존하지 않으므로 root 마이그레이션만으론 `deploy-trading`이 켜지지 않는다), `shared/src/main`·`deploy/**`·`Dockerfile`·빌드 파일·`server-deploy.yml`/`_deploy-role.yml`/스크립트 자체→전부. 테스트 전용 경로(`**/src/test/**`, `**/src/testFixtures/**`)는 jar에 안 들어가므로 `verify`만 돌고 배포는 생략, `docs/**`·`*.md` 등은 전부 생략(green). `workflow_dispatch`·최초 push·force push로 base 소실은 전부 배포. **판정 기준이 "직전 push와의 diff"라 마지막 성공 배포 대비가 아니다** — 가드에 막힌 `deploy-trading`은 그 실행에서 해당 잡만 Re-run 해야 하고, 뒤이은 docs 커밋이 대신 배포해 주지 않는다. 스크립트는 `printf '<경로>\n' | bash .github/scripts/detect-deploy-scope.sh`로 로컬 검증 가능
+- **3-role 배포**: 같은 GHCR 이미지를 컨테이너 3개로 띄운다 — `kista-api`(HTTP, `scheduler.enabled=false`, 가드 없이 잦은 배포)·`kista-scheduler`(`SCHEDULER_ENABLED=true`, 비-매매 스케쥴러 KbLand/finance/user/market, 가드 없음)는 `app.jar`, `kista-trading`(`APP_JAR=trading-core.jar`, 매매 배치 + trading-core HTTP)은 `trading-core.jar`. `server-deploy.yml`은 `changes`·`verify`·`build` 후 `deploy-api`·`deploy-scheduler`·`deploy-trading` 세 독립 잡(`_deploy-role.yml` 재사용 워크플로)을 호출하며 각 잡은 위 게이팅 플래그로 실행 여부가 갈린다. 매매 시간대 가드는 `deploy-trading`에만 있다 — 그 시간대에 trading-core 변경을 push하면 `deploy-trading`만 `exit 1`이고, 장 마감 후 Actions에서 해당 잡만 Re-run. EPR 미완료 이벤트 재발행은 `event_publication`이 서비스별 2개라 소유자도 둘이다 — `kista-trading`이 `trading.event_publication`(매매 알림 리스너가 trading-core로 이관돼 있음), `kista-scheduler`가 root `public.event_publication`을 재발행한다(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`가 docker-compose.yml에서 이 두 컨테이너에만 설정, `kista-api`는 false — 셋 중 둘 이상이 같은 테이블에 true면 이중 claim. 세부 → constraints.md Git 규칙). 수동 트리거(`/api/admin/scheduler/*`)는 Caddy가 `kista-scheduler`로 라우팅(kista-infra 레포). 또한 세 배포 잡이 각각 `production` GitHub 환경을 참조하므로, `production`에 protection rule(필수 리뷰어·wait timer)을 걸면 push 1건당 승인이 최대 3회 필요해진다 — 현재는 protection rule 없음.
+- **Flyway 마이그레이션 backward-compat 필수(root 마이그레이션 한정 — trading-core `migration-trading`은 독립)**: 2-role은 독립 배포라 `kista-scheduler`가 이전 이미지로 새 스키마를 물 수 있다. 컬럼 추가는 nullable/DEFAULT, 드롭·리네임은 두 배포로 나눠 코드가 참조를 먼저 끊는다(expand/contract). 이 조건을 못 지키는 마이그레이션은 두 role을 같은 커밋에서 함께 배포 **롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true`라 이전 이미지로 롤백하면 기동 실패할 수 있다(이력 테이블은 root `flyway_schema_history_api`·trading `flyway_schema_history_trading`으로 서비스별). 스키마 재편 이행 릴리스(`kista`→`trading` 등 스키마 이름 변경)는 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 자동 롤백도 무력화되므로 **자동 롤백이 불가능**하다 — 수동 SSH 런북 `deploy/server/schema-reorg/RUNBOOK.md`(정방향·역방향 SQL 포함)를 따른다.
 - **이벤트 클래스 패키지 이동 배포 전 필수 체크(`event_publication` 정리)**: Modulith EPR은 이벤트를 FQCN으로 저장하고 재기동 republish 시 그 이름으로 클래스를 resolve한다 — 이벤트 클래스를 다른 패키지로 옮기는 커밋(예: Task17의 trading/privacy 이벤트 12개 → `com.kista.sharedkernel.*` 이관)을 배포하기 직전, 옛 패키지로 남아있는 미완료 row가 있는지 반드시 확인한다. 남아있으면 배포 후 매 재기동마다 `ClassNotFoundException`으로 반복 실패하며 자연 치유되지 않는다.
   ```sql
   -- 배포 직전 서버 DB에서 실행 (옛 FQCN을 실제 이관 대상으로 치환)
@@ -78,7 +78,7 @@
 ### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
 - PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패
 - 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop app postgres && docker compose rm -f postgres app` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ `docker compose up -d app` (Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
-- 복원 시 flyway_schema_history duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
+- 복원 시 이력 테이블(`flyway_schema_history_api`/`flyway_schema_history_trading`) duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
 - `${DB_NAME:-}` 환경변수 미설정 시 `POSTGRES_DB=""` → kistadb 자동 생성 안 됨, postgres 기본 DB는 POSTGRES_USER값("kista") — 새 볼륨 후 반드시 `CREATE DATABASE kistadb OWNER kista;` 수동 실행
 
 ## 배포/인프라/외부 연동 런북
@@ -144,12 +144,12 @@ docker run -d -p 3001:3000 --name kis-trade-mcp \
 - `/doctor` "Missing environment variables" 경고는 false positive — `sh`가 부모 환경에서 자동 상속
 
 ### 운영 → 로컬 마이그레이션 (자체호스팅 postgres, Phase 3 이관 후 절차)
-DB가 자체호스팅 postgres로 바뀌면서 supabase-cli의 CSV 덤프/COPY 우회가 더 이상 필요 없다 — SSH로 서버 컨테이너에서 직접 `pg_dump -t`로 테이블을 골라 떠서 로컬로 복원한다.
+DB가 자체호스팅 postgres로 바뀌면서 supabase-cli의 CSV 덤프/COPY 우회가 더 이상 필요 없다 — SSH로 서버 컨테이너에서 직접 `pg_dump -t`로 테이블을 골라 떠서 로컬로 복원한다. 스키마 재편 이후 테이블은 소유 스키마로 한정해 지정한다(role 기본 search_path에 의존하지 않음).
 ```bash
 # 1. 서버에서 필요한 테이블만 pg_dump (custom format)
 ssh -i ~/secret/oci-ssh-key-kista.key ubuntu@<SERVER_HOST> \
   "docker exec kista-postgres pg_dump -U kista -d kistadb -Fc \
-     -t privacy_trade_bases -t privacy_trade_base_orders -t fear_greed_snapshots \
+     -t trading_ref.privacy_trade_bases -t trading_ref.privacy_trade_base_orders -t kista_ref.fear_greed_snapshots \
      -f /tmp/seed.dump && docker cp kista-postgres:/tmp/seed.dump /tmp/seed.dump"
 
 # 2. 로컬로 다운로드 후 로컬 컨테이너로 복원
@@ -157,7 +157,7 @@ scp -i ~/secret/oci-ssh-key-kista.key ubuntu@<SERVER_HOST>:/tmp/seed.dump /tmp/s
 docker cp /tmp/seed.dump kista-api-postgres-1:/tmp/seed.dump
 docker exec kista-api-postgres-1 pg_restore -U kista -d kistadb --data-only --disable-triggers /tmp/seed.dump
 # 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
-# docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE privacy_trade_base_orders, privacy_trade_bases, fear_greed_snapshots;"
+# docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE trading_ref.privacy_trade_base_orders, trading_ref.privacy_trade_bases, kista_ref.fear_greed_snapshots;"
 ```
 
 ## 백업/복구 런북
@@ -174,7 +174,7 @@ DB는 Supabase에서 자체호스팅 postgres(`kista-postgres` 컨테이너, A �
 ### 복구
 1. Object Storage에서 다운로드 → `gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_KEY" -d backup-YYYYMMDD.sql.gpg -o backup.dump`
 2. `docker exec -i kista-postgres pg_restore --no-owner --no-privileges -U kista -d kistadb < backup.dump` (재해 복구로 DB 자체가 없으면 먼저 `createdb -U kista kistadb`)
-3. 복원 후 `flyway_schema_history` 최신 버전이 배포 코드의 마이그레이션 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패
+3. 복원 후 두 이력 테이블 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)의 최신 버전이 각각 배포 코드의 `db/migration`·`db/migration-trading` 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패. 옛 공용 `public.flyway_schema_history`는 스키마 재편 롤백 증거로 보존된 테이블이라 검증 대상이 아니다
 4. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
 
 ### 키 백업 (분실 시 복구 불가 — DB 백업과 별도 보관 필수)

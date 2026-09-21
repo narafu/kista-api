@@ -13,7 +13,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Instant;
 
-// kista.user_notify_profile 복제본 동기화 — user 모듈이 발행한 이벤트만 받아 upsert/delete 한다.
+// trading.user_notify_profile 복제본 동기화 — user 모듈이 발행한 이벤트만 받아 upsert/delete 한다.
 // DB 분리(4단계) 전까지는 같은 DB 위 Modulith EPR 경유(실패 시 재기동 때 재시도).
 // fallbackExecution=true는 안전망이다 — 현재 발행 지점은 전부 트랜잭션 안이지만(login()의 ADMIN
 // 승격도 AdminSeedPromoter로 분리됨), 누군가 트랜잭션 밖에서 발행을 추가하면 이 플래그가 없을 때

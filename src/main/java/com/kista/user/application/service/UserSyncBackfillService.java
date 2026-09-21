@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-// 일회성 드리프트 복구 — DB가 아직 공유(4b-1) 상태라 kista.user_notify_profile을 JdbcTemplate
+// 일회성 드리프트 복구 — DB가 아직 공유(4b-1) 상태라 trading.user_notify_profile을 JdbcTemplate
 // 원시 SQL로 직접 들여다본다(trading-core 소유 테이블이지만 물리적으로 같은 DB). 4b-2 컷오버
 // 이후엔 이 쿼리가 더 이상 유효하지 않으므로 재사용하지 말 것 — 일회성 도구로 남긴다.
 @Service

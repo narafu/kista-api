@@ -53,6 +53,8 @@
 docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ```
 
+서비스별 Flyway baseline이 각자 자기 스키마에 적용된다(root `db/migration`→`public`/`finance`/`kista_ref`, trading-core `db/migration-trading`→`trading`/`trading_ref`). 옛 레이아웃(`kista`/`reference` 스키마 + 공용 `flyway_schema_history`)으로 만들어진 `kistadb_test`가 로컬에 남아 있으면 baseline 판정이 어긋나므로 재생성한다: `DROP DATABASE kistadb_test; CREATE DATABASE kistadb_test OWNER kista;`. trading-core `test` 태스크는 `workingDir = rootProject.projectDir`로 실행된다.
+
 ### 전략 테스트 분리 원칙
 - `InfinitePositionTest` (`com.kista.trading.domain.model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
 - `InfiniteStrategyTypeTest` (`com.kista.trading.domain.strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)

@@ -19,7 +19,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 // TradingUserProfilePort 구현 — user 모듈을 직접 참조하던 web의 TradingUserProfileAdapter를 대체한다.
-// trading-core 소유 복제 테이블(kista.user_notify_profile)만 읽으므로 root(:api) 컴파일 의존이 0이다.
+// trading-core 소유 복제 테이블(trading.user_notify_profile)만 읽으므로 root(:api) 컴파일 의존이 0이다.
 @Component
 @RequiredArgsConstructor
 @Slf4j
