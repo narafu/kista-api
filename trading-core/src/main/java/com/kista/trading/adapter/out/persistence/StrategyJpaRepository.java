@@ -53,12 +53,13 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
     boolean existsByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
 
     // ACTIVE 사용자의 ACTIVE 전략 전체 조회 (스케쥴러용) — 소프트 삭제 행 명시적 제외
+    // 사용자 활성 여부는 trading 소유 복제본(user_notify_profile.is_active)만 본다 — root 소유 users 비의존
     @Query(value = """
             SELECT s.* FROM strategy s
             JOIN accounts a ON s.account_id = a.id
-            JOIN users u ON a.user_id = u.id
-            WHERE u.status = 'ACTIVE' AND s.status = 'ACTIVE'
-              AND s.deleted_at IS NULL AND a.deleted_at IS NULL AND u.deleted_at IS NULL
+            JOIN user_notify_profile p ON p.user_id = a.user_id
+            WHERE p.is_active AND s.status = 'ACTIVE'
+              AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             """, nativeQuery = true)
     List<StrategyEntity> findAllActiveStrategies();
 

@@ -51,6 +51,50 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findAllActive_usesNotifyProfileActiveFlag_notUsersTable() {
+        // users.status는 REJECTED지만 프로필이 active → 포함돼야 한다(users 비의존 증명)
+        Strategy included = saveActiveStrategy(insertAccountOfUser("REJECTED", Boolean.TRUE), StrategyTicker.SOXL);
+        // users는 ACTIVE지만 프로필 inactive → 제외
+        saveActiveStrategy(insertAccountOfUser("ACTIVE", Boolean.FALSE), StrategyTicker.SOXL);
+        // 프로필 행 자체가 없음 → 제외
+        saveActiveStrategy(insertAccountOfUser("ACTIVE", null), StrategyTicker.SOXL);
+        // 활성 프로필이지만 계좌 소프트 삭제 → 제외
+        UUID deletedAccountId = insertAccountOfUser("ACTIVE", Boolean.TRUE);
+        saveActiveStrategy(deletedAccountId, StrategyTicker.SOXL);
+        jdbcTemplate.update("UPDATE accounts SET deleted_at = now() WHERE id = ?", deletedAccountId);
+        // 활성 프로필이지만 PAUSED 전략 → 제외
+        strategyAdapter.save(new Strategy(null, insertAccountOfUser("ACTIVE", Boolean.TRUE), StrategyType.INFINITE,
+                StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(strategyAdapter.findAllActive()).extracting(Strategy::id).containsExactly(included.id());
+    }
+
+    // 사용자+계좌 삽입 후 accountId 반환. profileActive=null이면 프로필 행을 만들지 않는다
+    private UUID insertAccountOfUser(String usersStatus, Boolean profileActive) {
+        UUID uid = UUID.randomUUID();
+        UUID aid = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
+                uid, "kakao_" + uid, usersStatus, "USER");
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                aid, uid, "계좌", "KIS", "74420614" + aid, "01", "key", "secret");
+        if (profileActive != null) {
+            jdbcTemplate.update(
+                    "INSERT INTO kista.user_notify_profile (user_id, notification_prefs, balance_check_enabled, is_active, updated_at) VALUES (?, '{}', TRUE, ?, now())",
+                    uid, profileActive);
+        }
+        return aid;
+    }
+
+    private Strategy saveActiveStrategy(UUID acctId, StrategyTicker ticker) {
+        return strategyAdapter.save(new Strategy(null, acctId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, ticker, StrategyCycleSeedType.NONE));
+    }
+
+    @Test
     void save_infiniteStrategy_persistsCommonAndDetailRows() {
         Strategy strategy = new Strategy(
                 null, accountId, StrategyType.INFINITE,
