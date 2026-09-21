@@ -114,7 +114,7 @@ graph TB
 
     RepoUI -->|"main push → 이미지 빌드·GHCR push<br/>→ SSH 배포"| UIApp
     RepoAPI -->|"main push → 변경 경로 판정<br/>→ 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ deploy-api 잡 (app.jar 변경 시)"| APIApp
-    RepoAPI -->|"deploy-scheduler 잡<br/>(app.jar 변경 시, kista-api와 동일)"| SchedApp
+    RepoAPI -->|"deploy-scheduler 잡<br/>(스케쥴러 전용 코드 또는 app.jar 공용 코드 변경 시)"| SchedApp
     RepoAPI -->|"deploy-trading 잡<br/>(trading-core 변경 시, 매매 시간대 가드)"| TradingApp
     RepoInfra -->|"Caddy·Postgres·Redis·백업 cron 소유"| Caddy
     Caddy --> APIApp
