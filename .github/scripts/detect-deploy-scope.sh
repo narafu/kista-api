@@ -32,7 +32,7 @@ while IFS= read -r f; do
     src/main/*)
       verify=true; api=true; scheduler=true ;;
     # 양쪽 jar에 들어가거나 3역할이 공유하는 입력 — 전부
-    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|lombok.config|Dockerfile|deploy/*|.github/scripts/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
+    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore|deploy/*|.github/scripts/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
       verify=true; api=true; scheduler=true; trading=true ;;
   esac
 done

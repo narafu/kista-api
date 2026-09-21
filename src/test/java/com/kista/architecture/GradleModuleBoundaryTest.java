@@ -74,4 +74,24 @@ class GradleModuleBoundaryTest {
                                 .and(resideOutsideOfPackage("com.kista.platform..")))
                 .check(importedClasses);
     }
+
+    // 루트(:api) main에서 adapter.in.schedule 패키지는 scheduler role 전용 — kista-api role에는 빈이 없다.
+    // .github/scripts/detect-deploy-scope.sh 가 이 패키지 변경만 있는 커밋을 deploy-scheduler 단독으로 분류하는 근거라,
+    // 패키지 밖(AdminSchedulerController 제외)이 이 패키지 타입을 참조하면 kista-api가 배포 없이 낡은 코드를 실행하게 된다.
+    // 게이트(@ConditionalOnProperty) 누락은 SchedulerDisabledContextTest가 컨텍스트 기준으로 잡는다.
+    @Test
+    void schedulerRoleOnlyPackageMustNotBeReferencedFromOutside() {
+        var importedClasses = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPath(Path.of("build/classes/java/main"));
+
+        // 디렉토리가 비어있으면(:compileJava 미실행 등) noClasses()가 공허하게 통과해버리는 걸 방지
+        assertThat(importedClasses).isNotEmpty();
+
+        ArchRuleDefinition.noClasses()
+                .that().resideOutsideOfPackage("..adapter.in.schedule..")
+                .and().doNotHaveFullyQualifiedName("com.kista.web.AdminSchedulerController")
+                .should().dependOnClassesThat().resideInAPackage("..adapter.in.schedule..")
+                .check(importedClasses);
+    }
 }
