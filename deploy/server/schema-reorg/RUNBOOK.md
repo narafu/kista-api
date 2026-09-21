@@ -8,7 +8,8 @@
 
 ```bash
 cd /opt/kista-api
-docker compose logs kista-trading 2>&1 | grep -i flyway | tail -20          # trading이 옛 이력을 어떻게 통과 중인지(future 무시 경고 예상)
+# (docker compose는 KISTA_API_IMAGE 미설정 시 interpolation 오류 — 조회는 plain docker 사용)
+docker logs kista-trading 2>&1 | grep -i flyway | tail -20   # 예상: ERROR 'Schema "public" has version 23, but no migration could be resolved' — 옛 이력 22행이 future로 무시돼 기동은 정상(2026-09-21 운영 로그로 확인됨)
 docker exec kista-postgres psql -U kista -d kistadb -c "SELECT version, type, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 3"
 # event_publication 분류 — 어느 쪽에도 안 걸리는 listener_id가 있으면 01-forward.sql 정규식을 보강
 docker exec kista-postgres psql -U kista -d kistadb -c "SELECT (listener_id ~ '^com\.kista\.(trading|matching|broker|account|privacy|marketcalendar)\.') AS trading_owned, count(*), count(*) FILTER (WHERE completion_date IS NULL) AS incomplete FROM event_publication GROUP BY 1"
@@ -19,7 +20,7 @@ docker exec kista-postgres psql -U kista -d kistadb -c "SELECT count(*) FROM kis
 # 컷오버 후 kista-scheduler가 재발행을 되켜면(EPR=true) 이 행들이 한꺼번에 재발행돼 텔레그램/FCM이 폭주하거나, 옛 이벤트 FQCN이면 매 재기동마다 ClassNotFoundException으로 실패한다.
 docker exec kista-postgres psql -U kista -d kistadb -c "SELECT event_type, count(*), min(publication_date) FROM event_publication WHERE completion_date IS NULL AND listener_id !~ '^com\.kista\.(trading|matching|broker|account|privacy|marketcalendar)\.' GROUP BY 1 ORDER BY 2 DESC"
 docker exec kista-postgres psql -U kista -d kistadb -Atc "SELECT current_user"   # 01/02 SQL이 role명 kista를 하드코딩 — kista가 아니면 SQL의 ALTER ROLE 수정 필요
-docker compose ps --format '{{.Service}} {{.Image}}'                        # 롤백용 현재 이미지 3개 기록
+docker ps --format '{{.Names}} {{.Image}} {{.Status}}'                       # 롤백용 현재 이미지 기록(세 서비스는 같은 이미지 태그)
 ```
 - [ ] 위 결과와 이미지 3개(kista-api / kista-scheduler / kista-trading) 태그를 메모했다.
 - [ ] root 소유 미완료 EPR 행(위 triage 결과)을 **purge 또는 수용**하기로 결정했다 — 수용하면 컷오버 후 kista-scheduler 첫 기동 때 일괄 재발행된다. purge는 `DELETE FROM event_publication WHERE completion_date IS NULL AND <조건>`(컷오버 직전 서비스 정지 상태에서, 유실되는 알림을 공지).
@@ -63,7 +64,7 @@ docker compose ps --format '{{.Service}} {{.Image}}'                        # �
 ## 2. 컷오버
 
 1. **이미지 빌드(배포 없이)**: GitHub Actions → Server Deploy → Run workflow → 브랜치 `release/schema-reorg`, `build_only=true`. 산출 이미지 태그(`ghcr.io/<repo>:<sha>`)를 메모(`NEW_IMAGE`).
-2. 서버에서 전 서비스 정지: `cd /opt/kista-api && docker compose stop kista-trading kista-scheduler kista-api`
+2. 서버에서 전 서비스 정지: `docker stop kista-trading kista-scheduler kista-api` (compose 대신 plain docker — KISTA_API_IMAGE 불필요)
 3. 직전 백업(원본 보존): `docker exec kista-postgres pg_dump -U kista kistadb -Fc > /opt/kista-api/pre-reorg-$(date +%Y%m%d-%H%M).dump` (크기 확인, 0바이트면 중단)
 4. 정방향 SQL(리허설과 동일, 트랜잭션 안에서 검증 후 COMMIT):
    ```bash
@@ -88,7 +89,7 @@ docker compose ps --format '{{.Service}} {{.Image}}'                        # �
    SELECT version, type, success FROM trading.flyway_schema_history_trading;         -- 1 | BASELINE | t
    ```
 7. 임시 `.env` 두 줄 삭제(이력 테이블이 생긴 뒤라 효과 없음 — 다음 정상 배포 때 함께 반영돼도 무방).
-8. **첫 사이클 관측**: 월 22:30 개장 → 화 04:30 마감. `docker compose logs kista-trading | grep -E "ERROR|Started"`, healthchecks.io heartbeat, 텔레그램 매매 리포트, `SELECT count(*) FROM trading.orders WHERE trade_date = current_date`, 미완료 EPR: `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL` / `public.event_publication`. `kista-scheduler` 로그에 EPR 재발행이 root 미완료 행을 처리하는지도 확인.
+8. **첫 사이클 관측**: 월 22:30 개장 → 화 04:30 마감. `docker logs kista-trading 2>&1 | grep -E "ERROR|Started"`, healthchecks.io heartbeat, 텔레그램 매매 리포트, `SELECT count(*) FROM trading.orders WHERE trade_date = current_date`, 미완료 EPR: `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL` / `public.event_publication`. `kista-scheduler` 로그에 EPR 재발행이 root 미완료 행을 처리하는지도 확인.
 9. 이상 없으면 **그때** `release/schema-reorg`를 main에 머지(자동 배포가 같은 내용으로 재배포 — 이미 baseline 완료 상태라 무해, 매매 시간대 가드 유의).
 
 ## 3. 검증 쿼리
