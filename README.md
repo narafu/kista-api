@@ -99,6 +99,7 @@ graph TB
         Caddy["Caddy (리버스 프록시·HTTPS)"]
         APIApp["kista-api (Spring Boot)"]
         SchedApp["kista-scheduler (같은 이미지, 배치)"]
+        TradingApp["kista-trading (같은 이미지, trading-core.jar)"]
         UIApp["kista-ui (Next.js 16)"]
         PG[("PostgreSQL (자체 호스팅)")]
         Redis[("Redis (자체 호스팅)")]
@@ -112,16 +113,20 @@ graph TB
     end
 
     RepoUI -->|"main push → 이미지 빌드·GHCR push<br/>→ SSH 배포"| UIApp
-    RepoAPI -->|"main push → 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ deploy-api 잡"| APIApp
-    RepoAPI -->|"deploy-scheduler 잡<br/>(매매 시간대 가드)"| SchedApp
+    RepoAPI -->|"main push → 변경 경로 판정<br/>→ 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ deploy-api 잡 (app.jar 변경 시)"| APIApp
+    RepoAPI -->|"deploy-scheduler 잡<br/>(app.jar 변경 시, kista-api와 동일)"| SchedApp
+    RepoAPI -->|"deploy-trading 잡<br/>(trading-core 변경 시, 매매 시간대 가드)"| TradingApp
     RepoInfra -->|"Caddy·Postgres·Redis·백업 cron 소유"| Caddy
     Caddy --> APIApp
     Caddy -->|"/api/admin/scheduler/*"| SchedApp
+    Caddy -->|"매매·계좌·통계 경로"| TradingApp
     Caddy --> UIApp
     APIApp --> PG
     SchedApp --> PG
+    TradingApp --> PG
     APIApp --> Redis
     SchedApp --> Redis
+    TradingApp --> Redis
     PG --> Backup
     Uptime --> APIApp
     SchedApp --> HC
