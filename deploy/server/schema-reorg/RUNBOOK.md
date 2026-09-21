@@ -50,8 +50,15 @@ docker ps --format '{{.Names}} {{.Image}} {{.Status}}'                       # �
    docker run --rm -v "$PWD/trading-core/src/main/resources/db/migration-trading:/flyway/sql" flyway/flyway:12 \
      -url=jdbc:postgresql://host.docker.internal:5432/fresh -user=kista -password=kista -defaultSchema=trading -table=flyway_schema_history_trading migrate
    bash schema-dump.sh <fresh-pg> fresh /tmp/fresh.sql
-   diff /tmp/rehearsal.sql /tmp/fresh.sql && echo SCHEMA_EQUAL     # 차이 0이어야 다음 단계 진행
+   diff /tmp/rehearsal.sql /tmp/fresh.sql && echo SCHEMA_EQUAL     # 차이가 아래 '운영 알려진 차이' 5종 외에는 없어야 다음 단계 진행
    ```
+   **운영 알려진 차이 (2026-09-21 운영 schema-only 덤프 vs 옛 마이그레이션 결과 실측, 기능 영향 없음 — Hibernate validate는 컬럼 순서·DEFAULT·제약명·FK 액션을 검사하지 않음)**: 운영이 옛 이력을 거치며 생긴 이력 잔재라 리허설 diff에도 그대로 나온다. 이 5종 외 차이는 즉시 중단하고 조사한다.
+   1. `orders.order_leg` 컬럼 위치(운영: 맨 끝, fresh: 중간).
+   2. `users.reject_reason` 컬럼 위치(운영: 끝쪽, fresh: 앞쪽).
+   3. `strategy_cycle_vr`·`strategy_vr_version`의 `created_at`/`updated_at`, `strategy_version.id`에 DEFAULT 없음(운영) — fresh는 `DEFAULT now()`/`gen_random_uuid()`. 엔티티가 `@CreatedDate`/`@GeneratedValue`로 값을 채워 운영에선 원래 DB DEFAULT에 의존하지 않는다.
+   4. `orders` PK 제약명: 운영 `orders_pkey1`, fresh `orders_pkey`.
+   5. `user_settings_user_id_fkey`·`user_notification_prefs_user_id_fkey`: 운영은 액션 미지정(NO ACTION), fresh는 `ON DELETE RESTRICT`.
+   실측으로 확인된 것: 두 스키마의 테이블 집합이 동일(운영 public 11 = root 소유 10 + broker_tokens), `accounts_user_id_fkey`·`broker_tokens_account_id_fkey`가 정방향 SQL이 가정하는 이름 그대로 존재.
    `schema-dump.sh`는 스키마 DDL만 비교한다 — **확장(extension)과 시드 데이터는 diff에 잡히지 않으므로 별도 확인**:
    ```sql
    SELECT extname FROM pg_extension ORDER BY 1;                          -- 두 DB 모두 btree_gist, plpgsql
