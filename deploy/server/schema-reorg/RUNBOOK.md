@@ -15,9 +15,14 @@ docker exec kista-postgres psql -U kista -d kistadb -c "SELECT (listener_id ~ '^
 docker exec kista-postgres psql -U kista -d kistadb -c "SELECT DISTINCT split_part(listener_id,'#',1) FROM event_publication ORDER BY 1"
 # accounts.user_id 고아 행 — 롤백 시 FK 재추가가 통과하려면 0이어야 한다(컷오버 직전에도 재확인)
 docker exec kista-postgres psql -U kista -d kistadb -c "SELECT count(*) FROM kista.accounts a LEFT JOIN public.users u ON u.id = a.user_id WHERE u.id IS NULL"
+# root 소유 미완료 EPR triage — 4a 이후 public.event_publication을 재발행하는 프로세스가 없었으므로 백로그가 쌓여 있을 수 있다.
+# 컷오버 후 kista-scheduler가 재발행을 되켜면(EPR=true) 이 행들이 한꺼번에 재발행돼 텔레그램/FCM이 폭주하거나, 옛 이벤트 FQCN이면 매 재기동마다 ClassNotFoundException으로 실패한다.
+docker exec kista-postgres psql -U kista -d kistadb -c "SELECT event_type, count(*), min(publication_date) FROM event_publication WHERE completion_date IS NULL AND listener_id !~ '^com\.kista\.(trading|matching|broker|account|privacy|marketcalendar)\.' GROUP BY 1 ORDER BY 2 DESC"
+docker exec kista-postgres psql -U kista -d kistadb -Atc "SELECT current_user"   # 01/02 SQL이 role명 kista를 하드코딩 — kista가 아니면 SQL의 ALTER ROLE 수정 필요
 docker compose ps --format '{{.Service}} {{.Image}}'                        # 롤백용 현재 이미지 3개 기록
 ```
 - [ ] 위 결과와 이미지 3개(kista-api / kista-scheduler / kista-trading) 태그를 메모했다.
+- [ ] root 소유 미완료 EPR 행(위 triage 결과)을 **purge 또는 수용**하기로 결정했다 — 수용하면 컷오버 후 kista-scheduler 첫 기동 때 일괄 재발행된다. purge는 `DELETE FROM event_publication WHERE completion_date IS NULL AND <조건>`(컷오버 직전 서비스 정지 상태에서, 유실되는 알림을 공지).
 - [ ] `.env`에 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` 정상. 원격 백업(`kista-infra/scripts/backup.sh`) 최근 성공 확인.
 - [ ] **매매 시간대 밖 창 확정**: 토요일 06:20 KST 이후 ~ 일요일(마감 배치는 화~토 04:30~06:20, 개장은 월~금 22:30~). 다음 개장(월 22:30) 전에 끝낸다.
 - [ ] Phase 0(활성 전략 조회의 `users` 의존 제거)이 운영에 배포돼 첫 개장 사이클이 정상이다.
@@ -88,7 +93,7 @@ docker compose ps --format '{{.Service}} {{.Image}}'                        # �
 
 ## 3. 검증 쿼리
 
-1. `SELECT n.nspname, count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='r' AND n.nspname IN ('public','finance','kista_ref','trading','trading_ref') GROUP BY 1 ORDER BY 1;` — 스키마별 테이블 수: public(옛 flyway_schema_history 포함) / finance 9 / kista_ref 4 / trading 14 / trading_ref 3.
+1. `SELECT n.nspname, count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='r' AND n.nspname IN ('public','finance','kista_ref','trading','trading_ref') GROUP BY 1 ORDER BY 1;` — 스키마별 테이블 수: public **11**(root 소유 10 + 옛 flyway_schema_history 1 — 새 이미지 기동 후엔 flyway_schema_history_api가 더해져 12; 다르면 원인 조사) / finance 9 / kista_ref 4 / trading 14 / trading_ref 3.
 2. 이행 전후 건수 대조(전·후 각각 실행해 diff): 각 테이블 `SELECT '<schema.table>', count(*) FROM <schema.table>` — 정방향 전에는 옛 이름, 후에는 새 이름으로. `event_publication`은 `public` + `trading` 합계가 이행 전 `public` 총계와 같아야 한다.
 
 ## 4. 롤백
@@ -97,7 +102,7 @@ docker compose ps --format '{{.Service}} {{.Image}}'                        # �
 |---|---|
 | §2-4 COMMIT 전 | `ROLLBACK;` — 아무것도 바뀌지 않음. 옛 이미지 3개 기동 |
 | 새 이미지 기동 후(사이클 관측 전·후 무관) | 1) 전 서비스 정지 2) `02-rollback.sql`을 `BEGIN; \i …; COMMIT;`으로 적용(사후 `trading.event_publication` 행은 public으로 병합됨) 3) 메모한 옛 이미지 3개와 옛 `docker-compose.yml`로 기동 4) 헬스·옛 `flyway_schema_history` 검증 통과 확인 |
-| 이행 SQL 자체가 비정상 종료 | 트랜잭션이므로 자동 롤백. 원인 조사 전 재시도 금지 |
+| 이행 SQL 자체가 비정상 종료 | 대화형 `BEGIN; \i …` 세션에서는 오류 후 트랜잭션이 aborted 상태로 열려 있다 — **반드시 `ROLLBACK;`을 입력**해 락을 풀고(커밋은 불가), 원인 조사 전 재시도 금지 |
 - 되돌릴 수 없는 것: 없음(FK 재추가는 고아 행이 있으면 실패 — 그 경우 원인 조사 후 정리). 최후 수단은 `pre-reorg-*.dump` 복원(옛 레이아웃).
 - 롤백 후 `.env`의 baseline 임시 줄이 남아 있다면 삭제.
 - 옛 이미지는 `ALTER ROLE kista SET search_path`가 복원돼야 unqualified SQL이 동작한다(02-rollback.sql이 복원). 롤백 후 `SELECT setconfig FROM pg_db_role_setting` 으로 확인.

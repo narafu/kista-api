@@ -12,7 +12,7 @@ class StrategyVrSchemaTest extends DataJpaTestBase {
     @Autowired JdbcTemplate jdbcTemplate;
 
     @Test
-    void strategyVrVersionSchemaAnd_followAuditConventionWithoutDeletedAt() throws Exception {
+    void strategyVrVersionSchema_followAuditConventionWithoutDeletedAt() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -44,7 +44,7 @@ class StrategyVrSchemaTest extends DataJpaTestBase {
     }
 
     @Test
-    void strategyCycleVrSchemaAnd_followAuditConventionWithoutDeletedAt() throws Exception {
+    void strategyCycleVrSchema_followAuditConventionWithoutDeletedAt() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns
@@ -64,7 +64,7 @@ class StrategyVrSchemaTest extends DataJpaTestBase {
                 .containsExactly("pool_limit_rate:numeric:NO");
         assertThat(checkConstraints("strategy_cycle_vr"))
                 .anyMatch(d -> d.contains("gradient > 0"))
-                .anyMatch(d -> d.contains("pool_limit_rate > ") && d.contains("pool_limit_rate <= "));
+                .anyMatch(d -> d.contains("pool_limit_rate > (0)::numeric") && d.contains("pool_limit_rate <= (1)::numeric"));
     }
 
     // 컬럼 "이름:타입:NULL허용" — 파일 텍스트가 아닌 실제 DB 카탈로그로 규약을 검사한다

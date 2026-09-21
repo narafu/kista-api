@@ -272,7 +272,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void cyclePositionInfiniteSchemaAndMigration_followAuditConventionAndKeepDeletedHistory() throws Exception {
+    void cyclePositionInfiniteSchema_followAuditConventionAndKeepDeletedHistory() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns

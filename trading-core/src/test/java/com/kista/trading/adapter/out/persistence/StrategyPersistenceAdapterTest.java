@@ -181,7 +181,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void strategyInfiniteSchemaAndMigration_followAuditConventionAndKeepDeletedHistory() throws Exception {
+    void strategyInfiniteSchema_followAuditConventionAndKeepDeletedHistory() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name
                 FROM information_schema.columns
