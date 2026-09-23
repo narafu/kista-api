@@ -9,7 +9,7 @@
 ```
 domain/          ← (레거시 최상위 com.kista.domain 패키지 자체가 소멸 — package-info까지 삭제됨. 아래는 이전 이력)
   model/         ← (폐지됨 — 레거시 최상위 domain/model 디렉토리 자체가 소멸. 마지막 잔류였던 account/strategy도 각각 com.kista.account.domain.model/com.kista.strategyconfig.domain.model로 이전 완료: broker/kis/toss는 com.kista.broker.domain.model로, order 전체 및 strategy 실행 이력 17개는 com.kista.trading.domain.model로, market(공포탐욕지수·시장휴장일)은 com.kista.market.domain.model로, privacy(FIDA 기준 매매표 + PrivacyDates 발행일↔거래일 헬퍼)는 com.kista.privacy.domain.model로, stats(통계 20타입) + backtest(커맨드·결과 5타입)는 com.kista.stats.domain.model(+.backtest)로, admin(관리자 read-model 9 + 런타임 설정 6, 총 15타입)은 com.kista.admin.domain.model(flat — admin/settings 서브패키지 없음)로, user(User/UserSettings)+auth(RefreshToken 등)는 com.kista.user.domain.{model,auth}로 이전됨 — User.UserRole/UserStatus/NotificationChannel nested enum + NotificationType은 com.kista.sharedkernel 독립 타입으로 별도 이관, 아래 "com.kista.sharedkernel/" 참고)
-                   Strategy.Type/Status/Ticker/CycleSeedType 등 nested enum도 com.kista.sharedkernel 독립 타입으로 이관 완료 (→ constraints.md "Account ↔ Strategy 분리")
+                   Strategy.Type/Status/Ticker/CycleSeedType 등 nested enum도 com.kista.sharedkernel 독립 타입으로 이관 완료 (→ `docs/agents/modules/trading.md` "Account ↔ Strategy 분리")
   (strategy/ 디렉토리 없음 — 전략 구현 클래스(Infinite/ReverseInfinite/Privacy/VrStrategy) 14개 전체가 com.kista.trading.domain.strategy로 이전됨, 아래 "com.kista.trading/" 참고)
   (domain/port/in, domain/port/out 폐지됨 — 레거시 포트는 application/usecase, application/port/output로 이전됨, 아래 application/ 절 참고)
 

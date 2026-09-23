@@ -1,0 +1,9 @@
+## com.kista.platform (`:shared`)
+
+com.kista.platform/  ← 전역 인프라 leaf 모듈. `@ApplicationModule(Type.OPEN)` — `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 outbound-zero를 강제(`com.kista.platform..` 외 `com.kista..` 전부 금지). Spring/JPA 바인딩이 있어 sharedkernel(순수 JDK)과 분리
+  persistence/   ← BaseAuditEntity(`createdAt`+`updatedAt`)/BaseCreatedAtEntity(`createdAt`만)/JpaAuditingConfig(`@EnableJpaAuditing` 단독 선언 — `@SpringBootApplication`에 두면 `@WebMvcTest` BeanCreationException). `@Setter(AccessLevel.PACKAGE)` 범위 주의 → constraints.md "Lombok @MappedSuperclass 상속 주의"
+  crypto/        ← AesCryptoService(AES-256, persistence 경계에서만 사용)/AccountNoHasher(계좌번호 결정론적 HMAC-SHA256 해시 — 전역 중복 체크용)/Sha256(RT 해시·Toss token fingerprint 공용)
+  time/          ← UsTradeDates(KST↔US 거래일 단순 ±1 변환). 사용처는 `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`가 4클래스(KisTradingApi/KisPriceApi/TossPriceApi/MarketCalendarPersistenceAdapter)로 강제
+  scheduling/    ← SchedulerJobRunner(공통 실행 골격 — STARTED/COMPLETED/FAILED `SchedulerLifecycleEvent` 발행 + 인터럽트 처리. `run(String, Runnable)` / 제네릭 `<T> run(String, Supplier<List<T>>, Action<T>)`)/SchedulerLockService(package-private 분산 락 `tryRun(lockKey, timeout, task)` — `@ConditionalOnProperty(scheduler.enabled)`, Postgres `scheduler_locks`, DB 서버 시각 `now()` 기준 `INSERT ... ON CONFLICT ... WHERE lock_until <= now()`라 다중 인스턴스 시계 편차 무관)/SchedulerLifecycleEvent(jobName, Phase, errorMessage). `SchedulerJobRunner`는 `NotifyPort`를 직접 주입하지 않고 이벤트만 발행하며 notify `SchedulerNotifier`(`@TransactionalEventListener(fallbackExecution=true)`)가 구독. 정확한 실행 시각·락 TTL → `scheduler-time-table.md`. **`@Scheduled` 사용 프로세스는 `@EnableScheduling` 필수** — 빠지면 에러 없이 조용히 무시된다(신규 부트 클래스에 `@Scheduled` 소비자가 있으면 반드시 확인, 실제 사고 → history)
+  redis/         ← `RedisStreamConfig`(user 이벤트 Stream 키·컨슈머그룹명)/`RedisPubSubConfig`
+  metrics/       ← MetricsConfig(모듈 의존 0의 순수 인프라)

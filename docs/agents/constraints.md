@@ -10,7 +10,7 @@
 - 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
 
 ### 신규 파일 배치
-신규 코드는 레거시 최상위가 아닌 해당 애그리게이트 모듈(`com.kista.<module>`) 안에 추가한다 — `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 서브구조 준수. 포트는 `domain/port/{in,out}`이 아닌 `application/{usecase,port/output}`에 위치. 모듈별 정확한 NamedInterface 공개 범위·internal 패키지는 `architecture.md` 패키지 트리가 SSOT — 신규 코드 추가 전 해당 모듈 절에서 확인할 것.
+신규 코드는 레거시 최상위가 아닌 해당 애그리게이트 모듈(`com.kista.<module>`) 안에 추가한다 — `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 서브구조 준수. 포트는 `domain/port/{in,out}`이 아닌 `application/{usecase,port/output}`에 위치. 모듈별 정확한 NamedInterface 공개 범위·internal 패키지는 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)가 SSOT — 신규 코드 추가 전 해당 모듈 문서에서 확인할 것.
 - broker `adapter/out/*`은 NamedInterface 비공개라 모듈 밖에서 접근 불가 — 새 기능이 필요하면 `com.kista.broker.application.port.output`에 신규 `*Port`를 만들어 노출한다
 - 레거시 `com.kista.adapter`/`com.kista.application` shim은 전부 소멸했다. 여러 모듈을 집계하는 앱 레벨 inbound 관심사(크로스모듈 컨트롤러·`GlobalExceptionHandler` 등 전역 `@ControllerAdvice`·`@Aspect`)는 `com.kista.web`(pure inbound sink, NamedInterface 0개)에 추가 — 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`으로
 - persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.platform`(인프라 leaf)에 추가 — 다른 `com.kista` 모듈 참조 시 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 빌드를 깬다
@@ -35,29 +35,7 @@
 - **(a) 신규 복제 테이블은 마이그레이션에서 기존 데이터를 반드시 백필한다.** 복제본이 비면 소비처가 빈 결과를 정상 응답으로 받아 기능이 멈춘다. `TradingUserProfilePort` 3개 메서드의 실제 실패 양상이 서로 다르다는 점에 주의: `findAllByUserIds()` 빈 맵 → `BatchContextFactory`가 전략마다 `NoSuchElementException`을 던지고 잡아 `errorReportPort.reportError()`로 관리자 알림을 내보낸다(**시끄럽게** 전면 중단 — 전략 수만큼 알림이 쏟아진다). `findByUserId()` 빈 Optional → 전략 등록이 "사용자를 찾을 수 없습니다"로 거부된다. `findAllActive()` 빈 리스트 → `MarketEventNotifier`가 **조용히** 아무에게도 안 보낸다(예외·로그 없음). 셋 중 마지막이 발견이 가장 늦다.
 - **(b) 원본의 모든 쓰기 지점을 전수 확인하고 발행을 건다.** 상태값은 `withStatus`/`withRejection` 같은 도메인 메서드명으로, 설정값은 필드명으로 grep한다. 포트 메서드명만 보고 판단하지 말 것 — `findAllActive()`가 실제로 `UserStatus.ACTIVE` 필터라는 사실은 소비처(`MarketEventNotifier`)와 구 어댑터를 읽어야만 드러났고, 이걸 놓쳤다면 복제본에 `is_active` 컬럼이 빠져 개장·마감 알림이 비활성 사용자에게까지 나갔을 것이다.
 
-**(a) 순환 불가피로 의도적 허용된 복제** (원장에 남는 것):
-- `ReorderCommand`/`ReorderResult`/`ManualTradeCorrectionCommand`/`ManualTradeCorrectionResult`(trading-core `com.kista.trading.domain.model`): admin의 `AdminReorderCommand`/`AdminReorderResult`/`AdminManualTradeCorrectionCommand`/`AdminTradeCorrectionResult`(root `com.kista.admin.domain.model`)와 구조적으로 동일한 own-type. Task 7+8에서 admin 재정렬/수동 체결 보정 로직 자체를 trading-core로 이관하면서 루트 main과 `:trading-core` main 사이에 컴파일 의존이 없고(특히 `:trading-core → :api`는 금지), trading-core는 admin의 원본 타입을 참조할 수 없다(`GradleModuleBoundaryTest`가 `:trading-core→:api` 역방향 의존을 컴파일 산출물 기준으로 강제 차단). 소유권을 admin 쪽 타입 하나로 통합하는 것도 불가능(trading-core가 그 타입을 import할 수 없으므로). root의 `AdminReorderService`/`AdminTradeCorrectionService`가 자기 타입에서 필드 그대로 매핑해 `TradingCommandPort`(HTTP 내부 API, `TradingCommandHttpAdapter`)로 넘긴다 — HTTP 요청/응답 바디 직렬화 경계이기도 해 (b) 성격도 일부 있으나, 게이트 판정의 1차 근거는 (a) 순환 불가피(Gradle 컴파일 경계)다.
-- `AdminOrderView`/`AdminStrategyView`(admin own-type read model, `Order`/`Strategy` 15/6필드 전체 복제): 같은 Gradle 컴파일 경계 근거 — `TradingQueryHttpAdapter`가 trading-core 내부 API 응답을 이 타입으로 역직렬화한다.
-- `AdminAccountView`(admin own-type read model, Task 8): `Account`의 9필드 중 id/userId/accountNo/broker/createdAt 5필드만 담는다 — 위 두 own-type과 달리 전체 복제가 아니라 **의도적으로 원본보다 좁힌 첫 사례**다. `Account`가 들고 있는 `appKey`/`secretKey`(복호화된 브로커 자격증명)/`nickname`/`brokerAccountCode`를 admin이 전혀 읽지 않는데도 그대로 복제하면 내부 API 응답에 평문 비밀값이 실리므로, `AccountInternalController`도 `Account`를 그대로 반환하지 않고 동일하게 좁힌 응답 DTO로 매핑해 보낸다.
-- `AdminPrivacyTradeBaseView`/`AdminFidaOrderCommand`/`AdminPrivacyBaseUpdateCommand`/`AdminPrivacyOrderUpdateCommand`(admin own-type, Task 9): `privacy.domain.model.PrivacyTradeBaseView`/`FidaOrderCommand`/`PrivacyBaseUpdateCommand`/`PrivacyOrderUpdateCommand` 전체 필드 1:1 복제(민감 필드 없음 — 위 `AdminAccountView`와 달리 좁힐 이유가 없다). 같은 Gradle 컴파일 경계 근거 — `AdminPrivacyTradeService`가 직접 주입하던 `PrivacyUseCase`/`PrivacyTradePort`를 제거하고 `PrivacyQueryPort`(HTTP 어댑터, `PrivacyQueryHttpAdapter`)로 전환하면서 admin이 더 이상 trading-core의 원본 타입을 import할 수 없어졌다. createBase는 기존 `POST /api/internal/fida-orders`(FidaOrderController)를 재사용하고, updateBase/updateOrder는 trading-core 신규 `PrivacyBaseInternalController`(`PATCH /api/internal/privacy/trade-bases/{baseId}`, `PATCH .../orders/{orderId}`, 그리고 createBase 재조회용 `GET .../{baseId}`)를 호출한다. 같은 전환의 부수 효과로 `AdminPrivacyTradeConflictException`(admin own-type 표지 예외, `AdminBrokerCredentialException`/`AdminBrokerRateLimitException`과 동일 패턴)도 신설됐다 — `FidaOrderController`가 던지는 `PrivacyTradeConflictException`(→409, `TradingExceptionHandler` 매핑)을 `PrivacyQueryHttpAdapter.createBase`가 `onStatus(409)`로 되돌려 root `GlobalExceptionHandler`가 다시 409로 매핑할 수 있게 한다 — 없으면 `HttpClientErrorException.Conflict`가 catch-all 500으로 뭉개진다.
-- `InvestmentPoint`(`LocalDate baseDate, BigDecimal investmentIndexUsd, BigDecimal periodReturn`)/`BenchmarkGranularity`(MONTHLY/DAILY/WEEKLY, root own-type, Task 11): trading-core `com.kista.trading.stats.domain.model`의 동명 타입 전체 필드 1:1 복제(shape 동일, 좁힐 이유 없음). 위 admin own-type들과 달리 root `com.kista.stats.application.port.output.InvestmentPointsPort`(stats 모듈 소유 포트)의 시그니처 타입이었다 — `InvestmentPointsHttpAdapter`가 trading-core 내부 API(`/api/internal/trading/stats/investment-points`) 응답을 이 타입으로 역직렬화한다. HTTP 호출 로직 자체는 Task 5(stage2)에서 이미 완성돼 있었고 Task 11은 타입 import만 own-type으로 교체했다 — 같은 Gradle 컴파일 경계 근거.
-- `MarketSession`(DIRECT/BLOCKED, root `com.kista.market.domain.model`, Task16): trading-core `com.kista.marketcalendar.domain.model.MarketSessionSnapshot.MarketSession`의 값 집합을 그대로 복제한 2값 enum. root `com.kista.market.application.port.output.MarketCalendarQueryPort.SessionView`(market 모듈 소유 포트)의 시그니처 타입 — `MarketCalendarQueryHttpAdapter`가 trading-core 내부 API(`/api/internal/marketcalendar/session`) 응답을 이 타입으로 역직렬화한다. root는 `:trading-core`를 구현체로만 단방향 참조하고 marketcalendar는 root를 참조할 수 없어(Gradle 컴파일 경계), 소유권을 marketcalendar 쪽으로 통합할 수 없다 — 같은 근거로 `MarketHolidayController`의 `MarketSessionResponse`도 이 own-type을 소비한다.
-- `TossDailyCandle`(`LocalDate date, BigDecimal open/high/low/close, long volume`, root `com.kista.market.domain.model`, Task16): trading-core `com.kista.broker.domain.model.toss.TossCandle`의 일봉 1건을 필드 shape byte-identical로 복제. root `com.kista.market.application.port.output.CandleQueryPort`(market 모듈 소유 포트)의 시그니처 타입 — `CandleQueryHttpAdapter`가 trading-core 내부 API(`/api/internal/broker/candles/latest`) 응답을 이 타입으로 역직렬화한다. 같은 Gradle 컴파일 경계 근거(root→broker 역방향 import 불가).
-- `TradeEventView`(root `com.kista.notify.domain.model` / trading-core `com.kista.trading.notify.domain.model`, 4a Task 8): 실시간 매매 SSE 알림 값 객체를 양쪽이 각자 own-type으로 소유 — HTTP 내부 API가 아닌 Redis Pub/Sub(발행: trading-core `RedisTradeEventPublisher`, 구독: root `RedisTradeEventSubscriber`)로 JSON 계약만 맞춰 동기화한다. 같은 Gradle 컴파일 경계 근거(:trading-core→:api 역방향 import 불가) — HTTP 어댑터 계열과 달리 이 쌍은 메시지 브로커 경유가 유일한 사례.
-
-**(b) 외부 계약 분리로 의도적 허용된 복제** (원장에 남는 것):
-- DTO 이중복제: `TossCandleResponse`(market/stats), `CycleHistoryPageResponse`/`CycleHistoryResponse`(stats/trading) — 각기 다른 HTTP 엔드포인트의 JSON 응답 계약. 통합 시 한 모듈의 엔드포인트 필드 추가가 다른 모듈 응답 스키마에 전이됨
-
-**단일 소유 포트 시그니처 타입** (쌍둥이 없음 — own-type 게이트 대상 아님, 참고용 기록):
-- broker `BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(`com.kista.broker.domain.model`): broker↔trading 간 `LiveBalancePort`/`BrokerOrderCorrectionPort.place()/cancel()` 요청·응답 shape. 복제본 없음 — trading이 직접 소비. `OrderInstruction`/`OrderResult`/`BrokerOrderCorrectionPort.place()` 직접 호출은 Task 7에서 trading-core `ReorderService`로 전부 이관됐다 — root `AdminReorderService`는 더 이상 이 타입들을 참조하지 않고, `TradingCommandPort`(HTTP 내부 API) 경유로 `ReorderCommand`/`ReorderResult`(trading own-type, 아래 신규 항목 참고)만 주고받는 얇은 요청/응답 매핑 + 감사 로그 프록시다. broker↔trading 순환은 이 타입들이 아니라 `BrokerAccountRef`(아래)로 끊는다
-- broker `PriceSnapshot`: `BrokerPricePort` 반환 타입, broker 단독 소유(matching 사본 없음 — 커널 코드는 `BigDecimal` 스칼라만 받아 자체 타입 불필요, trading이 broker판을 직접 소비)
-
-**narrowing projection** (own-type이되 값 복제가 아니라 애그리게이트 축소 노출 — 별도 트랙):
-- `BrokerAccountRef`(broker, `Account`의 자격증명 투영): `Account→BrokerAccountRef` 변환은 `Account.toBrokerRef()` 1곳이 전담. `SellableQuantity`/`BrokerCredentialException`/`BrokerRateLimitException`은 broker 단독 소유 — account 측엔 대응 타입 없음. "복제"가 아니라 broker-native
-- `StrategyRefLite`(broker, `MockSimulationDataPort` 확장용 초경량 뷰)
-- `StrategyCreationRequest`(trading.domain.strategy, 원시값 5개): 리졸버 4종이 19필드 `RegisterStrategyCommand` 전체 대신 실제로 쓰는 필드만 받는 ISP 좁히기 — 모듈 경계용이 아니라 순수 인터페이스 설계
-- `FidaPlannedOrder`(privacy.domain.model, 원시값 4필드): `trading.domain.model.Order`(15필드) 대신 FIDA가 실제로 보내고 privacy가 실제로 읽는 필드만 받는 ISP 좁히기 — 필드 타입은 `sharedkernel.OrderDirection`/`OrderType`
-- `StrategyRef`(`com.kista.stats.domain.model`, `Strategy`의 id/type/ticker 3필드만 담는 narrowing): `InvestmentPointsPort.Result.selectedStrategy`와 `HousingBenchmarkComparison.strategy`가 공유. modulith-migration-history.md에 "소멸했다"고 기록된 과거의 동명 trading own-type `StrategyRef`(strategyconfig 병합으로 제거)와는 이름만 같은 별개 타입 — 혼동 금지
+**신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read** — 기존 (a)(b) 허용 사례 전체 목록(ReorderCommand/AdminOrderView/AdminAccountView/AdminPrivacyTradeBaseView 계열/InvestmentPoint/MarketSession/TossDailyCandle/TradeEventView 등)·DTO 이중복제 사례·단일 소유 포트 시그니처 타입·narrowing projection 원장. 자동 로드되지 않는다.
 
 신규 broker/notify/privacy 포트 추가 시 이 게이트를 먼저 통과할 것 — (a)(b) 어느 쪽도 아니면 복제하지 말고 sharedkernel 승격 또는 소유권 이동을 먼저 검토한다.
 
@@ -72,26 +50,8 @@
 - Controller에서 별도 catch/rethrow 불필요 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT (예외별 코드는 코드가 SSOT)
 - async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 
-### Account ↔ Strategy 분리
-계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.
-- `Account`: type/status/ticker/multiple/updatedAt **없음** (전략 속성은 Strategy로 분리). `updatedAt`은 persistence `BaseAuditEntity`가 관리, `createdAt`은 신규 등록 시 null → persistence 저장 후 채워짐
-- `Strategy`: `StrategyType`/`StrategyStatus`/`StrategyTicker`/`StrategyCycleSeedType`는 `com.kista.sharedkernel`의 전역 공용 어휘 — nested 재도입 금지, DB `@Enumerated(STRING)` 컬럼 상수명 byte-identical 유지. `Strategy` record 자체는 `com.kista.trading.domain.model`에 위치
-- 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드) — `com.kista.trading.domain.model`(trading "domain" NamedInterface 공개)
-- 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount` 계약 → 아래 "VR 공식"의 "개장 금액 계약")은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
-- `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `vr` 필드는 top-level `com.kista.trading.domain.model.VrSummary`(VR 외 null)
-- 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개)
-- `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (기본 `NONE`); **VR은 NONE 강제** — 롤오버가 사이클 교체 담당
-
-### 잔고검증 토글 (UserSettings.balanceCheckEnabled)
-- `UserSettings` aggregate(`com.kista.user.domain.model`) — `User` record 아님
-- ON이면 `StrategyService` 시드 등록/수정 시 "KIS 가용금액 − 기존 활성 전략 점유 시드" 한도 초과를 `IllegalArgumentException`으로 차단
-- 설정 미존재 시 `UserSettings.defaultFor(userId)` — `balanceCheckEnabled=true`, 빈 notificationPrefs
-
-### 스케쥴러 주문 예산 배정 (상세 규칙 SSOT → workflow.md)
-- 예산 배정 우선순위·compute skip·실패 격리·수동 SELL 검증 등 실행 규칙 전체는 `docs/agents/workflow.md`가 SSOT — 매매·스케쥴러·주문 로직 작업 시 필수 Read
-- `orders.order_leg`는 스케쥴러 내부 leg 식별자 — 신규 전략 주문은 non-blank concrete leg 필수(`UNKNOWN` 잔존 시 `TradingService`가 PLANNED 저장 전 `IllegalStateException`으로 거절), legacy 행은 `UNKNOWN` 유지, 브로커 API payload에 미포함
-- 슬롯 점유 판단: concrete leg는 `timing + direction + orderLeg`, `UNKNOWN` legacy 행은 `timing + direction` coarse
-- `orders.order_leg`와 scheduler/reservation 조회용 인덱스(`idx_orders_cycle_date_timing_status` 등)는 현재 `V1__init.sql`에 포함되어 있다(과거 별도 마이그레이션이었으나 스쿼시됨) — 후속 orders 쿼리 변경 시 인덱스 prefix와 조회 조건 함께 확인
+### Account ↔ Strategy 분리 / 잔고검증 토글 / 스케쥴러 주문 예산 배정
+Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnabled)·스케쥴러 주문 예산 배정 규칙은 `docs/agents/modules/trading.md`(account.md·user.md에서 cross-link)로 이동했다.
 
 ### MetaController (enum SSOT)
 - `GET /api/meta` — enum 메타(label/description 포함) 단일 번들 제공 — UI에서 enum 리터럴 하드코딩 금지
@@ -130,65 +90,8 @@
 - **JPA 매핑**: `@Enumerated(EnumType.STRING)` 단독 사용 — `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 사용 금지
 - **Flyway**: `CREATE TYPE` 구문 작성 금지, 컬럼 정의는 `VARCHAR(20)` (값 길이 여유 있게)
 
-### 매매 공식 (변경 금지 — 단위 테스트로 검증)
-```
-averagePrice (holdings==0이면 prevClosePrice 전일종가)
-purchaseAmount = averagePrice × holdings
-totalAssets = usdDeposit + purchaseAmount
-unitAmount = totalAssets ÷ divisionCount  (scale=2, HALF_UP — 분모는 리터럴 20이 아닌 divisionCount; 허용값 20/30/40 — RuntimeSettings 기본값·capability 메타 availableDivisionCounts() 동기화됨, 기본값은 20)
-currentRound = holdings==0 ? 0.0 : purchaseAmount ÷ unitAmount  (double, 소수점 허용)
-priceOffsetRate = targetProfitRate × (1 - 2×currentRound/divisionCount)  (scale=2, HALF_UP)
-referencePrice = averagePrice × (1 + priceOffsetRate)  (scale=2, HALF_UP — LOC 주문 가격 기준)
-targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
-```
-- `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
-- `currentRound`는 floor 없이 소수점 허용
-- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < divisionCount/2 여부와 동치)
-- **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가) + LOC 매수②((unitAmount − averagePrice×매수①수량)×(1+priceOffsetRate)/referencePrice, 기준가) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
-- **후반 unitAmount>usdDeposit**: MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
-
-### VR 공식 (변경 금지 — 단위 테스트로 검증)
-```
-lowerBand = V × (1 − bandWidth/100)  (scale=2, HALF_UP)
-upperBand = V × (1 + bandWidth/100)  (scale=2, HALF_UP)
-buyPrice(m)  = lowerBand ÷ (holdings + m − 1)  (scale=2, HALF_UP, m=1..20, divisor<1이면 skip)
-sellPrice(s) = upperBand ÷ (holdings − s + 1)  (scale=2, HALF_UP, s=1..20)
-
-V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_UP, 중간 scale=10)
-     평가금 = holdings × 종가
-```
-- **gradient(G)·poolLimitRate 램프**: 둘 다 고정값이 아닌 "전략 최초 사이클 startDate부터 경과한 주수(weeks)"에 따라 점진 변화하는 값. 초기값·램프 파라미터(유예·단계주기·상하한) 8개는 전략 등록 시 사용자 입력(`StrategyVrDetail`: `initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor`), 생략 시 recurringMode(적립/거치/인출) 고정값 표(kista-ui `RAMP_DEFAULTS_BY_MODE`와 동기화) + 유예 52주·단계 26주로 채운다 — gGraceWeeks/gStepWeeks/pGraceWeeks/pStepWeeks 4필드만 생략 시 관례값, 나머지 4필드(initialGradient/gMax/initialPoolLimitRate/poolLimitFloor)는 아래 표 그대로
-    | recurringMode | initialGradient | gMax | initialPoolLimitRate | poolLimitFloor |
-    |---|---|---|---|---|
-    | 적립(`recurringAmount>0`) | 10 | 20 | 1.0 | 0.5 |
-    | 거치(`recurringAmount==0`) | 10 | 20 | 0.75 | 0.5 |
-    | 인출(`recurringAmount<0`) | 40 | 50 | 0.1 | 0.1 |
-  - `gradientAt(weeks)`: `weeks < gGraceWeeks` → `initialGradient`; 이후 `gStepWeeks`마다 `+1`(고정, `StrategyVrDetail.G_STEP`), `gMax` 상한
-    - `gStepWeeks=0`은 gradient 램프 자체를 비활성화(항상 `initialGradient` 유지) — 이때 `gMax`·`gGraceWeeks`는 무관해지므로 0 허용(등록·재설정 양쪽 `gStepWeeks > 0`일 때만 `gMax >= initialGradient` 강제)
-  - `poolLimitRateAt(weeks)`: `weeks < pGraceWeeks` → `initialPoolLimitRate`; 이후 `pStepWeeks`마다 `-5%p`(고정, `StrategyVrDetail.POOL_LIMIT_STEP`), `poolLimitFloor` 하한(scale=2 HALF_UP)
-    - `pStepWeeks=0`은 poolLimitRate 램프 자체를 비활성화(항상 `initialPoolLimitRate` 유지) — 이때 `poolLimitFloor`·`pGraceWeeks`는 무관해지므로 검증 없이 0 허용(등록·재설정 양쪽 `pStepWeeks > 0`일 때만 `0 < poolLimitFloor <= initialPoolLimitRate` 강제)
-  - G·poolLimitRate 두 램프의 유예·단계주기는 서로 독립
-  - weeks 재계산 시점: 사이클 롤오버(`VrCycleRolloverService`) 및 운영 중 재설정(`VrReconfigureService`) — 둘 다 `ChronoUnit.WEEKS.between(전략 최초 사이클.startDate, today)`. 사이클 진행 중엔 `strategy_cycle_vr` 스냅샷(gradient·poolLimitRate) 고정
-- 등록 검증: `initialValue`, `initialUsdDeposit`, `recurringAmount` null은 0으로 취급
-- 적립식(`recurringAmount > 0`): 초기 V와 초기 시드가 모두 0이어도 등록 가능
-- 거치식/인출식(`recurringAmount <= 0`): `initialValue + initialUsdDeposit > 0` 필수
-- 인출식(`recurringAmount < 0`): `initialValue + initialUsdDeposit >= abs(recurringAmount) × 100 × (4 / intervalWeeks)` 필수 — 운영 중 재설정으로 `recurringAmount`를 인출식으로 바꾸는 경우도 `VrReconfigureService`가 동일 규칙 재검증
-- **개장 금액 계약**: `initialUsdDeposit` = 사이클 개장 USD pool(개장 `CyclePosition.usdDeposit`), `startAmount` = 개장 예수금 + 개장 보유분 시장가(모든 전략), `poolLimit` = 개장 pool × `poolLimitRate` (scale=2 HALF_UP). 보유분 시장가를 pool에 포함하지 않는다.
-- **종료 금액 계약**: VR 롤오버 `endAmount` = 마감 예수금 + 보유분 종가 평가액(scale=2 HALF_UP). 재설정은 이전 사이클을 자본 조정 전 포지션의 총자산으로 종료하고 새 사이클을 자본 조정 후 총자산으로 시작해 주입/인출을 이전 사이클 손익에 포함하지 않는다.
-- **레거시 통계 호환**: Stats는 VR 개장 포지션의 `usdDeposit + holdings × closingPrice`를 개장 원금으로 사용한다. 개장 holdings가 양수인데 `closingPrice`가 null이면 시장가 복원이 불가능하므로 저장된 `startAmount`를 유지한다. 비-VR 계산은 저장된 `startAmount`를 그대로 사용한다.
-- **`strategy_cycle_vr.pool_limit_rate`**(비율, 달러 아님)를 스냅샷 저장. poolLimit(달러)은 저장하지 않고 조회 시점에 개장 `CyclePosition.usdDeposit × poolLimitRate`로 파생 — 첫 사이클은 `poolLimitRateAt(0)`, 롤오버·재설정 사이클은 `poolLimitRateAt(weeks)`를 저장
-- **bootstrap 진입 판정(`VrStrategy.buildOrders`/`needsBootstrap`)**: `firstCycle` 개념 없이 순수 상태 기반으로 게이팅. holdings=0인데 V=0이면 사다리 공식 자체가 무의미(lowerBand=0)해 bootstrap 대상. holdings=0이고 V>0이어도 사다리 첫 유효 단(m=2, 가격=lowerBand 그대로)이 잔여예산을 초과하면 마찬가지로 bootstrap 대상 — `nextValue()` 공식이 holdings와 무관하게 매 롤오버 V를 키우므로(`pool/G+recurringAmount` 항), holdings=0이 지속되면 V가 예산 대비 과도하게 커져 사다리로는 영원히 매수가 불가능해질 수 있기 때문
-  - **holdings>0 드리프트 케이스**: 등록 시 V=시장가×수량으로 확립되지만, 이후 holdings가 늘지 않는 채로 롤오버가 반복되면(`nextValue()`가 holdings 무관하게 V를 계속 키움) 사다리 첫 유효 단(m=1, divisor=holdings)조차 잔여예산을 초과할 수 있다. 이 경우도 매수만 bootstrap(예산 내 캡 가격 LOC)으로 대체하고, 매도 사다리는 이 드리프트와 무관하게 정상 생성한다(전량 bootstrap 전환과 달리 매도까지 사라지지 않음)
-- **bootstrap 잔여예산(`remainingBudget`)**: 원칙은 `poolLimit − poolUsed`(이번 사이클에 이미 매수 체결된 금액 차감). 단 `poolLimit`이 0(사이클 개장 시점 예수금 자체가 0이었던 완전 무일푼 시작이라 poolLimit이 그 사이클 내내 영구 고정)이면 DB상 예수금(`pool`, `cycle_position` 최신 스냅샷)을 그대로 상한으로 대신 쓴다. 어느 쪽이든 DB상 예수금은 넘지 않는다(`governanceLimit.min(pool)`). `poolUsed`가 실제 체결 기준이라 부분/미체결 여부와 무관하게 다음날 정확한 잔여예산이 재계산된다. 예산<=0이면 빈 주문(다음 롤오버에서 `nextValue()` 공식이 V를 자연 성장시킴 — 실제로 holdings가 생기면 이 판정 자체가 꺼지므로 별도 처리 불필요)
-- bootstrap LOC 가격: `PriceCapPolicy.capFor(referencePrice)`(= referencePrice × 1.05, currentPrice 없으면 전일종가로 대체 가능) — 일반 매수 캡과 동일 기준 사용. 주문 수량은 잔여예산/가격 내림 정수
-- 사다리 병합: 동일 가격 연속 rung은 수량 병합(매수), 매도는 holdings>20이면 마지막 단(s=20)에 잔여 전량
-- 가격 캡: `buyPrice > currentPrice × 1.05`(`PriceCapPolicy`, INFINITE/PRIVACY의 `BuyOrderPriceCapper`와 공용) 이면 cap 가격으로 교체 — scale=2 HALF_UP (currentPrice=null이면 미적용). VR은 매수 사다리 생성 시점(`VrStrategy.buildBuyOrders`)에는 캡을 적용하지 않고, 접수 직전 `BuyOrderPriceCapper`(`PriceCapMode.VR_POSITION`)가 `VrStrategy.buildCappedBuyOrders()`로 재산정한다 — INFINITE/PRIVACY와 동일한 공통 보정 경로
-- rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
-- V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림. V=0·holdings=0인 채로 롤오버가 진행되는 경우도 `nextValue()` 결과를 그대로 쓴다(예전 존재했던 "V 강제 0 유지" 가드는 폐기됨) — `pool/G+recurringAmount` 항으로 다음 사이클 V가 자연 성장하고, 실제 매수는 항상 pool/poolLimit 실측 잔고 한도 내에서만 이뤄지므로 과다지출 위험이 없다
-- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
-  - 램프 시계(경과주수)는 재설정해도 리셋하지 않음 — 항상 전략 최초 사이클 startDate 기준
-  - 순수 파라미터 수정: V·holdings·usdDeposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 수량 인출 -N주: holdings·V 감소, 잔여 평단가 유지. 예수금 주입/인출은 usdDeposit만 증감하고 V는 불변
-  - 검증 순서: 램프 파라미터·자본 주입 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정
+### 매매 공식 / VR 공식 (변경 금지 — 단위 테스트로 검증)
+매매 공식·VR 공식은 `docs/agents/modules/trading-formulas.md`로 이동했다 — `matching/`·`trading/` 작업 시 자동 로드, 그 외에는 직접 Read.
 
 ### 계좌번호 마스킹 (AccountNumberMasker)
 - `com.kista.sharedkernel.AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)
@@ -301,13 +204,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 발급
 
 ### 런타임 설정 API 규칙
-- `GET /api/runtime-config` → 로그인 전 UI가 가입·계좌·전략 생성 정책을 조회하는 공개 엔드포인트. 동적 설정이므로 `Cache-Control: no-store` 유지
-- `GET|PUT /api/admin/settings` → ADMIN 전용. PUT은 auth/brokers/strategies 전체 설정을 검증한 뒤 한 번에 교체하며 부분 갱신 API로 취급하지 않음. 조회·갱신 응답 모두 `Cache-Control: no-store` 유지
-- `brokers.<broker>.enabled=false`이면 해당 증권사의 신규 계좌 등록과 연결 테스트를 외부 API 호출 전에 400으로 차단. 기존 계좌의 조회·수정·매매는 영향받지 않음
-- `StrategyService.register()`는 신규 전략에만 `strategies.<type>` 생성 정책을 적용: `enabled=false`면 400으로 차단하고, ticker·INFINITE divisionCount·VR recurringMode/bandWidth/intervalWeeks의 생략 기본값과 허용/고정값을 검증. 기존 전략 수정·실행에는 소급 적용하지 않음
-- `RegisterStrategyCommand.divisionCount=0`은 INFINITE 신규 등록의 미입력 sentinel이며 런타임 기본값으로 치환. VR `recurringMode`는 `recurringAmount` 부호(DEPOSIT/HOLD/WITHDRAW)로만 검증하고 금액 크기는 기존 VR 자산 규칙에 맡김. `recurringMode.customizable=false` 설정은 기본값과 유일한 허용값이 모두 `HOLD`여야 함
-- 런타임 설정 응답은 `NON_NULL` 직렬화 사용. 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 `null`로 내리지 않고 JSON에서 생략
-- `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
+런타임 설정 API 규칙은 `docs/agents/modules/admin.md`로 이동했다 — admin 단독 소유.
 
 ### 시간 기준 정책 (KST 단일 기준)
 - **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (과거 US 거래일 기준에서 KST 기준으로 전환 완료됨)

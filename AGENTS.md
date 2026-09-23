@@ -15,6 +15,9 @@ Read the relevant shared documents before changing related code:
 - `docs/agents/kis-api.md`: KIS adapter/API work.
 - `docs/agents/toss-api.md`: Toss adapter/API work.
 - `docs/agents/docker-infra.md`: OCI server, Docker, and deployment operations.
+- `docs/agents/modules/<module>.md`: per-module package tree and strategy patterns — Read the relevant one before changing that module's code (Claude Code loads these automatically via nested `CLAUDE.md`; Codex does not, so read explicitly).
+- `docs/agents/own-type-ledger.md`: ledger of allowed own-type duplicates across module boundaries — required reading before proposing a new one.
+- `docs/agents/modules/trading-formulas.md`: trading/VR formulas (change-controlled SSOT).
 
 Claude-specific agents, hooks, and skills remain under `.claude/`. Codex does not execute those hooks automatically, so after Java edits run `./gradlew compileJava` or the focused test command explicitly when practical.
 

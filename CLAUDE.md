@@ -41,6 +41,12 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finan
 @docs/agents/constraints.md
 @docs/agents/testing.md
 
+## 모듈별 상세 문서 (해당 디렉토리 작업 시 로드)
+
+각 모듈 디렉토리의 `CLAUDE.md`가 `docs/agents/modules/<module>.md`를 import한다 — 그 모듈의 파일을 다루면 자동 로드된다. 여러 모듈을 동시에 설계하거나 own-type 신설을 검토할 때는 직접 Read:
+- `docs/agents/own-type-ledger.md` — own-type 허용 원장 (필수 Read)
+- `docs/agents/modules/trading-formulas.md` — 매매·VR 공식 (변경 금지 SSOT)
+
 ## 운영 도구
 
 - **API 운영 로그**: OCI 서버 SSH 접속 후 `docker compose logs kista-api` (상세 명령어 → `docs/agents/docker-infra.md`)
