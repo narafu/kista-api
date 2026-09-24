@@ -353,6 +353,36 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("pause() 호출 시 비소유자가 이미 중지된 전략을 요청해도 소유권 오류가 상태 오류보다 먼저 발생한다 (→ 403, 400 아님)")
+    void pause_by_non_owner_on_already_paused_strategy_throws_security_exception_not_state_exception() {
+        UUID otherUserId = UUID.randomUUID();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, otherUserId))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
+
+        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, otherUserId))
+                .isInstanceOf(SecurityException.class)
+                .isNotInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("resume() 호출 시 비소유자가 이미 활성화된 전략을 요청해도 소유권 오류가 상태 오류보다 먼저 발생한다 (→ 403, 400 아님)")
+    void resume_by_non_owner_on_already_active_strategy_throws_security_exception_not_state_exception() {
+        UUID otherUserId = UUID.randomUUID();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, otherUserId))
+                .thenThrow(new SecurityException("소유자가 아닙니다"));
+
+        assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, otherUserId))
+                .isInstanceOf(SecurityException.class)
+                .isNotInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("update() 호출 시 newSeed가 null이면 cycleSeedType만 변경되고 시드는 변경되지 않는다")
     void update_without_newSeed_only_changes_cycleSeedType() {
         Strategy maintained = ACTIVE_STRATEGY.withCycleSeedType(StrategyCycleSeedType.MAINTAIN);

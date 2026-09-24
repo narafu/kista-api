@@ -66,11 +66,11 @@ class StrategyService implements StrategyUseCase {
     @Override
     public void pause(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 중복 상태 guard — 이미 중지된 전략은 재중지 불가
         if (strategy.isPaused()) {
             throw new IllegalStateException("이미 중지된 전략입니다: " + strategyId);
         }
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
         log.info("전략 중지: strategyId={}", strategyId);
     }
@@ -78,11 +78,11 @@ class StrategyService implements StrategyUseCase {
     @Override
     public void resume(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가
         if (strategy.isActive()) {
             throw new IllegalStateException("이미 활성화된 전략입니다: " + strategyId);
         }
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         reopenCycleIfEnded(strategy);
         strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
         log.info("전략 재개: strategyId={}", strategyId);
