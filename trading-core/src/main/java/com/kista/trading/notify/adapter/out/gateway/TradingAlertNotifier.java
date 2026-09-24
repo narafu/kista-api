@@ -14,9 +14,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.util.NoSuchElementException;
-import java.util.UUID;
-
 // trading이 발행하는 관리자/사용자 알림 이벤트 6종을 구독해 TradingNotifyPort/TradingUserNotificationPort를 호출한다.
 // trading의 11개 발행 지점 중 어느 하나도 클래스/메서드에 @Transactional이 없음을 확인했다 — phase=AFTER_COMMIT을
 // 단독으로 쓰면 활성 트랜잭션이 없을 때 이벤트가 그냥 버려지므로 phase 미지정 + fallbackExecution=true로 트랜잭션이
@@ -38,7 +35,7 @@ public class TradingAlertNotifier {
         if (event.userId() == null) {
             notifyPort.notifyError(new RuntimeException(event.message()));
         } else {
-            TradingUserProfile profile = requireProfile(event.userId());
+            TradingUserProfile profile = TradingUserProfiles.requireProfile(userProfilePort, event.userId());
             userNotificationPort.notifyError(profile, new RuntimeException(event.message()));
         }
     }
@@ -48,7 +45,7 @@ public class TradingAlertNotifier {
         if (event.userId() == null) {
             notifyPort.notifyInsufficientBalance(event.holdings(), event.usdDeposit(), event.ticker());
         } else {
-            TradingUserProfile profile = requireProfile(event.userId());
+            TradingUserProfile profile = TradingUserProfiles.requireProfile(userProfilePort, event.userId());
             userNotificationPort.notifyInsufficientBalance(profile, event.accountNickname(), event.strategyType(), event.ticker());
         }
     }
@@ -60,22 +57,17 @@ public class TradingAlertNotifier {
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onMarketOpen(MarketOpenEvent event) {
-        userNotificationPort.notifyMarketOpen(requireProfile(event.userId()));
+        userNotificationPort.notifyMarketOpen(TradingUserProfiles.requireProfile(userProfilePort, event.userId()));
     }
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onMarketClose(MarketCloseEvent event) {
-        userNotificationPort.notifyMarketClose(requireProfile(event.userId()));
+        userNotificationPort.notifyMarketClose(TradingUserProfiles.requireProfile(userProfilePort, event.userId()));
     }
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onBatchInterrupted(BatchInterruptedEvent event) {
-        userNotificationPort.notifyBatchInterrupted(requireProfile(event.userId()), event.accountNickname());
-    }
-
-    // ID → TradingUserProfile 재조회 (EPR 역직렬화 대응) — root UserPort.findByIdOrThrow 대체
-    private TradingUserProfile requireProfile(UUID userId) {
-        return userProfilePort.findByUserId(userId)
-                .orElseThrow(() -> new NoSuchElementException("user_notify_profile 없음: " + userId));
+        userNotificationPort.notifyBatchInterrupted(
+                TradingUserProfiles.requireProfile(userProfilePort, event.userId()), event.accountNickname());
     }
 }

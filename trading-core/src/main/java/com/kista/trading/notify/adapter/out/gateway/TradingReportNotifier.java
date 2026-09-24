@@ -13,9 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.util.NoSuchElementException;
-import java.util.UUID;
-
 // 매매 리포트 알림(Telegram/FCM)과 체결 건별 SSE 알림을 채널 라우팅과 분리 — 발행처가 트랜잭션 안이든 밖이든 fallbackExecution으로 항상 실행되게 함
 // root의 동명 클래스를 이관 — User/UserNotificationPort/RealtimeNotificationPort 대신 TradingUserProfile/
 // TradingUserNotificationPort/TradingRealtimeNotificationPort 사용(구현체는 후속 태스크에서 채움)
@@ -31,7 +28,7 @@ class TradingReportNotifier {
     // 트랜잭션 있으면 커밋 후, 없으면 즉시 동기 실행
     @TransactionalEventListener(fallbackExecution = true)
     public void onTradingReportReady(TradingReportReadyEvent event) {
-        TradingUserProfile profile = requireProfile(event.userId());
+        TradingUserProfile profile = TradingUserProfiles.requireProfile(userProfilePort, event.userId());
 
         // TRADING_ALERT 알림 활성 여부에 따라 리포트 발송 여부 결정 (기본값 true)
         if (event.reportEnabled()) {
@@ -49,11 +46,5 @@ class TradingReportNotifier {
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", event.accountNickname(), event.executions().size());
-    }
-
-    // ID → TradingUserProfile 재조회 (EPR 역직렬화 대응) — root UserPort.findByIdOrThrow 대체
-    private TradingUserProfile requireProfile(UUID userId) {
-        return userProfilePort.findByUserId(userId)
-                .orElseThrow(() -> new NoSuchElementException("user_notify_profile 없음: " + userId));
     }
 }
