@@ -54,8 +54,7 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     public void delete(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
         // StrategyCycle + CyclePosition 소프트 삭제 → Strategy 삭제 순
         cyclePositionPort.deleteByStrategyId(strategyId);
         strategyCyclePort.deleteByStrategyId(strategyId);
@@ -65,9 +64,8 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     public void pause(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        // 중복 상태 guard — 이미 중지된 전략은 재중지 불가
+        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
+        // 중복 상태 guard — 이미 중지된 전략은 재중지 불가 (소유권 검증 이후 수행)
         if (strategy.isPaused()) {
             throw new IllegalStateException("이미 중지된 전략입니다: " + strategyId);
         }
@@ -77,15 +75,21 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     public void resume(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가
+        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
+        // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가 (소유권 검증 이후 수행)
         if (strategy.isActive()) {
             throw new IllegalStateException("이미 활성화된 전략입니다: " + strategyId);
         }
         reopenCycleIfEnded(strategy);
         strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
         log.info("전략 재개: strategyId={}", strategyId);
+    }
+
+    // 전략 조회 + 소유권 검증 — delete/pause/resume/getById/update 공용
+    private Strategy requireOwnedStrategy(UUID strategyId, UUID requesterId) {
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        return strategy;
     }
 
     // cycleSeedType=NONE 전략은 청산 시 자동 rotation 없이 사이클이 종료된 채로 PAUSED된다(CycleRotationService).
@@ -129,15 +133,13 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(readOnly = true)
     public StrategyDetail getById(UUID strategyId, UUID requesterId) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
         return toDetail(strategy);
     }
 
     @Override
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
         if (strategy.isVr() && cmd.newSeed() != null) {
             throw new IllegalArgumentException("VR 전략의 시드/시작금액은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
         }
