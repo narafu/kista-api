@@ -43,10 +43,8 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         verifyAssetCategory(userId, currentGroupId, command.categoryId());
         // 기록 점검 완료월에는 신규 등록 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, command.entryDate());
-        // 그룹 공유를 요청했는데 소속 그룹이 없으면 거부 (GroupShareSupport와 동일 메시지)
-        if (shareToGroup && currentGroupId == null) {
-            throw new IllegalStateException("소속된 그룹이 없습니다");
-        }
+        // 그룹 공유를 요청했는데 소속 그룹이 없으면 거부
+        GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
         UUID ownerGroupId = shareToGroup ? currentGroupId : null;
         AssetSnapshot snapshot = new AssetSnapshot(null, ownerGroupId, command.categoryId(), command.accountId(), userId,
                 command.entryDate(), command.assetClass(), command.market(), command.strategy(), command.memo(), command.amount(), null);
@@ -58,8 +56,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
     @Override
     public AssetSnapshot update(UUID snapshotId, UUID userId, AssetSnapshotCommand command) {
         AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         verifyAssetCategory(userId, currentGroupId, command.categoryId());
         // 마감월에서 빼내기(existing) + 마감월로 넣기(command) 둘 다 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, existing.entryDate());
@@ -82,8 +79,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
     @Override
     public void delete(UUID snapshotId, UUID userId) {
         AssetSnapshot existing = assetSnapshotPort.findByIdOrThrow(snapshotId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         // 마감월 기록은 삭제도 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, existing.entryDate());
         assetSnapshotPort.softDelete(snapshotId);

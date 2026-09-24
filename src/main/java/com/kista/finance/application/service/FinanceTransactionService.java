@@ -43,10 +43,8 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         verifyCategory(userId, currentGroupId, command.categoryId());
         // 기록 점검 완료월에는 신규 등록 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, command.transactionDate());
-        // 그룹 공유 생성을 요청했는데 소속 그룹이 없으면 거부 — GroupShareSupport와 동일 메시지
-        if (shareToGroup && currentGroupId == null) {
-            throw new IllegalStateException("소속된 그룹이 없습니다");
-        }
+        // 그룹 공유 생성을 요청했는데 소속 그룹이 없으면 거부
+        GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
         UUID ownerGroupId = shareToGroup ? currentGroupId : null;
         FinanceTransaction transaction = new FinanceTransaction(null, ownerGroupId, command.categoryId(), userId,
                 command.transactionDate(), command.amount(), command.memo(), null);
@@ -58,8 +56,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     @Override
     public FinanceTransaction update(UUID transactionId, UUID userId, FinanceTransactionCommand command) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         verifyCategory(userId, currentGroupId, command.categoryId());
         // 마감월에서 빼내기(existing) + 마감월로 넣기(command) 둘 다 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, existing.transactionDate());
@@ -81,8 +78,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
     @Override
     public void delete(UUID transactionId, UUID userId) {
         FinanceTransaction existing = transactionPort.findByIdOrThrow(transactionId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         // 마감월 거래는 삭제도 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, existing.transactionDate());
         transactionPort.softDelete(transactionId);

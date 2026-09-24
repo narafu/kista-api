@@ -5,11 +5,24 @@ import com.kista.finance.domain.model.GroupShareable;
 import java.util.Optional;
 import java.util.UUID;
 
-// shareToGroup/unshare 공용 로직 — FinanceBudget/FinanceTransaction/AssetSnapshot 세 서비스가 재사용한다.
+// shareToGroup/unshare 공용 로직 — FinanceAccount/FinanceBudget/FinanceTransaction/AssetSnapshot/FinanceCategory
+// 5개 서비스가 재사용한다. 그룹 필수 검증(requireCurrentGroup/requireGroupIfSharing)은 BulkFinanceRegisterService도 재사용.
 // Optional.empty() 반환은 멱등(이미 목표 상태)이라는 뜻 — 호출부는 save를 건너뛰고 기존 값을 그대로 반환하면 된다.
 final class GroupShareSupport {
 
     private GroupShareSupport() {
+    }
+
+    // "소속된 그룹이 없습니다" 메시지의 단일 소유자 — 그룹 필수 검증이 필요한 모든 호출부가 이 메서드를 거친다.
+    static UUID requireCurrentGroup(Optional<UUID> currentGroupId) {
+        return currentGroupId.orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
+    }
+
+    // shareToGroup=true로 신규 생성할 때만 그룹이 필수 — false면 개인 소유라 그룹 없어도 무방.
+    static void requireGroupIfSharing(boolean shareToGroup, UUID currentGroupId) {
+        if (shareToGroup) {
+            requireCurrentGroup(Optional.ofNullable(currentGroupId));
+        }
     }
 
     static <T extends GroupShareable<T>> Optional<T> shareToGroup(
@@ -17,7 +30,7 @@ final class GroupShareSupport {
         if (!existing.userId().equals(userId)) {
             throw new SecurityException(notOwnerMessage);
         }
-        UUID groupId = currentGroupId.orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
+        UUID groupId = requireCurrentGroup(currentGroupId);
         if (groupId.equals(existing.groupId())) {
             return Optional.empty(); // 이미 같은 그룹에 공유된 상태
         }

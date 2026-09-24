@@ -38,10 +38,8 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
     public FinanceCategory create(UUID userId, boolean shareToGroup, FinanceCategoryCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         FinanceCategory parent = resolveParent(command.parentId(), userId, currentGroupId, command.type());
-        // 그룹 공유 생성을 요청했는데 소속 그룹이 없으면 거부 — GroupShareSupport와 동일 메시지
-        if (shareToGroup && currentGroupId == null) {
-            throw new IllegalStateException("소속된 그룹이 없습니다");
-        }
+        // 그룹 공유 생성을 요청했는데 소속 그룹이 없으면 거부
+        GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
         // 그룹 소유 카테고리는 그룹 소유 부모 아래에만 생성한다 — 개인 부모 아래 그룹 자식은
         // 다른 멤버에게 부모 없는 트리 고아로 보이고, shareToGroup()/unshare()의 "같은 소유자 트리" 전제를 깬다
         if (shareToGroup && parent != null && !currentGroupId.equals(parent.groupId())) {
@@ -63,8 +61,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         if (existing.isSystem()) {
             throw new SecurityException("시스템 카테고리는 수정할 수 없습니다");
         }
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         // type·parentId는 생성 후 불변 — 커맨드에 값이 실려와도 무시하고 기존 값을 유지한다.
         FinanceCategory updated = new FinanceCategory(existing.id(), existing.groupId(), existing.parentId(),
                 existing.userId(), existing.type(), command.name(), command.sortOrder(), existing.createdAt());
@@ -113,8 +110,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         if (existing.isSystem()) {
             throw new SecurityException("시스템 카테고리는 삭제할 수 없습니다");
         }
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         categoryPort.softDeleteWithChildren(categoryId);
         log.info("카테고리 삭제: categoryId={}, userId={}", categoryId, userId);
     }

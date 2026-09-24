@@ -45,9 +45,7 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     public FinanceBudget create(UUID userId, boolean shareToGroup, FinanceBudgetCommand command) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         verifyBudgetCommand(userId, currentGroupId, command);
-        if (shareToGroup && currentGroupId == null) {
-            throw new IllegalStateException("소속된 그룹이 없습니다");
-        }
+        GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
         UUID ownerGroupId = shareToGroup ? currentGroupId : null;
 
         List<FinanceBudget> candidates = budgetPort.findOverlapping(
@@ -113,8 +111,7 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
     @Override
     public FinanceBudget update(UUID budgetId, UUID userId, FinanceBudgetCommand command) {
         FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        UUID currentGroupId = FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         verifyBudgetCommand(userId, currentGroupId, command);
         FinanceBudget updated = new FinanceBudget(existing.id(), existing.groupId(), command.categoryId(),
                 existing.userId(), command.applyStartDate(), command.applyEndDate(), command.amount(), existing.createdAt());
@@ -139,9 +136,8 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
 
     @Override
     public void delete(UUID budgetId, UUID userId) {
-        FinanceBudget existing = budgetPort.findByIdOrThrow(budgetId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        FinanceBudget existing = FinanceAccessSupport.loadAccessible(
+                budgetPort::findByIdOrThrow, budgetId, userId, financeGroupPort);
         // 파생 설정이므로 하드 삭제 (소프트 삭제 컬럼 없음)
         budgetPort.delete(budgetId);
         log.info("예산 삭제: budgetId={}, userId={}", budgetId, userId);

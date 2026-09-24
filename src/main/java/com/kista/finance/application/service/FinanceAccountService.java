@@ -39,9 +39,7 @@ class FinanceAccountService implements FinanceAccountUseCase {
         }
         // 대상 그룹은 클라가 아닌 서버가 현재 그룹으로 해석 — 단건 share PATCH와 동일 모델
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        if (shareToGroup && currentGroupId == null) {
-            throw new IllegalStateException("소속된 그룹이 없습니다");
-        }
+        GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
         UUID ownerGroupId = shareToGroup ? currentGroupId : null;
         FinanceAccount account = new FinanceAccount(null, ownerGroupId, userId, command.accountType(),
                 command.name(), command.accountNo(), command.memo(), null);
@@ -54,9 +52,8 @@ class FinanceAccountService implements FinanceAccountUseCase {
     public FinanceAccount update(UUID accountId, UUID userId, FinanceAccountCommand command) {
         // findByIdOrThrow(삭제된 계좌도 조회됨)를 쓰면 안 됨 — FinanceAccount에 deletedAt이 없어
         // save() merge 시 삭제 상태가 조용히 풀려버린다(코드리뷰에서 발견, 2026-08-19).
-        FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        FinanceAccount existing = FinanceAccessSupport.loadAccessible(
+                accountPort::findActiveByIdOrThrow, accountId, userId, financeGroupPort);
         if (command.accountNo() != null && accountPort.existsByAccountNo(command.accountNo(), accountId)) {
             throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
         }
@@ -67,9 +64,8 @@ class FinanceAccountService implements FinanceAccountUseCase {
 
     @Override
     public void delete(UUID accountId, UUID userId) {
-        FinanceAccount existing = accountPort.findByIdOrThrow(accountId);
-        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
-        existing.verifyAccessibleBy(userId, currentGroupId);
+        FinanceAccount existing = FinanceAccessSupport.loadAccessible(
+                accountPort::findByIdOrThrow, accountId, userId, financeGroupPort);
         if (assetSnapshotPort.existsByAccountId(accountId)) {
             throw new FinanceAccount.LinkedAssetSnapshotsException();
         }

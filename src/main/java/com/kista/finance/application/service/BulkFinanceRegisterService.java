@@ -38,8 +38,10 @@ class BulkFinanceRegisterService implements BulkFinanceRegisterUseCase {
                                                List<AssetSnapshotCommand> assets,
                                                List<FinanceTransactionCommand> transactions) {
         // 무그룹 유저의 공유 요청은 항목마다 실패시키지 않고 진입에서 차단 (kista-ui가 토글을 숨기므로 방어용)
-        if (shareToGroup && financeGroupPort.findCurrentGroupId(userId).isEmpty()) {
-            throw new IllegalStateException("소속된 그룹이 없습니다");
+        // shareToGroup=false면 그룹 조회 자체를 하지 않는다 — GroupShareSupport.requireGroupIfSharing은
+        // 인자로 이미 조회된 UUID를 받아 이 단락평가를 못 하므로 여기서는 직접 조건문을 유지한다.
+        if (shareToGroup) {
+            GroupShareSupport.requireCurrentGroup(financeGroupPort.findCurrentGroupId(userId));
         }
 
         List<String> failures = new ArrayList<>();
