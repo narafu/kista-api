@@ -7,6 +7,7 @@ import com.kista.sharedkernel.TimeZones;
 import com.kista.platform.time.UsTradeDates;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossCandle;
 import com.kista.broker.domain.model.toss.TossStockInfo;
 import lombok.RequiredArgsConstructor;
@@ -59,18 +60,29 @@ class TossPriceApi implements CommonMarketPriceFeed {
                 new ParameterizedTypeReference<TossResult<List<PriceItem>>>() {});
         List<PriceItem> items = wrapper != null ? wrapper.result() : null;
 
-        if (items == null) return Map.of();
+        // 응답 자체가 없는 전체 실패 — 조용히 빈 Map을 반환하면 호출부가 가격 0으로 오인
+        if (items == null) {
+            throw new TossApiException("Toss 가격 조회 응답 없음(전체 실패): tickers=" + tickers, null);
+        }
 
-        return items.stream()
+        Map<StrategyTicker, BigDecimal> result = items.stream()
                 .flatMap(item -> StrategyTicker.tryParse(item.symbol())  // StrategyTicker 외 종목(예: AAPL) silent drop
                         .map(t -> Map.entry(t, new BigDecimal(item.lastPrice())))
                         .stream())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        // 요청 티커 중 응답에 없는 종목이 있는 부분 실패 — 0 대체 대신 예외로 알려 호출부가 잘못된 값으로 계산하지 않게 함
+        List<StrategyTicker> missing = tickers.stream().filter(t -> !result.containsKey(t)).toList();
+        if (!missing.isEmpty()) {
+            throw new TossApiException("Toss 가격 조회 응답 누락(부분 실패): 요청=" + tickers + ", 누락=" + missing, null);
+        }
+
+        return result;
     }
 
     public BigDecimal getPrice(StrategyTicker ticker) {
-        // 단건도 getPrices 재사용 — HTTP 호출 횟수 동일
-        return getPrices(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
+        // 단건도 getPrices 재사용 — HTTP 호출 횟수 동일. 요청 티커가 응답에 없으면 getPrices가 예외 전파
+        return getPrices(List.of(ticker)).get(ticker);
     }
 
     public PriceSnapshot getPriceSnapshot(StrategyTicker ticker) {
@@ -88,7 +100,8 @@ class TossPriceApi implements CommonMarketPriceFeed {
     // 전일종가만 필요한 경우 — 현재가 API(/api/v1/prices) 미호출, 캔들 API만 호출
     // 캔들 조회가 실패한 종목만 현재가로 fallback (드문 경우라 별도 배치 호출로 보충)
     public BigDecimal getPrevClose(StrategyTicker ticker) {
-        return getPrevCloses(List.of(ticker)).getOrDefault(ticker, BigDecimal.ZERO);
+        // 캔들·현재가 폴백 모두 실패하면 getPrevCloses/getPrices가 예외 전파
+        return getPrevCloses(List.of(ticker)).get(ticker);
     }
 
     public Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers) {

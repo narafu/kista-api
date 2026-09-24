@@ -2,6 +2,7 @@ package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossCandle;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -59,15 +61,24 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("미등록 종목 (AAPL)은 결과에서 제외")
-    void getPrices_unknownSymbolExcluded() {
+    @DisplayName("요청 티커가 응답에 없으면 예외 (미등록 종목만 응답 — 부분 실패)")
+    void getPrices_requestedTickerMissingFromResponse_throws() {
         var item = new TossPriceApi.PriceItem("AAPL", "180.00", "USD");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
 
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of(StrategyTicker.SOXL));
+        assertThatThrownBy(() -> tossPriceApi.getPrices(List.of(StrategyTicker.SOXL)))
+                .isInstanceOf(TossApiException.class);
+    }
 
-        assertThat(result).isEmpty();
+    @Test
+    @DisplayName("getPrice: 응답에 티커가 없으면 예외 (0 반환 금지)")
+    void getPrice_missingFromResponse_throws() {
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap()); // 빈 목록
+
+        assertThatThrownBy(() -> tossPriceApi.getPrice(StrategyTicker.SOXL))
+                .isInstanceOf(TossApiException.class);
     }
 
     @Test
@@ -157,14 +168,13 @@ class TossPriceApiTest {
     }
 
     @Test
-    @DisplayName("null 응답 시 빈 Map 반환")
-    void getPrices_nullResponse_returnsEmptyMap() {
+    @DisplayName("null 응답 시 예외 (전체 실패)")
+    void getPrices_nullResponse_throws() {
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(null);
 
-        Map<StrategyTicker, BigDecimal> result = tossPriceApi.getPrices(List.of(StrategyTicker.SOXL));
-
-        assertThat(result).isEmpty();
+        assertThatThrownBy(() -> tossPriceApi.getPrices(List.of(StrategyTicker.SOXL)))
+                .isInstanceOf(TossApiException.class);
     }
 
     @Test
@@ -218,6 +228,17 @@ class TossPriceApiTest {
 
         assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
         verify(tossHttpClient, times(1)).getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class));
+    }
+
+    @Test
+    @DisplayName("getPrevClose: 캔들 조회도, 현재가 fallback도 모두 실패하면 예외 (0 반환 금지)")
+    void getPrevClose_candleAndPriceFallbackBothFail_throws() {
+        when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(wrap()); // 빈 목록 — 현재가 fallback도 SOXL 못 찾음
+
+        assertThatThrownBy(() -> tossPriceApi.getPrevClose(StrategyTicker.SOXL))
+                .isInstanceOf(TossApiException.class);
     }
 
     // ── TossStockInfo 캐시 테스트 ──────────────────────────────────────────────────
