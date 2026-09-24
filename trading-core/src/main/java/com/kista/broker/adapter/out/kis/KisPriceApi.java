@@ -224,11 +224,8 @@ class KisPriceApi {
     }
 
     record MultiPriceResponse(
-        @JsonProperty("output") Output output,
         @JsonProperty("output2") List<Output2> output2
     ) {
-        record Output(@JsonProperty("nrec") String nrec) {}
-
         // symb: 종목코드, last: 현재가(체결가), base: 전일종가(last 빈값 시 fallback)
         record Output2(
             @JsonProperty("symb") String symb,

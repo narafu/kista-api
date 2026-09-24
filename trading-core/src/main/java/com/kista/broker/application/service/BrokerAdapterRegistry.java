@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -33,13 +32,6 @@ public class BrokerAdapterRegistry {
                     account.broker() + " 브로커는 " + capability.getSimpleName() + "를 지원하지 않습니다");
         }
         return capability.cast(adapter);
-    }
-
-    // 지원하지 않으면 Optional.empty() — 호출자가 fallback 처리
-    public <T> Optional<T> find(BrokerAccountRef account, Class<T> capability) {
-        BrokerAdapterPort adapter = registry.get(account.broker());
-        if (adapter == null || !capability.isInstance(adapter)) return Optional.empty();
-        return Optional.of(capability.cast(adapter));
     }
 
     private BrokerAdapterPort getAdapter(BrokerAccountRef account) {

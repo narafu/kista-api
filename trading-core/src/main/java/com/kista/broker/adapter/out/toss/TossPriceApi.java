@@ -262,7 +262,6 @@ class TossPriceApi implements CommonMarketPriceFeed {
         @JsonProperty("englishName")      String englishName,     // 영문 종목명
         @JsonProperty("market")           String market,          // 거래소/시장
         @JsonProperty("currency")         String currency,        // 통화
-        @JsonProperty("status")           String status,          // 종목 상태
-        @JsonProperty("sharesOutstanding") String sharesOutstanding // 발행주식수
+        @JsonProperty("status")           String status           // 종목 상태
     ) {}
 }

@@ -51,7 +51,7 @@ class TossOrderApiTest {
 
     // Toss API 응답 TossResult<OrderResponse> 래퍼 헬퍼
     private static TossResult<TossOrderApi.OrderResponse> wrap(String orderId) {
-        return new TossResult<>(new TossOrderApi.OrderResponse(orderId, null));
+        return new TossResult<>(new TossOrderApi.OrderResponse(orderId));
     }
 
     // GET /api/v1/orders 응답 TossResult<OrdersResponse> 래퍼 헬퍼
@@ -117,7 +117,7 @@ class TossOrderApiTest {
     void place_nullOrderId_throwsTossApiException() {
         OrderInstruction instruction = locBuyInstruction();
         when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossOrderApi.OrderResponse(null, null)));
+            .thenReturn(new TossResult<>(new TossOrderApi.OrderResponse(null)));
 
         assertThatThrownBy(() -> tossOrderApi.place(instruction, ACCOUNT))
             .isInstanceOf(TossApiException.class);

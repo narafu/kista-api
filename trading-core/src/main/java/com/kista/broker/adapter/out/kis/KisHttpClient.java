@@ -30,12 +30,6 @@ class KisHttpClient {
     @Value("${kis.base-url}")
     private final String baseUrl;
 
-    // 계좌별 자격증명으로 헤더 구성 — 모든 KIS API 호출에 사용
-    public HttpHeaders buildHeaders(String trId, BrokerAccountRef account) {
-        String token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
-        return buildHeaders(token, account.appKey(), account.secretKey(), trId);
-    }
-
     // 토큰을 직접 보유한 호출부(KisAuthApi 등) 공용 헤더 빌더
     public static HttpHeaders buildHeaders(String token, String appKey, String appSecret, String trId) {
         HttpHeaders headers = new HttpHeaders();

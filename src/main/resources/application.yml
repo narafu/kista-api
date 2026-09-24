@@ -136,8 +136,3 @@ logging:
   level:
     root: INFO
     com.kista: DEBUG
-
-# dead-man's switch — 스케쥴러 실행 완료 핑 (미설정 시 생략)
-heartbeat:
-  open-url: ${HEARTBEAT_OPEN_URL:}
-  close-url: ${HEARTBEAT_CLOSE_URL:}

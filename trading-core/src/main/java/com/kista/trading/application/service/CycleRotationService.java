@@ -1,5 +1,4 @@
 package com.kista.trading.application.service;
-import com.kista.trading.application.service.support.SeedResolutionPolicy;
 
 import com.kista.sharedkernel.NewCycleStartedEvent;
 import com.kista.sharedkernel.TradingErrorEvent;
@@ -57,8 +56,7 @@ class CycleRotationService {
         BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle); // MAX 기준 시드 (내부 원장)
 
         // 잔고검증 정책 — ON: 증권사 실잔고 조회, OFF: 내부 원장만 사용
-        SeedResolutionPolicy policy = resolvePolicy(userProfile, account, strategy);
-        Optional<BigDecimal> balanceOpt = policy.resolveAvailableBalance(strategy, maintainSeed, maxSeed);
+        Optional<BigDecimal> balanceOpt = resolveAvailableBalance(userProfile, account, strategy, maintainSeed, maxSeed);
         if (balanceOpt.isEmpty()) {
             // 증권사 조회 실패 — 내부에서 notifyError 완료. 여기서 PAUSED하지 않으면 사이클은 이미
             // markEnded로 종료된 채 전략만 ACTIVE로 남아 후속 사이클 없는 좀비 상태가 되고,
@@ -126,15 +124,15 @@ class CycleRotationService {
         return null;
     }
 
-    // 잔고검증 설정에 따라 시드 결정 정책 선택
-    private SeedResolutionPolicy resolvePolicy(TradingUserProfile userProfile, Account account, Strategy strategy) {
+    // 잔고검증 설정에 따라 가용 잔고 결정 — 가용 잔고를 반환, 증권사 조회 실패·오류 시 Optional.empty() (호출부는 rotate 중단)
+    private Optional<BigDecimal> resolveAvailableBalance(TradingUserProfile userProfile, Account account, Strategy strategy,
+                                                          BigDecimal maintainSeed, BigDecimal maxSeed) {
         if (!userProfile.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)
-            return (s, maintainSeed, maxSeed) ->
-                    Optional.of(s.cycleSeedType() == StrategyCycleSeedType.MAX ? maxSeed : maintainSeed);
+            return Optional.of(strategy.cycleSeedType() == StrategyCycleSeedType.MAX ? maxSeed : maintainSeed);
         }
         // ON: 증권사 실잔고 조회
-        return (s, maintainSeed, maxSeed) -> Optional.ofNullable(fetchUsdBalance(s, account));
+        return Optional.ofNullable(fetchUsdBalance(strategy, account));
     }
 
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준

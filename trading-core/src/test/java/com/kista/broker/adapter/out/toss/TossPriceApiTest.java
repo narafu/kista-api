@@ -253,7 +253,7 @@ class TossPriceApiTest {
     void getStockInfo_sameSymbol_callsHttpOnce() {
         var stockItem = new TossPriceApi.StockItem("SOXL", "Direxion Daily Leveraged Semiconductor Bull 3X",
                                                      "Direxion Daily Semiconductor Bull 3X Shares",
-                                                     "NYSE ARCA", "USD", "NORMAL", "10000000");
+                                                     "NYSE ARCA", "USD", "NORMAL");
         when(tossHttpClient.getCommon(eq("/api/v1/stocks"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrapStocks(stockItem));
 

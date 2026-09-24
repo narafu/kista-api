@@ -1,6 +1,5 @@
 package com.kista.user.application.service;
 
-import com.kista.user.application.usecase.BlacklistUseCase;
 import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.platform.security.TokenBlacklistPort;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +10,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-class BlacklistService implements BlacklistUseCase, TokenBlacklistPort {
+class BlacklistService implements TokenBlacklistPort {
 
     private final BlacklistPort blacklistPort;
 

@@ -169,8 +169,7 @@ class TossOrderApi {
 
     // package-private — TossOrderApiTest에서 직접 생성하여 stub에 사용
     record OrderResponse(
-        @JsonProperty("orderId") String orderId,
-        @JsonProperty("clientOrderId") String clientOrderId
+        @JsonProperty("orderId") String orderId
     ) {}
 
     // GET /api/v1/orders 응답 — package-private으로 테스트에서 직접 생성 가능
