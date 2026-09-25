@@ -3,9 +3,7 @@ package com.kista.user.adapter.in.web;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.user.domain.model.NotificationChannel;
 import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.user.application.usecase.UpdateBalanceCheckUseCase;
-import com.kista.user.application.usecase.UpdateNotificationPrefUseCase;
-import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase;
+import com.kista.user.application.usecase.UserSettingsUseCase;
 import com.kista.user.application.usecase.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -39,9 +37,7 @@ class SettingsControllerTest {
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserProfileUseCase userProfileUseCase;
-    @MockitoBean UpdateBalanceCheckUseCase updateBalanceCheckUseCase;
-    @MockitoBean UpdateNotificationPrefUseCase updateNotificationPrefUseCase;
-    @MockitoBean UpdateStrategySuggestionsUseCase updateStrategySuggestionsUseCase;
+    @MockitoBean UserSettingsUseCase userSettingsUseCase;
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -127,8 +123,8 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(updateNotificationPrefUseCase).update(
-                argThat(cmd -> cmd.type().name().equals("TRADING_ALERT") && !cmd.enabled()));
+        verify(userSettingsUseCase).updateNotificationPref(
+                any(), argThat(type -> type.name().equals("TRADING_ALERT")), eq(false));
     }
 
     @Test
@@ -148,7 +144,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(updateBalanceCheckUseCase).update(argThat(cmd -> !cmd.enabled()));
+        verify(userSettingsUseCase).updateBalanceCheck(any(), eq(false));
     }
 
     @Test
@@ -159,7 +155,7 @@ class SettingsControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
 
-        verify(updateStrategySuggestionsUseCase).update(
-                argThat(cmd -> cmd.suggestions().equals(java.util.List.of("VR", "커스텀전략"))));
+        verify(userSettingsUseCase).updateStrategySuggestions(
+                any(), eq(java.util.List.of("VR", "커스텀전략")));
     }
 }

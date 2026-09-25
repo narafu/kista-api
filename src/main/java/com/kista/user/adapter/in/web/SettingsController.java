@@ -8,12 +8,7 @@ import com.kista.user.adapter.in.web.dto.StrategySuggestionsRequest;
 import com.kista.user.adapter.in.web.dto.TelegramUpdateRequest;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.NotificationChannel;
-import com.kista.user.application.usecase.UpdateBalanceCheckUseCase;
-import com.kista.user.application.usecase.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
-import com.kista.user.application.usecase.UpdateNotificationPrefUseCase;
-import com.kista.user.application.usecase.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
-import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase;
-import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
+import com.kista.user.application.usecase.UserSettingsUseCase;
 import com.kista.user.application.usecase.UserProfileUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -33,9 +28,7 @@ import java.util.UUID;
 public class SettingsController {
 
     private final UserProfileUseCase userProfileUseCase;
-    private final UpdateBalanceCheckUseCase updateBalanceCheckUseCase;       // 잔고검증 설정 — user_settings 테이블
-    private final UpdateNotificationPrefUseCase updateNotificationPrefUseCase; // 알림 타입별 on/off — user_notification_prefs 테이블
-    private final UpdateStrategySuggestionsUseCase updateStrategySuggestionsUseCase; // 운영전략 추천 목록 — user_settings 테이블
+    private final UserSettingsUseCase userSettingsUseCase; // 잔고검증/알림타입/운영전략 추천 목록 — user_settings·user_notification_prefs 테이블
 
     // 텔레그램 봇 설정 (botToken, chatId 저장 + getMe로 username 검증) — IllegalArgumentException→400 GlobalExceptionHandler 처리
     @Operation(summary = "텔레그램 설정 저장", description = "텔레그램 봇 토큰과 채팅 ID를 AES-256 암호화하여 저장. body: {\"botToken\": \"...\", \"chatId\": \"...\"}")
@@ -77,7 +70,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateBalanceCheck(@AuthenticationPrincipal UUID userId,
                                    @RequestBody BalanceCheckRequest body) {
-        updateBalanceCheckUseCase.update(new UpdateBalanceCheckCommand(userId, body.enabled()));
+        userSettingsUseCase.updateBalanceCheck(userId, body.enabled());
     }
 
     // 알림 타입 on/off (TRADING_ALERT 등)
@@ -96,7 +89,7 @@ public class SettingsController {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("알 수 없는 알림 타입: " + type + ". 허용값: TRADING_ALERT");
         }
-        updateNotificationPrefUseCase.update(new UpdateNotificationPrefCommand(userId, notificationType, body.enabled()));
+        userSettingsUseCase.updateNotificationPref(userId, notificationType, body.enabled());
     }
 
     // 운영전략 추천 목록 변경 (자산 등록 폼 자유입력을 돕는 추천값 — 값 자체를 제한하지 않음)
@@ -106,7 +99,7 @@ public class SettingsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStrategySuggestions(@AuthenticationPrincipal UUID userId,
                                           @Valid @RequestBody StrategySuggestionsRequest body) {
-        updateStrategySuggestionsUseCase.update(new UpdateStrategySuggestionsCommand(userId, body.suggestions()));
+        userSettingsUseCase.updateStrategySuggestions(userId, body.suggestions());
     }
 
     // 닉네임 변경 (1~10자, 한글·영문·숫자·공백)

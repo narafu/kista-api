@@ -2,9 +2,6 @@ package com.kista.user.application.service;
 
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.UserSettings;
-import com.kista.user.application.usecase.UpdateBalanceCheckUseCase.UpdateBalanceCheckCommand;
-import com.kista.user.application.usecase.UpdateNotificationPrefUseCase.UpdateNotificationPrefCommand;
-import com.kista.user.application.usecase.UpdateStrategySuggestionsUseCase.UpdateStrategySuggestionsCommand;
 import com.kista.user.application.port.output.ActiveStrategyCountPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import org.junit.jupiter.api.Test;
@@ -54,7 +51,7 @@ class UserSettingsServiceTest {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
-        service.update(new UpdateNotificationPrefCommand(USER_ID, NotificationType.TRADING_ALERT, false));
+        service.updateNotificationPref(USER_ID, NotificationType.TRADING_ALERT, false);
 
         verify(userSettingsPort).save(argThat(s ->
                 !s.isNotificationEnabled(NotificationType.TRADING_ALERT)));
@@ -66,7 +63,7 @@ class UserSettingsServiceTest {
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
         when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenReturn(0L);
 
-        service.update(new UpdateBalanceCheckCommand(USER_ID, false));
+        service.updateBalanceCheck(USER_ID, false);
 
         verify(userSettingsPort).save(argThat(s -> !s.balanceCheckEnabled()));
     }
@@ -76,7 +73,7 @@ class UserSettingsServiceTest {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
-        service.update(new UpdateStrategySuggestionsCommand(USER_ID, List.of("커스텀전략")));
+        service.updateStrategySuggestions(USER_ID, List.of("커스텀전략"));
 
         verify(userSettingsPort).save(argThat(s -> s.strategySuggestions().equals(List.of("커스텀전략"))));
     }
@@ -85,7 +82,7 @@ class UserSettingsServiceTest {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
-        service.update(new UpdateNotificationPrefCommand(USER_ID, NotificationType.TRADING_ALERT, false));
+        service.updateNotificationPref(USER_ID, NotificationType.TRADING_ALERT, false);
 
         // 저장된 값 그대로가 trading-core 복제본으로 전달돼야 한다
         verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s ->
@@ -98,7 +95,7 @@ class UserSettingsServiceTest {
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
         when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenReturn(0L);
 
-        service.update(new UpdateBalanceCheckCommand(USER_ID, false));
+        service.updateBalanceCheck(USER_ID, false);
 
         verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s ->
                 s.userId().equals(USER_ID) && !s.balanceCheckEnabled()));
@@ -109,7 +106,7 @@ class UserSettingsServiceTest {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
-        service.update(new UpdateStrategySuggestionsCommand(USER_ID, List.of("커스텀전략")));
+        service.updateStrategySuggestions(USER_ID, List.of("커스텀전략"));
 
         verifyNoInteractions(userNotifyProfilePublisher);
     }
