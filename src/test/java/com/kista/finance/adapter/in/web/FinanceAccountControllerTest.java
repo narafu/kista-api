@@ -45,7 +45,7 @@ class FinanceAccountControllerTest {
 
     @Test
     void list_returns200() throws Exception {
-        when(accountUseCase.list(any(), any())).thenReturn(List.of());
+        when(accountUseCase.list(any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/accounts")
                         .with(authentication(userToken(USER_ID))))

@@ -34,9 +34,8 @@ public class FinanceCategoryController {
     @GetMapping
     public List<FinanceCategoryResponse> list(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
             @RequestParam(required = false) FinanceCategory.Type type) {
-        List<FinanceCategory> flat = categoryUseCase.list(userId, groupId, type);
+        List<FinanceCategory> flat = categoryUseCase.list(userId, type);
         Map<UUID, List<FinanceCategory>> byParent = flat.stream()
                 .filter(c -> c.parentId() != null)
                 .collect(Collectors.groupingBy(FinanceCategory::parentId));

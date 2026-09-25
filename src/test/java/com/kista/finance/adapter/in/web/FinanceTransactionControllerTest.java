@@ -46,7 +46,7 @@ class FinanceTransactionControllerTest {
 
     @Test
     void list_withNoQueryParams_returns200() throws Exception {
-        when(transactionUseCase.list(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(transactionUseCase.list(any(), any(), any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/transactions")
                         .with(authentication(userToken(USER_ID))))
@@ -56,7 +56,7 @@ class FinanceTransactionControllerTest {
 
     @Test
     void list_withAllQueryParams_returns200() throws Exception {
-        when(transactionUseCase.list(any(), any(), any(), any(), any(), any())).thenReturn(List.of());
+        when(transactionUseCase.list(any(), any(), any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/transactions")
                         .param("from", "2026-08-01")

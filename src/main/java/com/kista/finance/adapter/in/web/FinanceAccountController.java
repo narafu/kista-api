@@ -31,9 +31,8 @@ public class FinanceAccountController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<FinanceAccountResponse> list(
-            @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId) {
-        return accountUseCase.list(userId, groupId).stream()
+            @AuthenticationPrincipal UUID userId) {
+        return accountUseCase.list(userId).stream()
                 .map(FinanceAccountResponse::from)
                 .toList();
     }

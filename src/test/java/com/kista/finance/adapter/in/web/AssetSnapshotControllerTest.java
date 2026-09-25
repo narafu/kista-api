@@ -60,7 +60,7 @@ class AssetSnapshotControllerTest {
     @Test
     void list_categoryIsL1_rootCategoryIdEqualsOwnId() throws Exception {
         UUID categoryId = UUID.randomUUID();
-        when(assetSnapshotUseCase.list(any(), any(), any(), any(), any()))
+        when(assetSnapshotUseCase.list(any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l1Category = new FinanceCategory(categoryId, null, null, null,
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
@@ -78,7 +78,7 @@ class AssetSnapshotControllerTest {
     void list_categoryIsL2_rootCategoryIdEqualsParentId() throws Exception {
         UUID parentId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
-        when(assetSnapshotUseCase.list(any(), any(), any(), any(), any()))
+        when(assetSnapshotUseCase.list(any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l2Category = new FinanceCategory(categoryId, null, parentId, null,
                 FinanceCategory.Type.ASSET, "국내주식", 0, Instant.now());
@@ -99,7 +99,7 @@ class AssetSnapshotControllerTest {
         UUID rootId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
-        when(assetSnapshotUseCase.list(any(), any(), any(), any(), any()))
+        when(assetSnapshotUseCase.list(any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, null)));
         FinanceCategory l3Category = new FinanceCategory(categoryId, null, parentId, null,
                 FinanceCategory.Type.ASSET, "미국주식", 0, Instant.now());
@@ -122,7 +122,7 @@ class AssetSnapshotControllerTest {
     void list_withAccountId_accountNamePresent() throws Exception {
         UUID categoryId = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
-        when(assetSnapshotUseCase.list(any(), any(), any(), any(), any()))
+        when(assetSnapshotUseCase.list(any(), any(), any(), any()))
                 .thenReturn(List.of(snapshot(categoryId, accountId)));
         FinanceCategory category = new FinanceCategory(categoryId, null, null, null,
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());

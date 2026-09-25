@@ -29,7 +29,7 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FinanceBudget> list(UUID userId, UUID requestedGroupId, UUID categoryId, LocalDate date) {
+    public List<FinanceBudget> list(UUID userId, UUID categoryId, LocalDate date) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         return budgetPort.findMyScope(userId, currentGroupId, categoryId, date);
     }

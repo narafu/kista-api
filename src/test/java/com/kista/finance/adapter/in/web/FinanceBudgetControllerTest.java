@@ -48,7 +48,7 @@ class FinanceBudgetControllerTest {
 
     @Test
     void list_withNoQueryParams_returns200() throws Exception {
-        when(budgetUseCase.list(any(), any(), any(), any())).thenReturn(List.of());
+        when(budgetUseCase.list(any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/budgets")
                         .with(authentication(userToken(USER_ID))))
@@ -58,7 +58,7 @@ class FinanceBudgetControllerTest {
 
     @Test
     void list_withAllQueryParams_returns200() throws Exception {
-        when(budgetUseCase.list(any(), any(), any(), any())).thenReturn(List.of());
+        when(budgetUseCase.list(any(), any(), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/finance/budgets")
                         .param("categoryId", UUID.randomUUID().toString())

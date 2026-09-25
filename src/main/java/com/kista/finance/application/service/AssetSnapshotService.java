@@ -31,7 +31,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AssetSnapshot> list(UUID userId, UUID requestedGroupId, LocalDate from, LocalDate to, UUID filterUserId) {
+    public List<AssetSnapshot> list(UUID userId, LocalDate from, LocalDate to, UUID filterUserId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         return assetSnapshotPort.findMyScope(userId, currentGroupId, from, to, filterUserId);
     }

@@ -34,12 +34,11 @@ public class FinanceTransactionController {
     @GetMapping
     public List<FinanceTransactionResponse> list(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(name = "userId", required = false) UUID filterUserId) {
-        return transactionUseCase.list(userId, groupId, from, to, categoryId, filterUserId).stream()
+        return transactionUseCase.list(userId, from, to, categoryId, filterUserId).stream()
                 .map(FinanceTransactionResponse::from)
                 .toList();
     }

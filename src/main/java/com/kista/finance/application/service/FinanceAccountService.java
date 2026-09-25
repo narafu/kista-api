@@ -26,7 +26,7 @@ class FinanceAccountService implements FinanceAccountUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FinanceAccount> list(UUID userId, UUID requestedGroupId) {
+    public List<FinanceAccount> list(UUID userId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         return accountPort.findMyScope(userId, currentGroupId);
     }

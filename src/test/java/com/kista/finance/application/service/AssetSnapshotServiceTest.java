@@ -66,7 +66,7 @@ class AssetSnapshotServiceTest {
         when(assetSnapshotPort.findMyScope(userId, groupId, null, null, null))
                 .thenReturn(List.of(personalSnapshot()));
 
-        List<AssetSnapshot> result = assetSnapshotService.list(userId, null, null, null, null);
+        List<AssetSnapshot> result = assetSnapshotService.list(userId, null, null, null);
 
         assertThat(result).hasSize(1);
         verify(assetSnapshotPort).findMyScope(userId, groupId, null, null, null);

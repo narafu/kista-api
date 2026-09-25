@@ -37,7 +37,7 @@ class MonthlyClosingServiceTest {
         MonthlyClosing closing = new MonthlyClosing(UUID.randomUUID(), groupId, userId, "2026-01", false, null, null);
         when(monthlyClosingPort.findMyScope(userId, groupId)).thenReturn(List.of(closing));
 
-        List<MonthlyClosing> result = monthlyClosingService.list(userId, null);
+        List<MonthlyClosing> result = monthlyClosingService.list(userId);
 
         assertThat(result).hasSize(1);
         verify(monthlyClosingPort).findMyScope(userId, groupId);
@@ -50,7 +50,7 @@ class MonthlyClosingServiceTest {
         MonthlyClosing closed = new MonthlyClosing(UUID.randomUUID(), null, userId, "2026-08", true, null, null);
         when(monthlyClosingPort.upsert(null, userId, "2026-08", true)).thenReturn(closed);
 
-        MonthlyClosing result = monthlyClosingService.setCompleted(userId, null, "2026-08", true);
+        MonthlyClosing result = monthlyClosingService.setCompleted(userId, "2026-08", true);
 
         assertThat(result).isEqualTo(closed);
         verify(monthlyClosingPort).upsert(null, userId, "2026-08", true);
@@ -63,7 +63,7 @@ class MonthlyClosingServiceTest {
         MonthlyClosing closed = new MonthlyClosing(UUID.randomUUID(), groupId, userId, "2026-08", true, null, null);
         when(monthlyClosingPort.upsert(groupId, userId, "2026-08", true)).thenReturn(closed);
 
-        monthlyClosingService.setCompleted(userId, null, "2026-08", true);
+        monthlyClosingService.setCompleted(userId, "2026-08", true);
 
         verify(monthlyClosingPort).upsert(groupId, userId, "2026-08", true);
     }
@@ -71,7 +71,7 @@ class MonthlyClosingServiceTest {
     @Test
     @DisplayName("잘못된 형식('2026-13')은 DateTimeParseException을 그대로 전파 (400 매핑은 GlobalExceptionHandler 책임)")
     void setCompleted_malformedMonth_invalidRange_propagatesParseException() {
-        assertThatThrownBy(() -> monthlyClosingService.setCompleted(userId, null, "2026-13", true))
+        assertThatThrownBy(() -> monthlyClosingService.setCompleted(userId, "2026-13", true))
                 .isInstanceOf(DateTimeParseException.class);
 
         verifyNoInteractions(monthlyClosingPort);
@@ -80,7 +80,7 @@ class MonthlyClosingServiceTest {
     @Test
     @DisplayName("잘못된 형식('August')은 DateTimeParseException을 그대로 전파")
     void setCompleted_malformedMonth_notNumeric_propagatesParseException() {
-        assertThatThrownBy(() -> monthlyClosingService.setCompleted(userId, null, "August", true))
+        assertThatThrownBy(() -> monthlyClosingService.setCompleted(userId, "August", true))
                 .isInstanceOf(DateTimeParseException.class);
 
         verifyNoInteractions(monthlyClosingPort);
@@ -95,7 +95,7 @@ class MonthlyClosingServiceTest {
         when(monthlyClosingPort.upsert(groupId, userId, "2026-08", false))
                 .thenReturn(new MonthlyClosing(UUID.randomUUID(), groupId, userId, "2026-08", false, null, null));
 
-        monthlyClosingService.setCompleted(userId, null, "2026-08", false);
+        monthlyClosingService.setCompleted(userId, "2026-08", false);
 
         verify(monthlyClosingPort).upsert(groupId, userId, "2026-08", false);
     }
@@ -109,7 +109,7 @@ class MonthlyClosingServiceTest {
         MonthlyClosing reopened = new MonthlyClosing(UUID.randomUUID(), groupId, userId, "2026-08", false, null, null);
         when(monthlyClosingPort.upsert(groupId, userId, "2026-08", false)).thenReturn(reopened);
 
-        MonthlyClosing result = monthlyClosingService.setCompleted(userId, null, "2026-08", false);
+        MonthlyClosing result = monthlyClosingService.setCompleted(userId, "2026-08", false);
 
         assertThat(result.completed()).isFalse();
         verify(monthlyClosingPort).upsert(groupId, userId, "2026-08", false);

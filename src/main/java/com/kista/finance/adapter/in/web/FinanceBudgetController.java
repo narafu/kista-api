@@ -34,10 +34,9 @@ public class FinanceBudgetController {
     @GetMapping
     public List<FinanceBudgetResponse> list(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return budgetUseCase.list(userId, groupId, categoryId, date).stream()
+        return budgetUseCase.list(userId, categoryId, date).stream()
                 .map(FinanceBudgetResponse::from)
                 .toList();
     }

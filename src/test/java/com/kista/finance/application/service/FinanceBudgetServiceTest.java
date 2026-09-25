@@ -60,7 +60,7 @@ class FinanceBudgetServiceTest {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(budgetPort.findMyScope(userId, groupId, categoryId, null)).thenReturn(List.of(personalBudget()));
 
-        List<FinanceBudget> result = budgetService.list(userId, null, categoryId, null);
+        List<FinanceBudget> result = budgetService.list(userId, categoryId, null);
 
         assertThat(result).hasSize(1);
         verify(budgetPort).findMyScope(userId, groupId, categoryId, null);

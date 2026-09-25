@@ -27,9 +27,8 @@ public class MonthlyClosingController {
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping
     public List<MonthlyClosingResponse> list(
-            @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId) {
-        return monthlyClosingUseCase.list(userId, groupId).stream()
+            @AuthenticationPrincipal UUID userId) {
+        return monthlyClosingUseCase.list(userId).stream()
                 .map(MonthlyClosingResponse::from)
                 .toList();
     }
@@ -43,9 +42,8 @@ public class MonthlyClosingController {
     public MonthlyClosingResponse setCompleted(
             @Parameter(description = "연월", example = "2026-08") @PathVariable String month,
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
             @RequestBody MonthlyClosingRequest request) {
         return MonthlyClosingResponse.from(
-                monthlyClosingUseCase.setCompleted(userId, groupId, month, request.completed()));
+                monthlyClosingUseCase.setCompleted(userId, month, request.completed()));
     }
 }

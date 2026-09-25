@@ -51,7 +51,7 @@ class FinanceCategoryControllerTest {
                 FinanceCategory.Type.EXPENSE, "식비", 0, Instant.now());
         FinanceCategory l2 = new FinanceCategory(l2Id, null, l1Id, null,
                 FinanceCategory.Type.EXPENSE, "외식", 0, Instant.now());
-        when(categoryUseCase.list(any(), any(), any())).thenReturn(List.of(l1, l2));
+        when(categoryUseCase.list(any(), any())).thenReturn(List.of(l1, l2));
 
         mockMvc.perform(get("/api/finance/categories")
                         .with(authentication(userToken(USER_ID))))
@@ -72,7 +72,7 @@ class FinanceCategoryControllerTest {
                 FinanceCategory.Type.EXPENSE, "외식", 0, Instant.now());
         FinanceCategory l3 = new FinanceCategory(l3Id, null, l2Id, null,
                 FinanceCategory.Type.EXPENSE, "배달", 0, Instant.now());
-        when(categoryUseCase.list(any(), any(), any())).thenReturn(List.of(l1, l2, l3));
+        when(categoryUseCase.list(any(), any())).thenReturn(List.of(l1, l2, l3));
 
         mockMvc.perform(get("/api/finance/categories")
                         .with(authentication(userToken(USER_ID))))

@@ -25,7 +25,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FinanceCategory> list(UUID userId, UUID requestedGroupId, FinanceCategory.Type type) {
+    public List<FinanceCategory> list(UUID userId, FinanceCategory.Type type) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         // 트리 중첩은 이 계층의 관심사가 아니다 — 도메인 레코드가 flat이라 web 계층 DTO에서 조립한다.
         return categoryPort.findSelectable(userId, currentGroupId, type).stream()

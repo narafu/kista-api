@@ -46,7 +46,7 @@ class MonthlyClosingControllerTest {
         UUID groupId = UUID.randomUUID();
         MonthlyClosing closing = new MonthlyClosing(UUID.randomUUID(), groupId, USER_ID,
                 "2026-08", true, Instant.now(), Instant.now());
-        when(monthlyClosingUseCase.list(any(), any())).thenReturn(List.of(closing));
+        when(monthlyClosingUseCase.list(any())).thenReturn(List.of(closing));
 
         mockMvc.perform(get("/api/finance/monthly-closings")
                         .with(authentication(userToken(USER_ID))))
@@ -61,7 +61,7 @@ class MonthlyClosingControllerTest {
     void list_personalClosing_groupIdIsNull() throws Exception {
         MonthlyClosing personal = new MonthlyClosing(UUID.randomUUID(), null, USER_ID,
                 "2026-08", true, Instant.now(), Instant.now());
-        when(monthlyClosingUseCase.list(any(), any())).thenReturn(List.of(personal));
+        when(monthlyClosingUseCase.list(any())).thenReturn(List.of(personal));
 
         mockMvc.perform(get("/api/finance/monthly-closings")
                         .with(authentication(userToken(USER_ID))))
@@ -75,7 +75,7 @@ class MonthlyClosingControllerTest {
     void setCompleted_patch_returns200() throws Exception {
         MonthlyClosing closing = new MonthlyClosing(UUID.randomUUID(), UUID.randomUUID(), USER_ID,
                 "2026-08", true, Instant.now(), Instant.now());
-        when(monthlyClosingUseCase.setCompleted(eq(USER_ID), any(), eq("2026-08"), eq(true)))
+        when(monthlyClosingUseCase.setCompleted(eq(USER_ID), eq("2026-08"), eq(true)))
                 .thenReturn(closing);
 
         mockMvc.perform(patch("/api/finance/monthly-closings/{month}", "2026-08")

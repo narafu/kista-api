@@ -265,7 +265,7 @@ class FinanceCategoryServiceTest {
         when(categoryPort.findSelectable(userId, groupId, FinanceCategory.Type.EXPENSE))
                 .thenReturn(List.of(c30, c10, c20));
 
-        List<FinanceCategory> result = categoryService.list(userId, null, FinanceCategory.Type.EXPENSE);
+        List<FinanceCategory> result = categoryService.list(userId, FinanceCategory.Type.EXPENSE);
 
         assertThat(result).extracting(FinanceCategory::sortOrder).containsExactly(10, 20, 30);
         verify(categoryPort).findSelectable(userId, groupId, FinanceCategory.Type.EXPENSE);
@@ -279,7 +279,7 @@ class FinanceCategoryServiceTest {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
         when(categoryPort.findSelectable(userId, null, null)).thenReturn(List.of());
 
-        categoryService.list(userId, null, null);
+        categoryService.list(userId, null);
 
         verify(categoryPort).findSelectable(userId, null, null);
     }

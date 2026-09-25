@@ -30,7 +30,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<FinanceTransaction> list(UUID userId, UUID requestedGroupId, LocalDate from, LocalDate to,
+    public List<FinanceTransaction> list(UUID userId, LocalDate from, LocalDate to,
                                           UUID categoryId, UUID filterUserId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         return transactionPort.findMyScope(userId, currentGroupId, from, to, categoryId, filterUserId);

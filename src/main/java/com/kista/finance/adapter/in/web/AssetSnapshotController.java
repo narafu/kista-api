@@ -43,11 +43,10 @@ public class AssetSnapshotController {
     @GetMapping
     public List<AssetSnapshotResponse> list(
             @AuthenticationPrincipal UUID userId,
-            @RequestParam(required = false) UUID groupId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(name = "userId", required = false) UUID filterUserId) {
-        return assetSnapshotUseCase.list(userId, groupId, from, to, filterUserId).stream()
+        return assetSnapshotUseCase.list(userId, from, to, filterUserId).stream()
                 .sorted(Comparator.comparing(AssetSnapshot::entryDate).reversed())
                 .map(this::enrich)
                 .toList();

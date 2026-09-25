@@ -26,13 +26,13 @@ class MonthlyClosingService implements MonthlyClosingUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<MonthlyClosing> list(UUID userId, UUID requestedGroupId) {
+    public List<MonthlyClosing> list(UUID userId) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         return monthlyClosingPort.findMyScope(userId, currentGroupId);
     }
 
     @Override
-    public MonthlyClosing setCompleted(UUID userId, UUID requestedGroupId, String month, boolean completed) {
+    public MonthlyClosing setCompleted(UUID userId, String month, boolean completed) {
         UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
         // 형식·범위(월 01~12) 동시 검증 — 실패 시 DateTimeParseException → GlobalExceptionHandler가 400으로 매핑
         YearMonth.parse(month, MONTH_FORMATTER);

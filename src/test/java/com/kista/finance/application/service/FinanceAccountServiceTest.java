@@ -49,7 +49,7 @@ class FinanceAccountServiceTest {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(accountPort.findMyScope(userId, groupId)).thenReturn(List.of(personalAccount()));
 
-        List<FinanceAccount> result = accountService.list(userId, null);
+        List<FinanceAccount> result = accountService.list(userId);
 
         assertThat(result).hasSize(1);
         verify(accountPort).findMyScope(userId, groupId);

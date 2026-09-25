@@ -62,7 +62,7 @@ class FinanceTransactionServiceTest {
         when(transactionPort.findMyScope(userId, groupId, null, null, null, null))
                 .thenReturn(List.of(personalTransaction()));
 
-        List<FinanceTransaction> result = transactionService.list(userId, null, null, null, null, null);
+        List<FinanceTransaction> result = transactionService.list(userId, null, null, null, null);
 
         assertThat(result).hasSize(1);
         verify(transactionPort).findMyScope(userId, groupId, null, null, null, null);

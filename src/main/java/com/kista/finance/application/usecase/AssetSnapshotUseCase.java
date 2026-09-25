@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface AssetSnapshotUseCase {
-    List<AssetSnapshot> list(UUID userId, UUID requestedGroupId, LocalDate from, LocalDate to, UUID createdBy);
+    List<AssetSnapshot> list(UUID userId, LocalDate from, LocalDate to, UUID createdBy);
     // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
     AssetSnapshot create(UUID userId, boolean shareToGroup, AssetSnapshotCommand command);
     AssetSnapshot update(UUID snapshotId, UUID userId, AssetSnapshotCommand command);

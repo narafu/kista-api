@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface FinanceTransactionUseCase {
-    List<FinanceTransaction> list(UUID userId, UUID requestedGroupId, LocalDate from, LocalDate to, UUID categoryId, UUID createdBy);
+    List<FinanceTransaction> list(UUID userId, LocalDate from, LocalDate to, UUID categoryId, UUID createdBy);
     // shareToGroup=true면 소유자의 현재 그룹 소유로 원자적 생성, false면 개인 소유.
     FinanceTransaction create(UUID userId, boolean shareToGroup, FinanceTransactionCommand command);
     FinanceTransaction update(UUID transactionId, UUID userId, FinanceTransactionCommand command);

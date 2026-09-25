@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface FinanceCategoryUseCase {
-    // list: requestedGroupId null이면 개인 그룹. type null이면 전체 타입. flat 목록 반환 — 트리 조립은 web 계층 책임.
-    List<FinanceCategory> list(UUID userId, UUID requestedGroupId, FinanceCategory.Type type);
+    // list: 조회 스코프는 항상 호출자의 현재 소속 그룹(서버 판단) — type null이면 전체 타입. flat 목록 반환 — 트리 조립은 web 계층 책임.
+    List<FinanceCategory> list(UUID userId, FinanceCategory.Type type);
     // create: shareToGroup=true면 현재 소속 그룹 소유로, false면 개인 소유로 원자적 생성. 무그룹인데 true면 거부.
     FinanceCategory create(UUID userId, boolean shareToGroup, FinanceCategoryCommand command);
     FinanceCategory update(UUID categoryId, UUID userId, FinanceCategoryCommand command);
