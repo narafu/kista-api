@@ -154,7 +154,8 @@ class TossHoldingsApi {
                 BUYING_POWER_PATH, account, params,
                 new ParameterizedTypeReference<TossResult<BuyableAmountResponse>>() {});
         if (wrapper == null || wrapper.result() == null || wrapper.result().cashBuyingPower() == null) {
-            return BigDecimal.ZERO;
+            // KIS KisTradingApi.getMargin()과 동일 처리 — 조용한 0 반환은 잔고 부족으로 오판정될 수 있어 예외로 전파
+            throw new TossApiException("Toss 매수가능금액 응답 없음: currency=" + currencyCode, null);
         }
         return new BigDecimal(wrapper.result().cashBuyingPower());
     }

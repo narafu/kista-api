@@ -86,17 +86,30 @@ class TossHoldingsApiTest {
     }
 
     @Test
-    @DisplayName("null 응답: holdings=0, usdDeposit=0")
-    void getBalance_nullResponse_returnsZeroBalance() {
+    @DisplayName("보유 종목 응답 null: holdings=0, 매수가능금액은 정상 반영")
+    void getBalance_holdingsResponseNull_buyingPowerValid_returnsZeroHoldingsWithDeposit() {
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(null);
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(null);
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00", "USD")));
 
         BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
         assertThat(balance.holdings()).isEqualTo(0);
-        assertThat(balance.usdDeposit()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(balance.avgPrice()).isNull();
+        assertThat(balance.usdDeposit()).isEqualByComparingTo("500.00");
+    }
+
+    @Test
+    @DisplayName("매수가능금액 응답 null: TossApiException 전파 (KIS getMargin()과 동일 처리)")
+    void getBalance_buyingPowerResponseNull_throwsTossApiException() {
+        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of())));
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(null);
+
+        assertThatThrownBy(() -> tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL))
+            .isInstanceOf(TossApiException.class);
     }
 
     @Test
@@ -108,6 +121,26 @@ class TossHoldingsApiTest {
         BigDecimal amount = tossHoldingsApi.getUsdBuyableAmount(ACCOUNT);
 
         assertThat(amount).isEqualByComparingTo("1234.56");
+    }
+
+    @Test
+    @DisplayName("getUsdBuyableAmount: wrapper null → TossApiException")
+    void getUsdBuyableAmount_nullWrapper_throwsTossApiException() {
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(null);
+
+        assertThatThrownBy(() -> tossHoldingsApi.getUsdBuyableAmount(ACCOUNT))
+            .isInstanceOf(TossApiException.class);
+    }
+
+    @Test
+    @DisplayName("getUsdBuyableAmount: cashBuyingPower 필드 null → TossApiException")
+    void getUsdBuyableAmount_nullCashBuyingPower_throwsTossApiException() {
+        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(null, "USD")));
+
+        assertThatThrownBy(() -> tossHoldingsApi.getUsdBuyableAmount(ACCOUNT))
+            .isInstanceOf(TossApiException.class);
     }
 
     @Test
