@@ -228,7 +228,7 @@ public class BacktestEngine {
 
         BigDecimal cap = PriceCapPolicy.capFor(prevClose);
         if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
-        return replaceBuysPreservingOrder(orders, VR_STRATEGY.buildCappedBuyOrders(position, ticker, tradeDate, cap));
+        return PriceCapPolicy.replaceBuysPreservingOrder(orders, VR_STRATEGY.buildCappedBuyOrders(position, ticker, tradeDate, cap));
     }
 
     // --- INFINITE 경로 ---
@@ -289,7 +289,7 @@ public class BacktestEngine {
 
         BigDecimal cap = PriceCapPolicy.capFor(prevClose);
         if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
-        return replaceBuysPreservingOrder(orders, INFINITE_STRATEGY.buildCappedBuyOrders(position, tradeDate, buys, cap));
+        return PriceCapPolicy.replaceBuysPreservingOrder(orders, INFINITE_STRATEGY.buildCappedBuyOrders(position, tradeDate, buys, cap));
     }
 
     // --- PRIVACY 경로 ---
@@ -356,18 +356,6 @@ public class BacktestEngine {
     }
 
     // --- 전략 공통 헬퍼 ---
-
-    // 재산정 BUY가 원래 BUY 자리를 채우고 남는 보정 BUY는 뒤에 붙인다 — SELL은 원래 상대 순서 그대로 유지
-    private static List<PlannedOrder> replaceBuysPreservingOrder(List<PlannedOrder> orders, List<PlannedOrder> cappedBuys) {
-        List<PlannedOrder> replaced = new ArrayList<>(orders.size() + cappedBuys.size());
-        int cappedIndex = 0;
-        for (PlannedOrder order : orders) {
-            if (order.direction() != BUY) replaced.add(order);
-            else if (cappedIndex < cappedBuys.size()) replaced.add(cappedBuys.get(cappedIndex++));
-        }
-        replaced.addAll(cappedBuys.subList(cappedIndex, cappedBuys.size()));
-        return List.copyOf(replaced);
-    }
 
     // 합성 VR 상세 — 램프 8파라미터는 백테스트 입력으로 받지 않고 운영의 recurringMode 고정값 표(RAMP_DEFAULTS_BY_MODE와 동기화)를 그대로 쓴다
     // gMax=initialGradient, poolLimitFloor=initialPoolLimitRate로 두면 gradientAt()/poolLimitRateAt()의 상하한 클램프가

@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -67,27 +66,12 @@ class BuyOrderPriceCapper {
             // bootstrap 주문(LOC+AT_CLOSE)은 사다리 재산정(buildCappedBuyOrders) 대상이 아니다 — 아래 isVrBootstrapShaped() 참고
             if (isVrBootstrapShaped(buyOrders)) return orders;
             List<PlannedOrder> cappedBuys = vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
-            return replaceBuysPreservingOrder(orders, cappedBuys);
+            return PriceCapPolicy.replaceBuysPreservingOrder(orders, cappedBuys);
         }
         if (position == null) return orders;
 
         List<PlannedOrder> cappedBuys = infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
-        return replaceBuysPreservingOrder(orders, cappedBuys);
-    }
-
-    // 재산정 BUY는 원래 BUY 슬롯을 채우고, 추가 correction BUY는 기존 상대 순서 뒤에 붙인다
-    private List<PlannedOrder> replaceBuysPreservingOrder(List<PlannedOrder> orders, List<PlannedOrder> cappedBuys) {
-        List<PlannedOrder> prepared = new ArrayList<>(orders.size() + cappedBuys.size());
-        int cappedBuyIndex = 0;
-        for (PlannedOrder order : orders) {
-            if (order.direction() != BUY) {
-                prepared.add(order);
-            } else if (cappedBuyIndex < cappedBuys.size()) {
-                prepared.add(cappedBuys.get(cappedBuyIndex++));
-            }
-        }
-        prepared.addAll(cappedBuys.subList(cappedBuyIndex, cappedBuys.size()));
-        return List.copyOf(prepared);
+        return PriceCapPolicy.replaceBuysPreservingOrder(orders, cappedBuys);
     }
 
     // 전략별 BUY 가격 캡 진입점 단일화 — 과거 capIfNeeded/capIfNeededAtOpen/capPrivacyIfNeeded/
