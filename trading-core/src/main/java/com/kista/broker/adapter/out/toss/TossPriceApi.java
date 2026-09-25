@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.broker.adapter.out.internal.ConfirmedCloseFallback;
 import com.kista.broker.adapter.out.internal.PrevCloseCache;
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.sharedkernel.TimeZones;
@@ -181,22 +182,29 @@ class TossPriceApi implements CommonMarketPriceFeed {
     }
 
     // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
-    // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환 (KIS KisPriceApi.fetchConfirmedClose와 동일 규칙)
-    // 봉 날짜가 기대 US 세션일과 다르면(미발행 등) filter에서 탈락 → 현재가 폴백
+    // 실패/미발행 시 현재가로 폴백 (KIS KisPriceApi.getClosingPrice와 동일 정책, ConfirmedCloseFallback 공용)
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate) {
+        return ConfirmedCloseFallback.resolve(
+                () -> fetchConfirmedClose(ticker, tradeDate),
+                () -> getPrice(ticker));
+    }
+
+    // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환 (KIS fetchConfirmedClose와 동일 규칙)
+    // 봉 날짜가 기대 US 세션일과 다르면(미발행 등) filter에서 탈락 → Optional.empty()
+    private Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate) {
         LocalDate usSessionDate = UsTradeDates.toUsTradeDate(tradeDate);
         try {
-            return tossCandleApi.getCandles(ticker.name(), "1d", usSessionDate, usSessionDate).stream()
+            Optional<BigDecimal> close = tossCandleApi.getCandles(ticker.name(), "1d", usSessionDate, usSessionDate).stream()
                     .filter(c -> c.date().equals(usSessionDate))
                     .findFirst()
-                    .map(TossCandle::close)
-                    .orElseGet(() -> {
-                        log.warn("Toss {} 확정 종가 캔들 없음(기대 US세션일={}), 현재가로 폴백: tradeDate={}", ticker, usSessionDate, tradeDate);
-                        return getPrice(ticker);
-                    });
+                    .map(TossCandle::close);
+            if (close.isEmpty()) {
+                log.warn("Toss {} 확정 종가 캔들 없음(기대 US세션일={}), 현재가로 폴백: tradeDate={}", ticker, usSessionDate, tradeDate);
+            }
+            return close;
         } catch (Exception e) {
             log.warn("Toss {} 확정 종가 조회 실패, 현재가로 폴백: tradeDate={}, error={}", ticker, tradeDate, e.getMessage());
-            return getPrice(ticker);
+            return Optional.empty();
         }
     }
 

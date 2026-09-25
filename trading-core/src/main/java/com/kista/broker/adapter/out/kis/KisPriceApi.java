@@ -2,6 +2,7 @@ package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.ClosingPriceLoop;
+import com.kista.broker.adapter.out.internal.ConfirmedCloseFallback;
 import com.kista.platform.time.UsTradeDates;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
@@ -128,7 +129,9 @@ class KisPriceApi {
     // 정규장 확정 종가 — 마감 리포트 전용(dailyprice, HHDFS76240000). 응답 봉 날짜가 기대 거래일과 다르면
     // (미발행 등) 라이브 현재가로 fallback — "하루 전 종가를 오늘 종가로 오기록"하는 사고를 방지한다.
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
-        return fetchConfirmedClose(ticker, tradeDate, account).orElseGet(() -> getPrice(ticker, account));
+        return ConfirmedCloseFallback.resolve(
+                () -> fetchConfirmedClose(ticker, tradeDate, account),
+                () -> getPrice(ticker, account));
     }
 
     // dailyprice는 종목당 단건 TR이라 벌크 API 없음 — 종목 수만큼 순차 호출(마감 리포트 1일 1회라 허용)
