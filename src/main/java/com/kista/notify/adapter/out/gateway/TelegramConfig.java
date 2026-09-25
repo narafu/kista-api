@@ -24,7 +24,7 @@ public class TelegramConfig {
         return factory;
     }
 
-    // package-private TelegramHttpClient를 Spring 빈으로 등록
+    // TelegramHttpClient를 Spring 빈으로 등록 (gateway 어댑터·adapter.in.telegram.TelegramApiClient 공용)
     @Bean
     TelegramHttpClient telegramHttpClient(RestClient telegramRestClient) {
         return new TelegramHttpClient(telegramRestClient);

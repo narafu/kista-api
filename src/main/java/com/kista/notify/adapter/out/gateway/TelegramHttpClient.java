@@ -7,17 +7,17 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 import java.util.Map;
 
-// 텔레그램 Bot API HTTP 전송 공통 유틸 — package-private (어댑터 레이어 내부 사용)
+// 텔레그램 Bot API HTTP 전송 공통 유틸 — sendMessage는 notify 모듈 내 다른 adapter 패키지(adapter.in.telegram)에서도 재사용하기 위해 public
 @Slf4j
 @RequiredArgsConstructor
-class TelegramHttpClient {
+public class TelegramHttpClient {
 
     private static final String API_BASE = "https://api.telegram.org";
 
     private final RestClient telegramRestClient;
 
     // 일반 텍스트 메시지 전송
-    void sendMessage(String chatId, String text, String botToken) {
+    public void sendMessage(String chatId, String text, String botToken) {
         if (botToken == null || botToken.isBlank()) return;
         try {
             String url = API_BASE + "/bot" + botToken + "/sendMessage";
