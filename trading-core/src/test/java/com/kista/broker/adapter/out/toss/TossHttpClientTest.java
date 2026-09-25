@@ -20,6 +20,7 @@ import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
@@ -75,7 +76,7 @@ class TossHttpClientTest {
 
     private TossHttpClient newClient() {
         setUpServer();
-        return new TossHttpClient(restClientBuilder.build(), tossAuthApi, BASE_URL);
+        return new TossHttpClient(restClientBuilder.build(), tossAuthApi, BASE_URL, new ObjectMapper());
     }
 
     private void expectGet(String bearerToken, HttpStatus status, String body) {
@@ -363,7 +364,7 @@ class TossHttpClientTest {
         });
         TossAuthApi realAuthApi = new TossAuthApi(sharedClient, tokenCoordinator,
                 BASE_URL, "admin-id", "admin-secret");
-        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, BASE_URL);
+        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, BASE_URL, new ObjectMapper());
 
         AtomicReference<String> requestAResult = new AtomicReference<>();
         AtomicReference<String> requestCResult = new AtomicReference<>();
@@ -412,7 +413,7 @@ class TossHttpClientTest {
         });
         TossAuthApi realAuthApi = new TossAuthApi(sharedClient, tokenCoordinator,
                 BASE_URL, "admin-id", "admin-secret");
-        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, BASE_URL);
+        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, BASE_URL, new ObjectMapper());
 
         AtomicReference<String> requestAResult = new AtomicReference<>();
         AtomicReference<String> requestCResult = new AtomicReference<>();

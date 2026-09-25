@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -59,7 +60,7 @@ class KisHttpClientTest {
     }
 
     private KisHttpClient newClient() {
-        return new KisHttpClient(restClientBuilder.build(), kisAuthApi, BASE_URL);
+        return new KisHttpClient(restClientBuilder.build(), kisAuthApi, BASE_URL, new ObjectMapper());
     }
 
     // KIS EGW00201(초당 거래건수 초과) 500 응답 바디

@@ -1,5 +1,8 @@
 package com.kista.broker.adapter.out.kis;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +17,7 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -29,6 +33,7 @@ class KisHttpClient {
     private final KisAuthApi kisAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
     @Value("${kis.base-url}")
     private final String baseUrl;
+    private final ObjectMapper objectMapper;
 
     // 토큰을 직접 보유한 호출부(KisAuthApi 등) 공용 헤더 빌더
     public static HttpHeaders buildHeaders(String token, String appKey, String appSecret, String trId) {
@@ -172,9 +177,12 @@ class KisHttpClient {
         }
     }
 
-    // KIS 게이트웨이가 초당 거래건수 제한으로 접수 전 거부한 응답 — msg_cd 정확 매칭(다른 오류 메시지 오탐 방지, Toss의 code 문자열 매칭과 동일 패턴)
+    // KIS 게이트웨이가 초당 거래건수 제한으로 접수 전 거부한 응답 — msg_cd 필드 디코딩 후 정확 매칭
+    // (substring 대신 JSON 필드 비교, 다른 오류 메시지 오탐 방지. Toss의 error.code 필드 매칭과 동일 기법)
     private boolean isRateLimited(HttpStatusCodeException e) {
-        return e.getResponseBodyAsString().contains("\"msg_cd\":\"EGW00201\"");
+        return ErrorBodyDecoder.decode(objectMapper, e.getResponseBodyAsString(), KisErrorBody.class)
+                .map(body -> "EGW00201".equals(body.msgCd()))
+                .orElse(false);
     }
 
     // 지수 백오프 + 지터 — 대기 중 인터럽트되면 false 반환(호출측이 재시도를 포기하고 즉시 실패 처리)
@@ -188,4 +196,8 @@ class KisHttpClient {
             return false;
         }
     }
+
+    // KIS 오류 응답 바디 — msg_cd 필드만 사용, 그 외 필드(rt_cd/msg1/message 등)는 무시
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record KisErrorBody(@JsonProperty("msg_cd") String msgCd) {}
 }

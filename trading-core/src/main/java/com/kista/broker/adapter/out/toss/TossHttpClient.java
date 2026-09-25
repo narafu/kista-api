@@ -1,5 +1,8 @@
 package com.kista.broker.adapter.out.toss;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +17,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -29,6 +33,7 @@ class TossHttpClient {
     private final TossAuthApi tossAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
     @Value("${toss.base-url}")
     private final String baseUrl;
+    private final ObjectMapper objectMapper;
 
     // 계좌 컨텍스트 API용 — X-Tossinvest-Account 헤더 포함 (주문·잔고·매수가능금액)
     public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
@@ -147,11 +152,15 @@ class TossHttpClient {
                     // 실제 취소되지 않은 주문이 DB에 CANCELLED로 오기록되는 것을 방지 (알림도 함께 억제되므로 오판정 위험 큼)
                     TossApiException.Conflict conflict = TossApiException.Conflict.NONE;
                     if (e.getStatusCode().value() == 409) {
-                        if (body.contains("\"code\":\"already-filled\"")) {
-                            conflict = TossApiException.Conflict.ALREADY_FILLED;
-                        } else if (body.contains("\"code\":\"already-canceled\"")) {
-                            conflict = TossApiException.Conflict.ALREADY_CANCELED;
-                        }
+                        conflict = ErrorBodyDecoder.decode(objectMapper, body, TossErrorBody.class)
+                                .map(TossErrorBody::error)
+                                .map(TossErrorBody.ErrorDetail::code)
+                                .map(code -> switch (code) {
+                                    case "already-filled" -> TossApiException.Conflict.ALREADY_FILLED;
+                                    case "already-canceled" -> TossApiException.Conflict.ALREADY_CANCELED;
+                                    default -> TossApiException.Conflict.NONE;
+                                })
+                                .orElse(TossApiException.Conflict.NONE);
                     }
                     throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, conflict);
                 }
@@ -184,5 +193,12 @@ class TossHttpClient {
         }
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
+    }
+
+    // Toss 오류 응답 바디 — error.code 필드만 사용, 그 외 필드(error.message 등)는 무시
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TossErrorBody(@JsonProperty("error") ErrorDetail error) {
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        record ErrorDetail(@JsonProperty("code") String code) {}
     }
 }
