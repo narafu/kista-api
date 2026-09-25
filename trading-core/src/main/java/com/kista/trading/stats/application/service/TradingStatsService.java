@@ -192,7 +192,7 @@ class TradingStatsService implements TradingStatsUseCase {
         for (CycleView v : open) {
             CyclePosition pos = latestPositions.get(v.cycle().id());
             if (pos != null) {
-                result.put(v.cycle().id(), assetOf(pos).subtract(v.effectiveStartAmount()));
+                result.put(v.cycle().id(), assetWithAvgPriceFallback(pos).subtract(v.effectiveStartAmount()));
             }
         }
         return result;
@@ -263,7 +263,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 if (view == null) continue;
                 LocalDate endDate = view.cycle().endDate();
                 if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
-                asset = asset.add(assetOf(posEntry.getValue()));
+                asset = asset.add(assetWithAvgPriceFallback(posEntry.getValue()));
                 principal = principal.add(view.effectiveStartAmount());
             }
             points.add(new EquityPoint(date,
@@ -273,7 +273,8 @@ class TradingStatsService implements TradingStatsUseCase {
         return points;
     }
 
-    private static BigDecimal assetOf(CyclePosition pos) {
+    // 종가 없으면 매입평단가로 대체(최후 0) → MonthlyReturnCalculator와 달리 null을 반환하지 않고 항상 값 산출, scale=2 반올림
+    private static BigDecimal assetWithAvgPriceFallback(CyclePosition pos) {
         BigDecimal unitPrice = pos.closingPrice() != null ? pos.closingPrice()
                 : pos.avgPrice() != null ? pos.avgPrice() : BigDecimal.ZERO;
         return pos.usdDeposit().add(unitPrice.multiply(BigDecimal.valueOf(pos.holdings())))
@@ -283,7 +284,7 @@ class TradingStatsService implements TradingStatsUseCase {
     private CyclePerformance toPerformance(CycleView v, Map<UUID, CyclePosition> latestPositions) {
         StrategyCycle c = v.cycle();
         BigDecimal endAmount = v.closed() ? c.endAmount()
-                : Optional.ofNullable(latestPositions.get(c.id())).map(TradingStatsService::assetOf).orElse(null);
+                : Optional.ofNullable(latestPositions.get(c.id())).map(TradingStatsService::assetWithAvgPriceFallback).orElse(null);
         BigDecimal pnl = endAmount != null ? endAmount.subtract(v.effectiveStartAmount()) : null;
         // 호환 개장금액이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
         BigDecimal returnRate = (pnl != null && v.effectiveStartAmount().signum() != 0)
