@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.internal;
 
-import com.kista.platform.internalapi.InternalApiErrorDetails;
+import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.notify.application.port.output.PortfolioQueryPort;
 import com.kista.sharedkernel.StrategyTicker;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +10,6 @@ import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Component
@@ -21,15 +20,13 @@ class PortfolioQueryHttpAdapter implements PortfolioQueryPort {
 
     @Override
     public PortfolioCurrentView getCurrent(UUID userId) {
-        return internalApiRestClient.get()
+        RestClient.ResponseSpec spec = internalApiRestClient.get()
                 .uri(b -> b.path("/api/internal/trading/stats/portfolio/current").queryParam("userId", userId).build())
-                .retrieve()
-                // trading 쪽 GlobalExceptionHandler가 매핑한 상태코드를 원래 예외 타입으로 되돌린다 — 없으면
-                // NoSuchElementException(포트폴리오 데이터 없음)이 HttpClientErrorException으로 흘러 TelegramBotService의
-                // catch(NoSuchElementException)가 동작하지 않는다
-                .onStatus(status -> status.value() == 404, (request, response) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, "포트폴리오 데이터가 없습니다."));
-                })
+                .retrieve();
+        // trading 쪽 GlobalExceptionHandler가 매핑한 상태코드를 원래 예외 타입으로 되돌린다 — 없으면
+        // NoSuchElementException(포트폴리오 데이터 없음)이 HttpClientErrorException으로 흘러 TelegramBotService의
+        // catch(NoSuchElementException)가 동작하지 않는다
+        return InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "포트폴리오 데이터가 없습니다.")
                 .body(PortfolioCurrentView.class);
     }
 
