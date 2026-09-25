@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-@Slf4j
 @Tag(name = "ClientErrorLog", description = "kista-ui 오류 바운더리 리포트")
 @RestController
 @RequestMapping("/api/client-errors")
@@ -30,10 +28,7 @@ public class ClientErrorLogController {
     @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void log(@Valid @RequestBody ClientErrorLogRequest body) {
-        try {
-            appErrorLogPort.save(body.errorType(), body.message(), body.stackTrace(), body.context());
-        } catch (Exception saveEx) {
-            log.warn("클라이언트 오류 로그 저장 실패: {}", saveEx.getMessage());
-        }
+        // 저장 실패 격리는 AppErrorLogPort.save() 계약(구현체 책임)으로 이동 — 여기서 별도 try/catch 불필요
+        appErrorLogPort.save(body.errorType(), body.message(), body.stackTrace(), body.context());
     }
 }

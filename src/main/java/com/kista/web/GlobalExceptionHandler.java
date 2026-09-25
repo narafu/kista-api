@@ -155,13 +155,9 @@ public class GlobalExceptionHandler {
         return detail;
     }
 
-    // DB 저장 실패가 원래 응답을 막지 않도록 격리
+    // 저장 실패 격리는 AppErrorLogPort.save() 계약(구현체 책임)으로 이동 — 여기서 별도 try/catch 불필요
     private void saveErrorLog(Exception e) {
-        try {
-            appErrorLogPort.save(e, "GlobalExceptionHandler");
-        } catch (Exception saveEx) {
-            log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
-        }
+        appErrorLogPort.save(e, "GlobalExceptionHandler");
     }
 
     // 클래스 계층 탐색 — 서브클래스 예외도 상위 매핑으로 처리 가능

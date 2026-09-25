@@ -30,17 +30,27 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
 
     @Override
     public void save(Exception e, String caller) {
-        // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)
-        StringWriter sw = new StringWriter();
-        e.printStackTrace(new PrintWriter(sw));
-        String stackTrace = truncateStackTrace(sw.toString());
+        // 저장 실패가 호출부(예외 핸들러·AOP 인터셉터)로 전파되지 않도록 이 메서드 계약 자체가 격리를 보장
+        try {
+            // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)
+            StringWriter sw = new StringWriter();
+            e.printStackTrace(new PrintWriter(sw));
+            String stackTrace = truncateStackTrace(sw.toString());
 
-        repo.save(buildEntity(e.getClass().getSimpleName(), e.getMessage(), stackTrace, Map.of("caller", caller)));
+            repo.save(buildEntity(e.getClass().getSimpleName(), e.getMessage(), stackTrace, Map.of("caller", caller)));
+        } catch (Exception saveEx) {
+            log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
+        }
     }
 
     @Override
     public void save(String errorType, String message, String stackTrace, Map<String, String> context) {
-        repo.save(buildEntity(errorType, message, truncateStackTrace(stackTrace), context));
+        // 저장 실패가 호출부(클라이언트/내부 API 컨트롤러)로 전파되지 않도록 이 메서드 계약 자체가 격리를 보장
+        try {
+            repo.save(buildEntity(errorType, message, truncateStackTrace(stackTrace), context));
+        } catch (Exception saveEx) {
+            log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
+        }
     }
 
     // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)

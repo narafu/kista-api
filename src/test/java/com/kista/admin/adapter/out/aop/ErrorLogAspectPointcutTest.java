@@ -13,7 +13,6 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import org.junit.jupiter.api.BeforeEach;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.StrategyTicker;
@@ -70,11 +69,6 @@ class ErrorLogAspectPointcutTest {
         verify(appErrorLogPort).save(eq(e), anyString());
     }
 
-    @Test
-    void save_실패해도_notifyError_예외_없이_완료된다() {
-        doThrow(new RuntimeException("DB 저장 실패")).when(appErrorLogPort).save(any(), anyString());
-
-        assertThatCode(() -> notifyPort.notifyError(new RuntimeException("test")))
-                .doesNotThrowAnyException();
-    }
+    // 저장 실패 시 notifyError가 예외 없이 완료되는지는 AppErrorLogPersistenceAdapterTest(격리 계약 실제 구현체)가 검증 —
+    // 여기서 mock AppErrorLogPort에 doThrow를 걸어 검증하던 방식은 포트 계약(절대 던지지 않음)과 모순돼 제거
 }

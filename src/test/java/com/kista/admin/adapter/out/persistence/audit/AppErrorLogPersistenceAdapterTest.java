@@ -12,7 +12,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +57,24 @@ class AppErrorLogPersistenceAdapterTest {
         assertThat(saved.getMessage()).isEqualTo("cannot read property");
         assertThat(saved.getStackTrace()).isEqualTo("at foo()\nat bar()");
         assertThat(saved.getContext()).contains("/login");
+    }
+
+    @Test
+    void save_exceptionOverload_swallowsRepoFailure() {
+        // 이 메서드는 저장 실패해도 예외를 던지지 않는다는 계약(호출부 4곳에서 이관된 격리 책임) 검증
+        doThrow(new RuntimeException("db down")).when(repo).save(any());
+
+        assertThatCode(() -> adapter.save(new RuntimeException("테스트 오류"), "TradingOpenScheduler"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void save_clientErrorOverload_swallowsRepoFailure() {
+        // 이 메서드는 저장 실패해도 예외를 던지지 않는다는 계약(호출부 4곳에서 이관된 격리 책임) 검증
+        doThrow(new RuntimeException("db down")).when(repo).save(any());
+
+        assertThatCode(() -> adapter.save("TypeError", "cannot read property", "at foo()", java.util.Map.of("pathname", "/login")))
+                .doesNotThrowAnyException();
     }
 
     @Test

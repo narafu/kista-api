@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -54,14 +53,6 @@ class ClientErrorLogControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    void log_portFailure_stillReturns204() throws Exception {
-        doThrow(new RuntimeException("db down"))
-                .when(appErrorLogPort).save(eq("TypeError"), eq("boom"), eq((String) null), eq((Map<String, String>) null));
-
-        mockMvc.perform(post("/api/client-errors")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"errorType\":\"TypeError\",\"message\":\"boom\"}"))
-                .andExpect(status().isNoContent());
-    }
+    // 저장 실패 시 호출부가 여전히 204를 반환하는지는 AppErrorLogPersistenceAdapterTest(격리 계약 실제 구현체)가 검증 —
+    // 여기서 mock AppErrorLogPort에 doThrow를 걸어 검증하던 방식은 포트 계약(절대 던지지 않음)과 모순돼 제거
 }
