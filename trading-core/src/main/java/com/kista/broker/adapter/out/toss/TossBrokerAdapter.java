@@ -1,5 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
+import com.kista.broker.adapter.out.internal.ClosingPriceLoop;
 import com.kista.broker.domain.model.*;
 import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 // Toss 증권사 어댑터 — 공통 7개 + Toss 전용 5개 Port 구현
@@ -145,11 +145,7 @@ public class TossBrokerAdapter implements BrokerAdapterPort,
 
     @Override
     public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker ticker : tickers) {
-            result.put(ticker, tossPriceApi.getClosingPrice(ticker, tradeDate));
-        }
-        return result;
+        return ClosingPriceLoop.collect(tickers, ticker -> tossPriceApi.getClosingPrice(ticker, tradeDate));
     }
 
     @Override

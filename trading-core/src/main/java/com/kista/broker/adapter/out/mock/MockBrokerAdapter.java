@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.mock;
 
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
+import com.kista.broker.adapter.out.internal.ClosingPriceLoop;
 import com.kista.broker.domain.model.*;
 import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.OrderDirection;
@@ -14,7 +15,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -106,11 +106,7 @@ public class MockBrokerAdapter implements BrokerAdapterPort,
 
     @Override
     public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker ticker : tickers) {
-            result.put(ticker, priceFeed.getClosingPrice(ticker, tradeDate));
-        }
-        return result;
+        return ClosingPriceLoop.collect(tickers, ticker -> priceFeed.getClosingPrice(ticker, tradeDate));
     }
 
     // --- LiveBalancePort ---

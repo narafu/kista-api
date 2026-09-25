@@ -56,7 +56,7 @@ class TossHttpClient {
                      ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
-            HttpHeaders headers = buildHeaders(account, token);
+            HttpHeaders headers = buildHeaders(account.brokerAccountCode(), token);
             return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
         });
     }
@@ -66,7 +66,7 @@ class TossHttpClient {
                                     ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
-            HttpHeaders headers = buildHeadersNoAccount(token);
+            HttpHeaders headers = buildHeaders(null, token);
             return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
         });
     }
@@ -78,7 +78,7 @@ class TossHttpClient {
         return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
                 tossAuthApi::recoverAdminToken,
                 token -> {
-                    HttpHeaders headers = buildAdminHeaders(token);
+                    HttpHeaders headers = buildHeaders(null, token);
                     return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
                 });
     }
@@ -87,7 +87,7 @@ class TossHttpClient {
     public <T> T post(String path, BrokerAccountRef account, Object body, ParameterizedTypeReference<T> typeRef) {
         return executeWithRetry(account, path, token -> tossRestClient.post()
                 .uri(baseUrl + path)
-                .headers(h -> h.addAll(buildHeaders(account, token)))
+                .headers(h -> h.addAll(buildHeaders(account.brokerAccountCode(), token)))
                 .body(body)
                 .retrieve()
                 .body(typeRef));
@@ -175,27 +175,13 @@ class TossHttpClient {
         }
     }
 
-    // 계좌 컨텍스트 헤더 (X-Tossinvest-Account 포함) — Account.brokerAccountCode에 accountSeq가 저장됨
-    private HttpHeaders buildHeaders(BrokerAccountRef account, String token) {
+    // 공통 헤더 빌더 — accountCode가 null이면 X-Tossinvest-Account 헤더를 생략한다(계좌 헤더 불필요 API·관리자 API 공용)
+    private HttpHeaders buildHeaders(String accountCode, String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
-        headers.set("X-Tossinvest-Account", account.brokerAccountCode());
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
-    }
-
-    // 계좌 헤더 미포함 — 시세 조회·환율 등 계좌 컨텍스트 불필요 API용
-    private HttpHeaders buildHeadersNoAccount(String token) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
-    }
-
-    // 관리자 토큰 헤더 — X-Tossinvest-Account 없이 Bearer 토큰만 (매 시도의 토큰을 인자로 받는다)
-    private HttpHeaders buildAdminHeaders(String token) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
+        if (accountCode != null) {
+            headers.set("X-Tossinvest-Account", accountCode);
+        }
         headers.setContentType(MediaType.APPLICATION_JSON);
         return headers;
     }

@@ -1,6 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.broker.adapter.out.internal.ClosingPriceLoop;
 import com.kista.platform.time.UsTradeDates;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
@@ -132,11 +133,7 @@ class KisPriceApi {
 
     // dailyprice는 종목당 단건 TR이라 벌크 API 없음 — 종목 수만큼 순차 호출(마감 리포트 1일 1회라 허용)
     public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker ticker : tickers) {
-            result.put(ticker, getClosingPrice(ticker, tradeDate, account));
-        }
-        return result;
+        return ClosingPriceLoop.collect(tickers, ticker -> getClosingPrice(ticker, tradeDate, account));
     }
 
     // dailyprice 확정 종가 조회 — 응답 봉 날짜(xymd)가 기대 US 거래일과 일치할 때만 신뢰
