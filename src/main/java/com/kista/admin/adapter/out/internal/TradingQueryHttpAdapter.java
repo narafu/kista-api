@@ -4,7 +4,7 @@ import com.kista.admin.application.port.output.TradingQueryPort;
 import com.kista.admin.domain.model.AdminOrderView;
 import com.kista.admin.domain.model.AdminStrategySummary;
 import com.kista.admin.domain.model.AdminStrategyView;
-import com.kista.platform.internalapi.InternalApiErrorDetails;
+import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -13,7 +13,6 @@ import org.springframework.web.client.RestClient;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
 
@@ -62,27 +61,23 @@ class TradingQueryHttpAdapter implements TradingQueryPort {
 
     @Override
     public List<AdminOrderView> findStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate) {
-        return internalApiRestClient.get()
+        // trading 쪽 컨트롤러가 소유권 불일치 시 NoSuchElementException(→404)을 던진다 —
+        // 여기서 되돌리지 않으면 admin의 GlobalExceptionHandler가 매핑하지 못하는
+        // HttpClientErrorException.NotFound로 흘러 500(catch-all)으로 뭉개진다.
+        RestClient.ResponseSpec spec = internalApiRestClient.get()
                 .uri(b -> b.path("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/orders")
                         .queryParam("tradeDate", tradeDate).build(accountId, strategyId))
-                .retrieve()
-                // trading 쪽 컨트롤러가 소유권 불일치 시 NoSuchElementException(→404)을 던진다 —
-                // 여기서 되돌리지 않으면 admin의 GlobalExceptionHandler가 매핑하지 못하는
-                // HttpClientErrorException.NotFound로 흘러 500(catch-all)으로 뭉개진다.
-                .onStatus(status -> status.value() == 404, (request, response) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, "전략이 해당 계좌에 속하지 않습니다"));
-                })
+                .retrieve();
+        return InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "전략이 해당 계좌에 속하지 않습니다")
                 .body(new ParameterizedTypeReference<List<AdminOrderView>>() {});
     }
 
     @Override
     public List<LocalDate> findStrategyTradeDates(UUID accountId, UUID strategyId) {
-        return internalApiRestClient.get()
+        RestClient.ResponseSpec spec = internalApiRestClient.get()
                 .uri("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/trade-dates", accountId, strategyId)
-                .retrieve()
-                .onStatus(status -> status.value() == 404, (request, response) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, "전략이 해당 계좌에 속하지 않습니다"));
-                })
+                .retrieve();
+        return InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "전략이 해당 계좌에 속하지 않습니다")
                 .body(new ParameterizedTypeReference<List<LocalDate>>() {});
     }
 }

@@ -8,13 +8,12 @@ import com.kista.admin.domain.model.AdminReorderTimingAvailability;
 import com.kista.admin.domain.model.AdminBrokerCredentialException;
 import com.kista.admin.domain.model.AdminBrokerRateLimitException;
 import com.kista.admin.domain.model.AdminTradeCorrectionResult;
-import com.kista.platform.internalapi.InternalApiErrorDetails;
+import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.sharedkernel.StrategyStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Component
@@ -39,16 +38,14 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
     // 옮겨 담아 admin 운영자가 9가지 거절 사유를 구분할 수 있게 한다(고정 문구로 뭉개지 않음).
     @Override
     public AdminReorderResult reorder(AdminReorderCommand command) {
-        return internalApiWriteRestClient.post()
+        // 404/400은 공용 팩토리(InternalApiStatusHandlers)로 위임, 422/429는 admin 전용 표지 예외라 그대로 유지
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
                 .uri("/api/internal/trading/reorder")
                 .body(command)
-                .retrieve()
-                .onStatus(status -> status.value() == 404, (request, response) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, "계좌 또는 전략을 찾을 수 없습니다"));
-                })
-                .onStatus(status -> status.value() == 400, (request, response) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(response, "재주문 요청이 유효하지 않습니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "계좌 또는 전략을 찾을 수 없습니다");
+        spec = InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "재주문 요청이 유효하지 않습니다");
+        return spec
                 .onStatus(status -> status.value() == 422, (request, response) -> {
                     throw new AdminBrokerCredentialException();
                 })
@@ -60,16 +57,12 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
 
     @Override
     public AdminTradeCorrectionResult correctManualFills(AdminManualTradeCorrectionCommand command) {
-        return internalApiWriteRestClient.post()
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
                 .uri("/api/internal/trading/trade-corrections")
                 .body(command)
-                .retrieve()
-                .onStatus(status -> status.value() == 404, (request, response) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, "계좌 또는 전략을 찾을 수 없습니다"));
-                })
-                .onStatus(status -> status.value() == 400, (request, response) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(response, "수동 체결 보정 요청이 유효하지 않습니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "계좌 또는 전략을 찾을 수 없습니다");
+        return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "수동 체결 보정 요청이 유효하지 않습니다")
                 .body(AdminTradeCorrectionResult.class);
     }
 
@@ -87,18 +80,14 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
     // 계좌·전략 소유권 검증 + 저장은 trading-core 쪽에서 처리 — DB 쓰기 경로라 internalApiWriteRestClient 사용
     @Override
     public void updateStrategyStatus(UUID accountId, UUID strategyId, StrategyStatus status) {
-        internalApiWriteRestClient.patch()
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.patch()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/status")
                         .queryParam("status", status)
                         .build(accountId, strategyId))
-                .retrieve()
-                .onStatus(status2 -> status2.value() == 404, (request, response) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, "계좌 또는 전략을 찾을 수 없습니다"));
-                })
-                .onStatus(status2 -> status2.value() == 400, (request, response) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(response, "전략이 계좌에 속하지 않습니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "계좌 또는 전략을 찾을 수 없습니다");
+        InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "전략이 계좌에 속하지 않습니다")
                 .toBodilessEntity();
     }
 }

@@ -8,6 +8,7 @@ import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
 import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
 import com.kista.admin.domain.model.AdminPrivacyTradeConflictException;
 import com.kista.platform.internalapi.InternalApiErrorDetails;
+import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +17,6 @@ import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
 @Component
@@ -41,17 +41,16 @@ class PrivacyQueryHttpAdapter implements PrivacyQueryPort {
     public CreateBaseResult createBase(AdminFidaOrderCommand command) {
         // 기존 FidaOrderController(POST /api/internal/fida-orders)를 그대로 호출 — 응답 body(FidaOrderResponse)엔
         // 주문 명세 id가 없어(echo 전용) 상태코드로 created만 판정하고, 전체 view는 id로 재조회한다.
-        ResponseEntity<FidaCreateAck> response = internalApiWriteRestClient.post()
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
                 .uri("/api/internal/fida-orders")
                 .body(command)
-                .retrieve()
-                .onStatus(status -> status.value() == 400, (request, resp) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표 등록 요청이 유효하지 않습니다"));
-                })
-                // FidaOrderController가 같은 (releaseDate, ticker)에 내용이 다른 데이터가 이미 있으면
-                // PrivacyTradeConflictException(→409)을 던진다 — 여기서 되돌리지 않으면 admin의
-                // GlobalExceptionHandler가 매핑하지 못하는 HttpClientErrorException.Conflict로 흘러
-                // 500(catch-all)으로 뭉개진다.
+                .retrieve();
+        spec = InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "PRIVACY 기준 매매표 등록 요청이 유효하지 않습니다");
+        // FidaOrderController가 같은 (releaseDate, ticker)에 내용이 다른 데이터가 이미 있으면
+        // PrivacyTradeConflictException(→409)을 던진다 — 여기서 되돌리지 않으면 admin의
+        // GlobalExceptionHandler가 매핑하지 못하는 HttpClientErrorException.Conflict로 흘러
+        // 500(catch-all)으로 뭉개진다. 409는 admin 전용 표지 예외라 공용 팩토리 대상이 아니다.
+        ResponseEntity<FidaCreateAck> response = spec
                 .onStatus(status -> status.value() == 409, (request, resp) -> {
                     throw new AdminPrivacyTradeConflictException(
                             InternalApiErrorDetails.detailOrDefault(resp, "같은 날짜/종목에 내용이 다른 PRIVACY 기준 매매표가 이미 존재합니다"));
@@ -68,63 +67,47 @@ class PrivacyQueryHttpAdapter implements PrivacyQueryPort {
 
     @Override
     public AdminPrivacyTradeBaseView updateBase(UUID baseId, AdminPrivacyBaseUpdateCommand command) {
-        return internalApiWriteRestClient.patch()
+        // trading 쪽 PrivacyTradePersistenceAdapter.updateBase가 baseId 미존재 시 NoSuchElementException(→404)을 던진다 —
+        // 여기서 되돌리지 않으면 admin의 GlobalExceptionHandler가 매핑하지 못하는 HttpClientErrorException.NotFound로
+        // 흘러 500(catch-all)으로 뭉개진다.
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.patch()
                 .uri("/api/internal/privacy/trade-bases/{baseId}", baseId)
                 .body(command)
-                .retrieve()
-                // trading 쪽 PrivacyTradePersistenceAdapter.updateBase가 baseId 미존재 시 NoSuchElementException(→404)을 던진다 —
-                // 여기서 되돌리지 않으면 admin의 GlobalExceptionHandler가 매핑하지 못하는 HttpClientErrorException.NotFound로
-                // 흘러 500(catch-all)으로 뭉개진다.
-                .onStatus(status -> status.value() == 404, (request, resp) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId));
-                })
-                .onStatus(status -> status.value() == 400, (request, resp) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표 수정 요청이 유효하지 않습니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId);
+        return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "PRIVACY 기준 매매표 수정 요청이 유효하지 않습니다")
                 .body(AdminPrivacyTradeBaseView.class);
     }
 
     @Override
     public AdminPrivacyTradeBaseView updateOrder(UUID baseId, UUID orderId, AdminPrivacyOrderUpdateCommand command) {
-        return internalApiWriteRestClient.patch()
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.patch()
                 .uri("/api/internal/privacy/trade-bases/{baseId}/orders/{orderId}", baseId, orderId)
                 .body(command)
-                .retrieve()
-                .onStatus(status -> status.value() == 404, (request, resp) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표 또는 주문 명세를 찾을 수 없습니다: " + orderId));
-                })
-                .onStatus(status -> status.value() == 400, (request, resp) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 주문 명세 수정 요청이 유효하지 않습니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "PRIVACY 기준 매매표 또는 주문 명세를 찾을 수 없습니다: " + orderId);
+        return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "PRIVACY 주문 명세 수정 요청이 유효하지 않습니다")
                 .body(AdminPrivacyTradeBaseView.class);
     }
 
     @Override
     public AdminPrivacyTradeBaseView addOrder(UUID baseId, AdminPrivacyOrderAddCommand command) {
-        return internalApiWriteRestClient.post()
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
                 .uri("/api/internal/privacy/trade-bases/{baseId}/orders", baseId)
                 .body(command)
-                .retrieve()
-                .onStatus(status -> status.value() == 404, (request, resp) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId));
-                })
-                .onStatus(status -> status.value() == 400, (request, resp) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 주문 명세 추가 요청이 유효하지 않습니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "PRIVACY 기준 매매표를 찾을 수 없습니다: " + baseId);
+        return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "PRIVACY 주문 명세 추가 요청이 유효하지 않습니다")
                 .body(AdminPrivacyTradeBaseView.class);
     }
 
     @Override
     public AdminPrivacyTradeBaseView deleteOrder(UUID baseId, UUID orderId) {
-        return internalApiWriteRestClient.delete()
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.delete()
                 .uri("/api/internal/privacy/trade-bases/{baseId}/orders/{orderId}", baseId, orderId)
-                .retrieve()
-                .onStatus(status -> status.value() == 404, (request, resp) -> {
-                    throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(resp, "PRIVACY 기준 매매표 또는 주문 명세를 찾을 수 없습니다: " + orderId));
-                })
-                .onStatus(status -> status.value() == 400, (request, resp) -> {
-                    throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(resp, "최소 1건의 주문 명세는 남아있어야 합니다"));
-                })
+                .retrieve();
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "PRIVACY 기준 매매표 또는 주문 명세를 찾을 수 없습니다: " + orderId);
+        return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "최소 1건의 주문 명세는 남아있어야 합니다")
                 .body(AdminPrivacyTradeBaseView.class);
     }
 
