@@ -82,7 +82,7 @@ class VrCycleRolloverService {
             evaluationClosingPrice = registry.require(ctx.account().toBrokerRef(), BrokerPricePort.class)
                     .getClosingPrice(strategy.ticker(), evaluationDate, ctx.account().toBrokerRef());
         } catch (Exception e) {
-            log.warn("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",
+            log.error("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",
                     strategy.id(), evaluationDate, e);
             eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
             return;
