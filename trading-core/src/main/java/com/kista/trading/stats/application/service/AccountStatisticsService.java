@@ -40,7 +40,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return brokerStatisticsRouter.getPresentBalance(account);
+        return BrokerCallGuard.wrap("잔고 조회", () -> brokerStatisticsRouter.getPresentBalance(account));
     }
 
     @Override

@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -63,5 +64,15 @@ class AccountStatisticsServiceTest {
         assertThat(result.get(StrategyTicker.SOXL)).isEqualByComparingTo("89.20");
         verify(pricePort, never()).getPrices(any(), any());
         verify(pricePort, never()).getPriceSnapshots(any(), any());
+    }
+
+    @Test
+    void getPresentBalance_brokerFailure_wrappedAsIllegalStateException() {
+        // getMargin()과 동일하게 BrokerCallGuard로 감싸져야 함 — 브로커 예외가 503 대신 400으로 통일
+        when(brokerStatisticsRouter.getPresentBalance(any())).thenThrow(new RuntimeException("Toss 매수가능금액 응답 없음"));
+
+        assertThatThrownBy(() -> service.getPresentBalance(accountId, userId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("증권사 API 조회에 실패했습니다");
     }
 }
