@@ -31,7 +31,7 @@ import com.kista.sharedkernel.StrategyTicker;
 
 // BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — InfiniteStrategy에 위임해 가격 캡 적용 후 재저장
 // 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
-// capIfNeeded/capPrivacyIfNeeded는 브로커 호출 없이 DB만 다루므로 @Transactional 허용 (constraints.md 외부 호출 금지 규칙과 무충돌)
+// capIfNeeded는 브로커 호출 없이 DB만 다루므로 @Transactional 허용 (constraints.md 외부 호출 금지 규칙과 무충돌)
 // — 사이클 row lock(StrategyCyclePort.lockForUpdate)으로 동시 호출을 직렬화해 read-cancel-write 경합에 의한 부분 저장을 방지한다
 @Component
 @RequiredArgsConstructor
@@ -90,21 +90,32 @@ class BuyOrderPriceCapper {
         return List.copyOf(prepared);
     }
 
+    // 전략별 BUY 가격 캡 진입점 단일화 — 과거 capIfNeeded/capIfNeededAtOpen/capPrivacyIfNeeded/
+    // capPrivacyIfNeededAtOpen/capVrIfNeeded/capVrIfNeededAtOpen 6개를 mode+atOpen 파라미터로 통합했다.
+    // mode==null||NONE, INFINITE_POSITION&&position==null, VR_POSITION&&vrPosition==null 3개 skip 가드는
+    // 이 메서드가 아닌 TradingOrderExecutor.applyCap에 있다 — 이 메서드는 @Transactional이라 가드를 메서드
+    // 내부에 두면 skip 케이스마다 스프링 AOP 프록시가 빈 트랜잭션을 열고 커밋한다(스케쥴러 매 틱 DB 커넥션풀
+    // 낭비). 호출측에서 조건을 걸러 이 메서드 자체를 아예 호출하지 않는 것만이 트랜잭션 오픈을 막는 방법이다.
+    @Transactional
+    void capIfNeeded(CycleOrderStrategy.PriceCapMode mode, boolean atOpen, LocalDate date, Account account, UUID strategyCycleId,
+                     BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, StrategyTicker ticker) {
+        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
+        List<Order> buyOrders = loadBuyOrders(strategyCycleId, date, atOpen);
+
+        if (mode == CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE) {
+            applyPrivacyCap(account, strategyCycleId, currentPrice, buyOrders);
+        } else if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION) {
+            applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
+                    (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, date, orders, cap));
+        } else if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION) {
+            // bootstrap(LOC+AT_CLOSE) 주문은 사다리 재산정 대상이 아니므로 skip한다 (isVrBootstrapShaped 참고)
+            applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
+                    (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, date, cap),
+                    BuyOrderPriceCapper::isVrBootstrapShaped);
+        }
+    }
+
     // PRIVACY 전용: cap 초과 주문만 CANCELLED → cap 가격으로 재저장 (cap 이하 주문은 그대로 유지)
-    @Transactional
-    void capPrivacyIfNeeded(LocalDate today, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
-        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        applyPrivacyCap(account, strategyCycleId, currentPrice, loadBuyOrders(strategyCycleId, today, false));
-    }
-
-    // PRIVACY 전용 AT_OPEN 스코프: PRIVACY BUY는 항상 AT_CLOSE라 실제로는 no-op이지만
-    // priceCapMode() 분기 대칭성(INFINITE_POSITION/VR_POSITION과 동일한 AT_OPEN 스코프 계약) 유지를 위해 제공한다
-    @Transactional
-    void capPrivacyIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId, BigDecimal currentPrice) {
-        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        applyPrivacyCap(account, strategyCycleId, currentPrice, loadBuyOrders(strategyCycleId, tradeDate, true));
-    }
-
     private void applyPrivacyCap(Account account, UUID strategyCycleId, BigDecimal currentPrice, List<Order> buyOrders) {
         if (buyOrders.isEmpty()) return;
 
@@ -120,53 +131,6 @@ class BuyOrderPriceCapper {
         log.info("[{}] PRIVACY BUY 가격 보정 완료 — 보정 주문: {}", account.nickname(), describePlannedOrders(corrected));
     }
 
-    // INFINITE 전용: position 기반 수량 재산정 + 보정 주문 포함
-    @Transactional
-    void capIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
-                     BigDecimal currentPrice, InfinitePosition position) {
-        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        List<Order> buyOrders = loadBuyOrders(strategyCycleId, today, false);
-        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
-                (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, today, orders, cap));
-    }
-
-    // INFINITE 전용 AT_OPEN 스코프: 개장 스케쥴러 선접수·개장 후 수동실행 경로에서 사용
-    // findAtOpenPlannedByCycleAndDate로 AT_OPEN PLANNED만 조회해 동일 사이클의 AT_CLOSE PLANNED(미도래)를 건드리지 않는다
-    // (INFINITE는 BUY가 항상 AT_CLOSE라 실제로는 no-op이지만 priceCapMode() 분기 대칭성을 위해 유지)
-    @Transactional
-    void capIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId,
-                          BigDecimal currentPrice, InfinitePosition position) {
-        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        List<Order> buyOrders = loadBuyOrders(strategyCycleId, tradeDate, true);
-        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
-                (orders, cap) -> infiniteStrategy.buildCappedBuyOrders(position, tradeDate, orders, cap));
-    }
-
-    // VR 전용: vrPosition 기반 매수 사다리 전체 재산정 — 기존 buyOrders 인자는 사용하지 않는다
-    // (VR 사다리는 position+cap만으로 자기완결적으로 재생성되며, poolLimit·pool 한도 내로 자연스럽게 재수렴한다)
-    // bootstrap(LOC+AT_CLOSE) 주문은 사다리 재산정 대상이 아니므로 skip한다 (isVrBootstrapShaped 참고)
-    @Transactional
-    void capVrIfNeeded(LocalDate today, Account account, UUID strategyCycleId,
-                       BigDecimal currentPrice, VrPosition vrPosition, StrategyTicker ticker) {
-        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        List<Order> buyOrders = loadBuyOrders(strategyCycleId, today, false);
-        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
-                (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, today, cap),
-                BuyOrderPriceCapper::isVrBootstrapShapedPersisted);
-    }
-
-    // VR 전용 AT_OPEN 스코프: 사다리(LIMIT+AT_OPEN) BUY만 조회해 보정한다 — 개장 스케쥴러 선접수·개장 후 수동실행 경로 전용
-    // AT_CLOSE PLANNED(bootstrap 또는 아직 접수 전인 마감 주문)는 findAtOpenPlannedByCycleAndDate 스코프 밖이라 자연히 제외된다
-    @Transactional
-    void capVrIfNeededAtOpen(LocalDate tradeDate, Account account, UUID strategyCycleId,
-                            BigDecimal currentPrice, VrPosition vrPosition, StrategyTicker ticker) {
-        strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
-        List<Order> buyOrders = loadBuyOrders(strategyCycleId, tradeDate, true);
-        applyCapIfNeeded(account, strategyCycleId, buyOrders, currentPrice,
-                (orders, cap) -> vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap),
-                BuyOrderPriceCapper::isVrBootstrapShapedPersisted);
-    }
-
     // VR bootstrap 주문(LOC+AT_CLOSE)인지 판별 — 이 함수는 buyOrders(BUY만 필터링된 목록)만 검사한다.
     // VrStrategy.buildOrders()는 holdings=0에서 첫 포지션을 못 만든 상태(needsBootstrap)면 bootstrap
     // 주문만 단독 반환하지만, holdings>0인데 사다리 첫 유효 단조차 예산 초과인 드리프트 상태에서는
@@ -176,11 +140,6 @@ class BuyOrderPriceCapper {
     // (PriceCapPolicy.capFor(referencePrice) = referencePrice×1.05)은 사다리의 buyPrice(m) 공식과 무관한
     // 별도 산정식이라 buildCappedBuyOrders(사다리 전용)로 재계산하면 안 된다.
     private static boolean isVrBootstrapShaped(List<PlannedOrder> buyOrders) {
-        return buyOrders.stream().anyMatch(o -> o.orderType() == OrderType.LOC);
-    }
-
-    // applyCapIfNeeded skipIf 콜백은 영속 List<Order>를 받는다 — 강등은 applyCapIfNeeded 내부에서 수행
-    private static boolean isVrBootstrapShapedPersisted(List<Order> buyOrders) {
         return buyOrders.stream().anyMatch(o -> o.orderType() == OrderType.LOC);
     }
 
@@ -202,14 +161,17 @@ class BuyOrderPriceCapper {
 
     // 공통 cap 적용 골격: skip 대상 여부 확인 → cap 초과 확인 → 기존 주문 CANCELLED → 보정 주문 저장
     // buyOrders: 호출측이 스코프(전체 PLANNED vs AT_OPEN 전용)를 결정해 미리 조회한 영속 목록
-    // skipIf: 조회된 buyOrders(영속)가 이 correctFn의 재산정 대상이 아니면 true (예: VR bootstrap 주문)
+    // skipIf: 강등된 plannedBuyOrders가 이 correctFn의 재산정 대상이 아니면 true (예: VR bootstrap 주문) —
+    // isVrBootstrapShaped(List<PlannedOrder>)와 타입을 맞추기 위해 toPlanned() 변환을 skip 판정보다 먼저 수행한다
     // correctFn은 커널(InfiniteStrategy/VrStrategy)에 위임하므로 강등한 List<PlannedOrder>를 받는다
     private void applyCapIfNeeded(Account account, UUID strategyCycleId, List<Order> buyOrders,
                                   BigDecimal currentPrice,
                                   BiFunction<List<PlannedOrder>, BigDecimal, List<PlannedOrder>> correctFn,
-                                  Predicate<List<Order>> skipIf) {
+                                  Predicate<List<PlannedOrder>> skipIf) {
         if (buyOrders.isEmpty()) return;
-        if (skipIf.test(buyOrders)) {
+
+        List<PlannedOrder> plannedBuyOrders = buyOrders.stream().map(Order::toPlanned).toList();
+        if (skipIf.test(plannedBuyOrders)) {
             log.info("[{}] BUY 보정 대상 아님(예: VR bootstrap) — post-hoc 캡 제외", account.nickname());
             return;
         }
@@ -217,9 +179,8 @@ class BuyOrderPriceCapper {
         BigDecimal cap = PriceCapPolicy.capFor(currentPrice);
         if (buyOrders.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return;
 
-        log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap, describeOrders(buyOrders));
+        log.info("[{}] BUY 가격 보정 필요 — cap={}, 원래 주문: {}", account.nickname(), cap, describePlannedOrders(plannedBuyOrders));
 
-        List<PlannedOrder> plannedBuyOrders = buyOrders.stream().map(Order::toPlanned).toList();
         List<PlannedOrder> newBuys = correctFn.apply(plannedBuyOrders, cap);
 
         // 기존 BUY PLANNED CANCELLED 처리(강등 전 원본 목록에서 id 읽음) → 보정된 BUY 재저장

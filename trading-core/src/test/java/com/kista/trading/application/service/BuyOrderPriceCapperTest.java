@@ -262,7 +262,8 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(Order.fromPlanned(bootstrapBuy, null, null)));
 
-        realCapper.capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("90.00"), bootstrapPosition, StrategyTicker.TQQQ);
+        realCapper.capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("90.00"), null, bootstrapPosition, StrategyTicker.TQQQ);
 
         // bootstrap 주문은 접수 전 보정 대상이 아니므로 취소·재저장이 전혀 발생하지 않아야 한다
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
@@ -274,7 +275,8 @@ class BuyOrderPriceCapperTest {
     void noBuyOrders_doesNothing() {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
 
         // 사이클 락은 조회 전에 항상 선행 — 보정 대상 없음과 무관하게 호출됨
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
@@ -289,7 +291,8 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("50.00", 18)));
 
-        capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
@@ -308,7 +311,8 @@ class BuyOrderPriceCapperTest {
         when(infiniteStrategy.buildCappedBuyOrders(eq(POSITION), eq(TODAY), eq(plannedBuyOrders), any()))
                 .thenReturn(capped);
 
-        capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
 
         // 락 획득이 조회·취소·재저장보다 먼저 일어나는지까지 순서 검증 (동시성 직렬화 의도 반영)
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
@@ -331,21 +335,23 @@ class BuyOrderPriceCapperTest {
         when(infiniteStrategy.buildCappedBuyOrders(eq(POSITION), eq(TODAY), eq(plannedBuyOrders), any()))
                 .thenReturn(List.of());
 
-        capper().capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), POSITION);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort).markCancelled(isNull()); // 테스트 buy()의 id=null
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
-    // ─── PRIVACY 캡 (capPrivacyIfNeeded) ────────────────────────────────────────
+    // ─── PRIVACY 캡 (capIfNeeded, mode=PRIVACY_SIMPLE) ──────────────────────────
 
     @Test
     void capPrivacyIfNeeded_noBuyOrders_doesNothing() {
         // PLANNED 주문이 없으면 아무 작업도 하지 않음
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, null, StrategyTicker.SOXL);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort, never()).markCancelled(any());
@@ -358,7 +364,8 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("50.00", 5)));
 
-        capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"));
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, null, StrategyTicker.SOXL);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort, never()).markCancelled(any());
@@ -372,7 +379,8 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(buy("40.00", 5), buy("28.00", 3)));
 
-        capper().capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("30.00"));
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("30.00"), null, null, StrategyTicker.SOXL);
 
         // 락 획득이 조회·취소·재저장보다 먼저 일어나는지까지 순서 검증
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
@@ -391,13 +399,14 @@ class BuyOrderPriceCapperTest {
         assertThat(saved.get(0).quantity()).isEqualTo(5);
     }
 
-    // ─── VR 캡 (capVrIfNeeded) ───────────────────────────────────────────────────
+    // ─── VR 캡 (capIfNeeded, mode=VR_POSITION) ───────────────────────────────────
 
     @Test
     void capVrIfNeeded_noBuyOrders_doesNothing() {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, VR_POSITION, StrategyTicker.TQQQ);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(vrStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
@@ -411,7 +420,8 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(vrLadderBuy("50.00", 1)));
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, VR_POSITION, StrategyTicker.TQQQ);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(vrStrategy, never()).buildCappedBuyOrders(any(), any(), any(), any());
@@ -428,7 +438,8 @@ class BuyOrderPriceCapperTest {
         when(vrStrategy.buildCappedBuyOrders(eq(VR_POSITION), eq(StrategyTicker.TQQQ), eq(TODAY), any()))
                 .thenReturn(capped);
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, VR_POSITION, StrategyTicker.TQQQ);
 
         // 락 획득이 조회·취소·재저장보다 먼저 일어나는지까지 순서 검증 — VR도 기존 사이클 동시 보정 직렬화 원칙 동일
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
@@ -450,7 +461,8 @@ class BuyOrderPriceCapperTest {
         when(vrStrategy.buildCappedBuyOrders(eq(VR_POSITION), eq(StrategyTicker.TQQQ), eq(TODAY), any()))
                 .thenReturn(List.of());
 
-        capper().capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, new BigDecimal("50.00"), VR_POSITION, StrategyTicker.TQQQ);
+        capper().capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, VR_POSITION, StrategyTicker.TQQQ);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort).markCancelled(isNull()); // 테스트 vrLadderBuy()의 id=null

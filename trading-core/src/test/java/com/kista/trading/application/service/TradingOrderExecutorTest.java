@@ -20,6 +20,7 @@ import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
@@ -122,7 +123,8 @@ class TradingOrderExecutorTest {
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
-        verify(buyOrderPriceCapper).capIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker());
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(orderId); // DB PK 보존
         assertThat(result.getFirst().status()).isEqualTo(OrderStatus.PLACED);
@@ -140,7 +142,8 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION, null, INFINITE_STRATEGY);
 
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
+        // currentPrice가 null이면 applyCap이 조기 반환 — capper와 아무 상호작용도 없어야 한다
+        verifyNoInteractions(buyOrderPriceCapper);
     }
 
     @Test
@@ -153,14 +156,14 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
-        // INFINITE 보정(capIfNeeded)은 호출되지 않음
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
-        // PRIVACY 캡(capPrivacyIfNeeded)은 PRIVACY 전략일 때 호출됨
-        verify(buyOrderPriceCapper).capPrivacyIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE);
+        // PRIVACY_SIMPLE 모드로 위임 — mode 판단·position/vrPosition 무시는 capIfNeeded 내부(BuyOrderPriceCapperTest)에서 검증
+        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker());
+        verifyNoMoreInteractions(buyOrderPriceCapper);
     }
 
     @Test
-    @DisplayName("VR + vrPosition 없음 → post-hoc 캡 미적용 (재계산 skip 케이스)")
+    @DisplayName("VR + vrPosition 없음 → BuyOrderPriceCapper 호출 없이 skip")
     void placeOrders_vrWithoutVrPosition_skipsAllCaps() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
@@ -169,14 +172,25 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, VR_STRATEGY);
 
-        // vrPosition이 null(재계산 skip 케이스)이면 INFINITE_POSITION과 동일한 원칙으로 post-hoc 캡을 건너뛴다
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
-        verify(buyOrderPriceCapper, never()).capPrivacyIfNeeded(any(), any(), any(), any());
-        verify(buyOrderPriceCapper, never()).capVrIfNeeded(any(), any(), any(), any(), any(), any());
+        // applyCap의 vrPosition null 가드가 capIfNeeded(@Transactional) 호출 자체를 막는다 — 빈 트랜잭션도 열리지 않음
+        verifyNoInteractions(buyOrderPriceCapper);
     }
 
     @Test
-    @DisplayName("VR + vrPosition 있음 → 접수 전 VR 매수 사다리 가격 보정(capVrIfNeeded) 호출")
+    @DisplayName("INFINITE + position 없음 → BuyOrderPriceCapper 호출 없이 skip")
+    void placeOrders_infiniteWithoutPosition_skipsAllCaps() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-INF-NULL"));
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, INFINITE_STRATEGY);
+
+        verifyNoInteractions(buyOrderPriceCapper);
+    }
+
+    @Test
+    @DisplayName("VR + vrPosition 있음 → 접수 전 VR 매수 사다리 가격 보정(capIfNeeded) 호출")
     void placeOrders_vrWithVrPosition_appliesVrCap() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
@@ -185,10 +199,10 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY);
 
-        // VR_POSITION mode + vrPosition non-null → 접수 전 VR 전용 보정 호출 (INFINITE_POSITION은 미호출)
-        verify(buyOrderPriceCapper).capVrIfNeeded(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, VR_POSITION, VR_STRATEGY.ticker());
-        verify(buyOrderPriceCapper, never()).capIfNeeded(any(), any(), any(), any(), any());
-        verify(buyOrderPriceCapper, never()).capPrivacyIfNeeded(any(), any(), any(), any());
+        // VR_POSITION mode + vrPosition non-null → 접수 전 VR 전용 보정 호출
+        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker());
+        verifyNoMoreInteractions(buyOrderPriceCapper);
     }
 
     @Test
@@ -206,7 +220,7 @@ class TradingOrderExecutorTest {
     // ─── placeAtOpenOrders (Task 4: AT_OPEN 접수도 동일 BUY cap 정책 적용) ──────────
 
     @Test
-    @DisplayName("VR + vrPosition 있음 → AT_OPEN 접수 전 VR 매수 사다리 가격 보정(capVrIfNeededAtOpen) 호출")
+    @DisplayName("VR + vrPosition 있음 → AT_OPEN 접수 전 VR 매수 사다리 가격 보정(capIfNeeded, atOpen=true) 호출")
     void placeAtOpenOrders_vrWithVrPosition_appliesVrCapAtOpenScope() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, OrderDirection.BUY, "60.00", 1);
@@ -215,10 +229,11 @@ class TradingOrderExecutorTest {
 
         List<Order> result = executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY);
 
-        // AT_OPEN 스코프 전용 보정(capVrIfNeededAtOpen) 호출 — 접수 전 자리에서 findPlannedByCycleAndDate(전체 PLANNED)를
-        // 쓰는 capVrIfNeeded는 절대 호출되지 않아야 한다 (동일 사이클의 AT_CLOSE PLANNED 오염 방지가 이 태스크의 핵심)
-        verify(buyOrderPriceCapper).capVrIfNeededAtOpen(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, VR_POSITION, VR_STRATEGY.ticker());
-        verify(buyOrderPriceCapper, never()).capVrIfNeeded(any(), any(), any(), any(), any(), any());
+        // AT_OPEN 스코프 전용 보정 — capIfNeeded(atOpen=true)로 위임돼 findAtOpenPlannedByCycleAndDate만 조회한다
+        // (atOpen=false 호출은 절대 발생하지 않아야 한다 — 동일 사이클의 AT_CLOSE PLANNED 오염 방지가 이 태스크의 핵심)
+        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, true, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker());
+        verifyNoMoreInteractions(buyOrderPriceCapper);
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().externalOrderId()).isEqualTo("KIS-VR-OPEN-001");
@@ -234,11 +249,11 @@ class TradingOrderExecutorTest {
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, null, VR_POSITION, VR_STRATEGY);
 
-        verify(buyOrderPriceCapper, never()).capVrIfNeededAtOpen(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(buyOrderPriceCapper);
     }
 
     @Test
-    @DisplayName("INFINITE + position 있음 → AT_OPEN 스코프 보정(capIfNeededAtOpen) 호출")
+    @DisplayName("INFINITE + position 있음 → AT_OPEN 스코프 보정(capIfNeeded, atOpen=true) 호출")
     void placeAtOpenOrders_infiniteWithPosition_appliesInfiniteCapAtOpenScope() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
@@ -247,12 +262,13 @@ class TradingOrderExecutorTest {
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
-        verify(buyOrderPriceCapper).capIfNeededAtOpen(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION);
+        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, true, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker());
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
     }
 
     @Test
-    @DisplayName("PRIVACY → AT_OPEN 스코프 보정(capPrivacyIfNeededAtOpen) 호출")
+    @DisplayName("PRIVACY → AT_OPEN 스코프 보정(capIfNeeded, atOpen=true) 호출")
     void placeAtOpenOrders_privacy_appliesPrivacyCapAtOpenScope() {
         UUID orderId = UUID.randomUUID();
         Order plannedOrder = planned(orderId, OrderDirection.SELL, "60.00", 5);
@@ -261,7 +277,8 @@ class TradingOrderExecutorTest {
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
-        verify(buyOrderPriceCapper).capPrivacyIfNeededAtOpen(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE);
+        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, true, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker());
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
     }
 

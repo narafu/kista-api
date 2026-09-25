@@ -183,7 +183,7 @@ class TradingCandidatePlanner {
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
             return new CycleState(ctx, balance, recalcPos, null, price, null);
         }
-        // PRIVACY: price 전달 — capPrivacyIfNeeded에서 현재가 기반 BUY 가격 캡 적용
+        // PRIVACY: price 전달 — BuyOrderPriceCapper.capIfNeeded(mode=PRIVACY_SIMPLE, ...)에서 현재가 기반 BUY 가격 캡 적용
         // VR: privacyBase 오염 방지 (혼합 배치 시 hasPrivacy=true로 조회됐을 수 있음)
         // VR은 canSkipOrderComputation()이 항상 false라 이 메서드에 도달하지 않음 — vrPosition은 항상 null로 둔다
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;

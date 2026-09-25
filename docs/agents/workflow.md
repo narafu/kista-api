@@ -26,31 +26,31 @@
 
 ### BuyOrderPriceCapper 보정 주문
 
-INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 각 전략마다 AT_CLOSE 스코프(`capIfNeeded`/`capPrivacyIfNeeded`/`capVrIfNeeded`)와 AT_OPEN 스코프(`capIfNeededAtOpen`/`capPrivacyIfNeededAtOpen`/`capVrIfNeededAtOpen`) 메서드가 쌍으로 존재한다 — AT_OPEN 스코프는 `findAtOpenPlannedByCycleAndDate`로 AT_OPEN PLANNED만 조회해 동일 사이클의 미도래 AT_CLOSE PLANNED를 건드리지 않는다. AT_CLOSE 접수(`TradingOrderExecutor.placeOrders()`)와 AT_OPEN 접수(`placeAtOpenOrders()`) 양쪽에서 `CycleOrderStrategy.priceCapMode()`로 분기해 호출한다.
+INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPriceCapper.capIfNeeded(mode, atOpen, ...)`가 `mode`(`CycleOrderStrategy.PriceCapMode`: INFINITE_POSITION/PRIVACY_SIMPLE/VR_POSITION)와 `atOpen`(AT_CLOSE/AT_OPEN 스코프) 두 파라미터로 과거 6개 메서드(전략별 3종 × AT_CLOSE/AT_OPEN 쌍)를 대체한다 — AT_OPEN 스코프(`atOpen=true`)는 `findAtOpenPlannedByCycleAndDate`로 AT_OPEN PLANNED만 조회해 동일 사이클의 미도래 AT_CLOSE PLANNED를 건드리지 않는다. AT_CLOSE 접수(`TradingOrderExecutor.placeOrders()`)와 AT_OPEN 접수(`placeAtOpenOrders()`) 양쪽에서 `CycleOrderStrategy.priceCapMode()`로 `mode`를 결정해 호출하며, `mode==NONE`/`INFINITE_POSITION&&position==null`/`VR_POSITION&&vrPosition==null` skip 가드는 호출측 `TradingOrderExecutor.applyCap`에 있다(`capIfNeeded`가 `@Transactional`이라 내부에 두면 skip 케이스마다 빈 트랜잭션이 열리기 때문).
 
-#### INFINITE 전략 (전후반 공통)
+#### INFINITE 전략 (전후반 공통, mode=INFINITE_POSITION)
 - 신규 후보는 `prepareForAllocation`에서 cap 후 base BUY 재산정과 correction BUY 생성을 먼저 수행하며, 이 최종 BUY 총액이 예산 배정 입력이 된다. 이 단계에서는 영속화하지 않는다.
-- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded`) — 재산정·보정 로직 자체는 `InfiniteStrategy.buildCappedBuyOrders()`에 위임 (아래 `computeEarlyBuys`/`computeLateBuys`/`CORRECTION_ORDER_COUNT`는 InfiniteStrategy 내부 심볼)
+- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded(mode=INFINITE_POSITION, ...)`) — 재산정·보정 로직 자체는 `InfiniteStrategy.buildCappedBuyOrders()`에 위임 (아래 `computeEarlyBuys`/`computeLateBuys`/`CORRECTION_ORDER_COUNT`는 InfiniteStrategy 내부 심볼)
 - 전반(buyOrders 2건): `computeEarlyBuys` — cappedAvg/cappedRef 기준 buy①② 재산정, 동가 시 병합
 - 후반(buyOrders 1건): `computeLateBuys` — cappedPrice 기준 단일 LOC 수량 재산정
 - **보정 주문 (전후반 공통)**: base buy 재산정 후 `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
   - 가격 = `K / (누적수량 + 1)` (HALF_UP, scale=2) — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip
 - 재산정 결과가 모두 비어있으면 BUY 주문 전체 제외 (log.warn)
-- INFINITE BUY는 항상 AT_CLOSE라 `capIfNeededAtOpen`은 실질 no-op — `priceCapMode()` 분기 대칭성 유지 목적으로만 존재
+- INFINITE BUY는 항상 AT_CLOSE라 `capIfNeeded(mode=INFINITE_POSITION, atOpen=true, ...)`은 실질 no-op — `priceCapMode()` 분기 대칭성 유지 목적으로만 존재
 
-#### PRIVACY 전략
+#### PRIVACY 전략 (mode=PRIVACY_SIMPLE)
 - 신규 후보는 allocator 전에 cap 초과 BUY 가격만 교체한 금액으로 예산을 검증하며, 이 단계에서는 영속화하지 않는다.
-- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 (`capPrivacyIfNeeded`)
+- 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 (`capIfNeeded(mode=PRIVACY_SIMPLE, ...)`)
 - **수량 재산정 없음** — cap 초과 BUY 주문가만 `currentPrice × 1.05`로 교체, 수량은 FIDA 원본 유지
-- `TradingOrderExecutor.placeOrders()`: `position == null && currentPrice != null` 분기 → `capPrivacyIfNeeded` 호출
+- `TradingOrderExecutor.placeOrders()`: PRIVACY_SIMPLE은 position/vrPosition null 가드 대상이 아니라(`applyCap`의 skip 가드는 INFINITE_POSITION/VR_POSITION 전용) 항상 `capIfNeeded` 호출
 - `TradingService`: PRIVACY도 `startPrice = price`로 `CycleState`에 전달 (이전에는 `null` → 캡 미적용 버그)
-- PRIVACY BUY도 항상 AT_CLOSE라 `capPrivacyIfNeededAtOpen`은 실질 no-op (대칭성 유지 목적)
+- PRIVACY BUY도 항상 AT_CLOSE라 `capIfNeeded(mode=PRIVACY_SIMPLE, atOpen=true, ...)`은 실질 no-op (대칭성 유지 목적)
 
-#### VR 전략
+#### VR 전략 (mode=VR_POSITION)
 - bootstrap 주문(LOC+AT_CLOSE, `PriceCapPolicy.capFor(referencePrice)` = referencePrice×1.05)은 사다리 공식과 무관한 별도 산정식이라 보정 대상에서 제외한다 — BUY 중 하나라도 `OrderType.LOC`이면 이번 배치 전체를 bootstrap으로 판별해 skip(`isVrBootstrapShaped`)
 - 사다리(LIMIT+AT_OPEN) BUY만 보정 대상: cap 초과 시 기존 buyOrders 인자 없이 `VrPosition`+cap만으로 `VrStrategy.buildCappedBuyOrders()`가 사다리 전체를 자기완결적으로 재생성 — poolLimit·pool 한도 내로 자연 재수렴
-- AT_CLOSE 스코프(`capVrIfNeeded`)는 사이클+거래일 전체 PLANNED BUY를, AT_OPEN 스코프(`capVrIfNeededAtOpen`)는 `findAtOpenPlannedByCycleAndDate`로 사다리 BUY만 조회 — bootstrap이 같은 사이클에 공존해도 스코프 밖이라 자연히 제외됨
+- AT_CLOSE 스코프(`capIfNeeded(mode=VR_POSITION, atOpen=false, ...)`)는 사이클+거래일 전체 PLANNED BUY를, AT_OPEN 스코프(`atOpen=true`)는 `findAtOpenPlannedByCycleAndDate`로 사다리 BUY만 조회 — bootstrap이 같은 사이클에 공존해도 스코프 밖이라 자연히 제외됨
 
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
