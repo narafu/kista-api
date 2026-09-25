@@ -37,6 +37,11 @@ public record AccountBalance(
         return newBuyTotal.compareTo(available) <= 0;
     }
 
+    // 예수금만 교체 — 예수금 플로어 클램프·적립/인출 반영·사이클 롤오버 개장잔고 구성에 사용
+    public AccountBalance withUsdDeposit(BigDecimal newUsdDeposit) {
+        return new AccountBalance(holdings, avgPrice, newUsdDeposit);
+    }
+
     // 체결 목록 반영 후 매매 후 잔고 — 평단가 = (매도 후 잔여 보유금 + 금일 매수금) ÷ 신규 보유수량 (매도는 평단가 불변)
     public AccountBalance applyExecutions(List<? extends Fill> executions) {
         if (executions.isEmpty()) return this;

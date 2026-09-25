@@ -151,7 +151,7 @@ class VrCycleRolloverService {
         // 새 사이클 + holdings 승계 스냅샷 원자 생성 — pool은 적립/인출 반영된 실 현금(adjustedPool)으로 개장
         // 시작일은 evaluationDate(항상 실제 거래일)로 고정 — dueDate(휴장일일 수 있음) 그대로 쓰면 시작일이 비거래일이 되고,
         // 배치 실행일(today)을 쓰면 실행이 며칠 밀릴 때마다 다음 due일도 함께 밀려 N주 스케줄이 누적 drift된다
-        AccountBalance newCycleBalance = new AccountBalance(postBalance.holdings(), postBalance.avgPrice(), adjustedPool);
+        AccountBalance newCycleBalance = postBalance.withUsdDeposit(adjustedPool);
         cycleSnapshotCreator.createVrCycleAndSnapshot(
                 strategy.id(),
                 cycle.strategyVersionId(),

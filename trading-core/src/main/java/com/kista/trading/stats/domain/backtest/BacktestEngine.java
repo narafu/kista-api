@@ -124,7 +124,7 @@ public class BacktestEngine {
                 floorTo = candle.date();
                 floorDays++;
                 if (shortfall.compareTo(floorMaxShortfall) > 0) floorMaxShortfall = shortfall;
-                state.balance = new AccountBalance(state.balance.holdings(), state.balance.avgPrice(), BigDecimal.ZERO);
+                state.balance = state.balance.withUsdDeposit(BigDecimal.ZERO);
             } else if (floorFrom != null) {
                 warnings.add(floorGapWarning(floorFrom, floorTo, floorDays, floorMaxShortfall));
                 floorFrom = null;
@@ -471,7 +471,7 @@ public class BacktestEngine {
             }
             // principal은 클램프 후 실제 반영된 만큼만 증감 — 요청 인출액 전부를 반영하면 원금이 과다 차감된다
             principal = principal.add(adjusted.subtract(before));
-            balance = new AccountBalance(balance.holdings(), balance.avgPrice(), adjusted);
+            balance = balance.withUsdDeposit(adjusted);
         }
     }
 

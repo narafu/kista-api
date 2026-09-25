@@ -46,7 +46,12 @@ class TradingOrderBudgetAllocator {
     private final TradingParallelRunner parallelRunner;         // 계좌별 브로커 선조회 병렬 실행
 
     // Allocation input for one strategy cycle; orders may include BUY, SELL, or both.
-    record Candidate(BatchContext ctx, List<PlannedOrder> orders) {}
+    record Candidate(BatchContext ctx, List<PlannedOrder> orders) {
+        // 주문 목록만 교체 — BUY/SELL 분리, 배정 승인/거절 등 ctx는 그대로 두고 orders만 바꾸는 재구성에 사용
+        Candidate withOrders(List<PlannedOrder> newOrders) {
+            return new Candidate(ctx, newOrders);
+        }
+    }
 
     // Approved contains only approved directions per candidate; rejected lists are direction-specific.
     record Allocation(List<Candidate> approved, List<Candidate> rejectedBuy, List<Candidate> rejectedSell) {}
@@ -88,7 +93,7 @@ class TradingOrderBudgetAllocator {
             Account account = accountCandidates.getFirst().ctx().account();
 
             List<Candidate> buyCandidates = accountCandidates.stream()
-                    .map(candidate -> new Candidate(candidate.ctx(),
+                    .map(candidate -> candidate.withOrders(
                             candidate.orders().stream().filter(order -> order.direction() == BUY).toList()))
                     .filter(candidate -> !candidate.orders().isEmpty())
                     .toList();
@@ -181,13 +186,13 @@ class TradingOrderBudgetAllocator {
         for (SellRequest request : sorted) {
             int requiredQuantity = sellTotal(request.orders());
             if (reservedQuantity + allocatedQuantity + requiredQuantity <= sellableQuantity) {
-                approved.add(new Candidate(request.candidate().ctx(), request.orders()));
+                approved.add(request.candidate().withOrders(request.orders()));
                 allocatedQuantity += requiredQuantity;
                 log.info("[{}] SELL 승인: ticker={}, required={}, reserved={}, allocated={}, sellable={}",
                         account.nickname(), accountTicker.ticker(), requiredQuantity, reservedQuantity,
                         allocatedQuantity, sellableQuantity);
             } else {
-                rejected.add(new Candidate(request.candidate().ctx(), request.orders()));
+                rejected.add(request.candidate().withOrders(request.orders()));
                 log.warn("[{}] SELL 판매가능수량 부족으로 제외: ticker={}, required={}, requestedTotal={}, reserved={}, allocated={}, sellable={}",
                         account.nickname(), accountTicker.ticker(), requiredQuantity, requestedQuantity,
                         reservedQuantity, allocatedQuantity, sellableQuantity);
@@ -201,7 +206,7 @@ class TradingOrderBudgetAllocator {
             List<PlannedOrder> buys = candidate.orders().stream().filter(order -> order.direction() == BUY).toList();
             if (!buys.isEmpty()) {
                 candidatesByAccount.computeIfAbsent(candidate.ctx().account().id(), ignored -> new ArrayList<>())
-                        .add(new Candidate(candidate.ctx(), buys));
+                        .add(candidate.withOrders(buys));
             }
         }
 
@@ -294,9 +299,12 @@ class TradingOrderBudgetAllocator {
         return Stream.concat(sellApproved.stream(), buyApproved.stream())
                 .map(Candidate::ctx)
                 .distinct()
-                .map(ctx -> new Candidate(ctx, sourceCandidates.get(ctx).orders().stream()
-                        .filter(order -> approvedDirections.get(ctx).contains(order.direction()))
-                        .toList()))
+                .map(ctx -> {
+                    Candidate source = sourceCandidates.get(ctx);
+                    return source.withOrders(source.orders().stream()
+                            .filter(order -> approvedDirections.get(ctx).contains(order.direction()))
+                            .toList());
+                })
                 .filter(candidate -> !candidate.orders().isEmpty())
                 .toList();
     }
