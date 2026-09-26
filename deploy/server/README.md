@@ -1,12 +1,5 @@
 # Server deployment (OCI)
 
-> ⚠️ **배포 전 필독 — 이 브랜치를 아직 `main`에 병합하지 말 것**
-> 이 문서와 `server-deploy.yml`은 `kista-infra` 레포(Caddy·Postgres·Redis 소유)가 실제로 서버에 배포된 **이후** 상태를 전제로 작성됐다.
-> `kista-infra`가 아직 배포되지 않은 시점에 이 브랜치를 `main`에 병합하면 `push: main` 트리거로 `server-deploy.yml`이 즉시 자동 실행되어 운영이 깨진다:
-> - `--remove-orphans` 없이 재기동되므로 현재 살아있는 구 caddy/redis 컨테이너가 orphan 처리되어 Caddy 라우팅이 끊긴다
-> - `REDIS_URL=redis://redis:6379`가 아직 존재하지 않는 `data_net`을 가리켜 Redis 연결 실패 → Toss 토큰 스토어가 DB fallback 없이 fail-closed(503) → 실거래 경로 장애 (`docs/agents/docker-infra.md` "Fly.io 다중 인스턴스 Toss 토큰 조정" 참고)
-> **병합 가능 조건**: kista-infra의 Phase 0(인스턴스 재편) + kista-infra 자체 최초 배포(`kista-infra/.github/workflows/server-deploy.yml` 성공 실행)가 완료된 뒤에만 이 브랜치를 `main`에 병합할 것.
-
 `kista-api`(HTTP)와 `kista-scheduler`(배치, 같은 이미지)를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 리버스 프록시(Caddy)·Postgres·Redis는
 `kista-infra` 레포가 소유하며, 이 레포는 `shared_net`(Caddy 라우팅)·`data_net`(Postgres/Redis 접근) 두 외부
 네트워크에 합류만 한다.
@@ -186,8 +179,3 @@ fida는 이 인스턴스(A: kista-api/kista-ui/kista-infra)와 **별도의 OCI �
 - [ ] UptimeRobot 헬스체크 URL 업데이트
 - [x] healthchecks.io 체크 2개 생성(개장/마감) + `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 등록 (API로 실제 ping_url·cron 스케쥴 일치 확인, 2026-08-04) — 알림 채널은 이메일만 연결됨, Grafana Cloud 연동은 미완료
 - [ ] kista-infra 배포 **전에** 구 `kista-api-caddy`/`kista-api-redis` 컨테이너 정리: `docker rm -f kista-api-caddy kista-api-redis` (포트 80/443 선점 해제, 신규 kista-infra caddy가 대신 기동)
-- [ ] Fly.io 1~2일 유지 후 종료
-
-## Fly.io 롤백
-
-`fly-deploy.yml` workflow_dispatch로 수동 실행 가능 — 커트오버 후 1~2일간 유지.
