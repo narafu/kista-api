@@ -1,5 +1,4 @@
 package com.kista.trading.application.service;
-import com.kista.trading.application.service.support.TradingParallelRunner;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
@@ -25,9 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.kista.sharedkernel.OrderDirection.BUY;
@@ -43,7 +40,6 @@ class TradingOrderBudgetAllocator {
     private final BrokerAdapterRegistry registry;              // live 잔고·판매가능수량 조회
     private final OrderPort orderPort;                         // 기존 PLANNED/PLACED 예약분 조회
     private final CycleOrderStrategies cycleOrderStrategies;    // 전략 타입별 예산 배정 우선순위 조회
-    private final TradingParallelRunner parallelRunner;         // 계좌별 브로커 선조회 병렬 실행
 
     // Allocation input for one strategy cycle; orders may include BUY, SELL, or both.
     record Candidate(BatchContext ctx, List<PlannedOrder> orders) {
@@ -56,130 +52,84 @@ class TradingOrderBudgetAllocator {
     // Approved contains only approved directions per candidate; rejected lists are direction-specific.
     record Allocation(List<Candidate> approved, List<Candidate> rejectedBuy, List<Candidate> rejectedSell) {}
 
-    // 계좌 단위 브로커 선조회 결과 — 실패는 failure로 보존해 allocate 시점에 원본 예외로 rethrow한다
-    // (runSafely 격리·알림 1회 계약 유지)
-    record AccountQuote(AccountBalance liveBalance, Map<StrategyTicker, Integer> sellableByTicker, Exception failure) {
-        static AccountQuote failed(Exception e) { return new AccountQuote(null, Map.of(), e); }
-    }
-
-    // 계좌별 선조회 결과 모음 — allocate 시점에 계좌 id로 조회한다
-    record LiveQuotes(Map<UUID, AccountQuote> byAccount) {
-        AccountQuote require(UUID accountId) {
-            AccountQuote quote = byAccount.get(accountId);
-            if (quote == null) throw new IllegalStateException("계좌 라이브 선조회 결과 없음: accountId=" + accountId);
-            return quote;
-        }
-    }
-
-    // 계좌별 candidates를 병렬로 선조회한다 — 계좌 내 예산 차감은 순차이지만 브로커 HTTP 호출은 계좌 간 병렬화한다
-    LiveQuotes fetchLiveQuotes(List<List<Candidate>> candidatesByAccount) throws InterruptedException {
-        List<TradingParallelRunner.Task<Map.Entry<UUID, AccountQuote>>> tasks = candidatesByAccount.stream()
-                .filter(accountCandidates -> !accountCandidates.isEmpty())
-                .map(accountCandidates -> {
-                    UUID accountId = accountCandidates.getFirst().ctx().account().id();
-                    return new TradingParallelRunner.Task<Map.Entry<UUID, AccountQuote>>(accountId,
-                            () -> Optional.of(Map.entry(accountId, fetchQuoteInline(accountCandidates))));
-                })
-                .toList();
-        Map<UUID, AccountQuote> byAccount = new LinkedHashMap<>();
-        parallelRunner.runAll(tasks).forEach(entry -> byAccount.put(entry.getKey(), entry.getValue()));
-        return new LiveQuotes(byAccount);
-    }
+    // 계좌 단위 브로커 선조회 결과
+    record AccountQuote(AccountBalance liveBalance, Map<StrategyTicker, Integer> sellableByTicker) {}
 
     // 한 계좌 스코프의 브로커 선조회 — 잔고는 BUY 후보 존재 시만, 판매가능수량은 SELL 후보의 종목별로만 조회한다
-    // (기존 allocateBuysForAccount/allocateSellsForAccountTicker의 조회 조건과 동일하게 유지)
-    private AccountQuote fetchQuoteInline(List<Candidate> accountCandidates) {
-        try {
-            Account account = accountCandidates.getFirst().ctx().account();
+    // candidates는 항상 단일 계좌 스코프여야 한다(호출부가 이미 계좌별로 묶어서 넘긴다)
+    private AccountQuote fetchQuote(List<Candidate> accountCandidates) {
+        Account account = accountCandidates.getFirst().ctx().account();
 
-            List<Candidate> buyCandidates = accountCandidates.stream()
-                    .map(candidate -> candidate.withOrders(
-                            candidate.orders().stream().filter(order -> order.direction() == BUY).toList()))
-                    .filter(candidate -> !candidate.orders().isEmpty())
-                    .toList();
-            AccountBalance liveBalance = null;
-            if (!buyCandidates.isEmpty()) {
-                Candidate probe = buyCandidates.stream().sorted(buyPriorityComparator()).findFirst().orElseThrow();
-                BrokerBalance bb = registry.require(account.toBrokerRef(), LiveBalancePort.class)
-                        .getLiveBalance(account.toBrokerRef(), probe.ctx().strategy().ticker());
-                liveBalance = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
-            }
-
-            Set<StrategyTicker> sellTickers = accountCandidates.stream()
-                    .flatMap(candidate -> candidate.orders().stream())
-                    .filter(order -> order.direction() == SELL)
-                    .map(PlannedOrder::ticker)
-                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-            Map<StrategyTicker, Integer> sellableByTicker = new LinkedHashMap<>();
-            for (StrategyTicker ticker : sellTickers) {
-                int sellable = registry.require(account.toBrokerRef(), SellableQuantityPort.class)
-                        .getSellableQuantity(ticker, account.toBrokerRef())
-                        .quantity();
-                sellableByTicker.put(ticker, sellable);
-            }
-            return new AccountQuote(liveBalance, sellableByTicker, null);
-        } catch (Exception e) {
-            return AccountQuote.failed(e);
+        List<Candidate> buyCandidates = accountCandidates.stream()
+                .map(candidate -> candidate.withOrders(
+                        candidate.orders().stream().filter(order -> order.direction() == BUY).toList()))
+                .filter(candidate -> !candidate.orders().isEmpty())
+                .toList();
+        AccountBalance liveBalance = null;
+        if (!buyCandidates.isEmpty()) {
+            Candidate probe = buyCandidates.stream().sorted(buyPriorityComparator()).findFirst().orElseThrow();
+            BrokerBalance bb = registry.require(account.toBrokerRef(), LiveBalancePort.class)
+                    .getLiveBalance(account.toBrokerRef(), probe.ctx().strategy().ticker());
+            liveBalance = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
         }
+
+        Set<StrategyTicker> sellTickers = accountCandidates.stream()
+                .flatMap(candidate -> candidate.orders().stream())
+                .filter(order -> order.direction() == SELL)
+                .map(PlannedOrder::ticker)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Map<StrategyTicker, Integer> sellableByTicker = new LinkedHashMap<>();
+        for (StrategyTicker ticker : sellTickers) {
+            int sellable = registry.require(account.toBrokerRef(), SellableQuantityPort.class)
+                    .getSellableQuantity(ticker, account.toBrokerRef())
+                    .quantity();
+            sellableByTicker.put(ticker, sellable);
+        }
+        return new AccountQuote(liveBalance, sellableByTicker);
     }
 
-    // 원본 예외를 그대로 rethrow — RuntimeException은 그대로, 아니면 IllegalStateException으로 래핑
-    private void rethrowIfFailed(AccountQuote quote) {
-        if (quote.failure() == null) return;
-        if (quote.failure() instanceof RuntimeException re) throw re;
-        throw new IllegalStateException("브로커 선조회 실패", quote.failure());
-    }
-
-    // 기존 호출부·단위 테스트 호환용 — 내부에서 단일 계좌 선조회 후 3-인자 allocate에 위임한다
+    // candidates는 반드시 단일 계좌 스코프 — 조회+배정을 한 번에 수행한다
     Allocation allocate(List<Candidate> candidates, LocalDate tradeDate) {
         if (candidates.isEmpty()) return new Allocation(List.of(), List.of(), List.of());
-        return allocate(candidates, tradeDate, fetchQuoteInline(candidates));
-    }
-
-    // 선조회된 quote를 사용하는 배정 — quote는 candidates와 동일 계좌 스코프여야 한다
-    Allocation allocate(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
-        if (candidates.isEmpty()) return new Allocation(List.of(), List.of(), List.of());
-        rethrowIfFailed(quote);
+        AccountQuote quote = fetchQuote(candidates);
 
         SellAllocation sellAllocation = allocateSells(candidates, tradeDate, quote);
-        BuyAllocation buyAllocation = allocateBuysByAccount(candidates, tradeDate, quote);
+        BuyAllocation buyAllocation = allocateBuys(candidates, tradeDate, quote);
         List<Candidate> approved = mergeApproved(candidates, sellAllocation.approved(), buyAllocation.approved());
         return new Allocation(approved, buyAllocation.rejected(), sellAllocation.rejected());
     }
 
     private SellAllocation allocateSells(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
-        Map<AccountTicker, List<SellRequest>> requestsByAccountTicker = new LinkedHashMap<>();
+        Map<StrategyTicker, List<SellRequest>> requestsByTicker = new LinkedHashMap<>();
         for (Candidate candidate : candidates) {
             Map<StrategyTicker, List<PlannedOrder>> sellsByTicker = candidate.orders().stream()
                     .filter(order -> order.direction() == SELL)
                     .collect(java.util.stream.Collectors.groupingBy(
                             PlannedOrder::ticker, LinkedHashMap::new, java.util.stream.Collectors.toList()));
-            sellsByTicker.forEach((ticker, sells) -> requestsByAccountTicker
-                    .computeIfAbsent(new AccountTicker(candidate.ctx().account().id(), ticker), ignored -> new ArrayList<>())
+            sellsByTicker.forEach((ticker, sells) -> requestsByTicker
+                    .computeIfAbsent(ticker, ignored -> new ArrayList<>())
                     .add(new SellRequest(candidate, sells)));
         }
 
         List<Candidate> approved = new ArrayList<>();
         List<Candidate> rejected = new ArrayList<>();
-        requestsByAccountTicker.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey(accountTickerComparator()))
-                .forEach(entry -> allocateSellsForAccountTicker(
-                        entry.getKey(), entry.getValue(), tradeDate, quote, approved, rejected));
+        requestsByTicker.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> allocateSellsForTicker(entry.getKey(), entry.getValue(), tradeDate, quote, approved, rejected));
         return new SellAllocation(approved, rejected);
     }
 
-    private void allocateSellsForAccountTicker(AccountTicker accountTicker, List<SellRequest> requests, LocalDate tradeDate,
+    private void allocateSellsForTicker(StrategyTicker ticker, List<SellRequest> requests, LocalDate tradeDate,
                                                 AccountQuote quote, List<Candidate> approved, List<Candidate> rejected) {
         List<SellRequest> sorted = requests.stream().sorted(sellPriorityComparator()).toList();
         Account account = sorted.getFirst().candidate().ctx().account();
-        Integer sellableQuantityBoxed = quote.sellableByTicker().get(accountTicker.ticker());
+        Integer sellableQuantityBoxed = quote.sellableByTicker().get(ticker);
         if (sellableQuantityBoxed == null) {
-            throw new IllegalStateException("판매가능수량 선조회 결과 없음: accountId=" + accountTicker.accountId()
-                    + ", ticker=" + accountTicker.ticker());
+            throw new IllegalStateException("판매가능수량 선조회 결과 없음: accountId=" + account.id() + ", ticker=" + ticker);
         }
         int sellableQuantity = sellableQuantityBoxed;
         int reservedQuantity = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-                account.id(), tradeDate, accountTicker.ticker());
+                account.id(), tradeDate, ticker);
         int requestedQuantity = sorted.stream().mapToInt(request -> sellTotal(request.orders())).sum();
         int allocatedQuantity = 0;
 
@@ -189,38 +139,24 @@ class TradingOrderBudgetAllocator {
                 approved.add(request.candidate().withOrders(request.orders()));
                 allocatedQuantity += requiredQuantity;
                 log.info("[{}] SELL 승인: ticker={}, required={}, reserved={}, allocated={}, sellable={}",
-                        account.nickname(), accountTicker.ticker(), requiredQuantity, reservedQuantity,
-                        allocatedQuantity, sellableQuantity);
+                        account.nickname(), ticker, requiredQuantity, reservedQuantity, allocatedQuantity, sellableQuantity);
             } else {
                 rejected.add(request.candidate().withOrders(request.orders()));
                 log.warn("[{}] SELL 판매가능수량 부족으로 제외: ticker={}, required={}, requestedTotal={}, reserved={}, allocated={}, sellable={}",
-                        account.nickname(), accountTicker.ticker(), requiredQuantity, requestedQuantity,
-                        reservedQuantity, allocatedQuantity, sellableQuantity);
+                        account.nickname(), ticker, requiredQuantity, requestedQuantity, reservedQuantity, allocatedQuantity, sellableQuantity);
             }
         }
     }
 
-    private BuyAllocation allocateBuysByAccount(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
-        Map<UUID, List<Candidate>> candidatesByAccount = new LinkedHashMap<>();
-        for (Candidate candidate : candidates) {
-            List<PlannedOrder> buys = candidate.orders().stream().filter(order -> order.direction() == BUY).toList();
-            if (!buys.isEmpty()) {
-                candidatesByAccount.computeIfAbsent(candidate.ctx().account().id(), ignored -> new ArrayList<>())
-                        .add(candidate.withOrders(buys));
-            }
-        }
+    private BuyAllocation allocateBuys(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
+        List<Candidate> buyCandidates = candidates.stream()
+                .map(candidate -> candidate.withOrders(
+                        candidate.orders().stream().filter(order -> order.direction() == BUY).toList()))
+                .filter(candidate -> !candidate.orders().isEmpty())
+                .toList();
+        if (buyCandidates.isEmpty()) return new BuyAllocation(List.of(), List.of());
 
-        List<Candidate> approved = new ArrayList<>();
-        List<Candidate> rejected = new ArrayList<>();
-        candidatesByAccount.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(entry -> allocateBuysForAccount(entry.getValue(), tradeDate, quote, approved, rejected));
-        return new BuyAllocation(approved, rejected);
-    }
-
-    private void allocateBuysForAccount(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote,
-                                        List<Candidate> approved, List<Candidate> rejected) {
-        List<Candidate> sorted = candidates.stream().sorted(buyPriorityComparator()).toList();
+        List<Candidate> sorted = buyCandidates.stream().sorted(buyPriorityComparator()).toList();
         Account account = sorted.getFirst().ctx().account();
         AccountBalance live = quote.liveBalance();
         if (live == null) {
@@ -229,6 +165,8 @@ class TradingOrderBudgetAllocator {
         BigDecimal reservedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), tradeDate);
         BigDecimal allocatedInBatch = BigDecimal.ZERO;
 
+        List<Candidate> approved = new ArrayList<>();
+        List<Candidate> rejected = new ArrayList<>();
         for (Candidate candidate : sorted) {
             BigDecimal required = buyTotal(candidate.orders());
             BigDecimal alreadyCommitted = reservedBuy.add(allocatedInBatch);
@@ -245,6 +183,7 @@ class TradingOrderBudgetAllocator {
                         remainingDeposit(live, reservedBuy, allocatedInBatch));
             }
         }
+        return new BuyAllocation(approved, rejected);
     }
 
     private Comparator<Candidate> buyPriorityComparator() {
@@ -261,11 +200,6 @@ class TradingOrderBudgetAllocator {
                 .thenComparingInt(request -> sellTotal(request.orders()))
                 .thenComparing(request -> request.candidate().ctx().strategy().id())
                 .thenComparing(request -> request.candidate().ctx().currentCycle().id());
-    }
-
-    private Comparator<AccountTicker> accountTickerComparator() {
-        return Comparator.comparing(AccountTicker::accountId)
-                .thenComparing(AccountTicker::ticker);
     }
 
     private int strategyPriority(StrategyType type) {
@@ -308,8 +242,6 @@ class TradingOrderBudgetAllocator {
                 .filter(candidate -> !candidate.orders().isEmpty())
                 .toList();
     }
-
-    private record AccountTicker(UUID accountId, StrategyTicker ticker) {}
 
     private record SellRequest(Candidate candidate, List<PlannedOrder> orders) {}
 

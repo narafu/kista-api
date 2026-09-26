@@ -2,6 +2,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 import com.kista.trading.application.service.support.TradingBatchGuard;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
+import com.kista.trading.application.service.support.TradingParallelRunner;
 
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.PriceSnapshot;
@@ -42,6 +43,7 @@ class TradingCandidatePlanner {
     private final TradingBalanceLoader balanceLoader;
     private final ApplicationEventPublisher eventPublisher; // 예수금 부족 알림(InsufficientBalanceEvent)
     private final TradingBatchGuard batchGuard;
+    private final TradingParallelRunner parallelRunner;         // 계좌별 조회+예산배정 병렬 실행
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
     record CycleState(
@@ -203,23 +205,18 @@ class TradingCandidatePlanner {
                         .add(candidate));
 
         Set<BatchContext> savedContexts = new LinkedHashSet<>();
-        List<TradingOrderBudgetAllocator.Allocation> allocations = new ArrayList<>();
 
-        // 브로커 HTTP 조회(잔고·판매가능수량)는 계좌 간 선 병렬 일괄 조회로 분리한다.
-        // 계좌 내 예산 차감(우선순위 순차 배정)은 순서 의존이라 아래 루프에서 그대로 순차 유지한다.
-        TradingOrderBudgetAllocator.LiveQuotes liveQuotes =
-                budgetAllocator.fetchLiveQuotes(List.copyOf(candidatesByAccount.values()));
-
-        // 계좌별 예산 조회 실패가 다른 계좌의 주문 생성을 막지 않도록 격리한다.
-        for (List<TradingOrderBudgetAllocator.Candidate> accountCandidates : candidatesByAccount.values()) {
-            BatchContext firstContext = accountCandidates.getFirst().ctx();
-            UUID accountId = firstContext.account().id();
-            Optional<TradingOrderBudgetAllocator.Allocation> allocation = batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
-                    () -> budgetAllocator.allocate(accountCandidates, tradeDate, liveQuotes.require(accountId)));
-            if (allocation.isPresent()) {
-                allocations.add(allocation.get());
-            }
-        }
+        // 계좌별 조회(잔고·판매가능수량)+예산 배정을 계좌 간 병렬 태스크로 묶는다.
+        // 계좌 내 예산 차감(우선순위 순차 배정)은 allocate() 내부에서 순차로 처리된다.
+        List<TradingParallelRunner.Task<TradingOrderBudgetAllocator.Allocation>> tasks = candidatesByAccount.values().stream()
+                .map(accountCandidates -> {
+                    BatchContext firstContext = accountCandidates.getFirst().ctx();
+                    return new TradingParallelRunner.Task<TradingOrderBudgetAllocator.Allocation>(firstContext.account().id(),
+                            () -> batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
+                                    () -> budgetAllocator.allocate(accountCandidates, tradeDate)));
+                })
+                .toList();
+        List<TradingOrderBudgetAllocator.Allocation> allocations = new ArrayList<>(parallelRunner.runAll(tasks));
 
         for (TradingOrderBudgetAllocator.Allocation allocation : allocations) {
             for (TradingOrderBudgetAllocator.Candidate approved : allocation.approved()) {

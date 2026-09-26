@@ -215,11 +215,11 @@ class TradingServiceTest {
         // MarketEventNotifier — TradingUserProfilePort/ApplicationEventPublisher를 직접 주입해 생성
         MarketEventNotifier marketEventNotifier = new MarketEventNotifier(tradingUserProfilePort, eventPublisher);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
-                tradingRegistry, orderPort, cycleStrategies, new TradingParallelRunner(0));
+                tradingRegistry, orderPort, cycleStrategies);
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
                 orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
-                budgetAllocator, balanceLoader, eventPublisher, batchGuard);
+                budgetAllocator, balanceLoader, eventPublisher, batchGuard, new TradingParallelRunner(0));
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
                 orderPort, strategyCyclePort,
