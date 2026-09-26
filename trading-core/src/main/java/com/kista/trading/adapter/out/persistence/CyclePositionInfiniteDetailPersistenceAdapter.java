@@ -46,11 +46,6 @@ class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfi
         return toDomain(jpaRepository.save(toEntity(detail)));
     }
 
-    @Override
-    public void deleteByStrategyId(UUID strategyId) {
-        jpaRepository.softDeleteByStrategyId(strategyId);
-    }
-
     private CyclePositionInfiniteDetail toDomain(CyclePositionInfiniteEntity entity) {
         return new CyclePositionInfiniteDetail(entity.getCyclePositionId(), entity.isReverseMode());
     }

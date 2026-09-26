@@ -148,39 +148,6 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void deleteByStrategyId_removesInfiniteDetailRowOnly() {
-        Strategy saved = strategyAdapter.save(new Strategy(
-                null, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE
-        ));
-        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, saved.id(), 1, null, null));
-        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 30));
-
-        strategyInfiniteDetailAdapter.deleteByStrategyId(saved.id());
-        entityManager.flush();
-        entityManager.clear();
-
-        Integer strategyRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM strategy WHERE id = ?",
-                Integer.class,
-                saved.id());
-        Integer activeDetailRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ? AND deleted_at IS NULL",
-                Integer.class,
-                version.id());
-        Integer totalDetailRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ?",
-                Integer.class,
-                version.id());
-
-        assertThat(strategyRows).isEqualTo(1);
-        assertThat(activeDetailRows).isZero();
-        assertThat(totalDetailRows).isEqualTo(1);
-        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionId(version.id())).isEmpty();
-        assertThat(strategyInfiniteDetailAdapter.findActiveByStrategyId(saved.id())).isEmpty();
-    }
-
-    @Test
     void strategyInfiniteSchema_followAuditConventionAndKeepDeletedHistory() throws Exception {
         assertThat(jdbcTemplate.queryForList("""
                 SELECT column_name

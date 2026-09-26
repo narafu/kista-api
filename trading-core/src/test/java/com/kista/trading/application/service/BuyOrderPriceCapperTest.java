@@ -229,7 +229,7 @@ class BuyOrderPriceCapperTest {
                 BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
         // referencePrice=100.00×1.05=105.00 — VrStrategy가 실제로 생성하는 bootstrap 주문 그대로 사용
         PlannedOrder bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, StrategyTicker.TQQQ,
-                new BigDecimal("100.00"), null, TODAY).getFirst();
+                new BigDecimal("100.00"), TODAY).getFirst();
         assertThat(bootstrapBuy.orderType()).isEqualTo(OrderType.LOC); // 픽스처 전제 확인
         assertThat(bootstrapBuy.timing()).isEqualTo(OrderTiming.AT_CLOSE);
         assertThat(bootstrapBuy.price()).isEqualByComparingTo("105.00");
@@ -257,7 +257,7 @@ class BuyOrderPriceCapperTest {
                 new AccountBalance(0, null, new BigDecimal("10000.00")),
                 BigDecimal.ZERO, new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
         PlannedOrder bootstrapBuy = realVrStrategy.buildOrders(bootstrapPosition, StrategyTicker.TQQQ,
-                new BigDecimal("100.00"), null, TODAY).getFirst();
+                new BigDecimal("100.00"), TODAY).getFirst();
         // orderPort.findPlannedByCycleAndDate는 영속 Order를 반환한다 — 커널 산출을 승격해 스텁한다
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
                 .thenReturn(List.of(Order.fromPlanned(bootstrapBuy, null, null)));

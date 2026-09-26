@@ -16,8 +16,7 @@ public class TossConfig {
         return RestClient.builder().requestFactory(tossRequestFactory()).build();
     }
 
-    // package-private — 필요 시 타임아웃 검증 테스트에서 직접 호출 가능
-    static HttpComponentsClientHttpRequestFactory tossRequestFactory() {
+    private static HttpComponentsClientHttpRequestFactory tossRequestFactory() {
         RequestConfig requestConfig = RequestConfig.custom()
                 .setConnectTimeout(Timeout.ofSeconds(3))
                 .setResponseTimeout(Timeout.ofSeconds(10))

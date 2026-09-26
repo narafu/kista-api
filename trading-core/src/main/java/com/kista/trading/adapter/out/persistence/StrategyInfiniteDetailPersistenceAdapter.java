@@ -6,7 +6,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -42,11 +41,6 @@ public class StrategyInfiniteDetailPersistenceAdapter implements StrategyInfinit
     @Override
     public StrategyInfiniteDetail save(StrategyInfiniteDetail detail) {
         return toDomain(jpaRepository.save(toEntity(detail)));
-    }
-
-    @Override
-    public void deleteByStrategyId(UUID strategyId) {
-        jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
     }
 
     private StrategyInfiniteDetail toDomain(StrategyInfiniteEntity entity) {

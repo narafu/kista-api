@@ -107,7 +107,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void findLatestByCycleId_andDeleteByStrategyId_followPersistedRows() {
+    void findLatestByCycleId_returnsMostRecentDetailsFirst() {
         Strategy strategy = strategyAdapter.save(new Strategy(
                 null, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
@@ -136,20 +136,6 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(latest)
                 .extracting(CyclePositionInfiniteDetail::isReverseMode)
                 .containsExactly(true, false);
-
-        cyclePositionInfiniteDetailAdapter.deleteByStrategyId(strategy.id());
-
-        Integer detailRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM cycle_position_infinite WHERE cycle_position_id IN (?, ?) AND deleted_at IS NULL",
-                Integer.class,
-                older.id(), newer.id());
-        Integer positionRows = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM cycle_position WHERE id IN (?, ?)",
-                Integer.class,
-                older.id(), newer.id());
-
-        assertThat(detailRows).isZero();
-        assertThat(positionRows).isEqualTo(2);
     }
 
     @Test

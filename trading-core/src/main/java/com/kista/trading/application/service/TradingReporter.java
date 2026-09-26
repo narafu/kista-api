@@ -57,15 +57,8 @@ class TradingReporter {
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
-        // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
         List<AccountBalance.Fill> fills = executions.stream()
-                .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
-                    @Override public OrderDirection direction() {
-                        return e.direction() == OrderDirection.BUY ? OrderDirection.BUY : OrderDirection.SELL;
-                    }
-                    @Override public int quantity() { return e.quantity(); }
-                    @Override public BigDecimal amountUsd() { return e.amountUsd(); }
-                })
+                .map(ExecutionFillMapper::toFill)
                 .toList();
         AccountBalance postBalance = balance.applyExecutions(fills);
         cyclePositionPersistor.saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);

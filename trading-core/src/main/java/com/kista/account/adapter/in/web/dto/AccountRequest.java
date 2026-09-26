@@ -24,7 +24,7 @@ public record AccountRequest(
         // accountNo를 그대로 저장 — KIS: "74420614-01", TOSS: "131-01-001931"
         // KIS CANO/ACNT_PRDT_CD 파싱은 KIS 어댑터가 담당
         // brokerAccountCode(TOSS accountSeq)는 AccountService에서 API 호출로 채움
-        return new RegisterAccountCommand(nickname, accountNo, appKey, secretKey, null, broker);
+        return new RegisterAccountCommand(nickname, accountNo, appKey, secretKey, broker);
     }
 
     public UpdateAccountCommand toUpdateCommand() {

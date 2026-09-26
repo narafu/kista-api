@@ -2,7 +2,6 @@ package com.kista.trading.adapter.out.persistence;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -22,15 +21,4 @@ interface CyclePositionInfiniteJpaRepository extends JpaRepository<CyclePosition
     List<CyclePositionInfiniteEntity> findTopNByStrategyCycleIdOrderByCreatedAtDesc(
             @Param("cycleId") UUID cycleId,
             Pageable pageable);
-
-    @Modifying
-    @Query(value = """
-            UPDATE cycle_position_infinite SET deleted_at = NOW()
-            WHERE cycle_position_id IN (
-                SELECT cp.id FROM cycle_position cp
-                WHERE cp.strategy_cycle_id IN (
-                    SELECT sc.id FROM strategy_cycle sc
-                    WHERE sc.strategy_id = :strategyId))
-            """, nativeQuery = true)
-    void softDeleteByStrategyId(@Param("strategyId") UUID strategyId);
 }

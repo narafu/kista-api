@@ -14,25 +14,11 @@ import com.kista.sharedkernel.StrategyTicker;
 
 interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
 
-    interface CycleStrategyType {
-        UUID getCycleId();
-        String getStrategyType();
-    }
-
     interface CycleStrategySummaryProjection {
         UUID getCycleId();
         UUID getStrategyId();
         String getStrategyType();
     }
-
-    @Query(value = """
-            SELECT sc.id AS cycleId, s.type AS strategyType
-            FROM strategy_cycle sc
-            JOIN strategy s ON sc.strategy_id = s.id
-            WHERE sc.id IN :cycleIds
-              AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
-            """, nativeQuery = true)
-    List<CycleStrategyType> findStrategyTypesByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
 
     @Query(value = """
             SELECT sc.id AS cycleId, s.id AS strategyId, s.type AS strategyType

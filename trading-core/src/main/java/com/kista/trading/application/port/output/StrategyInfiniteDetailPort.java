@@ -17,6 +17,4 @@ public interface StrategyInfiniteDetailPort {
     Map<UUID, StrategyInfiniteDetail> findByStrategyVersionIds(Collection<UUID> strategyVersionIds);
 
     StrategyInfiniteDetail save(StrategyInfiniteDetail detail);
-
-    void deleteByStrategyId(UUID strategyId);
 }

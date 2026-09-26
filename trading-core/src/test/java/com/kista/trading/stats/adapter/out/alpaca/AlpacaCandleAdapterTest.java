@@ -24,7 +24,7 @@ class AlpacaCandleAdapterTest {
 
     private final RestClient.Builder builder = RestClient.builder();
     private final AlpacaProperties properties = new AlpacaProperties(
-            "https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
+            "test-key", "test-secret", "https://data.test");
 
     private AlpacaCandleAdapter buildAdapter() {
         return new AlpacaCandleAdapter(builder.build(), properties);

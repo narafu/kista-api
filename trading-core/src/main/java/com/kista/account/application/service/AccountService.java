@@ -104,12 +104,6 @@ class AccountService implements AccountUseCase {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Account getById(UUID id) {
-        return accountPort.findByIdOrThrow(id);
-    }
-
-    @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
     public void test(Broker broker, String appKey, String appSecret, UUID accountId) {
         requireBrokerEnabled(broker);

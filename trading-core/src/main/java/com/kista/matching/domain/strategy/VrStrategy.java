@@ -27,10 +27,9 @@ public class VrStrategy {
     // 그 외(사다리로 정상 매수 가능)면 일반 밴드 사다리
     // ticker: 주문에 기록할 거래 종목 (VrPosition은 ticker를 직접 보유하지 않음)
     // referencePrice: bootstrap·캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체 가능
-    // livePrice: 과거 SELL bootstrap 전용 파라미터 — case1(V만 있음) 폐기로 현재 미사용, 시그니처는 호출부 영향 최소화를 위해 유지
     // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
     public List<PlannedOrder> buildOrders(VrPosition position, StrategyTicker ticker,
-                                   BigDecimal referencePrice, BigDecimal livePrice, LocalDate tradeDate) {
+                                   BigDecimal referencePrice, LocalDate tradeDate) {
         if (position.holdings() == 0 && needsBootstrap(position)) {
             return buildBootstrapBuyOrders(position, ticker, referencePrice, tradeDate);
         }

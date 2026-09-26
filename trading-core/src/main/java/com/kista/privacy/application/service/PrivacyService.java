@@ -4,16 +4,12 @@ import com.kista.sharedkernel.PrivacyAlertRaisedEvent;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.application.usecase.PrivacyUseCase;
 import com.kista.privacy.domain.model.FidaOrderCommand;
-import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -41,10 +37,5 @@ class PrivacyService implements PrivacyUseCase {
                     PrivacyAlertRaisedEvent.Severity.WARNING, "[PRIVACY] 기준 매매표 경고: " + report.summary()));
         }
         return privacyTradePort.saveBaseWithOrders(command);
-    }
-
-    @Override
-    public List<PrivacyTradeBaseView> findBasesFromTradeDate(LocalDate fromReleaseDate) {
-        return privacyTradePort.findBasesFromTradeDate(fromReleaseDate);
     }
 }

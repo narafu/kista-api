@@ -18,6 +18,4 @@ public interface CyclePositionInfiniteDetailPort {
     Map<UUID, CyclePositionInfiniteDetail> findByCyclePositionIds(Collection<UUID> cyclePositionIds);
 
     CyclePositionInfiniteDetail save(CyclePositionInfiniteDetail detail);
-
-    void deleteByStrategyId(UUID strategyId);
 }

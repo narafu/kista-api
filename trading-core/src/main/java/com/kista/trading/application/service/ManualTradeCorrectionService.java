@@ -26,7 +26,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,13 +115,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                                                 AccountBalance balance, StrategyCycle currentCycle) {
         Execution execution = Execution.ofManualFill(fill.tradeDate(), strategy.ticker(),
                 fill.direction(), fill.quantity(), fill.price(), fill.externalOrderId());
-        // broker 체결 → 잔고 재계산용 Fill (matching이 broker를 참조하지 않도록 호출부에서 변환)
-        AccountBalance.Fill f = new AccountBalance.Fill() {
-            @Override public OrderDirection direction() { return execution.direction(); }
-            @Override public int quantity() { return execution.quantity(); }
-            @Override public BigDecimal amountUsd() { return execution.amountUsd(); }
-        };
-        AccountBalance updated = balance.applyExecutions(List.of(f));
+        AccountBalance updated = balance.applyExecutions(List.of(ExecutionFillMapper.toFill(execution)));
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
         return updated;
     }

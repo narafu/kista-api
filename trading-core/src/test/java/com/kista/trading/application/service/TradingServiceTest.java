@@ -659,7 +659,7 @@ class TradingServiceTest {
                 OrderTiming.AT_OPEN, OrderDirection.BUY, 75, new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_TQQQ_AT_OPEN_BUY_20_00");
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(), any()))
                 .thenReturn(List.of(vrBuyOrder.toPlanned()));
         // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — 계좌별 우선순위 배정 메커니즘 자체를
         // 검증하는 목적이므로 AT_OPEN으로 대체해 개장 스케쥴러 경로에서도 동일하게 동작함을 확인
@@ -725,7 +725,7 @@ class TradingServiceTest {
                 OrderTiming.AT_OPEN, OrderDirection.BUY, 1, new BigDecimal("90.00"),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_VR_LADDER_BUY_STALE");
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(), any()))
                 .thenReturn(List.of(originalBuy.toPlanned()));
 
         // DB에 저장된(것으로 가정하는) PLANNED BUY — 개장 접수 전 캡 재평가 대상
@@ -1824,7 +1824,7 @@ class TradingServiceTest {
         when(strategyVrDetailPort.findByStrategyVersionId(vrVersionId)).thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
         // buildOrders: VR 전략은 LIMIT + AT_OPEN 주문만 반환
-        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any(), any()))
+        when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), any(), any()))
                 .thenReturn(List.of(vrBuyTemplate.toPlanned(), vrSellTemplate.toPlanned()));
         // 당일 AT_CLOSE 생성 주문 0건(AT_OPEN만 존재)이어도 마감 리포트까지 도달해야 함 — 아래 rollIfDue 검증 대상
         when(kisExecutionPort.getExecutions(any(), any(), eq(StrategyTicker.SOXL), eq(ACCOUNT_REF))).thenReturn(List.of());

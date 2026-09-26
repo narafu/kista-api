@@ -34,8 +34,4 @@ interface StrategyVersionJpaRepository extends JpaRepository<StrategyVersionEnti
     @Modifying
     @Query("UPDATE StrategyVersionEntity sv SET sv.deletedAt = :now WHERE sv.strategyId = :strategyId AND sv.deletedAt IS NULL")
     void softDeleteActiveByStrategyId(@Param("strategyId") UUID strategyId, @Param("now") Instant now);
-
-    @Modifying
-    @Query("UPDATE StrategyVersionEntity sv SET sv.deletedAt = :now WHERE sv.strategyId = :strategyId AND sv.deletedAt IS NULL")
-    void softDeleteByStrategyId(@Param("strategyId") UUID strategyId, @Param("now") Instant now);
 }

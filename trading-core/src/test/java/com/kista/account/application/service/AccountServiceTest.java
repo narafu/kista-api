@@ -48,7 +48,7 @@ class AccountServiceTest {
 
     private RegisterAccountCommand registerCmd() {
         return new RegisterAccountCommand(
-                "테스트계좌", "74420614", "appKey", "appSecret", "01", Broker.KIS
+                "테스트계좌", "74420614", "appKey", "appSecret", Broker.KIS
         );
     }
 
@@ -166,7 +166,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "토스테스트", "12345678901", "cid", "csecret", null, Broker.TOSS
+                "토스테스트", "12345678901", "cid", "csecret", Broker.TOSS
         );
 
         Account result = accountService.register(userId, cmd);
@@ -187,7 +187,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", "74420614-01", "appKey", "appSecret", null, null
+                "테스트계좌", "74420614-01", "appKey", "appSecret", null
         );
 
         Account result = accountService.register(userId, cmd);
@@ -217,7 +217,7 @@ class AccountServiceTest {
     void register_disabledToss_throwsValidationException() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(false);
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "토스테스트", "12345678901", "cid", "csecret", null, Broker.TOSS
+                "토스테스트", "12345678901", "cid", "csecret", Broker.TOSS
         );
 
         assertThatThrownBy(() -> accountService.register(userId, cmd))
@@ -279,7 +279,7 @@ class AccountServiceTest {
     void register_blankAccountNo_nonMockBroker_throws() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "테스트계좌", null, "appKey", "appSecret", null, Broker.KIS
+                "테스트계좌", null, "appKey", "appSecret", Broker.KIS
         );
 
         assertThatThrownBy(() -> accountService.register(userId, cmd))
@@ -301,7 +301,7 @@ class AccountServiceTest {
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
-                "모의계좌", null, null, null, null, Broker.MOCK
+                "모의계좌", null, null, null, Broker.MOCK
         );
 
         Account result = accountService.register(userId, cmd);

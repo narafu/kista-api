@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.in.web;
 
-import com.kista.privacy.application.usecase.PrivacyUseCase;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
@@ -36,7 +36,7 @@ class PrivacyInternalQueryControllerTest {
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean PrivacyUseCase privacy;
+    @MockitoBean PrivacyTradePort privacyTradePort;
 
     private static final String VALID_TOKEN = "test-internal-token";
 
@@ -49,7 +49,7 @@ class PrivacyInternalQueryControllerTest {
 
     @Test
     void listTradeBases_인증되면_200() throws Exception {
-        given(privacy.findBasesFromTradeDate(LocalDate.of(2026, 1, 1))).willReturn(List.of());
+        given(privacyTradePort.findBasesFromTradeDate(LocalDate.of(2026, 1, 1))).willReturn(List.of());
 
         mockMvc.perform(get("/api/internal/privacy/trade-bases")
                         .header("X-Internal-Token", VALID_TOKEN)

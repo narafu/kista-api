@@ -21,10 +21,10 @@ public record StrategyVrDetail(
         BigDecimal poolLimitFloor        // poolLimitRate 램프의 하한값
 ) {
 
-    // gradient 램프 1단계당 증가폭 — 재설정 서비스 등 다른 곳에서도 참조
-    public static final int G_STEP = 1;
-    // poolLimitRate 램프 1단계당 감소폭(5%p) — 재설정 서비스 등 다른 곳에서도 참조
-    public static final BigDecimal POOL_LIMIT_STEP = new BigDecimal("0.05");
+    // gradient 램프 1단계당 증가폭 — gradientAt 내부 전용(외부 참조 없음, 실측 확인)
+    private static final int G_STEP = 1;
+    // poolLimitRate 램프 1단계당 감소폭(5%p) — poolLimitRateAt 내부 전용(외부 참조 없음, 실측 확인)
+    private static final BigDecimal POOL_LIMIT_STEP = new BigDecimal("0.05");
 
     // gradientAt: 경과 주수(weeks) 기준 gradient(G) 값 — 유예 주수 이후 gStepWeeks마다 G_STEP씩 상승, gMax에서 상한
     // gStepWeeks<=0은 gradient 램프 비활성화를 의미 — initialGradient에 고정(gMax/gGraceWeeks 무관)

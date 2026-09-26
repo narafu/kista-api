@@ -11,7 +11,6 @@ import java.util.UUID;
 public interface AccountUseCase {
     // --- 조회 ---
     List<Account> listByUser(UUID userId);
-    Account getById(UUID id);
 
     // --- 등록 ---
     Account register(UUID userId, RegisterAccountCommand command);

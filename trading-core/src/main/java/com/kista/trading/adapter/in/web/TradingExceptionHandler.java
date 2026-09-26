@@ -112,10 +112,13 @@ public class TradingExceptionHandler {
             PrivacyTradeConflictException.class, Account.DuplicateAccountException.class
     })
     public ProblemDetail handleTradingCoreExceptions(Exception ex) {
-        Mapping m = resolveMapping(ex);
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(m.status(), ex.getMessage());
-        detail.setTitle(m.title());
-        return detail;
+        Mapping m = resolve(ex, MAPPINGS);
+        if (m == null) {
+            // 이 advice의 basePackages에 매치된 컨트롤러는 위 6종(또는 그 서브클래스)만 이 메서드로
+            // 라우팅되므로 도달 불가 — 방어적 가드
+            throw new IllegalStateException("매핑 없는 예외가 TradingExceptionHandler로 라우팅됨: " + ex.getClass());
+        }
+        return problem(m.status(), m.title(), ex.getMessage());
     }
 
     // root GlobalExceptionHandler.handleKisApiException과 동일 매핑(503) — 저장만 내부 API로 위임
@@ -170,7 +173,7 @@ public class TradingExceptionHandler {
             log.debug("클라이언트 연결 끊김으로 응답 미완: {}", ex.getMessage());
             return problem(HttpStatus.SERVICE_UNAVAILABLE, "Client Disconnected", "");
         }
-        Mapping m = resolveGenericMapping(ex);
+        Mapping m = resolve(ex, GENERIC_MAPPINGS);
         if (m != null) {
             return problem(m.status(), m.title(), ex.getMessage());
         }
@@ -189,18 +192,6 @@ public class TradingExceptionHandler {
             if (msg != null && (msg.contains("Broken pipe") || msg.contains("Connection reset by peer"))) return true;
         }
         return false;
-    }
-
-    // 클래스 계층 탐색 — resolveMapping(6종 전용)과 별개로 GENERIC_MAPPINGS를 조회, 매핑 없으면 null(500 폴백)
-    private static Mapping resolveGenericMapping(Exception ex) {
-        Class<?> cls = ex.getClass();
-        while (cls != null && Exception.class.isAssignableFrom(cls)) {
-            @SuppressWarnings("unchecked")
-            Mapping m = GENERIC_MAPPINGS.get((Class<? extends Exception>) cls);
-            if (m != null) return m;
-            cls = cls.getSuperclass();
-        }
-        return null;
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String msg) {
@@ -229,19 +220,18 @@ public class TradingExceptionHandler {
         }
     }
 
-    // 클래스 계층 탐색 — root GlobalExceptionHandler.resolveMapping과 동일 패턴.
-    // @ExceptionHandler는 서브클래스도 매치하므로(assignability 기준) 테이블 조회도 exact-class가
-    // 아닌 상위 클래스 탐색이어야 6종 중 하나의 향후 서브클래스가 NPE 없이 매칭된다.
-    private static Mapping resolveMapping(Exception ex) {
+    // 클래스 계층 탐색 — root GlobalExceptionHandler.resolveMapping과 동일 패턴. MAPPINGS/GENERIC_MAPPINGS
+    // 양쪽에 공용 — @ExceptionHandler는 서브클래스도 매치하므로(assignability 기준) 테이블 조회도
+    // exact-class가 아닌 상위 클래스 탐색이어야 등록된 예외의 향후 서브클래스가 NPE 없이 매칭된다.
+    // 매핑 없으면 null 반환 — 호출부가 throw(6종 전용, 도달 불가 가드)/폴백(범용, 500) 여부를 결정한다.
+    private static Mapping resolve(Exception ex, Map<Class<? extends Exception>, Mapping> mappings) {
         Class<?> cls = ex.getClass();
         while (cls != null && Exception.class.isAssignableFrom(cls)) {
             @SuppressWarnings("unchecked")
-            Mapping m = MAPPINGS.get((Class<? extends Exception>) cls);
+            Mapping m = mappings.get((Class<? extends Exception>) cls);
             if (m != null) return m;
             cls = cls.getSuperclass();
         }
-        // 이 advice의 basePackages에 매치된 컨트롤러는 위 6종(또는 그 서브클래스)만 이 메서드로
-        // 라우팅되므로 도달 불가 — 방어적 null 가드
-        throw new IllegalStateException("매핑 없는 예외가 TradingExceptionHandler로 라우팅됨: " + ex.getClass());
+        return null;
     }
 }

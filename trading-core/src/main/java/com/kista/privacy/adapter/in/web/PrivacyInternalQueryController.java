@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.in.web;
 
-import com.kista.privacy.application.usecase.PrivacyUseCase;
+import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.domain.model.PrivacyTradeBaseView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,12 +18,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PrivacyInternalQueryController {
 
-    private final PrivacyUseCase privacy;
+    private final PrivacyTradePort privacyTradePort;
 
     @Operation(summary = "기준 매매표 조회", description = "admin 조회 전용. X-Internal-Token 필수.")
     @GetMapping("/trade-bases")
     public List<PrivacyTradeBaseView> listTradeBases(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromReleaseDate) {
-        return privacy.findBasesFromTradeDate(fromReleaseDate);
+        return privacyTradePort.findBasesFromTradeDate(fromReleaseDate);
     }
 }
