@@ -70,7 +70,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label");
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_CYCLE_HISTORY);
@@ -88,7 +88,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label");
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -112,7 +112,7 @@ class StrategyOrderPlanBuilderTest {
                 eq(today), eq(vrCycle), eq(null), eq("vr-preview"), eq(null)))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, "vr-preview");
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, "vr-preview", Map.of());
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
@@ -131,7 +131,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null))
                 .thenReturn(Optional.of(plan));
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label");
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
 
         assertThat(result.isSkip()).isFalse();
         verify(pricePort, never()).getPrevClose(any(), any());
@@ -181,7 +181,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null))
                 .thenReturn(Optional.empty());
 
-        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label");
+        StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
 
         assertThat(result.isSkip()).isTrue();
         assertThat(result.skipReason()).isEqualTo(SkipReason.NO_PRIVACY_BASE);

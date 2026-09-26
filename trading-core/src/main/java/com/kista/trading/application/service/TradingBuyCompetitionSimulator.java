@@ -57,12 +57,6 @@ class TradingBuyCompetitionSimulator {
 
     BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
                                     List<PlannedOrder> currentBuyOrders, LocalDate today,
-                                    BigDecimal otherStrategiesPlannedBuyUsd) {
-        return simulate(currentStrategy, account, currentCycle, currentBuyOrders, today, otherStrategiesPlannedBuyUsd, null);
-    }
-
-    BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
-                                    List<PlannedOrder> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd, BatchContext context) {
         BigDecimal requiredForThis = AccountBalance.buyTotal(currentBuyOrders);
 
@@ -85,32 +79,27 @@ class TradingBuyCompetitionSimulator {
         ranked.add(new RankedCandidate(currentStrategy.id(), currentCycle.id(), currentStrategy.type(),
                 currentStrategy.ticker(), requiredForThis, true));
 
-        List<Strategy> candidates = context != null ? context.strategies() : strategyPort.findByAccountId(account.id());
+        List<Strategy> candidates = context.strategies();
         for (Strategy other : candidates) {
             if (other.id().equals(currentStrategy.id()) || other.status() != StrategyStatus.ACTIVE) {
                 continue;
             }
-            StrategyCycle otherCycle = context != null
-                    ? context.cyclesByStrategyId().get(other.id())
-                    : strategyCyclePort.findLatestByStrategyId(other.id()).orElse(null);
+            StrategyCycle otherCycle = context.cyclesByStrategyId().get(other.id());
             if (otherCycle == null || otherCycle.endDate() != null) {
                 continue; // 사이클 없거나 이미 종료된(좀비) 전략은 경쟁 대상이 될 수 없음
             }
-            List<Order> otherTodayOrders = context != null
-                    ? context.todayOrdersByStrategyId().getOrDefault(other.id(), List.of())
-                    : orderPort.findPlannedOrPlacedByCycleAndDate(otherCycle.id(), today);
+            List<Order> otherTodayOrders = context.todayOrdersByStrategyId().getOrDefault(other.id(), List.of());
             boolean alreadyOrdered = !otherTodayOrders.isEmpty();
             if (alreadyOrdered) {
                 continue; // PLANNED는 otherStrategiesPlannedBuyUsd에, PLACED는 라이브 예수금에 이미 반영됨
             }
 
             try {
-                StrategyOrderPlanBuilder.PlanResult result = context != null
-                        ? context.planResultsByStrategyId().get(other.id())
-                        : null;
+                StrategyOrderPlanBuilder.PlanResult result = context.planResultsByStrategyId().get(other.id());
                 if (result == null) {
-                    // 캐시 없음(non-batch 호출) 또는 사전 계산 실패(캐시 미스) — 즉시 재계산해 과소평가 방지
-                    result = planBuilder.build(other, account, otherCycle, today, "competition:" + other.id());
+                    // 사전 계산 실패(캐시 미스) — 즉시 재계산해 과소평가 방지. prevCloseCache는 여기서 알 수 없으므로
+                    // 빈 맵을 넘겨 StrategyOrderPlanBuilder가 단건 라이브 조회로 폴백하게 한다.
+                    result = planBuilder.build(other, account, otherCycle, today, "competition:" + other.id(), Map.of());
                 }
                 if (result.isSkip()) {
                     // NO_CYCLE_HISTORY/NO_PRIVACY_BASE 모두 야간 배치의 실제 동작을 확정할 수 없어
