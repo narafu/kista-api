@@ -20,7 +20,6 @@ public interface UserPort {
         return findById(id).orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + id));
     }
     User save(User user);
-    List<User> findAll(); // 전체 사용자 목록 (관리자용)
     List<User> findAllByStatus(UserStatus status); // 상태별 사용자 목록 (관리자용)
     Map<UserStatus, Long> countGroupByStatus(); // 상태별 사용자 수 단일 GROUP BY 집계 (관리자 통계용)
     long countByRole(UserRole role); // 역할별 사용자 수 (관리자 최소 1명 검증용)

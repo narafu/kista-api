@@ -2,6 +2,7 @@ package com.kista.user.domain.model;
 
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
+import lombok.With;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -9,16 +10,16 @@ import java.util.UUID;
 public record User(
         UUID id,                        // 카카오 OAuth UID (앱에서 할당)
         String kakaoId,                 // 카카오 고유 ID
-        String nickname,                // 카카오 닉네임
-        String email,                   // 카카오 계정 이메일 (AES-256 암호화 저장, 이메일 동의 안 하면 null 가능)
+        @With String nickname,          // 카카오 닉네임
+        @With String email,             // 카카오 계정 이메일 (AES-256 암호화 저장, 이메일 동의 안 하면 null 가능)
         UserStatus status,              // 계정 상태
-        UserRole role,                  // 사용자 권한 (USER / ADMIN)
+        @With UserRole role,            // 사용자 권한 (USER / ADMIN)
         String telegramBotToken,        // 전체 계좌 텔레그램 봇 토큰 (AES-256 암호화 저장, null 가능)
         String telegramChatId,          // 전체 계좌 텔레그램 Chat ID (null 가능)
         String telegramBotUsername,     // 텔레그램 봇 username (저장 시 getMe로 취득, 평문, null 가능)
         String rejectReason,            // 반려 사유 (REJECTED 상태에서만 의미, null 가능)
         Instant lastReappliedAt,        // nullable — 마지막 reapply()/reject() 호출 시점 (쿨다운 기준)
-        NotificationChannel notificationChannel // 알림 수단
+        @With NotificationChannel notificationChannel // 알림 수단
 ) {
     public static final NotificationChannel DEFAULT_CHANNEL = NotificationChannel.NONE; // 신규 유저 기본값
 
@@ -66,31 +67,4 @@ public record User(
                 botToken, chatId, botUsername, rejectReason, lastReappliedAt, notificationChannel);
     }
 
-    // 알림 채널 교체
-    public User withNotificationChannel(NotificationChannel channel) {
-        return new User(id, kakaoId, nickname, email, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
-                lastReappliedAt, channel);
-    }
-
-    // 역할만 교체 — AdminService.changeRole 전용
-    public User withRole(UserRole newRole) {
-        return new User(id, kakaoId, nickname, email, status, newRole,
-                telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
-                lastReappliedAt, notificationChannel);
-    }
-
-    // 닉네임 교체
-    public User withNickname(String nickname) {
-        return new User(id, kakaoId, nickname, email, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
-                lastReappliedAt, notificationChannel);
-    }
-
-    // 이메일 교체 — persistence 경계에서 암호화/복호화 왕복 전용
-    public User withEmail(String email) {
-        return new User(id, kakaoId, nickname, email, status, role,
-                telegramBotToken, telegramChatId, telegramBotUsername, rejectReason,
-                lastReappliedAt, notificationChannel);
-    }
 }

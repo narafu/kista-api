@@ -7,6 +7,7 @@ import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.usecase.AssetSnapshotUseCase;
 import com.kista.finance.application.usecase.BulkFinanceRegisterUseCase;
 import com.kista.finance.application.usecase.FinanceTransactionUseCase;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,19 +20,12 @@ import java.util.function.Function;
 // 여기서 전체를 하나의 @Transactional로 묶지 않는다. 한 항목 실패가 나머지 항목 등록을 막지 않기 위함.
 // shareToGroup=true면 각 create가 원자적으로 그룹 소유로 생성한다(별도 share 전환 단계 없음).
 @Service
+@RequiredArgsConstructor
 class BulkFinanceRegisterService implements BulkFinanceRegisterUseCase {
 
     private final AssetSnapshotUseCase assetSnapshotUseCase;
     private final FinanceTransactionUseCase financeTransactionUseCase;
     private final FinanceGroupPort financeGroupPort;
-
-    BulkFinanceRegisterService(AssetSnapshotUseCase assetSnapshotUseCase,
-                               FinanceTransactionUseCase financeTransactionUseCase,
-                               FinanceGroupPort financeGroupPort) {
-        this.assetSnapshotUseCase = assetSnapshotUseCase;
-        this.financeTransactionUseCase = financeTransactionUseCase;
-        this.financeGroupPort = financeGroupPort;
-    }
 
     @Override
     public BulkFinanceRegisterResult register(UUID userId, boolean shareToGroup,

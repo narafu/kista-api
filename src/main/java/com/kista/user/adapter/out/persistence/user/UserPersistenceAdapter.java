@@ -44,11 +44,6 @@ public class UserPersistenceAdapter implements UserPort {
     }
 
     @Override
-    public List<User> findAll() {
-        return jpaRepository.findAll().stream().map(this::toDomain).toList();
-    }
-
-    @Override
     public List<User> findAllByStatus(UserStatus status) {
         return jpaRepository.findAllByStatus(status).stream().map(this::toDomain).toList();
     }

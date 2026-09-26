@@ -11,7 +11,7 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
 
-// deleted_at 없음 — 그룹 단위 상태 레코드. 그룹 소프트 삭제(멤버 0) 시 deleteByGroupId로 하드 정리된다.
+// deleted_at 없음 — 그룹 단위 상태 레코드. 그룹 소프트 삭제 시 이 테이블의 group_id 행을 정리하는 경로는 없음(잠재 orphan).
 @Entity
 @Table(name = "finance_monthly_closings", schema = "finance")
 @Getter

@@ -57,23 +57,6 @@ class MarketCalendarQueryHttpAdapterTest {
     }
 
     @Test
-    void isMarketOpen_true_응답을_반환한다() {
-        server.enqueue(new MockResponse.Builder()
-                .code(200).addHeader("Content-Type", "application/json")
-                .body("true")
-                .build());
-
-        assertThat(adapter.isMarketOpen(LocalDate.of(2026, 1, 2))).isTrue();
-    }
-
-    @Test
-    void isMarketOpen_응답_본문이_없으면_false를_반환한다() {
-        server.enqueue(new MockResponse.Builder().code(204).build());
-
-        assertThat(adapter.isMarketOpen(LocalDate.of(2026, 1, 2))).isFalse();
-    }
-
-    @Test
     void currentSession_내부_API_응답을_own_type으로_변환한다() {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")

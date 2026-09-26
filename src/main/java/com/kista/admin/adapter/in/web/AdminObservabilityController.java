@@ -55,9 +55,6 @@ public class AdminObservabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         int safeLimit = Math.min(limit, MAX_LIMIT);
-        if (from == null && to == null) {
-            return adminQuery.listErrorLogs(safeLimit).stream().map(ErrorLogResponse::from).toList();
-        }
         Instant fromInstant = toInstantOrDefault(from, 0, Instant.EPOCH);
         Instant toInstant   = toInstantOrDefault(to, 1, Instant.now());
         return adminQuery.listErrorLogs(safeLimit, fromInstant, toInstant).stream()

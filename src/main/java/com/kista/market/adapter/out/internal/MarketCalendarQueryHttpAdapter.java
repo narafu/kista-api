@@ -28,17 +28,6 @@ class MarketCalendarQueryHttpAdapter implements MarketCalendarQueryPort {
     }
 
     @Override
-    public boolean isMarketOpen(LocalDate date) {
-        Boolean open = internalApiRestClient.get()
-                .uri(uriBuilder -> uriBuilder.path("/api/internal/marketcalendar/is-open")
-                        .queryParam("date", date)
-                        .build())
-                .retrieve()
-                .body(Boolean.class);
-        return open != null && open;
-    }
-
-    @Override
     public SessionView currentSession() {
         SessionResponse response = internalApiRestClient.get()
                 .uri("/api/internal/marketcalendar/session")

@@ -30,30 +30,28 @@ public class KbLandPriceIndexScheduler {
 
     @Scheduled(cron = "0 10 8 * * SAT", zone = TimeZones.KST_ID) // 매주 토요일 08:10 KST
     public void run() throws InterruptedException {
-        schedulerLockService.tryRun("kbland-price-index", Duration.ofMinutes(30),
-                () -> jobRunner.run("KB Land 주간 아파트 매매가격지수 수집 스케쥴러",
-                        () -> fetchHousingPriceIndexUseCase.fetchAndSave(RECENT_YEARS)));
+        trigger("kbland-price-index", RECENT_YEARS, "KB Land 주간 아파트 매매가격지수 수집 스케쥴러");
     }
 
     @Scheduled(cron = "0 20 8 1 * *", zone = TimeZones.KST_ID) // 매월 1일 08:20 KST
     public void runFullRefresh() throws InterruptedException {
-        schedulerLockService.tryRun("kbland-price-index-full", Duration.ofMinutes(30),
-                () -> jobRunner.run("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 스케쥴러",
-                        () -> fetchHousingPriceIndexUseCase.fetchAndSave(FULL_REFRESH_YEARS)));
+        trigger("kbland-price-index-full", FULL_REFRESH_YEARS, "KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 스케쥴러");
     }
 
     // 수동 트리거 — 크론 대기 없이 즉시 실행. run()과 락 이름을 공유해 크론과 동시 실행되지 않음
     public void runNow() throws InterruptedException {
-        schedulerLockService.tryRun("kbland-price-index", Duration.ofMinutes(30),
-                () -> jobRunner.run("KB Land 주간 아파트 매매가격지수 수집 스케쥴러 수동",
-                        () -> fetchHousingPriceIndexUseCase.fetchAndSave(RECENT_YEARS)));
+        trigger("kbland-price-index", RECENT_YEARS, "KB Land 주간 아파트 매매가격지수 수집 스케쥴러 수동");
     }
 
     // 수동 풀 리프레시 트리거 — KB Land 과거 값 보정을 다음 달 1일까지 기다리지 않고 즉시 반영해야 할 때 사용.
     // runFullRefresh()와 락 이름을 공유해 크론과 동시 실행되지 않음
     public void runFullRefreshNow() throws InterruptedException {
-        schedulerLockService.tryRun("kbland-price-index-full", Duration.ofMinutes(30),
-                () -> jobRunner.run("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 스케쥴러 수동",
-                        () -> fetchHousingPriceIndexUseCase.fetchAndSave(FULL_REFRESH_YEARS)));
+        trigger("kbland-price-index-full", FULL_REFRESH_YEARS, "KB Land 주간 아파트 매매가격지수 월간 풀 리프레시 스케쥴러 수동");
+    }
+
+    // 락 획득 + 지정 연도 범위 수집 실행 — 락 이름·연도·로그 라벨만 다른 4개 진입점의 공통 골격
+    private void trigger(String lockName, int years, String label) throws InterruptedException {
+        schedulerLockService.tryRun(lockName, Duration.ofMinutes(30),
+                () -> jobRunner.run(label, () -> fetchHousingPriceIndexUseCase.fetchAndSave(years)));
     }
 }

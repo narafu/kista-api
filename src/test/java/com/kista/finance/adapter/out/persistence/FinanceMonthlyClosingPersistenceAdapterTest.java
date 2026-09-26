@@ -147,14 +147,4 @@ class FinanceMonthlyClosingPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(adapter.isMonthClosed(null, userId, "2026-08")).isFalse();
     }
 
-    @Test
-    void deleteByGroupId_removesGroupClosings() {
-        adapter.upsert(groupId, userId, "2026-08", true);
-
-        adapter.deleteByGroupId(groupId);
-
-        Integer rowCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM finance_monthly_closings WHERE group_id = ?", Integer.class, groupId);
-        assertThat(rowCount).isZero();
-    }
 }

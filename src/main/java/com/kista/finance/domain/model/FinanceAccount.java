@@ -41,16 +41,6 @@ public record FinanceAccount(
         private final String label;
     }
 
-    // 과거 uq_finance_accounts_group_name(V13) 위반을 어댑터가 이 예외로 변환했다 — save()의 그룹 내 이름
-    // 중복, reassignGroup()의 이관 대상 그룹 이름 충돌 모두 이 하나의 제약에 의존했다. V16에서 해당 제약을
-    // DROP해(계좌 이름 중복 허용) 두 경로 모두 더 이상 이 예외로 이어지지 않는다 — 어댑터 코드·클래스는
-    // GlobalExceptionHandler 매핑 호환을 위해 유지.
-    public static class DuplicateNameException extends RuntimeException {
-        public DuplicateNameException(String name) {
-            super("이미 같은 이름의 계좌가 있습니다: " + name);
-        }
-    }
-
     // 계좌 삭제 요청 시 매핑된 자산 기록이 남아있으면 차단 — 먼저 자산 기록의 계좌를 미지정으로 바꿔야 한다.
     public static class LinkedAssetSnapshotsException extends RuntimeException {
         public LinkedAssetSnapshotsException() {

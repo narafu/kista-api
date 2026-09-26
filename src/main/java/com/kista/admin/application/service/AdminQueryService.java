@@ -156,12 +156,6 @@ class AdminQueryService implements AdminQueryUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AppErrorLog> listErrorLogs(int limit) {
-        return appErrorLogPort.findRecent(limit);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to) {
         return appErrorLogPort.findRecent(limit, from, to);
     }

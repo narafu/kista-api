@@ -9,6 +9,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,9 +83,11 @@ class AppErrorLogPersistenceAdapterTest {
         AppErrorLogEntity entity = new AppErrorLogEntity(
                 null, "KisApiException", "KIS 오류", "stack", "{\"caller\":\"TradingService\"}", null
         );
-        when(repo.findTopNByOrderByCreatedAtDesc(50)).thenReturn(List.of(entity));
+        Instant from = Instant.EPOCH;
+        Instant to = Instant.now();
+        when(repo.findTopNByCreatedAtBetween(from, to, 50)).thenReturn(List.of(entity));
 
-        List<AppErrorLog> result = adapter.findRecent(50);
+        List<AppErrorLog> result = adapter.findRecent(50, from, to);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().errorType()).isEqualTo("KisApiException");

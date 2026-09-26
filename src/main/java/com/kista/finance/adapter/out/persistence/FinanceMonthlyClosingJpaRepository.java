@@ -52,8 +52,4 @@ interface FinanceMonthlyClosingJpaRepository extends JpaRepository<FinanceMonthl
                           updated_at = now()
             """, nativeQuery = true)
     void upsertPersonal(@Param("userId") UUID userId, @Param("month") String month, @Param("completed") boolean completed);
-
-    @Modifying
-    @Query("DELETE FROM FinanceMonthlyClosingEntity m WHERE m.groupId = :groupId")
-    void deleteByGroupId(@Param("groupId") UUID groupId);
 }

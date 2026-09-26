@@ -68,7 +68,6 @@ public class GlobalExceptionHandler {
         // 아래는 admin이 PrivacyQueryHttpAdapter(내부 API 409 응답 복원)에서 던지는 own-type만 남는다
         Map.entry(AdminPrivacyTradeConflictException.class,            new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceBudget.OverlappingPeriodException.class,      new Mapping(HttpStatus.CONFLICT,           "Conflict")),
-        Map.entry(FinanceAccount.DuplicateNameException.class,         new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.DuplicateAccountNoException.class,    new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceAccount.LinkedAssetSnapshotsException.class,  new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),

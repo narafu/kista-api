@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.kista.support.WebMvcTestSupport.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -91,7 +93,7 @@ class AdminObservabilityControllerTest {
                 UUID.randomUUID(), "KisApiException", "KIS 오류", "stack...",
                 Map.of("caller", "TradingService"), Instant.now()
         );
-        when(adminQuery.listErrorLogs(100)).thenReturn(List.of(log));
+        when(adminQuery.listErrorLogs(eq(100), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of(log));
 
         mockMvc.perform(get("/api/admin/logs/errors")
                         .with(authentication(adminToken(ADMIN_UUID))))
@@ -101,7 +103,7 @@ class AdminObservabilityControllerTest {
 
     @Test
     void listErrorLogs_customLimit_passedToPort() throws Exception {
-        when(adminQuery.listErrorLogs(50)).thenReturn(List.of());
+        when(adminQuery.listErrorLogs(eq(50), eq(Instant.EPOCH), any(Instant.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/admin/logs/errors?limit=50")
                         .with(authentication(adminToken(ADMIN_UUID))))

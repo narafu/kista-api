@@ -145,16 +145,6 @@ class FinanceAccountServiceTest {
         verify(accountPort, never()).softDelete(accountId);
     }
 
-    @Test
-    @DisplayName("create 중 계좌명 중복 시 DuplicateNameException이 그대로 전파됨")
-    void create_duplicateName_propagatesUntouched() {
-        when(accountPort.save(any())).thenThrow(new FinanceAccount.DuplicateNameException("카카오뱅크"));
-
-        assertThatThrownBy(() -> accountService.create(userId, false, command()))
-                .isInstanceOf(FinanceAccount.DuplicateNameException.class)
-                .hasMessageContaining("카카오뱅크");
-    }
-
     // 삭제된 계좌는 findActiveByIdOrThrow가 못 찾아야 함 — findByIdOrThrow(삭제 계좌도 조회됨)를 쓰면
     // save() merge 시 deletedAt이 조용히 풀려 되살아난다(코드리뷰에서 발견, 2026-08-19).
     @Test

@@ -49,8 +49,7 @@ public interface AdminQueryUseCase {
     // 단일 계좌 조회 — listStrategyOrders 전용 (전체 풀스캔 불필요)
     Optional<AdminAccountView> findAccount(UUID accountId);
 
-    // 앱 에러 로그 조회 / 소프트 삭제 — AdminObservabilityController 전용
-    List<AppErrorLog> listErrorLogs(int limit);
+    // 앱 에러 로그 조회 / 소프트 삭제 — AdminObservabilityController 전용(from/to 기본값은 컨트롤러가 EPOCH/now로 대입)
     List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to);
     void deleteErrorLog(UUID id);
 }

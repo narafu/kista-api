@@ -14,9 +14,7 @@ public interface AppErrorLogPort {
     // 클라이언트(UI) 오류 리포트 저장 — 서버 Exception이 없는 브라우저 오류 전용
     // 계약: 저장 자체가 실패해도 이 메서드는 예외를 던지지 않는다(구현체가 격리 책임을 짐) — 호출부에서 별도 try/catch 불필요
     void save(String errorType, String message, String stackTrace, Map<String, String> context);
-    // 최신순 limit건 조회
-    List<AppErrorLog> findRecent(int limit);
-    // 기간 범위 조회 (최신순, limit건)
+    // 기간 범위 조회 (최신순, limit건) — from/to 기본값은 호출부가 결정(컨트롤러가 EPOCH/now 대입)
     List<AppErrorLog> findRecent(int limit, Instant from, Instant to);
     // 소프트 삭제 — deleted_at 설정, 없으면 NoSuchElementException
     void softDelete(UUID id);
