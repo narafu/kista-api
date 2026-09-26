@@ -9,9 +9,6 @@ import com.kista.sharedkernel.OrderDirection;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.trading.application.port.output.OrderPort;
-import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.support.TradingFixtures;
@@ -38,9 +35,6 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 @ExtendWith(MockitoExtension.class)
 class TradingBuyCompetitionSimulatorTest {
 
-    @Mock StrategyPort strategyPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock OrderPort orderPort;
     @Mock StrategyOrderPlanBuilder planBuilder;
     @Mock CycleOrderStrategies cycleOrderStrategies;
     @Mock PreviewDepositCache depositCache;
@@ -59,7 +53,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     @BeforeEach
     void setUp() {
-        simulator = new TradingBuyCompetitionSimulator(strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
+        simulator = new TradingBuyCompetitionSimulator(planBuilder, cycleOrderStrategies, depositCache);
         lenient().when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(infiniteOrderStrategy);
         lenient().when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(vrOrderStrategy);
         lenient().when(infiniteOrderStrategy.allocationPriority()).thenReturn(1);
@@ -132,7 +126,6 @@ class TradingBuyCompetitionSimulatorTest {
         assertThat(result.blockedByHigherPriority()).isEmpty();
         assertThat(result.uncertainStrategyIds()).isEmpty();
         assertThat(result.availableDeposit()).isEqualByComparingTo("1000.00");
-        verify(orderPort, never()).findPlannedOrPlacedByCycleAndDate(eq(endedCycle.id()), any());
         verify(planBuilder, never()).build(eq(vrStrategy), any(), any(), any(), anyString(), any());
     }
 
@@ -263,7 +256,6 @@ class TradingBuyCompetitionSimulatorTest {
 
         assertThat(result.blockedByHigherPriority()).isEmpty();
         verifyNoInteractions(planBuilder);
-        verify(strategyCyclePort, never()).findLatestByStrategyId(pausedVr.id());
     }
 
     @Test
@@ -284,6 +276,6 @@ class TradingBuyCompetitionSimulatorTest {
         assertThat(result.consumedByHigherPriority()).isEqualByComparingTo("0");
         assertThat(result.blockedByHigherPriority()).isEmpty();
         assertThat(result.uncertainStrategyIds()).isEmpty();
-        verifyNoInteractions(strategyPort); // 경쟁 전략 조회 자체를 시작하지 않고 즉시 반환
+        verifyNoInteractions(planBuilder); // 경쟁 전략 조회 자체를 시작하지 않고 즉시 반환
     }
 }

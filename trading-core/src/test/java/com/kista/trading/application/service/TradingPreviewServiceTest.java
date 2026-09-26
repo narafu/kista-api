@@ -124,10 +124,16 @@ class TradingPreviewServiceTest {
         when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(targetPlan, null));
         // 경쟁자는 이미 오늘 주문이 있으므로 previewBatch가 계획을 계산은 하지만(배치는 항상 전량 계산)
-        // TradingBuyCompetitionSimulator가 alreadyOrdered로 걸러 최종 경쟁 순위에는 포함하지 않는다
+        // TradingBuyCompetitionSimulator가 alreadyOrdered로 걸러 최종 경쟁 순위에는 포함하지 않는다.
+        // 금액을 target(20.00)보다 의도적으로 작게(10.00) 잡아야 한다 — BuyPriorityOrdering이 동일 타입일 때
+        // 금액 오름차순으로 정렬하므로, 제외 로직이 깨지면 더 작은 금액인 competitor가 항상 target보다
+        // 먼저 정렬돼 blocked에 반드시 나타난다. 동일 금액이면 tie-break가 랜덤 UUID 비교로 떨어져
+        // 회귀를 절반의 확률로만 잡는 결정성 없는 테스트가 된다.
+        PlannedOrder competitorBuyOrder = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.BUY, 1, new BigDecimal("10.00"));
         when(planBuilder.build(eq(competitor), eq(ACCOUNT), eq(competitorCycle), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(
-                        new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder)), null));
+                        new CycleOrderStrategy.OrderPlan(null, null, List.of(competitorBuyOrder)), null));
 
         // competitionSimulator는 @Mock이라 실제 경쟁 로직을 검증하려면 실제 구현체+실제 서비스가 필요
         PreviewDepositCache depositCache = mock(PreviewDepositCache.class);
@@ -138,7 +144,7 @@ class TradingPreviewServiceTest {
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
-                strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
+                planBuilder, cycleOrderStrategies, depositCache);
         TradingPreviewService realService = new TradingPreviewService(
                 accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, sellSufficiencySimulator, priceFetcher);
 
@@ -466,7 +472,7 @@ class TradingPreviewServiceTest {
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
-                strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
+                planBuilder, cycleOrderStrategies, depositCache);
         TradingPreviewService realService = new TradingPreviewService(
                 accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, sellSufficiencySimulator, priceFetcher);
 
@@ -510,7 +516,7 @@ class TradingPreviewServiceTest {
         lenient().when(orderStrategy.allocationPriority()).thenReturn(1);
 
         TradingBuyCompetitionSimulator realSimulator = new TradingBuyCompetitionSimulator(
-                strategyPort, strategyCyclePort, orderPort, planBuilder, cycleOrderStrategies, depositCache);
+                planBuilder, cycleOrderStrategies, depositCache);
         TradingPreviewService realService = new TradingPreviewService(
                 accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, realSimulator, sellSufficiencySimulator, priceFetcher);
 

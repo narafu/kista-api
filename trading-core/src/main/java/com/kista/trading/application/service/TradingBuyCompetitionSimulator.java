@@ -9,9 +9,6 @@ import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.trading.application.port.output.OrderPort;
-import com.kista.trading.application.port.output.StrategyCyclePort;
-import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,9 +33,6 @@ import com.kista.sharedkernel.StrategyTicker;
 @Slf4j
 class TradingBuyCompetitionSimulator {
 
-    private final StrategyPort strategyPort;              // 계좌 내 전략 전체 조회
-    private final StrategyCyclePort strategyCyclePort;    // 경쟁 전략의 현재 사이클 조회
-    private final OrderPort orderPort;                    // 경쟁 전략의 당일 기존 주문 유무 확인
     private final StrategyOrderPlanBuilder planBuilder;   // 경쟁 전략 가상 계산
     private final CycleOrderStrategies cycleOrderStrategies; // 우선순위 조회
     private final PreviewDepositCache depositCache;        // 계좌 단위 라이브 예수금 짧은 TTL 캐시 (preview 전용)
