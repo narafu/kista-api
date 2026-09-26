@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 // int라 시그니처를 맞추지 않으면 TradingAlertNotifier에서 컴파일 에러가 난다.
 public interface TradingNotifyPort {
     void notifyError(Exception e);
+    void notifyInfo(String message);
     void notifyInsufficientBalance(int holdings, BigDecimal usdDeposit, StrategyTicker ticker);
     void notifyMarketClosed();
 }

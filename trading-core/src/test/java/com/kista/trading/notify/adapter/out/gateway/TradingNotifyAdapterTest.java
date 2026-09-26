@@ -55,6 +55,17 @@ class TradingNotifyAdapterTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void notifyInfo_sendsRawMessage() {
+        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
+        adapter.notifyInfo("경고 메시지");
+
+        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
+        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
+        assertThat(text).isEqualTo("경고 메시지");
+    }
+
+    @Test
     void notifyError_withEmptyToken_skipsRestClientCall() {
         TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
         TradingNotifyAdapter noTokenAdapter = new TradingNotifyAdapter(httpClient, EMPTY_PROPS);

@@ -1,7 +1,7 @@
-package com.kista.notify.adapter.out.gateway;
+package com.kista.trading.notify.adapter.out.gateway;
 
 import com.kista.sharedkernel.OrderCancelFailedEvent;
-import com.kista.notify.application.port.output.NotifyPort;
+import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -13,7 +13,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class OrderCancelFailureNotifier {
 
-    private final NotifyPort notifyPort; // Spring 프록시 경유 호출 — ErrorLogAspect가 app_error_logs에 기록
+    private final TradingNotifyPort notifyPort;
 
     // 트랜잭션 있으면 커밋 후, 없으면 즉시 동기 실행
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)

@@ -1,19 +1,19 @@
-package com.kista.notify.adapter.out.gateway;
+package com.kista.trading.notify.adapter.out.gateway;
 
 import com.kista.sharedkernel.PrivacyAlertRaisedEvent;
-import com.kista.notify.application.port.output.NotifyPort;
+import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-// privacy가 발행하는 FIDA 기준 매매표 검증 경보를 구독해 기존 NotifyPort로 중계한다(MarketAlertNotifier와 동일 패턴).
+// privacy가 발행하는 FIDA 기준 매매표 검증 경보를 구독해 기존 TradingNotifyPort로 중계한다.
 // PrivacyService.executeFidaOrder()가 @Transactional 없이 이벤트 발행 직후 예외를 던지거나 저장을 진행하므로
 // fallbackExecution=true로 트랜잭션이 없으면 발행 시점에 동기 실행되게 한다.
 @Component
 @RequiredArgsConstructor
 public class PrivacyAlertNotifier {
 
-    private final NotifyPort notifyPort;
+    private final TradingNotifyPort notifyPort;
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onPrivacyAlert(PrivacyAlertRaisedEvent event) {

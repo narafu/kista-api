@@ -1,7 +1,7 @@
-package com.kista.notify.adapter.out.gateway;
+package com.kista.trading.notify.adapter.out.gateway;
 
 import com.kista.sharedkernel.OrderCancelFailedEvent;
-import com.kista.notify.application.port.output.NotifyPort;
+import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -17,7 +17,7 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class OrderCancelFailureNotifierTest {
 
-    @Mock NotifyPort notifyPort;
+    @Mock TradingNotifyPort notifyPort;
 
     @Test
     void onOrderCancelFailed_forwardsSummaryToNotifyPort() {

@@ -1,7 +1,7 @@
-package com.kista.notify.adapter.out.gateway;
+package com.kista.trading.notify.adapter.out.gateway;
 
 import com.kista.sharedkernel.PrivacyAlertRaisedEvent;
-import com.kista.notify.application.port.output.NotifyPort;
+import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -10,11 +10,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 
-// privacy가 발행하는 PrivacyAlertRaisedEvent가 severity별로 기존 NotifyPort 채널로 라우팅되는지 검증
+// privacy가 발행하는 PrivacyAlertRaisedEvent가 severity별로 기존 TradingNotifyPort 채널로 라우팅되는지 검증
 @ExtendWith(MockitoExtension.class)
 class PrivacyAlertNotifierTest {
 
-    @Mock NotifyPort notifyPort;
+    @Mock TradingNotifyPort notifyPort;
 
     private PrivacyAlertNotifier notifier() {
         return new PrivacyAlertNotifier(notifyPort);
