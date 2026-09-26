@@ -13,8 +13,6 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties(InternalApiProperties.class)
 public class InternalApiClientConfig {
 
-    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
-
     // 커넥션/응답 타임아웃 — 미설정 시 hung 호출이 admin 요청 스레드를 무한 점유
     private static final Timeout CONNECT_TIMEOUT = Timeout.ofSeconds(3);
     private static final Timeout RESPONSE_TIMEOUT = Timeout.ofSeconds(10);
@@ -47,7 +45,7 @@ public class InternalApiClientConfig {
         }
         return RestClient.builder()
                 .baseUrl(props.baseUrl())
-                .defaultHeader(INTERNAL_TOKEN_HEADER, props.token())
+                .defaultHeader(InternalApiProperties.TOKEN_HEADER, props.token())
                 .requestFactory(requestFactory)
                 .build();
     }

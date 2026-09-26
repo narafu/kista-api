@@ -3,6 +3,7 @@ package com.kista.platform.internalapi;
 import org.springframework.web.client.RestClient;
 
 import java.util.NoSuchElementException;
+import java.util.function.Function;
 
 // admin 내부 API 어댑터(TradingCommandHttpAdapter/PrivacyQueryHttpAdapter/TradingQueryHttpAdapter) 3곳이
 // 반복하던 "HTTP 404 → NoSuchElementException / HTTP 400 → IllegalArgumentException" onStatus 매핑을
@@ -15,15 +16,18 @@ public final class InternalApiStatusHandlers {
 
     // 404 응답을 NoSuchElementException으로 변환 — 응답 바디 detail 필드가 있으면 그 메시지, 없으면 fallback
     public static RestClient.ResponseSpec notFoundAsNoSuchElement(RestClient.ResponseSpec spec, String fallback) {
-        return spec.onStatus(status -> status.value() == 404, (request, response) -> {
-            throw new NoSuchElementException(InternalApiErrorDetails.detailOrDefault(response, fallback));
-        });
+        return onStatus(spec, 404, fallback, NoSuchElementException::new);
     }
 
     // 400 응답을 IllegalArgumentException으로 변환 — 응답 바디 detail 필드가 있으면 그 메시지, 없으면 fallback
     public static RestClient.ResponseSpec badRequestAsIllegalArgument(RestClient.ResponseSpec spec, String fallback) {
-        return spec.onStatus(status -> status.value() == 400, (request, response) -> {
-            throw new IllegalArgumentException(InternalApiErrorDetails.detailOrDefault(response, fallback));
+        return onStatus(spec, 400, fallback, IllegalArgumentException::new);
+    }
+
+    private static RestClient.ResponseSpec onStatus(RestClient.ResponseSpec spec, int statusCode, String fallback,
+            Function<String, ? extends RuntimeException> exceptionFactory) {
+        return spec.onStatus(status -> status.value() == statusCode, (request, response) -> {
+            throw exceptionFactory.apply(InternalApiErrorDetails.detailOrDefault(response, fallback));
         });
     }
 }

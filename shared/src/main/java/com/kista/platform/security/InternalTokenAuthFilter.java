@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.kista.platform.internalapi.InternalApiProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,7 +20,6 @@ import java.util.List;
 @Component
 public class InternalTokenAuthFilter extends OncePerRequestFilter {
 
-    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
     private static final String INTERNAL_PATH_PREFIX = "/api/internal/";
 
     private final String internalApiToken;
@@ -39,7 +39,7 @@ public class InternalTokenAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String token = request.getHeader(INTERNAL_TOKEN_HEADER);
+        String token = request.getHeader(InternalApiProperties.TOKEN_HEADER);
         if (internalApiToken.isBlank() || !internalApiToken.equals(token)) {
             log.warn("내부 API 인증 실패: uri={}", request.getRequestURI());
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
