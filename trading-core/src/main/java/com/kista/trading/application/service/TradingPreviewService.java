@@ -138,9 +138,15 @@ class TradingPreviewService {
             StrategyOrderPlanBuilder.PlanResult planResult = planResultsByStrategyId.get(strategy.id());
             if (planResult == null) {
                 // 사전계산 단계에서 이 전략의 build()가 실패해 캐시에 없는 경우 — 즉시 재시도.
-                // 재시도도 실패하면 기존과 동일하게 예외를 그대로 전파한다(호출부인 previewBatch()가
-                // 통째로 실패하는 기존 동작 그대로 — 이 계획은 그 예외 처리 정책 자체는 바꾸지 않는다).
-                planResult = planBuilder.build(strategy, account, cycle, today, "preview:" + strategy.id(), prevCloseCache);
+                // 재시도도 실패하면 이 전략만 결과 맵에서 생략한다 — 위 "사이클 없는 전략은 결과 맵에서
+                // 생략" 처리와 동일한 부분 실패 허용 정책이다. 한 전략의 지속적 계산 실패가 preview(단건)
+                // 호출 시 계좌 내 다른(건강한) 전략까지 실패시키는 회귀를 막는다.
+                try {
+                    planResult = planBuilder.build(strategy, account, cycle, today, "preview:" + strategy.id(), prevCloseCache);
+                } catch (RuntimeException e) {
+                    log.warn("배치 미리보기 재시도도 실패 — 이 전략만 생략: strategyId={}, error={}", strategy.id(), e.getMessage());
+                    continue;
+                }
             }
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
                     todayOrdersByStrategyId.get(strategy.id()), planResult, context, totalAccountPlannedBuy));

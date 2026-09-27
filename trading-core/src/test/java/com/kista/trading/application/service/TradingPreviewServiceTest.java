@@ -178,6 +178,40 @@ class TradingPreviewServiceTest {
         verify(planBuilder, times(2)).build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any());
     }
 
+    // 최종 리뷰 Finding 1 회귀 테스트 — previewBatch()의 사전계산 재시도 실패가 계좌 내 다른(형제)
+    // 전략까지 전파돼 preview(단건) 호출 전체를 실패시키던 문제를 막는다. 형제 전략의 build()가
+    // 사전계산·재시도 양쪽 모두 지속적으로 실패해도(thenReturn 없이 항상 throw), 대상 전략의
+    // 정상 조회는 영향받지 않아야 한다.
+    @Test
+    void preview_isolatesTargetFromSiblingStrategyThatPersistentlyFailsComputation() {
+        Strategy sibling = new Strategy(
+                UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        StrategyCycle siblingCycle = new StrategyCycle(
+                UUID.randomUUID(), sibling.id(), UUID.randomUUID(), new BigDecimal("1000.00"),
+                null, LocalDate.now().minusDays(7), null, null, null);
+
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, sibling));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id(), sibling.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE, sibling.id(), siblingCycle));
+
+        PlannedOrder sellOrder = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        CycleOrderStrategy.OrderPlan targetPlan = new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder));
+        when(planBuilder.build(eq(STRATEGY), eq(ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(targetPlan, null));
+        // 형제 전략은 사전계산·재시도 양쪽 모두 지속적으로 실패한다 — thenReturn 없이 항상 throw
+        when(planBuilder.build(eq(sibling), eq(ACCOUNT), eq(siblingCycle), any(), anyString(), any()))
+                .thenThrow(new RuntimeException("지속적 계산 오류"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result).isNotNull();
+        assertThat(result.orders()).hasSize(1);
+        // 형제 전략은 사전계산 1회 + 최종 루프 재시도 1회, 총 2회 시도된다
+        verify(planBuilder, times(2)).build(eq(sibling), eq(ACCOUNT), eq(siblingCycle), any(), anyString(), any());
+    }
+
     // 시작예정일 미도래 사이클 — TradingService.filterScheduledStart와 동일 기준으로 미리보기도 skip해야 함
     @Test
     void preview_returnsScheduledStartNotReached_whenCycleStartDateIsFuture() {
