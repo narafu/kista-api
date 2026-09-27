@@ -1,19 +1,13 @@
 package com.kista.trading.application.service;
-import com.kista.trading.application.service.support.TradingBalanceLoader;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 
 import com.kista.broker.application.service.BrokerAdapterRegistry;
-import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
-import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
-import com.kista.broker.application.port.output.LiveBalancePort;
-import com.kista.broker.application.port.output.SellableQuantityPort;
+import com.kista.trading.application.port.output.*;
+import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.sharedkernel.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +21,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyTicker;
 
 @Slf4j
 @Service
@@ -38,11 +31,12 @@ class ManualTradingService {
     private final StrategyCyclePort strategyCyclePort;
     private final AccountPort accountPort;
     private final OrderPort orderPort;
-    private final PrivacyTradePort privacyTradePort;
     private final TradingPriceFetcher priceFetcher;
-    private final TradingBalanceLoader balanceLoader;
-    private final CycleOrderComputer orderComputer;
-    private final TradingOrderPlanner orderPlanner;
+    private final StrategyOrderPlanBuilder planBuilder;
+    private final BuyOrderPriceCapper priceCapper;
+    private final TradingOrderBudgetAllocator budgetAllocator;
+    private final TradingOrderPlanner orderPlanner;            // allocator 승인 결과 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
+    private final CycleOrderStrategies cycleOrderStrategies;   // priceCapper.prepareForAllocation의 mode 조회용
     private final TradingOrderExecutor orderExecutor;
     private final BrokerAdapterRegistry registry;
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
@@ -69,35 +63,39 @@ class ManualTradingService {
         if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())
             throw new ManualTradingException("오늘 이미 주문이 등록된 전략입니다");
 
-        // 전일종가 조회(0회차 평단가 대용) 후 PLANNED 주문 저장 — 증권사 접수는 스케쥴러가 담당
-        BigDecimal prevClosePrice = fetchPrevCloseOrThrow(strategy, account);
+        // 잔고 로드~전일종가~privacyBase~전략 계산을 배치와 동일한 StrategyOrderPlanBuilder에 위임한다
+        StrategyOrderPlanBuilder.PlanResult result = planBuilder.build(strategy, account, currentCycle, today, account.nickname(), Map.of());
+        if (result.isSkip()) return List.of(); // 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
+        CycleOrderStrategy.OrderPlan plan = result.plan();
 
-        AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
-        log.info("잔고 조회 (이력): [{}] {} {}주, 통합주문가능금액 ${}",
-                account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
+        // 접수 전 가격 캡 적용 — 배치(TradingCandidatePlanner)와 동일 지점에서 동일 기준으로 적용해
+        // 캡 적용 전 금액으로 검증하던 기존 버그(배치는 캡 적용 후 배정, 수동실행은 캡 적용 전 검증)를 없앤다
+        BigDecimal startPrice = fetchStartPriceOrNull(strategy, account);
+        List<PlannedOrder> preparedOrders = priceCapper.prepareForAllocation(
+                plan.orders(), startPrice, plan.position(), plan.vrPosition(), strategy.ticker(),
+                cycleOrderStrategies.of(strategy.type()).priceCapMode(), today);
 
-        // PRIVACY는 당일 기준매매표 조회, INFINITE는 null (PlanContext에서 무시됨)
-        // PrivacyTradePort에는 이 조합 전용 헬퍼가 없어 동일 로직을 인라인
-        PrivacyTradeBase privacyBase = strategy.isPrivacy() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;
-
-        CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, account.nickname(), null)
-                .orElse(null);
-        if (plan == null) return List.of(); // 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
-
-        // live 잔고 1회 조회 — BUY 예수금·SELL 보유수량 모두 검사
-        AccountBalance liveBalance = fetchLiveBalanceOrThrow(account, strategy);
-
-        // 예수금 부족 체크: 신규 BUY 합계 > (live 잔고 - 타 전략 당일 PLANNED BUY 합계)
-        BigDecimal otherBuyTotal = orderPort.sumPlannedBuyByAccountAndDate(account.id(), today);
-        if (!liveBalance.hasSufficientDepositFor(plan.orders(), otherBuyTotal)) {
-            throw new ManualTradingException("예수금이 부족합니다");
+        // 예산 배정기로 예수금/보유수량 검증 — 단건 candidate 하나만 넘긴다(Task 2가 단일계좌 전용으로 축소한 진입점)
+        BatchContext ctx = new BatchContext(strategy, currentCycle, account,
+                null /* userProfile: 알림 미사용 경로라 null — allocate()는 approved/rejected 판단에만 ctx.account() 사용 */);
+        TradingOrderBudgetAllocator.Allocation allocation;
+        try {
+            allocation = budgetAllocator.allocate(
+                    List.of(new TradingOrderBudgetAllocator.Candidate(ctx, preparedOrders)), today);
+        } catch (Exception e) {
+            log.warn("[{}] 예산 배정 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
+                    account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
+            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
+        if (!allocation.rejectedBuy().isEmpty()) throw new ManualTradingException("예수금이 부족합니다");
+        if (!allocation.rejectedSell().isEmpty()) throw new ManualTradingException("보유 수량이 부족합니다");
 
-        // 보유수량 부족 체크: 기존 예약 SELL + 신규 SELL > 판매가능수량 (KIS: CTRP6504R / Toss: /api/v1/sellable-quantity)
-        checkSellableOrThrow(account, strategy, today, plan.orders());
-
-        orderPlanner.savePlannedOrders(plan.orders(), account, currentCycle.id());
+        List<PlannedOrder> approvedOrders = allocation.approved().stream()
+                .flatMap(candidate -> candidate.orders().stream())
+                .toList();
+        orderPlanner.savePlannedOrders(approvedOrders, account, currentCycle.id());
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요
@@ -107,49 +105,13 @@ class ManualTradingService {
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
     }
 
-    // 시세 조회 실패 시 ManualTradingException으로 래핑
-    private BigDecimal fetchPrevCloseOrThrow(Strategy strategy, Account account) {
+    // BUY 가격 캡 판단용 현재가 — 조회 실패 시 캡 미적용(null이면 prepareForAllocation이 원본 그대로 반환)
+    private BigDecimal fetchStartPriceOrNull(Strategy strategy, Account account) {
         try {
-            Map<StrategyTicker, PriceSnapshot> snapshots =
-                    priceFetcher.fetchPriceSnapshots(List.of(strategy.ticker()), account);
-            return PriceSnapshot.prevCloseOrNull(snapshots.get(strategy.ticker()));
+            return priceFetcher.fetchPrices(List.of(strategy.ticker()), account).get(strategy.ticker());
         } catch (Exception e) {
-            // priceFetcher.fetchPriceSnapshots는 내부에서 실패를 흡수하고 절대 던지지 않으므로(TradingPriceFetcher가 자체 notifyError 처리)
-            // 이 catch는 도달하지 않음 — 인터페이스 계약 방어용으로만 유지
-            log.warn("종가 조회 실패 — 바로주문 중단: ticker={}, error={}", strategy.ticker().name(), e.getMessage());
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
-    }
-
-    // live 잔고 조회 실패 시 ManualTradingException으로 래핑
-    private AccountBalance fetchLiveBalanceOrThrow(Account account, Strategy strategy) {
-        try {
-            BrokerBalance bb = registry.require(account.toBrokerRef(), LiveBalancePort.class).getLiveBalance(account.toBrokerRef(), strategy.ticker());
-            AccountBalance lb = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
-            log.info("live 잔고 조회: [{}] {} holdings={}주, usdDeposit=${}",
-                    account.nickname(), strategy.ticker().name(), lb.holdings(), lb.usdDeposit());
-            return lb;
-        } catch (Exception e) {
-            log.warn("live 잔고 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
-                    account.id(), strategy.ticker().name(), e.getMessage());
-            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
-        }
-    }
-
-    // 기존 예약 SELL과 신규 SELL 합계가 판매가능수량을 초과하면 ManualTradingException
-    private void checkSellableOrThrow(Account account, Strategy strategy, LocalDate tradeDate, List<PlannedOrder> orders) {
-        int newSellTotal = orders.stream()
-                .filter(o -> o.direction() == OrderDirection.SELL)
-                .mapToInt(PlannedOrder::quantity).sum();
-        int sellableQty = registry.require(account.toBrokerRef(), SellableQuantityPort.class).getSellableQuantity(strategy.ticker(), account.toBrokerRef()).quantity();
-        int reservedSellTotal = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-                account.id(), tradeDate, strategy.ticker());
-        log.info("SELL 수량 검증: [{}] {} 예약={}주, 신규={}주, 판매가능={}주",
-                account.nickname(), strategy.ticker().name(), reservedSellTotal, newSellTotal, sellableQty);
-        if (reservedSellTotal + newSellTotal > sellableQty) {
-            throw new ManualTradingException("보유 수량이 부족합니다");
+            log.warn("[{}] 캡 판단용 현재가 조회 실패 — 캡 미적용: {}", account.nickname(), e.getMessage());
+            return null;
         }
     }
 

@@ -107,27 +107,31 @@ class ManualTradingServiceTest {
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
-        // BrokerPricePort: kisPricePort 직접 연결 (KisPricePort 삭제로 단순화)
         doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
-
-        // LiveBalancePort: 필드 mock 직접 연결
-        doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(LiveBalancePort.class));
+        // SELL 전용 시나리오(BUY 후보 없음)에서는 allocator.fetchQuote()가 LiveBalancePort를 아예 조회하지 않으므로 lenient
+        lenient().doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(LiveBalancePort.class));
 
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(brokerAdapterRegistry, eventPublisher, privacyTradePort);
+        StrategyOrderPlanBuilder planBuilder = new StrategyOrderPlanBuilder(
+                balanceLoader, brokerAdapterRegistry, privacyTradePort, orderComputer, cycleStrategies);
+        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
+                orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
+        TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
+                brokerAdapterRegistry, orderPort, cycleStrategies);
+
+        // ManualTradingService 필드 목록에 orderPlanner가 포함돼 있다(배치 TradingCandidatePlanner와 동일하게
+        // allocator 승인 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
-                privacyTradePort, priceFetcher, balanceLoader,
-                orderComputer, orderPlanner, orderExecutor, brokerAdapterRegistry, eventPublisher);
+                priceFetcher, planBuilder, priceCapper, budgetAllocator, orderPlanner, cycleStrategies,
+                orderExecutor, brokerAdapterRegistry, eventPublisher);
 
-        // getSellableQuantity 기본 stub — BUY 전용 테스트에서 SELL 체크가 0>충분값으로 통과
         lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))
                 .thenReturn(sellableQuantityPort);
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 100));
 
-        // 공통 stubbing — lenient: VR 전략 테스트에서 vrStrat.id()를 사용하므로 STRATEGY.id() stub은 미호출 가능
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
-        // requireOwnedAccount는 default 메서드 — mock이 override하므로 직접 stub
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
         lenient().when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(CYCLE);
         lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
@@ -140,6 +144,13 @@ class ManualTradingServiceTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
         lenient().when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("22.00"), new BigDecimal("20.00"))));
+        // planBuilder는 INFINITE/VR 둘 다 requiresPrevClose()=true라 전일종가를 항상 조회한다(BrokerPricePort.getPrevClose 경유,
+        // priceFetcher.fetchPriceSnapshots와 별도) — holdings>0인 기존 픽스처는 이 값을 쓰지 않지만 VR referencePrice 폴백에는 필요
+        lenient().when(kisPricePort.getPrevClose(eq(StrategyTicker.SOXL), eq(ACCOUNT_REF)))
+                .thenReturn(new BigDecimal("20.00"));
+        // 캡 판단용 현재가 — 기존 주문 픽스처 가격(22.00)에 캡(×1.05=23.10)이 걸리지 않는 기본값(개별 테스트가 필요 시 override)
+        lenient().when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("22.00")));
     }
 
     @Test
@@ -151,8 +162,8 @@ class ManualTradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder.toPlanned()));
-        // live holdings=10, sellable=10 < SELL 15주
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
+        // live holdings=10, sellable=10 < SELL 15주 — BUY 후보가 없어 allocator가 LiveBalancePort를 조회하지 않으므로 lenient
+        lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 10));
@@ -189,7 +200,8 @@ class ManualTradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder.toPlanned()));
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
+        // BUY 후보가 없어 allocator가 LiveBalancePort를 조회하지 않으므로 lenient
+        lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 5));
@@ -230,6 +242,73 @@ class ManualTradingServiceTest {
 
         verify(orderPort).saveAll(anyList());
         assertThat(orders).hasSize(1);
+    }
+
+    // 캡 적용 전 금액으로는 예수금 부족이지만 캡 적용 후 금액으로는 충분한 경계 케이스 —
+    // 수동실행이 배치와 동일하게 "캡 적용 후" 금액으로 검증하도록 바뀐 것을 고정하는 회귀 테스트
+    @Test
+    void execute_buyPriceExceedsCapButCappedAmountFitsBudget_savesOrders() {
+        // 원가 100.00×1주=100.00은 live usdDeposit(60.00)을 초과하지만,
+        // 현재가 50.00 기준 캡(52.50)으로 보정된 뒤 금액(52.50)은 예산 안에 든다
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("100.00"),
+                OrderStatus.PLANNED, null, null, null);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate.toPlanned()));
+        // InfinitePosition 캡 재산정 — 1주 그대로, 가격만 cap(52.50)으로 교체
+        when(infiniteStrategy.buildCappedBuyOrders(any(InfinitePosition.class), any(LocalDate.class), anyList(), eq(new BigDecimal("52.50"))))
+                .thenAnswer(invocation -> {
+                    List<PlannedOrder> original = invocation.getArgument(2);
+                    return original.stream().map(o -> o.withPrice(new BigDecimal("52.50"))).toList();
+                });
+        // 캡 판단용 현재가 50.00 → cap = 52.50
+        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
+        // live 잔고: holdings=10, usdDeposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("60.00")));
+        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
+        Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
+                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("52.50"), OrderStatus.PLANNED, null, null, null);
+        lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
+                .thenReturn(List.of(), List.of(savedOrder));
+
+        List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
+
+        verify(orderPort).saveAll(argThat(saved -> saved.stream()
+                .anyMatch(o -> o.price().compareTo(new BigDecimal("52.50")) == 0)));
+        assertThat(orders).hasSize(1);
+    }
+
+    // 캡을 적용해도 여전히 예산을 초과하면 거부되어야 한다(캡이 항상 통과시키는 것은 아님을 확인)
+    @Test
+    void execute_cappedAmountStillExceedsBudget_throwsManualTradingException() {
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("100.00"),
+                OrderStatus.PLANNED, null, null, null);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate.toPlanned()));
+        when(infiniteStrategy.buildCappedBuyOrders(any(InfinitePosition.class), any(LocalDate.class), anyList(), eq(new BigDecimal("52.50"))))
+                .thenAnswer(invocation -> {
+                    List<PlannedOrder> original = invocation.getArgument(2);
+                    return original.stream().map(o -> o.withPrice(new BigDecimal("52.50"))).toList();
+                });
+        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
+        // live usdDeposit=10.00 — 캡 후 금액(52.50)조차 초과
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10.00")));
+        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessage("예수금이 부족합니다");
+
+        verify(orderPort, never()).saveAll(anyList());
     }
 
     // VR 수동 실행 공용 테스트 픽스처 — 개장 전/후 분기를 나누는 두 테스트가 공유
