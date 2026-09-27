@@ -1,10 +1,10 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.*;
+import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.matching.domain.model.*;
 import com.kista.trading.application.port.output.*;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
@@ -38,7 +38,6 @@ class ManualTradingService {
     private final TradingOrderPlanner orderPlanner;            // allocator 승인 결과 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
     private final CycleOrderStrategies cycleOrderStrategies;   // priceCapper.prepareForAllocation의 mode 조회용
     private final TradingOrderExecutor orderExecutor;
-    private final BrokerAdapterRegistry registry;
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
@@ -64,8 +63,25 @@ class ManualTradingService {
             throw new ManualTradingException("오늘 이미 주문이 등록된 전략입니다");
 
         // 잔고 로드~전일종가~privacyBase~전략 계산을 배치와 동일한 StrategyOrderPlanBuilder에 위임한다
-        StrategyOrderPlanBuilder.PlanResult result = planBuilder.build(strategy, account, currentCycle, today, account.nickname(), Map.of());
-        if (result.isSkip()) return List.of(); // 전략 차원 skip (PRIVACY 기준매매표 미수신 등)
+        // (전일종가 조회는 내부적으로 BrokerCallGuard.wrap 경유 브로커 호출이라 실패 시 raw 예외가 나올 수 있음 — 아래서 동일 패턴으로 흡수)
+        StrategyOrderPlanBuilder.PlanResult result;
+        try {
+            result = planBuilder.build(strategy, account, currentCycle, today, account.nickname(), Map.of());
+        } catch (Exception e) {
+            log.warn("[{}] 계획 계산 실패 — 바로주문 중단: account={}, ticker={}, error={}",
+                    account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
+            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
+            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
+            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
+        }
+        if (result.isSkip()) {
+            // NO_CYCLE_HISTORY(사이클 이력 없음)는 데이터 무결성 오류에 준하므로 조용한 무동작이 아닌 시끄러운 실패로 승격 —
+            // 그 외(PRIVACY 기준매매표 미수신 등)는 pre-Task3 ManualTradingService도 조용히 스킵했으므로 회귀 아님, 그대로 유지
+            if (result.skipReason() == SkipReason.NO_CYCLE_HISTORY) {
+                throw new ManualTradingException("전략 실행 이력이 없어 수동 실행할 수 없습니다");
+            }
+            return List.of();
+        }
         CycleOrderStrategy.OrderPlan plan = result.plan();
 
         // 접수 전 가격 캡 적용 — 배치(TradingCandidatePlanner)와 동일 지점에서 동일 기준으로 적용해

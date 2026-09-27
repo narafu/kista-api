@@ -107,7 +107,9 @@ class ManualTradingServiceTest {
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
 
-        doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
+        // NO_CYCLE_HISTORY skip 테스트는 planBuilder.build()가 잔고 로드 단계에서 즉시 skip돼
+        // BrokerPricePort/LiveBalancePort 어느 쪽도 조회하지 않으므로 둘 다 lenient
+        lenient().doReturn(kisPricePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
         // SELL 전용 시나리오(BUY 후보 없음)에서는 allocator.fetchQuote()가 LiveBalancePort를 아예 조회하지 않으므로 lenient
         lenient().doReturn(liveBalancePort).when(brokerAdapterRegistry).require(any(BrokerAccountRef.class), eq(LiveBalancePort.class));
 
@@ -121,10 +123,12 @@ class ManualTradingServiceTest {
 
         // ManualTradingService 필드 목록에 orderPlanner가 포함돼 있다(배치 TradingCandidatePlanner와 동일하게
         // allocator 승인 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
+        // registry(BrokerAdapterRegistry) 필드는 리뷰에서 dead field로 지적돼 제거됨 — planBuilder/priceCapper/
+        // budgetAllocator가 각자 자기 BrokerAdapterRegistry를 보유하므로 ManualTradingService 자체엔 불필요
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 priceFetcher, planBuilder, priceCapper, budgetAllocator, orderPlanner, cycleStrategies,
-                orderExecutor, brokerAdapterRegistry, eventPublisher);
+                orderExecutor, eventPublisher);
 
         lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))
                 .thenReturn(sellableQuantityPort);
@@ -307,6 +311,20 @@ class ManualTradingServiceTest {
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
                 .hasMessage("예수금이 부족합니다");
+
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    // NO_CYCLE_HISTORY skip은 planBuilder.build()가 내부적으로 tryLoadBalance(soft skip)를 쓰면서
+    // 조용한 List.of() 무동작으로 바뀌었던 리뷰 발견 결함을 고정하는 회귀 테스트 —
+    // 이력 없는 전략은 사용자가 원인을 알 수 없는 무동작이 아니라 명시적 4xx로 거부돼야 한다
+    @Test
+    void execute_noCycleHistory_throwsManualTradingException() {
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessage("전략 실행 이력이 없어 수동 실행할 수 없습니다");
 
         verify(orderPort, never()).saveAll(anyList());
     }
