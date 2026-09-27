@@ -35,28 +35,14 @@ class TossHttpClient {
     private final String baseUrl;
     private final ObjectMapper objectMapper;
 
-    // 계좌 컨텍스트 API용 — X-Tossinvest-Account 헤더 포함 (주문·잔고·매수가능금액)
-    public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
-        return get(path, account, params, ParameterizedTypeReference.forType(responseType));
-    }
-
-    // 계좌 헤더 불필요 API용 — 시세 조회·환율 등 (개별 계좌 토큰 사용)
-    public <T> T getNoAccountHeader(String path, BrokerAccountRef account, MultiValueMap<String, String> params, Class<T> responseType) {
-        return getNoAccountHeader(path, account, params, ParameterizedTypeReference.forType(responseType));
-    }
-
-    // 공통 API용 — 관리자 토큰 사용, 계좌 컨텍스트 불필요 (시세·환율·캔들·시장정보)
-    public <T> T getCommon(String path, MultiValueMap<String, String> params, Class<T> responseType) {
-        return getCommon(path, params, ParameterizedTypeReference.forType(responseType));
-    }
-
     public <T> T post(String path, BrokerAccountRef account, Object body, Class<T> responseType) {
         return post(path, account, body, ParameterizedTypeReference.forType(responseType));
     }
 
-    // ParameterizedTypeReference 오버로드 — 실제 HTTP 호출 로직 본체, Class<T> 오버로드가 위임
+    // get/getNoAccountHeader/getCommon은 ParameterizedTypeReference 버전만 유지 — 실제 호출부가 전부
+    // TossResult<T> 제네릭 래퍼를 언랩해야 해서 Class<T> 오버로드가 쓰이지 않았다(post만 Void.class로 사용).
 
-    // 계좌 컨텍스트 API용 (ParameterizedTypeReference 버전)
+    // 계좌 컨텍스트 API용
     public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
                      ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();

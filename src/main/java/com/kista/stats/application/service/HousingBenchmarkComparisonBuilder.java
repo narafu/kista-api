@@ -6,8 +6,12 @@ import com.kista.stats.domain.model.HousingBenchmarkComparison;
 import com.kista.stats.domain.model.HousingBenchmarkPoint;
 import com.kista.stats.domain.model.InvestmentPoint;
 import com.kista.stats.domain.model.PerformanceComparisonSummary;
-import com.kista.sharedkernel.ReturnMetrics;
 import com.kista.stats.domain.model.StrategyRef;
+
+import static com.kista.sharedkernel.ReturnMetrics.annualizedReturn;
+import static com.kista.sharedkernel.ReturnMetrics.cumulativeReturn;
+import static com.kista.sharedkernel.ReturnMetrics.maxDrawdown;
+import static com.kista.sharedkernel.ReturnMetrics.normalize;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -123,11 +127,6 @@ final class HousingBenchmarkComparisonBuilder {
                 null, List.of(), null, reason);
     }
 
-    private static BigDecimal normalize(BigDecimal value, BigDecimal initialValue) {
-        // 순수 수학 계산은 domain/model/stats/ReturnMetrics로 위임(백테스트와 공용)
-        return ReturnMetrics.normalize(value, initialValue);
-    }
-
     private static BigDecimal periodReturn(BigDecimal current, BigDecimal previous) {
         if (previous == null || previous.signum() <= 0) {
             return null;
@@ -135,17 +134,5 @@ final class HousingBenchmarkComparisonBuilder {
         return current.divide(previous, SCALE, HALF_UP)
                 .subtract(BigDecimal.ONE)
                 .setScale(SCALE, HALF_UP);
-    }
-
-    private static BigDecimal cumulativeReturn(BigDecimal lastIndex) {
-        return ReturnMetrics.cumulativeReturn(lastIndex);
-    }
-
-    private static BigDecimal annualizedReturn(BigDecimal lastIndex, double periodsPerYear) {
-        return ReturnMetrics.annualizedReturn(lastIndex, periodsPerYear);
-    }
-
-    private static BigDecimal maxDrawdown(List<BigDecimal> indices) {
-        return ReturnMetrics.maxDrawdown(indices);
     }
 }

@@ -43,7 +43,12 @@ class PrivacyServiceTest {
     void setUp() {
         org.mockito.Mockito.lenient()
                 .when(validationService.inspect(any(FidaOrderCommand.class)))
-                .thenReturn(PrivacyTradeValidationReport.empty());
+                .thenReturn(report());
+    }
+
+    // 검증 리포트 생성 헬퍼 — issue 0~N개
+    private static PrivacyTradeValidationReport report(PrivacyTradeValidationReport.Issue... issues) {
+        return new PrivacyTradeValidationReport(List.of(issues));
     }
 
     @Test
@@ -90,7 +95,7 @@ class PrivacyServiceTest {
                         new FidaPlannedOrder(OrderDirection.BUY, OrderType.LIMIT, 2, new BigDecimal("233.84"))));
 
         when(validationService.inspect(any(FidaOrderCommand.class)))
-                .thenReturn(PrivacyTradeValidationReport.warning("MISSING_SELL", "SELL 주문이 없습니다"));
+                .thenReturn(report(new PrivacyTradeValidationReport.Issue(PrivacyTradeValidationReport.Severity.WARNING, "MISSING_SELL", "SELL 주문이 없습니다")));
         when(privacyTradePort.saveBaseWithOrders(any())).thenReturn(new PrivacyTradeSaveResult(baseId, true));
 
         PrivacyTradeSaveResult result = sut.executeFidaOrder(req);
@@ -110,7 +115,7 @@ class PrivacyServiceTest {
                 List.of(new FidaPlannedOrder(OrderDirection.SELL, OrderType.LIMIT, 4, new BigDecimal("236.54"))));
 
         when(validationService.inspect(any(FidaOrderCommand.class)))
-                .thenReturn(PrivacyTradeValidationReport.blocking("EXPLICIT_SELL_EXCEEDS_HOLDINGS", "매도 수량 초과"));
+                .thenReturn(report(new PrivacyTradeValidationReport.Issue(PrivacyTradeValidationReport.Severity.BLOCKING, "EXPLICIT_SELL_EXCEEDS_HOLDINGS", "매도 수량 초과")));
 
         assertThatThrownBy(() -> sut.executeFidaOrder(req))
                 .isInstanceOf(IllegalArgumentException.class)

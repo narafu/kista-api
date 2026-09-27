@@ -6,11 +6,11 @@ import com.kista.stats.domain.model.HousingPriceIndex;
 import com.kista.stats.application.port.output.HousingBenchmarkFeedPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
-import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -40,21 +40,16 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
     private static final DateTimeFormatter BASE_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyyMM");
     private static final DateTimeFormatter UPDATED_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    private final RestClient kbLandRestClient; // 빈 이름: kbLandRestClient
-    private final KbLandProperties properties;
+    private static final ParameterizedTypeReference<Envelope<KbLandData>> PRICE_ENVELOPE =
+            new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<Envelope<KbLandIndexData>> INDEX_ENVELOPE =
+            new ParameterizedTypeReference<>() {};
+
+    private final RestClient kbLandRestClient; // 빈 이름: kbLandRestClient — baseUrl은 KbLandConfig에서 설정
 
     @Override
     public List<HousingBenchmarkPrice> fetchAptQteSalePrices() {
-        KbLandResponse response = kbLandRestClient.get().uri(requestUri()).retrieve().body(KbLandResponse.class);
-        if (response == null) {
-            throw new IllegalStateException("KB Land 주택 벤치마크 API 응답이 비어있음");
-        }
-        validateResultCode(response.dataHeader(), "KB Land 주택 벤치마크");
-        if (response.dataBody() == null || response.dataBody().data() == null) {
-            throw new IllegalStateException("KB Land 주택 벤치마크 API 응답이 비어있음");
-        }
-
-        KbLandData data = response.dataBody().data();
+        KbLandData data = fetch(APT_QTE_SALE_PRICE_PATH, PRICE_ENVELOPE, "KB Land 주택 벤치마크");
         LocalDate sourceUpdatedDate = parseUpdatedDate(data.updatedDate());
         Instant fetchedAt = Instant.now();
         List<HousingBenchmarkPrice> prices = new ArrayList<>();
@@ -79,16 +74,8 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
 
     @Override
     public List<HousingPriceIndex> fetchWeeklyAptSalePriceIndex(int years) {
-        KbLandIndexResponse response = kbLandRestClient.get().uri(weeklyIndexRequestUri(years)).retrieve().body(KbLandIndexResponse.class);
-        if (response == null) {
-            throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 응답이 비어있음");
-        }
-        validateResultCode(response.dataHeader(), "KB Land 주간 아파트 매매가격지수");
-        if (response.dataBody() == null || response.dataBody().data() == null) {
-            throw new IllegalStateException("KB Land 주간 아파트 매매가격지수 API 응답이 비어있음");
-        }
-
-        KbLandIndexData data = response.dataBody().data();
+        KbLandIndexData data = fetch(
+                WEEKLY_APT_SALE_PRICE_INDEX_PATH + years, INDEX_ENVELOPE, "KB Land 주간 아파트 매매가격지수");
         List<String> baseDates = data.baseDates();
         LocalDate sourceUpdatedDate = parseUpdatedDate(data.updatedDate());
         Instant fetchedAt = Instant.now();
@@ -129,12 +116,18 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         return indices;
     }
 
-    private URI requestUri() {
-        return URI.create(trimTrailingSlash(properties.baseUrl()) + APT_QTE_SALE_PRICE_PATH);
-    }
-
-    private URI weeklyIndexRequestUri(int years) {
-        return URI.create(trimTrailingSlash(properties.baseUrl()) + WEEKLY_APT_SALE_PRICE_INDEX_PATH + years);
+    // 공용 GET + resultCode/body 검증 — 두 API 모두 { dataHeader: {resultCode}, dataBody: { data } } 봉투 구조를 공유한다.
+    private <T> T fetch(String path, ParameterizedTypeReference<Envelope<T>> type, String apiLabel) {
+        Envelope<T> response = kbLandRestClient.get().uri(path).retrieve().body(type);
+        if (response == null) {
+            throw new IllegalStateException(apiLabel + " API 응답이 비어있음");
+        }
+        validateResultCode(response.dataHeader(), apiLabel);
+        T data = response.dataBody() == null ? null : response.dataBody().data();
+        if (data == null) {
+            throw new IllegalStateException(apiLabel + " API 응답이 비어있음");
+        }
+        return data;
     }
 
     private static HousingBenchmarkPrice toDomain(
@@ -181,10 +174,6 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         return parsed;
     }
 
-    private static String trimTrailingSlash(String value) {
-        return value != null && value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
-    }
-
     // 월별 데이터가 모든 필수 5분위 필드를 포함하는지 확인한다.
     private static boolean hasCompleteQuintileData(KbLandMonthlyPrice monthlyPrice) {
         return monthlyPrice.firstQuintilePrice() != null
@@ -203,15 +192,12 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         }
     }
 
-    // KB Land 공통 응답 래퍼
-    record KbLandResponse(
-            @JsonProperty("dataHeader") KbLandHeader dataHeader,
-            @JsonProperty("dataBody") KbLandBody dataBody
-    ) {}
+    // KB Land 공용 응답 봉투 — 5분위/주간지수 두 API가 { dataHeader: {resultCode}, dataBody: { data: T } } 구조를 공유한다.
+    record KbLandHeader(String resultCode) {}
 
-    record KbLandHeader(@JsonProperty("resultCode") String resultCode) {}
+    record Envelope<T>(KbLandHeader dataHeader, EnvelopeBody<T> dataBody) {}
 
-    record KbLandBody(@JsonProperty("data") KbLandData data) {}
+    record EnvelopeBody<T>(T data) {}
 
     record KbLandData(
             @JsonProperty("업데이트일자") String updatedDate,
@@ -221,7 +207,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
     record KbLandRegion(
             @JsonProperty("지역코드") String regionCode,
             @JsonProperty("지역명") String regionName,
-            @JsonProperty("dataList") List<KbLandMonthlyPrice> dataList
+            List<KbLandMonthlyPrice> dataList
     ) {}
 
     record KbLandMonthlyPrice(
@@ -234,14 +220,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
             @JsonProperty("5분위배율") BigDecimal fifthQuintileRatio
     ) {}
 
-    // KB Land 주간 아파트 매매가격지수 응답 래퍼 (5분위 응답과 구조가 달라 별도 record로 분리)
-    record KbLandIndexResponse(
-            @JsonProperty("dataHeader") KbLandHeader dataHeader,
-            @JsonProperty("dataBody") KbLandIndexBody dataBody
-    ) {}
-
-    record KbLandIndexBody(@JsonProperty("data") KbLandIndexData data) {}
-
+    // KB Land 주간 아파트 매매가격지수 응답 data — 5분위 응답과 구조가 달라 별도 record로 분리
     record KbLandIndexData(
             @JsonProperty("업데이트일자") String updatedDate,
             @JsonProperty("날짜리스트") List<String> baseDates,
@@ -251,6 +230,6 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
     record KbLandIndexRegion(
             @JsonProperty("지역코드") String regionCode,
             @JsonProperty("지역명") String regionName,
-            @JsonProperty("dataList") List<BigDecimal> dataList
+            List<BigDecimal> dataList
     ) {}
 }

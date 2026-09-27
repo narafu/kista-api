@@ -59,9 +59,8 @@ dependencies {
     // API Documentation
     implementation(libs.springdoc.openapi.webmvc.ui)
 
-    // Observability
-    implementation(libs.micrometer.prometheus)
-    implementation(libs.micrometer.otlp) // Grafana Cloud OTLP push (단일 프로세스 — Alloy 사이드카 대신 앱이 직접 push)
+    // Observability — micrometer-prometheus/micrometer-otlp는 root에서 직접 import하지 않는다.
+    // :shared가 implementation으로 선언해 런타임 클래스패스에 전이 전파된다(MetricsConfig가 사용).
 
     // Firebase
     implementation(libs.firebase.admin)
@@ -71,9 +70,6 @@ dependencies {
     implementation(libs.spring.modulith.events.api)
     implementation(libs.spring.modulith.events.jdbc)
     implementation(libs.spring.modulith.events.jackson) // EventSerializer 빈 제공 (JdbcEventPublicationAutoConfiguration 필수 의존성 — 브리프 미기재)
-
-    // Apache HttpClient 5 — HttpComponentsClientHttpRequestFactory (에러 응답 바디 정상 읽기)
-    implementation("org.apache.httpcomponents.client5:httpclient5")
 
     // Lombok (컴파일 타임 코드 생성)
     compileOnly(libs.lombok)
@@ -88,6 +84,8 @@ dependencies {
     testImplementation(libs.spring.security.test)
     testImplementation(libs.spring.boot.starter.security.test)
     testImplementation(libs.archunit.junit5)
+    // Apache HttpClient 5 — root main은 미사용(:shared가 implementation으로 소유), 테스트에서만 HttpClients 직접 참조
+    testImplementation("org.apache.httpcomponents.client5:httpclient5")
     // Boot 4 기술별 테스트 슬라이스 분리 — @WebMvcTest / @DataJpaTest+@AutoConfigureTestDatabase / TestRestTemplate
     testImplementation(libs.spring.boot.starter.webmvc.test)
     testImplementation(libs.spring.boot.starter.data.jpa.test)

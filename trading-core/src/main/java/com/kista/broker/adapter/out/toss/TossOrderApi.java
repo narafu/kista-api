@@ -181,9 +181,7 @@ class TossOrderApi {
 
     record OrderItem(
         @JsonProperty("orderId")   String orderId,
-        @JsonProperty("symbol")    String symbol,
         @JsonProperty("side")      String side,       // BUY / SELL
-        @JsonProperty("status")    String status,
         @JsonProperty("execution") OrderExecutionItem execution
     ) {}
 

@@ -39,7 +39,7 @@ class TossMarketApiTest {
     private static TossResult<TossMarketApi.MarketCalendarResponse> openDayWrapper(String date) {
         TossMarketApi.SessionWindow regular = new TossMarketApi.SessionWindow(
                 date + "T13:30:00Z", date + "T20:00:00Z");
-        TossMarketApi.MarketDay today = new TossMarketApi.MarketDay(date, null, regular, null);
+        TossMarketApi.MarketDay today = new TossMarketApi.MarketDay(null, regular, null);
         return new TossResult<>(new TossMarketApi.MarketCalendarResponse(today));
     }
 
@@ -48,6 +48,17 @@ class TossMarketApiTest {
     void getMarketCalendar_rangeExceedsMax_throws() {
         LocalDate from = LocalDate.of(2026, 7, 1);
         LocalDate to = from.plusDays(30); // 31일 범위
+
+        assertThatThrownBy(() -> tossMarketApi.getMarketCalendar(from, to))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("월 경계를 넘는 40일 범위는 실제 경과일수 기준으로 30일 초과 판정한다")
+    void getMarketCalendar_crossMonthRangeExceedsMax_throws() {
+        // Period.getDays()로 계산하면 8(월 성분 제외)로 잘못 산출돼 가드를 통과하던 버그 케이스
+        LocalDate from = LocalDate.of(2026, 1, 20);
+        LocalDate to = LocalDate.of(2026, 2, 28); // 실제 경과 39일 + 1 = 40일
 
         assertThatThrownBy(() -> tossMarketApi.getMarketCalendar(from, to))
                 .isInstanceOf(IllegalArgumentException.class);

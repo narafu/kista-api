@@ -47,6 +47,13 @@ public record AdminSettingsRequest(
         return value;
     }
 
+    // 필드 허용값이 모두 양수인지 검증 — divisionCount/bandWidth/intervalWeeks 3곳 공통
+    private static void requirePositive(List<? extends Number> allowedValues, String label) {
+        if (allowedValues.stream().anyMatch(v -> v.doubleValue() <= 0)) {
+            throw new IllegalArgumentException(label + " 허용값은 0보다 커야 합니다");
+        }
+    }
+
     public record AuthRequest(
             @Schema(description = "신규 가입 승인 필요 여부")
             @NotNull Boolean approvalRequired) { // 가입 승인 관리자 입력
@@ -93,9 +100,7 @@ public record AdminSettingsRequest(
 
         StrategyFieldSettings<Integer> divisionCountValue() {
             FieldRequest<Integer> value = require(divisionCount, "divisionCount");
-            if (value.allowedValues().stream().anyMatch(v -> v <= 0)) {
-                throw new IllegalArgumentException("무한매수 분할 수(divisionCount) 허용값은 0보다 커야 합니다");
-            }
+            requirePositive(value.allowedValues(), "무한매수 분할 수(divisionCount)");
             return value.toDomain();
         }
 
@@ -103,17 +108,13 @@ public record AdminSettingsRequest(
 
         StrategyFieldSettings<BigDecimal> bandWidthValue() {
             FieldRequest<BigDecimal> value = require(bandWidth, "bandWidth");
-            if (value.allowedValues().stream().anyMatch(v -> v.signum() <= 0)) {
-                throw new IllegalArgumentException("VR 밴드 폭(bandWidth) 허용값은 0보다 커야 합니다");
-            }
+            requirePositive(value.allowedValues(), "VR 밴드 폭(bandWidth)");
             return value.toDomain();
         }
 
         StrategyFieldSettings<Integer> intervalWeeksValue() {
             FieldRequest<Integer> value = require(intervalWeeks, "intervalWeeks");
-            if (value.allowedValues().stream().anyMatch(v -> v <= 0)) {
-                throw new IllegalArgumentException("VR 리밸런싱 주기(intervalWeeks) 허용값은 0보다 커야 합니다");
-            }
+            requirePositive(value.allowedValues(), "VR 리밸런싱 주기(intervalWeeks)");
             return value.toDomain();
         }
     }

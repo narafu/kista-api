@@ -19,6 +19,8 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
+import com.kista.broker.application.port.output.MarginPort;
+import com.kista.broker.application.port.output.PortfolioPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -34,19 +36,22 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final AccountPort accountPort;
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
-    private final BrokerStatisticsRouter brokerStatisticsRouter;
     private final BrokerAdapterRegistry registry;
 
+    // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("잔고 조회", () -> brokerStatisticsRouter.getPresentBalance(account));
+        return BrokerCallGuard.wrap("잔고 조회", () ->
+                registry.require(account.toBrokerRef(), PortfolioPort.class).getPresentBalance(account.toBrokerRef()));
     }
 
+    // 증거금 통화별 조회 — KIS: TTTC2101R / Toss: buying-power USD+KRW
     @Override
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("예수금 조회", () -> brokerStatisticsRouter.getMargin(account));
+        return BrokerCallGuard.wrap("예수금 조회", () ->
+                registry.require(account.toBrokerRef(), MarginPort.class).getMargin(account.toBrokerRef()));
     }
 
     @Override
@@ -70,15 +75,12 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                     BigDecimal amount = price.multiply(BigDecimal.valueOf(qty));
                     return new DailyTransaction(
                             o.tradeDate().toString(),
-                            null,
                             o.direction(),
                             o.ticker(),
                             o.ticker().name(),
                             qty,
                             price,
                             amount,
-                            null,
-                            null,
                             "USD"
                     );
                 })

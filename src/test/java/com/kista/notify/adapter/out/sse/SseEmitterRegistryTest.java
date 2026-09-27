@@ -1,10 +1,8 @@
 package com.kista.notify.adapter.out.sse;
 
-import com.kista.notify.domain.model.TradeEventView;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -12,18 +10,16 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.Mockito.verify;
 import com.kista.sharedkernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class SseEmitterRegistryTest {
 
-    @Mock TradeSseEmitterRegistry tradeSseEmitterRegistry;
     SseEmitterRegistry registry;
 
     @BeforeEach
     void setUp() {
-        registry = new SseEmitterRegistry(tradeSseEmitterRegistry);
+        registry = new SseEmitterRegistry();
     }
 
     @Test
@@ -46,13 +42,5 @@ class SseEmitterRegistryTest {
         registry.connect(userId);
         assertThatCode(() -> registry.notifyStatusChange(userId, UserStatus.ACTIVE))
                 .doesNotThrowAnyException();
-    }
-
-    @Test
-    void notifyTrade_delegates_to_trade_registry() {
-        UUID userId = UUID.randomUUID();
-        TradeEventView event = TradeEventView.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
-        registry.notifyTrade(userId, event);
-        verify(tradeSseEmitterRegistry).send(userId, event);
     }
 }

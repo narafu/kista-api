@@ -51,7 +51,7 @@ class TossPriceApiTest {
     @Test
     @DisplayName("복수 종목 현재가 정상 파싱")
     void getPrices_multipleSymbols_success() {
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
+        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
 
@@ -63,7 +63,7 @@ class TossPriceApiTest {
     @Test
     @DisplayName("요청 티커가 응답에 없으면 예외 (미등록 종목만 응답 — 부분 실패)")
     void getPrices_requestedTickerMissingFromResponse_throws() {
-        var item = new TossPriceApi.PriceItem("AAPL", "180.00", "USD");
+        var item = new TossPriceApi.PriceItem("AAPL", "180.00");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
 
@@ -84,7 +84,7 @@ class TossPriceApiTest {
     @Test
     @DisplayName("PriceSnapshot: 캔들 조회 실패 시 prevClose가 current로 fallback")
     void getPriceSnapshot_candleFails_prevCloseFallsBackToCurrent() {
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
+        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(item));
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
@@ -98,7 +98,7 @@ class TossPriceApiTest {
     @Test
     @DisplayName("같은 종목·같은 날짜 재조회 시 캔들 API 1회만 호출 (캐시 히트)")
     void getPriceSnapshot_sameSymbolSameDay_callsCandleApiOnce() {
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
+        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
         TossCandle candle = new TossCandle(LocalDate.now().minusDays(1), new BigDecimal("23.00"),
@@ -148,7 +148,7 @@ class TossPriceApiTest {
         LocalDate usSessionDate = LocalDate.of(2026, 8, 23);
         when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
                 .thenReturn(List.of());
-        var item = new TossPriceApi.PriceItem("TQQQ", "69.09", "USD");
+        var item = new TossPriceApi.PriceItem("TQQQ", "69.09");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
 
@@ -182,8 +182,8 @@ class TossPriceApiTest {
     void getPriceSnapshots_candleFails_prevCloseFallsBackToCurrent() {
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap(
-                new TossPriceApi.PriceItem("SOXL", "25.50", "USD"),
-                new TossPriceApi.PriceItem("TQQQ", "50.00", "USD")
+                new TossPriceApi.PriceItem("SOXL", "25.50"),
+                new TossPriceApi.PriceItem("TQQQ", "50.00")
             ));
         when(tossCandleApi.getCandleBefore(any(), eq("1d"), any())).thenReturn(Optional.empty());
 
@@ -220,7 +220,7 @@ class TossPriceApiTest {
     @DisplayName("getPrevCloses: 캔들 조회 실패 종목만 현재가 API로 fallback")
     void getPrevCloses_fallsBackToCurrentPriceOnlyForFailedCandle() {
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
-        var item = new TossPriceApi.PriceItem("SOXL", "25.50", "USD");
+        var item = new TossPriceApi.PriceItem("SOXL", "25.50");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
 

@@ -196,7 +196,7 @@ class TradingOpenSchedulerTest {
         when(strategyPort.findAllActive()).thenReturn(List.of(infinite, privacy));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(invalidBase));
         when(validationService.inspect(invalidBase))
-                .thenReturn(PrivacyTradeValidationReport.warning("MISSING_SELL", "SELL 주문이 없습니다"));
+                .thenReturn(new PrivacyTradeValidationReport(java.util.List.of(new PrivacyTradeValidationReport.Issue(PrivacyTradeValidationReport.Severity.WARNING, "MISSING_SELL", "SELL 주문이 없습니다"))));
         // 가드 후 INFINITE만 남아 contextFactory에 전달됨
         when(contextFactory.buildAll(List.of(infinite))).thenReturn(List.of(infiniteCtx));
 

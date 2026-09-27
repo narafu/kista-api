@@ -47,6 +47,8 @@ dependencies {
 
     implementation(libs.spring.modulith.starter.core)
     implementation(libs.spring.modulith.events.api)
+    implementation(libs.spring.modulith.events.jdbc)
+    implementation(libs.spring.modulith.events.jackson) // JdbcEventPublicationAutoConfiguration 필수 의존성(root와 동일 근거) — 누락 시 EPR이 JDBC로 영속화되지 않아 재기동 시 trading.event_publication 재발행이 동작하지 않음
 
     implementation("org.apache.httpcomponents.client5:httpclient5") // broker KIS/Toss HTTP 클라이언트
 

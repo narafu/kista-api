@@ -52,10 +52,6 @@ dependencies {
     // platform.redis(RedisPubSubConfig) — trade.event/push-notification 채널 공통 배선
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
-    // platform.internalapi(InternalApiErrorDetails) — Boot 4 기본 Jackson 3(tools.jackson)이 아닌
-    // Jackson 2(com.fasterxml.jackson.databind) API 직접 사용, 버전은 Boot dependency-management BOM 관리
-    implementation(libs.jackson.databind)
-
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
     testCompileOnly(libs.lombok)

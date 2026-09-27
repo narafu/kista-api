@@ -1,8 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.broker.adapter.out.internal.ConfirmedCloseFallback;
-import com.kista.broker.adapter.out.internal.PrevCloseCache;
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.platform.time.UsTradeDates;
@@ -31,6 +29,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -46,7 +46,10 @@ class TossPriceApi implements CommonMarketPriceFeed {
 
     private final TossHttpClient tossHttpClient;
     private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
-    private final PrevCloseCache prevCloseCache = new PrevCloseCache();
+    // 전일종가(prevClose) 캐시 — 종목+거래일(KST)+정규장 진행여부 버킷 단위로 하루 내 재조회 방지.
+    // 만료 로직 없음 — 날짜가 바뀌면 키가 자연히 달라지고, 종목 수가 적어(4개) 메모리 증가는 무시 가능.
+    private record PrevCloseCacheKey(String symbol, LocalDate date, String bucket) {}
+    private final ConcurrentMap<PrevCloseCacheKey, Optional<BigDecimal>> prevCloseCache = new ConcurrentHashMap<>();
     private final TossStockInfoCache stockInfoCache = new TossStockInfoCache(Duration.ofHours(6), Instant::now);
 
     public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers) {
@@ -134,8 +137,8 @@ class TossPriceApi implements CommonMarketPriceFeed {
                 ? session.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
                 : Instant.now();                                   // 이미 확정된 봉만 존재
         String bucket = session.regularSessionActive() ? "ACTIVE" : "CLOSED";
-        return prevCloseCache.getOrFetch(symbol, LocalDate.now(TimeZones.KST), bucket,
-                () -> fetchPrevCloseUncached(symbol, before));
+        PrevCloseCacheKey key = new PrevCloseCacheKey(symbol, LocalDate.now(TimeZones.KST), bucket);
+        return prevCloseCache.computeIfAbsent(key, k -> fetchPrevCloseUncached(symbol, before));
     }
 
     // ── trading DstInfo.isRegularSessionActive()/lastSessionOpenInstant() 복제 ──────────────
@@ -182,11 +185,9 @@ class TossPriceApi implements CommonMarketPriceFeed {
     }
 
     // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
-    // 실패/미발행 시 현재가로 폴백 (KIS KisPriceApi.getClosingPrice와 동일 정책, ConfirmedCloseFallback 공용)
+    // 실패/미발행 시 현재가로 폴백 (KIS KisPriceApi.getClosingPrice와 동일 정책)
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate) {
-        return ConfirmedCloseFallback.resolve(
-                () -> fetchConfirmedClose(ticker, tradeDate),
-                () -> getPrice(ticker));
+        return fetchConfirmedClose(ticker, tradeDate).orElseGet(() -> getPrice(ticker));
     }
 
     // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환 (KIS fetchConfirmedClose와 동일 규칙)
@@ -259,8 +260,7 @@ class TossPriceApi implements CommonMarketPriceFeed {
     // package-private — TossPriceApiTest에서 직접 생성하여 stub에 사용
     record PriceItem(
         @JsonProperty("symbol")    String symbol,    // 종목 코드 (예: SOXL)
-        @JsonProperty("lastPrice") String lastPrice, // 현재가 (문자열 소수 형식)
-        @JsonProperty("currency")  String currency   // 통화 (예: USD)
+        @JsonProperty("lastPrice") String lastPrice  // 현재가 (문자열 소수 형식)
     ) {}
 
     // stocks API 응답 — 가격 정보 없음 (name/market/currency 등 기본 정보만)

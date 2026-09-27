@@ -1,8 +1,10 @@
 package com.kista.stats.application.service;
 
 import com.kista.stats.domain.model.HousingBenchmarkPrice;
+import com.kista.stats.domain.model.HousingPriceIndex;
 import com.kista.stats.application.port.output.HousingBenchmarkFeedPort;
 import com.kista.stats.application.port.output.HousingBenchmarkPricePort;
+import com.kista.stats.application.port.output.HousingPriceIndexPort;
 import com.kista.stats.application.event.StatsAlertRaisedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,7 @@ class HousingBenchmarkServiceTest {
 
     @Mock private HousingBenchmarkFeedPort feedPort;
     @Mock private HousingBenchmarkPricePort pricePort;
+    @Mock private HousingPriceIndexPort indexPort;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     private HousingBenchmarkService service;
@@ -34,7 +37,7 @@ class HousingBenchmarkServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new HousingBenchmarkService(feedPort, pricePort, eventPublisher);
+        service = new HousingBenchmarkService(feedPort, pricePort, indexPort, eventPublisher);
     }
 
     @Test
@@ -60,6 +63,44 @@ class HousingBenchmarkServiceTest {
         verify(pricePort, never()).upsertAll(any());
         verify(eventPublisher).publishEvent(argThat(
                 (StatsAlertRaisedEvent e) -> "kbland api down".equals(e.message())));
+    }
+
+    @Test
+    void fetchAndSave_years_fetchesKbLandWeeklyIndexAndUpsertsAllRows() {
+        HousingPriceIndex seoul = index("서울", "1100000000");
+        when(feedPort.fetchWeeklyAptSalePriceIndex(2)).thenReturn(List.of(seoul));
+
+        service.fetchAndSave(2);
+
+        ArgumentCaptor<List<HousingPriceIndex>> captor = ArgumentCaptor.captor();
+        verify(indexPort).upsertAll(captor.capture());
+        assertThat(captor.getValue()).containsExactly(seoul);
+        verify(eventPublisher, never()).publishEvent(any(StatsAlertRaisedEvent.class));
+    }
+
+    @Test
+    void fetchAndSave_years_notifiesErrorWhenKbLandFetchFails() {
+        RuntimeException failure = new RuntimeException("kbland api down");
+        when(feedPort.fetchWeeklyAptSalePriceIndex(20)).thenThrow(failure);
+
+        service.fetchAndSave(20);
+
+        verify(indexPort, never()).upsertAll(any());
+        verify(eventPublisher).publishEvent(argThat(
+                (StatsAlertRaisedEvent e) -> "kbland api down".equals(e.message())));
+    }
+
+    private static HousingPriceIndex index(String regionName, String regionCode) {
+        return new HousingPriceIndex(
+                "KBLAND",
+                "WEEKLY_APT_SALE_PRICE_INDEX",
+                regionCode,
+                regionName,
+                LocalDate.of(2026, 7, 6),
+                new BigDecimal("100.000000000000"),
+                LocalDate.of(2026, 8, 3),
+                Instant.parse("2026-08-03T00:00:00Z")
+        );
     }
 
     private static HousingBenchmarkPrice price(String regionName, String regionCode) {

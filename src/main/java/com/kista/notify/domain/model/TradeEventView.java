@@ -2,7 +2,7 @@ package com.kista.notify.domain.model;
 
 import java.time.Instant;
 
-// 실시간 매매 SSE 알림(RealtimeNotificationPort.notifyTrade)의 wire DTO — RedisTradeEventSubscriber가
+// 실시간 매매 SSE 알림(TradeSseEmitterRegistry.send)의 wire DTO — RedisTradeEventSubscriber가
 // trading-core의 Redis 발행분을 이 타입으로 역직렬화해 TradeSseEmitterRegistry에 전달한다.
 // trading-core의 com.kista.trading.notify.domain.model.TradeEventView와 필드 shape byte-identical
 // own-type 복제 — Gradle 컴파일 경계상 root가 trading-core 타입을 import할 수 없어(순환 불가피,

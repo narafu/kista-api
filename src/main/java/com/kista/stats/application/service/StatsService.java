@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -61,7 +60,7 @@ class StatsService implements UserStatsUseCase {
 
     private HousingBenchmarkComparison computeHousingComparisonBody(
             UUID userId, BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
-        LocalDate effectiveTo = completedMonthEnd(to, BenchmarkGranularity.WEEKLY);
+        LocalDate effectiveTo = completedMonthEnd(to);
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
                 userId, scope, strategyId, from, effectiveTo,
                 BenchmarkGranularity.WEEKLY);
@@ -120,7 +119,7 @@ class StatsService implements UserStatsUseCase {
 
     private HousingBenchmarkComparison computeEtfComparisonBody(
             UUID userId, BenchmarkScope scope, UUID strategyId, EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
-        LocalDate effectiveTo = completedMonthEnd(to, BenchmarkGranularity.DAILY);
+        LocalDate effectiveTo = completedMonthEnd(to);
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
                 userId, scope, strategyId, from, effectiveTo,
                 BenchmarkGranularity.DAILY);
@@ -252,19 +251,10 @@ class StatsService implements UserStatsUseCase {
         }
     }
 
-    // MONTHLY만 월 단위로 늦게 발행되는 데이터를 전제로 직전 완료 월까지 clamp한다.
-    // 그 외(WEEKLY·DAILY)는 포인트 단위로 자주 갱신되어 clamp가 필요 없다 —
-    // 그대로 적용하면 당월 투자 기록·벤치마크 시세가 전부 잘려나간다.
-    private static LocalDate completedMonthEnd(LocalDate requestedTo, BenchmarkGranularity granularity) {
-        LocalDate today = LocalDate.now(TimeZones.KST);
-        if (granularity != BenchmarkGranularity.MONTHLY) {
-            return requestedTo != null ? requestedTo : today;
-        }
-        YearMonth requestedMonth = YearMonth.from(requestedTo != null ? requestedTo : today);
-        YearMonth lastCompletedMonth = YearMonth.from(today).minusMonths(1);
-        YearMonth effectiveMonth = requestedMonth.isAfter(lastCompletedMonth)
-                ? lastCompletedMonth : requestedMonth;
-        return effectiveMonth.atEndOfMonth();
+    // WEEKLY·DAILY는 포인트 단위로 자주 갱신되어 clamp가 필요 없다 — 요청값 그대로 사용
+    // (root가 실제로 넘기는 granularity는 WEEKLY/DAILY뿐 — MONTHLY clamp 분기는 사용되지 않아 제거됨)
+    private static LocalDate completedMonthEnd(LocalDate requestedTo) {
+        return requestedTo != null ? requestedTo : LocalDate.now(TimeZones.KST);
     }
 
     private CurrentExchangeRate fetchCurrentExchangeRate() {

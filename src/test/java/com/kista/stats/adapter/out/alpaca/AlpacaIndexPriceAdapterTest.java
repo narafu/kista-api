@@ -18,7 +18,7 @@ class AlpacaIndexPriceAdapterTest {
 
     private final RestClient.Builder builder = RestClient.builder();
     private final AlpacaProperties properties = new AlpacaProperties(
-            "https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
+            "test-key", "test-secret", "https://data.test");
 
     private AlpacaIndexPriceAdapter buildAdapter() {
         return new AlpacaIndexPriceAdapter(builder.build(), properties);

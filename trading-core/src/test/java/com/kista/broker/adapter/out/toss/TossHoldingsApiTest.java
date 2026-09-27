@@ -61,7 +61,7 @@ class TossHoldingsApiTest {
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of(item))));
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("1000.00", "USD")));
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("1000.00")));
 
         BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
@@ -76,7 +76,7 @@ class TossHoldingsApiTest {
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of())));
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00", "USD")));
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00")));
 
         BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
@@ -91,7 +91,7 @@ class TossHoldingsApiTest {
         when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(null);
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00", "USD")));
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00")));
 
         BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
 
@@ -116,7 +116,7 @@ class TossHoldingsApiTest {
     @DisplayName("getUsdBuyableAmount: 정상 금액 반환")
     void getUsdBuyableAmount_returnsAmount() {
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("1234.56", "USD")));
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("1234.56")));
 
         BigDecimal amount = tossHoldingsApi.getUsdBuyableAmount(ACCOUNT);
 
@@ -137,7 +137,7 @@ class TossHoldingsApiTest {
     @DisplayName("getUsdBuyableAmount: cashBuyingPower 필드 null → TossApiException")
     void getUsdBuyableAmount_nullCashBuyingPower_throwsTossApiException() {
         when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(null, "USD")));
+            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(null)));
 
         assertThatThrownBy(() -> tossHoldingsApi.getUsdBuyableAmount(ACCOUNT))
             .isInstanceOf(TossApiException.class);
@@ -154,7 +154,7 @@ class TossHoldingsApiTest {
                     (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
                 String currency = params.getFirst("currency");
                 String amount = "USD".equals(currency) ? "100.00" : "140000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
+                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
             });
         when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(new TossResult<>(new TossHoldingsApi.ExchangeRateResult("1400.00", "1400.00")));
@@ -183,7 +183,7 @@ class TossHoldingsApiTest {
                     (org.springframework.util.MultiValueMap<String, String>) inv.getArgument(2);
                 String currency = params.getFirst("currency");
                 String amount = "USD".equals(currency) ? "100.00" : "50000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
+                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
             });
         when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(null);
@@ -271,7 +271,7 @@ class TossHoldingsApiTest {
                 MultiValueMap<String, String> params = (MultiValueMap<String, String>) inv.getArgument(2);
                 String currency = params.getFirst("currency");
                 String amount = "USD".equals(currency) ? "100.00" : "140000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
+                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
             });
         when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
             .thenAnswer(inv -> {
@@ -297,7 +297,7 @@ class TossHoldingsApiTest {
                 MultiValueMap<String, String> params = (MultiValueMap<String, String>) inv.getArgument(2);
                 String currency = params.getFirst("currency");
                 String amount = "USD".equals(currency) ? "100.00" : "140000";
-                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount, currency));
+                return new TossResult<>(new TossHoldingsApi.BuyableAmountResponse(amount));
             });
         when(tossHttpClient.getCommon(eq("/api/v1/exchange-rate"), any(), any(ParameterizedTypeReference.class)))
             .thenAnswer(inv -> {

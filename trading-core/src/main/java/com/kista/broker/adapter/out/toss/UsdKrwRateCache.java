@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.function.Supplier;
 
 // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개라 volatile 단일 Entry + double-check로 충분
-// 성공 값(rate > 0)만 저장 — 실패 폴백(ZERO)·예외는 캐싱하지 않고 그대로 반환·전파 (PrevCloseCache 스타일, Spring bean 아님)
+// 성공 값(rate > 0)만 저장 — 실패 폴백(ZERO)·예외는 캐싱하지 않고 그대로 반환·전파 (TossPriceApi.prevCloseCache 스타일, Spring bean 아님)
 final class UsdKrwRateCache {
 
     // 캐시 항목: 값 + 만료 시각

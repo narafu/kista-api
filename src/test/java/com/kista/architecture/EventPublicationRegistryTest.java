@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verify;
 // 무관하게 전역 추적되는지 실증 — 다음 태스크들의 annotation-미변경 결정의 전제 검증
 // 원래 MarketClosedEvent/TradingAlertNotifier.onMarketClosed로 검증했으나, 4a단계에서 그 리스너가
 // trading-core로 이관되며 root 프로세스에 더 이상 구독자가 없어져 이 테스트가 깨짐 — root에 여전히
-// 남아있는 동일 패턴의 리스너(StatsAlertNotifier, @TransactionalEventListener(fallbackExecution=true)
+// 남아있는 동일 패턴의 리스너(AlertNotifier.onStatsAlertRaised, @TransactionalEventListener(fallbackExecution=true)
 // + NotifyPort 단일 호출)로 이벤트만 교체, 검증 대상(EPR 메커니즘 자체)은 동일
 @SpringBootTest
 @ActiveProfiles("test")
@@ -36,7 +36,7 @@ class EventPublicationRegistryTest {
 
     @Test
     void 리스너_실패_시_incomplete_publication이_기록되고_재제출로_완료된다() {
-        // StatsAlertNotifier.onStatsAlertRaised(@TransactionalEventListener(fallbackExecution=true))가
+        // AlertNotifier.onStatsAlertRaised(@TransactionalEventListener(fallbackExecution=true))가
         // StatsAlertRaisedEvent를 소비 — 이 리스너는 어떤 코드도 바꾸지 않은 기존 프로덕션 리스너다
         doThrow(new RuntimeException("강제 실패 1회차"))
                 .doNothing()

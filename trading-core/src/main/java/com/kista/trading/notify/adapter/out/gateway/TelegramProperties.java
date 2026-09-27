@@ -6,7 +6,4 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 // TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID 환경변수를 읽어 같은 채팅방으로 발송한다(의도된 중복).
 @ConfigurationProperties(prefix = "telegram")
 public record TelegramProperties(String botToken, String chatId) {
-    public boolean hasBot() {
-        return botToken != null && !botToken.isBlank();
-    }
 }

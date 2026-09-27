@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -36,7 +37,7 @@ class TossCandleApi {
         // before = to 다음날 00:00 UTC (to 당일 봉 포함)
         String beforeParam = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
         // count = from~to 달력 일수 × 1.5 (주말·공휴일 여유분), 최대 200
-        long calendarDays = from.until(to).getDays() + 1;
+        long calendarDays = ChronoUnit.DAYS.between(from, to) + 1;
         int count = (int) Math.min(calendarDays * 3 / 2 + 5, MAX_COUNT);
 
         List<TossCandle> candles = fetchCandles(symbol, interval, count, beforeParam);
@@ -97,8 +98,7 @@ class TossCandleApi {
 
     // package-private — 테스트에서 직접 생성
     record CandlesResult(
-        @JsonProperty("candles") List<CandleItem> candles,
-        @JsonProperty("nextBefore") String nextBefore
+        @JsonProperty("candles") List<CandleItem> candles
     ) {}
 
     record CandleItem(
@@ -107,7 +107,6 @@ class TossCandleApi {
         @JsonProperty("highPrice")  String highPrice,   // 고가
         @JsonProperty("lowPrice")   String lowPrice,    // 저가
         @JsonProperty("closePrice") String closePrice,  // 종가
-        @JsonProperty("volume")     String volume,      // 거래량
-        @JsonProperty("currency")   String currency     // 통화
+        @JsonProperty("volume")     String volume       // 거래량
     ) {}
 }

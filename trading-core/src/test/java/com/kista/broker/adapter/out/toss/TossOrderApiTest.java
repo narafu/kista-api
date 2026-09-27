@@ -159,7 +159,7 @@ class TossOrderApiTest {
     @DisplayName("CLOSED 체결 → Execution 변환 (filledQuantity>0인 주문만)")
     void getExecutions_closed_convertsFilledOrders() {
         TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("3", "25.50", "76.50", null);
-        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-1", "SOXL", "BUY", "FILLED", exec);
+        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-1", "BUY", exec);
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
@@ -186,8 +186,8 @@ class TossOrderApiTest {
     void getExecutions_skipsUnfilledOrders() {
         TossOrderApi.OrderExecutionItem noFill   = new TossOrderApi.OrderExecutionItem("0",  null, null, null);
         TossOrderApi.OrderExecutionItem nullFill = new TossOrderApi.OrderExecutionItem(null, null, null, null);
-        TossOrderApi.OrderItem unfilledItem  = new TossOrderApi.OrderItem("oid-2", "SOXL", "BUY", "PENDING", noFill);
-        TossOrderApi.OrderItem nullFillItem  = new TossOrderApi.OrderItem("oid-3", "SOXL", "BUY", "PENDING", nullFill);
+        TossOrderApi.OrderItem unfilledItem  = new TossOrderApi.OrderItem("oid-2", "BUY", noFill);
+        TossOrderApi.OrderItem nullFillItem  = new TossOrderApi.OrderItem("oid-3", "BUY", nullFill);
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(unfilledItem, nullFillItem), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 
@@ -205,7 +205,7 @@ class TossOrderApiTest {
     @DisplayName("OPEN 상태 부분 체결 → Execution 포함")
     void getExecutions_open_partialFilled_included() {
         TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("2", "30.00", "60.00", null);
-        TossOrderApi.OrderItem partial = new TossOrderApi.OrderItem("oid-4", "SOXL", "SELL", "PARTIAL_FILLED", exec);
+        TossOrderApi.OrderItem partial = new TossOrderApi.OrderItem("oid-4", "SELL", exec);
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(partial), null, false);
 
@@ -226,7 +226,7 @@ class TossOrderApiTest {
     void getExecutions_nullPrice_fallbackAmount() {
         // amountUsd="50.00", price=null → price=BigDecimal.ZERO, amountUsd="50.00"(명시값 우선)
         TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("2", null, "50.00", null);
-        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-5", "SOXL", "BUY", "FILLED", exec);
+        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-5", "BUY", exec);
         TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
         TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
 

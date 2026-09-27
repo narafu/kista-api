@@ -80,14 +80,6 @@ server:
   port: 8080
   shutdown: graceful
 
-kis:
-  base-url: https://openapi.koreainvestment.com:9443
-
-toss:
-  base-url: https://openapi.tossinvest.com
-  admin-client-id: ${TOSS_ADMIN_CLIENT_ID:}      # 공통 API(시세·환율·시장정보)용 관리자 자격증명
-  admin-client-secret: ${TOSS_ADMIN_CLIENT_SECRET:}
-
 telegram:
   bot-token: ${TELEGRAM_BOT_TOKEN}
   chat-id: ${TELEGRAM_CHAT_ID}
@@ -99,8 +91,6 @@ app:
   cookie:
     secure: true        # prod: HTTPS 쿠키
     same-site: "None"   # prod: 크로스 오리진(kista-app.com→api.kista-app.com)
-  trading:
-    parallel-per-account: 2   # 계좌별 사이클 동시 실행 상한 (0 이하 = 순차)
 
 jwt:
   signing-key: ${JWT_SIGNING_KEY}
@@ -121,7 +111,6 @@ internal:
     base-url: ${INTERNAL_API_BASE_URL:http://localhost:8081} # 이 프로세스가 나가는 내부 API 호출 대상(trading-core) — 예전엔 자기 자신(단일 프로세스) 기본값이었으나 4a 분리 이후 trading-core 기본 포트(8081)로 정정
 
 alpaca:
-  base-url: https://paper-api.alpaca.markets
   api-key: ${ALPACA_API_KEY:}
   api-secret: ${ALPACA_API_SECRET:}
   data-base-url: https://data.alpaca.markets

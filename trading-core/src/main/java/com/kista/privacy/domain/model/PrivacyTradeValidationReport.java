@@ -11,18 +11,6 @@ public record PrivacyTradeValidationReport(
         issues = issues == null ? List.of() : List.copyOf(issues);
     }
 
-    public static PrivacyTradeValidationReport empty() {
-        return new PrivacyTradeValidationReport(List.of());
-    }
-
-    public static PrivacyTradeValidationReport warning(String code, String message) {
-        return new PrivacyTradeValidationReport(List.of(new Issue(Severity.WARNING, code, message)));
-    }
-
-    public static PrivacyTradeValidationReport blocking(String code, String message) {
-        return new PrivacyTradeValidationReport(List.of(new Issue(Severity.BLOCKING, code, message)));
-    }
-
     public boolean hasIssues() {
         return !issues.isEmpty();
     }

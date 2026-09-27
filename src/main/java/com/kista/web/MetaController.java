@@ -45,8 +45,12 @@ public class MetaController {
     public ResponseEntity<MetaBundle> getBundle() {
         MetaBundle bundle = new MetaBundle(
                 getStrategyTypeList(), getTickerList(), getBrokerList(),
-                getStrategyStatusList(), getCycleSeedTypeList(),
-                getAssetClassList(), getMarketList(), getFinanceAccountTypeList(), getFinanceCategoryTypeList()
+                toEnumMeta(StrategyStatus.values(), StrategyStatus::getLabel),
+                toEnumMeta(StrategyCycleSeedType.values(), StrategyCycleSeedType::getLabel),
+                toEnumMeta(AssetClass.values(), AssetClass::getLabel),
+                toEnumMeta(Market.values(), Market::getLabel),
+                toEnumMeta(FinanceAccount.Type.values(), FinanceAccount.Type::getLabel),
+                toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel)
         );
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);
     }
@@ -74,30 +78,6 @@ public class MetaController {
         return Arrays.stream(Broker.values())
                 .map(b -> new EnumMeta(b.name(), b.getLabel(), b.getShortLabel()))
                 .toList();
-    }
-
-    private List<EnumMeta> getStrategyStatusList() {
-        return toEnumMeta(StrategyStatus.values(), StrategyStatus::getLabel);
-    }
-
-    private List<EnumMeta> getCycleSeedTypeList() {
-        return toEnumMeta(StrategyCycleSeedType.values(), StrategyCycleSeedType::getLabel);
-    }
-
-    private List<EnumMeta> getAssetClassList() {
-        return toEnumMeta(AssetClass.values(), AssetClass::getLabel);
-    }
-
-    private List<EnumMeta> getMarketList() {
-        return toEnumMeta(Market.values(), Market::getLabel);
-    }
-
-    private List<EnumMeta> getFinanceAccountTypeList() {
-        return toEnumMeta(FinanceAccount.Type.values(), FinanceAccount.Type::getLabel);
-    }
-
-    private List<EnumMeta> getFinanceCategoryTypeList() {
-        return toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel);
     }
 
     private static <E extends Enum<E>> List<EnumMeta> toEnumMeta(E[] values, Function<E, String> label) {

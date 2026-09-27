@@ -4,9 +4,6 @@ import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import com.kista.sharedkernel.StrategyTicker;
-
-import java.math.BigDecimal;
 
 @Slf4j
 @Component
@@ -15,17 +12,6 @@ public class TelegramAdapter implements NotifyPort {
 
     private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
     private final TelegramProperties props;              // 관리자 봇 설정
-
-    @Override
-    public void notifyMarketClosed() {
-        send("오늘은 휴장일입니다. 매매를 건너뜁니다.");
-    }
-
-    @Override
-    public void notifyInsufficientBalance(int holdings, BigDecimal usdDeposit, StrategyTicker ticker) {
-        send(String.format("잔고 부족: %s %d주, 예수금 $%.2f. 매매를 건너뜁니다.",
-                ticker.name(), holdings, usdDeposit));
-    }
 
     @Override
     public void notifyError(Exception e) {

@@ -1,8 +1,9 @@
 package com.kista.notify.adapter.in.telegram;
 
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.notify.adapter.out.gateway.TelegramHttpClient;
+import com.kista.notify.adapter.out.gateway.TelegramProperties;
 import com.kista.notify.application.port.output.PortfolioQueryPort;
-import com.kista.user.application.usecase.TelegramApprovalUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,10 +27,11 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TelegramBotServiceTest {
 
-    @Mock TelegramApiClient apiClient;
+    @Mock TelegramHttpClient telegramHttpClient;
     @Mock PortfolioQueryPort portfolioQueryPort;
     @Mock UserUseCase userUseCase;
-    @Mock TelegramApprovalUseCase telegramApprovalUseCase;
+
+    static final TelegramProperties PROPS = new TelegramProperties("admin-token", String.valueOf(12345L));
 
     TelegramBotService sut;
     static final long CHAT_ID = 12345L;
@@ -37,7 +39,7 @@ class TelegramBotServiceTest {
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(String.valueOf(CHAT_ID), apiClient, portfolioQueryPort, userUseCase, telegramApprovalUseCase);
+        sut = new TelegramBotService(String.valueOf(CHAT_ID), telegramHttpClient, PROPS, portfolioQueryPort, userUseCase);
         // adminChatId로 userId 조회 — status/history 명령에서만 사용, 다른 테스트에서는 미호출
         lenient().when(userUseCase.findUserIdByTelegramChatId(String.valueOf(CHAT_ID))).thenReturn(Optional.of(USER_ID));
     }
@@ -58,7 +60,8 @@ class TelegramBotServiceTest {
     void help_command_returns_command_list() {
         sut.handle(update("/help"));
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture());
+        // 관리자 봇 토큰(PROPS.botToken())이 실제로 전달되는지까지 검증 — any()로만 받으면 토큰 누락/오전달을 못 잡는다
+        verify(telegramHttpClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture(), eq("admin-token"));
         assertThat(captor.getValue()).contains("/status").contains("/history");
     }
 
@@ -72,7 +75,7 @@ class TelegramBotServiceTest {
         sut.handle(update("/status"));
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(any(), captor.capture());
+        verify(telegramHttpClient).sendMessage(any(), captor.capture(), any());
         assertThat(captor.getValue()).contains("100주");
     }
 
@@ -83,7 +86,7 @@ class TelegramBotServiceTest {
         sut.handle(update("/status"));
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(any(), captor.capture());
+        verify(telegramHttpClient).sendMessage(any(), captor.capture(), any());
         assertThat(captor.getValue()).contains("데이터가 없습니다");
     }
 
@@ -102,7 +105,7 @@ class TelegramBotServiceTest {
         sut.handle(update("/run"));
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(any(), captor.capture());
+        verify(telegramHttpClient).sendMessage(any(), captor.capture(), any());
         // V2에서는 확인 절차 없이 스케쥴러 안내 메시지 즉시 반환
         assertThat(captor.getValue()).contains("스케줄러");
     }
@@ -115,7 +118,7 @@ class TelegramBotServiceTest {
 
         sut.handle(badUpdate);
 
-        verifyNoInteractions(apiClient);
+        verifyNoInteractions(telegramHttpClient);
     }
 
     @Test
@@ -123,7 +126,7 @@ class TelegramBotServiceTest {
         sut.handle(update("/unknown"));
 
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(any(), captor.capture());
+        verify(telegramHttpClient).sendMessage(any(), captor.capture(), any());
         assertThat(captor.getValue()).contains("/help");
     }
 
@@ -131,28 +134,31 @@ class TelegramBotServiceTest {
     void approve_callback_delegates_to_telegram_approval_usecase() {
         sut.handle(callbackUpdate("approve:" + USER_ID));
 
-        verify(telegramApprovalUseCase).handle(TelegramApprovalUseCase.Action.APPROVE, USER_ID);
+        verify(userUseCase).approve(USER_ID);
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture());
+        verify(telegramHttpClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture(), eq("admin-token"));
         assertThat(captor.getValue()).contains("승인 완료").contains(USER_ID.toString());
+        verify(telegramHttpClient).answerCallbackQuery("cb-1", "admin-token");
     }
 
     @Test
     void reject_callback_delegates_to_telegram_approval_usecase() {
         sut.handle(callbackUpdate("reject:" + USER_ID));
 
-        verify(telegramApprovalUseCase).handle(TelegramApprovalUseCase.Action.REJECT, USER_ID);
+        verify(userUseCase).reject(USER_ID, null);
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(apiClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture());
+        verify(telegramHttpClient).sendMessage(eq(String.valueOf(CHAT_ID)), captor.capture(), eq("admin-token"));
         assertThat(captor.getValue()).contains("거절 완료").contains(USER_ID.toString());
+        verify(telegramHttpClient).answerCallbackQuery("cb-1", "admin-token");
     }
 
     @Test
     void unknown_callback_action_is_ignored() {
         sut.handle(callbackUpdate("unknown:" + USER_ID));
 
-        verifyNoInteractions(telegramApprovalUseCase);
-        verify(apiClient, never()).sendMessage(any(), any());
+        verify(userUseCase, never()).approve(any());
+        verify(userUseCase, never()).reject(any(), any());
+        verify(telegramHttpClient, never()).sendMessage(any(), any(), any());
     }
 
 }

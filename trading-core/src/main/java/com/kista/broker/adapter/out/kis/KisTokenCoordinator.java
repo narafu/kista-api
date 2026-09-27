@@ -1,6 +1,5 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.broker.adapter.out.internal.DoubleCheckedTokenCache;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
@@ -8,16 +7,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
 
-// KIS 계좌 토큰 조정 — JVM-local 더블체크락(DoubleCheckedTokenCache) + PostgreSQL broker_tokens 캐시.
+// KIS 계좌 토큰 조정 — JVM-local 더블체크락 + PostgreSQL broker_tokens 캐시.
 // Toss(TossDistributedTokenCoordinator, Redis 분산 lease+fencing)와 같은 TokenCoordinator 계약을
 // 구현하지만 메커니즘은 다르다 — KIS 재발급은 이전 토큰을 무효화하지 않아(비파괴적) 인스턴스 간
 // 분산 조정이 불필요하다. 이 비대칭은 의도된 설계다(docs/agents/architecture.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다" 참고).
 @Component
 class KisTokenCoordinator implements TokenCoordinator {
 
-    private final DoubleCheckedTokenCache tokenCache = new DoubleCheckedTokenCache();
+    // 계좌별 락 — 같은 계좌 동시 호출이 토큰을 N번 발급하는 것 방지
+    private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
     private final BrokerTokenCachePort cachePort;
 
     @Autowired
@@ -27,8 +31,23 @@ class KisTokenCoordinator implements TokenCoordinator {
 
     @Override
     public String obtain(UUID accountId, TokenIssuer issuer) {
-        return tokenCache.getOrFetch(cachePort, accountId, KisTokenCoordinator::threshold,
-                () -> issueAndCache(accountId, issuer));
+        // 1차 조회 — 락 없이 빠른 경로
+        Optional<String> cached = cachePort.findValidToken(accountId, threshold());
+        if (cached.isPresent()) {
+            return cached.get();
+        }
+        ReentrantLock lock = locks.computeIfAbsent(accountId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            // 2차 조회(double-check) — 다른 스레드가 이미 발급했을 수 있음
+            Optional<String> doubleChecked = cachePort.findValidToken(accountId, threshold());
+            if (doubleChecked.isPresent()) {
+                return doubleChecked.get();
+            }
+            return issueAndCache(accountId, issuer);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override

@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 // 종목 기본정보(symbol 키) TTL 캐시 — 저변동 데이터라 6시간 TTL, 성공 응답만 저장 (실패 empty·예외는 미캐싱)
-// 키는 Ticker enum 종목 수(소수)로 한정되어 크기 관리 불필요 (PrevCloseCache 스타일, Spring bean 아님)
+// 키는 Ticker enum 종목 수(소수)로 한정되어 크기 관리 불필요 (TossPriceApi.prevCloseCache 스타일, Spring bean 아님)
 final class TossStockInfoCache {
 
     private record Entry(TossStockInfo value, Instant expiresAt) {}

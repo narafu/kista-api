@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 // 증권사별 연결테스트 포트 라우터 — supports()로 Map 빌드, broker enum으로 조회
 @Slf4j
@@ -16,12 +18,13 @@ public class BrokerConnectionTesters {
     private final Map<Broker, BrokerConnectionTestPort> testers;
 
     BrokerConnectionTesters(List<BrokerConnectionTestPort> list) {
-        testers = BrokerRegistrySupport.buildMap(list, BrokerConnectionTestPort::supports);
+        testers = list.stream().collect(Collectors.toMap(BrokerConnectionTestPort::supports, t -> t));
         log.info("BrokerConnectionTesters 초기화: {}", testers.keySet());
     }
 
     // 미지원 증권사면 IllegalArgumentException → GlobalExceptionHandler 400
     public BrokerConnectionTestPort of(Broker broker) {
-        return BrokerRegistrySupport.requireByBroker(testers, broker);
+        return Optional.ofNullable(testers.get(broker))
+                .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 증권사: " + broker));
     }
 }

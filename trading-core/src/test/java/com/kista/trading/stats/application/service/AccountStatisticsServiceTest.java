@@ -8,6 +8,7 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
+import com.kista.broker.application.port.output.PortfolioPort;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,9 +36,9 @@ class AccountStatisticsServiceTest {
     @Mock AccountPort accountPort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
-    @Mock BrokerStatisticsRouter brokerStatisticsRouter;
     @Mock BrokerAdapterRegistry registry;
     @Mock BrokerPricePort pricePort;
+    @Mock PortfolioPort portfolioPort;
 
     private AccountStatisticsService service;
     private final UUID accountId = UUID.randomUUID();
@@ -46,11 +47,12 @@ class AccountStatisticsServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccountStatisticsService(
-                accountPort, cyclePositionPort, orderPort, brokerStatisticsRouter, registry);
+                accountPort, cyclePositionPort, orderPort, registry);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
         Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
-        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
+        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
+        lenient().doReturn(portfolioPort).when(registry).require(any(BrokerAccountRef.class), eq(PortfolioPort.class));
     }
 
     @Test
@@ -69,7 +71,7 @@ class AccountStatisticsServiceTest {
     @Test
     void getPresentBalance_brokerFailure_wrappedAsIllegalStateException() {
         // getMargin()과 동일하게 BrokerCallGuard로 감싸져야 함 — 브로커 예외가 503 대신 400으로 통일
-        when(brokerStatisticsRouter.getPresentBalance(any())).thenThrow(new RuntimeException("Toss 매수가능금액 응답 없음"));
+        when(portfolioPort.getPresentBalance(any())).thenThrow(new RuntimeException("Toss 매수가능금액 응답 없음"));
 
         assertThatThrownBy(() -> service.getPresentBalance(accountId, userId))
                 .isInstanceOf(IllegalStateException.class)

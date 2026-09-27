@@ -2,8 +2,9 @@ package com.kista.notify.adapter.in.telegram;
 
 import com.kista.sharedkernel.TimeZones;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.notify.adapter.out.gateway.TelegramHttpClient;
+import com.kista.notify.adapter.out.gateway.TelegramProperties;
 import com.kista.notify.application.port.output.PortfolioQueryPort;
-import com.kista.user.application.usecase.TelegramApprovalUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,10 +25,11 @@ class TelegramBotService {
 
     @Value("${telegram.chat-id:}")
     private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
-    private final TelegramApiClient apiClient;
+    private final TelegramHttpClient telegramHttpClient;
+    private final TelegramProperties props;            // 관리자 봇 토큰
     private final PortfolioQueryPort portfolioQueryPort;
-    private final UserUseCase userUseCase; // /status, /history 명령의 chatId→userId 조회 전용
-    private final TelegramApprovalUseCase telegramApprovalUseCase; // 관리자 승인/거절 명령 위임
+    private final UserUseCase userUseCase; // /status, /history 조회 + 관리자 승인/거절 명령 실행 전용
+
     void handle(TelegramUpdate update) {
         // 인라인 버튼 클릭(callback_query) 처리 — message가 null이므로 별도 분기 필수
         if (update.callbackQuery() != null) {
@@ -45,13 +47,13 @@ class TelegramBotService {
 
         String reply = handleIdle(text);
         if (reply != null) {
-            apiClient.sendMessage(String.valueOf(chatId), reply);
+            telegramHttpClient.sendMessage(String.valueOf(chatId), reply, props.botToken());
         }
     }
 
     private void handleCallbackQuery(TelegramUpdate.CallbackQuery callbackQuery) {
         // 버튼 로딩 스피너 즉시 해제
-        apiClient.answerCallbackQuery(callbackQuery.id());
+        telegramHttpClient.answerCallbackQuery(callbackQuery.id(), props.botToken());
 
         long chatId = callbackQuery.message().chat().id();
         if (isUnauthorized(chatId)) {
@@ -77,12 +79,12 @@ class TelegramBotService {
 
         String reply = switch (action) {
             case "approve" -> {
-                telegramApprovalUseCase.handle(TelegramApprovalUseCase.Action.APPROVE, targetUserId);
+                userUseCase.approve(targetUserId);
                 log.info("텔레그램 관리자 승인: targetUserId={}", targetUserId);
                 yield "✅ 승인 완료: " + targetUserId;
             }
             case "reject" -> {
-                telegramApprovalUseCase.handle(TelegramApprovalUseCase.Action.REJECT, targetUserId);
+                userUseCase.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
                 log.info("텔레그램 관리자 거절: targetUserId={}", targetUserId);
                 yield "❌ 거절 완료: " + targetUserId;
             }
@@ -93,7 +95,7 @@ class TelegramBotService {
         };
 
         if (reply != null) {
-            apiClient.sendMessage(String.valueOf(chatId), reply);
+            telegramHttpClient.sendMessage(String.valueOf(chatId), reply, props.botToken());
         }
     }
 

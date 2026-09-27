@@ -1,7 +1,7 @@
 package com.kista.platform.internalapi;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import org.springframework.http.client.ClientHttpResponse;
 
 // 내부 API(:api ↔ :trading-core) 호출 어댑터 4종(TradingCommandHttpAdapter/TradingQueryHttpAdapter/
@@ -11,7 +11,7 @@ import org.springframework.http.client.ClientHttpResponse;
 // 안전하게 재사용할 수 있다.
 public final class InternalApiErrorDetails {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final JsonMapper MAPPER = new JsonMapper();
 
     private InternalApiErrorDetails() {}
 

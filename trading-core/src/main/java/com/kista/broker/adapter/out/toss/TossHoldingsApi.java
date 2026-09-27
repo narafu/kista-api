@@ -238,8 +238,7 @@ class TossHoldingsApi {
     ) {}
 
     record BuyableAmountResponse(
-        @JsonProperty("cashBuyingPower") String cashBuyingPower, // 현금 기반 매수 가능 금액 (미수 미발생 기준)
-        @JsonProperty("currency") String currency                // 통화 (예: USD)
+        @JsonProperty("cashBuyingPower") String cashBuyingPower  // 현금 기반 매수 가능 금액 (미수 미발생 기준)
     ) {}
 
     record ExchangeRateResult(

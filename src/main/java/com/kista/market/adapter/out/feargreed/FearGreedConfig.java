@@ -1,5 +1,6 @@
 package com.kista.market.adapter.out.feargreed;
 
+import com.kista.platform.http.HttpClientTimeouts;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -21,10 +22,7 @@ class FearGreedConfig {
     // package-private — FearGreedConfigTest에서 타임아웃 검증용으로 직접 호출
     static SimpleClientHttpRequestFactory fearGreedRequestFactory() {
         // CNN Fear & Greed 지수 조회 API 응답 지연 대비 타임아웃 설정 — 미설정 시 OS 기본값(~60초)로 무한 대기 가능
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000); // 연결 타임아웃 3초
-        factory.setReadTimeout(7_000);    // 읽기 타임아웃 7초
-        return factory;
+        return HttpClientTimeouts.timeouts(3_000, 7_000); // 연결 3초, 읽기 7초
     }
 
     // package-private — Cnn/CryptoFearGreedAdapterTest에서 동일 인터셉터 재사용

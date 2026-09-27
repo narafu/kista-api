@@ -139,8 +139,8 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 ### AES-256 암호화 위치
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
 
-### TelegramApiClient package-private 제약
-- `TelegramApiClient` (`com.kista.notify.adapter.in.telegram`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가
+### adapter.in.telegram package-private 제약
+- `TelegramBotService`(`com.kista.notify.adapter.in.telegram`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가. 공용 텔레그램 전송은 `adapter.out.gateway.TelegramHttpClient`(public)가 담당(구 `TelegramApiClient` 1:1 래퍼는 중복 제거로 삭제됨 — `TelegramBotService`가 `TelegramHttpClient`를 직접 주입받는다)
 - 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `com.kista.notify.application.port.output` 포트 + `com.kista.notify.adapter.out.gateway` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
 - 기존 `telegramRestTemplate` 빈 재사용 가능 (필드명 일치시키면 자동 주입)
 

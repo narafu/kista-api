@@ -220,7 +220,7 @@ class TossHttpClientTest {
         expectGet("admin-token-1", HttpStatus.UNAUTHORIZED, "");
         expectGet("admin-token-1", HttpStatus.OK, "OK");
 
-        String result = client.getCommon(PATH, new LinkedMultiValueMap<>(), String.class);
+        String result = client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {});
 
         assertThat(result).isEqualTo("OK");
         verify(tossAuthApi).recoverAdminToken("admin-token-0", false);
@@ -247,7 +247,7 @@ class TossHttpClientTest {
         expectGet("admin-token-2", HttpStatus.UNAUTHORIZED, "");
         expectGet("admin-token-3", HttpStatus.UNAUTHORIZED, "");
 
-        assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), String.class))
+        assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}))
                 .isInstanceOf(TossApiException.class)
                 .hasMessageContaining("토큰 재시도 실패");
 
@@ -419,10 +419,10 @@ class TossHttpClientTest {
         AtomicReference<String> requestCResult = new AtomicReference<>();
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Thread requestA = startRequest("admin-request-a", failure,
-                () -> requestAResult.set(client.getCommon(PATH, new LinkedMultiValueMap<>(), String.class)));
+                () -> requestAResult.set(client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {})));
         Thread requestC = startRequest("admin-request-c", failure, () -> {
             await(token1Issued);
-            requestCResult.set(client.getCommon(PATH, new LinkedMultiValueMap<>(), String.class));
+            requestCResult.set(client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}));
         });
 
         join(requestA);

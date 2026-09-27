@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 // SchedulerJobRunner가 발행하는 생명주기 이벤트를 구독해 기존 NotifyPort로 중계한다
-// (MarketAlertNotifier/PrivacyAlertNotifier/StatsAlertNotifier와 동일 패턴 — 4번째 인스턴스).
+// (AlertNotifier/PrivacyAlertNotifier와 동일 패턴).
 // 스케쥴러는 @Transactional 밖에서 실행되므로 fallbackExecution=true로 발행 시점에 동기 실행되게 한다.
 @Component
 @RequiredArgsConstructor

@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.client.RestClient;
 
-import java.util.List;
 import java.util.Map;
 
 // 텔레그램 Bot API HTTP 전송 공통 유틸 — package-private (어댑터 레이어 내부 사용)
@@ -28,23 +27,4 @@ class TelegramHttpClient {
         }
     }
 
-    // 인라인 버튼이 포함된 메시지 전송 (callback_data 버튼 목록)
-    void sendWithInlineKeyboard(String chatId, String text, String botToken,
-                                List<Map<String, String>> buttons) {
-        if (botToken == null || botToken.isBlank()) {
-            return;
-        }
-        try {
-            String url = API_BASE + "/bot" + botToken + "/sendMessage";
-            Map<String, Object> body = Map.of(
-                    "chat_id", chatId,
-                    "text", text,
-                    "parse_mode", "HTML",
-                    "reply_markup", Map.of("inline_keyboard", List.of(buttons))
-            );
-            telegramRestClient.post().uri(url).body(body).retrieve().body(String.class);
-        } catch (Exception e) {
-            log.error("Telegram 인라인 버튼 메시지 전송 실패: {}", e.getMessage());
-        }
-    }
 }

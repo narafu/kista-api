@@ -2,8 +2,6 @@ package com.kista.notify.adapter.out.sse;
 
 import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
-import com.kista.notify.domain.model.TradeEventView;
-import com.kista.notify.application.port.output.RealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -17,10 +15,9 @@ import com.kista.sharedkernel.UserStatus;
 
 @Component
 @RequiredArgsConstructor
-public class SseEmitterRegistry implements RealtimeNotificationPort {
+public class SseEmitterRegistry {
 
     private final ConcurrentHashMap<UUID, SseEmitter> emitters = new ConcurrentHashMap<>();
-    private final TradeSseEmitterRegistry tradeSseEmitterRegistry; // 매매 알림 SSE 레지스트리
 
     // 사용자 SSE 연결 등록 — AuthController에서 호출
     public SseEmitter connect(UUID userId) {
@@ -32,7 +29,6 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
         return emitter;
     }
 
-    @Override
     public void notifyStatusChange(UUID userId, UserStatus status) {
         SseEmitter emitter = emitters.get(userId);
         if (emitter == null) return;
@@ -42,11 +38,6 @@ public class SseEmitterRegistry implements RealtimeNotificationPort {
         } catch (IOException e) {
             emitters.remove(userId, emitter);
         }
-    }
-
-    @Override
-    public void notifyTrade(UUID userId, TradeEventView event) {
-        tradeSseEmitterRegistry.send(userId, event);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
 
 // market-calendar 날짜별 캐시 — 과거(미국 동부 기준 오늘 이전) 날짜는 확정이라 영구, 오늘·미래는 15분 TTL
-// 실패(empty)·예외는 캐싱하지 않음 — 과거 날짜에 일시 장애가 영구 오염되는 것 방지 (PrevCloseCache 스타일, Spring bean 아님)
+// 실패(empty)·예외는 캐싱하지 않음 — 과거 날짜에 일시 장애가 영구 오염되는 것 방지 (TossPriceApi.prevCloseCache 스타일, Spring bean 아님)
 final class TossMarketCalendarCache {
 
     private static final ZoneId US_EASTERN = ZoneId.of("America/New_York");

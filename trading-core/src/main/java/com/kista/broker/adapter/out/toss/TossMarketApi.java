@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -37,13 +38,13 @@ class TossMarketApi {
     private static final int MAX_RANGE_DAYS = 30;
 
     private final TossHttpClient tossHttpClient;
-    // 날짜별 캐시 — 과거(미국 동부 기준 오늘 이전) 확정 날짜는 영구, 오늘·미래는 15분 TTL (Spring bean 아님, PrevCloseCache 스타일)
+    // 날짜별 캐시 — 과거(미국 동부 기준 오늘 이전) 확정 날짜는 영구, 오늘·미래는 15분 TTL (Spring bean 아님, TossPriceApi.prevCloseCache 스타일)
     private final TossMarketCalendarCache calendarCache = new TossMarketCalendarCache(Duration.ofMinutes(15), Instant::now);
 
     // ── TossMarketCalendarPort ─────────────────────────────────────────────────
 
     public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to) {
-        long days = from.until(to).getDays() + 1;
+        long days = ChronoUnit.DAYS.between(from, to) + 1;
         if (days > MAX_RANGE_DAYS) {
             throw new IllegalArgumentException("market-calendar 조회는 최대 " + MAX_RANGE_DAYS + "일 범위만 지원합니다");
         }
@@ -113,7 +114,6 @@ class TossMarketApi {
     ) {}
 
     record MarketDay(
-        @JsonProperty("date")          String        date,
         @JsonProperty("preMarket")     SessionWindow preMarket,
         @JsonProperty("regularMarket") SessionWindow regularMarket,
         @JsonProperty("afterMarket")   SessionWindow afterMarket

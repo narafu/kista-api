@@ -9,14 +9,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClient;
 
-import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import com.kista.sharedkernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class TelegramAdapterTest {
@@ -38,32 +36,21 @@ class TelegramAdapterTest {
     }
 
     @Test
-    void notifyMarketClosed_sendsCorrectUrl() {
-        adapter.notifyMarketClosed();
+    void notifyInfo_sendsCorrectUrl() {
+        adapter.notifyInfo("스케쥴러 시작");
 
         verify(restClient.post()).uri(contains("/bottest-token/sendMessage"));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void notifyMarketClosed_bodyContainsChatId() {
+    void notifyInfo_bodyContainsChatId() {
         ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
-        adapter.notifyMarketClosed();
+        adapter.notifyInfo("스케쥴러 시작");
 
         verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
         assertThat((Map<String, String>) bodyCaptor.getValue()).containsEntry("chat_id", "chat-123");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void notifyInsufficientBalance_bodyContainsQuantityAndAmount() {
-        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
-        adapter.notifyInsufficientBalance(0, new BigDecimal("5.00"), StrategyTicker.SOXL);
-
-        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
-        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
-        assertThat(text).contains("0주").contains("5.00");
     }
 
     @Test
@@ -71,7 +58,7 @@ class TelegramAdapterTest {
         TelegramHttpClient emptyHttpClient = new TelegramHttpClient(restClient);
         TelegramAdapter noTokenAdapter = new TelegramAdapter(emptyHttpClient, EMPTY_PROPS);
 
-        noTokenAdapter.notifyMarketClosed();
+        noTokenAdapter.notifyInfo("스케쥴러 시작");
 
         verifyNoInteractions(restClient);
     }
