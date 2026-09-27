@@ -7,7 +7,6 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -29,10 +28,8 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 class TossHttpClient {
 
-    private final RestClient tossRestClient;
+    private final RestClient tossRestClient; // baseUrl은 TossConfig가 빈 생성 시점에 고정 — 여기선 상대 경로만 다룬다
     private final TossAuthApi tossAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
-    @Value("${toss.base-url}")
-    private final String baseUrl;
     private final ObjectMapper objectMapper;
 
     public <T> T post(String path, BrokerAccountRef account, Object body, Class<T> responseType) {
@@ -45,7 +42,7 @@ class TossHttpClient {
     // 계좌 컨텍스트 API용
     public <T> T get(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
                      ParameterizedTypeReference<T> typeRef) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
+        String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
             HttpHeaders headers = buildHeaders(account.brokerAccountCode(), token);
             return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
@@ -55,7 +52,7 @@ class TossHttpClient {
     // 계좌 헤더 불필요 API용 (ParameterizedTypeReference 버전)
     public <T> T getNoAccountHeader(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
                                     ParameterizedTypeReference<T> typeRef) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
+        String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
             HttpHeaders headers = buildHeaders(null, token);
             return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
@@ -65,7 +62,7 @@ class TossHttpClient {
     // 공통 API용 (ParameterizedTypeReference 버전)
     public <T> T getCommon(String path, MultiValueMap<String, String> params,
                            ParameterizedTypeReference<T> typeRef) {
-        String url = UriComponentsBuilder.fromUriString(baseUrl + path).queryParams(params).toUriString();
+        String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
         return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
                 tossAuthApi::recoverAdminToken,
                 token -> {
@@ -77,7 +74,7 @@ class TossHttpClient {
     // POST 요청 (ParameterizedTypeReference 버전)
     public <T> T post(String path, BrokerAccountRef account, Object body, ParameterizedTypeReference<T> typeRef) {
         return executeWithRetry(account, path, token -> tossRestClient.post()
-                .uri(baseUrl + path)
+                .uri(path)
                 .headers(h -> h.addAll(buildHeaders(account.brokerAccountCode(), token)))
                 .body(body)
                 .retrieve()

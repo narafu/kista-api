@@ -55,12 +55,13 @@ class KisHttpClientTest {
 
     @BeforeEach
     void setUp() {
-        restClientBuilder = RestClient.builder();
+        // baseUrl은 이제 RestClient(=KisConfig 빈)에 고정 — 테스트도 KisConfig와 동일하게 builder에 설정
+        restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
     }
 
     private KisHttpClient newClient() {
-        return new KisHttpClient(restClientBuilder.build(), kisAuthApi, BASE_URL, new ObjectMapper());
+        return new KisHttpClient(restClientBuilder.build(), kisAuthApi, new ObjectMapper());
     }
 
     // KIS EGW00201(초당 거래건수 초과) 500 응답 바디

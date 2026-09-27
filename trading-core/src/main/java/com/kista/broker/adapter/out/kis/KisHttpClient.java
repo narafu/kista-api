@@ -7,7 +7,6 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -29,10 +28,8 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 class KisHttpClient {
 
-    private final RestClient kisRestClient;
+    private final RestClient kisRestClient; // baseUrl은 KisConfig가 빈 생성 시점에 고정 — 여기선 상대 경로만 다룬다
     private final KisAuthApi kisAuthApi; // 포트 대신 같은 패키지 구체 클래스 직접 주입
-    @Value("${kis.base-url}")
-    private final String baseUrl;
     private final ObjectMapper objectMapper;
 
     // 토큰을 직접 보유한 호출부(KisAuthApi 등) 공용 헤더 빌더
@@ -55,14 +52,14 @@ class KisHttpClient {
 
     public <T> T get(String path, HttpHeaders headers, MultiValueMap<String, String> params, Class<T> responseType) {
         String url = UriComponentsBuilder
-                .fromUriString(baseUrl + path)
+                .fromPath(path)
                 .queryParams(params)
                 .toUriString();
         return kisRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
     }
 
     public <T> T post(String path, HttpHeaders headers, Object body, Class<T> responseType) {
-        return kisRestClient.post().uri(baseUrl + path)
+        return kisRestClient.post().uri(path)
                 .headers(h -> h.addAll(headers))
                 .body(body)
                 .retrieve()

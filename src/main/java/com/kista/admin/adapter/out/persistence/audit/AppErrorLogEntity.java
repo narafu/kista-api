@@ -8,6 +8,7 @@ import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -35,7 +36,7 @@ class AppErrorLogEntity extends BaseCreatedAtEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private String context; // 발생 위치 메타 JSON
+    private Map<String, String> context; // 발생 위치 메타 (Hibernate가 JSON 컬럼에 직접 매핑 — Jackson2가 classpath에 있어 그쪽을 사용, 값은 항상 문자열이라 영향 없음)
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // 소프트 삭제 일시 (null = 활성)

@@ -1,6 +1,5 @@
 package com.kista.admin.adapter.out.persistence.audit;
 
-import tools.jackson.databind.ObjectMapper;
 import com.kista.admin.domain.model.AppErrorLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -27,7 +27,7 @@ class AppErrorLogPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AppErrorLogPersistenceAdapter(repo, new ObjectMapper());
+        adapter = new AppErrorLogPersistenceAdapter(repo);
     }
 
     @Test
@@ -42,7 +42,7 @@ class AppErrorLogPersistenceAdapterTest {
         assertThat(saved.getErrorType()).isEqualTo("RuntimeException");
         assertThat(saved.getMessage()).isEqualTo("테스트 오류");
         assertThat(saved.getStackTrace()).isNotBlank();
-        assertThat(saved.getContext()).contains("TradingOpenScheduler");
+        assertThat(saved.getContext()).containsEntry("caller", "TradingOpenScheduler");
     }
 
     @Test
@@ -57,7 +57,7 @@ class AppErrorLogPersistenceAdapterTest {
         assertThat(saved.getErrorType()).isEqualTo("TypeError");
         assertThat(saved.getMessage()).isEqualTo("cannot read property");
         assertThat(saved.getStackTrace()).isEqualTo("at foo()\nat bar()");
-        assertThat(saved.getContext()).contains("/login");
+        assertThat(saved.getContext()).containsEntry("pathname", "/login");
     }
 
     @Test
@@ -81,7 +81,7 @@ class AppErrorLogPersistenceAdapterTest {
     @Test
     void findRecent_returns_mapped_list() {
         AppErrorLogEntity entity = new AppErrorLogEntity(
-                null, "KisApiException", "KIS 오류", "stack", "{\"caller\":\"TradingService\"}", null
+                null, "KisApiException", "KIS 오류", "stack", Map.of("caller", "TradingService"), null
         );
         Instant from = Instant.EPOCH;
         Instant to = Instant.now();

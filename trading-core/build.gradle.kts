@@ -50,8 +50,6 @@ dependencies {
     implementation(libs.spring.modulith.events.jdbc)
     implementation(libs.spring.modulith.events.jackson) // JdbcEventPublicationAutoConfiguration 필수 의존성(root와 동일 근거) — 누락 시 EPR이 JDBC로 영속화되지 않아 재기동 시 trading.event_publication 재발행이 동작하지 않음
 
-    implementation("org.apache.httpcomponents.client5:httpclient5") // broker KIS/Toss HTTP 클라이언트
-
     // Observability — MetricsConfig(:shared, platform.metrics)가 MeterRegistry 빈을 요구하는데,
     // 이 빈은 spring-boot-starter-actuator의 auto-config가 만든다(micrometer registry 구현체만
     // 있고 actuator 자체가 없으면 부팅 실패 — 4a Task 10 로컬 2-프로세스 스모크 테스트에서 실측 확인)

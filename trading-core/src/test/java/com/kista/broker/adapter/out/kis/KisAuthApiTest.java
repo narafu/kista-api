@@ -44,9 +44,10 @@ class KisAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        restClientBuilder = RestClient.builder();
+        // baseUrl은 이제 RestClient(=KisConfig 빈)에 고정 — 테스트도 KisConfig와 동일하게 builder에 설정
+        restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        api = new KisAuthApi(restClientBuilder.build(), brokerTokenCachePort, tokenCoordinator, BASE_URL);
+        api = new KisAuthApi(restClientBuilder.build(), brokerTokenCachePort, tokenCoordinator);
     }
 
     private void expectOAuthToken(String accessToken, String expiredAt) {

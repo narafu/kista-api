@@ -29,7 +29,10 @@ class AlpacaCalendarAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void refreshMonth_거래일_목록에_없는_평일을_휴장일로_저장한다() throws Exception {
-        RestClient.Builder builder = RestClient.builder().requestFactory(AlpacaConfig.alpacaRequestFactory());
+        // baseUrl은 이제 RestClient(=AlpacaConfig 빈)에 고정 — 테스트도 AlpacaConfig와 동일하게 builder에 설정
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl("https://paper-api.alpaca.markets")
+                .requestFactory(AlpacaConfig.alpacaRequestFactory());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);
@@ -64,7 +67,9 @@ class AlpacaCalendarAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void 거래일_응답이_비어있으면_해당_월_평일_전체를_휴장일로_처리한다() {
-        RestClient.Builder builder = RestClient.builder().requestFactory(AlpacaConfig.alpacaRequestFactory());
+        RestClient.Builder builder = RestClient.builder()
+                .baseUrl("https://paper-api.alpaca.markets")
+                .requestFactory(AlpacaConfig.alpacaRequestFactory());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AlpacaProperties properties = new AlpacaProperties("https://paper-api.alpaca.markets", "test-key", "test-secret", "https://data.test");
         MarketHolidayStorePort holidayStorePort = mock(MarketHolidayStorePort.class);

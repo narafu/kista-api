@@ -51,7 +51,8 @@ class TossAuthApiNoJpaTest extends DataJpaTestBase {
         UUID accountId = UUID.randomUUID();
         String scope = TossDistributedTokenCoordinator.accountScope(accountId);
         TossTokenStore tokenStore = mock(TossTokenStore.class);
-        RestClient.Builder restClientBuilder = RestClient.builder();
+        // baseUrl은 이제 RestClient(=TossConfig 빈)에 고정 — 테스트도 TossConfig와 동일하게 builder에 설정
+        RestClient.Builder restClientBuilder = RestClient.builder().baseUrl("http://toss.test");
         MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
         RestClient restClient = restClientBuilder.build();
         when(tokenStore.find(scope)).thenReturn(Optional.empty());
@@ -67,7 +68,7 @@ class TossAuthApiNoJpaTest extends DataJpaTestBase {
         TossDistributedTokenCoordinator coordinator = new TossDistributedTokenCoordinator(
                 tokenStore, ignored -> {}, () -> "owner", 3);
         TossAuthApi api = new TossAuthApi(
-                restClient, coordinator, "http://toss.test", "admin-id", "admin-secret");
+                restClient, coordinator, "admin-id", "admin-secret");
 
         int rowsBefore = brokerTokenRows(accountId);
         int activeConnectionsBefore = hikari.getHikariPoolMXBean().getActiveConnections();

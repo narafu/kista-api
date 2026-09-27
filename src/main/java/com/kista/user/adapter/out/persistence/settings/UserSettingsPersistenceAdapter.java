@@ -1,8 +1,5 @@
 package com.kista.user.adapter.out.persistence.settings;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserSettingsPort;
@@ -23,7 +20,6 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
 
     private final UserSettingsJpaRepository settingsRepo;
     private final UserNotificationPrefJpaRepository prefRepo;
-    private final ObjectMapper objectMapper; // strategySuggestions JSON 직렬화 경계
 
     @Override
     public Optional<UserSettings> loadByUserId(UUID userId) {
@@ -36,7 +32,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
                             UserNotificationPrefJpaEntity::isEnabled
                     ));
             return new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs,
-                    deserializeSuggestions(entity.getStrategySuggestions()));
+                    resolveSuggestions(entity.getStrategySuggestions()));
         });
     }
 
@@ -44,7 +40,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
     public void save(UserSettings settings) {
         // user_settings 행 저장 (없으면 INSERT, 있으면 UPDATE)
         settingsRepo.save(new UserSettingsJpaEntity(settings.userId(), settings.balanceCheckEnabled(),
-                serializeSuggestions(settings.strategySuggestions())));
+                settings.strategySuggestions()));
         // 알림 선호도 각 타입별로 저장
         settings.notificationPrefs().forEach((type, enabled) ->
                 prefRepo.save(new UserNotificationPrefJpaEntity(settings.userId(), type.name(), enabled))
@@ -74,7 +70,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
                 UserSettingsJpaEntity entity = entities.get(userId);
                 Map<NotificationType, Boolean> prefs = prefsByUserId.getOrDefault(userId, Map.of());
                 result.put(userId, new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs,
-                        deserializeSuggestions(entity.getStrategySuggestions())));
+                        resolveSuggestions(entity.getStrategySuggestions())));
             } else {
                 // 설정이 없는 사용자는 기본값으로 채운다
                 result.put(userId, UserSettings.defaultFor(userId));
@@ -84,20 +80,8 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
         return result;
     }
 
-    private String serializeSuggestions(List<String> suggestions) {
-        try {
-            return objectMapper.writeValueAsString(suggestions);
-        } catch (JacksonException e) {
-            throw new IllegalArgumentException("strategySuggestions 직렬화 실패", e);
-        }
-    }
-
-    private List<String> deserializeSuggestions(String json) {
-        if (json == null) return UserSettings.DEFAULT_STRATEGY_SUGGESTIONS;
-        try {
-            return objectMapper.readValue(json, new TypeReference<List<String>>() {});
-        } catch (JacksonException e) {
-            throw new IllegalStateException("strategySuggestions 역직렬화 실패", e);
-        }
+    // null(컬럼 미설정)이면 기본 추천 목록으로 대체 — Hibernate가 이미 List로 매핑했으므로 여기선 null 분기만 담당
+    private List<String> resolveSuggestions(List<String> suggestions) {
+        return suggestions != null ? suggestions : UserSettings.DEFAULT_STRATEGY_SUGGESTIONS;
     }
 }

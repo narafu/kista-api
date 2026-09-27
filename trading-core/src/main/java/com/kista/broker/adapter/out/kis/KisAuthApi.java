@@ -11,7 +11,6 @@ import com.kista.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.sharedkernel.Broker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -46,15 +45,13 @@ class KisAuthApi implements BrokerConnectionTestPort {
     private final ConcurrentHashMap<String, TempTokenEntry> tempTokenCache = new ConcurrentHashMap<>();
     private record TempTokenEntry(String token, Instant expiresAt) {}
 
-    private final RestClient kisRestClient;
+    private final RestClient kisRestClient; // baseUrl은 KisConfig가 빈 생성 시점에 고정 — 여기선 상대 경로만 다룬다
     // verifyCredentials/verifyAccount(계좌 등록 전, accountId 없을 수 있음) 전용 — 코디네이터를 거치지 않는 단순 캐시 접근
     private final BrokerTokenCachePort brokerTokenCachePort;
     // getToken/recoverToken 전용 — JVM-local 더블체크락 + DB 캐시 조정 (Toss는 별도 Redis 분산 구현체).
     // TokenCoordinator를 구현하는 빈이 2개(KIS/Toss)라 인터페이스로 주입하면 Spring이 모호해짐 —
     // TossAuthApi가 TossDistributedTokenCoordinator를 구체 타입으로 주입받는 것과 동일하게 구체 타입 사용
     private final KisTokenCoordinator tokenCoordinator;
-    @Value("${kis.base-url}")
-    private final String kisBaseUrl;
 
     // ── 토큰 발급 / 401 복구 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
 
@@ -145,7 +142,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
         HttpHeaders headers = KisHttpClient.buildHeaders(token, appKey, secretKey, KisTradingApi.MARGIN_TR_ID);
 
         String url = UriComponentsBuilder
-                .fromUriString(kisBaseUrl + KisTradingApi.MARGIN_PATH)
+                .fromPath(KisTradingApi.MARGIN_PATH)
                 .queryParam("CANO", parts[0])
                 .queryParam("ACNT_PRDT_CD", parts[1])
                 .toUriString();
@@ -187,7 +184,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
                 "appsecret", appSecret
         );
         TokenResponse response = kisRestClient.post()
-                .uri(kisBaseUrl + "/oauth2/tokenP")
+                .uri("/oauth2/tokenP")
                 .headers(h -> h.addAll(headers))
                 .body(body)
                 .retrieve()

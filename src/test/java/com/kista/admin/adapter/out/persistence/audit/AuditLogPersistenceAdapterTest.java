@@ -1,6 +1,5 @@
 package com.kista.admin.adapter.out.persistence.audit;
 
-import tools.jackson.databind.ObjectMapper;
 import com.kista.admin.domain.model.AuditLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ class AuditLogPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AuditLogPersistenceAdapter(repo, new ObjectMapper());
+        adapter = new AuditLogPersistenceAdapter(repo);
     }
 
     @Test
@@ -42,7 +41,7 @@ class AuditLogPersistenceAdapterTest {
         AuditLogEntity saved = captor.getValue();
         assertThat(saved.getAdminId()).isEqualTo(ADMIN_ID);
         assertThat(saved.getAction()).isEqualTo("DELETE_USER");
-        assertThat(saved.getPayload()).contains("key");
+        assertThat(saved.getPayload()).containsEntry("key", "val");
     }
 
     @Test

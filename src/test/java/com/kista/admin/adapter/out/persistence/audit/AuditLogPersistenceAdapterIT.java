@@ -1,16 +1,14 @@
 package com.kista.admin.adapter.out.persistence.audit;
 
-import tools.jackson.databind.ObjectMapper;
 import com.kista.admin.domain.model.AuditLog;
 import com.kista.support.DataJpaTestBase;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -24,32 +22,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 // application-test.yml 로 연결된 로컬 PostgreSQL 위에서 AuditLogPersistenceAdapter JPA 저장/조회 검증
 // @DataJpaTest가 JPA Auditing(@EnableJpaAuditing)을 자동 활성화하므로 JpaAuditingConfig import 불필요
 @Tag("integration")
-@Import({AuditLogPersistenceAdapter.class, AuditLogPersistenceAdapterIT.TestJacksonConfig.class})
+@Import(AuditLogPersistenceAdapter.class)
 @DisplayName("AuditLogPersistenceAdapter — PG 통합 테스트")
 class AuditLogPersistenceAdapterIT extends DataJpaTestBase {
 
     @Autowired AuditLogJpaRepository repo;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired EntityManager entityManager;
 
     AuditLogPersistenceAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new AuditLogPersistenceAdapter(repo, new ObjectMapper());
+        adapter = new AuditLogPersistenceAdapter(repo);
     }
 
     private void insertAdmin(UUID adminId) {
         jdbcTemplate.update(
                 "INSERT INTO users (id, kakao_id, status, role, notification_channel, created_at, updated_at) VALUES (?, ?, ?, ?, ?, now(), now())",
                 adminId, "kakao_" + adminId, "ACTIVE", "USER", "TELEGRAM");
-    }
-
-    @TestConfiguration
-    static class TestJacksonConfig {
-        @Bean
-        ObjectMapper objectMapper() {
-            return new ObjectMapper();
-        }
     }
 
     @Test
@@ -61,6 +52,9 @@ class AuditLogPersistenceAdapterIT extends DataJpaTestBase {
         insertAdmin(adminId);
 
         adapter.log(adminId, "USER_APPROVE", "USER", targetId, payload);
+        // 1차 캐시(identity map)에 남은 인스턴스가 아니라 DB에 저장된 jsonb를 실제로 역직렬화해 읽는지 검증
+        entityManager.flush();
+        entityManager.clear();
 
         // findAll로 방금 저장된 행의 id를 가져옴
         List<AuditLog> all = adapter.findAll();

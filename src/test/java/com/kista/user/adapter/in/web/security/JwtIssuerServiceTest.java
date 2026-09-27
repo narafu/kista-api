@@ -1,5 +1,6 @@
 package com.kista.user.adapter.in.web.security;
 
+import com.kista.platform.security.JwtDecoderConfig;
 import com.kista.user.domain.auth.TokenConstants;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.ECKey;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
@@ -84,6 +87,43 @@ class JwtIssuerServiceTest {
     @DisplayName("expiresInSeconds() — AT_TTL(1일, 86400초) 반환")
     void expiresInSeconds_returns_900() {
         assertThat(jwtIssuerService.expiresInSeconds()).isEqualTo(TokenConstants.AT_TTL.toSeconds());
+    }
+
+    @Test
+    @DisplayName("issue() — 헤더에 kid 없음(jjwt 시절 발급 토큰과 동일한 헤더 shape) + 알고리즘 ES256")
+    void issue_token_header_has_no_kid() throws Exception {
+        String token = jwtIssuerService.issue(UUID.randomUUID(), UserRole.USER);
+
+        var header = SignedJWT.parse(token).getHeader();
+        assertThat(header.getKeyID()).isNull();
+        assertThat(header.getAlgorithm()).isEqualTo(JWSAlgorithm.ES256);
+    }
+
+    @Test
+    @DisplayName("issue() — jti 발급 + exp-iat 간격이 AT_TTL과 일치")
+    void issue_token_has_jti_and_correct_ttl() throws Exception {
+        String token = jwtIssuerService.issue(UUID.randomUUID(), UserRole.USER);
+
+        JWTClaimsSet claims = verifyAndExtractClaims(token);
+
+        assertThat(claims.getJWTID()).isNotBlank();
+        long ttlSeconds = (claims.getExpirationTime().getTime() - claims.getIssueTime().getTime()) / 1000;
+        assertThat(ttlSeconds).isEqualTo(TokenConstants.AT_TTL.toSeconds());
+    }
+
+    @Test
+    @DisplayName("issue() — 실제 JwtDecoderConfig(kid 포함 signing key로 구성)로도 검증 성공")
+    void issue_token_verifiable_by_real_jwt_decoder_config() throws Exception {
+        // 운영과 동일한 방식: JwtDecoderConfig는 signingJwk(kid 포함)에서 공개키만 추출해 JWKSet 구성
+        String signingJwk = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU\",\"y\":\"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0\",\"d\":\"jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI\",\"use\":\"sig\",\"alg\":\"ES256\",\"kid\":\"test-key-1\"}";
+        JwtDecoder realDecoder = new JwtDecoderConfig().jwtDecoder(signingJwk);
+        UUID userId = UUID.randomUUID();
+
+        String token = jwtIssuerService.issue(userId, UserRole.ADMIN);
+        Jwt decoded = realDecoder.decode(token); // JwtAuthFilter가 실제로 거치는 것과 동일한 디코더
+
+        assertThat(decoded.getSubject()).isEqualTo(userId.toString());
+        assertThat(decoded.getClaimAsString("role")).isEqualTo("ADMIN");
     }
 
     // 공개키로 ES256 서명 검증 후 클레임 반환

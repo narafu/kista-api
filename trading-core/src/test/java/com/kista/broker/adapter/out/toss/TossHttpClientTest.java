@@ -70,13 +70,14 @@ class TossHttpClientTest {
     MockRestServiceServer server;
 
     private void setUpServer() {
-        restClientBuilder = RestClient.builder();
+        // baseUrl은 이제 RestClient(=TossConfig 빈)에 고정 — 테스트도 TossConfig와 동일하게 builder에 설정
+        restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
     }
 
     private TossHttpClient newClient() {
         setUpServer();
-        return new TossHttpClient(restClientBuilder.build(), tossAuthApi, BASE_URL, new ObjectMapper());
+        return new TossHttpClient(restClientBuilder.build(), tossAuthApi, new ObjectMapper());
     }
 
     private void expectGet(String bearerToken, HttpStatus status, String body) {
@@ -302,7 +303,8 @@ class TossHttpClientTest {
                 return getResponder.apply(Thread.currentThread().getName(), authorization);
             }
         };
-        return RestClient.builder().requestFactory(factory).build();
+        // baseUrl은 이제 RestClient(=TossConfig 빈)에 고정 — 이 커스텀 팩토리 기반 클라이언트도 동일하게 설정
+        return RestClient.builder().baseUrl(BASE_URL).requestFactory(factory).build();
     }
 
     private static ClientHttpResponse jsonResponse(HttpStatus status, String body) {
@@ -363,8 +365,8 @@ class TossHttpClientTest {
             return textResponse(HttpStatus.OK, "C:" + authorization.substring("Bearer ".length()));
         });
         TossAuthApi realAuthApi = new TossAuthApi(sharedClient, tokenCoordinator,
-                BASE_URL, "admin-id", "admin-secret");
-        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, BASE_URL, new ObjectMapper());
+                "admin-id", "admin-secret");
+        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, new ObjectMapper());
 
         AtomicReference<String> requestAResult = new AtomicReference<>();
         AtomicReference<String> requestCResult = new AtomicReference<>();
@@ -412,8 +414,8 @@ class TossHttpClientTest {
             return textResponse(HttpStatus.OK, "C:" + authorization.substring("Bearer ".length()));
         });
         TossAuthApi realAuthApi = new TossAuthApi(sharedClient, tokenCoordinator,
-                BASE_URL, "admin-id", "admin-secret");
-        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, BASE_URL, new ObjectMapper());
+                "admin-id", "admin-secret");
+        TossHttpClient client = new TossHttpClient(sharedClient, realAuthApi, new ObjectMapper());
 
         AtomicReference<String> requestAResult = new AtomicReference<>();
         AtomicReference<String> requestCResult = new AtomicReference<>();

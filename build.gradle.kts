@@ -50,10 +50,7 @@ dependencies {
 
     // Security & JWT
     implementation(libs.spring.boot.starter.security)
-    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // NimbusJwtDecoder (ECC P-256 JWKS 검증)
-    implementation(libs.jjwt.api) // DevAuthController(local) HS256 토큰 생성용
-    runtimeOnly(libs.jjwt.impl)
-    runtimeOnly(libs.jjwt.gson) // jjwt는 Jackson 3 미지원 — gson 직렬화로 대체
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // NimbusJwtDecoder+NimbusJwtEncoder (ECC P-256 JWKS 검증/발급)
     runtimeOnly(libs.gson)
 
     // API Documentation

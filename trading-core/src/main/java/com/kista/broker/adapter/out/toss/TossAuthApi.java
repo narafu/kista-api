@@ -26,10 +26,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class TossAuthApi implements BrokerConnectionTestPort {
 
-    private final RestClient tossRestClient;
+    private final RestClient tossRestClient; // baseUrl은 TossConfig가 빈 생성 시점에 고정 — 여기선 상대 경로만 다룬다
     private final TossDistributedTokenCoordinator tokenCoordinator;
-    @Value("${toss.base-url}")
-    private final String tossBaseUrl;
     @Value("${toss.admin-client-id}")
     private final String adminClientId;         // 공통 API용 관리자 Toss client_id
     @Value("${toss.admin-client-secret}")
@@ -110,7 +108,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
         body.add("client_secret", clientSecret);
         try {
             TokenResponse response = tossRestClient.post()
-                    .uri(tossBaseUrl + "/oauth2/token")
+                    .uri("/oauth2/token")
                     .headers(h -> h.addAll(headers))
                     .body(body)
                     .retrieve()
@@ -131,7 +129,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
         headers.set("Authorization", "Bearer " + token);
         try {
             TossResult<List<AccountItem>> response = tossRestClient.get()
-                    .uri(tossBaseUrl + "/api/v1/accounts")
+                    .uri("/api/v1/accounts")
                     .headers(h -> h.addAll(headers))
                     .retrieve()
                     .body(new ParameterizedTypeReference<TossResult<List<AccountItem>>>() {});

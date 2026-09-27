@@ -1,8 +1,5 @@
 package com.kista.admin.adapter.out.persistence.audit;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import com.kista.admin.domain.model.AuditLog;
 import com.kista.admin.application.port.output.AuditLogPort;
 import lombok.AccessLevel;
@@ -20,19 +17,11 @@ import java.util.UUID;
 class AuditLogPersistenceAdapter implements AuditLogPort {
 
     private final AuditLogJpaRepository repo; // audit_logs 테이블 JPA 저장소
-    private final ObjectMapper objectMapper; // Spring Boot 자동 구성 빈
 
     @Override
     public void log(UUID adminId, String action, String targetType, UUID targetId, Map<String, Object> payload) {
-        // payload Map → JSON String 직렬화
-        String payloadJson;
-        try {
-            payloadJson = objectMapper.writeValueAsString(payload);
-        } catch (JacksonException e) {
-            throw new IllegalArgumentException("payload 직렬화 실패", e);
-        }
-        // 엔티티 생성 후 저장 (id·createdAt은 DB 자동 부여)
-        AuditLogEntity entity = new AuditLogEntity(null, adminId, action, targetType, targetId, payloadJson);
+        // 엔티티 생성 후 저장 (id·createdAt은 DB 자동 부여, payload는 Hibernate가 jsonb로 직접 매핑)
+        AuditLogEntity entity = new AuditLogEntity(null, adminId, action, targetType, targetId, payload);
         repo.save(entity);
     }
 
@@ -56,16 +45,8 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
                 .toList();
     }
 
-    // 엔티티 → 도메인 record 변환 (payload JSON String → Map 역직렬화)
+    // 엔티티 → 도메인 record 변환 (payload는 Hibernate가 이미 Map으로 매핑)
     private AuditLog toDomain(AuditLogEntity entity) {
-        Map<String, Object> p = null;
-        if (entity.getPayload() != null) {
-            try {
-                p = objectMapper.readValue(entity.getPayload(), new TypeReference<>() {});
-            } catch (JacksonException ex) {
-                throw new IllegalStateException("payload 역직렬화 실패", ex);
-            }
-        }
-        return new AuditLog(entity.getId(), entity.getAdminId(), entity.getAction(), entity.getTargetType(), entity.getTargetId(), p, entity.getCreatedAt());
+        return new AuditLog(entity.getId(), entity.getAdminId(), entity.getAction(), entity.getTargetType(), entity.getTargetId(), entity.getPayload(), entity.getCreatedAt());
     }
 }

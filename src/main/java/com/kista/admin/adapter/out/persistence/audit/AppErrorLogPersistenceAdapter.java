@@ -1,8 +1,5 @@
 package com.kista.admin.adapter.out.persistence.audit;
 
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import lombok.AccessLevel;
@@ -24,7 +21,6 @@ import java.util.UUID;
 class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
 
     private final AppErrorLogJpaRepository repo; // app_error_logs 테이블 JPA 저장소
-    private final ObjectMapper objectMapper; // Spring Boot 자동 구성 빈
 
     private static final int MAX_STACK_LINES = 30;
 
@@ -62,19 +58,12 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
     }
 
     private AppErrorLogEntity buildEntity(String errorType, String message, String stackTrace, Map<String, String> context) {
-        // context JSON 직렬화
-        String contextJson;
-        try {
-            contextJson = objectMapper.writeValueAsString(context != null ? context : Map.of());
-        } catch (JacksonException ex) {
-            contextJson = "{}";
-        }
         return new AppErrorLogEntity(
                 null,
                 errorType,
                 message,
                 stackTrace,
-                contextJson,
+                context != null ? context : Map.of(), // Hibernate가 Map을 jsonb로 직접 매핑
                 null // deletedAt
         );
     }
@@ -94,22 +83,14 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
         repo.save(entity);
     }
 
-    // 엔티티 → 도메인 record 변환
+    // 엔티티 → 도메인 record 변환 (context는 Hibernate가 이미 Map으로 매핑)
     private AppErrorLog toDomain(AppErrorLogEntity entity) {
-        Map<String, String> ctx = null;
-        if (entity.getContext() != null) {
-            try {
-                ctx = objectMapper.readValue(entity.getContext(), new TypeReference<>() {});
-            } catch (JacksonException ex) {
-                log.warn("context 역직렬화 실패: {}", ex.getMessage());
-            }
-        }
         return new AppErrorLog(
                 entity.getId(),
                 entity.getErrorType(),
                 entity.getMessage(),
                 entity.getStackTrace(),
-                ctx,
+                entity.getContext(),
                 entity.getCreatedAt()
         );
     }

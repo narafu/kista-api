@@ -45,10 +45,11 @@ class TossAuthApiTest {
 
     @BeforeEach
     void setUp() {
-        restClientBuilder = RestClient.builder();
+        // baseUrl은 이제 RestClient(=TossConfig 빈)에 고정 — 테스트도 TossConfig와 동일하게 builder에 설정
+        restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
         api = new TossAuthApi(restClientBuilder.build(), tokenCoordinator,
-                BASE_URL, ADMIN_CLIENT_ID, ADMIN_CLIENT_SECRET);
+                ADMIN_CLIENT_ID, ADMIN_CLIENT_SECRET);
         stubCoordinatorIssuance();
     }
 

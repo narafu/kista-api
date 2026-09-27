@@ -1,6 +1,5 @@
 package com.kista.user.adapter.out.persistence.settings;
 
-import tools.jackson.databind.ObjectMapper;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.UserSettings;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +27,7 @@ class UserSettingsPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new UserSettingsPersistenceAdapter(settingsRepo, prefRepo, new ObjectMapper());
+        adapter = new UserSettingsPersistenceAdapter(settingsRepo, prefRepo);
     }
 
     @Test
@@ -39,7 +38,7 @@ class UserSettingsPersistenceAdapterTest {
 
     @Test
     void loadByUserId_assembles_settings_with_prefs() {
-        UserSettingsJpaEntity entity = new UserSettingsJpaEntity(USER_ID, false, "[\"VR\"]");
+        UserSettingsJpaEntity entity = new UserSettingsJpaEntity(USER_ID, false, List.of("VR"));
         UserNotificationPrefJpaEntity pref = new UserNotificationPrefJpaEntity(USER_ID, "TRADING_ALERT", false);
         when(settingsRepo.findById(USER_ID)).thenReturn(Optional.of(entity));
         when(prefRepo.findByUserId(USER_ID)).thenReturn(List.of(pref));
@@ -71,7 +70,7 @@ class UserSettingsPersistenceAdapterTest {
         adapter.save(settings);
 
         verify(settingsRepo).save(argThat(e -> e.getUserId().equals(USER_ID) && e.isBalanceCheckEnabled()
-                && e.getStrategySuggestions().equals("[\"VR\"]")));
+                && e.getStrategySuggestions().equals(List.of("VR"))));
         verify(prefRepo).save(argThat(e -> e.getType().equals("TRADING_ALERT") && !e.isEnabled()));
     }
 }
