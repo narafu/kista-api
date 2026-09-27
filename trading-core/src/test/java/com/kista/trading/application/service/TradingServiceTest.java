@@ -172,7 +172,7 @@ class TradingServiceTest {
         // SellableQuantityPort: BUY 예산과 독립적인 SELL 판매가능수량 검증
         lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class));
 
-        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
+        BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, eventPublisher, privacyTradePort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, eventPublisher, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
@@ -652,7 +652,7 @@ class TradingServiceTest {
         when(strategyVrDetailPort.findByStrategyVersionId(vrCycle.strategyVersionId()))
                 .thenReturn(Optional.of(vrDetail));
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
-        // VR도 이제 priceCapMode()=VR_POSITION이라 prepareForAllocation이 cap(PRICE×1.05=23.10)을 검사한다.
+        // VR도 vrPosition 기반 capBuyOrders를 타므로 prepareForAllocation이 cap(PRICE×1.05=23.10)을 검사한다.
         // 이 테스트는 계좌별 예산 우선순위 배정(총액 $1500 소비)을 검증하는 것이 목적이므로,
         // 단가는 cap 이하(20.00)로 낮추고 수량을 75주로 늘려 원래 의도한 소비 총액($1500)을 유지한다.
         Order vrBuyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.TQQQ, OrderType.LIMIT,

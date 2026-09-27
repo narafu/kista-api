@@ -20,7 +20,6 @@ import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
@@ -83,7 +82,7 @@ class TradingOrderExecutorTest {
     static final Strategy VR_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT.userId(),
             StrategyType.VR, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
-    // 실제 capability 구현체로 CycleOrderStrategies 조립 — priceCapMode() 실제 값 검증
+    // 실제 capability 구현체로 CycleOrderStrategies 조립 — needsCapCheck() 실제 값 검증
     static final CycleOrderStrategies CYCLE_STRATEGIES = new CycleOrderStrategies(List.of(
             new InfiniteCycleOrderStrategy(null, null),
             new PrivacyCycleOrderStrategy(null),
@@ -123,7 +122,7 @@ class TradingOrderExecutorTest {
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
-        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, false, TODAY, ACCOUNT,
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker());
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(orderId); // DB PK 보존
@@ -156,8 +155,8 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
-        // PRIVACY_SIMPLE 모드로 위임 — mode 판단·position/vrPosition 무시는 capIfNeeded 내부(BuyOrderPriceCapperTest)에서 검증
-        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, false, TODAY, ACCOUNT,
+        // PRIVACY 타입으로 위임 — 개별/전체 취소 판단·position/vrPosition 무시는 capIfNeeded 내부(BuyOrderPriceCapperTest)에서 검증
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.PRIVACY, false, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker());
         verifyNoMoreInteractions(buyOrderPriceCapper);
     }
@@ -199,8 +198,8 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY);
 
-        // VR_POSITION mode + vrPosition non-null → 접수 전 VR 전용 보정 호출
-        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, false, TODAY, ACCOUNT,
+        // VR 타입 + vrPosition non-null → 접수 전 VR 전용 보정 호출
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.VR, false, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker());
         verifyNoMoreInteractions(buyOrderPriceCapper);
     }
@@ -231,7 +230,7 @@ class TradingOrderExecutorTest {
 
         // AT_OPEN 스코프 전용 보정 — capIfNeeded(atOpen=true)로 위임돼 findAtOpenPlannedByCycleAndDate만 조회한다
         // (atOpen=false 호출은 절대 발생하지 않아야 한다 — 동일 사이클의 AT_CLOSE PLANNED 오염 방지가 이 태스크의 핵심)
-        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.VR_POSITION, true, TODAY, ACCOUNT,
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.VR, true, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker());
         verifyNoMoreInteractions(buyOrderPriceCapper);
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
@@ -262,7 +261,7 @@ class TradingOrderExecutorTest {
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
-        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION, true, TODAY, ACCOUNT,
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, true, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker());
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
     }
@@ -277,7 +276,7 @@ class TradingOrderExecutorTest {
 
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
-        verify(buyOrderPriceCapper).capIfNeeded(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE, true, TODAY, ACCOUNT,
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.PRIVACY, true, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker());
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
     }

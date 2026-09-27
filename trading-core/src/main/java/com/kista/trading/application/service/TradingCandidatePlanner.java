@@ -149,7 +149,7 @@ class TradingCandidatePlanner {
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
         List<PlannedOrder> preparedOrders = priceCapper.prepareForAllocation(
                 planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
-                cycleOrderStrategies.of(strategy.type()).priceCapMode(), tradeDate);
+                strategy.type(), tradeDate);
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<PlannedOrder> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);

@@ -2,15 +2,19 @@ package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.matching.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.VrPosition;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 // PRIVACY 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcPrivacy + CycleRotationService.resolveMinRequired(PRIVACY) 이전
@@ -22,9 +26,6 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public StrategyType cycleType() { return StrategyType.PRIVACY; }
-
-    @Override
-    public PriceCapMode priceCapMode() { return PriceCapMode.PRIVACY_SIMPLE; }
 
     @Override
     public int allocationPriority() { return 2; }
@@ -51,4 +52,16 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
         // currentCycleStart 0.5배 적용
         return privacyBase.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP);
     }
+
+    @Override
+    public List<PlannedOrder> capBuyOrders(List<PlannedOrder> buyOrders, BigDecimal cap,
+                                            InfinitePosition position, VrPosition vrPosition,
+                                            StrategyTicker ticker, LocalDate tradeDate) {
+        return buyOrders.stream()
+                .map(o -> o.price().compareTo(cap) > 0 ? o.withPrice(cap) : o)
+                .toList();
+    }
+
+    @Override
+    public boolean capsIndividualOrders() { return true; }
 }

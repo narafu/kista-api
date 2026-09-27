@@ -117,7 +117,7 @@ class ManualTradingServiceTest {
         StrategyOrderPlanBuilder planBuilder = new StrategyOrderPlanBuilder(
                 balanceLoader, brokerAdapterRegistry, privacyTradePort, orderComputer, cycleStrategies);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
-                orderPort, orderPlanner, infiniteStrategy, vrStrategy, strategyCyclePort);
+                orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
                 brokerAdapterRegistry, orderPort, cycleStrategies);
 
@@ -127,8 +127,8 @@ class ManualTradingServiceTest {
         // budgetAllocator가 각자 자기 BrokerAdapterRegistry를 보유하므로 ManualTradingService 자체엔 불필요
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
-                priceFetcher, planBuilder, priceCapper, budgetAllocator, orderPlanner, cycleStrategies,
-                orderExecutor, eventPublisher);
+                priceFetcher, planBuilder, priceCapper, budgetAllocator,
+                orderPlanner, orderExecutor, eventPublisher);
 
         lenient().when(brokerAdapterRegistry.require(any(), eq(SellableQuantityPort.class)))
                 .thenReturn(sellableQuantityPort);

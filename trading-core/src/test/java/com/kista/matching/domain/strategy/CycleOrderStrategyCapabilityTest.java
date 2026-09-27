@@ -1,14 +1,23 @@
 package com.kista.matching.domain.strategy;
 
-import com.kista.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.model.AccountBalance;
+import com.kista.matching.domain.model.InfinitePosition;
+import com.kista.matching.domain.model.VrPosition;
+import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CycleOrderStrategyCapabilityTest {
+
+    static final InfinitePosition POSITION = new InfinitePosition(
+            new AccountBalance(0, null, new BigDecimal("20000")), StrategyTicker.SOXL, new BigDecimal("10.00"), 20);
+
+    static final VrPosition VR_POSITION = new VrPosition(
+            new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("5000.00")),
+            new BigDecimal("10000.00"), new BigDecimal("15.00"), new BigDecimal("5000.00"), BigDecimal.ZERO, 0);
 
     @Test
     void infinite_capabilities() {
@@ -20,7 +29,9 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(infinite.endsCycleOnLiquidation()).isTrue(); // 기본값 true
         assertThat(infinite.tracksReverseMode()).isTrue();
         assertThat(infinite.requiresRolloverCheck()).isFalse(); // 기본값
-        assertThat(infinite.priceCapMode()).isEqualTo(CycleOrderStrategy.PriceCapMode.INFINITE_POSITION);
+        assertThat(infinite.capsIndividualOrders()).isFalse(); // 기본값 — 사다리 전체 취소·재저장
+        assertThat(infinite.needsCapCheck(null, null)).isFalse(); // position 없으면 캡 검사 스킵
+        assertThat(infinite.needsCapCheck(POSITION, null)).isTrue();
         assertThat(infinite.allocationPriority()).isEqualTo(1);
     }
 
@@ -33,7 +44,8 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(privacy.endsCycleOnLiquidation()).isTrue(); // 기본값 true
         assertThat(privacy.tracksReverseMode()).isFalse(); // 기본값
         assertThat(privacy.requiresRolloverCheck()).isFalse(); // 기본값
-        assertThat(privacy.priceCapMode()).isEqualTo(CycleOrderStrategy.PriceCapMode.PRIVACY_SIMPLE);
+        assertThat(privacy.capsIndividualOrders()).isTrue(); // 개별 주문 가격만 치환
+        assertThat(privacy.needsCapCheck(null, null)).isTrue(); // 기본값 — position/vrPosition 불필요
         assertThat(privacy.allocationPriority()).isEqualTo(2);
     }
 
@@ -47,7 +59,9 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.endsCycleOnLiquidation()).isFalse(); // VR만 false — 전량 청산 후에도 사이클 유지
         assertThat(vr.tracksReverseMode()).isFalse(); // 기본값
         assertThat(vr.requiresRolloverCheck()).isTrue();
-        assertThat(vr.priceCapMode()).isEqualTo(CycleOrderStrategy.PriceCapMode.VR_POSITION);
+        assertThat(vr.capsIndividualOrders()).isFalse(); // 기본값 — 사다리 전체 취소·재저장
+        assertThat(vr.needsCapCheck(null, null)).isFalse(); // vrPosition 없으면 캡 검사 스킵
+        assertThat(vr.needsCapCheck(null, VR_POSITION)).isTrue();
         assertThat(vr.allocationPriority()).isZero();
     }
 }

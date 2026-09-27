@@ -2,11 +2,13 @@ package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.VrPosition;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import com.kista.sharedkernel.StrategyType;
@@ -45,10 +47,6 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
     @Override
     public int allocationPriority() { return 0; }
 
-    // VR도 접수 전 BuyOrderPriceCapper 공통 보정 경로를 탄다 — 생성 시점 cap은 VrStrategy에서 제거됨
-    @Override
-    public PriceCapMode priceCapMode() { return PriceCapMode.VR_POSITION; }
-
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
         PlanContext.VrInputs inputs = ctx.vr();
@@ -75,5 +73,27 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
     public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
         // VR은 최소 시드 가드 미적용 (poolLimit 기반 자체 제한 — poolLimit=0인 무일푼 개장 사이클은 라이브 pool()로 폴백, VrStrategy.governanceLimit 참고)
         return null;
+    }
+
+    @Override
+    public List<PlannedOrder> capBuyOrders(List<PlannedOrder> buyOrders, BigDecimal cap,
+                                            InfinitePosition position, VrPosition vrPosition,
+                                            StrategyTicker ticker, LocalDate tradeDate) {
+        if (vrPosition == null || isVrBootstrapShaped(buyOrders)) return buyOrders;
+        return vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
+    }
+
+    @Override
+    public boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) {
+        return vrPosition != null;
+    }
+
+    // VR bootstrap 주문(LOC+AT_CLOSE)은 사다리 재산정 대상이 아니다 — BuyOrderPriceCapper에서 이동.
+    // VrStrategy.buildOrders()는 holdings=0에서 첫 포지션을 못 만든 상태(needsBootstrap)면 bootstrap
+    // 주문만 단독 반환하지만, holdings>0인데 사다리 첫 유효 단조차 예산 초과인 드리프트 상태에서는
+    // bootstrap BUY(LOC+AT_CLOSE)와 정상 매도 사다리(LIMIT+AT_OPEN)가 같은 배치에 섞여 반환될 수 있다.
+    // 사다리 매수는 항상 LIMIT+AT_OPEN이므로, BUY 중 하나라도 LOC이면 이번 배치의 매수가 bootstrap이라는 뜻이다.
+    private static boolean isVrBootstrapShaped(List<PlannedOrder> buyOrders) {
+        return buyOrders.stream().anyMatch(o -> o.orderType() == com.kista.sharedkernel.OrderType.LOC);
     }
 }

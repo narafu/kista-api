@@ -6,10 +6,12 @@ import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.ReverseModePosition;
+import com.kista.matching.domain.model.VrPosition;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 import static java.math.RoundingMode.HALF_UP;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyDefaults;
+import com.kista.sharedkernel.StrategyTicker;
 
 
 // INFINITE 전략의 주문 계획 + 최소금액 정책
@@ -48,9 +51,6 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     // RuntimeSettings 기본 허용값(20/30/40)과 동기화 — 기본값은 20
     @Override
     public List<Integer> availableDivisionCounts() { return List.of(20, 30, 40); }
-
-    @Override
-    public PriceCapMode priceCapMode() { return PriceCapMode.INFINITE_POSITION; }
 
     @Override
     public int allocationPriority() { return 1; }
@@ -171,5 +171,18 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         if (price == null) return null;
         BigDecimal multiplier = BigDecimal.valueOf(divisionCount * MIN_DEPOSIT_FACTOR);
         return price.multiply(multiplier).setScale(2, HALF_UP);
+    }
+
+    @Override
+    public List<PlannedOrder> capBuyOrders(List<PlannedOrder> buyOrders, BigDecimal cap,
+                                            InfinitePosition position, VrPosition vrPosition,
+                                            StrategyTicker ticker, LocalDate tradeDate) {
+        if (position == null) return buyOrders;
+        return infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
+    }
+
+    @Override
+    public boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) {
+        return position != null;
     }
 }

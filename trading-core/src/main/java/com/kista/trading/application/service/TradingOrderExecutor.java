@@ -53,7 +53,7 @@ class TradingOrderExecutor {
         return placed;
     }
 
-    // BuyOrderPriceCapper.capIfNeeded 적용 여부는 전략의 priceCapMode()로 결정 — mode/position/vrPosition
+    // BuyOrderPriceCapper.capIfNeeded 적용 여부는 전략의 needsCapCheck()로 결정 — position/vrPosition
     // null 가드는 applyCap에 있다 (capIfNeeded는 @Transactional이라 내부에 두면 skip 케이스마다 빈 트랜잭션이 열림)
     List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
@@ -64,16 +64,14 @@ class TradingOrderExecutor {
         return placed;
     }
 
-    // AT_OPEN/AT_CLOSE 공용 BUY 가격 캡 디스패치 — mode/position/vrPosition null skip 가드를 여기서 걸어
+    // AT_OPEN/AT_CLOSE 공용 BUY 가격 캡 디스패치 — needsCapCheck() skip 가드를 여기서 걸어
     // BuyOrderPriceCapper.capIfNeeded(@Transactional)가 skip 케이스에 호출되지 않도록 한다(빈 트랜잭션 오픈 방지)
     private void applyCap(boolean atOpen, LocalDate date, Account account, UUID strategyCycleId,
                           BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         if (currentPrice == null) return;
-        CycleOrderStrategy.PriceCapMode mode = cycleOrderStrategies.of(strategy.type()).priceCapMode();
-        if (mode == CycleOrderStrategy.PriceCapMode.NONE) return;
-        if (mode == CycleOrderStrategy.PriceCapMode.INFINITE_POSITION && position == null) return;
-        if (mode == CycleOrderStrategy.PriceCapMode.VR_POSITION && vrPosition == null) return;
-        buyOrderPriceCapper.capIfNeeded(mode, atOpen, date, account, strategyCycleId, currentPrice, position, vrPosition, strategy.ticker());
+        CycleOrderStrategy orderStrategy = cycleOrderStrategies.of(strategy.type());
+        if (!orderStrategy.needsCapCheck(position, vrPosition)) return;
+        buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId, currentPrice, position, vrPosition, strategy.ticker());
     }
 
     // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)

@@ -7,7 +7,6 @@ import com.kista.trading.domain.model.*;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.matching.domain.model.*;
 import com.kista.trading.application.port.output.*;
-import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.sharedkernel.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,6 @@ class ManualTradingService {
     private final BuyOrderPriceCapper priceCapper;
     private final TradingOrderBudgetAllocator budgetAllocator;
     private final TradingOrderPlanner orderPlanner;            // allocator 승인 결과 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
-    private final CycleOrderStrategies cycleOrderStrategies;   // priceCapper.prepareForAllocation의 mode 조회용
     private final TradingOrderExecutor orderExecutor;
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
 
@@ -89,7 +87,7 @@ class ManualTradingService {
         BigDecimal startPrice = fetchStartPriceOrNull(strategy, account);
         List<PlannedOrder> preparedOrders = priceCapper.prepareForAllocation(
                 plan.orders(), startPrice, plan.position(), plan.vrPosition(), strategy.ticker(),
-                cycleOrderStrategies.of(strategy.type()).priceCapMode(), today);
+                strategy.type(), today);
 
         // 예산 배정기로 예수금/보유수량 검증 — 단건 candidate 하나만 넘긴다(Task 2가 단일계좌 전용으로 축소한 진입점)
         BatchContext ctx = new BatchContext(strategy, currentCycle, account,

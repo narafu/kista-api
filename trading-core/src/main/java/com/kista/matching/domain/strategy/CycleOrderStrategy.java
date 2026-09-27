@@ -50,11 +50,22 @@ public interface CycleOrderStrategy {
     // 포지션 저장 후 N주 롤오버 판정을 수행할지 여부 (VR만 true)
     default boolean requiresRolloverCheck() { return false; }
 
-    // BUY 가격 사후 보정(post-hoc cap) 방식 — NONE: 미적용, INFINITE_POSITION: InfinitePosition 기반,
-    // PRIVACY_SIMPLE: 단순 가격 치환, VR_POSITION: VrPosition 기반 사다리 재산정
-    // VR도 생성 시점 cap을 제거하고 접수 전 BuyOrderPriceCapper가 보정하므로 기본값 아님
-    enum PriceCapMode { NONE, INFINITE_POSITION, PRIVACY_SIMPLE, VR_POSITION }
-    default PriceCapMode priceCapMode() { return PriceCapMode.NONE; }
+    // 캡 초과 BUY 재산정 — INFINITE/VR은 사다리 전체 재구성(개수·구성이 원본과 달라질 수 있음),
+    // PRIVACY는 개별 주문 가격만 치환(개수·순서 불변). 캡 미적용 대상(position/vrPosition 없음, 부트스트랩 등)이면
+    // 입력을 그대로(참조 동일) 반환한다 — 호출부가 이 "변경 없음"을 감지해 취소·재저장을 건너뛴다.
+    default List<PlannedOrder> capBuyOrders(List<PlannedOrder> buyOrders, BigDecimal cap,
+                                             InfinitePosition position, VrPosition vrPosition,
+                                             StrategyTicker ticker, LocalDate tradeDate) {
+        return buyOrders;
+    }
+
+    // true: capBuyOrders 결과를 buyOrders와 인덱스별로 비교해 값이 바뀐 주문만 개별 취소·재저장(PRIVACY)
+    // false: buyOrders 전체를 한 번에 취소하고 결과 전체를 재저장(INFINITE/VR — 사다리 재구성은 개별 대응이 무의미)
+    default boolean capsIndividualOrders() { return false; }
+
+    // 가격 캡 로직을 시도하기 전에 필요한 입력(position/vrPosition)이 갖춰졌는지 여부 —
+    // false면 호출부가 DB 조회·트랜잭션을 열지 않고 즉시 스킵한다(스케쥴러 매 틱 빈 트랜잭션 방지)
+    default boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) { return true; }
 
     // 계좌별 주문 예산 배정 우선순위 — 값이 작을수록 먼저 승인
     default int allocationPriority() { return 100; }
