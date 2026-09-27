@@ -65,7 +65,7 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
         log.info("[{}] VR 전략 계산: holdings={}, value={}, lowerBand={}, upperBand={}, orders={}",
                 ctx.label(), position.holdings(), position.value(),
                 position.lowerBand(), position.upperBand(), orders.size());
-        // vrPosition을 OrderPlan에 함께 실어 보낸다 — BuyOrderPriceCapper가 접수 전 VR BUY 재산정에 재사용(VR_POSITION mode)
+        // vrPosition을 OrderPlan에 함께 실어 보낸다 — BuyOrderPriceCapper가 접수 전 VR BUY 재산정(capBuyOrders)에 재사용
         return Optional.of(new OrderPlan(null, position, orders));
     }
 

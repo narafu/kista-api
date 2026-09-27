@@ -8,7 +8,7 @@ com.kista.matching/  ← Spring Modulith 모듈(CLOSED) — 주문생성 커널(
 ### CycleOrderStrategy Capability 패턴
 - SSOT 위치: `com.kista.matching.domain.strategy`. `CycleOrderStrategy` 인터페이스: 전략 타입별 동작(basePrice 소스, 전일종가 필요 여부, 분할수, 리버스모드 지원, 청산 시 사이클 종료 여부, 최소시드, 예산배정 우선순위, compute skip, 롤오버 판정 필요 여부, BUY 가격 캡 보정 방식 등)을 캡슐화하는 다형성 계층 — 메서드별 상세는 코드가 SSOT
   - `canSkipOrderComputation()`은 기본 false이며 INFINITE만 complete concrete leg 또는 direction-aware legacy UNKNOWN 점유를 보수적으로 판단한다
-  - `priceCapMode()`: VR도 생성 시점 cap을 적용하지 않고 접수 전 `BuyOrderPriceCapper`가 `VrStrategy.buildCappedBuyOrders()`로 보정한다
+  - `capBuyOrders()`/`capsIndividualOrders()`/`needsCapCheck()`: BUY 가격 사후 보정(post-hoc cap) capability — INFINITE/VR은 사다리 전체 재구성(`capsIndividualOrders()=false`), PRIVACY는 개별 주문 가격만 치환(`capsIndividualOrders()=true`). VR도 생성 시점 cap을 적용하지 않고 접수 전 `BuyOrderPriceCapper`가 `VrCycleOrderStrategy.capBuyOrders()`(내부적으로 `VrStrategy.buildCappedBuyOrders()`)로 보정한다
 - `CycleOrderStrategies`: `Map<StrategyType, CycleOrderStrategy>` 라우터 — `of(type)`으로 구현체 조회
 - **프론트 capability 소비**: `GET /api/meta`의 `StrategyTypeMeta`에 capability 7필드(code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts) 직렬화 → 프론트는 `isInfinite` 휴리스틱 대신 `divisionCounts`/`requiresPrivacyBase` 직접 소비
 - **최소시드 미리보기**: `GET /api/accounts/{id}/strategy-seed-preview?type=&ticker=&divisionCount=` → `StrategySeedPreviewResponse { ticker, basePrice, minSeed, skipReason }`

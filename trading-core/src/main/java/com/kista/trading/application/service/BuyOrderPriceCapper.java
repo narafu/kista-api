@@ -72,7 +72,7 @@ class BuyOrderPriceCapper {
         List<PlannedOrder> corrected = strategy.capBuyOrders(plannedBuyOrders, cap, position, vrPosition, ticker, date);
 
         if (strategy.capsIndividualOrders()) {
-            applyIndividualCap(account, strategyCycleId, buyOrders, plannedBuyOrders, corrected);
+            applyIndividualCap(account, strategyCycleId, buyOrders, plannedBuyOrders, corrected, cap);
         } else {
             applyBatchCap(account, strategyCycleId, buyOrders, plannedBuyOrders, corrected);
         }
@@ -80,7 +80,7 @@ class BuyOrderPriceCapper {
 
     // PRIVACY 전용 — 값이 바뀐 행만 취소·재저장(변하지 않은 행은 DB에 그대로 둔다)
     private void applyIndividualCap(Account account, UUID strategyCycleId, List<Order> buyOrders,
-                                    List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected) {
+                                    List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected, BigDecimal cap) {
         List<PlannedOrder> changed = new ArrayList<>();
         for (int i = 0; i < buyOrders.size(); i++) {
             if (!plannedBuyOrders.get(i).equals(corrected.get(i))) {
@@ -89,7 +89,7 @@ class BuyOrderPriceCapper {
             }
         }
         if (changed.isEmpty()) return;
-        log.info("[{}] BUY 가격 보정 필요 — 개별 보정 주문: {}", account.nickname(), describePlannedOrders(changed));
+        log.info("[{}] BUY 가격 보정 필요 — cap={}, 개별 보정 주문: {}", account.nickname(), cap, describePlannedOrders(changed));
         orderPlanner.savePlannedOrders(changed, account, strategyCycleId);
         log.info("[{}] BUY 가격 보정 완료(개별)", account.nickname());
     }
