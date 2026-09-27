@@ -237,7 +237,7 @@ class CycleOrderComputerTest {
     @DisplayName("VR plan() 경유 — 생성 시점 가격 캡 미적용 (rung 단가가 currentPrice 기준 cap을 초과해도 그대로 유지)")
     void compute_vrStrategy_doesNotCapAtPlanTime() {
         // 실제 VrStrategy + VrCycleOrderStrategy 조립 (mock stub 없음)
-        // Task 2: VR 생성 시점 cap을 제거하고 접수 전 BuyOrderPriceCapper(VR_POSITION)로 이전 — plan()은 더 이상 캡을 적용하지 않는다
+        // VR 생성 시점 cap을 제거하고 접수 전 VrCycleOrderStrategy.capBuyOrders()로 이전 — plan()은 더 이상 캡을 적용하지 않는다
         VrStrategy realVrStrategy = new VrStrategy();
         VrCycleOrderStrategy realVrCycleStrategy = new VrCycleOrderStrategy(realVrStrategy);
         CycleOrderStrategies realCycleStrategies = new CycleOrderStrategies(List.of(realVrCycleStrategy));
@@ -265,7 +265,7 @@ class CycleOrderComputerTest {
                 balance, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "캡미적용테스트", currentPrice);
 
         assertThat(planOpt).isPresent();
-        // vrPosition도 함께 실려 있어야 BuyOrderPriceCapper(VR_POSITION)의 접수 전 보정이 가능하다
+        // vrPosition도 함께 실려 있어야 VrCycleOrderStrategy.capBuyOrders()의 접수 전 보정이 가능하다
         assertThat(planOpt.get().vrPosition()).isNotNull();
         List<PlannedOrder> buyOrders = planOpt.get().orders().stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)

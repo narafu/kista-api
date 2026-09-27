@@ -377,7 +377,7 @@ class VrStrategyTypeTest {
 
     // ── 생성 시점 가격 캡 미적용 검증 (Task 2) ──────────────────────────────────
     // BUY 사다리 생성(buildOrders/buildBuyOrders)은 더 이상 가격 캡을 적용하지 않는다.
-    // 캡은 접수 직전 BuyOrderPriceCapper(VR_POSITION)가 buildCappedBuyOrders로 별도 재산정한다.
+    // 캡은 접수 직전 VrCycleOrderStrategy.capBuyOrders()가 buildCappedBuyOrders로 별도 재산정한다.
 
     @Test
     @DisplayName("buildOrders는 생성 시점에 가격 캡을 적용하지 않는다 — rung 단가가 원가 그대로 유지된다")
@@ -432,7 +432,7 @@ class VrStrategyTypeTest {
         assertThat(partialBuys.size()).isLessThan(fullBuys.size());
     }
 
-    // ── 접수 전 가격 캡 재산정 (buildCappedBuyOrders — BuyOrderPriceCapper VR_POSITION 전용) ──────
+    // ── 접수 전 가격 캡 재산정 (buildCappedBuyOrders — VrCycleOrderStrategy.capBuyOrders() 전용) ──────
 
     @Test
     @DisplayName("buildCappedBuyOrders: rung 단가 > cap 시 cap으로 교체")
@@ -461,7 +461,7 @@ class VrStrategyTypeTest {
 
     @Test
     @DisplayName("buildCappedBuyOrders도 poolLimit=0(무일푼 개장 사이클)이면 pool()로 폴백한다 " +
-            "— 접수 전 재산정 경로(BuyOrderPriceCapper VR_POSITION)도 buildBuyLadder를 공유하므로 동일하게 적용됨")
+            "— 접수 전 재산정 경로(VrCycleOrderStrategy.capBuyOrders())도 buildBuyLadder를 공유하므로 동일하게 적용됨")
     void buildCappedBuyOrders_poolLimitZero_fallsBackToLivePoolAsBudget() {
         // holdings=1, V=1000, bandWidth=10% → lowerBand=900
         // buyPrice(1)=900/1=900, buyPrice(2)=900/2=450, cap=1000(캡에 걸리지 않아 가격 변화 없음)

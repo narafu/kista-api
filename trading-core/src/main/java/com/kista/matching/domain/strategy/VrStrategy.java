@@ -27,7 +27,7 @@ public class VrStrategy {
     // 그 외(사다리로 정상 매수 가능)면 일반 밴드 사다리
     // ticker: 주문에 기록할 거래 종목 (VrPosition은 ticker를 직접 보유하지 않음)
     // referencePrice: bootstrap·캡 판정 공용 기준가 — currentPrice 없으면 전일종가로 대체 가능
-    // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 담당
+    // 일반 매수·매도 사다리는 생성 시점 가격 캡을 적용하지 않는다 — 접수 전 VrCycleOrderStrategy.capBuyOrders()가 담당
     public List<PlannedOrder> buildOrders(VrPosition position, StrategyTicker ticker,
                                    BigDecimal referencePrice, LocalDate tradeDate) {
         if (position.holdings() == 0 && needsBootstrap(position)) {
@@ -103,12 +103,12 @@ public class VrStrategy {
     }
 
     // 매수 사다리 생성 — 최대 MAX_RUNGS단, 1주씩, poolLimit·pool 한도 내
-    // 생성 시점 가격 캡은 적용하지 않는다(cap=null) — 접수 전 BuyOrderPriceCapper(VR_POSITION)가 buildCappedBuyOrders로 재산정
+    // 생성 시점 가격 캡은 적용하지 않는다(cap=null) — 접수 전 VrCycleOrderStrategy.capBuyOrders()가 buildCappedBuyOrders로 재산정
     private List<PlannedOrder> buildBuyOrders(VrPosition position, StrategyTicker ticker, LocalDate tradeDate) {
         return buildBuyLadder(position, ticker, tradeDate, null);
     }
 
-    // 접수 직전 가격 캡 보정 — BuyOrderPriceCapper(VR_POSITION)가 최신 현재가 기준 cap으로 사다리를 다시 만든다
+    // 접수 직전 가격 캡 보정 — VrCycleOrderStrategy.capBuyOrders()가 최신 현재가 기준 cap으로 사다리를 다시 만든다
     // position은 plan() 시점과 동일 스냅샷(pool·poolUsed·holdings 등) 재사용, cap만 최신 가격 기준으로 교체
     // 주의: 사다리(LIMIT+AT_OPEN) 전용 재산정이다 — bootstrap(LOC+AT_CLOSE, PriceCapPolicy.capFor) 주문에는
     // 호출하면 안 된다. bootstrap은 value=0인 경우이므로 lowerBand=0 → buyPrice(m)=0이 되어 사다리 공식이

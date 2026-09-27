@@ -17,7 +17,6 @@ import com.kista.matching.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
@@ -146,8 +145,6 @@ class ManualTradingServiceTest {
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
         lenient().when(strategyInfiniteDetailPort.findActiveByStrategyId(STRATEGY.id()))
                 .thenReturn(Optional.of(new StrategyInfiniteDetail(STRATEGY_VERSION_ID, 40)));
-        lenient().when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("22.00"), new BigDecimal("20.00"))));
         // planBuilder는 INFINITE/VR 둘 다 requiresPrevClose()=true라 전일종가를 항상 조회한다(BrokerPricePort.getPrevClose 경유,
         // priceFetcher.fetchPriceSnapshots와 별도) — holdings>0인 기존 픽스처는 이 값을 쓰지 않지만 VR referencePrice 폴백에는 필요
         lenient().when(kisPricePort.getPrevClose(eq(StrategyTicker.SOXL), eq(ACCOUNT_REF)))
@@ -166,15 +163,15 @@ class ManualTradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder.toPlanned()));
-        // live holdings=10, sellable=10 < SELL 15주 — BUY 후보가 없어 allocator가 LiveBalancePort를 조회하지 않으므로 lenient
-        lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
+        // live holdings=10, sellable=10 < SELL 15주 — 보유수량 부족
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 10));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
                 .hasMessageContaining("보유 수량이 부족합니다");
+        // BUY 후보가 없으므로 allocator가 LiveBalancePort를 조회하지 않아야 한다
+        verify(liveBalancePort, never()).getLiveBalance(any(), any());
     }
 
     @Test
@@ -204,9 +201,6 @@ class ManualTradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder.toPlanned()));
-        // BUY 후보가 없어 allocator가 LiveBalancePort를 조회하지 않으므로 lenient
-        lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
@@ -218,6 +212,8 @@ class ManualTradingServiceTest {
                 .hasMessage("보유 수량이 부족합니다");
 
         verify(orderPort, never()).saveAll(anyList());
+        // BUY 후보가 없으므로 allocator가 LiveBalancePort를 조회하지 않아야 한다
+        verify(liveBalancePort, never()).getLiveBalance(any(), any());
     }
 
     @Test

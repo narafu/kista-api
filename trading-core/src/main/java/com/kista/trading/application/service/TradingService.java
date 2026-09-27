@@ -216,7 +216,7 @@ class TradingService {
 
         TradingCandidatePlanner.SaveAllocationResult result = candidatePlanner.saveAllocatedOrders(candidates, tradeDate);
         // position/vrPosition/시작가까지 담긴 CycleState 그대로 접수 단계로 전달 — BatchContext만 넘기면
-        // VR_POSITION 등 BUY cap 보정에 필요한 정보가 유실된다 (planAll()과 동일 패턴)
+        // VR 등 전략별 capBuyOrders()에 필요한 position/vrPosition 정보가 유실된다 (planAll()과 동일 패턴)
         List<TradingCandidatePlanner.CycleState> placeableStates = candidates.stream()
                 .filter(candidate -> candidate.hasExistingOrders()
                         || result.savedContexts().contains(candidate.state().ctx()))

@@ -52,8 +52,8 @@ class TradingOrderBudgetAllocator {
     // Approved contains only approved directions per candidate; rejected lists are direction-specific.
     record Allocation(List<Candidate> approved, List<Candidate> rejectedBuy, List<Candidate> rejectedSell) {}
 
-    // 계좌 단위 브로커 선조회 결과
-    record AccountQuote(AccountBalance liveBalance, Map<StrategyTicker, Integer> sellableByTicker) {}
+    // 계좌 단위 브로커 조회 결과 — allocate() 내부에서 즉시 조회해 바로 소비(선조회 캐시 아님)
+    private record AccountQuote(AccountBalance liveBalance, Map<StrategyTicker, Integer> sellableByTicker) {}
 
     // 한 계좌 스코프의 브로커 선조회 — 잔고는 BUY 후보 존재 시만, 판매가능수량은 SELL 후보의 종목별로만 조회한다
     // candidates는 항상 단일 계좌 스코프여야 한다(호출부가 이미 계좌별로 묶어서 넘긴다)

@@ -79,8 +79,14 @@ class BuyOrderPriceCapper {
     }
 
     // PRIVACY 전용 — 값이 바뀐 행만 취소·재저장(변하지 않은 행은 DB에 그대로 둔다)
+    // 개별 취소는 원본·재산정 목록이 같은 개수·순서라는 전제 위에서만 안전하다(현재 capsIndividualOrders()=true는 PRIVACY 하나뿐이고,
+    // PrivacyCycleOrderStrategy.capBuyOrders()는 단순 가격 치환이라 개수·순서를 바꾸지 않는다) — 위반 시 조용히 잘못된 행을 취소하는 대신 즉시 실패시킨다
     private void applyIndividualCap(Account account, UUID strategyCycleId, List<Order> buyOrders,
                                     List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected, BigDecimal cap) {
+        if (corrected.size() != plannedBuyOrders.size()) {
+            throw new IllegalStateException("개별 취소 대상 개수 불일치 — capsIndividualOrders() 구현체는 개수·순서를 바꾸면 안 됨: "
+                    + "original=" + plannedBuyOrders.size() + ", corrected=" + corrected.size());
+        }
         List<PlannedOrder> changed = new ArrayList<>();
         for (int i = 0; i < buyOrders.size(); i++) {
             if (!plannedBuyOrders.get(i).equals(corrected.get(i))) {

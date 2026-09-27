@@ -217,7 +217,7 @@ public class BacktestEngine {
                 plan.map(CycleOrderStrategy.OrderPlan::vrPosition).orElse(null), command.ticker(), candle.date());
     }
 
-    // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(VR_POSITION)와 동일 규칙, 현재가 대용으로 전일 종가 사용
+    // 접수 전 BUY 가격 캡 보정 — 운영 VrCycleOrderStrategy.capBuyOrders()와 동일 규칙, 현재가 대용으로 전일 종가 사용
     private List<PlannedOrder> applyVrBuyCap(List<PlannedOrder> orders, BigDecimal prevClose, VrPosition position,
                                       StrategyTicker ticker, LocalDate tradeDate) {
         if (prevClose == null || position == null) return orders;
@@ -280,7 +280,7 @@ public class BacktestEngine {
                 plan.map(CycleOrderStrategy.OrderPlan::position).orElse(null), candle.date());
     }
 
-    // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(INFINITE_POSITION)와 동일 규칙, 현재가 대용으로 전일 종가 사용
+    // 접수 전 BUY 가격 캡 보정 — 운영 InfiniteCycleOrderStrategy.capBuyOrders()와 동일 규칙, 현재가 대용으로 전일 종가 사용
     private List<PlannedOrder> applyInfiniteBuyCap(List<PlannedOrder> orders, BigDecimal prevClose, InfinitePosition position,
                                             LocalDate tradeDate) {
         if (prevClose == null || position == null) return orders;
@@ -345,7 +345,7 @@ public class BacktestEngine {
         return applyPrivacyBuyCap(orders, prevClose);
     }
 
-    // 접수 전 BUY 가격 캡 보정 — 운영 BuyOrderPriceCapper(PRIVACY_SIMPLE)와 동일 규칙
+    // 접수 전 BUY 가격 캡 보정 — 운영 PrivacyCycleOrderStrategy.capBuyOrders()와 동일 규칙
     // cap 초과 BUY만 가격을 cap으로 치환하고 수량은 건드리지 않는다 (VR/INFINITE와 달리 재산정 자체가 없다)
     private static List<PlannedOrder> applyPrivacyBuyCap(List<PlannedOrder> orders, BigDecimal prevClose) {
         if (prevClose == null || orders.isEmpty()) return orders;

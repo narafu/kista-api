@@ -50,7 +50,7 @@ class TradingCandidatePlanner {
             BatchContext ctx,
             AccountBalance balance,
             InfinitePosition position,      // INFINITE만 non-null (신규 계산 시 — pre-existing skip 케이스는 null)
-            VrPosition vrPosition,          // VR만 non-null (신규 계산 시 — BuyOrderPriceCapper VR_POSITION 보정용)
+            VrPosition vrPosition,          // VR만 non-null (신규 계산 시 — VrCycleOrderStrategy.capBuyOrders() 보정용)
             BigDecimal startPrice,          // 배치 시작 시점 가격 — placeAll()에서 접수 직전 재조회(reloadPlacementPrices) 실패 시 폴백으로만 사용
             PrivacyTradeBase privacyBase    // PRIVACY만 non-null (rotation 시 최소금액 산정용)
     ) {}
@@ -185,7 +185,7 @@ class TradingCandidatePlanner {
                     .map(CycleOrderStrategy.OrderPlan::position).orElse(null);
             return new CycleState(ctx, balance, recalcPos, null, price, null);
         }
-        // PRIVACY: price 전달 — BuyOrderPriceCapper.capIfNeeded(mode=PRIVACY_SIMPLE, ...)에서 현재가 기반 BUY 가격 캡 적용
+        // PRIVACY: price 전달 — BuyOrderPriceCapper.capIfNeeded(type=PRIVACY, ...)에서 현재가 기반 BUY 가격 캡 적용
         // VR: privacyBase 오염 방지 (혼합 배치 시 hasPrivacy=true로 조회됐을 수 있음)
         // VR은 canSkipOrderComputation()이 항상 false라 이 메서드에 도달하지 않음 — vrPosition은 항상 null로 둔다
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
