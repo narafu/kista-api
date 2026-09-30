@@ -19,6 +19,8 @@ public interface BrokerStatisticsUseCase {
     BrokerStockInfo getStockInfo(UUID accountId, UUID requesterId, StrategyTicker ticker);
     // 환율 (USD/KRW)
     ExchangeRateQuote getExchangeRate(UUID accountId, UUID requesterId);
+    // 현재 환율 (USD/KRW) — 계좌 무관 공개 API라 소유권 검증 없이 조회(내부 API용)
+    ExchangeRateQuote currentExchangeRate();
     // 해외 장 운영 정보
     List<MarketCalendarDay> getMarketCalendar(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     // 증권사 계좌 목록

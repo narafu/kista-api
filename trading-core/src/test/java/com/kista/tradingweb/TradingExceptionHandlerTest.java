@@ -1,10 +1,10 @@
 package com.kista.tradingweb;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.domain.model.BrokerRateLimitException;
-import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.broker.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.sharedkernel.AppErrorRaisedEvent;
 import com.kista.trading.domain.model.ManualTradingException;
@@ -63,21 +63,21 @@ class TradingExceptionHandlerTest {
 
     @Test
     void kisApiException_mapsTo503AndPublishesErrorReport() {
-        var detail = handler.handleBrokerApiException(new KisApiException("KIS API 연결 오류", null));
+        var detail = handler.handleBrokerApiException(new StubBrokerApiException("KIS", "KIS API 연결 오류", BrokerApiException.Conflict.NONE));
 
         assertThat(detail.getStatus()).isEqualTo(503);
         assertThat(detail.getTitle()).isEqualTo("KIS API Error");
         ArgumentCaptor<AppErrorRaisedEvent> captor = ArgumentCaptor.forClass(AppErrorRaisedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
-        assertThat(captor.getValue().errorType()).isEqualTo("KisApiException");
+        assertThat(captor.getValue().errorType()).isEqualTo("StubBrokerApiException");
         assertThat(captor.getValue().message()).isEqualTo("KIS API 연결 오류");
         assertThat(captor.getValue().context()).containsEntry("caller", "TradingExceptionHandler");
-        assertThat(captor.getValue().stackTrace()).contains("KisApiException");
+        assertThat(captor.getValue().stackTrace()).contains("StubBrokerApiException");
     }
 
     @Test
     void tossApiException_mapsTo503AndPublishesErrorReport() {
-        var detail = handler.handleBrokerApiException(new TossApiException("invalid-token", null));
+        var detail = handler.handleBrokerApiException(new StubBrokerApiException("Toss", "invalid-token", BrokerApiException.Conflict.NONE));
 
         assertThat(detail.getStatus()).isEqualTo(503);
         assertThat(detail.getTitle()).isEqualTo("Toss API Error");
@@ -89,7 +89,7 @@ class TradingExceptionHandlerTest {
     void kisApiException_publishFails_stillMapsTo503() {
         doThrow(new RuntimeException("발행 실패")).when(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
 
-        var detail = handler.handleBrokerApiException(new KisApiException("KIS API 연결 오류", null));
+        var detail = handler.handleBrokerApiException(new StubBrokerApiException("KIS", "KIS API 연결 오류", BrokerApiException.Conflict.NONE));
 
         assertThat(detail.getStatus()).isEqualTo(503);
     }

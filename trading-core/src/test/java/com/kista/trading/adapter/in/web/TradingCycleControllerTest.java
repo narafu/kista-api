@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.in.web;
 
-import com.kista.broker.domain.model.kis.KisApiException;
+import com.kista.support.StubBrokerApiException;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.CycleHistoryPage;
@@ -123,7 +123,7 @@ class TradingCycleControllerTest {
 
     @Test
     void executeManually_kisApiError_returns503() throws Exception {
-        doThrow(new KisApiException("KIS API 연결 오류", null))
+        doThrow(new StubBrokerApiException("KIS API 연결 오류"))
                 .when(tradingExecution).executeManually(any(), any());
 
         mockMvc.perform(post("/api/trading-cycles/{id}/execute", CYCLE_ID)

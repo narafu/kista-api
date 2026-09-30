@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.SellableQuantity;
@@ -118,7 +119,7 @@ class TradingSellSufficiencySimulatorTest {
     @Test
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
         when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
-                .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
+                .thenThrow(new StubBrokerApiException("Toss API 토큰 재시도 실패: 401"));
         List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 
         SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);

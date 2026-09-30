@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
@@ -11,7 +12,7 @@ import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.broker.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
@@ -155,8 +156,8 @@ class OrderCancelServiceTest {
                 .thenReturn(List.of(order1, order2));
         // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
         doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
-        doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
-                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(eq(cancelOf(order2)), any());
+        doThrow(new StubBrokerApiException("Toss API 오류: 409 CONFLICT already-canceled",
+                BrokerApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(eq(cancelOf(order2)), any());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
@@ -231,8 +232,8 @@ class OrderCancelServiceTest {
         Order order = placedOrder(orderId, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        doThrow(new TossApiException("Toss API 오류: 409 CONFLICT already-canceled", null,
-                TossApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
+        doThrow(new StubBrokerApiException("Toss API 오류: 409 CONFLICT already-canceled",
+                BrokerApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
 
         service.cancelOrder(orderId, requesterId);
 

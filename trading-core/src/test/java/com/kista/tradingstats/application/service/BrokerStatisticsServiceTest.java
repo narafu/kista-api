@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -88,6 +89,23 @@ class BrokerStatisticsServiceTest {
         assertThat(actual).isSameAs(expected);
         assertThat(actual.rate()).isEqualByComparingTo("1380.50");
         assertThat(actual.midRate()).isEqualByComparingTo("1375.00");
+    }
+
+    @Test
+    void currentExchangeRate_TOSS_통계_포트로_계좌_없이_조회() {
+        ExchangeRateQuote expected = new ExchangeRateQuote(new BigDecimal("1380.50"), new BigDecimal("1375.00"));
+        when(statisticsPorts.find(Broker.TOSS)).thenReturn(Optional.of(statisticsPort));
+        when(statisticsPort.getExchangeRate()).thenReturn(expected);
+
+        assertThat(sut.currentExchangeRate()).isSameAs(expected);
+        verifyNoInteractions(accountPort); // 계좌 소유권 검증 없음
+    }
+
+    @Test
+    void currentExchangeRate_TOSS_포트가_없으면_IllegalStateException() {
+        when(statisticsPorts.find(Broker.TOSS)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> sut.currentExchangeRate()).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

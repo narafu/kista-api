@@ -2,7 +2,8 @@ package com.kista.tradingstats.adapter.in.web;
 
 import com.kista.tradingweb.TradingApplication;
 import org.springframework.test.context.ContextConfiguration;
-import com.kista.broker.application.port.output.ExchangeRatePort;
+import com.kista.broker.domain.model.ExchangeRateQuote;
+import com.kista.tradingstats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingstats.application.usecase.InvestmentPointsQuery;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;
 import com.kista.sharedkernel.BenchmarkGranularity;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,7 +47,7 @@ class TradingStatsInternalControllerTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean InvestmentPointsQuery investmentPointsQuery;
-    @MockitoBean ExchangeRatePort exchangeRatePort; // TradingStatsInternalController의 환율 조회 라우트 의존성 (Task15)
+    @MockitoBean BrokerStatisticsUseCase brokerStatisticsUseCase; // 환율 조회 라우트 의존성
 
     private static final String VALID_TOKEN = "test-internal-token";
     private static final UUID USER_ID = UUID.randomUUID();
@@ -69,6 +71,17 @@ class TradingStatsInternalControllerTest {
                 .andExpect(jsonPath("$.effectiveFrom").value("2026-01-01"))
                 .andExpect(jsonPath("$.effectiveTo").value("2026-09-01"))
                 .andExpect(jsonPath("$.selectedStrategy").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void 현재_환율은_매매기준율_단일_값을_반환한다() throws Exception {
+        given(brokerStatisticsUseCase.currentExchangeRate())
+                .willReturn(new ExchangeRateQuote(new java.math.BigDecimal("1380.50"), new java.math.BigDecimal("1375.00")));
+
+        mockMvc.perform(get("/api/internal/trading/stats/exchange-rate")
+                        .header("X-Internal-Token", VALID_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(content().string("1375.00"));
     }
 
     @Test

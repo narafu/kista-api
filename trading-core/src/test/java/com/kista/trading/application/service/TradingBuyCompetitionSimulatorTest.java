@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
@@ -261,7 +262,7 @@ class TradingBuyCompetitionSimulatorTest {
     @Test
     void simulate_returnsUnavailablePreview_whenLiveBalanceFetchFails() {
         when(depositCache.getUsdDeposit(account, StrategyTicker.SOXL))
-                .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
+                .thenThrow(new StubBrokerApiException("Toss API 토큰 재시도 실패: 401"));
         List<PlannedOrder> buyOrders = List.of(buyOrder(StrategyTicker.SOXL, 10, new BigDecimal("20.00")));
         TradingBuyCompetitionSimulator.BatchContext context = new TradingBuyCompetitionSimulator.BatchContext(
                 List.of(), Map.of(), Map.of(), Map.of());

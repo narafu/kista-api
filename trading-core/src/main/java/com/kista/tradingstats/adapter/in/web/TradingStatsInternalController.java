@@ -1,7 +1,7 @@
 package com.kista.tradingstats.adapter.in.web;
 
-import com.kista.broker.application.port.output.ExchangeRatePort;
 import com.kista.contract.stats.InvestmentPointsResponse;
+import com.kista.tradingstats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingstats.application.usecase.InvestmentPointsQuery;
 import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;
@@ -22,7 +22,7 @@ import java.util.UUID;
 public class TradingStatsInternalController {
 
     private final InvestmentPointsQuery investmentPointsQuery;
-    private final ExchangeRatePort exchangeRatePort;
+    private final BrokerStatisticsUseCase brokerStatisticsUseCase; // 환율 조회(증권사 선택은 유스케이스가 결정)
 
     @Operation(summary = "투자 성과 시리즈 조회", description = "벤치마크 비교용 InvestmentPoint 시리즈. X-Internal-Token 헤더 필수.")
     @GetMapping("/investment-points")
@@ -40,6 +40,6 @@ public class TradingStatsInternalController {
     @Operation(summary = "현재 USD/KRW 매매기준율 조회", description = "TOSS_INVEST 매매기준율(midRate) 단일 값. X-Internal-Token 헤더 필수.")
     @GetMapping("/exchange-rate")
     public BigDecimal exchangeRate() {
-        return exchangeRatePort.getExchangeRate().midRate();
+        return brokerStatisticsUseCase.currentExchangeRate().midRate();
     }
 }

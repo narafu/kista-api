@@ -95,5 +95,4 @@ EOF
 
 ## 6. 알려진 후속 과제 (범위 밖으로 남긴 것)
 
-- `HexagonalArchitectureTest.vendor_models_must_not_leak_outside_broker`는 root 테스트 클래스패스에서 돌아 trading-core **테스트** 클래스의 Toss 타입 사용은 검사하지 않는다.
-- `TradingStatsInternalController`가 `ExchangeRatePort`를 직접 주입 — Toss 외 구현체가 생기면 주입이 모호해진다.
+현재 남은 후속 과제 없음(2026-10-01).

@@ -3,12 +3,11 @@ package com.kista.finance.application.service;
 import com.kista.finance.application.event.FinanceRegistrationReminderDueEvent;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
+import com.kista.finance.application.port.output.FinanceMemberPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
-import com.kista.sharedkernel.UserStatus;
-import com.kista.user.application.port.output.UserPort;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,7 +30,7 @@ class FinanceRegistrationReminderNotifierTest {
 
     @Test
     void 이번달_등록이_없는_유저에게만_알림을_요청한다() {
-        UserPort userPort = mock(UserPort.class);
+        FinanceMemberPort financeMemberPort = mock(FinanceMemberPort.class);
         FinanceGroupPort financeGroupPort = mock(FinanceGroupPort.class);
         AssetSnapshotPort assetSnapshotPort = mock(AssetSnapshotPort.class);
         FinanceTransactionPort financeTransactionPort = mock(FinanceTransactionPort.class);
@@ -40,7 +39,7 @@ class FinanceRegistrationReminderNotifierTest {
         UUID userWithData = UUID.randomUUID();
         UUID userWithoutData = UUID.randomUUID();
 
-        when(userPort.findIdsByStatus(UserStatus.ACTIVE)).thenReturn(List.of(userWithData, userWithoutData));
+        when(financeMemberPort.activeMemberIds()).thenReturn(List.of(userWithData, userWithoutData));
         when(financeGroupPort.findCurrentGroupId(any())).thenReturn(Optional.empty());
         AssetSnapshot existingSnapshot = new AssetSnapshot(UUID.randomUUID(), null, UUID.randomUUID(), null,
                 userWithData, java.time.LocalDate.of(2026, 8, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1000L, null);
@@ -52,7 +51,7 @@ class FinanceRegistrationReminderNotifierTest {
                 .thenReturn(List.of());
 
         var notifier = new FinanceRegistrationReminderNotifier(
-                userPort, financeGroupPort, assetSnapshotPort, financeTransactionPort, eventPublisher);
+                financeMemberPort, financeGroupPort, assetSnapshotPort, financeTransactionPort, eventPublisher);
 
         notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.of(2026, 8));
 
@@ -66,12 +65,12 @@ class FinanceRegistrationReminderNotifierTest {
 
     @Test
     void ACTIVE_유저가_없으면_이벤트를_발행하지_않는다() {
-        UserPort userPort = mock(UserPort.class);
+        FinanceMemberPort financeMemberPort = mock(FinanceMemberPort.class);
         ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-        when(userPort.findIdsByStatus(UserStatus.ACTIVE)).thenReturn(List.of());
+        when(financeMemberPort.activeMemberIds()).thenReturn(List.of());
 
         var notifier = new FinanceRegistrationReminderNotifier(
-                userPort, mock(FinanceGroupPort.class), mock(AssetSnapshotPort.class),
+                financeMemberPort, mock(FinanceGroupPort.class), mock(AssetSnapshotPort.class),
                 mock(FinanceTransactionPort.class), eventPublisher);
 
         notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.of(2026, 8));

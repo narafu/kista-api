@@ -1,8 +1,8 @@
 package com.kista.tradingstats.adapter.in.web;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.tradingweb.TradingApplication;
 import org.springframework.test.context.ContextConfiguration;
-import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.tradingstats.application.usecase.AccountStatisticsUseCase;
@@ -97,7 +97,7 @@ class StatisticsControllerTest {
     @Test
     void prices_returns_503_on_kis_error() throws Exception {
         when(accountStatistics.getPrices(any(), any(), any()))
-                .thenThrow(new KisApiException("KIS API 오류", null));
+                .thenThrow(new StubBrokerApiException("KIS API 오류"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/prices")
                         .param("tickers", "TQQQ")

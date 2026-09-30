@@ -3,10 +3,9 @@ package com.kista.finance.adapter.in.web;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
-import com.kista.user.domain.model.User;
 import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
-import com.kista.user.application.usecase.UserUseCase;
+import com.kista.finance.application.port.output.FinanceMemberPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -20,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.kista.support.WebMvcTestSupport.*;
@@ -32,8 +32,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
 
 @WebMvcTest(FinanceGroupController.class)
 @Execution(ExecutionMode.SAME_THREAD)
@@ -45,7 +43,7 @@ class FinanceGroupControllerTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean FinanceGroupUseCase groupUseCase;
-    @MockitoBean UserUseCase userUseCase;
+    @MockitoBean FinanceMemberPort financeMemberPort;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
@@ -66,9 +64,7 @@ class FinanceGroupControllerTest {
         FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
         when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
-        User user = new User(USER_ID, "kakao", "홍길동", null, UserStatus.ACTIVE, UserRole.USER,
-                null, null, null, null, null, User.DEFAULT_CHANNEL);
-        when(userUseCase.getById(USER_ID)).thenReturn(user);
+        when(financeMemberPort.nicknameOf(USER_ID)).thenReturn(Optional.of("홍길동"));
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))
@@ -87,10 +83,8 @@ class FinanceGroupControllerTest {
         FinanceGroupMember other = new FinanceGroupMember(UUID.randomUUID(), groupId, otherUserId,
                 FinanceGroup.MemberRole.MEMBER, Instant.now(), Instant.now());
         when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(owner, other));
-        when(userUseCase.getById(USER_ID)).thenReturn(new User(USER_ID, "kakao", "홍길동", null,
-                UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
-        when(userUseCase.getById(otherUserId)).thenReturn(new User(otherUserId, "kakao2", "김철수", null,
-                UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL));
+        when(financeMemberPort.nicknameOf(USER_ID)).thenReturn(Optional.of("홍길동"));
+        when(financeMemberPort.nicknameOf(otherUserId)).thenReturn(Optional.of("김철수"));
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))
@@ -107,7 +101,7 @@ class FinanceGroupControllerTest {
         FinanceGroupMember member = new FinanceGroupMember(UUID.randomUUID(), groupId, USER_ID,
                 FinanceGroup.MemberRole.OWNER, Instant.now(), Instant.now());
         when(groupUseCase.listMembers(groupId, USER_ID)).thenReturn(List.of(member));
-        when(userUseCase.getById(USER_ID)).thenThrow(new java.util.NoSuchElementException("사용자를 찾을 수 없습니다"));
+        when(financeMemberPort.nicknameOf(USER_ID)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/finance/groups/{id}/members", groupId)
                         .with(authentication(userToken(USER_ID))))

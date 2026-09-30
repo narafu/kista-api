@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.broker.domain.model.BrokerAccountRef;
@@ -14,7 +15,7 @@ import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.broker.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.application.event.TradingErrorEvent;
@@ -212,9 +213,9 @@ class TradingReporterTest {
     void Toss_취소가_이미체결_409로_거부되면_관리자_알림없이_체결로_기록된다() {
         UUID orderId = UUID.randomUUID();
         Order order = tossPlacedOrder(orderId, "E1", 5);
-        doThrow(new TossApiException(
+        doThrow(new StubBrokerApiException(
                 "Toss API 오류: 409 CONFLICT {\"error\":{\"code\":\"already-filled\",\"message\":\"체결 완료된 주문입니다.\"}}",
-                null, TossApiException.Conflict.ALREADY_FILLED)).when(brokerOrderPort).cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), TOSS_ACCOUNT_REF);
+                BrokerApiException.Conflict.ALREADY_FILLED)).when(brokerOrderPort).cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), TOSS_ACCOUNT_REF);
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, TOSS_ACCOUNT_REF))
                 .thenReturn(List.of(buyExecution("E1", 5, "20.00")));
 

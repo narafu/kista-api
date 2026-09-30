@@ -6,8 +6,8 @@ import com.kista.finance.adapter.in.web.dto.FinanceGroupInvitationStatusRequest;
 import com.kista.finance.adapter.in.web.dto.FinanceGroupMemberResponse;
 import com.kista.finance.adapter.in.web.dto.FinanceGroupResponse;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
+import com.kista.finance.application.port.output.FinanceMemberPort;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
-import com.kista.user.application.usecase.UserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -31,7 +31,7 @@ import java.util.UUID;
 public class FinanceGroupController {
 
     private final FinanceGroupUseCase groupUseCase;
-    private final UserUseCase userUseCase;
+    private final FinanceMemberPort financeMemberPort; // 멤버 닉네임 조회(user 모듈 의존은 포트 어댑터가 격리)
 
     @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 전체 — 개인 그룹 포함.")
     @ApiResponse(responseCode = "200", description = "조회 성공")
@@ -52,18 +52,9 @@ public class FinanceGroupController {
             @Parameter(description = "그룹 ID") @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         return groupUseCase.listMembers(id, userId).stream()
-                .map(m -> FinanceGroupMemberResponse.from(m, resolveNickname(m.userId())))
+                // 조회와 탈퇴 사이 경합으로 방금 탈퇴한 멤버는 닉네임 없이(null) 보여준다 — 목록 전체를 404로 죽이지 않는다
+                .map(m -> FinanceGroupMemberResponse.from(m, financeMemberPort.nicknameOf(m.userId()).orElse(null)))
                 .toList();
-    }
-
-    // 조회와 탈퇴 사이 경합으로 멤버가 방금 회원 탈퇴했으면 그 한 명만 닉네임 없이 보여준다 —
-    // NoSuchElementException을 그대로 전파하면 목록 전체가 404로 죽는다.
-    private String resolveNickname(UUID userId) {
-        try {
-            return userUseCase.getById(userId).nickname();
-        } catch (java.util.NoSuchElementException e) {
-            return null;
-        }
     }
 
     @Operation(summary = "그룹 초대 생성", description = "그룹 OWNER만 생성할 수 있습니다.")

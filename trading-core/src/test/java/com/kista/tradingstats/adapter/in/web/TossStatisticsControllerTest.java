@@ -1,10 +1,10 @@
 package com.kista.tradingstats.adapter.in.web;
 
+import com.kista.support.StubBrokerApiException;
 import com.kista.tradingweb.TradingApplication;
 import org.springframework.test.context.ContextConfiguration;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.*;
-import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.tradingstats.application.usecase.BrokerStatisticsUseCase;
 import org.junit.jupiter.api.Test;
@@ -99,7 +99,7 @@ class TossStatisticsControllerTest {
     @Test
     void candles_returns_503_on_toss_api_error() throws Exception {
         when(brokerStatistics.getCandles(any(), any(), any(), any(), any(), any()))
-                .thenThrow(new TossApiException("Toss API 오류", null));
+                .thenThrow(new StubBrokerApiException("Toss API 오류"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/candles")
                         .param("ticker", "SOXL")
@@ -130,7 +130,7 @@ class TossStatisticsControllerTest {
     @Test
     void stockInfo_returns_503_on_toss_api_error() throws Exception {
         when(brokerStatistics.getStockInfo(any(), any(), any()))
-                .thenThrow(new TossApiException("Toss API 오류", null));
+                .thenThrow(new StubBrokerApiException("Toss API 오류"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/stock-info")
                         .param("ticker", "SOXL")
@@ -191,7 +191,7 @@ class TossStatisticsControllerTest {
     @Test
     void marketCalendar_returns_503_on_toss_api_error() throws Exception {
         when(brokerStatistics.getMarketCalendar(any(), any(), any(), any()))
-                .thenThrow(new TossApiException("Toss API 오류", null));
+                .thenThrow(new StubBrokerApiException("Toss API 오류"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/market-calendar")
                         .param("from", "2025-01-01")
@@ -229,7 +229,7 @@ class TossStatisticsControllerTest {
     @Test
     void brokerAccounts_returns_503_on_toss_api_error() throws Exception {
         when(brokerStatistics.getAccountList(any(), any()))
-                .thenThrow(new TossApiException("Toss API 오류", null));
+                .thenThrow(new StubBrokerApiException("Toss API 오류"));
 
         mockMvc.perform(get("/api/accounts/" + ACCOUNT_ID + "/broker-accounts")
                         .with(authentication(userToken(DEV_USER_UUID))))
