@@ -2,7 +2,7 @@ package com.kista.benchmark.adapter.in.web;
 
 import com.kista.benchmark.domain.model.*;
 import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.benchmark.application.usecase.UserStatsUseCase;
+import com.kista.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -27,15 +27,15 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(StatsController.class)
+@WebMvcTest(BenchmarkController.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class StatsControllerTest {
+class BenchmarkControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean UserStatsUseCase userStats;
+    @MockitoBean BenchmarkUseCase userStats;
 
     private static final UUID USER_ID = UUID.randomUUID();
 

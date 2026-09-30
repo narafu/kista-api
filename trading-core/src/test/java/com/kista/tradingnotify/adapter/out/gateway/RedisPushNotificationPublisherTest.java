@@ -16,7 +16,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,7 +35,9 @@ class RedisPushNotificationPublisherTest {
         publisher.publish(new UserPushNotificationRequestedEvent(userId, "장 개시", "🟢 미국 장이 열렸습니다."));
 
         ArgumentCaptor<MapRecord<String, Object, Object>> captor = ArgumentCaptor.forClass(MapRecord.class);
-        verify(streamOperations).add(captor.capture(), any(XAddOptions.class));
+        ArgumentCaptor<XAddOptions> optionsCaptor = ArgumentCaptor.forClass(XAddOptions.class);
+        verify(streamOperations).add(captor.capture(), optionsCaptor.capture());
+        assertThat(optionsCaptor.getValue().getMaxlen()).isEqualTo(RedisStreamConfig.PUSH_NOTIFICATION_MAXLEN);
         assertThat(captor.getValue().getStream()).isEqualTo(RedisStreamConfig.PUSH_NOTIFICATION_STREAM);
         String payload = captor.getValue().getValue().get("payload").toString();
         assertThat(payload).contains(userId.toString()).contains("\"title\":\"장 개시\"");

@@ -364,7 +364,7 @@ class MonthlyReturnCalculatorTest {
                 List.of(cycle), positions, JANUARY_1, MARCH_31, BenchmarkGranularity.MONTHLY);
 
         // MDD 자체는 HousingBenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 반영되지 않고
-        // 월말 지수만 산출되는지 확인한다 (StatsServiceTest.월말_지수의_고점_대비_최대낙폭을_계산한다 참고)
+        // 월말 지수만 산출되는지 확인한다 (BenchmarkServiceTest.월말_지수의_고점_대비_최대낙폭을_계산한다 참고)
         assertThat(points)
                 .extracting(InvestmentPoint::investmentIndexUsd)
                 .containsExactly(new BigDecimal("100.0000000000"),

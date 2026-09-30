@@ -14,6 +14,10 @@ public class RedisPubSubConfig {
 
     public static final String TRADE_EVENT_CHANNEL = "trade.event";
 
+    // Stream 전환 호환용 — trading-core 배포가 확인된 다음 릴리스에서 구독자(LegacyPushNotificationRelayListener)와 함께 삭제
+    @Deprecated
+    public static final String LEGACY_PUSH_NOTIFICATION_CHANNEL = "user.push-notification.requested";
+
     @Bean
     RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();

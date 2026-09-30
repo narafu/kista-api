@@ -46,7 +46,7 @@ class CurrentExchangeRateHttpAdapterTest {
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/exchange-rate");
     }
 
-    // 네트워크 오류·5xx 등은 StatsService의 "환율 조회 실패 시 null" 계약을 지키기 위해
+    // 네트워크 오류·5xx 등은 BenchmarkService의 "환율 조회 실패 시 null" 계약을 지키기 위해
     // 여기서 흡수해 null을 반환한다 — 벤치마크 비교 본체까지 실패시키지 않는다.
     @Test
     void 장애_응답은_예외를_전파하지_않고_null을_반환한다() {

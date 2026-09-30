@@ -35,7 +35,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     private final CyclePositionPort cyclePositionPort;
     private final MonthlyReturnCalculator monthlyReturnCalculator = new MonthlyReturnCalculator();
 
-    // 원본 StatsService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
+    // 원본 BenchmarkService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
     // 이 메서드가 담당하므로(authorizeIfStrategyScope 대체) api 쪽은 사전검증을 하지 않는다.
     @Override
     public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId,

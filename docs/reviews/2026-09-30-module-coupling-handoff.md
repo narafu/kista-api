@@ -93,3 +93,4 @@ EOF
 - `HexagonalArchitectureTest.vendor_models_must_not_leak_outside_broker`는 root 테스트 클래스패스에서 돌아 trading-core **테스트** 클래스의 Toss 타입 사용은 검사하지 않는다.
 - `TradingStatsInternalController`가 `ExchangeRatePort`를 직접 주입 — Toss 외 구현체가 생기면 주입이 모호해진다.
 - `StrategyCapability` 생성자의 `EnumSet.copyOf`는 빈 non-EnumSet 입력에 예외 — 현재 호출부 없음.
+- Legacy Pub/Sub 푸시 구독자 제거 — trading-core 배포가 Stream 발행 버전으로 확인된 다음 릴리스에서 `notify.adapter.in.redis.LegacyPushNotificationRelayListener`(+ 테스트)와 `RedisPubSubConfig.LEGACY_PUSH_NOTIFICATION_CHANNEL`(@Deprecated)을 삭제한다.

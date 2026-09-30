@@ -1,11 +1,7 @@
 package com.kista.notify.adapter.in.redis;
 
-import com.kista.notify.adapter.out.gateway.FcmAdapter;
+import com.kista.notify.application.port.output.PushNotificationPort;
 import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.support.DomainFixtures;
-import com.kista.user.application.port.output.UserPort;
-import com.kista.user.domain.model.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -19,11 +15,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -34,13 +28,12 @@ class PushNotificationStreamConsumerTest {
     @Mock RedisConnectionFactory connectionFactory;
     @Mock StringRedisTemplate redisTemplate;
     @Mock StreamOperations<String, Object, Object> streamOperations;
-    @Mock FcmAdapter fcmAdapter;
-    @Mock UserPort userPort;
+    @Mock PushNotificationPort pushNotificationPort;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private PushNotificationStreamConsumer consumer() {
         when(redisTemplate.opsForStream()).thenReturn((StreamOperations) streamOperations);
-        return new PushNotificationStreamConsumer(connectionFactory, redisTemplate, fcmAdapter, userPort, new ObjectMapper());
+        return new PushNotificationStreamConsumer(connectionFactory, redisTemplate, pushNotificationPort, new ObjectMapper());
     }
 
     private static MapRecord<String, String, String> record(UUID userId) {
@@ -55,42 +48,27 @@ class PushNotificationStreamConsumerTest {
     }
 
     @Test
-    void FCM_채널_사용자에게_푸시를_보내고_ack한다() {
-        User user = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
-        when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
-        PushNotificationStreamConsumer consumer = consumer();
-        MapRecord<String, String, String> record = record(user.id());
-
-        consumer.handle(record);
-
-        verify(fcmAdapter).send(user.id(), "체결", "SOXL 매수 체결");
-        verify(streamOperations).acknowledge(RedisStreamConfig.PUSH_NOTIFICATION_STREAM, RedisStreamConfig.ROOT_CONSUMER_GROUP, record.getId());
-    }
-
-    @Test
-    void FCM을_포함하지_않는_채널이면_보내지_않고_ack한다() {
-        User user = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.TELEGRAM);
-        when(userPort.findByIdOrThrow(user.id())).thenReturn(user);
-        PushNotificationStreamConsumer consumer = consumer();
-        MapRecord<String, String, String> record = record(user.id());
-
-        consumer.handle(record);
-
-        verify(fcmAdapter, never()).send(any(), any(), any());
-        verify(streamOperations).acknowledge(RedisStreamConfig.PUSH_NOTIFICATION_STREAM, RedisStreamConfig.ROOT_CONSUMER_GROUP, record.getId());
-    }
-
-    // 사용자 조회 실패도 처리 실패로 삼키고 ack — 영구 재시도 방지
-    @Test
-    void 사용자를_찾을_수_없어도_ack한다() {
+    void 봉투를_풀어_포트에_위임하고_ack한다() {
         UUID userId = UUID.randomUUID();
-        when(userPort.findByIdOrThrow(userId)).thenThrow(new NoSuchElementException("없음"));
         PushNotificationStreamConsumer consumer = consumer();
         MapRecord<String, String, String> record = record(userId);
 
         consumer.handle(record);
 
-        verifyNoInteractions(fcmAdapter);
+        verify(pushNotificationPort).pushIfEnabled(userId, "체결", "SOXL 매수 체결");
+        verify(streamOperations).acknowledge(RedisStreamConfig.PUSH_NOTIFICATION_STREAM, RedisStreamConfig.ROOT_CONSUMER_GROUP, record.getId());
+    }
+
+    // 포트 예외도 삼키고 ack — 영구 재시도 방지
+    @Test
+    void 포트가_예외를_던져도_ack한다() {
+        UUID userId = UUID.randomUUID();
+        doThrow(new IllegalStateException("fcm down")).when(pushNotificationPort).pushIfEnabled(userId, "체결", "SOXL 매수 체결");
+        PushNotificationStreamConsumer consumer = consumer();
+        MapRecord<String, String, String> record = record(userId);
+
+        consumer.handle(record);
+
         verify(streamOperations).acknowledge(RedisStreamConfig.PUSH_NOTIFICATION_STREAM, RedisStreamConfig.ROOT_CONSUMER_GROUP, record.getId());
     }
 
@@ -101,7 +79,7 @@ class PushNotificationStreamConsumerTest {
 
         consumer.handle(record);
 
-        verifyNoInteractions(userPort, fcmAdapter);
+        verifyNoInteractions(pushNotificationPort);
         verify(streamOperations).acknowledge(RedisStreamConfig.PUSH_NOTIFICATION_STREAM, RedisStreamConfig.ROOT_CONSUMER_GROUP, record.getId());
     }
 }

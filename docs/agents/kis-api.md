@@ -30,7 +30,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   - `KisHttpClient.executeWithRetry`가 조회·주문접수·취소 등 스케쥴러·서비스 경유 KIS 호출의 공통 경로라 이 한 지점에서 방어(예외: `KisAuthApi.verifyAccount`는 계좌 등록 전 검증용으로 `kisRestTemplate`을 직접 호출해 이 게이트를 타지 않음 — 등록 전 1회성 호출이라 리스크 낮음):
     - **사전 게이트(appKey 단위, GET+POST 공통, 401 인라인 재시도 포함)**: 같은 appKey로의 연속 호출 사이 최소 간격(`MIN_CALL_INTERVAL_MILLIS`=350ms)을 CAS 루프로 강제(`System.nanoTime()` 기준, 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않음 — 안 그러면 반복 거부가 대기열을 무한정 미래로 밀어버림). 대량 배치(VR 사다리 등)가 슬롯을 선점 중이어도 `MAX_QUEUE_WAIT_MILLIS`(20초)를 넘으면 무한 대기 대신 즉시 `KisApiException` — 같은 appKey의 실시간 조회(`StatisticsController` 등)가 배치 뒤에 무한정 밀리는 것을 방지
     - **반응 재시도(조회 GET 전용)**: `retryOnRateLimit=true`일 때 msg_cd 매칭 시 추가로 지수 백오프(1초 기준) 재시도. 주문 접수/취소(POST)는 재시도 안 함(중복 주문 위험 배제 — 사전 게이트만으로 방어)
-    - **단일 인스턴스 전제**: `nextSlotByAppKey`는 JVM 로컬 상태 — 롤링 배포로 인스턴스 2개가 잠시 공존하면 같은 appKey에 대한 실효 간격이 인스턴스 수만큼 짧아진다(`StatsResultCache`와 동일한 전제)
+    - **단일 인스턴스 전제**: `nextSlotByAppKey`는 JVM 로컬 상태 — 롤링 배포로 인스턴스 2개가 잠시 공존하면 같은 appKey에 대한 실효 간격이 인스턴스 수만큼 짧아진다(`BenchmarkResultCache`와 동일한 전제)
   - `TradingOrderExecutor.placeEach()`(주문 접수)에 있던 자체 페이싱은 이 공통 게이트로 대체되며 제거됨 — 취소 경로(`OrderCancelService.cancelByCycle`)도 같은 `KisHttpClient.post()`를 거치므로 별도 처리 불필요. (`TradingReporter.cancelUnresolvedOrders`는 Toss 전용 분기라 KIS에는 처음부터 해당 없음)
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
 - `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 `TradingOrderBudgetAllocator`에서 BUY·SELL을 독립 검증하며, BUY는 cap·correction 반영 최종 총액과 기존 PLANNED 금액을, SELL은 계좌·거래일·종목별 기존 PLANNED/PLACED 예약 수량을 각각 반영한다. 수동 SELL도 기존 예약 수량과 신규 수량의 합을 검증한다.

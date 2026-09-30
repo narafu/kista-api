@@ -28,7 +28,7 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 
 // 사용자 통계 중 trading 소유 부분 — 실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록.
-// housing/ETF 벤치마크 비교는 api의 StatsService(com.kista.benchmark)가 계속 소유한다.
+// housing/ETF 벤치마크 비교는 api의 BenchmarkService(com.kista.benchmark)가 계속 소유한다.
 @Service
 @RequiredArgsConstructor
 class TradingStatsService implements TradingStatsUseCase {

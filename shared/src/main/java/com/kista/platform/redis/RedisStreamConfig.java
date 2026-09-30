@@ -10,6 +10,7 @@ public final class RedisStreamConfig {
     public static final String USER_NOTIFY_PROFILE_CHANGED_STREAM = "stream:user.notify-profile.changed";
     public static final String APP_ERROR_STREAM = "stream:app.error"; // trading-core 오류 보고 → root app_error_logs
     public static final String PUSH_NOTIFICATION_STREAM = "stream:user.push-notification.requested"; // trading-core 체결 푸시 요청 → root FCM 발송
+    public static final long PUSH_NOTIFICATION_MAXLEN = 10_000; // root 하루 다운을 가정한 상한 — 초과 시 오래된 것부터 근사 트리밍, 무한 적재 방지
     public static final String TRADING_CONSUMER_GROUP = "trading-core"; // user.* 스트림 구독 그룹(kista-trading)
     public static final String ROOT_CONSUMER_GROUP = "root"; // trading-core→root 스트림(app.error·push-notification) 구독 그룹(kista-api·kista-scheduler 공용)
 

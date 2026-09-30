@@ -3,7 +3,7 @@ package com.kista.benchmark.application.service;
 import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.benchmark.domain.model.*;
-import com.kista.benchmark.application.usecase.UserStatsUseCase;
+import com.kista.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.benchmark.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-class StatsService implements UserStatsUseCase {
+class BenchmarkService implements BenchmarkUseCase {
 
     private static final String SEOUL_REGION_CODE = "1100000000";
     // 실제 KB Land 데이터는 2008-12부터 존재 — 여유 있는 안전 하한
@@ -39,7 +39,7 @@ class StatsService implements UserStatsUseCase {
     private final HousingPriceIndexPort housingPriceIndexPort;
     private final CurrentExchangeRatePort currentExchangeRatePort;
     private final IndexPricePort indexPricePort;
-    private final StatsResultCache statsResultCache;
+    private final BenchmarkResultCache statsResultCache;
     private final HousingBenchmarkComparisonBuilder comparisonBuilder =
             new HousingBenchmarkComparisonBuilder();
 

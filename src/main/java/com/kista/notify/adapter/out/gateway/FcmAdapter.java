@@ -43,8 +43,8 @@ public class FcmAdapter implements UserNotificationPort {
         send(user.userId(), "KISTA 알림", "❌ 가입이 거절되었습니다.");
     }
 
-    // public — UserNotificationRequestedListener(같은 패키지)와 push 스트림 컨슈머(notify.adapter.in.redis)가 재사용
-    public void send(UUID userId, String title, String body) {
+    // package-private — 외부 호출은 PushNotificationPort(UserPushNotificationAdapter)를 거쳐 채널 판정을 한 곳에서 한다
+    void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             return;
         }

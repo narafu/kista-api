@@ -27,8 +27,8 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     private static final String RECOVERY_CONSUMER = "-recovery"; // 복구 전용 컨슈머 이름 접미사
     private static final int CLAIM_BATCH_SIZE = 100; // 복구 1회 최대 claim 건수
 
-    private final RedisConnectionFactory connectionFactory;
-    protected final StringRedisTemplate redisTemplate;
+    private final RedisConnectionFactory connectionFactory; // 구독 컨테이너 생성용 연결 팩토리
+    protected final StringRedisTemplate redisTemplate;      // ack·XCLAIM·서브클래스 조회용 템플릿
     private final String streamKey;    // 구독할 스트림 키
     private final String group;        // 컨슈머 그룹명
     private final String consumerPrefix; // 컨슈머 이름 접두사(root 등) — 인스턴스별 고유 이름은 접두사 + UUID
@@ -103,6 +103,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
         }
     }
 
+    // idleThreshold 이상 ack 없는 pending을 복구 컨슈머로 claim해 handle로 재처리 — 처리 건수 반환
     public int reclaimPending(Duration idleThreshold) {
         return RedisStreams.reclaimPending(redisTemplate, streamKey, group,
                 consumerPrefix + RECOVERY_CONSUMER, idleThreshold, CLAIM_BATCH_SIZE, this::handle);
@@ -121,6 +122,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
         subscription = null;
     }
 
+    // 빈 종료 시 구독 정리
     @Override
     public void destroy() {
         stop();

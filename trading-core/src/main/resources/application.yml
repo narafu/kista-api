@@ -79,7 +79,7 @@ heartbeat: # 스케쥴러별 healthchecks.io 핑 — 미설정 시 핑 생략
   open-url: ${HEARTBEAT_OPEN_URL:}
   close-url: ${HEARTBEAT_CLOSE_URL:}
 
-alpaca: # marketcalendar(휴장일)와 stats(백테스트 과거 일봉) 공용 — root와 동일 API 키 재사용
+alpaca: # marketcalendar(휴장일)와 tradingstats(백테스트 과거 일봉) 공용 — root와 동일 API 키 재사용
   base-url: https://paper-api.alpaca.markets
   api-key: ${ALPACA_API_KEY:}
   api-secret: ${ALPACA_API_SECRET:}

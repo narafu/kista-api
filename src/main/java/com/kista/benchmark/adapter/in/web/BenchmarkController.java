@@ -8,7 +8,7 @@ import com.kista.benchmark.adapter.in.web.dto.EtfPriceSeriesResponse;
 import com.kista.benchmark.domain.model.BenchmarkAssetType;
 import com.kista.benchmark.domain.model.BenchmarkScope;
 import com.kista.benchmark.domain.model.EtfBenchmarkSymbol;
-import com.kista.benchmark.application.usecase.UserStatsUseCase;
+import com.kista.benchmark.application.usecase.BenchmarkUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -26,11 +26,11 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/api/stats")
 @RequiredArgsConstructor
-public class StatsController {
+public class BenchmarkController {
 
     private static final CacheControl HOUSING_BENCHMARK_CACHE = CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic();
 
-    private final UserStatsUseCase userStats;
+    private final BenchmarkUseCase userStats;
 
     @Operation(summary = "벤치마크 비교 (아파트 매매가격지수 · ETF)",
             description = "USD 투자 성과와 벤치마크(아파트 지역 매매가격지수 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "

@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
-// TradingStatsService(summary/equity-curve/cycles) 전용 인메모리 TTL 캐시 — com.kista.benchmark.application.service.StatsResultCache
+// TradingStatsService(summary/equity-curve/cycles) 전용 인메모리 TTL 캐시 — com.kista.benchmark.application.service.BenchmarkResultCache
 // (housing/ETF 벤치마크 비교 전용으로 축소됨)의 별개 인스턴스. 구현은 완전히 동일(제네릭 TTL get-or-compute/peek) —
 // summary/equity-curve 캐시(TTL 5분)를 벤치마크 캐시(TTL 10분)와 분리해 서로 다른 만료 정책이 한 캐시에 섞이지 않게 한다.
 // 단일 인스턴스 배포 전제 — 다중 인스턴스로 확장 시 인스턴스별 캐시가 최대 TTL만큼 서로 다를 수 있음

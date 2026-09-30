@@ -40,9 +40,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// Task 5로 api StatsService.buildInvestmentContext에서 이전된 소유권 검증·MOCK 계좌 필터링·
+// Task 5로 api BenchmarkService.buildInvestmentContext에서 이전된 소유권 검증·MOCK 계좌 필터링·
 // MonthlyReturnCalculator 배선 책임을 검증한다 — 스냅/벤치마크 비교 로직 자체는 api의
-// StatsServiceTest가 계속 커버한다(이 서비스는 순수 InvestmentPoint 시리즈만 반환).
+// BenchmarkServiceTest가 계속 커버한다(이 서비스는 순수 InvestmentPoint 시리즈만 반환).
 @ExtendWith(MockitoExtension.class)
 class InvestmentPointsQueryServiceTest {
 
@@ -98,7 +98,7 @@ class InvestmentPointsQueryServiceTest {
 
     @Test
     void 소유하지_않은_전략은_사이클_포지션_조회_전에_거부한다() {
-        // 옛 api StatsServiceTest의 "소유하지 않은 전략은 포지션을 읽기 전에 거부한다" 불변식이
+        // 옛 api BenchmarkServiceTest의 "소유하지 않은 전략은 포지션을 읽기 전에 거부한다" 불변식이
         // 소유권 검증 로직과 함께 trading 쪽으로 이전됐다 — fast-fail이 실제로 strategyCyclePort/
         // cyclePositionPort 호출보다 먼저 일어나는지는 이제 여기서만 검증된다.
         UUID otherUserId = UUID.randomUUID();

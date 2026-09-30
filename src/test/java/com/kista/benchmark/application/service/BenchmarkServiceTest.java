@@ -25,13 +25,13 @@ import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
-// Task 5 이후: StatsService는 accountPort/strategyPort/strategyCyclePort/cyclePositionPort를 직접
+// Task 5 이후: BenchmarkService는 accountPort/strategyPort/strategyCyclePort/cyclePositionPort를 직접
 // 호출하지 않고 investmentPointsPort(HTTP 경유)로부터 InvestmentPoint 시리즈를 받는다. 소유권 검증·
 // MOCK 계좌 필터링·MonthlyReturnCalculator 배선 등은 trading-core의 InvestmentPointsQueryService로
-// 이전됐고 그쪽 테스트(InvestmentPointsQueryServiceTest)가 커버한다 — 여기서는 StatsService 자신의
+// 이전됐고 그쪽 테스트(InvestmentPointsQueryServiceTest)가 커버한다 — 여기서는 BenchmarkService 자신의
 // 책임(KB 조사일 as-of 스냅, ETF 거래일 보정, 캐시∥환율 병렬 조회, 검증 fast-fail)만 검증한다.
 @ExtendWith(MockitoExtension.class)
-class StatsServiceTest {
+class BenchmarkServiceTest {
 
     @Mock InvestmentPointsPort investmentPointsPort;
     @Mock HousingBenchmarkPricePort housingBenchmarkPricePort;
@@ -39,8 +39,8 @@ class StatsServiceTest {
     @Mock CurrentExchangeRatePort currentExchangeRatePort;
     @Mock IndexPricePort indexPricePort;
     // getOrCompute가 null을 반환하지 않도록 mock이 아닌 실제 캐시 인스턴스 사용 (@InjectMocks가 생성자로 주입)
-    @Spy StatsResultCache statsResultCache = new StatsResultCache();
-    @InjectMocks StatsService statsService;
+    @Spy BenchmarkResultCache statsResultCache = new BenchmarkResultCache();
+    @InjectMocks BenchmarkService statsService;
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
@@ -598,7 +598,7 @@ class StatsServiceTest {
 
     @Test
     void ETF_벤치마크_비교는_다운샘플링_없이_거래일별_교집합으로_비교한다() {
-        // IndexPrice.tradeDate는 US 거래일 원본이라 StatsService가 KST로 +1일 보정한다.
+        // IndexPrice.tradeDate는 US 거래일 원본이라 BenchmarkService가 KST로 +1일 보정한다.
         // 투자 시리즈는 그 보정된 KST 날짜(1/6, 1/7, 2/28)에 맞춰 배치한다.
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
                 any(), any(), eq(BenchmarkGranularity.DAILY)))

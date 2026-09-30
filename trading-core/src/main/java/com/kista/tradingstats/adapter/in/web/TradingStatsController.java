@@ -18,7 +18,7 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 
 // 사용자 통계 중 trading 소유 부분(실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록) —
-// housing/ETF 벤치마크 비교는 api의 StatsController(com.kista.benchmark)가 계속 소유한다.
+// housing/ETF 벤치마크 비교는 api의 BenchmarkController(com.kista.benchmark)가 계속 소유한다.
 // 같은 "/api/stats" prefix를 두 컨트롤러가 sub-path로 나눠 갖는다(경로 충돌 없음).
 @Tag(name = "통계", description = "사용자 전략 수익 통계 (DB 근사 집계)")
 @RestController

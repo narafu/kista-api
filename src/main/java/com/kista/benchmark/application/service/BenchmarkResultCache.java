@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 // 통계 결과 인메모리 TTL 캐시 — Stats는 "DB 근사 집계"라 수 분 stale 허용 (PreviewDepositCache TTL 패턴 재사용)
 // 단일 인스턴스 배포 전제 — 다중 인스턴스로 확장 시 인스턴스별 캐시가 최대 TTL만큼 서로 다를 수 있음
 @Component
-class StatsResultCache {
+class BenchmarkResultCache {
 
     private static final int CLEANUP_THRESHOLD = 1000; // 만료 엔트리 기회적 청소 트리거 크기
     private static final int LOCK_STRIPES = 64;         // 동시 miss 직렬화용 고정 스트라이프 락 수 (키에 날짜 포함돼 카디널리티 무한 → 맵 대신 스트라이프로 메모리 유계)
@@ -24,11 +24,11 @@ class StatsResultCache {
     private final ReentrantLock[] stripes = createStripes(); // 키 해시로 매핑하는 고정 크기 락 배열 — 무한 증가·제거 레이스 없음
 
     @Autowired
-    StatsResultCache() {
+    BenchmarkResultCache() {
         this(Clock.systemUTC());
     }
 
-    StatsResultCache(Clock clock) {
+    BenchmarkResultCache(Clock clock) {
         this.clock = clock;
     }
 

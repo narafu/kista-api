@@ -24,8 +24,8 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class AppErrorStreamConsumer extends RedisStreamSubscriber {
 
-    private final ObjectMapper objectMapper;
-    private final AppErrorLogPort appErrorLogPort;
+    private final ObjectMapper objectMapper;         // 봉투 payload 역직렬화
+    private final AppErrorLogPort appErrorLogPort;   // app_error_logs 저장 포트(실패 격리는 포트 계약)
 
     public AppErrorStreamConsumer(RedisConnectionFactory connectionFactory, StringRedisTemplate redisTemplate,
                                   ObjectMapper objectMapper, AppErrorLogPort appErrorLogPort) {
@@ -35,6 +35,7 @@ public class AppErrorStreamConsumer extends RedisStreamSubscriber {
         this.appErrorLogPort = appErrorLogPort;
     }
 
+    // 기동 시 구독 시작
     @PostConstruct
     void init() {
         start();

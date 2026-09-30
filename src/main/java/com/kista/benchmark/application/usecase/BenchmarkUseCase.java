@@ -12,7 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-public interface UserStatsUseCase {
+public interface BenchmarkUseCase {
     HousingBenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             String regionCode, LocalDate from, LocalDate to);

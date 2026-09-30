@@ -1,13 +1,12 @@
 package com.kista.finance.application.service;
 
+import com.kista.finance.application.event.FinanceRegistrationReminderDueEvent;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
-import com.kista.sharedkernel.NotificationType;
-import com.kista.sharedkernel.UserNotificationRequestedEvent;
 import com.kista.sharedkernel.UserStatus;
 import com.kista.user.application.port.output.UserPort;
 import org.junit.jupiter.api.Test;
@@ -57,13 +56,12 @@ class FinanceRegistrationReminderNotifierTest {
 
         notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.of(2026, 8));
 
-        ArgumentCaptor<UserNotificationRequestedEvent> captor = ArgumentCaptor.forClass(UserNotificationRequestedEvent.class);
+        ArgumentCaptor<FinanceRegistrationReminderDueEvent> captor = ArgumentCaptor.forClass(FinanceRegistrationReminderDueEvent.class);
         verify(eventPublisher, times(1)).publishEvent(captor.capture());
-        UserNotificationRequestedEvent event = captor.getValue();
+        FinanceRegistrationReminderDueEvent event = captor.getValue();
         assertThat(event.userId()).isEqualTo(userWithoutData);
-        assertThat(event.type()).isEqualTo(NotificationType.FINANCE_REMINDER);
         assertThat(event.title()).isEqualTo("가계부 등록을 아직 안 하셨어요");
-        assertThat(event.body()).isEqualTo("8월 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
+        assertThat(event.body()).isEqualTo("📒 8월 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
     }
 
     @Test

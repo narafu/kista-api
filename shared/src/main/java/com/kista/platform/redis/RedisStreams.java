@@ -28,12 +28,18 @@ public final class RedisStreams {
     private RedisStreams() {
     }
 
-    // JSON payload 1필드로 감싸 XADD — MAXLEN 근사 트리밍으로 최근 1000건만 보존
+    // JSON payload 1필드로 감싸 XADD — 기본 MAXLEN(최근 1000건 근사 보존)
     public static void add(StringRedisTemplate redisTemplate, String streamKey, String payloadJson) {
+        add(redisTemplate, streamKey, payloadJson, DEFAULT_MAXLEN);
+    }
+
+    // JSON payload 1필드로 감싸 XADD — maxLen 근사 트리밍(초과 시 오래된 것부터 삭제)으로 무한 적재를 막는다.
+    // 소비자가 오래 멈춰도 보존해야 하는 스트림은 상한을 키워서 호출한다
+    public static void add(StringRedisTemplate redisTemplate, String streamKey, String payloadJson, long maxLen) {
         redisTemplate.opsForStream().add(StreamRecords.newRecord()
                         .in(streamKey)
                         .ofMap(Collections.singletonMap(PAYLOAD_FIELD, payloadJson)),
-                XAddOptions.maxlen(DEFAULT_MAXLEN).approximateTrimming(true));
+                XAddOptions.maxlen(maxLen).approximateTrimming(true));
     }
 
     // 봉투에서 payload JSON 추출

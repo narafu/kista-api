@@ -11,7 +11,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 // 사용자 통계 중 trading 소유 부분(실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록) —
-// housing/ETF 벤치마크 비교는 api의 UserStatsUseCase가 계속 소유한다
+// housing/ETF 벤치마크 비교는 api의 BenchmarkUseCase가 계속 소유한다
 public interface TradingStatsUseCase {
     StatsSummary getSummary(UUID userId);
 
