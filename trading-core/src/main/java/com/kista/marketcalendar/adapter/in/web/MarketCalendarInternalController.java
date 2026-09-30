@@ -1,5 +1,6 @@
 package com.kista.marketcalendar.adapter.in.web;
 
+import com.kista.contract.marketcalendar.MarketSessionResponse;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.marketcalendar.domain.model.MarketSessionSnapshot;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,10 +35,8 @@ public class MarketCalendarInternalController {
     }
 
     @GetMapping("/session")
-    public SessionResponse session() {
+    public MarketSessionResponse session() {
         MarketSessionSnapshot snapshot = MarketSessionSnapshot.now();
-        return new SessionResponse(snapshot.session().name(), snapshot.isDst());
+        return new MarketSessionResponse(snapshot.session(), snapshot.isDst());
     }
-
-    record SessionResponse(String session, boolean isDst) {}
 }

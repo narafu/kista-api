@@ -6,9 +6,9 @@ import com.kista.admin.adapter.in.web.dto.AdminReorderResponse;
 import com.kista.admin.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.admin.adapter.in.web.dto.AdminTradeResponse;
 import com.kista.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
-import com.kista.admin.domain.model.AdminAccountView;
-import com.kista.admin.domain.model.AdminOrderView;
-import com.kista.admin.domain.model.AdminStrategySummary;
+import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.contract.trading.OrderResponse;
+import com.kista.contract.trading.StrategySummaryResponse;
 import com.kista.user.domain.model.AdminUserView;
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
@@ -74,19 +74,19 @@ public class AdminTradeController {
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        List<AdminOrderView> orders = adminQuery.listStrategyOrders(accountId, strategyId, tradeDate).stream()
+        List<OrderResponse> orders = adminQuery.listStrategyOrders(accountId, strategyId, tradeDate).stream()
                 .filter(order -> accountId.equals(order.accountId()))
                 .toList();
         if (orders.isEmpty()) return List.of();
         // 단일 계좌만 조회 — 전체 풀스캔 불필요
-        AdminAccountView account = adminQuery.findAccount(accountId)
+        AccountSummaryResponse account = adminQuery.findAccount(accountId)
                 .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
         AdminUserView user = adminUser.findUser(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + account.userId()));
-        Map<UUID, AdminAccountView> accountMap = Map.of(accountId, account);
+        Map<UUID, AccountSummaryResponse> accountMap = Map.of(accountId, account);
         Map<UUID, AdminUserView> userMap = Map.of(account.userId(), user);
-        Set<UUID> cycleIds = orders.stream().map(AdminOrderView::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, AdminStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Set<UUID> cycleIds = orders.stream().map(OrderResponse::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, StrategySummaryResponse> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap)).toList();
     }
 
@@ -116,21 +116,21 @@ public class AdminTradeController {
         return AdminReorderResponse.from(adminReorder.reorder(adminId, request.toCommand()));
     }
 
-    // accountId → AdminAccountView 전체 매핑 (N+1 방지용 일괄 조회)
-    private Map<UUID, AdminAccountView> buildAccountMap() {
+    // accountId → AccountSummaryResponse 전체 매핑 (N+1 방지용 일괄 조회)
+    private Map<UUID, AccountSummaryResponse> buildAccountMap() {
         return adminQuery.listAccounts(null, null).stream()
-                .collect(Collectors.toMap(AdminAccountView::id, Function.identity()));
+                .collect(Collectors.toMap(AccountSummaryResponse::id, Function.identity()));
     }
 
     // 주문 목록 → AdminTradeResponse 목록 변환 (accountMap/userMap/strategyTypeMap 공통 조립)
-    private List<AdminTradeResponse> toResponses(List<AdminOrderView> orders) {
-        Map<UUID, AdminAccountView> accountMap = buildAccountMap();
+    private List<AdminTradeResponse> toResponses(List<OrderResponse> orders) {
+        Map<UUID, AccountSummaryResponse> accountMap = buildAccountMap();
         Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
         Set<UUID> cycleIds = orders.stream()
-                .map(AdminOrderView::strategyCycleId)
+                .map(OrderResponse::strategyCycleId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Map<UUID, AdminStrategySummary> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
+        Map<UUID, StrategySummaryResponse> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream()
                 .map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap))
                 .toList();

@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminReorderCommand;
+import com.kista.contract.trading.ReorderRequest;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -33,8 +33,8 @@ public record AdminReorderRequest(
         @Schema(description = "메모 (선택)")
         String memo
 ) {
-    public AdminReorderCommand toCommand() {
-        return new AdminReorderCommand(
+    public ReorderRequest toCommand() {
+        return new ReorderRequest(
                 userId,
                 accountId,
                 strategyId,

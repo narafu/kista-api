@@ -1,6 +1,6 @@
 package com.kista.stats.application.port.output;
 
-import com.kista.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.stats.domain.model.BenchmarkScope;
 import com.kista.stats.domain.model.InvestmentPoint;
 import com.kista.stats.domain.model.StrategyRef;

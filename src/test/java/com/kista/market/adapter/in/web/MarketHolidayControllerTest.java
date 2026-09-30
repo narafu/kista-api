@@ -6,7 +6,7 @@ import com.kista.platform.security.SecurityConfig;
 import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
 import com.kista.market.application.usecase.MarketUseCase;
-import com.kista.market.domain.model.MarketSession;
+import com.kista.sharedkernel.MarketSession;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -70,7 +70,7 @@ class MarketHolidayControllerTest {
     @Test
     void session_returns_200_without_auth() throws Exception {
         when(marketCalendarQueryPort.currentSession())
-                .thenReturn(new MarketCalendarQueryPort.SessionView(MarketSession.DIRECT, true));
+                .thenReturn(new com.kista.contract.marketcalendar.MarketSessionResponse(MarketSession.DIRECT, true));
 
         // /api/market/session은 anyRequest().authenticated() 에 해당 — 인증 포함으로 테스트
         mockMvc.perform(get("/api/market/session")

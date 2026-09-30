@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
-import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
+import com.kista.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.admin.domain.model.AdminPrivacyTradeConflictException;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
@@ -68,9 +68,9 @@ class AdminPrivacyTradeControllerTest {
 
     @Test
     void listBases_adminRange30_returns200_andPassesDays30() throws Exception {
-        var view = new AdminPrivacyTradeBaseView(UUID.randomUUID(), LocalDate.of(2026, 6, 10), "SOXL",
+        var view = new PrivacyTradeBaseResponse(UUID.randomUUID(), LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("45.20"), new BigDecimal("27.80"), 120,
-                List.of(new AdminPrivacyTradeBaseView.OrderLine(UUID.randomUUID(), "BUY", "LOC", new BigDecimal("14.25"), 60)));
+                List.of(new PrivacyTradeBaseResponse.OrderLine(UUID.randomUUID(), "BUY", "LOC", new BigDecimal("14.25"), 60)));
         when(adminQuery.listPrivacyBases(30)).thenReturn(List.of(view));
 
         mockMvc.perform(get("/api/admin/privacy-trade-bases?range=30")
@@ -103,7 +103,7 @@ class AdminPrivacyTradeControllerTest {
     @Test
     void createBase_신규저장이면_201을_반환한다() throws Exception {
         UUID id = UUID.randomUUID();
-        var view = new AdminPrivacyTradeBaseView(id, LocalDate.of(2026, 6, 10), "SOXL",
+        var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("0"), null, 0, List.of());
         when(adminPrivacyTrade.createBase(eq(ADMIN_UUID), any()))
                 .thenReturn(new AdminPrivacyTradeUseCase.CreateResult(view, true));
@@ -123,7 +123,7 @@ class AdminPrivacyTradeControllerTest {
     @Test
     void createBase_기존동일데이터면_200을_반환한다() throws Exception {
         UUID id = UUID.randomUUID();
-        var view = new AdminPrivacyTradeBaseView(id, LocalDate.of(2026, 6, 10), "SOXL",
+        var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), new BigDecimal("0"), null, 0, List.of());
         when(adminPrivacyTrade.createBase(eq(ADMIN_UUID), any()))
                 .thenReturn(new AdminPrivacyTradeUseCase.CreateResult(view, false));
@@ -161,7 +161,7 @@ class AdminPrivacyTradeControllerTest {
     @Test
     void updateBase_요청을_위임하고_결과를_반환한다() throws Exception {
         UUID id = UUID.randomUUID();
-        var view = new AdminPrivacyTradeBaseView(id, LocalDate.of(2026, 6, 10), "SOXL",
+        var view = new PrivacyTradeBaseResponse(id, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("30.00"), new BigDecimal("5.00"), new BigDecimal("29.00"), 100, List.of());
         when(adminPrivacyTrade.updateBase(eq(ADMIN_UUID), eq(id), any())).thenReturn(view);
 
@@ -180,7 +180,7 @@ class AdminPrivacyTradeControllerTest {
     void updateOrder_요청을_위임하고_결과를_반환한다() throws Exception {
         UUID baseId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
-        var view = new AdminPrivacyTradeBaseView(baseId, LocalDate.of(2026, 6, 10), "SOXL",
+        var view = new PrivacyTradeBaseResponse(baseId, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("30.00"), new BigDecimal("5.00"), new BigDecimal("29.00"), 100, List.of());
         when(adminPrivacyTrade.updateOrder(eq(ADMIN_UUID), eq(baseId), eq(orderId), any())).thenReturn(view);
 

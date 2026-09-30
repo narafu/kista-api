@@ -1,15 +1,19 @@
 package com.kista.stats.adapter.out.internal;
 
+import com.kista.contract.stats.InvestmentPointsResponse;
 import com.kista.platform.internalapi.InternalApiErrorDetails;
 import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.stats.application.port.output.InvestmentPointsPort;
-import com.kista.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.stats.domain.model.BenchmarkScope;
+import com.kista.stats.domain.model.InvestmentPoint;
+import com.kista.stats.domain.model.StrategyRef;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,9 +43,20 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
                 .onStatus(status -> status.value() == 403, (request, response) -> {
                     throw new SecurityException(InternalApiErrorDetails.detailOrDefault(response, "소유하지 않은 리소스입니다"));
                 });
-        return InternalApiStatusHandlers.badRequestAsIllegalArgument(
+        InvestmentPointsResponse response = InternalApiStatusHandlers.badRequestAsIllegalArgument(
                         InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "리소스를 찾을 수 없습니다"),
                         "잘못된 요청입니다")
-                .body(Result.class);
+                .body(InvestmentPointsResponse.class);
+        return toResult(response);
+    }
+
+    // contract → stats 도메인 매핑 — 벤치마크 계산(HousingBenchmarkComparisonBuilder 등)은 root stats 도메인 타입을 쓴다
+    private static Result toResult(InvestmentPointsResponse r) {
+        List<InvestmentPoint> points = r.points().stream()
+                .map(p -> new InvestmentPoint(p.baseDate(), p.investmentIndexUsd(), p.periodReturn()))
+                .toList();
+        StrategyRef strategy = r.selectedStrategy() == null ? null
+                : new StrategyRef(r.selectedStrategy().id(), r.selectedStrategy().type(), r.selectedStrategy().ticker());
+        return new Result(points, r.effectiveFrom(), r.effectiveTo(), strategy);
     }
 }

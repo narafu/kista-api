@@ -4,7 +4,7 @@ import com.kista.trading.application.port.output.TradingUserProfilePort;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.notify.application.port.output.TradingRealtimeNotificationPort;
 import com.kista.trading.notify.application.port.output.TradingUserNotificationPort;
-import com.kista.trading.notify.domain.model.TradeEventView;
+import com.kista.contract.notify.TradeEventMessage;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.TradeLegSummary;
@@ -40,9 +40,9 @@ class TradingReportNotifier {
 
         // 체결 건별 SSE 실시간 알림 — 알림 설정과 무관하게 항상 발송
         for (TradeLegSummary e : event.executions()) {
-            TradeEventView tradeEvent = e.direction() == OrderDirection.SELL
-                    ? TradeEventView.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.accountNickname())
-                    : TradeEventView.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.accountNickname());
+            TradeEventMessage tradeEvent = e.direction() == OrderDirection.SELL
+                    ? TradeEventMessage.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.accountNickname())
+                    : TradeEventMessage.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.accountNickname());
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", event.accountNickname(), event.executions().size());

@@ -3,7 +3,7 @@ package com.kista.trading.stats.adapter.in.web;
 import com.kista.broker.application.port.output.ExchangeRatePort;
 import com.kista.trading.stats.application.usecase.InvestmentPointsQuery;
 import com.kista.trading.stats.domain.model.InvestmentPointsResult;
-import com.kista.trading.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;

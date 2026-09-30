@@ -1,5 +1,6 @@
 package com.kista.trading.domain.model;
 
+import com.kista.sharedkernel.MarketSession;
 import com.kista.sharedkernel.TimeZones;
 
 import java.time.*;
@@ -33,12 +34,6 @@ public record DstInfo(
 
     private static Instant atKst(LocalDate date, LocalTime time) {
         return date.atTime(time).atZone(KST).toInstant();
-    }
-
-    // 수동 실행 시 주문 가능 시간대
-    public enum MarketSession {
-        DIRECT,  // 프리마켓+정규장: 주문 가능 (DST: 17:00~05:00, 비DST: 18:00~06:00)
-        BLOCKED  // 장마감 후~프리마켓 전: 주문 불가 (DST: 05:00~17:00, 비DST: 06:00~18:00)
     }
 
     // 현재 KST 기준 주문 가능 시간대 판단 — 주말은 요일 무관 BLOCKED

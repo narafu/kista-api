@@ -1,7 +1,7 @@
 package com.kista.trading.notify.adapter.out.gateway;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.trading.notify.domain.model.TradeEventView;
+import com.kista.contract.notify.TradeEventMessage;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -61,7 +61,7 @@ class RedisTradeEventPublisherTest {
 
         RedisTradeEventPublisher publisher = new RedisTradeEventPublisher(redisTemplate, new ObjectMapper());
         UUID userId = UUID.randomUUID();
-        TradeEventView event = TradeEventView.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
+        TradeEventMessage event = TradeEventMessage.buy("SOXL", 5, 22.5, 112.5, "테스트계좌");
 
         // 리스너 등록이 비동기라 발행 전 잠깐의 여유가 필요 — 실패 시 sleep 연장 대신 원인 재확인
         Thread.sleep(200);

@@ -3,7 +3,7 @@ package com.kista.market.application.service;
 import com.kista.market.application.port.output.CandleQueryPort;
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
 import com.kista.market.application.usecase.MarketUseCase;
-import com.kista.market.domain.model.TossDailyCandle;
+import com.kista.contract.broker.DailyCandleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +23,7 @@ class MarketHolidayService implements MarketUseCase {
     }
 
     @Override
-    public List<TossDailyCandle> getDailyCandles(String symbol, int count) {
+    public List<DailyCandleResponse> getDailyCandles(String symbol, int count) {
         return candleQueryPort.latestDailyCandles(symbol, count);
     }
 }

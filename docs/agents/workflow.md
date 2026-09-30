@@ -17,7 +17,7 @@
 - `KbLandHousingBenchmarkScheduler`: 매주 토요일 08:00 KST `kbland-housing-benchmark` 분산 락으로 실행 — KB Land 최근 1년치 아파트 5분위 매매평균가격을 자연키(source+metric+region+baseMonth) 기준 upsert
 - `KbLandPriceIndexScheduler`: 매주 토요일 08:10 KST `kbland-price-index` 분산 락(5분위와 별도)으로 실행 — KB Land 최근 2년치 아파트 주간 매매가격지수를 자연키(source+metric+region+baseDate) 기준 upsert. 매월 1일 08:20 KST `kbland-price-index-full` 분산 락으로 20년 전체를 다시 받아 과거 기준일 값 사후 보정을 반영(수동 트리거: `POST /api/admin/scheduler/kbland-price-index/full-refresh`)
 
-### DstInfo.MarketSession (수동 실행 시간대 판단)
+### MarketSession (수동 실행 시간대 판단 — `sharedkernel.MarketSession`)
 - `DIRECT`: 프리마켓+정규장 전 구간 — 주문 가능 (DST: 17:00~05:00 / 비DST: 18:00~06:00 KST)
 - `BLOCKED`: 장마감~프리마켓 전 — 주문 불가 (DST: 05:00~17:00 / 비DST: 06:00~18:00 KST)
 - `ManualTradingService.execute()` 수동 실행 진입 시 BLOCKED이면 `IllegalStateException` → 컨트롤러 503; DIRECT(개장 후)이면 AT_OPEN PLANNED 주문(INFINITE는 매도 선접수, VR은 매수·매도 사다리)을 `TradingOrderExecutor.placeAtOpenOrders()`로 즉시 접수한다 — 개장 스케쥴러와 동일하게 BUY cap 보정(`BuyOrderPriceCapper`)을 거친 뒤 접수되며, 반환은 `findPlannedOrPlacedByCycleAndDate`. SELL 가능수량 검증은 같은 계좌·거래일·ticker의 기존 PLANNED/PLACED 예약 수량과 신규 SELL 합계를 사용한다.

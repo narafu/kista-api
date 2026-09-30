@@ -1,13 +1,13 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.TradingCommandPort;
-import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
-import com.kista.admin.domain.model.AdminReorderCommand;
-import com.kista.admin.domain.model.AdminReorderResult;
-import com.kista.admin.domain.model.AdminReorderTimingAvailability;
+import com.kista.contract.trading.TradeCorrectionRequest;
+import com.kista.contract.trading.ReorderRequest;
+import com.kista.contract.trading.ReorderResponse;
+import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
 import com.kista.admin.domain.model.AdminBrokerCredentialException;
 import com.kista.admin.domain.model.AdminBrokerRateLimitException;
-import com.kista.admin.domain.model.AdminTradeCorrectionResult;
+import com.kista.contract.trading.TradeCorrectionResponse;
 import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.sharedkernel.StrategyStatus;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +37,7 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
     // 각 케이스는 trading 쪽 GlobalExceptionHandler가 ProblemDetail.detail에 실은 원 메시지를 그대로
     // 옮겨 담아 admin 운영자가 9가지 거절 사유를 구분할 수 있게 한다(고정 문구로 뭉개지 않음).
     @Override
-    public AdminReorderResult reorder(AdminReorderCommand command) {
+    public ReorderResponse reorder(ReorderRequest command) {
         // 404/400은 공용 팩토리(InternalApiStatusHandlers)로 위임, 422/429는 admin 전용 표지 예외라 그대로 유지
         RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
                 .uri("/api/internal/trading/reorder")
@@ -52,29 +52,29 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
                 .onStatus(status -> status.value() == 429, (request, response) -> {
                     throw new AdminBrokerRateLimitException();
                 })
-                .body(AdminReorderResult.class);
+                .body(ReorderResponse.class);
     }
 
     @Override
-    public AdminTradeCorrectionResult correctManualFills(AdminManualTradeCorrectionCommand command) {
+    public TradeCorrectionResponse correctManualFills(TradeCorrectionRequest command) {
         RestClient.ResponseSpec spec = internalApiWriteRestClient.post()
                 .uri("/api/internal/trading/trade-corrections")
                 .body(command)
                 .retrieve();
         spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "계좌 또는 전략을 찾을 수 없습니다");
         return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "수동 체결 보정 요청이 유효하지 않습니다")
-                .body(AdminTradeCorrectionResult.class);
+                .body(TradeCorrectionResponse.class);
     }
 
     // 순수 조회(DstInfo.calculate()의 로컬 계산)라 도메인 예외가 없다 — 401(INTERNAL_API_TOKEN 미설정)·
     // 5xx(trading 쪽 장애)뿐이며 둘 다 인프라 오류이므로 admin의 GlobalExceptionHandler catch-all(500 +
     // saveErrorLog)로 떨어지는 것이 적절한 동작이다. 의도적으로 onStatus 매핑을 추가하지 않는다.
     @Override
-    public AdminReorderTimingAvailability reorderTimingAvailability() {
+    public ReorderTimingAvailabilityResponse reorderTimingAvailability() {
         return internalApiRestClient.get()
                 .uri("/api/internal/trading/reorder-timing-availability")
                 .retrieve()
-                .body(AdminReorderTimingAvailability.class);
+                .body(ReorderTimingAvailabilityResponse.class);
     }
 
     // 계좌·전략 소유권 검증 + 저장은 trading-core 쪽에서 처리 — DB 쓰기 경로라 internalApiWriteRestClient 사용

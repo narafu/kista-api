@@ -2,10 +2,10 @@ package com.kista.admin.application.service;
 
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.PrivacyQueryPort;
-import com.kista.admin.domain.model.AdminFidaOrderCommand;
-import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
+import com.kista.contract.privacy.FidaOrderRequest;
+import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
@@ -41,9 +41,9 @@ class AdminPrivacyTradeServiceTest {
 
     @Test
     void createBase_포트에_위임하고_결과와_감사로그를_남긴다() {
-        AdminFidaOrderCommand command = new AdminFidaOrderCommand(LocalDate.of(2026, 6, 10), StrategyTicker.SOXL,
+        FidaOrderRequest command = new FidaOrderRequest(LocalDate.of(2026, 6, 10), StrategyTicker.SOXL,
                 new BigDecimal("28.50"), BigDecimal.ZERO, null, 0, List.of());
-        AdminPrivacyTradeBaseView view = new AdminPrivacyTradeBaseView(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
+        PrivacyTradeBaseResponse view = new PrivacyTradeBaseResponse(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("28.50"), BigDecimal.ZERO, null, 0, List.of());
         when(privacyQueryPort.createBase(command)).thenReturn(new PrivacyQueryPort.CreateBaseResult(view, true));
 
@@ -56,13 +56,13 @@ class AdminPrivacyTradeServiceTest {
 
     @Test
     void updateBase_포트에_위임하고_감사로그를_남긴다() {
-        AdminPrivacyBaseUpdateCommand command = new AdminPrivacyBaseUpdateCommand(
+        PrivacyBaseUpdateRequest command = new PrivacyBaseUpdateRequest(
                 new BigDecimal("30.00"), new BigDecimal("5.00"), new BigDecimal("29.00"), 100);
-        AdminPrivacyTradeBaseView view = new AdminPrivacyTradeBaseView(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
+        PrivacyTradeBaseResponse view = new PrivacyTradeBaseResponse(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("30.00"), new BigDecimal("5.00"), new BigDecimal("29.00"), 100, List.of());
         when(privacyQueryPort.updateBase(BASE_ID, command)).thenReturn(view);
 
-        AdminPrivacyTradeBaseView result = service.updateBase(ADMIN_ID, BASE_ID, command);
+        PrivacyTradeBaseResponse result = service.updateBase(ADMIN_ID, BASE_ID, command);
 
         assertThat(result).isEqualTo(view);
         verify(auditLogPort).log(eq(ADMIN_ID), eq("PRIVACY_BASE_UPDATE"), eq("PRIVACY_TRADE_BASE"), eq(BASE_ID), any());
@@ -70,12 +70,12 @@ class AdminPrivacyTradeServiceTest {
 
     @Test
     void updateOrder_포트에_위임하고_감사로그를_남긴다() {
-        AdminPrivacyOrderUpdateCommand command = new AdminPrivacyOrderUpdateCommand(new BigDecimal("31.00"), 15);
-        AdminPrivacyTradeBaseView view = new AdminPrivacyTradeBaseView(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
+        PrivacyOrderUpdateRequest command = new PrivacyOrderUpdateRequest(new BigDecimal("31.00"), 15);
+        PrivacyTradeBaseResponse view = new PrivacyTradeBaseResponse(BASE_ID, LocalDate.of(2026, 6, 10), "SOXL",
                 new BigDecimal("30.00"), new BigDecimal("5.00"), new BigDecimal("29.00"), 100, List.of());
         when(privacyQueryPort.updateOrder(BASE_ID, ORDER_ID, command)).thenReturn(view);
 
-        AdminPrivacyTradeBaseView result = service.updateOrder(ADMIN_ID, BASE_ID, ORDER_ID, command);
+        PrivacyTradeBaseResponse result = service.updateOrder(ADMIN_ID, BASE_ID, ORDER_ID, command);
 
         assertThat(result).isEqualTo(view);
         verify(auditLogPort).log(eq(ADMIN_ID), eq("PRIVACY_ORDER_UPDATE"), eq("PRIVACY_TRADE_BASE_ORDER"), eq(ORDER_ID), any());

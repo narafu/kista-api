@@ -1,9 +1,9 @@
 package com.kista.trading.stats.adapter.in.web;
 
 import com.kista.broker.application.port.output.ExchangeRatePort;
-import com.kista.trading.stats.adapter.in.web.dto.InvestmentPointsResponse;
+import com.kista.contract.stats.InvestmentPointsResponse;
 import com.kista.trading.stats.application.usecase.InvestmentPointsQuery;
-import com.kista.trading.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.trading.stats.domain.model.InvestmentPointsResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,8 +34,7 @@ public class TradingStatsInternalController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam BenchmarkGranularity granularity) {
         InvestmentPointsResult result = investmentPointsQuery.fetch(userId, scope, strategyId, from, to, granularity);
-        return new InvestmentPointsResponse(
-                result.points(), result.effectiveFrom(), result.effectiveTo(), result.selectedStrategy());
+        return StatsContractMapper.toResponse(result);
     }
 
     @Operation(summary = "현재 USD/KRW 매매기준율 조회", description = "TOSS_INVEST 매매기준율(midRate) 단일 값. X-Internal-Token 헤더 필수.")

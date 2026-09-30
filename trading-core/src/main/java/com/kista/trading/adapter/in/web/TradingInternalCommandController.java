@@ -1,12 +1,13 @@
 package com.kista.trading.adapter.in.web;
 
+import com.kista.contract.trading.ReorderRequest;
+import com.kista.contract.trading.ReorderResponse;
+import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
+import com.kista.contract.trading.TradeCorrectionRequest;
+import com.kista.contract.trading.TradeCorrectionResponse;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.trading.domain.model.DstInfo;
-import com.kista.trading.domain.model.ManualTradeCorrectionCommand;
-import com.kista.trading.domain.model.ManualTradeCorrectionResult;
-import com.kista.trading.domain.model.ReorderCommand;
-import com.kista.trading.domain.model.ReorderResult;
 import com.kista.trading.application.usecase.ManualTradeCorrectionUseCase;
 import com.kista.trading.application.usecase.ReorderUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,22 +31,23 @@ public class TradingInternalCommandController {
 
     @Operation(summary = "관리자 재주문 접수/취소")
     @PostMapping("/reorder")
-    public ReorderResult reorder(@RequestBody @Valid ReorderCommand command) {
-        return reorderUseCase.reorder(command);
+    public ReorderResponse reorder(@RequestBody @Valid ReorderRequest request) {
+        return TradingContractMapper.toResponse(reorderUseCase.reorder(TradingContractMapper.toCommand(request)));
     }
 
     @Operation(summary = "관리자 수동 체결 보정")
     @PostMapping("/trade-corrections")
-    public ManualTradeCorrectionResult correctManualFills(@RequestBody @Valid ManualTradeCorrectionCommand command) {
-        return manualTradeCorrectionUseCase.correctManualFills(command);
+    public TradeCorrectionResponse correctManualFills(@RequestBody @Valid TradeCorrectionRequest request) {
+        return TradingContractMapper.toResponse(
+                manualTradeCorrectionUseCase.correctManualFills(TradingContractMapper.toCommand(request)));
     }
 
     @Operation(summary = "재주문 시점 가용성 조회", description = "비개장일엔 3개 boolean 전부 false를 반환합니다.")
     @GetMapping("/reorder-timing-availability")
-    public DstInfo.ReorderTimingAvailability reorderTimingAvailability() {
+    public ReorderTimingAvailabilityResponse reorderTimingAvailability() {
         if (!marketCalendarPort.isMarketOpen(LocalDate.now(TimeZones.KST))) {
-            return new DstInfo.ReorderTimingAvailability(false, false, false);
+            return new ReorderTimingAvailabilityResponse(false, false, false);
         }
-        return DstInfo.calculate().reorderTimingAvailability();
+        return TradingContractMapper.toResponse(DstInfo.calculate().reorderTimingAvailability());
     }
 }

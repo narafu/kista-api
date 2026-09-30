@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.out.internal;
 
-import com.kista.admin.domain.model.AdminOrderView;
-import com.kista.admin.domain.model.AdminStrategySummary;
+import com.kista.contract.trading.OrderResponse;
+import com.kista.contract.trading.StrategySummaryResponse;
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
@@ -80,10 +80,10 @@ class TradingQueryHttpAdapterTest {
                     """.formatted(id, accountId, strategyCycleId))
                 .build());
 
-        List<AdminOrderView> result = adapter.findAllOrders(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1));
+        List<OrderResponse> result = adapter.findAllOrders(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1));
 
         assertThat(result).hasSize(1);
-        AdminOrderView order = result.get(0);
+        OrderResponse order = result.get(0);
         assertThat(order.id()).isEqualTo(id);
         assertThat(order.accountId()).isEqualTo(accountId);
         assertThat(order.strategyCycleId()).isEqualTo(strategyCycleId);
@@ -116,7 +116,7 @@ class TradingQueryHttpAdapterTest {
                     """.formatted(cycleId, strategyId))
                 .build());
 
-        Map<UUID, AdminStrategySummary> result = adapter.findStrategySummariesByCycleIds(Set.of(cycleId));
+        Map<UUID, StrategySummaryResponse> result = adapter.findStrategySummariesByCycleIds(Set.of(cycleId));
 
         assertThat(result).containsOnlyKeys(cycleId);
         assertThat(result.get(cycleId).strategyId()).isEqualTo(strategyId);

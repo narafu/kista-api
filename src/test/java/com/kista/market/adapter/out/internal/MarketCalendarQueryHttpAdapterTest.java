@@ -1,7 +1,8 @@
 package com.kista.market.adapter.out.internal;
 
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
-import com.kista.market.domain.model.MarketSession;
+import com.kista.contract.marketcalendar.MarketSessionResponse;
+import com.kista.sharedkernel.MarketSession;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
@@ -57,13 +58,13 @@ class MarketCalendarQueryHttpAdapterTest {
     }
 
     @Test
-    void currentSession_내부_API_응답을_own_type으로_변환한다() {
+    void currentSession_내부_API_응답을_contract_type으로_역직렬화한다() {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("{\"session\":\"DIRECT\",\"isDst\":true}")
                 .build());
 
-        MarketCalendarQueryPort.SessionView session = adapter.currentSession();
+        MarketSessionResponse session = adapter.currentSession();
 
         assertThat(session.session()).isEqualTo(MarketSession.DIRECT);
         assertThat(session.isDst()).isTrue();

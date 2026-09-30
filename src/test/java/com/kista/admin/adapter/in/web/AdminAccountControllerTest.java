@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
-import com.kista.admin.domain.model.AdminStrategyView;
+import com.kista.contract.trading.StrategyResponse;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminStrategyUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
@@ -79,7 +79,7 @@ class AdminAccountControllerTest {
     void listStrategiesByAccount_adminRole_returns200() throws Exception {
         UUID accountId = UUID.randomUUID();
         when(adminQuery.listStrategies(accountId)).thenReturn(List.of(
-                new AdminStrategyView(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                new StrategyResponse(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                         StrategyTicker.SOXL, StrategyCycleSeedType.MAX)));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies", accountId)

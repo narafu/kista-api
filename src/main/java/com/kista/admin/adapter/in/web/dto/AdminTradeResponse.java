@@ -1,8 +1,8 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminAccountView;
-import com.kista.admin.domain.model.AdminOrderView;
-import com.kista.admin.domain.model.AdminStrategySummary;
+import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.contract.trading.OrderResponse;
+import com.kista.contract.trading.StrategySummaryResponse;
 import com.kista.user.domain.model.AdminUserView;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -48,15 +48,15 @@ public record AdminTradeResponse(
         @Schema(description = "체결 가격 (미체결 시 null)")
         BigDecimal filledPrice
 ) {
-    public static AdminTradeResponse from(AdminOrderView t, Map<UUID, AdminAccountView> accountMap,
+    public static AdminTradeResponse from(OrderResponse t, Map<UUID, AccountSummaryResponse> accountMap,
                                           Map<UUID, AdminUserView> userMap,
-                                          Map<UUID, AdminStrategySummary> strategySummaryMap) {
+                                          Map<UUID, StrategySummaryResponse> strategySummaryMap) {
         // accountId → userId → nickname 순서로 역방향 조회
-        AdminAccountView account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
+        AccountSummaryResponse account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
         UUID userId = account != null ? account.userId() : null;
         AdminUserView user = userId != null ? userMap.get(userId) : null;
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
-        AdminStrategySummary strategySummary = t.strategyCycleId() != null ? strategySummaryMap.get(t.strategyCycleId()) : null;
+        StrategySummaryResponse strategySummary = t.strategyCycleId() != null ? strategySummaryMap.get(t.strategyCycleId()) : null;
         return new AdminTradeResponse(
                 t.id(), userId, t.accountId(),
                 strategySummary != null ? strategySummary.strategyId() : null,

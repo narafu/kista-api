@@ -1,8 +1,8 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminAccountView;
+import com.kista.contract.account.AccountSummaryResponse;
 import com.kista.user.domain.model.AdminUserView;
-import com.kista.admin.domain.model.AdminStrategyView;
+import com.kista.contract.trading.StrategyResponse;
 import com.kista.sharedkernel.AccountNumberMasker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -24,7 +24,7 @@ public record AdminAccountResponse(
         @Schema(description = "계좌에 등록된 전략 목록")
         List<AdminStrategyResponse> strategies
 ) {
-    public static AdminAccountResponse from(AdminAccountView a, AdminUserView user, List<AdminStrategyView> strategies) {
+    public static AdminAccountResponse from(AccountSummaryResponse a, AdminUserView user, List<StrategyResponse> strategies) {
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
         return new AdminAccountResponse(
                 a.id(), a.userId(), nickname, AccountNumberMasker.mask(a.accountNo()),

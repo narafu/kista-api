@@ -3,8 +3,8 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
-import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
-import com.kista.admin.domain.model.AdminTradeCorrectionResult;
+import com.kista.contract.trading.TradeCorrectionRequest;
+import com.kista.contract.trading.TradeCorrectionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +22,8 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
     private final AuditLogPort auditLogPort;
 
     @Override
-    public AdminTradeCorrectionResult correctManualFills(UUID adminId, AdminManualTradeCorrectionCommand command) {
-        AdminTradeCorrectionResult result = tradingCommandPort.correctManualFills(command);
+    public TradeCorrectionResponse correctManualFills(UUID adminId, TradeCorrectionRequest command) {
+        TradeCorrectionResponse result = tradingCommandPort.correctManualFills(command);
 
         auditLogPort.log(adminId, AUDIT_ACTION, "STRATEGY", result.strategyId(),
                 Map.of(

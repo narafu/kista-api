@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.AccountQueryPort;
-import com.kista.admin.domain.model.AdminAccountView;
+import com.kista.contract.account.AccountSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,7 @@ class AccountQueryHttpAdapter implements AccountQueryPort {
     private final RestClient internalApiRestClient;
 
     @Override
-    public List<AdminAccountView> findAll(LocalDate from, LocalDate to) {
+    public List<AccountSummaryResponse> findAll(LocalDate from, LocalDate to) {
         return internalApiRestClient.get()
                 .uri(b -> {
                     b.path("/api/internal/accounts");
@@ -28,15 +28,15 @@ class AccountQueryHttpAdapter implements AccountQueryPort {
                     if (to != null) b.queryParam("to", to);
                     return b.build();
                 })
-                .retrieve().body(new ParameterizedTypeReference<List<AdminAccountView>>() {});
+                .retrieve().body(new ParameterizedTypeReference<List<AccountSummaryResponse>>() {});
     }
 
     @Override
-    public Optional<AdminAccountView> findById(UUID accountId) {
+    public Optional<AccountSummaryResponse> findById(UUID accountId) {
         try {
             return Optional.ofNullable(internalApiRestClient.get()
                     .uri("/api/internal/accounts/{id}", accountId)
-                    .retrieve().body(AdminAccountView.class));
+                    .retrieve().body(AccountSummaryResponse.class));
         } catch (HttpClientErrorException.NotFound e) {
             // trading-core 쪽 findByIdOrThrow가 NoSuchElementException -> 404로 매핑되는 경우 —
             // 없음을 나타내는 Optional.empty()로 되돌린다

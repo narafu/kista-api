@@ -4,11 +4,11 @@ import com.kista.sharedkernel.OrderStatus;
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
-import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
-import com.kista.admin.domain.model.AdminReorderCommand;
-import com.kista.admin.domain.model.AdminReorderResult;
-import com.kista.admin.domain.model.AdminReorderTimingAvailability;
-import com.kista.admin.domain.model.AdminTradeCorrectionResult;
+import com.kista.contract.trading.TradeCorrectionRequest;
+import com.kista.contract.trading.ReorderRequest;
+import com.kista.contract.trading.ReorderResponse;
+import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
+import com.kista.contract.trading.TradeCorrectionResponse;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.OrderTiming;
@@ -82,7 +82,7 @@ class AdminInternalApiIntegrationTest {
     void MOCK_계좌_재주문이_내부_API를_왕복해_PLANNED로_접수된다() {
         // 재주문 접수는 실시간 KST 요일/시각(DstInfo)에 무조건 게이팅된다(BLOCKED 시간대·주말 전부 불가) —
         // 테스트 클럭을 주입할 수 없으므로 실제 가용성을 먼저 조회(=배선 검증 겸용)하고, 불가 구간이면 스킵한다.
-        AdminReorderTimingAvailability avail = tradingCommandPort.reorderTimingAvailability();
+        ReorderTimingAvailabilityResponse avail = tradingCommandPort.reorderTimingAvailability();
         assumeTrue(avail.atClose(), "BLOCKED 시간대 또는 주말 — 지금은 재주문 접수가 불가능한 구간이라 스킵");
 
         UUID userId = UUID.randomUUID();
@@ -115,11 +115,11 @@ class AdminInternalApiIntegrationTest {
                         + "VALUES (?, ?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', ?, ?, 'PLANNED', now(), now())",
                 orderId, accountId, cycleId, today, new BigDecimal("20.00"), 1);
 
-        AdminReorderCommand command = new AdminReorderCommand(
+        ReorderRequest command = new ReorderRequest(
                 userId, accountId, strategyId, orderId,
                 OrderTiming.AT_CLOSE, today, OrderDirection.BUY, 2, new BigDecimal("21.00"), "통합테스트");
 
-        AdminReorderResult result = adminReorderUseCase.reorder(userId, command); // adminId는 감사 로그 FK용 — 소유자 재사용
+        ReorderResponse result = adminReorderUseCase.reorder(userId, command); // adminId는 감사 로그 FK용 — 소유자 재사용
 
         assertThat(result.sourceOrderId()).isEqualTo(orderId);
         assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLANNED);
@@ -171,12 +171,12 @@ class AdminInternalApiIntegrationTest {
                         + "VALUES (?, ?, ?, ?, ?, now())",
                 UUID.randomUUID(), cycleId, new BigDecimal("1000.00"), new BigDecimal("100.00"), 2);
 
-        AdminManualTradeCorrectionCommand command = new AdminManualTradeCorrectionCommand(
+        TradeCorrectionRequest command = new TradeCorrectionRequest(
                 userId, accountId, strategyId,
-                List.of(new AdminManualTradeCorrectionCommand.Fill(
+                List.of(new TradeCorrectionRequest.Fill(
                         today, OrderDirection.BUY, 1, new BigDecimal("120.00"), "MANUAL-1", "통합테스트")));
 
-        AdminTradeCorrectionResult result = adminTradeCorrectionUseCase.correctManualFills(userId, command);
+        TradeCorrectionResponse result = adminTradeCorrectionUseCase.correctManualFills(userId, command);
 
         // BUY 1주@120 반영 후: holdings=3, avgPrice=(100*2+120)/3=106.6667, usdDeposit=1000-120=880.00
         assertThat(result.processedCount()).isEqualTo(1);

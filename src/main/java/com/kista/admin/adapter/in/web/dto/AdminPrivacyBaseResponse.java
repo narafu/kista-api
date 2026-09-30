@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
+import com.kista.contract.privacy.PrivacyTradeBaseResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -27,7 +27,7 @@ public record AdminPrivacyBaseResponse(
         @Schema(description = "계획 주문 명세 목록")
         List<OrderLine> orders
 ) {
-    public static AdminPrivacyBaseResponse from(AdminPrivacyTradeBaseView v) {
+    public static AdminPrivacyBaseResponse from(PrivacyTradeBaseResponse v) {
         List<OrderLine> orders = v.orders().stream().map(OrderLine::from).toList();
         return new AdminPrivacyBaseResponse(v.id(), v.releaseDate(), v.ticker(),
                 v.currentCycleStart(), v.currentCycleRealizedPnl(), v.avgPrice(), v.holdings(), orders);
@@ -45,7 +45,7 @@ public record AdminPrivacyBaseResponse(
             BigDecimal price,
             @Schema(description = "주문 수량 (nullable)")
             Integer quantity) {
-        public static OrderLine from(AdminPrivacyTradeBaseView.OrderLine o) {
+        public static OrderLine from(PrivacyTradeBaseResponse.OrderLine o) {
             return new OrderLine(o.id(), o.direction(), o.orderType(), o.price(), o.quantity());
         }
     }

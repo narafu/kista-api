@@ -1,7 +1,7 @@
 package com.kista.market.adapter.out.internal;
 
+import com.kista.contract.marketcalendar.MarketSessionResponse;
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
-import com.kista.market.domain.model.MarketSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -28,13 +28,10 @@ class MarketCalendarQueryHttpAdapter implements MarketCalendarQueryPort {
     }
 
     @Override
-    public SessionView currentSession() {
-        SessionResponse response = internalApiRestClient.get()
+    public MarketSessionResponse currentSession() {
+        return internalApiRestClient.get()
                 .uri("/api/internal/marketcalendar/session")
                 .retrieve()
-                .body(SessionResponse.class);
-        return new SessionView(MarketSession.valueOf(response.session()), response.isDst());
+                .body(MarketSessionResponse.class);
     }
-
-    record SessionResponse(String session, boolean isDst) {}
 }

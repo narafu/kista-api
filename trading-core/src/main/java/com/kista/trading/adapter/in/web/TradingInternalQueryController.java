@@ -1,10 +1,11 @@
 package com.kista.trading.adapter.in.web;
 
+import com.kista.contract.trading.OrderResponse;
+import com.kista.contract.trading.StrategyResponse;
+import com.kista.contract.trading.StrategySummaryResponse;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyPort;
-import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.StrategySummary;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 // admin의 TradingQueryHttpAdapter가 소비하는 내부 전용 읽기 엔드포인트 — X-Internal-Token 인증
@@ -30,10 +32,10 @@ public class TradingInternalQueryController {
 
     @Operation(summary = "기간 내 전체 주문 조회", description = "관리자 거래내역 조회용. X-Internal-Token 필수.")
     @GetMapping("/orders")
-    public List<Order> listOrders(
+    public List<OrderResponse> listOrders(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return orderPort.findAll(from, to);
+        return orderPort.findAll(from, to).stream().map(TradingContractMapper::toResponse).toList();
     }
 
     @Operation(summary = "기간 내 distinct 계좌 ID", description = "이상징후 감지용.")
@@ -46,29 +48,33 @@ public class TradingInternalQueryController {
 
     @Operation(summary = "계좌 단건 전략 목록")
     @GetMapping("/accounts/{accountId}/strategies")
-    public List<Strategy> listStrategiesByAccount(@PathVariable UUID accountId) {
-        return strategyPort.findByAccountId(accountId);
+    public List<StrategyResponse> listStrategiesByAccount(@PathVariable UUID accountId) {
+        return strategyPort.findByAccountId(accountId).stream().map(TradingContractMapper::toResponse).toList();
     }
 
     @Operation(summary = "계좌 다건 전략 배치 조회", description = "N+1 방지 배치 조회.")
     @PostMapping("/strategies/by-account-ids")
-    public Map<UUID, List<Strategy>> listStrategiesByAccountIds(@RequestBody Set<UUID> accountIds) {
-        return strategyPort.findByAccountIds(accountIds);
+    public Map<UUID, List<StrategyResponse>> listStrategiesByAccountIds(@RequestBody Set<UUID> accountIds) {
+        return strategyPort.findByAccountIds(accountIds).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> e.getValue().stream().map(TradingContractMapper::toResponse).toList()));
     }
 
     @Operation(summary = "사이클 ID 기준 전략 요약 배치 조회")
     @PostMapping("/strategy-summaries")
-    public Map<UUID, StrategySummary> getStrategySummariesByCycleIds(@RequestBody Set<UUID> cycleIds) {
-        return strategyPort.findSummariesByCycleIds(cycleIds);
+    public Map<UUID, StrategySummaryResponse> getStrategySummariesByCycleIds(@RequestBody Set<UUID> cycleIds) {
+        return strategyPort.findSummariesByCycleIds(cycleIds).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> TradingContractMapper.toResponse(e.getValue())));
     }
 
     @Operation(summary = "전략 단건 주문 조회")
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
-    public List<Order> listStrategyOrders(
+    public List<OrderResponse> listStrategyOrders(
             @PathVariable UUID accountId, @PathVariable UUID strategyId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
         requireStrategyOwnedByAccount(accountId, strategyId);
-        return orderPort.findByStrategyId(strategyId, tradeDate, tradeDate);
+        return orderPort.findByStrategyId(strategyId, tradeDate, tradeDate).stream()
+                .map(TradingContractMapper::toResponse).toList();
     }
 
     @Operation(summary = "전략 단건 거래일 목록")

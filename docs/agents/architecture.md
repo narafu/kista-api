@@ -2,13 +2,13 @@
 
 ### Gradle 구조
 
-세 서브프로젝트: `:trading-core`(매매 실행 도메인 — trading/matching/broker/account/privacy/marketcalendar), `:shared`(sharedkernel/platform — outbound-zero 공용 어휘+인프라 leaf), 루트 `:api`(그 외 전부, bootJar 산출). 루트와 `:trading-core` 모두 `:shared`를 단방향 `implementation` 의존한다(`shared ← trading-core`, `shared ← api`).
+세 서브프로젝트: `:trading-core`(매매 실행 도메인 — trading/matching/broker/account/privacy/marketcalendar), `:shared`(sharedkernel/contract/platform — outbound-zero 공용 어휘·wire 계약·인프라 leaf), 루트 `:api`(그 외 전부, bootJar 산출). 루트와 `:trading-core` 모두 `:shared`를 단방향 `implementation` 의존한다(`shared ← trading-core`, `shared ← api`).
 
-- 루트 main과 `:trading-core` main 사이 컴파일 의존은 **양방향 모두 없다** — 루트는 trading-core 타입을 import할 수 없고 HTTP 내부 API·Redis·own-type으로만 통신한다. 루트 **테스트** 소스만 `testImplementation(project(":trading-core"))`·`testFixtures(project(":trading-core"))`로 참조한다(루트 `src/testFixtures`엔 User fixture `DomainFixtures`만 잔류).
+- 루트 main과 `:trading-core` main 사이 컴파일 의존은 **양방향 모두 없다** — 루트는 trading-core 타입을 import할 수 없고 HTTP 내부 API·Redis로만 통신하며, 그 wire 타입은 양쪽이 컴파일 타임에 공유하는 `com.kista.contract`(`:shared`)가 선언한다. 루트 **테스트** 소스만 `testImplementation(project(":trading-core"))`·`testFixtures(project(":trading-core"))`로 참조한다(루트 `src/testFixtures`엔 User fixture `DomainFixtures`만 잔류).
 - 배포 산출물은 둘: 루트 `app.jar`(`kista-api`/`kista-scheduler` 2-role)와 `trading-core.jar`(`TradingApplication`, `kista-trading` 프로세스). `Dockerfile`이 한 이미지에 두 jar를 담고 `APP_JAR`로 선택한다 — 컴파일 경계이면서 런타임 프로세스 분리다.
 - `shared/build.gradle.kts`는 JUnit Platform 버전 정합을 위해 `org.springframework.boot` 플러그인을 적용하되 `bootJar`를 `enabled = false`로 비활성화한다. `trading-core/build.gradle.kts`는 `bootJar`를 활성 상태로 둔다.
 - 테스트 지원: `com.kista.support`(`DataJpaTestBase`/`WebMvcTestSupport`/`TradingFixtures`)·`application-test.yml`은 `trading-core/src/testFixtures`. com.kista.trading 밖 패키지의 trading-core `@DataJpaTest`는 상위 `@SpringBootConfiguration`이 없으므로 `@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)`를 명시한다. `trading-core`의 `test` 태스크는 `workingDir = rootProject.projectDir`다(루트 상대경로를 읽는 테스트용). Flyway 마이그레이션은 서비스별로 나뉜다 — root `db/migration`, trading-core `db/migration-trading`.
-- **경계 검증**: `GradleModuleBoundaryTest`(`src/test/java/com/kista/architecture`)가 `:trading-core→:api`, `:shared→:trading-core`/`:shared→:api` 역방향 의존 금지를 컴파일 산출물(`*/build/classes/java/main`) 기준으로 강제하고, trading-core 테스트·testFixtures 산출물도 동일 규칙으로 검증한다. 복제(own-type) 쌍의 shape 드리프트는 `OwnTypeContractTest`가 검증한다(reader 컴포넌트 ⊆ writer, 상세는 테스트 헤더 주석 — (b) 외부 계약 분리 쌍은 독립 진화가 의도라 제외).
+- **경계 검증**: `GradleModuleBoundaryTest`(`src/test/java/com/kista/architecture`)가 `:trading-core→:api`, `:shared→:trading-core`/`:shared→:api` 역방향 의존 금지를 컴파일 산출물(`*/build/classes/java/main`) 기준으로 강제하고, trading-core 테스트·testFixtures 산출물도 동일 규칙으로 검증한다. 내부 API wire 계약은 `InternalApiContractTest`가 잠근다 — `/api/internal/**` 핸들러의 반환·`@RequestBody` 타입이 `contract`/`sharedkernel`/JDK 밖이면 실패하고, `contract`의 의존은 JDK·sharedkernel·Jackson/Swagger/Bean Validation 어노테이션으로 제한된다(과거 own-type 복제쌍 + 리플렉션 검증 `OwnTypeContractTest`는 폐지).
 
 Hexagonal Architecture (Port & Adapter). **ArchUnit이 빌드 시 레이어 의존성을 강제 검증**한다 (`HexagonalArchitectureTest`). `domain_must_not_depend_on_outer_layers`는 `com.kista..domain..` 전체를 예외 없이 커버한다 — 전략 구현체 Spring 배선은 `CycleStrategyBeanConfig` 팩토리가 전담한다.
 클래스·필드 상세는 코드가 SSOT — 아래 맵은 위치·역할·비자명한 규칙만 기록한다 (record aggregate 분리 제약 → `docs/agents/modules/trading.md` "Account ↔ Strategy 분리"). 마이그레이션·이관·사고 이력은 `docs/agents/modulith-migration-history.md` 참고 (필요시 Read).
@@ -24,6 +24,7 @@ DB 스키마 5분리, 소유 서비스별(같은 DB `kistadb`·같은 DB 유저)
 
 ```
 com.kista.sharedkernel/  :shared    · OPEN · (NamedInterface 없음, 순수 어휘)   · 공유 enum·이벤트·순수 포트, outbound 0    → modules/sharedkernel.md
+com.kista.contract/      :shared    · OPEN · (NamedInterface 없음, wire 스키마) · 프로세스 경계 내부 API·Redis 요청/응답 record(Published Language), sharedkernel 외 outbound 0 → modules/contract.md
 com.kista.platform/      :shared    · OPEN · (NamedInterface 없음, 인프라 leaf) · persistence/crypto/time/scheduling/redis 공용 인프라, outbound 0 → modules/platform.md
 com.kista.matching/      :trading-core · CLOSED · "kernel"                 · 주문생성 커널(순수 계산), CycleOrderStrategy SSOT → modules/matching.md
 com.kista.finance/       :api       · CLOSED · "domain"/"usecase"/"port"   · 가계부 애그리게이트, 마감월 쓰기 차단          → modules/finance.md
@@ -40,12 +41,12 @@ com.kista.account/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"e
 com.kista.web/           :api       · CLOSED · (NamedInterface 0개, 앱셸 sink) · 크로스모듈 fan-out·GlobalExceptionHandler·MetaController → modules/web.md
 ```
 
-신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read — 기존 (a)(b) 허용 사례·단일 소유 포트 타입·narrowing projection 원장 전체. 자동 로드되지 않는다.
+신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read — (b) 허용 사례·단일 소유 포트 타입·narrowing projection 원장(프로세스 경계 wire 타입은 own-type이 아니라 `com.kista.contract`). 자동 로드되지 않는다.
 
 ### Spring Modulith 모듈 구성
-15개 모듈(finance/notify/broker/trading/matching/market/marketcalendar/privacy/stats/admin/user/account/sharedkernel/platform/web — `:api`·`:trading-core`·`:shared`에 나뉘어 위치) 전부 `@ApplicationModule`로 선언돼 있고, 모듈 간 경계는 `ApplicationModules.verify()`(`ModulithArchitectureTest`)가, 모듈 내부 레이어 방향은 `HexagonalArchitectureTest`가 각각 검증한다. 각 모듈의 NamedInterface와 내부 패키지는 위 "모듈 한눈에 보기" 요약과 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)에 기록돼 있다 — 신규 코드 추가 시 해당 모듈 문서에서 위치·공개 범위를 확인할 것.
+16개 모듈(finance/notify/broker/trading/matching/market/marketcalendar/privacy/stats/admin/user/account/sharedkernel/contract/platform/web — `:api`·`:trading-core`·`:shared`에 나뉘어 위치) 전부 `@ApplicationModule`로 선언돼 있고, 모듈 간 경계는 `ApplicationModules.verify()`(`ModulithArchitectureTest`)가, 모듈 내부 레이어 방향은 `HexagonalArchitectureTest`가 각각 검증한다. 각 모듈의 NamedInterface와 내부 패키지는 위 "모듈 한눈에 보기" 요약과 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)에 기록돼 있다 — 신규 코드 추가 시 해당 모듈 문서에서 위치·공개 범위를 확인할 것.
 
-모듈 간 참조는 원칙적으로 상대 모듈이 공개한 NamedInterface(도메인 타입 또는 own-type projection)만 거쳐야 하며, 서로 참조가 얽히면 포트 역전(own-type 정의 + 상대가 구현) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도) 패턴을 쓴다. 다른 프로세스(trading-core ↔ root) 사이는 EPR이 전달되지 않으므로 내부 HTTP API 또는 Redis(Pub/Sub·Stream)를 쓴다.
+모듈 간 참조는 원칙적으로 상대 모듈이 공개한 NamedInterface(도메인 타입 또는 own-type projection)만 거쳐야 하며(프로세스 경계를 넘는 wire 타입은 own-type이 아니라 `com.kista.contract`), 서로 참조가 얽히면 포트 역전(own-type 정의 + 상대가 구현) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도) 패턴을 쓴다. 다른 프로세스(trading-core ↔ root) 사이는 EPR이 전달되지 않으므로 내부 HTTP API 또는 Redis(Pub/Sub·Stream)를 쓴다.
 
 ### 인증 userId 추출 패턴
 - 모든 컨트롤러: `@AuthenticationPrincipal UUID userId` 메서드 파라미터로 직접 주입 — `SecurityContextHolder` 수동 호출 금지

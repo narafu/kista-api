@@ -1,5 +1,7 @@
 package com.kista.notify.adapter.out.internal;
 
+import com.kista.contract.stats.PortfolioCurrentResponse;
+import com.kista.contract.stats.PortfolioOrderResponse;
 import com.kista.notify.application.port.output.PortfolioQueryPort;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.OrderType;
@@ -47,7 +49,7 @@ class PortfolioQueryHttpAdapterTest {
                 .body("{\"ticker\":\"TQQQ\",\"holdings\":10,\"avgPrice\":100.50,\"usdDeposit\":500.00,\"closingPrice\":105.00}")
                 .build());
 
-        PortfolioQueryPort.PortfolioCurrentView current = adapter.getCurrent(userId);
+        PortfolioCurrentResponse current = adapter.getCurrent(userId);
 
         assertThat(current.ticker()).isEqualTo(StrategyTicker.TQQQ);
         assertThat(current.holdings()).isEqualTo(10);
@@ -90,7 +92,7 @@ class PortfolioQueryHttpAdapterTest {
                 .body("[{\"tradeDate\":\"2026-01-05\",\"ticker\":\"TQQQ\",\"direction\":\"BUY\",\"orderType\":\"LOC\",\"quantity\":3,\"price\":100.00}]")
                 .build());
 
-        List<PortfolioQueryPort.PortfolioOrderView> history = adapter.getHistory(userId, from, to, StrategyTicker.TQQQ);
+        List<PortfolioOrderResponse> history = adapter.getHistory(userId, from, to, StrategyTicker.TQQQ);
 
         assertThat(history).hasSize(1);
         assertThat(history.get(0).direction()).isEqualTo(OrderDirection.BUY);

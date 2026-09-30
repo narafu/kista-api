@@ -1,7 +1,7 @@
 package com.kista.stats.application.service;
 
 import com.kista.stats.domain.model.BenchmarkAssetType;
-import com.kista.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.stats.domain.model.BenchmarkScope;
 import com.kista.stats.domain.model.HousingBenchmarkComparison;
 import com.kista.stats.domain.model.InvestmentPoint;

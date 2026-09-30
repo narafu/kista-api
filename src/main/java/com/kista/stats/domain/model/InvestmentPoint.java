@@ -3,8 +3,8 @@ package com.kista.stats.domain.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-// trading.stats.domain.model.InvestmentPoint own-type — InvestmentPointsPort가 root 소유
-// 타입만 쓰도록 컴파일 의존을 없애기 위한 복제(값 shape 동일)
+// 투자 누적지수 시점 — root stats 도메인 값(벤치마크 계산 입력). 내부 API 응답(contract.stats.InvestmentPointsResponse.InvestmentPointDto)은
+// InvestmentPointsHttpAdapter가 이 타입으로 명시 매핑한다
 public record InvestmentPoint(
         LocalDate baseDate,
         BigDecimal investmentIndexUsd,

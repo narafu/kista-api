@@ -3,8 +3,8 @@ package com.kista.admin.application.service;
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.TradingCommandPort;
-import com.kista.admin.domain.model.AdminReorderCommand;
-import com.kista.admin.domain.model.AdminReorderResult;
+import com.kista.contract.trading.ReorderRequest;
+import com.kista.contract.trading.ReorderResponse;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
 import org.junit.jupiter.api.Test;
@@ -42,20 +42,20 @@ class AdminReorderServiceTest {
 
     @Test
     void reorder_요청을_포트로_그대로_전달하고_응답을_되돌리고_감사로그를_남긴다() {
-        AdminReorderCommand command = new AdminReorderCommand(
+        ReorderRequest command = new ReorderRequest(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
                 OrderTiming.AT_CLOSE, LocalDate.of(2026, 7, 1), OrderDirection.SELL,
                 2, new BigDecimal("250.00"), "reorder memo");
-        AdminReorderResult result = new AdminReorderResult(USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
+        ReorderResponse result = new ReorderResponse(USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
                 OrderStatus.PLANNED, OrderStatus.PLANNED, null,
                 new BigDecimal("236.54"), 1, OrderDirection.SELL);
         when(tradingCommandPort.reorder(any())).thenReturn(result);
 
-        AdminReorderResult response = service.reorder(ADMIN_ID, command);
+        ReorderResponse response = service.reorder(ADMIN_ID, command);
 
-        ArgumentCaptor<AdminReorderCommand> captor = ArgumentCaptor.forClass(AdminReorderCommand.class);
+        ArgumentCaptor<ReorderRequest> captor = ArgumentCaptor.forClass(ReorderRequest.class);
         verify(tradingCommandPort).reorder(captor.capture());
-        AdminReorderCommand sent = captor.getValue();
+        ReorderRequest sent = captor.getValue();
         assertThat(sent).isEqualTo(command);
 
         assertThat(response).isEqualTo(result);

@@ -1,6 +1,6 @@
 package com.kista.trading.stats.application.usecase;
 
-import com.kista.trading.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.trading.stats.domain.model.InvestmentPointsResult;
 
 import java.time.LocalDate;

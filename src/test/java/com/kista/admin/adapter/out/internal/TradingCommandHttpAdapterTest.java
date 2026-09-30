@@ -1,13 +1,13 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
-import com.kista.admin.domain.model.AdminReorderCommand;
-import com.kista.admin.domain.model.AdminReorderResult;
-import com.kista.admin.domain.model.AdminReorderTimingAvailability;
+import com.kista.contract.trading.TradeCorrectionRequest;
+import com.kista.contract.trading.ReorderRequest;
+import com.kista.contract.trading.ReorderResponse;
+import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
 import com.kista.admin.domain.model.AdminBrokerCredentialException;
 import com.kista.admin.domain.model.AdminBrokerRateLimitException;
-import com.kista.admin.domain.model.AdminTradeCorrectionResult;
+import com.kista.contract.trading.TradeCorrectionResponse;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.StrategyStatus;
@@ -56,15 +56,15 @@ class TradingCommandHttpAdapterTest {
         server.close();
     }
 
-    private static AdminReorderCommand reorderCommand() {
-        return new AdminReorderCommand(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+    private static ReorderRequest reorderCommand() {
+        return new ReorderRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 OrderTiming.AT_CLOSE, LocalDate.of(2026, 7, 1), OrderDirection.SELL,
                 2, new BigDecimal("250.00"), "memo");
     }
 
-    private static AdminManualTradeCorrectionCommand correctionCommand() {
-        return new AdminManualTradeCorrectionCommand(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                List.of(new AdminManualTradeCorrectionCommand.Fill(
+    private static TradeCorrectionRequest correctionCommand() {
+        return new TradeCorrectionRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                List.of(new TradeCorrectionRequest.Fill(
                         LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
                         new BigDecimal("267.37"), "MANUAL-1", "memo")));
     }
@@ -75,7 +75,7 @@ class TradingCommandHttpAdapterTest {
     void reorder_요청_경로와_바디를_전송하고_응답을_역직렬화한다() throws InterruptedException {
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        AdminReorderCommand command = reorderCommand();
+        ReorderRequest command = reorderCommand();
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("""
@@ -84,7 +84,7 @@ class TradingCommandHttpAdapterTest {
                     """.formatted(userId, command.accountId(), command.strategyId(), orderId))
                 .build());
 
-        AdminReorderResult result = adapter.reorder(command);
+        ReorderResponse result = adapter.reorder(command);
 
         assertThat(result.sourceOrderId()).isEqualTo(orderId);
         assertThat(result.originalStatus()).isEqualTo(OrderStatus.PLANNED);
@@ -108,7 +108,7 @@ class TradingCommandHttpAdapterTest {
                     """.formatted(userId, accountId, strategyId))
                 .build());
 
-        AdminTradeCorrectionResult result = adapter.correctManualFills(correctionCommand());
+        TradeCorrectionResponse result = adapter.correctManualFills(correctionCommand());
 
         assertThat(result.processedCount()).isEqualTo(1);
         assertThat(result.finalHoldings()).isZero();
@@ -128,7 +128,7 @@ class TradingCommandHttpAdapterTest {
                     """)
                 .build());
 
-        AdminReorderTimingAvailability result = adapter.reorderTimingAvailability();
+        ReorderTimingAvailabilityResponse result = adapter.reorderTimingAvailability();
 
         assertThat(result.atOpen()).isTrue();
         assertThat(result.atClose()).isTrue();

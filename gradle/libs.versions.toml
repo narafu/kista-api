@@ -26,6 +26,7 @@ spring-boot-starter-flyway     = { module = "org.springframework.boot:spring-boo
 flyway-postgresql              = { module = "org.flywaydb:flyway-database-postgresql" }
 
 # API Documentation
+swagger-annotations            = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version = "2.2.52" } # shared contract 패키지의 @Schema용(springdoc 3.1.0이 끌어오는 버전과 동일)
 springdoc-openapi-webmvc-ui    = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 
 # Observability

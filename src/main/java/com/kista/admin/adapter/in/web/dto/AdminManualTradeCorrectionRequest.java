@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminManualTradeCorrectionCommand;
+import com.kista.contract.trading.TradeCorrectionRequest;
 import com.kista.sharedkernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -24,8 +24,8 @@ public record AdminManualTradeCorrectionRequest(
         @Schema(description = "반영할 체결 명세 목록 (배열 순서대로 반영)")
         @NotEmpty List<@Valid FillRequest> fills
 ) {
-    public AdminManualTradeCorrectionCommand toCommand() {
-        return new AdminManualTradeCorrectionCommand(
+    public TradeCorrectionRequest toCommand() {
+        return new TradeCorrectionRequest(
                 userId, accountId, strategyId,
                 fills.stream().map(FillRequest::toCommand).toList()
         );
@@ -46,8 +46,8 @@ public record AdminManualTradeCorrectionRequest(
             @Schema(description = "메모 (선택)")
             String memo
     ) {
-        public AdminManualTradeCorrectionCommand.Fill toCommand() {
-            return new AdminManualTradeCorrectionCommand.Fill(
+        public TradeCorrectionRequest.Fill toCommand() {
+            return new TradeCorrectionRequest.Fill(
                     tradeDate,
                     OrderDirection.valueOf(direction),
                     quantity,

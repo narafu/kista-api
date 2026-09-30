@@ -1,7 +1,7 @@
 ## com.kista.sharedkernel (`:shared`)
 
 com.kista.sharedkernel/ ← 순수 어휘 패키지. `@ApplicationModule(Type.OPEN)` — outbound reference 0인 값 타입만 담아 다른 모듈을 참조하지 않는다는 전제(`HexagonalArchitectureTest.sharedkernel_must_not_depend_on_other_modules`). user/account 모듈은 소비만 하고 소유하지 않는다. 승격 경위 → history "sharedkernel 승격 경위"
-  공유 enum       ← UserRole/UserStatus/NotificationType/StrategyType/StrategyStatus/StrategyTicker/StrategyCycleSeedType/Broker(TOSS/KIS/MOCK)/OrderDirection/OrderType/OrderStatus/OrderTiming. KIS/Toss wire 매핑은 어댑터 코드가 담당(enum 값 집합엔 외부 계약 없음). `NotificationChannel`은 user 단독 소비라 `com.kista.user.domain.model` 잔류
+  공유 enum       ← UserRole/UserStatus/NotificationType/StrategyType/StrategyStatus/StrategyTicker/StrategyCycleSeedType/Broker(TOSS/KIS/MOCK)/OrderDirection/OrderType/OrderStatus/OrderTiming/MarketSession(DIRECT/BLOCKED — market·marketcalendar·`DstInfo` 3중 복제 통합, 2026-09-30)/BenchmarkGranularity(MONTHLY/DAILY/WEEKLY — root stats·trading-core stats 복제 통합, 2026-09-30). KIS/Toss wire 매핑은 어댑터 코드가 담당(enum 값 집합엔 외부 계약 없음). `NotificationChannel`은 user 단독 소비라 `com.kista.user.domain.model` 잔류
   정책·기본값     ← RecurringMode/StrategyCreationSettings/StrategyFieldSettings(전략 생성 정책 — 자체 검증 로직을 가진 record도 outbound-zero면 포함)/StrategyDefaults(`DEFAULT_DIVISION_COUNT=20` — PRIVACY/VR처럼 분할 수 설정이 없는 전략의 고정값)
   유틸            ← `TimeZones`(KST 단일 소스)/`AccountNumberMasker`(계좌번호 마스킹 SSOT). `UsTradeDates`는 어댑터 전용이라 sharedkernel이 아닌 `platform.time` 소속
   값 타입         ← `ReturnMetrics`(자산곡선 성과 지표 순수 계산 — root `HousingBenchmarkComparisonBuilder`·trading-core `BacktestEngine`/`BacktestService` 공용)/`TradeLegSummary`(direction/ticker/quantity/price/amountUsd 5필드 — `broker.Execution`의 notify 전용 narrowing). 전부 sharedkernel enum+JDK 타입만 참조. `TradingReport`/`DailyCandle`은 trading-core 전용이라 각각 `trading.domain.model`/`trading.stats.domain.model` 소유
@@ -9,3 +9,4 @@ com.kista.sharedkernel/ ← 순수 어휘 패키지. `@ApplicationModule(Type.OP
   정책 묶음       ← `TradingPolicySettings(brokers, strategies)`/`BrokerSettings` — trading-core가 소유·집행하고 root admin이 내부 API(PUT /api/internal/trading/policy-settings) body로 편집하는 매매 런타임 정책. 프로세스 간 계약이라 sharedkernel에 둔다
   오류 보고       ← `AppErrorRaisedEvent(errorType, message, stackTrace, context)` — trading-core가 발행해 Redis Stream(`stream:app.error`)으로 root admin(app_error_logs)에 전달하는 통합 이벤트. `of(Exception, caller)` 헬퍼
   port/           ← (폐지, 2026-09-30) 포트는 필요로 하는 모듈이 소유한다 — `BrokerEnabledPort`는 account, `StrategyCreationPolicyPort`는 trading으로 환원됐다
+  contract 분리    ← 프로세스 경계 wire 스키마(요청·응답 record)는 sharedkernel이 아니라 같은 `:shared`의 `com.kista.contract`에 둔다 → `modules/contract.md`. 어휘(enum·정책 값)는 sharedkernel, wire 스키마(필드명이 곧 계약)는 contract

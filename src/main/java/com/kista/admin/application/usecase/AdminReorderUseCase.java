@@ -1,10 +1,10 @@
 package com.kista.admin.application.usecase;
 
-import com.kista.admin.domain.model.AdminReorderCommand;
-import com.kista.admin.domain.model.AdminReorderResult;
+import com.kista.contract.trading.ReorderRequest;
+import com.kista.contract.trading.ReorderResponse;
 
 import java.util.UUID;
 
 public interface AdminReorderUseCase {
-    AdminReorderResult reorder(UUID adminId, AdminReorderCommand command);
+    ReorderResponse reorder(UUID adminId, ReorderRequest command);
 }

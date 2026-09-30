@@ -9,8 +9,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-import static com.kista.marketcalendar.domain.model.MarketSessionSnapshot.MarketSession.BLOCKED;
-import static com.kista.marketcalendar.domain.model.MarketSessionSnapshot.MarketSession.DIRECT;
+import static com.kista.sharedkernel.MarketSession.BLOCKED;
+import static com.kista.sharedkernel.MarketSession.DIRECT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("MarketSessionSnapshot 검증")

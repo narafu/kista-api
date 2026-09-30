@@ -50,7 +50,7 @@ class InvestmentPointsHttpAdapterTest {
         InvestmentPointsPort.Result result = adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.stats.domain.model.BenchmarkGranularity.MONTHLY);
+                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY);
 
         assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 1));
         assertThat(result.effectiveTo()).isEqualTo(LocalDate.of(2026, 9, 1));
@@ -76,7 +76,7 @@ class InvestmentPointsHttpAdapterTest {
         InvestmentPointsPort.Result result = adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.STRATEGY, strategyId,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23),
-                com.kista.stats.domain.model.BenchmarkGranularity.WEEKLY);
+                com.kista.sharedkernel.BenchmarkGranularity.WEEKLY);
 
         StrategyRef expected = new StrategyRef(strategyId,
                 com.kista.sharedkernel.StrategyType.INFINITE, com.kista.sharedkernel.StrategyTicker.SOXL);
@@ -105,7 +105,7 @@ class InvestmentPointsHttpAdapterTest {
 
         adapter.fetch(userId, BenchmarkScope.STRATEGY, strategyId,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.stats.domain.model.BenchmarkGranularity.WEEKLY);
+                com.kista.sharedkernel.BenchmarkGranularity.WEEKLY);
 
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/investment-points");
@@ -126,7 +126,7 @@ class InvestmentPointsHttpAdapterTest {
         assertThatThrownBy(() -> adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.stats.domain.model.BenchmarkGranularity.MONTHLY))
+                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY))
                 .isInstanceOf(SecurityException.class);
     }
 
@@ -137,7 +137,7 @@ class InvestmentPointsHttpAdapterTest {
         assertThatThrownBy(() -> adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.stats.domain.model.BenchmarkGranularity.MONTHLY))
+                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
@@ -148,7 +148,7 @@ class InvestmentPointsHttpAdapterTest {
         assertThatThrownBy(() -> adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.stats.domain.model.BenchmarkGranularity.MONTHLY))
+                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

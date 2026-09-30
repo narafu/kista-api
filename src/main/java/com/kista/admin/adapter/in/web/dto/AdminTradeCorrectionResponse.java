@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminTradeCorrectionResult;
+import com.kista.contract.trading.TradeCorrectionResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -30,7 +30,7 @@ public record AdminTradeCorrectionResponse(
         @Schema(description = "사이클 종료일 (cycleEnded=false면 null)")
         LocalDate cycleEndDate
 ) {
-    public static AdminTradeCorrectionResponse from(AdminTradeCorrectionResult result) {
+    public static AdminTradeCorrectionResponse from(TradeCorrectionResponse result) {
         return new AdminTradeCorrectionResponse(
                 result.userId(),
                 result.accountId(),

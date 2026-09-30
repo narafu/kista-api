@@ -1,7 +1,7 @@
 package com.kista.trading.stats.application;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.trading.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.trading.stats.domain.model.InvestmentPoint;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;

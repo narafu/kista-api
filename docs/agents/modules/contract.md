@@ -1,0 +1,14 @@
+## com.kista.contract (`:shared`)
+
+com.kista.contract/  ← Published Language. `@ApplicationModule(Type.OPEN)` — 프로세스 경계(root `:api` ↔ `:trading-core`)를 넘는 내부 API(`/api/internal/**`) 요청·응답 body와 Redis Pub/Sub payload를 한 곳에 선언하고 양쪽이 컴파일 타임에 공유한다. own-type 복제 + `OwnTypeContractTest` 손동기화를 대체(2026-09-30, 결합도 재검토 2단계). sharedkernel(도메인 어휘)과 별개 — 여기는 wire 스키마이고 **필드명이 곧 계약**이다
+  규칙          ← 불변 record만. 참조 허용은 JDK + `com.kista.sharedkernel` + Jackson/Swagger/Bean Validation 어노테이션(+ package-info의 Modulith 선언)뿐 — `HexagonalArchitectureTest.contract_must_not_depend_on_other_modules`(다른 com.kista 모듈 금지)와 `InternalApiContractTest.contract_must_only_depend_on_allowed_packages`(패키지 화이트리스트)가 강제. 도메인 타입을 import할 수 없으므로 **domain → contract 매핑은 소유 모듈이 한다**(trading-core 컨트롤러 옆 package-private `*ContractMapper`, root는 어댑터). 로직은 없다(예외: `TradeEventMessage.buy/sell`은 Instant.now()를 채우는 값 생성 편의)
+  잠금          ← `InternalApiContractTest.internal_api_handlers_must_only_use_contract_types` — `/api/internal/**` 핸들러의 반환·`@RequestBody` 타입(ResponseEntity/List/Map/Set/Optional 언랩)이 `contract`/`sharedkernel`/JDK가 아니면 빌드 실패. 도메인 record(`Order`/`Strategy` 등)를 wire에 직접 태울 수 없다. 임시 예외 1건: `StrategyCapabilityInternalController`(4단계에서 엔드포인트째 삭제 예정)
+  trading/      ← OrderResponse/StrategyResponse/StrategySummaryResponse/ReorderTimingAvailabilityResponse/ReorderRequest·Response/TradeCorrectionRequest·Response — admin ↔ trading-core(`TradingInternalQuery/CommandController`)
+  privacy/      ← PrivacyTradeBaseResponse/FidaOrderRequest·Response/PrivacyBaseUpdateRequest/PrivacyOrderUpdateRequest/PrivacyOrderAddRequest — `FidaOrderRequest`/`FidaOrderResponse`는 **외부 FIDA 프로젝트도 호출하는 `POST /api/internal/fida-orders`**의 body라 JSON 필드명·shape(`releaseDate` + `@JsonAlias("tradeDate")` 등)을 바꾸면 안 된다
+  account/      ← AccountSummaryResponse(id/userId/accountNo/broker/createdAt — appKey/secretKey 등 자격증명은 의도적으로 제외한 narrowing)
+  marketcalendar/ ← MarketSessionResponse(`sharedkernel.MarketSession session`, `isDst`)
+  broker/       ← DailyCandleResponse(일봉 1건)
+  stats/        ← InvestmentPointsResponse(+ nested InvestmentPointDto/StrategyRefDto)/PortfolioCurrentResponse/PortfolioOrderResponse. 환율(`/exchange-rate`)은 bare `BigDecimal` body(JDK 타입)라 contract 대상이 아니다
+  notify/       ← TradeEventMessage(SSE 이벤트 body이자 Redis payload — kista-ui 소비)/TradeEventEnvelope(`{userId, event}` 발행 단위)
+  sharedkernel에 남는 통합 타입 ← `TradingPolicySettings`/`AppErrorRaisedEvent`/`UserDeletedEvent`/`UserNotifyProfileChangedEvent`/`UserPushNotificationRequestedEvent` — 이벤트 FQCN을 옮기면 `event_publication` replay가 `ClassNotFoundException`으로 깨지므로(constraints.md Flyway 절) contract로 옮기지 않았다
+  변경 시 주의  ← root(`kista-api`)와 trading-core(`kista-trading`)는 독립 배포된다 — contract 필드 추가는 양쪽이 무시/기본값으로 견디도록 nullable·additive로, 삭제·리네임은 두 배포에 분리한다(Flyway expand/contract와 같은 원칙). 응답 record에 필드를 추가해도 구버전 소비자는 미지 필드를 무시한다(Spring Boot 기본 `FAIL_ON_UNKNOWN_PROPERTIES=false`)

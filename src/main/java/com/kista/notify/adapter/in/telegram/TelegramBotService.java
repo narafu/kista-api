@@ -1,5 +1,7 @@
 package com.kista.notify.adapter.in.telegram;
 
+import com.kista.contract.stats.PortfolioCurrentResponse;
+import com.kista.contract.stats.PortfolioOrderResponse;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.notify.adapter.out.gateway.TelegramHttpClient;
@@ -119,7 +121,7 @@ class TelegramBotService {
         return userUseCase.findUserIdByTelegramChatId(adminChatId)
                 .map(userId -> {
                     try {
-                        PortfolioQueryPort.PortfolioCurrentView s = portfolioQueryPort.getCurrent(userId);
+                        PortfolioCurrentResponse s = portfolioQueryPort.getCurrent(userId);
                         // closingPrice가 null이면 평가액 0으로 처리
                         double marketValue = s.closingPrice() != null
                                 ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
@@ -142,7 +144,7 @@ class TelegramBotService {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
         return userUseCase.findUserIdByTelegramChatId(adminChatId)
                 .map(userId -> {
-                    List<PortfolioQueryPort.PortfolioOrderView> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
+                    List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
                     StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
                     list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",

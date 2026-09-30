@@ -53,7 +53,7 @@ class GradleModuleBoundaryTest {
                 .check(importedClasses);
     }
 
-    // :shared(sharedkernel+platform) 서브프로젝트 소스만 스캔해, :trading-core·:api 어느 쪽도
+    // :shared(sharedkernel+platform+contract) 서브프로젝트 소스만 스캔해, :trading-core·:api 어느 쪽도
     // 역참조하지 않는지 고정한다 — 3-서브프로젝트 그래프는 shared ← trading-core ← api,
     // shared ← api 단방향만 허용(shared가 leaf). 이 테스트가 실패하면 :shared→:trading-core
     // 또는 :shared→:api 역방향 의존이 생긴 것.
@@ -71,7 +71,8 @@ class GradleModuleBoundaryTest {
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
                                 .and(resideOutsideOfPackage("com.kista.sharedkernel.."))
-                                .and(resideOutsideOfPackage("com.kista.platform..")))
+                                .and(resideOutsideOfPackage("com.kista.platform.."))
+                                .and(resideOutsideOfPackage("com.kista.contract..")))
                 .check(importedClasses);
     }
 

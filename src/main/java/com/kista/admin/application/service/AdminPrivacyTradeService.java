@@ -3,11 +3,11 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.PrivacyQueryPort;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
-import com.kista.admin.domain.model.AdminFidaOrderCommand;
-import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
-import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
+import com.kista.contract.privacy.FidaOrderRequest;
+import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.contract.privacy.PrivacyOrderAddRequest;
+import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.contract.privacy.PrivacyTradeBaseResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +28,7 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
     private final AuditLogPort auditLogPort;
 
     @Override
-    public CreateResult createBase(UUID adminId, AdminFidaOrderCommand command) {
+    public CreateResult createBase(UUID adminId, FidaOrderRequest command) {
         PrivacyQueryPort.CreateBaseResult result = privacyQueryPort.createBase(command);
         auditLogPort.log(adminId, "PRIVACY_BASE_CREATE", "PRIVACY_TRADE_BASE", result.view().id(),
                 Map.of("releaseDate", command.releaseDate().toString(),
@@ -38,8 +38,8 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
     }
 
     @Override
-    public AdminPrivacyTradeBaseView updateBase(UUID adminId, UUID baseId, AdminPrivacyBaseUpdateCommand command) {
-        AdminPrivacyTradeBaseView updated = privacyQueryPort.updateBase(baseId, command);
+    public PrivacyTradeBaseResponse updateBase(UUID adminId, UUID baseId, PrivacyBaseUpdateRequest command) {
+        PrivacyTradeBaseResponse updated = privacyQueryPort.updateBase(baseId, command);
         auditLogPort.log(adminId, "PRIVACY_BASE_UPDATE", "PRIVACY_TRADE_BASE", baseId,
                 Map.of("currentCycleStart", command.currentCycleStart().toString(),
                         "currentCycleRealizedPnl", command.currentCycleRealizedPnl().toString(),
@@ -48,8 +48,8 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
     }
 
     @Override
-    public AdminPrivacyTradeBaseView updateOrder(UUID adminId, UUID baseId, UUID orderId, AdminPrivacyOrderUpdateCommand command) {
-        AdminPrivacyTradeBaseView updated = privacyQueryPort.updateOrder(baseId, orderId, command);
+    public PrivacyTradeBaseResponse updateOrder(UUID adminId, UUID baseId, UUID orderId, PrivacyOrderUpdateRequest command) {
+        PrivacyTradeBaseResponse updated = privacyQueryPort.updateOrder(baseId, orderId, command);
         auditLogPort.log(adminId, "PRIVACY_ORDER_UPDATE", "PRIVACY_TRADE_BASE_ORDER", orderId,
                 Map.of("baseId", baseId.toString(),
                         "price", command.price().toString(),
@@ -58,8 +58,8 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
     }
 
     @Override
-    public AdminPrivacyTradeBaseView addOrder(UUID adminId, UUID baseId, AdminPrivacyOrderAddCommand command) {
-        AdminPrivacyTradeBaseView updated = privacyQueryPort.addOrder(baseId, command);
+    public PrivacyTradeBaseResponse addOrder(UUID adminId, UUID baseId, PrivacyOrderAddRequest command) {
+        PrivacyTradeBaseResponse updated = privacyQueryPort.addOrder(baseId, command);
         auditLogPort.log(adminId, "PRIVACY_ORDER_ADD", "PRIVACY_TRADE_BASE_ORDER", baseId,
                 Map.of("baseId", baseId.toString(),
                         "direction", command.direction().name(),
@@ -70,8 +70,8 @@ class AdminPrivacyTradeService implements AdminPrivacyTradeUseCase {
     }
 
     @Override
-    public AdminPrivacyTradeBaseView deleteOrder(UUID adminId, UUID baseId, UUID orderId) {
-        AdminPrivacyTradeBaseView updated = privacyQueryPort.deleteOrder(baseId, orderId);
+    public PrivacyTradeBaseResponse deleteOrder(UUID adminId, UUID baseId, UUID orderId) {
+        PrivacyTradeBaseResponse updated = privacyQueryPort.deleteOrder(baseId, orderId);
         auditLogPort.log(adminId, "PRIVACY_ORDER_DELETE", "PRIVACY_TRADE_BASE_ORDER", orderId,
                 Map.of("baseId", baseId.toString()));
         return updated;

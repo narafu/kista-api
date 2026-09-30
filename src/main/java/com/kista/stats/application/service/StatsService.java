@@ -1,5 +1,6 @@
 package com.kista.stats.application.service;
 
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.stats.domain.model.*;
 import com.kista.stats.application.usecase.UserStatsUseCase;

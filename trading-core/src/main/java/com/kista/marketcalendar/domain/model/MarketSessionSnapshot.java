@@ -1,5 +1,6 @@
 package com.kista.marketcalendar.domain.model;
 
+import com.kista.sharedkernel.MarketSession;
 import com.kista.sharedkernel.TimeZones;
 
 import java.time.DayOfWeek;
@@ -13,12 +14,6 @@ import java.time.ZonedDateTime;
 public record MarketSessionSnapshot(boolean isDst, MarketSession session) {
 
     private static final ZoneId NY = ZoneId.of("America/New_York");
-
-    // 수동 실행 시 주문 가능 시간대 (trading.DstInfo.MarketSession과 값 집합 동일)
-    public enum MarketSession {
-        DIRECT,  // 프리마켓+정규장: 주문 가능 (DST: 17:00~05:00, 비DST: 18:00~06:00)
-        BLOCKED  // 장마감 후~프리마켓 전: 주문 불가 (DST: 05:00~17:00, 비DST: 06:00~18:00)
-    }
 
     private static LocalTime marketCloseTime(boolean isDst)    { return isDst ? LocalTime.of(5, 0)  : LocalTime.of(6, 0); }
     private static LocalTime premarketStartTime(boolean isDst) { return isDst ? LocalTime.of(17, 0) : LocalTime.of(18, 0); }

@@ -19,7 +19,9 @@
 모듈 간 참조가 얽히면 own-type 정의(아래 "모듈 경계 own-type" 게이트 통과 시) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도 보장) 패턴을 사용한다. 마이그레이션 경위·순환 해소 상세는 `docs/agents/modulith-migration-history.md` 참고(필요시 Read).
 
 ### 모듈 경계 own-type — 정당화 게이트
-값 타입을 다른 모듈에 복제(own-type)하는 것은 다음 둘 중 하나를 만족할 때만 정당하다. 아니면 복제가 아니라 sharedkernel 승격 또는 소유권 이동 대상이다.
+**프로세스 경계(root `:api` ↔ `:trading-core`)를 넘는 wire 타입(내부 HTTP API 요청·응답 body, Redis payload)은 own-type 복제가 아니라 `com.kista.contract`(`:shared`)에 선언해 양쪽이 컴파일 타임에 공유한다 — 이 게이트를 거치지 않는다.** "Gradle 컴파일 경계 때문에 복제"라는 (a) 논리는 `:shared`가 있는 이상 성립하지 않는다(contract는 JDK+sharedkernel만 참조하는 outbound-zero 값 타입이라 양쪽이 의존 가능). 새 내부 엔드포인트는 (1) `contract.<채널>`에 record를 두고 (2) trading-core 컨트롤러가 도메인 → contract로 매핑하며(도메인 record를 wire에 직접 반환 금지) (3) root 어댑터가 contract를 그대로 포트 시그니처에 쓴다. `InternalApiContractTest`가 이 규칙을 강제한다. 공유 어휘(enum 등)는 sharedkernel, wire 스키마(필드명이 곧 계약)는 contract — `docs/agents/modules/contract.md`.
+
+아래 게이트는 wire 타입이 아닌 **모듈 간 값 타입** 복제에 적용된다. 값 타입을 다른 모듈에 복제(own-type)하는 것은 다음 둘 중 하나를 만족할 때만 정당하다. 아니면 복제가 아니라 sharedkernel 승격 또는 소유권 이동 대상이다.
 - **(a) 순환 불가피**: 통합하면 모듈 순환이 생기고, 소유권 이동으로도 끊을 수 없다.
 - **(b) 외부 계약 분리**: 두 값 집합이 각기 다른 외부 계약(증권사 wire 포맷, DB 컬럼, 업스트림 피드, HTTP 응답 스키마)에 묶여 독립적으로 버전이 오를 수 있다.
 
@@ -35,7 +37,7 @@
 - **(a) 신규 복제 테이블은 마이그레이션에서 기존 데이터를 반드시 백필한다.** 복제본이 비면 소비처가 빈 결과를 정상 응답으로 받아 기능이 멈춘다. `TradingUserProfilePort` 3개 메서드의 실제 실패 양상이 서로 다르다는 점에 주의: `findAllByUserIds()` 빈 맵 → `BatchContextFactory`가 전략마다 `NoSuchElementException`을 던지고 잡아 `errorReportPort.reportError()`로 관리자 알림을 내보낸다(**시끄럽게** 전면 중단 — 전략 수만큼 알림이 쏟아진다). `findByUserId()` 빈 Optional → 전략 등록이 "사용자를 찾을 수 없습니다"로 거부된다. `findAllActive()` 빈 리스트 → `MarketEventNotifier`가 **조용히** 아무에게도 안 보낸다(예외·로그 없음). 셋 중 마지막이 발견이 가장 늦다.
 - **(b) 원본의 모든 쓰기 지점을 전수 확인하고 발행을 건다.** 상태값은 `withStatus`/`withRejection` 같은 도메인 메서드명으로, 설정값은 필드명으로 grep한다. 포트 메서드명만 보고 판단하지 말 것 — `findAllActive()`가 실제로 `UserStatus.ACTIVE` 필터라는 사실은 소비처(`MarketEventNotifier`)와 구 어댑터를 읽어야만 드러났고, 이걸 놓쳤다면 복제본에 `is_active` 컬럼이 빠져 개장·마감 알림이 비활성 사용자에게까지 나갔을 것이다.
 
-**신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read** — 기존 (a)(b) 허용 사례 전체 목록(ReorderCommand/AdminOrderView/AdminAccountView/AdminPrivacyTradeBaseView 계열/InvestmentPoint/MarketSession/TossDailyCandle/TradeEventView 등)·DTO 이중복제 사례·단일 소유 포트 시그니처 타입·narrowing projection 원장. 자동 로드되지 않는다.
+**신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read** — (b) DTO 이중복제 사례·단일 소유 포트 시그니처 타입·narrowing projection 원장(과거 (a) 순환 불가피 목록은 `com.kista.contract` 도입으로 소멸). 자동 로드되지 않는다.
 
 신규 broker/notify/privacy 포트 추가 시 이 게이트를 먼저 통과할 것 — (a)(b) 어느 쪽도 아니면 복제하지 말고 sharedkernel 승격 또는 소유권 이동을 먼저 검토한다.
 

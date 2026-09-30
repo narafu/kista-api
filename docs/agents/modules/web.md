@@ -5,4 +5,4 @@ com.kista.web/       ← Spring Modulith 앱셸 모듈. `@ApplicationModule(Type
   GlobalExceptionHandler ← root 소유 컨트롤러(admin/user/finance/stats/market/web) 전용 범용 예외(`SecurityException`→403/`NoSuchElementException`→404/`IllegalArgumentException`→400 등) 매핑(`@RestControllerAdvice`). trading-core 예외 6종은 `TradingExceptionHandler`가 전담. `KisApiException`/`TossApiException`은 root/admin 소유 `AppErrorLogPort` 의존 때문에 root 잔류
   MetaController        ← `GET /api/meta` — enum 메타(label/description) 단일 번들. finance(`domain.model`)+matching(`"kernel"` — 내부 API 경유)+sharedkernel fan-out이라 단일 모듈 이관 불가, UI enum 리터럴 하드코딩 방지
   AdminSchedulerController ← stats "schedule" 소비 — KbLand 스케쥴러 수동 트리거(`/api/admin/scheduler/kbland-*`). 클래스 레벨 `@ConditionalOnProperty(scheduler.enabled)`라 kista-api role에선 빈 미등록(오라우팅 시 404)
-  dto/                 ← MetaBundle·EnumMeta·StrategyTypeMeta·TickerMeta·StrategyCapability(matching 내부 API 응답 own-type)
+  dto/                 ← MetaBundle·EnumMeta·StrategyTypeMeta·TickerMeta·StrategyCapability(matching 내부 API 응답 own-type — 4단계에서 엔드포인트째 삭제 예정)

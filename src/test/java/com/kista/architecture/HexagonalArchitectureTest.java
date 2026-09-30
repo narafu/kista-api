@@ -45,6 +45,22 @@ class HexagonalArchitectureTest {
     }
 
     @Test
+    @DisplayName("contract는 sharedkernel 외 다른 com.kista 모듈에 의존하지 않는다 — Published Language 불변식")
+    void contract_must_not_depend_on_other_modules() {
+        // contract는 프로세스 경계를 넘는 wire 스키마(순수 record)만 담는다 — 도메인 타입을 import하는 순간
+        // trading-core가 root를(또는 그 반대를) 컴파일 타임에 알게 된다. sharedkernel(공용 어휘) 참조만 허용하고,
+        // 자기 자신(com.kista.contract..)과 JDK·Jackson·Swagger·Bean Validation 어노테이션 외 의존은
+        // InternalApiContractTest.contract_must_only_depend_on_allowed_packages가 별도로 잠근다.
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.contract..")
+                .should().dependOnClassesThat(
+                        resideInAPackage("com.kista..")
+                                .and(resideOutsideOfPackage("com.kista.contract.."))
+                                .and(resideOutsideOfPackage("com.kista.sharedkernel..")));
+        rule.check(classes);
+    }
+
+    @Test
     @DisplayName("platform은 다른 com.kista 모듈에 의존하지 않는다 — 인프라 leaf 불변식")
     void platform_must_not_depend_on_other_modules() {
         // platform은 persistence base·crypto·스케쥴러 골격 등 순수 인프라만 담는다는 전제로 OPEN 선언됨 —

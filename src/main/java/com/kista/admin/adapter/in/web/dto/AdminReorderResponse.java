@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.admin.domain.model.AdminReorderResult;
+import com.kista.contract.trading.ReorderResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
@@ -22,7 +22,7 @@ public record AdminReorderResponse(
         @Schema(description = "신규 접수 주문의 브로커 측 ID (IMMEDIATE 즉시 접수 성공 시만 non-null)")
         String newOrderExternalId    // IMMEDIATE 즉시 접수 성공 시만 non-null
 ) {
-    public static AdminReorderResponse from(AdminReorderResult result) {
+    public static AdminReorderResponse from(ReorderResponse result) {
         return new AdminReorderResponse(
                 result.userId(),
                 result.accountId(),

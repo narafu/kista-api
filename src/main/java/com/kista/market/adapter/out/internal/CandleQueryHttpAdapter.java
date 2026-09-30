@@ -1,7 +1,7 @@
 package com.kista.market.adapter.out.internal;
 
 import com.kista.market.application.port.output.CandleQueryPort;
-import com.kista.market.domain.model.TossDailyCandle;
+import com.kista.contract.broker.DailyCandleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
     private final RestClient internalApiRestClient;
 
     @Override
-    public List<TossDailyCandle> latestDailyCandles(String symbol, int count) {
+    public List<DailyCandleResponse> latestDailyCandles(String symbol, int count) {
         return internalApiRestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/internal/broker/candles/latest")
                         .queryParam("symbol", symbol)
@@ -24,6 +24,6 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
                         .queryParam("count", count)
                         .build())
                 .retrieve()
-                .body(new ParameterizedTypeReference<List<TossDailyCandle>>() {});
+                .body(new ParameterizedTypeReference<List<DailyCandleResponse>>() {});
     }
 }

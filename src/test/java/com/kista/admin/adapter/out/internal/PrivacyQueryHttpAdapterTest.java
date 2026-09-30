@@ -1,10 +1,10 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.PrivacyQueryPort;
-import com.kista.admin.domain.model.AdminFidaOrderCommand;
-import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyTradeBaseView;
+import com.kista.contract.privacy.FidaOrderRequest;
+import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;
@@ -53,7 +53,7 @@ class PrivacyQueryHttpAdapterTest {
                     """.formatted(id))
                 .build());
 
-        List<AdminPrivacyTradeBaseView> result = adapter.findBasesFromTradeDate(LocalDate.of(2026, 1, 1));
+        List<PrivacyTradeBaseResponse> result = adapter.findBasesFromTradeDate(LocalDate.of(2026, 1, 1));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).id()).isEqualTo(id);
@@ -83,9 +83,9 @@ class PrivacyQueryHttpAdapterTest {
                     """.formatted(id, UUID.randomUUID()))
                 .build());
 
-        AdminFidaOrderCommand command = new AdminFidaOrderCommand(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
+        FidaOrderRequest command = new FidaOrderRequest(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
                 new BigDecimal("100.0"), BigDecimal.ZERO, null, 0,
-                List.of(new AdminFidaOrderCommand.PlannedOrder(OrderDirection.BUY, OrderType.LOC, 10, new BigDecimal("95.0"))));
+                List.of(new FidaOrderRequest.PlannedOrder(OrderDirection.BUY, OrderType.LOC, 10, new BigDecimal("95.0"))));
 
         PrivacyQueryPort.CreateBaseResult result = adapter.createBase(command);
 
@@ -119,7 +119,7 @@ class PrivacyQueryHttpAdapterTest {
                     """.formatted(id))
                 .build());
 
-        AdminFidaOrderCommand command = new AdminFidaOrderCommand(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
+        FidaOrderRequest command = new FidaOrderRequest(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
                 new BigDecimal("100.0"), BigDecimal.ZERO, null, 0, List.of());
 
         PrivacyQueryPort.CreateBaseResult result = adapter.createBase(command);
@@ -136,7 +136,7 @@ class PrivacyQueryHttpAdapterTest {
                     """)
                 .build());
 
-        AdminFidaOrderCommand command = new AdminFidaOrderCommand(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
+        FidaOrderRequest command = new FidaOrderRequest(LocalDate.of(2026, 1, 1), StrategyTicker.SOXL,
                 new BigDecimal("100.0"), BigDecimal.ZERO, null, 0, List.of());
 
         assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> adapter.createBase(command)))
@@ -155,10 +155,10 @@ class PrivacyQueryHttpAdapterTest {
                     """.formatted(baseId))
                 .build());
 
-        AdminPrivacyBaseUpdateCommand command = new AdminPrivacyBaseUpdateCommand(
+        PrivacyBaseUpdateRequest command = new PrivacyBaseUpdateRequest(
                 new BigDecimal("110.0"), new BigDecimal("5.0"), new BigDecimal("100.0"), 50);
 
-        AdminPrivacyTradeBaseView result = adapter.updateBase(baseId, command);
+        PrivacyTradeBaseResponse result = adapter.updateBase(baseId, command);
 
         assertThat(result.holdings()).isEqualTo(50);
         RecordedRequest recorded = server.takeRequest();
@@ -170,7 +170,7 @@ class PrivacyQueryHttpAdapterTest {
     void updateBase_404면_NoSuchElementException으로_변환한다() {
         server.enqueue(new MockResponse.Builder().code(404).build());
 
-        AdminPrivacyBaseUpdateCommand command = new AdminPrivacyBaseUpdateCommand(
+        PrivacyBaseUpdateRequest command = new PrivacyBaseUpdateRequest(
                 new BigDecimal("110.0"), new BigDecimal("5.0"), null, 0);
 
         assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> adapter.updateBase(UUID.randomUUID(), command)))
@@ -189,9 +189,9 @@ class PrivacyQueryHttpAdapterTest {
                     """.formatted(baseId))
                 .build());
 
-        AdminPrivacyOrderUpdateCommand command = new AdminPrivacyOrderUpdateCommand(new BigDecimal("96.0"), 20);
+        PrivacyOrderUpdateRequest command = new PrivacyOrderUpdateRequest(new BigDecimal("96.0"), 20);
 
-        AdminPrivacyTradeBaseView result = adapter.updateOrder(baseId, orderId, command);
+        PrivacyTradeBaseResponse result = adapter.updateOrder(baseId, orderId, command);
 
         assertThat(result.id()).isEqualTo(baseId);
         RecordedRequest recorded = server.takeRequest();

@@ -1,6 +1,6 @@
 package com.kista.market.adapter.out.internal;
 
-import com.kista.market.domain.model.TossDailyCandle;
+import com.kista.contract.broker.DailyCandleResponse;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
@@ -39,13 +39,13 @@ class CandleQueryHttpAdapterTest {
     }
 
     @Test
-    void latestDailyCandles_내부_API_응답을_own_type으로_역직렬화한다() throws InterruptedException {
+    void latestDailyCandles_내부_API_응답을_contract_type으로_역직렬화한다() throws InterruptedException {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("[{\"date\":\"2026-01-02\",\"open\":100,\"high\":110,\"low\":90,\"close\":105,\"volume\":1000}]")
                 .build());
 
-        List<TossDailyCandle> candles = adapter.latestDailyCandles("QQQ", 1);
+        List<DailyCandleResponse> candles = adapter.latestDailyCandles("QQQ", 1);
 
         assertThat(candles).hasSize(1);
         assertThat(candles.get(0).close()).isEqualByComparingTo("105");

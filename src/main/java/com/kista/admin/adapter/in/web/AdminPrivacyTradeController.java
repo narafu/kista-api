@@ -3,10 +3,10 @@ package com.kista.admin.adapter.in.web;
 import com.kista.admin.adapter.in.web.dto.AdminPrivacyBaseResponse;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
-import com.kista.admin.domain.model.AdminFidaOrderCommand;
-import com.kista.admin.domain.model.AdminPrivacyBaseUpdateCommand;
-import com.kista.admin.domain.model.AdminPrivacyOrderAddCommand;
-import com.kista.admin.domain.model.AdminPrivacyOrderUpdateCommand;
+import com.kista.contract.privacy.FidaOrderRequest;
+import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.contract.privacy.PrivacyOrderAddRequest;
+import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -59,7 +59,7 @@ public class AdminPrivacyTradeController {
     @PostMapping
     public ResponseEntity<AdminPrivacyBaseResponse> createBase(
             @AuthenticationPrincipal UUID adminId,
-            @RequestBody @Valid AdminFidaOrderCommand command) {
+            @RequestBody @Valid FidaOrderRequest command) {
         AdminPrivacyTradeUseCase.CreateResult result = adminPrivacyTrade.createBase(adminId, command);
         AdminPrivacyBaseResponse body = AdminPrivacyBaseResponse.from(result.view());
         if (!result.created()) return ResponseEntity.ok(body);
@@ -72,7 +72,7 @@ public class AdminPrivacyTradeController {
     public AdminPrivacyBaseResponse updateBase(
             @AuthenticationPrincipal UUID adminId,
             @PathVariable UUID id,
-            @RequestBody @Valid AdminPrivacyBaseUpdateCommand command) {
+            @RequestBody @Valid PrivacyBaseUpdateRequest command) {
         return AdminPrivacyBaseResponse.from(adminPrivacyTrade.updateBase(adminId, id, command));
     }
 
@@ -83,7 +83,7 @@ public class AdminPrivacyTradeController {
             @AuthenticationPrincipal UUID adminId,
             @PathVariable UUID baseId,
             @PathVariable UUID orderId,
-            @RequestBody @Valid AdminPrivacyOrderUpdateCommand command) {
+            @RequestBody @Valid PrivacyOrderUpdateRequest command) {
         return AdminPrivacyBaseResponse.from(adminPrivacyTrade.updateOrder(adminId, baseId, orderId, command));
     }
 
@@ -93,7 +93,7 @@ public class AdminPrivacyTradeController {
     public AdminPrivacyBaseResponse addOrder(
             @AuthenticationPrincipal UUID adminId,
             @PathVariable UUID baseId,
-            @RequestBody @Valid AdminPrivacyOrderAddCommand command) {
+            @RequestBody @Valid PrivacyOrderAddRequest command) {
         return AdminPrivacyBaseResponse.from(adminPrivacyTrade.addOrder(adminId, baseId, command));
     }
 

@@ -1,6 +1,6 @@
 package com.kista.admin.application.service;
 
-import com.kista.admin.domain.model.AdminAccountView;
+import com.kista.contract.account.AccountSummaryResponse;
 import com.kista.admin.domain.model.AdminStats;
 import com.kista.sharedkernel.Broker;
 import com.kista.admin.application.port.output.*;
@@ -129,10 +129,10 @@ class AdminQueryServiceTest {
     @Test
     void findAccount_ID로_단일_계좌를_조회한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        AdminAccountView account = new AdminAccountView(accountId, UUID.randomUUID(), "74420614", Broker.KIS, null);
+        AccountSummaryResponse account = new AccountSummaryResponse(accountId, UUID.randomUUID(), "74420614", Broker.KIS, null);
         when(accountQueryPort.findById(accountId)).thenReturn(Optional.of(account));
 
-        Optional<AdminAccountView> result = service.findAccount(accountId);
+        Optional<AccountSummaryResponse> result = service.findAccount(accountId);
 
         assertThat(result).isPresent().contains(account);
         verify(accountQueryPort).findById(accountId);

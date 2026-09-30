@@ -1,6 +1,7 @@
 package com.kista.privacy.adapter.in.web;
 
-import com.kista.privacy.adapter.in.web.dto.FidaOrderResponse;
+import com.kista.contract.privacy.FidaOrderRequest;
+import com.kista.contract.privacy.FidaOrderResponse;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.privacy.application.usecase.PrivacyUseCase;
@@ -34,9 +35,11 @@ public class FidaOrderController {
             @ApiResponse(responseCode = "409", description = "같은 날짜/종목에 내용이 다른 데이터 존재")
     })
     @PostMapping("/fida-orders")
-    public ResponseEntity<FidaOrderResponse> placeFidaOrder(@RequestBody @Valid FidaOrderCommand command) {
+    public ResponseEntity<FidaOrderResponse> placeFidaOrder(@RequestBody @Valid FidaOrderRequest request) {
+        // 요청 contract → 도메인 command 변환 후 실행, 응답은 요청 echo + 저장된 ID
+        FidaOrderCommand command = PrivacyContractMapper.toCommand(request);
         PrivacyTradeSaveResult result = privacy.executeFidaOrder(command);
-        FidaOrderResponse body = FidaOrderResponse.of(result.id(), command);
+        FidaOrderResponse body = PrivacyContractMapper.toResponse(result.id(), command);
         return result.created()
                 ? ResponseEntity.status(HttpStatus.CREATED).body(body)
                 : ResponseEntity.ok(body);

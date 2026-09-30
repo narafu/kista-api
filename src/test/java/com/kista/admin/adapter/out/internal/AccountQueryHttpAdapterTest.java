@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.out.internal;
 
-import com.kista.admin.domain.model.AdminAccountView;
+import com.kista.contract.account.AccountSummaryResponse;
 import com.kista.sharedkernel.Broker;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -41,7 +41,7 @@ class AccountQueryHttpAdapterTest {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json").body("[]").build());
 
-        List<AdminAccountView> result = adapter.findAll(null, null);
+        List<AccountSummaryResponse> result = adapter.findAll(null, null);
 
         assertThat(result).isEmpty();
         RecordedRequest recorded = server.takeRequest();
@@ -73,10 +73,10 @@ class AccountQueryHttpAdapterTest {
                     """.formatted(id, userId))
                 .build());
 
-        List<AdminAccountView> result = adapter.findAll(null, null);
+        List<AccountSummaryResponse> result = adapter.findAll(null, null);
 
         assertThat(result).hasSize(1);
-        AdminAccountView view = result.get(0);
+        AccountSummaryResponse view = result.get(0);
         assertThat(view.id()).isEqualTo(id);
         assertThat(view.userId()).isEqualTo(userId);
         assertThat(view.accountNo()).isEqualTo("74420614-01");
@@ -93,7 +93,7 @@ class AccountQueryHttpAdapterTest {
                     """.formatted(id, UUID.randomUUID()))
                 .build());
 
-        Optional<AdminAccountView> result = adapter.findById(id);
+        Optional<AccountSummaryResponse> result = adapter.findById(id);
 
         assertThat(result).isPresent();
         assertThat(result.get().id()).isEqualTo(id);
@@ -105,7 +105,7 @@ class AccountQueryHttpAdapterTest {
     void findById_404_응답은_Optional_empty로_변환된다() {
         server.enqueue(new MockResponse.Builder().code(404).build());
 
-        Optional<AdminAccountView> result = adapter.findById(UUID.randomUUID());
+        Optional<AccountSummaryResponse> result = adapter.findById(UUID.randomUUID());
 
         assertThat(result).isEmpty();
     }

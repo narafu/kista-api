@@ -15,7 +15,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.stats.application.usecase.InvestmentPointsQuery;
 import com.kista.trading.stats.domain.model.InvestmentPointsResult;
-import com.kista.trading.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

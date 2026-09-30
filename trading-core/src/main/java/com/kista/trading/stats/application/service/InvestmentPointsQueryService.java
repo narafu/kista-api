@@ -12,7 +12,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.stats.application.MonthlyReturnCalculator;
 import com.kista.trading.stats.application.usecase.InvestmentPointsQuery;
-import com.kista.trading.stats.domain.model.BenchmarkGranularity;
+import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.trading.stats.domain.model.InvestmentPoint;
 import com.kista.trading.stats.domain.model.InvestmentPointsResult;
 import lombok.RequiredArgsConstructor;
