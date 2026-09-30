@@ -4,7 +4,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
-import com.kista.user.domain.model.User;
+import com.kista.notify.domain.model.NotificationRecipient;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
@@ -24,28 +24,28 @@ public class FcmAdapter implements UserNotificationPort {
     private final Optional<FirebaseMessaging> firebaseMessaging; // null-safe — 미설정 시 empty
 
     @Override
-    public void notifyNewUser(User user) {
+    public void notifyNewUser(NotificationRecipient user) {
         // 신규 가입 알림은 관리자 전용 — CompositeAdapter에서 항상 Telegram 경유
     }
 
     @Override
-    public void notifyAutoApprovedUser(User user) {
+    public void notifyAutoApprovedUser(NotificationRecipient user) {
         // 신규 가입 알림은 관리자 전용 — CompositeAdapter에서 항상 Telegram 경유
     }
 
     @Override
-    public void notifyApproved(User user) {
-        send(user.id(), "KISTA 알림", "✅ 가입이 승인되었습니다.");
+    public void notifyApproved(NotificationRecipient user) {
+        send(user.userId(), "KISTA 알림", "✅ 가입이 승인되었습니다.");
     }
 
     @Override
-    public void notifyRejected(User user) {
-        send(user.id(), "KISTA 알림", "❌ 가입이 거절되었습니다.");
+    public void notifyRejected(NotificationRecipient user) {
+        send(user.userId(), "KISTA 알림", "❌ 가입이 거절되었습니다.");
     }
 
     @Override
-    public void notifyFinanceRegistrationReminder(User user, String month) {
-        send(user.id(), "가계부 등록을 아직 안 하셨어요",
+    public void notifyFinanceRegistrationReminder(NotificationRecipient user, String month) {
+        send(user.userId(), "가계부 등록을 아직 안 하셨어요",
                 month + " 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
     }
 

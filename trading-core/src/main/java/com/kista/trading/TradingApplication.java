@@ -37,9 +37,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @ConfigurationPropertiesScan(basePackages = {
         "com.kista.trading",
         "com.kista.tradingstats", // AlpacaProperties
-        "com.kista.tradingnotify", // TelegramProperties
         "com.kista.broker",
-        "com.kista.platform",
+        "com.kista.platform", // TelegramProperties
 })
 @EnableScheduling
 public class TradingApplication {

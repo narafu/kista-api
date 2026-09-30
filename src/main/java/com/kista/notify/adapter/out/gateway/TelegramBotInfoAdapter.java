@@ -1,42 +1,19 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.platform.telegram.TelegramHttpClient;
 import com.kista.user.application.port.output.TelegramBotInfoPort;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-import java.util.Map;
-
-@Slf4j
+// user의 TelegramBotInfoPort 구현 — getMe 호출·검증은 platform TelegramHttpClient가 담당(notify는 web.client 직접 사용 금지)
 @Component
 @RequiredArgsConstructor
 class TelegramBotInfoAdapter implements TelegramBotInfoPort {
 
-    private static final String API_BASE = "https://api.telegram.org";
-
-    private final RestClient telegramRestClient; // 빈 이름: telegramRestClient
+    private final TelegramHttpClient telegramHttpClient; // 공통 HTTP 전송 유틸
 
     @Override
-    @SuppressWarnings("unchecked")
     public String getUsername(String botToken) {
-        try {
-            String url = API_BASE + "/bot" + botToken + "/getMe";
-            Map<String, Object> response = telegramRestClient.get().uri(url).retrieve().body(Map.class);
-            if (response == null || !Boolean.TRUE.equals(response.get("ok"))) {
-                throw new IllegalArgumentException("유효하지 않은 Bot Token입니다");
-            }
-            // 응답 구조: { ok: true, result: { username: "narafu_kista_bot", ... } }
-            Map<String, Object> result = (Map<String, Object>) response.get("result");
-            String username = (String) result.get("username");
-            if (username == null || username.isBlank()) {
-                throw new IllegalArgumentException("봇 username을 가져올 수 없습니다");
-            }
-            return username;
-        } catch (RestClientException e) {
-            log.warn("Telegram getMe 실패: {}", e.getMessage());
-            throw new IllegalArgumentException("유효하지 않은 Bot Token입니다: " + e.getMessage(), e);
-        }
+        return telegramHttpClient.getBotUsername(botToken);
     }
 }

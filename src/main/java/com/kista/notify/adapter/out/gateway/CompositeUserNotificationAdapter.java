@@ -7,6 +7,7 @@ import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.domain.model.User;
 import com.kista.notify.application.port.output.UserNotificationPort;
+import com.kista.notify.domain.model.NotificationRecipient;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
 import lombok.RequiredArgsConstructor;
@@ -34,47 +35,53 @@ public class CompositeUserNotificationAdapter implements UserNotificationPort {
             return; // 관리자 seed 부트스트랩은 알림 불필요
         }
         if (user.status() == UserStatus.ACTIVE) {
-            notifyAutoApprovedUser(user); // 승인 불필요 설정이라 즉시 활성화된 신규 가입 — 정보성 알림만
+            notifyAutoApprovedUser(toRecipient(user)); // 승인 불필요 설정이라 즉시 활성화된 신규 가입 — 정보성 알림만
         } else {
-            notifyNewUser(user); // 승인 대기 — 승인/거절 버튼 포함
+            notifyNewUser(toRecipient(user)); // 승인 대기 — 승인/거절 버튼 포함
         }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserApproved(UserApprovedEvent event) {
-        notifyApproved(userPort.findByIdOrThrow(event.userId()));
+        notifyApproved(toRecipient(userPort.findByIdOrThrow(event.userId())));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserRejected(UserRejectedEvent event) {
-        notifyRejected(userPort.findByIdOrThrow(event.userId()));
+        notifyRejected(toRecipient(userPort.findByIdOrThrow(event.userId())));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserReapplied(UserReappliedEvent event) {
-        notifyNewUser(userPort.findByIdOrThrow(event.userId()));
+        notifyNewUser(toRecipient(userPort.findByIdOrThrow(event.userId())));
     }
 
     // 관리자 알림 — 채널 무관, 항상 Telegram (인라인 버튼 필요)
     @Override
-    public void notifyNewUser(User user) {
+    public void notifyNewUser(NotificationRecipient user) {
         telegram.notifyNewUser(user);
     }
 
     @Override
-    public void notifyAutoApprovedUser(User user) {
+    public void notifyAutoApprovedUser(NotificationRecipient user) {
         telegram.notifyAutoApprovedUser(user);
     }
 
     // 승인/거절 알림 — notificationChannel 설정과 무관하게 연결된 수단 전부로 발송 (각 어댑터가 자체 게이트 보유)
-    @Override public void notifyApproved(User user) { telegram.notifyApproved(user); fcm.notifyApproved(user); }
-    @Override public void notifyRejected(User user) { telegram.notifyRejected(user); fcm.notifyRejected(user); }
+    @Override public void notifyApproved(NotificationRecipient user) { telegram.notifyApproved(user); fcm.notifyApproved(user); }
+    @Override public void notifyRejected(NotificationRecipient user) { telegram.notifyRejected(user); fcm.notifyRejected(user); }
 
     // 가계부 미등록 리마인더 — notificationChannel 기반 라우팅 유지
-    @Override public void notifyFinanceRegistrationReminder(User user, String month)    { route(user, p -> p.notifyFinanceRegistrationReminder(user, month)); }
+    @Override public void notifyFinanceRegistrationReminder(NotificationRecipient user, String month)    { route(user, p -> p.notifyFinanceRegistrationReminder(user, month)); }
+
+    // User 애그리게이트 → notify 수신자 투영 — 이벤트 payload가 ID만 담아 재조회한 User를 여기서만 변환한다
+    private static NotificationRecipient toRecipient(User user) {
+        return new NotificationRecipient(user.id(), user.nickname(), user.notificationChannel(),
+                user.telegramBotToken(), user.telegramChatId(), user.rejectReason());
+    }
 
     // notificationChannel 기반 어댑터 라우팅 — Telegram/FCM 순서 고정
-    private void route(User user, Consumer<UserNotificationPort> action) {
+    private void route(NotificationRecipient user, Consumer<UserNotificationPort> action) {
         if (user.notificationChannel().includesTelegram()) action.accept(telegram);
         if (user.notificationChannel().includesFcm())      action.accept(fcm);
     }

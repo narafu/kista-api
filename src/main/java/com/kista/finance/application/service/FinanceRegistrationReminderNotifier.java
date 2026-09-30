@@ -8,6 +8,7 @@ import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
 import com.kista.notify.application.port.output.UserNotificationPort;
+import com.kista.notify.domain.model.NotificationRecipient;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
@@ -72,12 +73,18 @@ class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminder
         }
         try {
             if (hasRegistrationThisMonth(user.id(), from, to)) return;
-            userNotificationPort.notifyFinanceRegistrationReminder(user, monthLabel);
+            userNotificationPort.notifyFinanceRegistrationReminder(toRecipient(user), monthLabel);
         } catch (Exception e) {
             log.warn("[userId={}] 가계부 등록 알림 발송 실패: {}", user.id(), e.getMessage());
         } finally {
             limiter.release();
         }
+    }
+
+    // User → notify 수신자 투영 — notify는 User 애그리게이트를 모르므로 호출자가 변환한다
+    private static NotificationRecipient toRecipient(User user) {
+        return new NotificationRecipient(user.id(), user.nickname(), user.notificationChannel(),
+                user.telegramBotToken(), user.telegramChatId(), user.rejectReason());
     }
 
     private boolean hasRegistrationThisMonth(UUID userId, LocalDate from, LocalDate to) {

@@ -1,9 +1,9 @@
 package com.kista.tradingstats.adapter.out.alpaca;
 
+import com.kista.platform.http.RestClients;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 // marketcalendar 모듈(com.kista.marketcalendar.adapter.out.alpaca.AlpacaConfig, "marketAlpacaConfig")과
@@ -15,13 +15,6 @@ class AlpacaConfig {
 
     @Bean
     public RestClient tradingStatsAlpacaRestClient() {
-        return RestClient.builder().requestFactory(alpacaRequestFactory()).build();
-    }
-
-    static SimpleClientHttpRequestFactory alpacaRequestFactory() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3_000); // 연결 타임아웃 3초
-        factory.setReadTimeout(7_000);    // 읽기 타임아웃 7초
-        return factory;
+        return RestClients.withTimeouts(3_000, 7_000); // 연결 3초, 읽기 7초
     }
 }

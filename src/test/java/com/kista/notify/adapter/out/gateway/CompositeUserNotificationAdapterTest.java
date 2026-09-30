@@ -6,10 +6,11 @@ import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.domain.model.User;
-import com.kista.user.domain.model.NotificationChannel;
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
 import com.kista.support.DomainFixtures;
+import static com.kista.support.DomainFixtures.recipientOf;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,9 +48,9 @@ class CompositeUserNotificationAdapterTest {
         // FCM 채널 사용자도 신규가입 알림은 Telegram (관리자 알림)
         User fcmUser = userWith(NotificationChannel.FCM);
 
-        composite.notifyNewUser(fcmUser);
+        composite.notifyNewUser(recipientOf(fcmUser));
 
-        verify(telegram).notifyNewUser(fcmUser);
+        verify(telegram).notifyNewUser(recipientOf(fcmUser));
         verify(fcm, never()).notifyNewUser(any());
     }
 
@@ -60,20 +61,20 @@ class CompositeUserNotificationAdapterTest {
         // 승인/거절은 notificationChannel 설정과 무관하게 연결된 수단 전부로 발송 — 각 어댑터가 자체 게이트 보유
         User user = userWith(NotificationChannel.TELEGRAM);
 
-        composite.notifyApproved(user);
+        composite.notifyApproved(recipientOf(user));
 
-        verify(telegram).notifyApproved(user);
-        verify(fcm).notifyApproved(user);
+        verify(telegram).notifyApproved(recipientOf(user));
+        verify(fcm).notifyApproved(recipientOf(user));
     }
 
     @Test
     void notifyRejected_ignoresChannelSetting_alwaysCallsBothAdapters() {
         User user = userWith(NotificationChannel.NONE);
 
-        composite.notifyRejected(user);
+        composite.notifyRejected(recipientOf(user));
 
-        verify(telegram).notifyRejected(user);
-        verify(fcm).notifyRejected(user);
+        verify(telegram).notifyRejected(recipientOf(user));
+        verify(fcm).notifyRejected(recipientOf(user));
     }
 
     @Test
@@ -83,7 +84,7 @@ class CompositeUserNotificationAdapterTest {
 
         composite.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));
 
-        verify(telegram).notifyNewUser(user);
+        verify(telegram).notifyNewUser(recipientOf(user));
         verify(telegram, never()).notifyAutoApprovedUser(any());
     }
 
@@ -95,7 +96,7 @@ class CompositeUserNotificationAdapterTest {
 
         composite.onNewUserRegistered(new NewUserRegisteredEvent(user.id()));
 
-        verify(telegram).notifyAutoApprovedUser(user);
+        verify(telegram).notifyAutoApprovedUser(recipientOf(user));
         verify(telegram, never()).notifyNewUser(any());
     }
 
@@ -129,8 +130,8 @@ class CompositeUserNotificationAdapterTest {
 
         composite.onUserApproved(new UserApprovedEvent(user.id()));
 
-        verify(telegram).notifyApproved(user);
-        verify(fcm).notifyApproved(user);
+        verify(telegram).notifyApproved(recipientOf(user));
+        verify(fcm).notifyApproved(recipientOf(user));
     }
 
     @Test
@@ -140,8 +141,8 @@ class CompositeUserNotificationAdapterTest {
 
         composite.onUserRejected(new UserRejectedEvent(user.id()));
 
-        verify(telegram).notifyRejected(user);
-        verify(fcm).notifyRejected(user);
+        verify(telegram).notifyRejected(recipientOf(user));
+        verify(fcm).notifyRejected(recipientOf(user));
     }
 
     @Test
@@ -151,6 +152,6 @@ class CompositeUserNotificationAdapterTest {
 
         composite.onUserReapplied(new UserReappliedEvent(user.id()));
 
-        verify(telegram).notifyNewUser(user);
+        verify(telegram).notifyNewUser(recipientOf(user));
     }
 }

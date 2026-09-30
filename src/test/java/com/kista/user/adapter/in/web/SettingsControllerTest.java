@@ -1,7 +1,7 @@
 package com.kista.user.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.user.domain.model.NotificationChannel;
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.user.application.usecase.UserSettingsUseCase;
 import com.kista.user.application.usecase.UserProfileUseCase;

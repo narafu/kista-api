@@ -1,10 +1,10 @@
-package com.kista.notify.adapter.in.telegram;
+package com.kista.admin.adapter.in.telegram;
 
 import com.kista.contract.stats.PortfolioCurrentResponse;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.notify.adapter.out.gateway.TelegramHttpClient;
-import com.kista.notify.adapter.out.gateway.TelegramProperties;
-import com.kista.notify.application.port.output.PortfolioQueryPort;
+import com.kista.admin.application.port.output.PortfolioQueryPort;
+import com.kista.platform.telegram.TelegramHttpClient;
+import com.kista.platform.telegram.TelegramProperties;
 import com.kista.user.application.usecase.UserUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ class TelegramBotServiceTest {
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(String.valueOf(CHAT_ID), telegramHttpClient, PROPS, portfolioQueryPort, userUseCase);
+        sut = new TelegramBotService(telegramHttpClient, PROPS, portfolioQueryPort, userUseCase);
         // adminChatId로 userId 조회 — status/history 명령에서만 사용, 다른 테스트에서는 미호출
         lenient().when(userUseCase.findUserIdByTelegramChatId(String.valueOf(CHAT_ID))).thenReturn(Optional.of(USER_ID));
     }

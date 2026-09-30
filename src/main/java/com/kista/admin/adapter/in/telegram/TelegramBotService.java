@@ -1,16 +1,15 @@
-package com.kista.notify.adapter.in.telegram;
+package com.kista.admin.adapter.in.telegram;
 
 import com.kista.contract.stats.PortfolioCurrentResponse;
 import com.kista.contract.stats.PortfolioOrderResponse;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.notify.adapter.out.gateway.TelegramHttpClient;
-import com.kista.notify.adapter.out.gateway.TelegramProperties;
-import com.kista.notify.application.port.output.PortfolioQueryPort;
+import com.kista.admin.application.port.output.PortfolioQueryPort;
+import com.kista.platform.telegram.TelegramHttpClient;
+import com.kista.platform.telegram.TelegramProperties;
 import com.kista.user.application.usecase.UserUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -25,8 +24,6 @@ class TelegramBotService {
 
     private static final String NOT_LINKED_MSG = "텔레그램 Chat ID가 계정과 연결되지 않았습니다.";
 
-    @Value("${telegram.chat-id:}")
-    private final String adminChatId;  // 명령을 허용하는 관리자 텔레그램 채팅 ID
     private final TelegramHttpClient telegramHttpClient;
     private final TelegramProperties props;            // 관리자 봇 토큰
     private final PortfolioQueryPort portfolioQueryPort;
@@ -118,7 +115,7 @@ class TelegramBotService {
 
     private String buildStatusMessage() {
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
-        return userUseCase.findUserIdByTelegramChatId(adminChatId)
+        return userUseCase.findUserIdByTelegramChatId(adminChatId())
                 .map(userId -> {
                     try {
                         PortfolioCurrentResponse s = portfolioQueryPort.getCurrent(userId);
@@ -142,7 +139,7 @@ class TelegramBotService {
         LocalDate to = LocalDate.now(TimeZones.KST);
         LocalDate from = to.minusDays(days);
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
-        return userUseCase.findUserIdByTelegramChatId(adminChatId)
+        return userUseCase.findUserIdByTelegramChatId(adminChatId())
                 .map(userId -> {
                     List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
@@ -162,7 +159,12 @@ class TelegramBotService {
         return 7;
     }
 
+    // 명령을 허용하는 관리자 텔레그램 채팅 ID — 미설정이면 빈 문자열(어떤 chatId도 인가되지 않음)
+    private String adminChatId() {
+        return props.chatId() == null ? "" : props.chatId();
+    }
+
     private boolean isUnauthorized(long chatId) {
-        return !String.valueOf(chatId).equals(adminChatId);
+        return !String.valueOf(chatId).equals(adminChatId());
     }
 }

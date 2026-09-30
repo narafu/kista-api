@@ -1,7 +1,8 @@
 package com.kista.support;
 
+import com.kista.notify.domain.model.NotificationRecipient;
 import com.kista.user.domain.model.User;
-import com.kista.user.domain.model.NotificationChannel;
+import com.kista.sharedkernel.NotificationChannel;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -48,5 +49,11 @@ public final class DomainFixtures {
     // 텔레그램 설정된 사용자 — 알림 어댑터 테스트용 (botUsername은 null 고정)
     public static User telegramUser(UUID id, String botToken, String chatId) {
         return activeUser(id, NotificationChannel.TELEGRAM).withTelegram(botToken, chatId, null);
+    }
+
+    // User → NotificationRecipient 투영 — 알림 어댑터/리마인더의 변환과 동일 필드 매핑 (record 동등성으로 verify)
+    public static NotificationRecipient recipientOf(User user) {
+        return new NotificationRecipient(user.id(), user.nickname(), user.notificationChannel(),
+                user.telegramBotToken(), user.telegramChatId(), user.rejectReason());
     }
 }

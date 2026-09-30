@@ -1,78 +1,49 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.platform.telegram.TelegramHttpClient;
+import com.kista.platform.telegram.TelegramProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestClient;
-
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
+// HTTP 전송 상세(URL·빈 토큰 가드·오류 삼킴)는 platform TelegramHttpClientTest가 검증 — 여기선 어댑터의 위임 인자만 확인한다
 @ExtendWith(MockitoExtension.class)
 class TelegramAdapterTest {
 
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-    RestClient restClient;
+    @Mock TelegramHttpClient telegramHttpClient;
 
     TelegramAdapter adapter;
 
     static final TelegramProperties PROPS =
             new TelegramProperties("test-token", "chat-123");
-    static final TelegramProperties EMPTY_PROPS =
-            new TelegramProperties("", "chat-123");
 
     @BeforeEach
     void setUp() {
-        TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
-        adapter = new TelegramAdapter(httpClient, PROPS);
+        adapter = new TelegramAdapter(telegramHttpClient, PROPS);
     }
 
     @Test
-    void notifyInfo_sendsCorrectUrl() {
+    void notifyInfo_관리자_채팅방과_봇_토큰으로_메시지를_그대로_전송한다() {
         adapter.notifyInfo("스케쥴러 시작");
 
-        verify(restClient.post()).uri(contains("/bottest-token/sendMessage"));
+        verify(telegramHttpClient).sendMessage("chat-123", "스케쥴러 시작", "test-token");
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void notifyInfo_bodyContainsChatId() {
-        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
+    void notifyError_예외_메시지를_관리자_알림_문구로_감싸_전송한다() {
+        ArgumentCaptor<String> textCaptor = ArgumentCaptor.forClass(String.class);
 
-        adapter.notifyInfo("스케쥴러 시작");
+        adapter.notifyError(new RuntimeException("KIS API 호출 실패"));
 
-        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
-        assertThat((Map<String, String>) bodyCaptor.getValue()).containsEntry("chat_id", "chat-123");
-    }
-
-    @Test
-    void send_withEmptyToken_skipsRestClientCall() {
-        TelegramHttpClient emptyHttpClient = new TelegramHttpClient(restClient);
-        TelegramAdapter noTokenAdapter = new TelegramAdapter(emptyHttpClient, EMPTY_PROPS);
-
-        noTokenAdapter.notifyInfo("스케쥴러 시작");
-
-        verifyNoInteractions(restClient);
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void notifyError_bodyContainsExceptionMessage() {
-        Exception ex = new RuntimeException("KIS API 호출 실패");
-        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
-
-        adapter.notifyError(ex);
-
-        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
-        assertThat(((Map<String, String>) bodyCaptor.getValue()).get("text"))
+        verify(telegramHttpClient).sendMessage(org.mockito.ArgumentMatchers.eq("chat-123"), textCaptor.capture(),
+                org.mockito.ArgumentMatchers.eq("test-token"));
+        assertThat(textCaptor.getValue())
                 .contains("⚠️ 관리자 알림")
                 .contains("KIS API 호출 실패");
     }

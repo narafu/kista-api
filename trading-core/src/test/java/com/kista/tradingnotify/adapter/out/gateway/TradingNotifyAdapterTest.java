@@ -1,5 +1,7 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
+import com.kista.platform.telegram.TelegramHttpClient;
+import com.kista.platform.telegram.TelegramProperties;
 import com.kista.sharedkernel.StrategyTicker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

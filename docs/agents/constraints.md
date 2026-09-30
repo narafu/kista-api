@@ -69,7 +69,7 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User/Account/Strategy 공유 enum — sharedkernel 이관 완료
-`User.UserRole`/`UserStatus`/`NotificationType`, `Strategy.Type`/`Status`/`Ticker`/`CycleSeedType`, `Account.Broker`는 여러 모듈이 공유하는 값이라 `com.kista.sharedkernel` 독립 타입이다 — 이 모듈들에 nested enum으로 재도입 금지. `NotificationChannel`은 user 단독 소비라 `com.kista.user.domain.model` 독립 파일로 잔류. DB `@Enumerated(STRING)` 컬럼 상수명은 모두 byte-identical 유지 — 이동해도 상수명은 절대 바꾸지 않는다.
+`User.UserRole`/`UserStatus`/`NotificationType`, `Strategy.Type`/`Status`/`Ticker`/`CycleSeedType`, `Account.Broker`는 여러 모듈이 공유하는 값이라 `com.kista.sharedkernel` 독립 타입이다 — 이 모듈들에 nested enum으로 재도입 금지. `NotificationChannel`도 user(설정 저장)와 notify(채널 라우팅)가 공유해 `com.kista.sharedkernel`로 승격됐다(2026-09-30). DB `@Enumerated(STRING)` 컬럼 상수명은 모두 byte-identical 유지 — 이동해도 상수명은 절대 바꾸지 않는다.
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수, `User`에 유지) — 서비스/컨트롤러에서 직접 하드코딩 금지
 
 ### 도메인 Command 명명 규칙
@@ -143,9 +143,10 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
 
 ### adapter.in.telegram package-private 제약
-- `TelegramBotService`(`com.kista.notify.adapter.in.telegram`)는 package-private → application layer나 다른 패키지에서 직접 참조 불가. 공용 텔레그램 전송은 `adapter.out.gateway.TelegramHttpClient`(public)가 담당(구 `TelegramApiClient` 1:1 래퍼는 중복 제거로 삭제됨 — `TelegramBotService`가 `TelegramHttpClient`를 직접 주입받는다)
-- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `com.kista.notify.application.port.output` 포트 + `com.kista.notify.adapter.out.gateway` 어댑터 신규 생성 패턴 (예: `TelegramBotInfoPort` + `TelegramBotInfoAdapter`)
-- 기존 `telegramRestTemplate` 빈 재사용 가능 (필드명 일치시키면 자동 주입)
+- 텔레그램 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아닌 **인바운드 관리자 명령**이라 `com.kista.admin.adapter.in.telegram`이 소유한다(2026-09-30 notify에서 이전). `TelegramBotService`는 package-private → 컨트롤러 외 다른 패키지에서 직접 참조 불가. `/telegram/webhook`은 `platform.security.SecurityConfig`에서 permitAll(경로 불변)
+- 텔레그램 HTTP 전송은 `com.kista.platform.telegram.TelegramHttpClient`(public — `sendMessage`/`sendWithInlineKeyboard`/`answerCallbackQuery`/`getBotUsername`) 하나로 통합돼 root(notify·admin)와 trading-core(`tradingnotify`)가 공용한다. 새 텔레그램 API 호출은 이 클래스에 메서드를 추가하고, notify·admin에 `RestClient`를 직접 쓰지 않는다(`HexagonalArchitectureTest.notify_must_stay_pure_outbound_gateway`가 notify의 `org.springframework.web.client..`·`..application.usecase..` 의존을 잠근다)
+- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `TelegramHttpClient`에 메서드 추가 + 소유 모듈 포트(예: user `TelegramBotInfoPort`)를 `com.kista.notify.adapter.out.gateway` 어댑터(`TelegramBotInfoAdapter`)가 구현·위임하는 패턴
+- `RestClient` 빈이 여러 개이므로 텔레그램 빈은 이름 `telegramRestClient`/`telegramHttpClient` — 주입 지점은 필드명 `telegramRestClient` 또는 `TelegramHttpClient` 타입으로만 받는다(불일치 시 `NoUniqueBeanDefinitionException`)
 
 ### Spring Security Filter 이중 등록 방지
 - `@Component` Filter + `addFilterBefore()` 조합 시 `FilterRegistrationBean.setEnabled(false)` 필수 (이중 실행 방지)

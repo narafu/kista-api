@@ -1,4 +1,4 @@
-package com.kista.notify.adapter.in.telegram;
+package com.kista.admin.adapter.in.telegram;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

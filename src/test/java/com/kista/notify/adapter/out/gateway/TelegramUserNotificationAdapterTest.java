@@ -1,28 +1,24 @@
 package com.kista.notify.adapter.out.gateway;
 
+import com.kista.platform.telegram.TelegramHttpClient;
+import com.kista.platform.telegram.TelegramProperties;
 import com.kista.user.domain.model.User;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Answers;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestClient;
 
-import java.util.Map;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
 
+// HTTP 전송 상세는 platform TelegramHttpClientTest가 검증 — 여기선 사용자 봇 토큰·Chat ID와 문구만 확인한다
 @ExtendWith(MockitoExtension.class)
 class TelegramUserNotificationAdapterTest {
 
-    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
-    RestClient restClient;
+    @Mock TelegramHttpClient telegramHttpClient;
 
     TelegramUserNotificationAdapter adapter;
 
@@ -30,50 +26,37 @@ class TelegramUserNotificationAdapterTest {
 
     @BeforeEach
     void setUp() {
-        TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
-        adapter = new TelegramUserNotificationAdapter(httpClient, PROPS);
+        adapter = new TelegramUserNotificationAdapter(telegramHttpClient, PROPS);
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void notifyRejected_withReason_appendsReasonToMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection("서류 미비");
-        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
-        adapter.notifyRejected(user);
+        adapter.notifyRejected(DomainFixtures.recipientOf(user));
 
-        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
-        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
-        assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.\n사유: 서류 미비");
+        verify(telegramHttpClient).sendMessage("user-chat-789", "❌ 가입 신청이 거절되었습니다.\n사유: 서류 미비", "user-bot-token");
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void notifyRejected_withNullReason_sendsUnchangedMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection(null);
-        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
-        adapter.notifyRejected(user);
+        adapter.notifyRejected(DomainFixtures.recipientOf(user));
 
-        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
-        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
-        assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.");
+        verify(telegramHttpClient).sendMessage("user-chat-789", "❌ 가입 신청이 거절되었습니다.", "user-bot-token");
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void notifyRejected_withBlankReason_sendsUnchangedMessage() {
         // UserService.reject()가 blank -> null로 정규화하지만, 어댑터 자체 방어 로직(isBlank 가드)을 직접 검증
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection("   ");
-        ArgumentCaptor<Object> bodyCaptor = ArgumentCaptor.forClass(Object.class);
 
-        adapter.notifyRejected(user);
+        adapter.notifyRejected(DomainFixtures.recipientOf(user));
 
-        verify(restClient.post().uri(anyString())).body(bodyCaptor.capture());
-        String text = ((Map<String, String>) bodyCaptor.getValue()).get("text");
-        assertThat(text).isEqualTo("❌ 가입 신청이 거절되었습니다.");
+        verify(telegramHttpClient).sendMessage("user-chat-789", "❌ 가입 신청이 거절되었습니다.", "user-bot-token");
     }
 }

@@ -1,8 +1,8 @@
-package com.kista.notify.adapter.out.internal;
+package com.kista.admin.adapter.out.internal;
 
 import com.kista.contract.stats.PortfolioCurrentResponse;
 import com.kista.contract.stats.PortfolioOrderResponse;
-import com.kista.notify.application.port.output.PortfolioQueryPort;
+import com.kista.admin.application.port.output.PortfolioQueryPort;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.StrategyTicker;

@@ -1,4 +1,4 @@
-package com.kista.notify.adapter.in.telegram;
+package com.kista.admin.adapter.in.telegram;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

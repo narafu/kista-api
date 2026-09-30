@@ -28,7 +28,7 @@ com.kista.contract/      :shared    · OPEN · (NamedInterface 없음, wire 스�
 com.kista.platform/      :shared    · OPEN · (NamedInterface 없음, 인프라 leaf) · persistence/crypto/time/scheduling/redis 공용 인프라, outbound 0 → modules/platform.md
 com.kista.matching/      :trading-core · CLOSED · "kernel"                 · 주문생성 커널(순수 계산), CycleOrderStrategy SSOT → modules/matching.md
 com.kista.finance/       :api       · CLOSED · "domain"/"usecase"/"port"   · 가계부 애그리게이트, 마감월 쓰기 차단          → modules/finance.md
-com.kista.notify/        :api       · CLOSED · "port"                     · Telegram/FCM 얇은 게이트웨이. 매매 알림 6종은 tradingnotify(trading-core) 소유 → modules/notify.md
+com.kista.notify/        :api       · CLOSED · "port"/"domain"            · Telegram/FCM 순수 아웃바운드 알림 게이트웨이(봇 명령 채널은 admin 소유, 수신자는 notify 소유 NotificationRecipient). 매매 알림 6종은 tradingnotify(trading-core) 소유 → modules/notify.md
 com.kista.broker/        :trading-core · CLOSED · "domain"/"port"/"application" · KIS/Toss/Mock 연동, Account를 전혀 참조하지 않음(Account.toBrokerRef() 1곳 전담) → modules/broker.md
 com.kista.trading/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"schedule"/"event" · 주문·사이클 실행·전략 설정 (통계·알림은 아래 두 모듈로 분리) → modules/trading.md
 com.kista.tradingstats/  :trading-core · CLOSED · "domain"/"usecase"/"port"  · 계좌·증권사 통계·백테스트·포트폴리오·summary 조회. trading 공개 계약만 읽는 단방향 소비자 → modules/tradingstats.md

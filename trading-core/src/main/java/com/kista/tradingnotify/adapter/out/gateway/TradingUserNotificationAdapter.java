@@ -1,5 +1,6 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
+import com.kista.platform.telegram.TelegramHttpClient;
 import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;

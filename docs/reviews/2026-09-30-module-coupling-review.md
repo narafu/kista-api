@@ -2,7 +2,7 @@
 
 기준 커밋 `68ca7cd` (`refactor(broker,trading): BrokerAdapterRegistry를 포트 단위 라우팅으로 교체`). 소스 921파일(`:api` 432 / `:trading-core` 439 / `:shared` 50)의 `import com.kista.*` 전수 집계 + 내부 API 엔드포인트 36개 + 배포 토폴로지(`deploy/server/docker-compose.yml`)를 실측한 결과다. 문서(`docs/agents/**`)가 아니라 코드를 근거로 삼았고, 문서와 코드가 다른 곳은 별도 절(§8)에 모았다.
 
-> **진행 상태**: 1~4단계 완료·커밋, 5단계 구현 완료(검수 전, 브랜치 `wip/coupling-phase5`), 6·7단계 미착수. 인계 메모와 재개 절차는 `docs/reviews/2026-09-30-module-coupling-handoff.md`. 아래 본문의 "현재" 수치는 검토 시점 기준 그대로 둔다.
+> **진행 상태**: 1~5단계 완료·검수·커밋, 6·7단계 진행 중. 인계 메모와 재개 절차는 `docs/reviews/2026-09-30-module-coupling-handoff.md`. 아래 본문의 "현재" 수치는 검토 시점 기준 그대로 둔다.
 
 ---
 

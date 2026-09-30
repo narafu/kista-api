@@ -1,7 +1,7 @@
 ## com.kista.user (`:api`)
 
 com.kista.user/     ← Spring Modulith 모듈(CLOSED) — 가입·승인·프로필·설정 + JWT/RefreshToken/블랙리스트/카카오 OAuth. "domain"(domain.model+domain.auth 병합)·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter·config internal
-  domain/model/       ← User/UserSettings/AdminUserView/NotificationChannel. `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수) — 서비스/컨트롤러 하드코딩 금지
+  domain/model/       ← User/UserSettings/AdminUserView. `NotificationChannel`은 2026-09-30 `com.kista.sharedkernel`로 승격(notify 채널 라우팅과 공유 — 상수명 byte-identical, `@Enumerated(STRING)` 컬럼 불변). `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수) — 서비스/컨트롤러 하드코딩 금지
   domain/auth/        ← RefreshToken/TokenRefreshResult/TokenConstants/InvalidRefreshTokenException
   application/usecase/ ← BlacklistUseCase/GetUserSettingsQuery/TokenUseCase/UserProfileUseCase/UserSettingsUseCase/UserUseCase
   application/port/output/ ← AdminUserViewPort/ApprovalPolicyPort/BlacklistPort/KakaoOAuthPort/RefreshTokenPort/TelegramBotInfoPort/UserPort/UserSettingsPort/ActiveStrategyCountPort. `ApprovalPolicyPort`(가입 승인 필요 여부 FOR UPDATE 락 조회)는 user가 정의하고 admin이 구현하는 포트 역전
@@ -12,7 +12,7 @@ com.kista.user/     ← Spring Modulith 모듈(CLOSED) — 가입·승인·프�
   adapter/in/schedule/ ← RefreshTokenCleanupScheduler(platform `SchedulerJobRunner` 재사용)
   adapter/out/kakao/  ← KakaoOAuthAdapter/KakaoConfig/KakaoProperties
   adapter/out/internal/ ← ActiveStrategyCountAdapter(`ActiveStrategyCountPort` 구현 — trading-core 내부 API `GET /api/internal/trading/active-strategy-count`를 호출하는 순수 HTTP 어댑터, 타입 의존 없음. 과거 `com.kista.web.trading`에 있던 것을 2026-09-30 여기로 이전 — 인바운드 패키지의 RestClient 금지 규칙 때문)
-  adapter/out/redis/  ← RedisBlacklistAdapter + UserEventStreamPublisher(trading-core 복제본 동기화용 Redis Stream 발행)
+  adapter/out/redis/  ← RedisBlacklistAdapter(platform `RedisTokenBlacklistReader` 상속 — 읽기 3종은 베이스, 쓰기 3종만 이 클래스) + UserEventStreamPublisher(trading-core 복제본 동기화용 Redis Stream 발행)
   adapter/out/persistence/user/    ← UserEntity + UserJpaRepository + UserPersistenceAdapter, AdminUserViewAdapter
   adapter/out/persistence/auth/    ← RefreshTokenEntity + JpaRepository + PersistenceAdapter
   adapter/out/persistence/settings/ ← UserSettingsJpaEntity/UserNotificationPrefJpaEntity/UserNotificationPrefId + JpaRepository + UserSettingsPersistenceAdapter

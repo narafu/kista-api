@@ -5,7 +5,7 @@ import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.user.domain.model.User;
-import com.kista.user.domain.model.NotificationChannel;
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
@@ -14,6 +14,7 @@ import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.support.DomainFixtures;
+import static com.kista.support.DomainFixtures.recipientOf;
 import org.junit.jupiter.api.Test;
 
 import java.time.YearMonth;
@@ -65,8 +66,8 @@ class FinanceRegistrationReminderNotifierTest {
 
         notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.of(2026, 8));
 
-        verify(notificationPort, never()).notifyFinanceRegistrationReminder(eq(userWithData), any());
-        verify(notificationPort, times(1)).notifyFinanceRegistrationReminder(eq(userWithoutData), eq("8월"));
+        verify(notificationPort, never()).notifyFinanceRegistrationReminder(eq(recipientOf(userWithData)), any());
+        verify(notificationPort, times(1)).notifyFinanceRegistrationReminder(eq(recipientOf(userWithoutData)), eq("8월"));
     }
 
     @Test

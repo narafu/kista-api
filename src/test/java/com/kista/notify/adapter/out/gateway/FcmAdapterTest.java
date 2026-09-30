@@ -3,8 +3,9 @@ package com.kista.notify.adapter.out.gateway;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.MulticastMessage;
+import com.kista.notify.domain.model.NotificationRecipient;
 import com.kista.user.domain.model.User;
-import com.kista.user.domain.model.NotificationChannel;
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,8 +32,8 @@ class FcmAdapterTest {
 
     FcmAdapter adapter;
 
-    static User user(UUID id) {
-        return DomainFixtures.activeUser(id, NotificationChannel.FCM);
+    static NotificationRecipient user(UUID id) {
+        return DomainFixtures.recipientOf(DomainFixtures.activeUser(id, NotificationChannel.FCM));
     }
 
     @BeforeEach

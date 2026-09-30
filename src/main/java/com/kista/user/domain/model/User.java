@@ -1,5 +1,6 @@
 package com.kista.user.domain.model;
 
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
 import lombok.With;

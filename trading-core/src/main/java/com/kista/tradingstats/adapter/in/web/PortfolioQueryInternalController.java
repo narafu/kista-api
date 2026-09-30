@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-// notify(TelegramBotService)가 PortfolioUseCase를 직접 참조하지 않도록 내부 API로 노출 — X-Internal-Token 인증
+// admin(텔레그램 TelegramBotService)이 PortfolioUseCase를 직접 참조하지 않도록 내부 API로 노출 — X-Internal-Token 인증
 @Tag(name = "내부 API", description = "서버 간 내부 호출 전용 엔드포인트 (X-Internal-Token 인증)")
 @RestController
 @RequestMapping("/api/internal/trading/stats/portfolio")

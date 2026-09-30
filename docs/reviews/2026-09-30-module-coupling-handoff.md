@@ -12,18 +12,16 @@
 | 1·2단계 리뷰 지적 수정 (app.error 구독 자가복구, 공개 runtime-config 장애 강등) | 완료·커밋 | `main` `9351b33` |
 | 3단계 — `tradingstats`·`tradingnotify` 분리, 브로커 벤더 타입 차단 (F3) | 완료·검수·커밋 | `main` `89fdfff` |
 | 4단계 — matching 커널 `PrivacyPlan`, `StrategyCapability` sharedkernel 승격, `/api/meta` HTTP 제거 (F4·F5) | 완료·검수·커밋 | `main` `a64aa3b` |
-| **5단계 — notify 순수 게이트웨이화 + 인프라 공용화 (F6)** | **구현·테스트 완료, 리뷰어 검수 미실시** | **브랜치 `wip/coupling-phase5`** (main + 1커밋) |
+| 5단계 — notify 순수 게이트웨이화 + 인프라 공용화 (F6) | 완료·검수·커밋 (리뷰 지적 6건 반영: 봇 토큰 로그 마스킹, getMe 방어 파싱, chat-id 이중 바인딩 제거, 타임아웃 단언 복원, 테스트 헬퍼 통합, 원장 갱신) | `main` |
 | 6단계 — 앱셸 대칭화 (F7) | 미착수 | — |
 | 7단계 — 잔여 정리 (F8~F10 + 문서 드리프트) | 미착수 | — |
 
-`main`은 `origin/main`보다 앞서 있고 **push하지 않았다**(저장소 규칙: push는 사용자 명시 요청 시에만). 다른 세션(특히 클라우드)이 이 작업을 보려면 먼저 `main`과 `wip/coupling-phase5`가 원격에 push돼 있어야 한다.
+5단계는 검수 후 `main`에 반영됐다(`wip/coupling-phase5`는 역할을 다해 삭제 — 원격에 남아 있으면 지워도 된다). 주의: 인계 메모 커밋 `e137b9b`에 5단계 파일 이동·삭제가 실수로 섞여 들어가 그 커밋 단독으로는 컴파일되지 않는다(직후 5단계 커밋이 복구). 이력 재작성 없이 그대로 둔다.
 
 ## 2. 재개 절차
 
-1. `git checkout wip/coupling-phase5` — 5단계 변경(73파일)이 "검수 전" 커밋 1개로 들어 있다.
-2. 5단계 리뷰어 검수: `/code-review medium`(diff 범위: `main..wip/coupling-phase5`). 실제 결함은 수정·재검증.
-3. 통과하면 `main`으로 fast-forward 후 커밋 메시지를 정식 형식으로 다듬는다(`git checkout main && git merge --ff-only wip/coupling-phase5`, 필요 시 `git commit --amend`로 메시지 교체 — 아직 push 전이라 amend 가능). WIP 브랜치 삭제.
-4. 6단계 → 7단계 순으로 진행(아래 §4). 단계마다 같은 절차: 구현 → 전체 컴파일 → 전체 단위 테스트 → 리뷰어 검수 → 커밋.
+1. 5단계까지 `main`에 반영 완료.
+2. 6단계 → 7단계 순으로 진행(아래 §4). 단계마다 같은 절차: 구현 → 전체 컴파일 → 전체 단위 테스트 → 리뷰어 검수 → 커밋.
 
 ## 3. 진행 방식 (지금까지 쓴 방법)
 

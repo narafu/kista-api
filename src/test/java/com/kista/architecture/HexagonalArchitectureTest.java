@@ -121,6 +121,19 @@ class HexagonalArchitectureTest {
     }
 
     @Test
+    @DisplayName("notify는 순수 아웃바운드 게이트웨이 — 다른 모듈 유스케이스와 web.client(RestClient)에 의존하지 않는다")
+    void notify_must_stay_pure_outbound_gateway() {
+        // 텔레그램 봇 명령 채널(승인/거절·조회)은 admin.adapter.in.telegram으로 이전됐다. notify가 유스케이스를 호출하거나
+        // 다른 프로세스를 HTTP로 조회하는 순간 알림 게이트웨이가 다시 인바운드 명령 채널이 된다 —
+        // 사용자 조회는 UserPort·이벤트로, 텔레그램 전송·getMe는 platform.telegram.TelegramHttpClient가 맡는다.
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista.notify..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "com.kista..application.usecase..", "org.springframework.web.client..");
+        rule.check(classes);
+    }
+
+    @Test
     @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.kis/toss)을 참조하지 않는다 — 벤더 타입 침투 차단")
     void vendor_models_must_not_leak_outside_broker() {
         // KIS/Toss 전용 타입(KisApiException/TossCandle 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
