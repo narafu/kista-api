@@ -23,11 +23,7 @@ import java.util.UUID;
 // trading 소유 영속 데이터는 MockSimulationDataPort(broker 소유 포트, trading이 구현) 경유로만 접근 — trading 타입 직접 참조 없음
 @Component
 @RequiredArgsConstructor
-public class MockBrokerAdapter implements BrokerAdapterPort,
-        PortfolioPort, MarginPort, SellableQuantityPort,
-        BrokerOrderCorrectionPort,
-        ExecutionPort,
-        BrokerPricePort, LiveBalancePort {
+public class MockBrokerAdapter implements BrokerCapabilitiesPort {
 
     private final CommonMarketPriceFeed priceFeed;               // 시세 재사용 — Spring이 TossPriceApi 빈을 이 인터페이스로 주입 (이미 broker 소유 PriceSnapshot 반환)
     private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)

@@ -15,11 +15,7 @@ import java.util.Map;
 // KIS 증권사 어댑터 — 공통 7개 Port 구현 (BrokerPricePort + LiveBalancePort 추가)
 @Component
 @RequiredArgsConstructor
-public class KisBrokerAdapter implements BrokerAdapterPort,
-        PortfolioPort, MarginPort, SellableQuantityPort,
-        BrokerOrderCorrectionPort,
-        ExecutionPort,
-        BrokerPricePort, LiveBalancePort {
+public class KisBrokerAdapter implements BrokerCapabilitiesPort {
 
     private final KisTradingApi kisTradingApi; // portfolio/margin/sellable/execution/account
     private final KisOrderApi kisOrderApi;     // cancel/place

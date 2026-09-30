@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
@@ -23,7 +22,6 @@ import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,8 +47,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 class TradingOrderExecutorTest {
 
     @Mock OrderPort orderPort;
-    @Mock BrokerAdapterRegistry registry;
-    @Mock BrokerOrderCorrectionPort brokerPort;  // registry.require(account, BrokerOrderCorrectionPort.class) 반환값
+    @Mock BrokerOrderCorrectionPort brokerPort;
     @Mock BuyOrderPriceCapper buyOrderPriceCapper;
     @Mock ApplicationEventPublisher eventPublisher;
 
@@ -88,14 +85,8 @@ class TradingOrderExecutorTest {
             new PrivacyCycleOrderStrategy(null),
             new VrCycleOrderStrategy(null)));
 
-    @BeforeEach
-    void setUp() {
-        // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
-        lenient().doReturn(brokerPort).when(registry).require(any(BrokerAccountRef.class), any());
-    }
-
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, registry, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES);
+        return new TradingOrderExecutor(orderPort, brokerPort, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES);
     }
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {

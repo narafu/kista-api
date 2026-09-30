@@ -4,7 +4,6 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.MarginPort;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.matching.domain.model.BootstrapPosition;
 import com.kista.matching.domain.model.StrategyVrDetail;
@@ -42,7 +41,8 @@ class StrategyCreationService {
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final AccountPort accountPort;
     private final TradingUserProfilePort tradingUserProfilePort;
-    private final BrokerAdapterRegistry registry;
+    private final BrokerPricePort brokerPricePort;
+    private final MarginPort marginPort;
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
 
@@ -137,7 +137,7 @@ class StrategyCreationService {
     // 조회 실패 시 등록 자체가 실패한다 — BrokerCallGuard가 IllegalStateException으로 래핑해 GlobalExceptionHandler 400 매핑
     private BigDecimal fetchMarketPrice(Account account, StrategyTicker ticker) {
         return BrokerCallGuard.wrap("전일종가 조회",
-                () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrevClose(ticker, account.toBrokerRef()));
+                () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef()));
     }
 
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.
@@ -291,7 +291,7 @@ class StrategyCreationService {
 
     // 예수금 = 증권사 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {
-        BigDecimal kisUsdAmount = registry.require(account.toBrokerRef(), MarginPort.class).getUsdBuyableAmount(account.toBrokerRef());
+        BigDecimal kisUsdAmount = marginPort.getUsdBuyableAmount(account.toBrokerRef());
 
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
                 .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())

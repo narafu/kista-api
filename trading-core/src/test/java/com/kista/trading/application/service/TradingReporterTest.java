@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.trading.application.event.TradingReportReadyEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
@@ -48,8 +47,6 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingReporterTest {
-
-    @Mock BrokerAdapterRegistry registry;
     @Mock ExecutionPort executionPort;
     @Mock OrderPort orderPort;
     @Mock ApplicationEventPublisher eventPublisher;
@@ -90,11 +87,8 @@ class TradingReporterTest {
 
     @BeforeEach
     void setUp() {
-        reporter = new TradingReporter(registry, orderPort,
+        reporter = new TradingReporter(executionPort, brokerOrderPort, orderPort,
                 cyclePositionPersistor, eventPublisher);
-        lenient().when(registry.require(ACCOUNT_REF, ExecutionPort.class)).thenReturn(executionPort);
-        lenient().when(registry.require(TOSS_ACCOUNT_REF, ExecutionPort.class)).thenReturn(executionPort);
-        lenient().when(registry.require(TOSS_ACCOUNT_REF, BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderPort);
         // TRADING_ALERT 기본 활성 — USER/TOSS_USER 모두 notificationPrefs 비어있어 isNotificationEnabled()가 true 반환
     }
 

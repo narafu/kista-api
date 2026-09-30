@@ -6,7 +6,6 @@ import com.kista.trading.domain.model.TradingReport;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.sharedkernel.TradeLegSummary;
 import com.kista.trading.application.event.TradingErrorEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.AccountBalance;
@@ -39,7 +38,9 @@ import com.kista.sharedkernel.StrategyTicker;
 @Slf4j
 class TradingReporter {
 
-    private final BrokerAdapterRegistry registry;
+    private final ExecutionPort executionPort;
+
+    private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final OrderPort orderPort;                              // 주문 체결 상태 갱신
     private final CyclePositionPersistor cyclePositionPersistor;   // 포지션 스냅샷 저장 위임
     private final ApplicationEventPublisher eventPublisher;        // 리포트/SSE 알림 이벤트 발행
@@ -53,7 +54,7 @@ class TradingReporter {
         cancelUnresolvedOrders(mainOrders, account);
 
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
-        List<Execution> executions = registry.require(account.toBrokerRef(), ExecutionPort.class).getExecutions(today, today, strategy.ticker(), account.toBrokerRef());
+        List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.toBrokerRef());
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
@@ -85,7 +86,7 @@ class TradingReporter {
         for (Order order : mainOrders) {
             if (order.status() != OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {
-                registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
+                brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
             } catch (Exception e) {
                 if (isAlreadyFilled(e)) {

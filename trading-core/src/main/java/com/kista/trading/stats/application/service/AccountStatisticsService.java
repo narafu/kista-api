@@ -1,6 +1,5 @@
 package com.kista.trading.stats.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
@@ -36,14 +35,16 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final AccountPort accountPort;
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
-    private final BrokerAdapterRegistry registry;
+    private final PortfolioPort portfolioPort;
+    private final MarginPort marginPort;
+    private final BrokerPricePort brokerPricePort;
 
     // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
     @Override
     public PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("잔고 조회", () ->
-                registry.require(account.toBrokerRef(), PortfolioPort.class).getPresentBalance(account.toBrokerRef()));
+                portfolioPort.getPresentBalance(account.toBrokerRef()));
     }
 
     // 증거금 통화별 조회 — KIS: TTTC2101R / Toss: buying-power USD+KRW
@@ -51,7 +52,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("예수금 조회", () ->
-                registry.require(account.toBrokerRef(), MarginPort.class).getMargin(account.toBrokerRef()));
+                marginPort.getMargin(account.toBrokerRef()));
     }
 
     @Override
@@ -105,7 +106,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     public Map<StrategyTicker, BigDecimal> getPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("전일종가 조회",
-                () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrevCloses(tickers, account.toBrokerRef()));
+                () -> brokerPricePort.getPrevCloses(tickers, account.toBrokerRef()));
     }
 
     @Override

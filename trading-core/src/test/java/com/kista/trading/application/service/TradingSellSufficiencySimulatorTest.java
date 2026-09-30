@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.SellableQuantity;
@@ -35,8 +34,6 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingSellSufficiencySimulatorTest {
-
-    @Mock BrokerAdapterRegistry registry;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock OrderPort orderPort;
 
@@ -49,8 +46,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @BeforeEach
     void setUp() {
-        simulator = new TradingSellSufficiencySimulator(registry, orderPort);
-        lenient().when(registry.require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class))).thenReturn(sellableQuantityPort);
+        simulator = new TradingSellSufficiencySimulator(sellableQuantityPort, orderPort);
     }
 
     private PlannedOrder sellOrder(int quantity, BigDecimal price) {

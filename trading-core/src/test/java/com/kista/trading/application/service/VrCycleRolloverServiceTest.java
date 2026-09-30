@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
@@ -47,7 +46,6 @@ class VrCycleRolloverServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock MarketCalendarPort marketCalendarPort;
-    @Mock BrokerAdapterRegistry registry;
     @Mock BrokerPricePort brokerPricePort;
 
     VrCycleRolloverService service;
@@ -99,14 +97,13 @@ class VrCycleRolloverServiceTest {
         service = new VrCycleRolloverService(
                 strategyCycleVrPort, strategyVrDetailPort, strategyCyclePort,
                 cycleSnapshotCreator, eventPublisher,
-                marketCalendarPort, registry);
+                marketCalendarPort, brokerPricePort);
         ctx = new BatchContext(VR_STRATEGY, CYCLE, ACCOUNT, USER);
         // 램프 재계산 기준 — 최초 사이클 시작일 조회 기본 stub (CYCLE 자신이 최초 사이클인 케이스)
         // due 미도래·cycleVr 미존재 등 조기 return 테스트는 호출 자체가 없어 unnecessary stub 문제 없음(lenient)
         lenient().when(strategyCyclePort.findFirstByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         // due일 확정 종가 조회 — 기본은 항상 거래일(휴장 역탐색 불필요) + CLOSING_PRICE 반환
         lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        lenient().when(registry.require(any(BrokerAccountRef.class), eq(BrokerPricePort.class))).thenReturn(brokerPricePort);
         lenient().when(brokerPricePort.getClosingPrice(any(), any(), any())).thenReturn(CLOSING_PRICE);
     }
 

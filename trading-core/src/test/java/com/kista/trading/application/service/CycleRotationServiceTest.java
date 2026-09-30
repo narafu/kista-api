@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CyclePosition;
@@ -42,8 +41,6 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CycleRotationService 단위 테스트")
 class CycleRotationServiceTest {
-
-    @Mock BrokerAdapterRegistry registry;
     @Mock MarginPort marginPort;
     @Mock StrategyPort strategyPort;
     @Mock StrategyVersionPort strategyVersionPort;
@@ -71,7 +68,7 @@ class CycleRotationServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        service = new CycleRotationService(registry, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
+        service = new CycleRotationService(marginPort, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
                 cyclePositionPort, cycleSnapshotCreator, eventPublisher, cycleStrategies);
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenReturn(Optional.of(new StrategyVersion(STRATEGY_VERSION_ID, null, 1, null, null)));
@@ -99,7 +96,6 @@ class CycleRotationServiceTest {
         Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
         // MAINTAIN도 실잔고 확인 — actual >= maintainSeed 이면 재등록
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("1500.00"));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
@@ -117,7 +113,6 @@ class CycleRotationServiceTest {
         BigDecimal deposit = new BigDecimal("500.00");
         Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("600.00"));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
@@ -139,8 +134,6 @@ class CycleRotationServiceTest {
 
         // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
         CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, null, null);
-
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(lastPosition));
 
@@ -156,7 +149,6 @@ class CycleRotationServiceTest {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         RuntimeException kisError = new RuntimeException("KIS 잔고 조회 실패");
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(kisError);
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
@@ -172,7 +164,6 @@ class CycleRotationServiceTest {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
         // USD 잔고 없음 → router가 BigDecimal.ZERO 반환
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(BigDecimal.ZERO);
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
@@ -187,7 +178,6 @@ class CycleRotationServiceTest {
     void max_kisLookupFails_pausesStrategy() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(new RuntimeException("KIS 잔고 조회 실패"));
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
@@ -200,7 +190,6 @@ class CycleRotationServiceTest {
     void max_createCycleFails_pausesStrategyAndRethrows() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         RuntimeException boom = new RuntimeException("사이클 생성 실패");
         when(cycleSnapshotCreator.createCycleAndSnapshot(eq(strategy.id()), eq(STRATEGY_VERSION_ID), any(), eq(PRICE)))
@@ -218,7 +207,6 @@ class CycleRotationServiceTest {
     void max_listenerFailsAfterCycleCreated_doesNotPause() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        when(registry.require(ACCOUNT_REF, MarginPort.class)).thenReturn(marginPort);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         doThrow(new RuntimeException("리스너 실패")).when(eventPublisher).publishEvent(any(Object.class));
 

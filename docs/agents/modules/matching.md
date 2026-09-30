@@ -12,7 +12,7 @@ com.kista.matching/  ← Spring Modulith 모듈(CLOSED) — 주문생성 커널(
 - `CycleOrderStrategies`: `Map<StrategyType, CycleOrderStrategy>` 라우터 — `of(type)`으로 구현체 조회
 - **프론트 capability 소비**: `GET /api/meta`의 `StrategyTypeMeta`에 capability 7필드(code/description/availableTickers/requiresPrivacyBase/tickerFixed/supportsReverseMode/divisionCounts) 직렬화 → 프론트는 `isInfinite` 휴리스틱 대신 `divisionCounts`/`requiresPrivacyBase` 직접 소비
 - **최소시드 미리보기**: `GET /api/accounts/{id}/strategy-seed-preview?type=&ticker=&divisionCount=` → `StrategySeedPreviewResponse { ticker, basePrice, minSeed, skipReason }`
-  - `StrategyService.strategySeedPreview()`(trading) — `BrokerAdapterRegistry`(BrokerPricePort) + `PrivacyTradePort` + `CycleOrderStrategies.minRequiredDeposit` 조합. 브로커 HTTP 호출 포함이라 `@Transactional(NOT_SUPPORTED)` (register()와 동일)
+  - `StrategyService.strategySeedPreview()`(trading) — `BrokerPricePort` + `PrivacyTradePort` + `CycleOrderStrategies.minRequiredDeposit` 조합. 브로커 HTTP 호출 포함이라 `@Transactional(NOT_SUPPORTED)` (register()와 동일)
   - PRIVACY + 기준 매매표 없는 날 → `skipReason="NO_PRIVACY_BASE"` (basePrice/minSeed=null)
 - **신규 전략 타입 추가 시**: `StrategyType` enum case + `CycleOrderStrategy` 구현체 1개만 추가하면 메타 capability·최소시드·UI 자동 반영
 

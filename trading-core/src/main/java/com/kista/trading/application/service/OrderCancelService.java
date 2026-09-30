@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.trading.application.event.OrderCancelFailedEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
@@ -33,7 +32,7 @@ import java.util.UUID;
 class OrderCancelService {
 
     private final OrderPort orderPort;
-    private final BrokerAdapterRegistry registry;
+    private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final AccountPort accountPort;
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -67,7 +66,7 @@ class OrderCancelService {
 
         for (Order order : placedOrders) {
             try {
-                registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
+                brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
                 stateWriter.markCancelled(order.id());
                 cancelledCount++;
@@ -114,7 +113,7 @@ class OrderCancelService {
         }
 
         try {
-            registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
+            brokerOrderCorrectionPort
                     .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
         } catch (Exception e) {
             if (!isAlreadyCanceled(e)) {

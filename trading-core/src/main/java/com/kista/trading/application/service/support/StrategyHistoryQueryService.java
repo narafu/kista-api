@@ -3,7 +3,6 @@ package com.kista.trading.application.service.support;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.application.port.output.BrokerPricePort;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -42,7 +41,7 @@ public class StrategyHistoryQueryService {
     private final OrderPort orderPort;
     private final CycleOrderStrategies cycleStrategies;
     private final PrivacyTradePort privacyTradePort;
-    private final BrokerAdapterRegistry registry;
+    private final BrokerPricePort brokerPricePort;
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
     // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
@@ -70,7 +69,7 @@ public class StrategyHistoryQueryService {
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
         BigDecimal price = strategy.requiresPrivacyBase()
                 ? null
-                : registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrevClose(ticker, account.toBrokerRef());
+                : brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
         BigDecimal basePrice = strategy.requiresPrivacyBase()
                 ? privacyBase.currentCycleStart()
                 : price;

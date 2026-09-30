@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.account.domain.model.Account;
@@ -42,8 +41,6 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingOrderBudgetAllocatorTest {
-
-    @Mock BrokerAdapterRegistry registry;
     @Mock LiveBalancePort liveBalancePort;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock OrderPort orderPort;
@@ -70,9 +67,7 @@ class TradingOrderBudgetAllocatorTest {
         lenient().when(vrCycleOrderStrategy.allocationPriority()).thenReturn(0);
         CycleOrderStrategies cycleOrderStrategies = new CycleOrderStrategies(List.of(
                 infiniteCycleOrderStrategy, privacyCycleOrderStrategy, vrCycleOrderStrategy));
-        allocator = new TradingOrderBudgetAllocator(registry, orderPort, cycleOrderStrategies);
-        lenient().when(registry.require(any(BrokerAccountRef.class), eq(LiveBalancePort.class))).thenReturn(liveBalancePort);
-        lenient().when(registry.require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class))).thenReturn(sellableQuantityPort);
+        allocator = new TradingOrderBudgetAllocator(liveBalancePort, sellableQuantityPort, orderPort, cycleOrderStrategies);
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(eq(account.id()), eq(tradeDate))).thenReturn(BigDecimal.ZERO);
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), eq(account.toBrokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 100));

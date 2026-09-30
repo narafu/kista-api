@@ -11,7 +11,6 @@ import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.event.MarketClosedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
@@ -83,7 +82,7 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock com.kista.broker.application.port.output.MarginPort kisMarginBrokerPort; // BrokerAdapterRegistry → CycleRotationService 위임용
+    @Mock com.kista.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
     @Mock LiveBalancePort liveBalancePort;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingUserProfilePort tradingUserProfilePort;
@@ -147,40 +146,20 @@ class TradingServiceTest {
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
-        // CycleRotationService: BrokerAdapterRegistry.require(account, MarginPort) → kisMarginPort로 위임
-        BrokerAdapterRegistry marginRegistry = mock(BrokerAdapterRegistry.class);
-        lenient().when(marginRegistry.require(any(BrokerAccountRef.class),
-                eq(MarginPort.class))).thenReturn(kisMarginBrokerPort);
         CycleRotationService rotationService = new CycleRotationService(
-                marginRegistry, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
+                kisMarginBrokerPort, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
                 cycleHistoryPort, cycleSnapshotCreator, eventPublisher, cycleStrategies);
-        // 브로커 포트 레지스트리 — 각 mock을 직접 연결 (KisPricePort/KisExecutionPort 삭제로 단순화)
-        BrokerAdapterRegistry tradingRegistry = mock(BrokerAdapterRegistry.class);
 
-        // BrokerPricePort: kisPricePort 직접 연결 (위임 레이어 제거)
-        lenient().doReturn(kisPricePort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
-
-        // BrokerOrderCorrectionPort: 필드 mock 직접 연결
-        lenient().doReturn(brokerOrderPort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(BrokerOrderCorrectionPort.class));
-
-        // ExecutionPort: kisExecutionPort 직접 연결 (위임 레이어 제거)
-        lenient().doReturn(kisExecutionPort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(ExecutionPort.class));
-
-        // LiveBalancePort: 필드 mock 직접 연결
-        lenient().doReturn(liveBalancePort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(LiveBalancePort.class));
-
-        // SellableQuantityPort: BUY 예산과 독립적인 SELL 판매가능수량 검증
-        lenient().doReturn(sellableQuantityPort).when(tradingRegistry).require(any(BrokerAccountRef.class), eq(SellableQuantityPort.class));
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(tradingRegistry, eventPublisher, privacyTradePort);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, tradingRegistry, priceCapper, eventPublisher, cycleStrategies);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService);
         TradingReporter reporter = new TradingReporter(
-                tradingRegistry, orderPort,
+                kisExecutionPort, brokerOrderPort, orderPort,
                 positionPersistor, eventPublisher);
         // 계좌 기준 테스트 — live 잔고 체크 시 liveBalancePort.getLiveBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
@@ -215,7 +194,7 @@ class TradingServiceTest {
         // MarketEventNotifier — TradingUserProfilePort/ApplicationEventPublisher를 직접 주입해 생성
         MarketEventNotifier marketEventNotifier = new MarketEventNotifier(tradingUserProfilePort, eventPublisher);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
-                tradingRegistry, orderPort, cycleStrategies);
+                liveBalancePort, sellableQuantityPort, orderPort, cycleStrategies);
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
                 orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,

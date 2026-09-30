@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
@@ -42,7 +41,6 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 class StrategyOrderPlanBuilderTest {
 
     @Mock TradingBalanceLoader balanceLoader;
-    @Mock BrokerAdapterRegistry registry;
     @Mock BrokerPricePort pricePort;
     @Mock PrivacyTradePort privacyTradePort;
     @Mock CycleOrderComputer orderComputer;
@@ -60,9 +58,8 @@ class StrategyOrderPlanBuilderTest {
 
     @BeforeEach
     void setUp() {
-        builder = new StrategyOrderPlanBuilder(balanceLoader, registry, privacyTradePort, orderComputer, cycleOrderStrategies);
+        builder = new StrategyOrderPlanBuilder(balanceLoader, pricePort, privacyTradePort, orderComputer, cycleOrderStrategies);
         lenient().when(cycleOrderStrategies.of(strategy.type())).thenReturn(orderStrategy);
-        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 
     @Test

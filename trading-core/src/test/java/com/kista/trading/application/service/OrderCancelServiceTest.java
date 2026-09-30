@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
@@ -54,8 +53,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
 class OrderCancelServiceTest {
 
     @Mock OrderPort orderPort;
-    @Mock BrokerAdapterRegistry registry;
-    @Mock BrokerOrderCorrectionPort brokerPort;  // registry.require(account, BrokerOrderCorrectionPort.class) 반환값
+    @Mock BrokerOrderCorrectionPort brokerPort;
     @Mock AccountPort accountPort;
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
@@ -79,10 +77,8 @@ class OrderCancelServiceTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
                 null, LocalDate.now(), null, null, null);
-        // registry.require(account, BrokerOrderCorrectionPort.class) → brokerPort 반환 스텁 (일부 테스트는 도달 전 종료 → lenient)
-        lenient().doReturn(brokerPort).when(registry).require(any(), any());
         // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
-        service = new OrderCancelService(orderPort, registry, accountPort, cyclePort, strategyCyclePort,
+        service = new OrderCancelService(orderPort, brokerPort, accountPort, cyclePort, strategyCyclePort,
                 eventPublisher, new OrderCancelStateWriter(orderPort));
     }
 

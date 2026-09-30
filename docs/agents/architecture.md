@@ -70,4 +70,4 @@ com.kista.web/           :api       · CLOSED · (NamedInterface 0개, 앱셸 si
 - `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용
 
 ### 전략 패턴 (모듈별 문서로 이동)
-BrokerAdapter Registry 패턴·TDA 전략 패턴(InfiniteStrategy)·CycleOrderStrategy Capability 패턴·PRIVACY 전략 패턴·VR 전략 패턴은 각각 `modules/broker.md`·`modules/trading.md`·`modules/matching.md`·`modules/privacy.md`·`modules/trading.md`로 이동했다.
+BrokerCapabilitiesPort/BrokerRouter 패턴·TDA 전략 패턴(InfiniteStrategy)·CycleOrderStrategy Capability 패턴·PRIVACY 전략 패턴·VR 전략 패턴은 각각 `modules/broker.md`·`modules/trading.md`·`modules/matching.md`·`modules/privacy.md`·`modules/trading.md`로 이동했다.

@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerBalance;
@@ -28,8 +27,6 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PreviewDepositCacheTest {
-
-    @Mock BrokerAdapterRegistry registry;
     @Mock LiveBalancePort liveBalancePort;
 
     PreviewDepositCache cache;
@@ -37,8 +34,7 @@ class PreviewDepositCacheTest {
 
     @BeforeEach
     void setUp() {
-        cache = new PreviewDepositCache(registry);
-        lenient().doReturn(liveBalancePort).when(registry).require(any(BrokerAccountRef.class), any());
+        cache = new PreviewDepositCache(liveBalancePort);
     }
 
     @Test

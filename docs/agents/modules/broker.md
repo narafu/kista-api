@@ -3,8 +3,8 @@
 com.kista.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss/Mock 증권사 연동. "domain"·"port"·"application" 3개 NamedInterface 공개, adapter/out은 비공개. **broker는 `Account`를 전혀 참조하지 않는다** — 자체 타입만 사용, `Account→BrokerAccountRef` 변환은 `Account.toBrokerRef()` 1곳이 전담
   domain/model/       ← Currency/DailyTransaction*/Execution/MarginItem/PresentBalanceResult 등 공통 값 객체 + broker 단독 소유 타입(쌍둥이 없음): PriceSnapshot(`BrokerPricePort` 반환 + `prevCloseOrNull`)/BrokerBalance(LiveBalancePort 반환 — trading이 자신의 AccountBalance 구성에 사용)/OrderInstruction·OrderResult·CancelInstruction(`BrokerOrderCorrectionPort.place()/cancel()`)/PlacedOrderView·PositionView·StrategyRefLite(MockSimulationDataPort 반환용 얇은 뷰)/BrokerAccountRef(id/appKey/secretKey/accountNo/brokerAccountCode + broker — Account 전체를 포트에 노출하지 않기 위한 자격증명 투영)/SellableQuantity/BrokerCredentialException·BrokerRateLimitException(KIS/Toss 인증 실패 시 KisAuthApi/TossAuthApi가 throw, 422/429 매핑)
   domain/model/kis/·toss/ ← KIS/Toss 전용 도메인 모델 — domain/model과 함께 "domain"으로 병합 공개
-  application/port/output/ ← 브로커 Capability `*Port` 16개 — 공통 7개(KIS/Toss/Mock 모두 구현) + BrokerAdapterPort(라우팅 마커) + BrokerConnectionTestPort(*AuthApi가 구현 — 계좌 등록 전 검증이라 Account 없이 broker enum으로 라우팅, verifyAccount→brokerAccountCode(KIS: null, Toss: accountSeq)) + BrokerTokenCachePort(KisTokenPersistenceAdapter 구현) + MockSimulationDataPort(MockBrokerAdapter 전용 — 데이터를 필요로 하는 broker가 정의하고 가진 trading이 `MockSimulationDataAdapter`로 구현하는 포트 역전) + Toss 전용 5개. 10개 포트는 `Account` 대신 `BrokerAccountRef`를 시그니처에 사용
-  application/service/ ← BrokerAdapterRegistry(public, `require(BrokerAccountRef, Port.class)`/`find()`)/BrokerConnectionTesters(`of(Broker)`)/BrokerCallGuard — "application"
+  application/port/output/ ← 브로커 Capability `*Port` 17개 — 공통 7개(KIS/Toss/Mock 모두 구현) + BrokerAdapterPort(어댑터 식별 마커) + BrokerCapabilitiesPort(BrokerAdapterPort+공통 7개 묶음) + BrokerConnectionTestPort(*AuthApi가 구현 — 계좌 등록 전 검증이라 Account 없이 broker enum으로 라우팅, verifyAccount→brokerAccountCode(KIS: null, Toss: accountSeq)) + BrokerTokenCachePort(KisTokenPersistenceAdapter 구현) + MockSimulationDataPort(MockBrokerAdapter 전용 — 데이터를 필요로 하는 broker가 정의하고 가진 trading이 `MockSimulationDataAdapter`로 구현하는 포트 역전) + Toss 전용 5개. 10개 포트는 `Account` 대신 `BrokerAccountRef`를 시그니처에 사용
+  application/service/ ← BrokerRouter(package-private `@Primary`, 공통 7개 Port 라우터)/BrokerConnectionTesters(`of(Broker)`)/BrokerCallGuard — "application"
   adapter/in/web/     ← internal — CandleInternalController(`/api/internal/broker/candles/latest`, X-Internal-Token) — root market이 `CandlePort`/`TossCandle`을 참조하지 않도록 하는 내부 엔드포인트, own-type `CandleResponse`(컨트롤러 내부 record)로 매핑해 반환, `market.adapter.out.internal.CandleQueryHttpAdapter`가 소비
   adapter/out/kis/    ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화 후 최신 토큰으로 1회 재시도)/KisAuthApi/KisOrderApi/KisPriceApi/KisTradingApi/KisResponseParser/KisExchangeRegistry/KisConfig/KisTokenCoordinator/KisBrokerAdapter
   adapter/out/toss/   ← TossHttpClient/TossConfig/TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossMarketApi/TossResponseParser/TossResult/TossMarketCalendarCache/TossStockInfoCache/UsdKrwRateCache
@@ -14,10 +14,10 @@ com.kista.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss/Mock 증권
   adapter/out/internal/ ← TokenCoordinator(계좌 토큰 obtain/recover 공통 계약 — adapter 내부 인터페이스, 폴리모픽 주입 없음)/ErrorBodyDecoder(KIS/Toss 오류 응답 바디 디코딩 공용 기법). 더블체크락(KisTokenCoordinator)·전일종가 캐시(TossPriceApi)·확정종가 폴백(KisPriceApi/TossPriceApi)·getClosingPrices 순회(KisPriceApi/TossBrokerAdapter/MockBrokerAdapter)는 과거 공용 유틸(DoubleCheckedTokenCache/PrevCloseCache/ConfirmedCloseFallback/ClosingPriceLoop)로 분리돼 있었으나 각 호출부가 1곳뿐이라 ponytail-audit로 각 소비자 내부에 인라인되어 소멸했다(2026-09-27)
   adapter/out/persistence/ ← KisTokenEntity + KisTokenJpaRepository + KisTokenPersistenceAdapter
 
-### BrokerAdapter Registry 패턴
-- `com.kista.broker.application.service.BrokerAdapterRegistry`: `Map<Broker, BrokerAdapterPort>`(sharedkernel.Broker) — Spring이 `List<BrokerAdapterPort>` 자동 수집
-- `registry.require(account, XxxPort.class)` — 브로커가 Capability 미지원 시 `IllegalArgumentException` → GlobalExceptionHandler 400
-- `registry.find(account, XxxPort.class)` — `Optional<T>`, 미지원 시 `Optional.empty()`
-- 신규 브로커 추가: `BrokerAdapterPort` 구현체 1개만 추가 — Router/switch 수정 불필요
+### BrokerCapabilitiesPort + BrokerRouter 패턴
+- 공통 7개 Port(Portfolio/Margin/SellableQuantity/BrokerOrderCorrection/Execution/BrokerPrice/LiveBalance) + `BrokerAdapterPort`를 묶은 `BrokerCapabilitiesPort`를 KIS/Toss/Mock 어댑터가 구현한다 — Toss 전용 5개 Port(Candle/ExchangeRate/StockInfo/BrokerMarketCalendar/BrokerAccount)는 `TossBrokerAdapter`만 추가 구현(단일 빈이라 직접 주입 가능)
+- `com.kista.broker.application.service.BrokerRouter`(package-private, `@Primary @Component`): `List<BrokerCapabilitiesPort>`를 `Map<Broker, BrokerCapabilitiesPort>`로 수집해 공통 7개 Port를 **개별로** 구현하고 `account.broker()`로 위임한다. `BrokerCapabilitiesPort`/`BrokerAdapterPort`를 구현하지 않는 이유 — 구현하면 자기 자신이 `List<BrokerCapabilitiesPort>`에 수집된다. 미등록 브로커는 `IllegalArgumentException("지원하지 않는 증권사: ...")` → GlobalExceptionHandler 400
+- 소비처(trading 등)는 `BrokerPricePort` 같은 Port 인터페이스를 그대로 주입 — `@Primary`가 Router를 고른다(어댑터 3개도 같은 타입 빈이라 Router가 없으면 모호)
+- 신규 브로커 추가: `BrokerCapabilitiesPort` 구현체 1개만 추가 — Router/switch 수정 불필요
 - `Account.isToss()` 삭제됨 — 브로커 분기 필요 시 `account.broker() == Broker.TOSS` 직접 비교
-- `BrokerAdapterRegistry`는 `public` — 여러 모듈에서 "application" NamedInterface로 소비하는 예외적 공개 접근자
+- "application" NamedInterface는 `BrokerConnectionTesters`/`BrokerCallGuard` 공개용으로 유지

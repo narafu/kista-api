@@ -5,7 +5,7 @@ import com.kista.sharedkernel.Broker;
 import java.util.UUID;
 
 // 계좌 등록 전 자격증명 검증 포트 — Account 저장 전 원시 자격증명만으로 호출되므로
-// BrokerAdapterRegistry(account.broker 라우팅) 대신 별도 broker enum 라우터로 조회
+// BrokerRouter(account.broker 라우팅) 대신 별도 broker enum 라우터로 조회
 public interface BrokerConnectionTestPort {
     // 이 구현체가 담당하는 증권사
     Broker supports();

@@ -70,7 +70,7 @@ sequenceDiagram
     participant Noti as Telegram / FCM
 
     S1->>TF: executeBatch() — 전략 전체 순회
-    TF->>KIS: 잔고/보유수량 조회 (BrokerAdapterRegistry 경유)
+    TF->>KIS: 잔고/보유수량 조회 (BrokerRouter 경유)
     TF->>TF: CycleOrderStrategy.plan()<br/>(INFINITE/PRIVACY/VR 별 주문 계산)
     TF->>DB: Order 저장 (계획 상태)
     TF->>KIS: 매도 선접수 (INFINITE)

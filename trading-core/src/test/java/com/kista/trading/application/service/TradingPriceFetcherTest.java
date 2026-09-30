@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
@@ -29,8 +28,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TradingPriceFetcher 단위 테스트")
 class TradingPriceFetcherTest {
-
-    @Mock BrokerAdapterRegistry registry;
     @Mock BrokerPricePort pricePort;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock PrivacyTradePort privacyTradePort;
@@ -39,8 +36,7 @@ class TradingPriceFetcherTest {
 
     @BeforeEach
     void setUp() {
-        priceFetcher = new TradingPriceFetcher(registry, eventPublisher, privacyTradePort);
-        doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
+        priceFetcher = new TradingPriceFetcher(pricePort, eventPublisher, privacyTradePort);
     }
 
     @Test

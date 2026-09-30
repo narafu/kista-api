@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.account.domain.model.Account;
 import com.kista.matching.domain.model.AccountBalance;
@@ -46,7 +45,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final StrategyVrDetailPort strategyVrDetailPort;
     private final StrategyCycleVrPort strategyCycleVrPort;
     private final CyclePositionPort cyclePositionPort;
-    private final BrokerAdapterRegistry registry;
+    private final BrokerPricePort brokerPricePort;
     private final CycleSnapshotCreator cycleSnapshotCreator; // 버전 교체 + 사이클 종료 + 새 사이클 원자 저장
     private final OrderCancelService orderCancelService;     // 재설정 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;   // 새 사이클 시작 이벤트 발행 + 사용자 알림 실패 시 관리자 알림 이벤트
@@ -91,7 +90,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
         // 현재가 조회 — 수량 주입 시 V 증분·holdings 승계 스냅샷 종가 기준 (구조적 검증 통과 후에만 호출, 실패 시 불필요한 API 호출 방지)
         BigDecimal currentPrice = BrokerCallGuard.wrap("현재가 조회",
-                () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrice(strategy.ticker(), account.toBrokerRef()));
+                () -> brokerPricePort.getPrice(strategy.ticker(), account.toBrokerRef()));
         BigDecimal newValue = computeNewValue(cmd, currentCycleVr, currentPrice);
 
         // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(StrategyCreationService.validateVrCommand)과 동일 규칙,

@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.broker.domain.model.OrderInstruction;
@@ -31,7 +30,7 @@ import java.util.UUID;
 class TradingOrderExecutor {
 
     private final OrderPort orderPort;
-    private final BrokerAdapterRegistry registry;
+    private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final ApplicationEventPublisher eventPublisher;
     private final CycleOrderStrategies cycleOrderStrategies;
@@ -90,7 +89,7 @@ class TradingOrderExecutor {
                     p.orderType(), p.quantity(), p.price());
             OrderResult result;
             try {
-                result = registry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class).place(instruction, account.toBrokerRef());
+                result = brokerOrderCorrectionPort.place(instruction, account.toBrokerRef());
             } catch (Exception e) {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());

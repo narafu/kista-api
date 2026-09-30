@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderDirection;
@@ -37,7 +36,9 @@ import com.kista.sharedkernel.StrategyTicker;
 @RequiredArgsConstructor
 class TradingOrderBudgetAllocator {
 
-    private final BrokerAdapterRegistry registry;              // live 잔고·판매가능수량 조회
+    private final LiveBalancePort liveBalancePort; // live 잔고·판매가능수량 조회
+
+    private final SellableQuantityPort sellableQuantityPort;
     private final OrderPort orderPort;                         // 기존 PLANNED/PLACED 예약분 조회
     private final CycleOrderStrategies cycleOrderStrategies;    // 전략 타입별 예산 배정 우선순위 조회
 
@@ -68,7 +69,7 @@ class TradingOrderBudgetAllocator {
         AccountBalance liveBalance = null;
         if (!buyCandidates.isEmpty()) {
             Candidate probe = buyCandidates.stream().sorted(buyPriorityComparator()).findFirst().orElseThrow();
-            BrokerBalance bb = registry.require(account.toBrokerRef(), LiveBalancePort.class)
+            BrokerBalance bb = liveBalancePort
                     .getLiveBalance(account.toBrokerRef(), probe.ctx().strategy().ticker());
             liveBalance = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
         }
@@ -80,7 +81,7 @@ class TradingOrderBudgetAllocator {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         Map<StrategyTicker, Integer> sellableByTicker = new LinkedHashMap<>();
         for (StrategyTicker ticker : sellTickers) {
-            int sellable = registry.require(account.toBrokerRef(), SellableQuantityPort.class)
+            int sellable = sellableQuantityPort
                     .getSellableQuantity(ticker, account.toBrokerRef())
                     .quantity();
             sellableByTicker.put(ticker, sellable);

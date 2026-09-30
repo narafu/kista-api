@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.matching.domain.model.AccountBalance;
@@ -63,11 +62,10 @@ class VrReconfigureServiceTest {
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort;
     @Mock CyclePositionPort cyclePositionPort;
-    @Mock BrokerAdapterRegistry registry;
     @Mock CycleSnapshotCreator cycleSnapshotCreator;
     @Mock OrderCancelService orderCancelService;
     @Mock ApplicationEventPublisher eventPublisher;
-    @Mock BrokerPricePort pricePort; // registry.require(account, BrokerPricePort.class) 반환값
+    @Mock BrokerPricePort pricePort;
 
     @InjectMocks VrReconfigureService service;
 
@@ -112,7 +110,6 @@ class VrReconfigureServiceTest {
     private void stubHappyPathChain(LocalDate firstStartDate) {
         lenient().when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(vrStrategy);
         lenient().when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
-        lenient().when(registry.require(account.toBrokerRef(), BrokerPricePort.class)).thenReturn(pricePort);
         lenient().when(pricePort.getPrice(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(currentPrice);
         lenient().when(orderCancelService.cancelByCycle(strategyId, requesterId)).thenReturn(new CancelResult(0, 0));
         lenient().when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(currentCycle);

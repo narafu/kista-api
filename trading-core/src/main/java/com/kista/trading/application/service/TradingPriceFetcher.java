@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -29,7 +28,7 @@ import java.util.function.BiFunction;
 @Slf4j
 class TradingPriceFetcher {
 
-    private final BrokerAdapterRegistry registry;
+    private final BrokerPricePort brokerPricePort;
     private final ApplicationEventPublisher eventPublisher; // 일괄+단건 fallback 모두 실패한 종목을 관리자에게 이벤트로 통지
     private final PrivacyTradePort privacyTradePort; // loadPriceContext의 PRIVACY 기준 매매표 조회용
 
@@ -81,15 +80,15 @@ class TradingPriceFetcher {
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, Account account) {
         return fetchWithFallback(tickers, account, "현재가",
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrices(t, acc.toBrokerRef()),
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrice(t, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getPrices(t, acc.toBrokerRef()),
+                (t, acc) -> brokerPricePort.getPrice(t, acc.toBrokerRef()));
     }
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
     Map<StrategyTicker, PriceSnapshot> fetchPriceSnapshots(List<StrategyTicker> tickers, Account account) {
         Map<StrategyTicker, PriceSnapshot> snapshots = fetchWithFallback(tickers, account, "스냅샷",
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPriceSnapshots(t, acc.toBrokerRef()),
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPriceSnapshot(t, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getPriceSnapshots(t, acc.toBrokerRef()),
+                (t, acc) -> brokerPricePort.getPriceSnapshot(t, acc.toBrokerRef()));
         // snap==null(일괄+단건 fallback 모두 실패)인 종목은 제외 — 호출부(collectCycleCandidate 등)가 맵에 키 부재를 이미 null-tolerant하게 처리함
         snapshots.entrySet().removeIf(entry -> entry.getValue() == null);
         return snapshots;
@@ -98,15 +97,15 @@ class TradingPriceFetcher {
     // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
     Map<StrategyTicker, BigDecimal> fetchPrevCloses(List<StrategyTicker> tickers, Account account) {
         return fetchWithFallback(tickers, account, "전일종가",
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrevCloses(t, acc.toBrokerRef()),
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getPrevClose(t, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getPrevCloses(t, acc.toBrokerRef()),
+                (t, acc) -> brokerPricePort.getPrevClose(t, acc.toBrokerRef()));
     }
 
     // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용)
     Map<StrategyTicker, BigDecimal> fetchClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, Account account) {
         return fetchWithFallback(tickers, account, "확정종가",
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getClosingPrices(t, tradeDate, acc.toBrokerRef()),
-                (t, acc) -> registry.require(acc.toBrokerRef(), BrokerPricePort.class).getClosingPrice(t, tradeDate, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getClosingPrices(t, tradeDate, acc.toBrokerRef()),
+                (t, acc) -> brokerPricePort.getClosingPrice(t, tradeDate, acc.toBrokerRef()));
     }
 
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격

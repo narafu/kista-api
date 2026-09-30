@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
@@ -51,7 +50,6 @@ class ReorderServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock OrderPort orderPort;
-    @Mock BrokerAdapterRegistry brokerAdapterRegistry;
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     @Mock MarketCalendarPort marketCalendarPort;
 
@@ -98,7 +96,6 @@ class ReorderServiceTest {
     @Test
     void reorder_fromPlaced_cancelsBrokerThenSavesPlanned() {
         stubCommon(placedOrder());
-        when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
 
         reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
@@ -132,7 +129,6 @@ class ReorderServiceTest {
     @Test
     void reorder_immediate_success_savesPlaced() {
         stubCommon(plannedOrder());
-        when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
         when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-1"));
 
         ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
@@ -145,7 +141,6 @@ class ReorderServiceTest {
     @Test
     void reorder_immediate_brokerError_savesFailed() {
         stubCommon(plannedOrder());
-        when(brokerAdapterRegistry.require(account().toBrokerRef(), BrokerOrderCorrectionPort.class)).thenReturn(brokerOrderCorrectionPort);
         when(brokerOrderCorrectionPort.place(any(), any())).thenThrow(new RuntimeException("증권사 오류"));
 
         ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);

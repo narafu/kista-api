@@ -9,7 +9,7 @@ com.kista.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/사이클 실
                          TradingBatchGuard(전략별 단계 실행 격리 — runSafely/notifyErrorSafely/notifyBatchInterrupted) + TradingCandidatePlanner(후보수집+계좌별 예산 배정 — executeBatch/placeOpenOrders 공용)
                          PreviewDepositCache — TradingBuyCompetitionSimulator 전용 계좌 단위 라이브 usdDeposit 3초 TTL 캐시 + 계좌별 락(계좌당 전략 N개 preview 병렬 호출을 실제 조회 1회로). 실주문 경로(ManualTradingService/TradingOrderBudgetAllocator)는 미사용 — 항상 최신값
                          TradingOrderBudgetAllocator — 계좌별 slot-aware BUY/SELL 독립 예산 배정 (규칙 → workflow.md "스케쥴러 주문 예산 배정")
-                         live 잔고·판매가능수량은 `BrokerAdapterRegistry.require(account, LiveBalancePort/SellableQuantityPort.class)` 직접 라우팅 — 별도 Router 없음
+                         브로커 호출: broker 공통 7개 Port(`LiveBalancePort`/`SellableQuantityPort`/`BrokerPricePort` 등)는 broker가 `@Primary BrokerRouter`로 제공 — 소비처는 Port 인터페이스만 주입(service locator 없음). Toss 전용 5개 Port는 `TossStatisticsService`가 직접 주입하고 비-TOSS 계좌는 서비스 가드가 `IllegalArgumentException`(400)
                          CyclePositionPersistor: 포지션 스냅샷 저장 + 사이클 종료·rotation + `VrCycleRolloverService.rollIfDue()` 호출 (VR 예외 → "VR 전략 패턴")
                          support/CycleCloser·SelectionChain(admin에서 이관된 사이클 종료·선정 체인)/ReorderService/StrategyService(StrategyUseCase 구현)/AccountCascadeListener(AccountDeletedEvent 구독)/StrategyUserCascadeListener(UserDeletedEvent 구독)
   adapter/in/schedule/ ← TradingOpenScheduler/TradingCloseScheduler/BatchContextFactory(전략 목록 → BatchContext, 조회 실패 시 skip + notifyError). root는 이 빈을 주입할 수 없어 수동 트리거는 `TradingSchedulerInternalController`가 대신 실행 — "schedule"

@@ -1,6 +1,5 @@
 package com.kista.trading.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.LiveBalancePort;
@@ -24,7 +23,7 @@ class PreviewDepositCache {
 
     private static final Duration TTL = Duration.ofSeconds(3);
 
-    private final BrokerAdapterRegistry registry;
+    private final LiveBalancePort liveBalancePort;
 
     private final ConcurrentMap<UUID, Entry> cache = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>(); // 계좌별 락 — 동시 miss가 N번 조회하는 것 방지
@@ -49,7 +48,7 @@ class PreviewDepositCache {
             if (doubleChecked != null && doubleChecked.isValid(Instant.now())) {
                 return doubleChecked.usdDeposit();
             }
-            BigDecimal fresh = registry.require(account.toBrokerRef(), LiveBalancePort.class)
+            BigDecimal fresh = liveBalancePort
                     .getLiveBalance(account.toBrokerRef(), probeTicker)
                     .usdDeposit();
             cache.put(account.id(), new Entry(fresh, Instant.now().plus(TTL)));

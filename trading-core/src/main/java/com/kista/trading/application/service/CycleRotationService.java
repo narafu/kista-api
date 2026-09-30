@@ -3,7 +3,6 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.CyclePosition;
@@ -33,7 +32,7 @@ import com.kista.sharedkernel.StrategyDefaults;
 @Slf4j
 class CycleRotationService {
 
-    private final BrokerAdapterRegistry registry;               // USD 매수가능금액 조회 (MAX 재등록)
+    private final MarginPort marginPort; // USD 매수가능금액 조회 (MAX 재등록)
     private final StrategyPort strategyPort;                   // 시스템 자동 일시정지(사이클 재등록 실패)에도 사용
     private final StrategyVersionPort strategyVersionPort;     // 활성 전략 버전 조회/종료
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
@@ -145,7 +144,7 @@ class CycleRotationService {
     // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
     private BigDecimal fetchUsdBalance(Strategy strategy, Account account) {
         try {
-            BigDecimal usdAmount = registry.require(account.toBrokerRef(), MarginPort.class).getUsdBuyableAmount(account.toBrokerRef());
+            BigDecimal usdAmount = marginPort.getUsdBuyableAmount(account.toBrokerRef());
             if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
                 eventPublisher.publishEvent(new TradingErrorEvent(null,

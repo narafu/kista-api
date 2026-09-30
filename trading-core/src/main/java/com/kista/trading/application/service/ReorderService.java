@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.SelectionChain;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
@@ -42,7 +41,7 @@ class ReorderService implements ReorderUseCase {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final OrderPort orderPort;
-    private final BrokerAdapterRegistry brokerAdapterRegistry;
+    private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final MarketCalendarPort marketCalendarPort;
 
     @Override
@@ -107,7 +106,7 @@ class ReorderService implements ReorderUseCase {
         switch (order.status()) {
             case PLANNED -> orderPort.markCancelled(order.id());
             case PLACED -> {
-                brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class)
+                brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
                 orderPort.markCancelled(order.id());
             }
@@ -118,7 +117,7 @@ class ReorderService implements ReorderUseCase {
     // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
     private PlacementResult placeOrSave(Order newOrder, Account account, com.kista.sharedkernel.OrderTiming timing) {
         if (timing == com.kista.sharedkernel.OrderTiming.IMMEDIATE) {
-            BrokerOrderCorrectionPort broker = brokerAdapterRegistry.require(account.toBrokerRef(), BrokerOrderCorrectionPort.class);
+            BrokerOrderCorrectionPort broker = brokerOrderCorrectionPort;
             try {
                 OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), newOrder.direction(),
                         newOrder.orderType(), newOrder.quantity(), newOrder.price());

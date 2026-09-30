@@ -1,6 +1,5 @@
 package com.kista.trading.stats.application.service;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
 import com.kista.account.application.port.output.AccountPort;
@@ -18,7 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,7 +26,7 @@ class TossStatisticsServiceTest {
     private AccountPort accountPort;
 
     @Mock
-    private BrokerAdapterRegistry registry;
+    private ExchangeRatePort exchangeRatePort;
 
     @InjectMocks
     private TossStatisticsService sut;
@@ -60,26 +58,21 @@ class TossStatisticsServiceTest {
     }
 
     @Test
-    void getExchangeRate_KIS_계좌면_registry에서_IllegalArgumentException_전파() {
+    void getExchangeRate_KIS_계좌면_IllegalArgumentException_전파() {
         Account kisAccount = kisAccount();
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(kisAccount);
-        // KIS 브로커는 ExchangeRatePort(Toss 전용) 미지원 — registry.require가 거절
-        when(registry.require(kisAccount.toBrokerRef(), ExchangeRatePort.class))
-                .thenThrow(new IllegalArgumentException(
-                        kisAccount.broker() + " 브로커는 ExchangeRatePort를 지원하지 않습니다"));
+        // KIS 브로커는 ExchangeRatePort(Toss 전용) 미지원 — 서비스 가드가 거절
 
         assertThatThrownBy(() -> sut.getExchangeRate(accountId, requesterId))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ExchangeRatePort");
+                .hasMessage("KIS 브로커는 ExchangeRatePort를 지원하지 않습니다");
     }
 
     @Test
     void getExchangeRate_정상_경로면_포트가_반환한_값을_그대로_반환() {
         Account tossAccount = tossAccount();
         TossExchangeRate expected = new TossExchangeRate(new BigDecimal("1380.50"), new BigDecimal("1375.00"));
-        ExchangeRatePort exchangeRatePort = mock(ExchangeRatePort.class);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(tossAccount);
-        when(registry.require(tossAccount.toBrokerRef(), ExchangeRatePort.class)).thenReturn(exchangeRatePort);
         when(exchangeRatePort.getExchangeRate()).thenReturn(expected);
 
         TossExchangeRate actual = sut.getExchangeRate(accountId, requesterId);

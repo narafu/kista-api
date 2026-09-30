@@ -8,8 +8,8 @@ import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
+import com.kista.broker.application.port.output.MarginPort;
 import com.kista.broker.application.port.output.PortfolioPort;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,9 +36,9 @@ class AccountStatisticsServiceTest {
     @Mock AccountPort accountPort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
-    @Mock BrokerAdapterRegistry registry;
     @Mock BrokerPricePort pricePort;
     @Mock PortfolioPort portfolioPort;
+    @Mock MarginPort marginPort;
 
     private AccountStatisticsService service;
     private final UUID accountId = UUID.randomUUID();
@@ -47,12 +47,10 @@ class AccountStatisticsServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccountStatisticsService(
-                accountPort, cyclePositionPort, orderPort, registry);
+                accountPort, cyclePositionPort, orderPort, portfolioPort, marginPort, pricePort);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
         Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
-        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), eq(BrokerPricePort.class));
-        lenient().doReturn(portfolioPort).when(registry).require(any(BrokerAccountRef.class), eq(PortfolioPort.class));
     }
 
     @Test

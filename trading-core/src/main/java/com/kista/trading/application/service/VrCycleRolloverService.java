@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
@@ -34,7 +33,7 @@ class VrCycleRolloverService {
     private final CycleSnapshotCreator cycleSnapshotCreator;     // 새 사이클 + 초기 포지션 원자 저장
     private final ApplicationEventPublisher eventPublisher;       // 새 사이클 시작 이벤트 발행 + 관리자·사용자 오류 알림 이벤트
     private final MarketCalendarPort marketCalendarPort;          // due일 직전 거래일 탐색
-    private final BrokerAdapterRegistry registry;                 // due일 기준 확정 종가 조회
+    private final BrokerPricePort brokerPricePort; // due일 기준 확정 종가 조회
 
     // 마감 리포트(saveCyclePosition) 직후 호출 — due 도래 시 V′ 계산 후 사이클 교체
     void rollIfDue(BatchContext ctx, AccountBalance postBalance, BigDecimal closingPrice, LocalDate today) {
@@ -79,7 +78,7 @@ class VrCycleRolloverService {
         LocalDate evaluationDate = lastTradingDayOnOrBefore(dueDate);
         BigDecimal evaluationClosingPrice;
         try {
-            evaluationClosingPrice = registry.require(ctx.account().toBrokerRef(), BrokerPricePort.class)
+            evaluationClosingPrice = brokerPricePort
                     .getClosingPrice(strategy.ticker(), evaluationDate, ctx.account().toBrokerRef());
         } catch (Exception e) {
             log.error("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",

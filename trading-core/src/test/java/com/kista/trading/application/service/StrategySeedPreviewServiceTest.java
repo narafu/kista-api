@@ -13,7 +13,6 @@ import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.matching.domain.strategy.PrivacyCycleOrderStrategy;
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,8 +38,7 @@ import static org.mockito.Mockito.when;
 class StrategySeedPreviewServiceTest {
 
     @Mock AccountPort accountPort;
-    @Mock BrokerAdapterRegistry registry;
-    @Mock BrokerPricePort pricePort;  // registry.require(ref, BrokerPricePort.class) 반환값
+    @Mock BrokerPricePort pricePort;
     @Mock PrivacyTradePort privacyTradePort;
 
     private StrategyService service;
@@ -57,14 +55,13 @@ class StrategySeedPreviewServiceTest {
         ));
         // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지는 미사용이라 null
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
-                accountPort, null, null, null, cycleStrategies, privacyTradePort, registry);
+                accountPort, null, null, null, cycleStrategies, privacyTradePort, pricePort);
         service = new StrategyService(
                 null, null, null, null, null, null, null,
                 accountPort, null, historyQueryService, null);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
         account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
-        lenient().doReturn(pricePort).when(registry).require(any(BrokerAccountRef.class), any());
     }
 
     @Test

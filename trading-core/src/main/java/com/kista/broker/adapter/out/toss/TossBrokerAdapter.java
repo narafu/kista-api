@@ -17,11 +17,7 @@ import java.util.Map;
 // Toss 증권사 어댑터 — 공통 7개 + Toss 전용 5개 Port 구현
 @Component
 @RequiredArgsConstructor
-public class TossBrokerAdapter implements BrokerAdapterPort,
-        PortfolioPort, MarginPort, SellableQuantityPort,
-        BrokerOrderCorrectionPort,
-        ExecutionPort,
-        BrokerPricePort, LiveBalancePort,
+public class TossBrokerAdapter implements BrokerCapabilitiesPort,
         CandlePort, ExchangeRatePort, StockInfoPort,
         BrokerMarketCalendarPort, BrokerAccountPort {
 

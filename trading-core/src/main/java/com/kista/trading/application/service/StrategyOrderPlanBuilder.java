@@ -1,7 +1,6 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 
-import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
@@ -29,7 +28,7 @@ import com.kista.sharedkernel.StrategyTicker;
 class StrategyOrderPlanBuilder {
 
     private final TradingBalanceLoader balanceLoader;       // cycle_position 최신 스냅샷 기반 잔고 로드
-    private final BrokerAdapterRegistry registry;            // 전일종가 조회용 브로커 라우팅
+    private final BrokerPricePort brokerPricePort; // 전일종가 조회용 브로커 라우팅
     private final PrivacyTradePort privacyTradePort;         // PRIVACY 기준매매표 조회
     private final CycleOrderComputer orderComputer;          // 전략 계산 + 유효성 검증
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 타입별 capability 조회
@@ -59,7 +58,7 @@ class StrategyOrderPlanBuilder {
             prevClosePrice = prevCloseCache.containsKey(strategy.ticker())
                     ? prevCloseCache.get(strategy.ticker())
                     : BrokerCallGuard.wrap("전일종가 조회",
-                            () -> registry.require(account.toBrokerRef(), BrokerPricePort.class).getPrevClose(strategy.ticker(), account.toBrokerRef()));
+                            () -> brokerPricePort.getPrevClose(strategy.ticker(), account.toBrokerRef()));
         }
         // PrivacyTradePort에는 이 조합 전용 헬퍼가 없어 동일 로직을 인라인
         PrivacyTradeBase privacyBase = strategy.isPrivacy() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;
