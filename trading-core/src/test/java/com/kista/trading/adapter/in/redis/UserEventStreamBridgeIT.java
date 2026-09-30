@@ -21,7 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // 실제 로컬 Redis(localhost:6379) 필요 — docker compose up -d redis 선행.
-// UserEventStreamBridge가 스트림 메시지를 실제로 로컬 이벤트로 재발행하는지만 검증하고,
+// UserDeletedStreamConsumer(베이스 handle 경유)가 스트림 메시지를 UserEventStreamBridge로 실제 로컬 이벤트 재발행하고 ack하는지만 검증하고,
 // 기존 4개 cascade 리스너 자체의 동작(soft-delete 등)은 각 리스너의 기존 단위 테스트가 검증한다.
 @Tag("integration")
 @DisplayName("UserEventStreamBridge 스트림→로컬이벤트 재발행 통합 테스트")
@@ -45,9 +45,10 @@ class UserEventStreamBridgeIT {
     }
 
     @Test
-    void handleUserDeletedRecord_republishesLocallyAndAcks() {
+    void handle_republishesLocallyAndAcks() {
         ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
-        UserEventStreamBridge bridge = new UserEventStreamBridge(redisTemplate, new ObjectMapper(), new UserEventRepublisher(eventPublisher));
+        UserEventStreamBridge bridge = new UserEventStreamBridge(new ObjectMapper(), new UserEventRepublisher(eventPublisher));
+        UserDeletedStreamConsumer consumer = new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge);
         UUID userId = UUID.randomUUID();
         redisTemplate.<String, String>opsForStream().createGroup(RedisStreamConfig.USER_DELETED_STREAM,
                 org.springframework.data.redis.connection.stream.ReadOffset.from("0"), RedisStreamConfig.TRADING_CONSUMER_GROUP);
@@ -61,7 +62,7 @@ class UserEventStreamBridgeIT {
                 org.springframework.data.redis.connection.stream.StreamOffset.create(RedisStreamConfig.USER_DELETED_STREAM,
                         org.springframework.data.redis.connection.stream.ReadOffset.lastConsumed()));
 
-        bridge.handleUserDeletedRecord(records.get(0));
+        consumer.handle(records.get(0)); // 베이스 handle: onRecord → 브릿지 재발행 + ack
 
         Mockito.verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));
         var pending = redisTemplate.opsForStream().pending(RedisStreamConfig.USER_DELETED_STREAM, RedisStreamConfig.TRADING_CONSUMER_GROUP);

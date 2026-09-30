@@ -14,7 +14,10 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +30,7 @@ class RedisStreamSubscriberTest {
     private static class TestSubscriber extends RedisStreamSubscriber {
         final List<String> received = new ArrayList<>();
         boolean fail;
+        boolean ackOnFailure = true; // 처리 실패 시 ack 여부 — false면 pending 유지
 
         TestSubscriber(StringRedisTemplate redisTemplate) {
             super(mock(RedisConnectionFactory.class), redisTemplate, STREAM, GROUP, "test");
@@ -36,6 +40,11 @@ class RedisStreamSubscriberTest {
         protected void onRecord(MapRecord<String, String, String> record) {
             if (fail) throw new IllegalStateException("처리 실패");
             received.add(RedisStreams.payload(record));
+        }
+
+        @Override
+        protected boolean ackOnFailure(MapRecord<String, String, String> record, Exception e) {
+            return ackOnFailure;
         }
     }
 
@@ -75,6 +84,21 @@ class RedisStreamSubscriberTest {
         assertThatCode(() -> subscriber.handle(record)).doesNotThrowAnyException();
 
         verify(ops).acknowledge(STREAM, GROUP, record.getId());
+    }
+
+    // ackOnFailure=false면 처리 예외 시 ack하지 않고 pending으로 남겨 XCLAIM 재시도에 맡긴다
+    @Test
+    void handle_ackOnFailure_false면_처리_예외_시_ack하지_않는다() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        var ops = stubOps(redisTemplate);
+        TestSubscriber subscriber = new TestSubscriber(redisTemplate);
+        subscriber.fail = true;
+        subscriber.ackOnFailure = false;
+        MapRecord<String, String, String> record = record("x");
+
+        assertThatCode(() -> subscriber.handle(record)).doesNotThrowAnyException();
+
+        verify(ops, never()).acknowledge(anyString(), anyString(), any(RecordId[].class));
     }
 
     // ack 실패도 삼킨다 — pending으로 남아 XCLAIM 복구 대상이 될 뿐 구독을 죽이지 않는다

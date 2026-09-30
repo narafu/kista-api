@@ -1,6 +1,7 @@
 package com.kista.trading.adapter.in.redis;
 
 import com.kista.platform.redis.RedisStreamConfig;
+import com.kista.sharedkernel.UserDeletedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 실제 로컬 Redis(localhost:6379) 필요. 컨슈머 A가 읽고 ack 안 한 채(크래시 시뮬레이션) 종료된
 // pending 항목을, 신규 컨슈머 B가 claim해 재처리+ack하는 시나리오 검증.
 @Tag("integration")
-@DisplayName("UserEventStreamRecoveryScheduler pending claim 재처리 통합 테스트")
+@DisplayName("UserDeletedStreamConsumer pending claim 재처리 통합 테스트")
 class UserEventStreamRecoveryIT {
 
     private LettuceConnectionFactory connectionFactory;
@@ -60,11 +61,13 @@ class UserEventStreamRecoveryIT {
 
         ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
         UserEventRepublisher republisher = new UserEventRepublisher(eventPublisher);
-        UserEventStreamBridge bridge = new UserEventStreamBridge(redisTemplate, new ObjectMapper(), republisher);
-        UserEventStreamRecoveryScheduler scheduler = new UserEventStreamRecoveryScheduler(
-                redisTemplate, bridge, Mockito.mock(com.kista.platform.scheduling.SchedulerJobRunner.class));
+        UserEventStreamBridge bridge = new UserEventStreamBridge(new ObjectMapper(), republisher);
+        UserDeletedStreamConsumer consumer = new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge);
 
-        scheduler.reclaimPending(Duration.ZERO); // 유휴시간 0으로 즉시 claim 대상 처리
+        int recovered = consumer.reclaimPending(Duration.ZERO); // 유휴시간 0으로 즉시 claim 대상 처리
+
+        assertThat(recovered).isEqualTo(1);
+        Mockito.verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));
 
         var pending = redisTemplate.opsForStream().pending(RedisStreamConfig.USER_DELETED_STREAM, RedisStreamConfig.TRADING_CONSUMER_GROUP);
         assertThat(pending.getTotalPendingMessages()).isZero();

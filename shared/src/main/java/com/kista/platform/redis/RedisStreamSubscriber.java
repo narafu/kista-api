@@ -18,8 +18,9 @@ import java.util.UUID;
 // ack 보장, 끊긴 구독 재기동, XCLAIM pending 복구를 한 곳에 둔다. 서브클래스는 onRecord(도메인 처리)만 구현하고,
 // 기동(@PostConstruct → start())과 주기 복구(@Scheduled → recoverPending())는 서브클래스가 배선한다 —
 // platform은 @Scheduled/@PostConstruct 프로세스 배선을 갖지 않는다. 베이스를 빈으로 등록하면 서브클래스와 이중 구독이 된다.
-// 처리 실패는 onRecord 예외를 삼켜 warn만 남기고 ack한다(poison 메시지의 영구 재시도 방지) — 재시도가 필요한 소비자는
-// onRecord에서 예외를 던지는 대신 스스로 재시도 정책을 가져야 한다. ack 실패도 삼켜 pending으로 남기고 XCLAIM 복구에 맡긴다.
+// 처리 실패 정책은 훅으로 고른다 — 기본(ackOnFailure=true)은 onRecord 예외를 삼켜 warn만 남기고 ack해 poison 메시지의 영구 재시도를
+// 막는다(app.error·푸시처럼 유실 허용 소비자). 정합성 이벤트 소비자는 ackOnFailure를 false로 override해 일시 오류를 pending으로 남기고
+// recoverPending()의 XCLAIM 재시도에 맡기되, maxDeliveries로 재시도 한도를 둬 poison의 무한 재시도를 막는다. ack 실패도 삼켜 pending으로 남긴다.
 @Slf4j
 public abstract class RedisStreamSubscriber implements DisposableBean {
 
@@ -46,8 +47,18 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
         this.consumerName = consumerPrefix + "-" + UUID.randomUUID();
     }
 
-    // 레코드 1건의 도메인 처리 — 예외는 베이스가 삼키고 warn 로그만 남긴 뒤 ack한다
+    // 레코드 1건의 도메인 처리 — 예외는 베이스가 삼키고 warn 로그를 남긴 뒤 ackOnFailure 정책에 따라 ack 여부를 정한다
     protected abstract void onRecord(MapRecord<String, String, String> record);
+
+    // 처리 실패 시 ack할지 결정하는 훅 — 기본 true(실패도 ack: 유실 허용 소비자). false면 ack하지 않고 pending으로 남겨 XCLAIM이 재시도한다
+    protected boolean ackOnFailure(MapRecord<String, String, String> record, Exception e) {
+        return true;
+    }
+
+    // pending 재시도 최대 전달 횟수 훅 — 기본 무제한. 초과한 메시지는 reclaimPending이 포기(ack)한다
+    protected int maxDeliveries() {
+        return Integer.MAX_VALUE;
+    }
 
     // 구독 시작 — 이미 살아 있으면 no-op, 기동 실패는 삼키고 다음 recoverPending()이 처음부터 재시도한다
     public void start() {
@@ -82,6 +93,11 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
         try {
             onRecord(record);
         } catch (Exception e) {
+            // 재시도 대기(ackOnFailure=false)면 ack 없이 pending으로 남겨 XCLAIM 복구에 맡긴다
+            if (!ackOnFailure(record, e)) {
+                log.warn("{} 스트림 메시지 처리 실패 — pending 유지(재시도 대기) recordId={}: {}", streamKey, record.getId(), e.getMessage());
+                return;
+            }
             log.warn("{} 스트림 메시지 처리 실패 — recordId={}: {}", streamKey, record.getId(), e.getMessage());
         }
         try {
@@ -106,7 +122,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     // idleThreshold 이상 ack 없는 pending을 복구 컨슈머로 claim해 handle로 재처리 — 처리 건수 반환
     public int reclaimPending(Duration idleThreshold) {
         return RedisStreams.reclaimPending(redisTemplate, streamKey, group,
-                consumerPrefix + RECOVERY_CONSUMER, idleThreshold, CLAIM_BATCH_SIZE, this::handle);
+                consumerPrefix + RECOVERY_CONSUMER, idleThreshold, CLAIM_BATCH_SIZE, maxDeliveries(), this::handle);
     }
 
     // 구독 컨테이너 정지 — 정지 중 오류는 무시하고 상태를 초기화해 재기동 가능하게 한다

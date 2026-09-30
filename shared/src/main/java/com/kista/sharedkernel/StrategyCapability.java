@@ -16,7 +16,10 @@ public record StrategyCapability(
 ) {
     public StrategyCapability {
         // 방어적 복사 — 상수 공유 중 외부 변경 차단, EnumSet 순서(ordinal)를 유지해 UI 티커 정렬을 보존
-        availableTickers = Collections.unmodifiableSet(EnumSet.copyOf(availableTickers));
+        // EnumSet.copyOf는 빈 non-EnumSet 컬렉션에 IllegalArgumentException을 던지므로 빈 입력은 noneOf로 처리
+        availableTickers = Collections.unmodifiableSet(availableTickers.isEmpty()
+                ? EnumSet.noneOf(StrategyTicker.class)
+                : EnumSet.copyOf(availableTickers));
         divisionCounts = List.copyOf(divisionCounts);
     }
 }

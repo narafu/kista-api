@@ -3,6 +3,9 @@ package com.kista.sharedkernel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("StrategyType.capability() — 전략 capability 상수 SSOT")
@@ -48,5 +51,13 @@ class StrategyTypeCapabilityTest {
             assertThat(type.availableTickers()).isEqualTo(type.capability().availableTickers());
             assertThat(type.capability().tickerFixed()).isEqualTo(type.availableTickers().size() == 1);
         }
+    }
+
+    @Test
+    @DisplayName("빈 availableTickers(Set.of())도 예외 없이 빈 집합으로 방어 복사한다")
+    void emptyAvailableTickersIsAccepted() {
+        StrategyCapability c = new StrategyCapability(Set.of(), false, false, false, List.of());
+        assertThat(c.availableTickers()).isEmpty();
+        assertThat(c.divisionCounts()).isEmpty();
     }
 }
