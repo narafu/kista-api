@@ -1,5 +1,6 @@
 package com.kista.trading.stats.application.usecase;
 
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.trading.stats.domain.model.CyclePerformancePage;
 import com.kista.trading.stats.domain.model.EquityCurve;
@@ -17,6 +18,7 @@ public interface TradingStatsUseCase {
     // from/to null 허용 (null이면 전체/오늘)
     EquityCurve getEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to);
 
-    // type null이면 전체
-    CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, Instant cursor, int size);
+    // type/accountId/ticker 각각 null이면 해당 조건 미적용 (AND 조합). 타 사용자 accountId는 빈 결과
+    CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId, StrategyTicker ticker,
+                                              Instant cursor, int size);
 }

@@ -214,7 +214,7 @@ class TradingStatsServiceTest {
 
         StatsSummary summary = statsService.getSummary(USER_ID);
         CyclePerformance performance = statsService
-                .getCyclePerformances(USER_ID, StrategyType.VR, null, 10)
+                .getCyclePerformances(USER_ID, StrategyType.VR, null, null, null, 10)
                 .items().getFirst();
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("200.00");
@@ -278,7 +278,7 @@ class TradingStatsServiceTest {
         StrategyCycle c2 = closedCycle("1000.00", "1200.00", "2026-02-01", "2026-02-28");
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
 
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 1);
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, null, null, 1);
 
         assertThat(page.items()).hasSize(1);
         assertThat(page.items().get(0).startDate()).isEqualTo(LocalDate.parse("2026-02-01")); // 최신순
@@ -301,10 +301,40 @@ class TradingStatsServiceTest {
         assertThat(stats.avgReturnRate()).isNull(); // 0-start만 있으면 평균 수익률 없음
         assertThat(stats.realizedPnl()).isEqualByComparingTo("500.00");
 
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, null, null, 10);
 
         assertThat(page.items().get(0).pnl()).isEqualByComparingTo("500.00");
         assertThat(page.items().get(0).returnRate()).isNull();
+    }
+
+    @Test
+    void 사이클_성과_목록은_계좌와_티커로_필터링한다() {
+        UUID otherAccountId = UUID.randomUUID();
+        UUID otherStrategyId = UUID.randomUUID();
+        Strategy otherAccountStrategy = new Strategy(otherStrategyId, otherAccountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        Account otherAccount = new Account(otherAccountId, USER_ID, "두번째계좌",
+                "11112222", "appKey", "appSecret", null, Broker.KIS, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), otherAccount));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID, otherAccountId))).thenReturn(Map.of(
+                ACCOUNT_ID, List.of(STRATEGY), otherAccountId, List.of(otherAccountStrategy)));
+        StrategyCycle soxl = closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31");
+        StrategyCycle tqqq = new StrategyCycle(UUID.randomUUID(), otherStrategyId, null,
+                new BigDecimal("1000.00"), new BigDecimal("1200.00"),
+                LocalDate.parse("2026-02-01"), LocalDate.parse("2026-02-28"),
+                Instant.parse("2026-02-01T00:00:00Z"), null);
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(soxl, tqqq));
+
+        assertThat(statsService.getCyclePerformances(USER_ID, null, otherAccountId, null, null, 10).items())
+                .extracting(CyclePerformance::cycleId).containsExactly(tqqq.id());
+        assertThat(statsService.getCyclePerformances(USER_ID, null, null, StrategyTicker.SOXL, null, 10).items())
+                .extracting(CyclePerformance::cycleId).containsExactly(soxl.id());
+        // AND 조합 — 계좌·티커 불일치면 빈 결과
+        assertThat(statsService.getCyclePerformances(USER_ID, null, ACCOUNT_ID, StrategyTicker.TQQQ, null, 10).items())
+                .isEmpty();
+        // 타 사용자(본인 소유 아님) 계좌 ID는 빈 결과
+        assertThat(statsService.getCyclePerformances(USER_ID, null, UUID.randomUUID(), null, null, 10).items())
+                .isEmpty();
     }
 
     @Test
@@ -315,7 +345,7 @@ class TradingStatsServiceTest {
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
 
         // 1페이지 마지막 커서(c2.createdAt) 이후 → createdAt < cursor인 c1만
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, c2.createdAt(), 10);
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, null, c2.createdAt(), 10);
 
         assertThat(page.items()).hasSize(1);
         assertThat(page.items().get(0).cycleId()).isEqualTo(c1.id());
@@ -436,7 +466,7 @@ class TradingStatsServiceTest {
                 .thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY), mockAccountId, List.of(mockStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(mockCycle));
 
-        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, 10);
+        CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, null, null, 10);
 
         assertThat(page.items()).extracting(CyclePerformance::accountId).containsExactly(mockAccountId);
     }

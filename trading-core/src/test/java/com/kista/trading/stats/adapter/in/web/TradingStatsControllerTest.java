@@ -89,9 +89,24 @@ class TradingStatsControllerTest {
     }
 
     @Test
+    void cycles는_계좌와_티커_필터를_전달한다() throws Exception {
+        var accountId = UUID.randomUUID();
+        when(tradingStats.getCyclePerformances(any(), any(), any(), any(), any(), anyInt()))
+                .thenReturn(new CyclePerformancePage(List.of(), null, false));
+
+        mockMvc.perform(get("/api/stats/cycles")
+                        .param("type", "INFINITE").param("accountId", accountId.toString()).param("ticker", "SOXL")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk());
+
+        verify(tradingStats).getCyclePerformances(
+                USER_ID, StrategyType.INFINITE, accountId, StrategyTicker.SOXL, null, 50);
+    }
+
+    @Test
     void cycles를_커서와_함께_반환한다() throws Exception {
         var createdAt = Instant.parse("2026-02-01T00:00:00Z");
-        when(tradingStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), eq(50)))
+        when(tradingStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), eq(50)))
                 .thenReturn(new CyclePerformancePage(
                         List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
                                 StrategyTicker.SOXL, LocalDate.parse("2026-01-01"),

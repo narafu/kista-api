@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 
 // 사용자 통계 중 trading 소유 부분(실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록) —
@@ -43,15 +44,18 @@ class TradingStatsController {
         return EquityCurveResponse.from(tradingStats.getEquityCurve(userId, type, from, to));
     }
 
-    @Operation(summary = "사이클 성과 목록", description = "종료·진행 중 사이클의 손익/수익률/소요일 (커서 페이지네이션).")
+    @Operation(summary = "사이클 성과 목록",
+            description = "종료·진행 중 사이클의 손익/수익률/소요일 (커서 페이지네이션). type/accountId/ticker는 AND 조합, 타 사용자 accountId는 빈 결과.")
     @GetMapping("/cycles")
     public CyclePerformancePageResponse getCycles(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) StrategyType type,
+            @RequestParam(required = false) UUID accountId,
+            @RequestParam(required = false) StrategyTicker ticker,
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CyclePerformancePageResponse.from(
-                tradingStats.getCyclePerformances(userId, type, cursorInstant, Math.clamp(size, 1, 200)));
+                tradingStats.getCyclePerformances(userId, type, accountId, ticker, cursorInstant, Math.clamp(size, 1, 200)));
     }
 }

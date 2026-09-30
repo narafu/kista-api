@@ -24,6 +24,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 
 // 사용자 통계 중 trading 소유 부분 — 실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록.
@@ -109,10 +110,13 @@ class TradingStatsService implements TradingStatsUseCase {
     }
 
     @Override
-    public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type,
-                                                     Instant cursor, int size) {
+    public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId,
+                                                     StrategyTicker ticker, Instant cursor, int size) {
+        // loadCycles가 본인 계좌로 한정하므로 타 사용자 accountId는 자연히 빈 결과
         List<CycleView> filtered = loadCycles(userId).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
+                .filter(v -> accountId == null || v.strategy().accountId().equals(accountId))
+                .filter(v -> ticker == null || v.strategy().ticker() == ticker)
                 .sorted(Comparator.comparing((CycleView v) -> v.cycle().createdAt()).reversed())
                 .filter(v -> cursor == null || v.cycle().createdAt().isBefore(cursor))
                 .toList();
