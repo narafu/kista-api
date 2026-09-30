@@ -34,9 +34,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(DevAuthController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 @ActiveProfiles("local")
 @TestPropertySource(properties = {

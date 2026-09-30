@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // 스케쥴러 빈이 정상 등록된 상태(kista-scheduler role)에서의 수동 트리거 API 검증
 // trading 개장/마감 트리거 케이스는 AdminTradingSchedulerControllerTest로 이관됨
 @WebMvcTest(AdminSchedulerController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AdminSchedulerControllerTest {
 

@@ -20,7 +20,7 @@ Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith(점진 도
 
 ### 계층 구조 (Hexagonal Architecture)
 
-레이어 의존 방향(`adapter → application → domain`)은 ArchUnit(`HexagonalArchitectureTest`)이 빌드 시 강제 검증한다. 아래 다이어그램은 레이어 관계를 보여주는 일반 도해다. 실제로는 13개 애그리게이트(`finance`·`notify`·`broker`·`trading`·`tradingstats`·`tradingnotify`·`matching`·`market`·`privacy`·`stats`·`admin`·`user`·`account`)가 전부 Spring Modulith 모듈로 이전됐고(`strategyconfig`는 2026-09-07 `trading`으로 병합, `matching`은 주문생성 커널 추출로 신설, `tradingstats`·`tradingnotify`는 2026-09-30 `trading`에서 분리), 레거시 최상위 shim(`com.kista.{domain,application,adapter,common}`)은 전부 소멸했다 — 크로스모듈 컨트롤러·전역 예외 핸들러는 `com.kista.web`(앱셸 CLOSED sink), persistence base·암호화·스케쥴러 골격·순수 공용 유틸은 `com.kista.platform`(인프라 leaf OPEN)·`com.kista.sharedkernel`(전역 공용 어휘 OPEN)에 있고, 프로세스 경계(root↔trading-core)를 넘는 내부 API·Redis 요청/응답 타입은 `com.kista.contract`(Published Language, OPEN)를 양쪽이 컴파일 타임에 공유한다. `ApplicationModules.verify()`가 모듈 경계까지 GREEN으로 검증한다 (상세 → `docs/agents/architecture.md` "Spring Modulith 모듈 구성", 마이그레이션 경위는 `docs/agents/modulith-migration-history.md`).
+레이어 의존 방향(`adapter → application → domain`)은 ArchUnit(`HexagonalArchitectureTest`)이 빌드 시 강제 검증한다. 아래 다이어그램은 레이어 관계를 보여주는 일반 도해다. 실제로는 13개 애그리게이트(`finance`·`notify`·`broker`·`trading`·`tradingstats`·`tradingnotify`·`matching`·`market`·`privacy`·`stats`·`admin`·`user`·`account`)가 전부 Spring Modulith 모듈로 이전됐고(`strategyconfig`는 2026-09-07 `trading`으로 병합, `matching`은 주문생성 커널 추출로 신설, `tradingstats`·`tradingnotify`는 2026-09-30 `trading`에서 분리), 레거시 최상위 shim(`com.kista.{domain,application,adapter,common}`)은 전부 소멸했다 — 크로스모듈 컨트롤러·전역 예외 핸들러는 `com.kista.web`(앱셸 CLOSED sink — trading-core 쪽 대칭 앱셸은 `com.kista.tradingweb`: 부팅 진입점·전역 예외 핸들러), persistence base·암호화·스케쥴러 골격·순수 공용 유틸은 `com.kista.platform`(인프라 leaf OPEN)·`com.kista.sharedkernel`(전역 공용 어휘 OPEN)에 있고, 프로세스 경계(root↔trading-core)를 넘는 내부 API·Redis 요청/응답 타입은 `com.kista.contract`(Published Language, OPEN)를 양쪽이 컴파일 타임에 공유한다. `ApplicationModules.verify()`가 모듈 경계까지 GREEN으로 검증한다 (상세 → `docs/agents/architecture.md` "Spring Modulith 모듈 구성", 마이그레이션 경위는 `docs/agents/modulith-migration-history.md`).
 
 각 모듈(예: `trading`/`user`/`notify`) 내부는 동일한 레이어 구조를 반복한다:
 
@@ -29,7 +29,7 @@ graph TB
     subgraph in["<모듈>/adapter/in"]
         web["web/ REST Controller\n+DTO"]
         schedule["schedule/ 스케쥴러"]
-        telegram_in["telegram/ Webhook (notify 모듈)"]
+        telegram_in["telegram/ Webhook (admin 모듈)"]
     end
 
     subgraph core["<모듈>/application + domain (ArchUnit 강제)"]

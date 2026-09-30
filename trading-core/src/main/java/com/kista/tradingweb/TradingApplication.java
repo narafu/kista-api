@@ -1,4 +1,4 @@
-package com.kista.trading;
+package com.kista.tradingweb;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -6,9 +6,10 @@ import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-// trading-core 전용 부팅 진입점. scanBasePackages는 root(com.kista.user/finance/admin/stats(벤치마크)/market/web)
-// 패키지를 명시적으로 배제하기 위해 trading-core가 실제 소유한 최상위 패키지만 나열한다.
-// @EnableJpaRepositories는 이 클래스가 아니라 별도 JpaRepositoryConfig(package-private)에 선언한다 —
+// trading-core 전용 부팅 진입점(앱셸 com.kista.tradingweb 소속 — root com.kista.web과 대칭). scanBasePackages는
+// root(com.kista.user/finance/admin/stats(벤치마크)/market/web) 패키지를 명시적으로 배제하기 위해 trading-core가
+// 실제 소유한 최상위 패키지(앱셸 tradingweb 포함)만 나열한다.
+// @EnableJpaRepositories는 이 클래스가 아니라 같은 패키지의 별도 JpaRepositoryConfig(package-private)에 선언한다 —
 // 이 클래스에 직접 붙이면 @WebMvcTest(@ContextConfiguration(classes = TradingApplication.class))가
 // 슬라이스 테스트의 auto-configuration 제외 메커니즘을 우회해 entityManagerFactory 없는 슬라이스
 // 컨텍스트에서도 리포지토리 프록시 생성을 시도해 전체 웹 슬라이스 테스트가 깨진다(실측 확인) —
@@ -16,6 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 // 이 클래스를 걸러내 슬라이스에선 무시되고, 실제 부트(TradingApplication의 scanBasePackages
 // 컴포넌트 스캔)에서만 정상 활성화된다
 @SpringBootApplication(scanBasePackages = {
+        "com.kista.tradingweb", // 앱셸 — TradingExceptionHandler·JpaRepositoryConfig
         "com.kista.trading",
         "com.kista.tradingstats",
         "com.kista.tradingnotify",

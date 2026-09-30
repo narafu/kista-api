@@ -11,61 +11,48 @@ import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
-import com.kista.admin.application.port.output.AppErrorLogPort;
+import com.kista.platform.web.ProblemDetailMappings;
+import com.kista.platform.web.ProblemDetailMappings.Mapping;
+import com.kista.sharedkernel.AppErrorRaisedEvent;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.time.format.DateTimeParseException;
 import java.util.Map;
-import java.util.NoSuchElementException;
+
+import static com.kista.platform.web.ProblemDetailMappings.problem;
 
 @Slf4j
 @RequiredArgsConstructor
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private final AppErrorLogPort appErrorLogPort;
+    // 500 오류 보고 이벤트 발행용 — 저장은 admin AppErrorRaisedListener가 담당(web은 admin 포트를 모른다)
+    private final ApplicationEventPublisher eventPublisher;
 
-    // status·title 쌍 튜플 — 테이블 값 타입
-    private record Mapping(HttpStatus status, String title) {}
-
-    // 단순 status·title 매핑 테이블 — 엔트리 1줄 추가만으로 신규 예외 확장 (catch-all이 테이블 조회 통합)
-    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
+    // root 고유 status·title 매핑 테이블 — 엔트리 1줄 추가만으로 신규 예외 확장 (catch-all이 테이블 조회 통합).
+    // JDK/Spring 범용 예외(SecurityException·IllegalStateException·NoSuchElementException 등)는 ProblemDetailMappings.GENERIC이 공급한다
+    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = ProblemDetailMappings.withGeneric(Map.ofEntries(
         Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
-        Map.entry(SecurityException.class,                         new Mapping(HttpStatus.FORBIDDEN,              "Access Denied")),
         // broker.domain.model.BrokerCredentialException/BrokerRateLimitException 원본은
         // trading-core 네이티브 컨트롤러(AccountController 등)에서만 던져지므로 trading-core 소유
-        // com.kista.trading.adapter.in.web.TradingExceptionHandler로 이관됨 — 아래는 admin이
+        // com.kista.tradingweb.TradingExceptionHandler로 이관됨 — 아래는 admin이
         // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
         Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
         Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
         // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
         Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable")),
-        Map.entry(IllegalStateException.class,                     new Mapping(HttpStatus.BAD_REQUEST,            "Invalid State")),
-        Map.entry(NoSuchElementException.class,                    new Mapping(HttpStatus.NOT_FOUND,              "Resource Not Found")),
-        Map.entry(IllegalArgumentException.class,                  new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Request")),
-        Map.entry(MissingServletRequestParameterException.class,   new Mapping(HttpStatus.BAD_REQUEST,            "Bad Request")),
-        Map.entry(MethodArgumentTypeMismatchException.class,       new Mapping(HttpStatus.BAD_REQUEST,            "Bad Request")),
-        Map.entry(DateTimeParseException.class,                    new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Date Format")),
-        // 요청 바디 파싱 실패(잘못된 JSON, enum에 없는 값 등) — 매핑 누락 시 catch-all이 500으로 처리해버려 클라이언트 오류가 서버 오류로 잘못 보고됨
-        Map.entry(HttpMessageNotReadableException.class,           new Mapping(HttpStatus.BAD_REQUEST,            "Malformed Request")),
-        // 존재하지 않는 정적 리소스·경로(취약점 스캐너의 /actuator/** probe 등) — 매핑 없으면 catch-all이 500 + saveErrorLog로 처리해 로그·app_error_logs 오염
-        Map.entry(NoResourceFoundException.class,                  new Mapping(HttpStatus.NOT_FOUND,              "Not Found")),
         // Account.DuplicateAccountException/ManualTradingException/OrderCancelException/
         // PrivacyTradeConflictException(trading-core 소유 원본)은 TradingExceptionHandler로 이관됨 —
         // 아래는 admin이 PrivacyQueryHttpAdapter(내부 API 409 응답 복원)에서 던지는 own-type만 남는다
@@ -76,7 +63,7 @@ public class GlobalExceptionHandler {
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict")),
         Map.entry(MonthlyClosing.MonthClosedException.class,           new Mapping(HttpStatus.CONFLICT,           "Conflict"))
-    );
+    ));
 
     // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지
     @ExceptionHandler(User.CooldownException.class)
@@ -89,14 +76,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).headers(headers).body(detail);
     }
 
-    // 필드 오류 메시지 집계 — 부가 로직 있으므로 개별 유지
+    // 필드 오류 메시지 집계 — 공용 유틸 사용
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
-                .map(e -> e.getField() + ": " + e.getDefaultMessage())
-                .toList()
-                .toString();
-        return problem(HttpStatus.BAD_REQUEST, "Validation Failed", message);
+        return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ProblemDetailMappings.validationMessage(ex));
     }
 
     // SSE 타임아웃·연결 종료는 이미 끝난 스트림에 별도 응답 본문을 쓰지 않고 종료 처리
@@ -115,62 +98,29 @@ public class GlobalExceptionHandler {
         response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
     }
 
-    // 원인 체인에 Tomcat ClientAbortException 또는 broken pipe/connection reset 메시지가 있으면 클라이언트 이탈로 판정
-    // (JsonMappingException도 IOException을 상속하므로 instanceof IOException으로는 실제 직렬화 결함과 구분 불가 — 클래스명·메시지로 좁힘)
-    private static boolean isClientDisconnect(Throwable ex) {
-        for (Throwable t = ex; t != null; t = t.getCause()) {
-            if (t.getClass().getName().equals("org.apache.catalina.connector.ClientAbortException")) return true;
-            String msg = t.getMessage();
-            if (msg != null && (msg.contains("Broken pipe") || msg.contains("Connection reset by peer"))) return true;
-        }
-        return false;
-    }
-
-    // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────
+    // ── 5xx — 서버 오류, 이벤트로 오류 로그 보고 ────────────────────────────────
     // KisApiException/TossApiException(trading-core 소유) 핸들러는 TradingExceptionHandler로 이관됐다 —
     // trading-core의 app_error_logs 저장은 Redis Stream(stream:app.error → admin AppErrorStreamConsumer)으로 전달된다
 
-    // catch-all — MAPPINGS 테이블 우선 조회, 매핑 있으면 4xx 응답(saveErrorLog 없음) / 없으면 500 처리
+    // catch-all — MAPPINGS 테이블 우선 조회, 매핑 있으면 4xx 응답(오류 보고 없음) / 없으면 reportUnmapped 후 500 (공통 본문은 ProblemDetailMappings.catchAll)
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleAll(Exception ex) {
-        // 클라이언트가 응답 수신 전 연결을 끊으면(모바일 이탈 — broken pipe, ClientAbortException) 직렬화·응답 쓰기가 실패한다
-        // HttpMessageNotWritableException으로 감싸이거나 raw IOException으로 전파되거나 둘 다 이 catch-all로 떨어지므로 여기서 한 번에 걸러 기록 없이 종료
-        if (isClientDisconnect(ex)) {
-            log.debug("클라이언트 연결 끊김으로 응답 미완: {}", ex.getMessage());
-            return problem(HttpStatus.SERVICE_UNAVAILABLE, "Client Disconnected", "");
-        }
-        // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용
-        Mapping m = resolveMapping(ex);
-        if (m != null) {
-            return problem(m.status(), m.title(), ex.getMessage());
-        }
-        // 매핑 없는 미처리 예외 — saveErrorLog + log.error + 500
-        saveErrorLog(ex);
+        return ProblemDetailMappings.catchAll(ex, MAPPINGS, this::reportUnmapped);
+    }
+
+    // 매핑 없는 미처리 예외 — 오류 보고 이벤트 + log.error
+    private void reportUnmapped(Exception ex) {
+        reportErrorLog(ex);
         log.error("미처리 예외 발생: {}", ex.getMessage(), ex);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "예기치 않은 오류가 발생했습니다");
     }
 
-    // ProblemDetail 생성 헬퍼 — 모든 핸들러에서 반복되는 3줄 보일러플레이트 제거
-    private static ProblemDetail problem(HttpStatus status, String title, String msg) {
-        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, msg);
-        detail.setTitle(title);
-        return detail;
-    }
-
-    // 저장 실패 격리는 AppErrorLogPort.save() 계약(구현체 책임)으로 이동 — 여기서 별도 try/catch 불필요
-    private void saveErrorLog(Exception e) {
-        appErrorLogPort.save(e, "GlobalExceptionHandler");
-    }
-
-    // 클래스 계층 탐색 — 서브클래스 예외도 상위 매핑으로 처리 가능
-    private static Mapping resolveMapping(Exception ex) {
-        Class<?> cls = ex.getClass();
-        while (cls != null && Exception.class.isAssignableFrom(cls)) {
-            @SuppressWarnings("unchecked")
-            Mapping m = MAPPINGS.get((Class<? extends Exception>) cls);
-            if (m != null) return m;
-            cls = cls.getSuperclass();
+    // app_error_logs 저장은 admin 리스너가 이벤트로 수행 — 발행 실패(리스너 예외)가 원래 응답을 막지 않도록 격리
+    // (TradingExceptionHandler.reportErrorLog와 동일)
+    private void reportErrorLog(Exception ex) {
+        try {
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, "GlobalExceptionHandler"));
+        } catch (Exception reportEx) {
+            log.warn("오류 보고 이벤트 발행 실패: {}", reportEx.getMessage());
         }
-        return null;
     }
 }

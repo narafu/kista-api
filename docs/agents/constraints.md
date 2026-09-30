@@ -12,7 +12,7 @@
 ### 신규 파일 배치
 신규 코드는 레거시 최상위가 아닌 해당 애그리게이트 모듈(`com.kista.<module>`) 안에 추가한다 — `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 서브구조 준수. 포트는 `domain/port/{in,out}`이 아닌 `application/{usecase,port/output}`에 위치. 모듈별 정확한 NamedInterface 공개 범위·internal 패키지는 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)가 SSOT — 신규 코드 추가 전 해당 모듈 문서에서 확인할 것.
 - broker `adapter/out/*`은 NamedInterface 비공개라 모듈 밖에서 접근 불가 — 새 기능이 필요하면 `com.kista.broker.application.port.output`에 신규 `*Port`를 만들어 노출한다
-- 레거시 `com.kista.adapter`/`com.kista.application` shim은 전부 소멸했다. 여러 모듈을 집계하는 앱 레벨 inbound 관심사(크로스모듈 컨트롤러·`GlobalExceptionHandler` 등 전역 `@ControllerAdvice`·`@Aspect`)는 `com.kista.web`(pure inbound sink, NamedInterface 0개)에 추가 — 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`으로
+- 레거시 `com.kista.adapter`/`com.kista.application` shim은 전부 소멸했다. 여러 모듈을 집계하는 앱 레벨 inbound 관심사(크로스모듈 컨트롤러·`GlobalExceptionHandler` 등 전역 `@ControllerAdvice`)는 `com.kista.web`(pure inbound sink, NamedInterface 0개)에, trading-core 프로세스 전역 web 관심사(부팅 진입점·`TradingExceptionHandler`)는 대칭 앱셸 `com.kista.tradingweb`에 추가 — 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`으로. `@Aspect`는 저장소 전체에서 금지(`HexagonalArchitectureTest.no_aspects_in_codebase` — 포인트컷 문자열은 Modulith·ArchUnit이 못 보는 모듈 간 런타임 결합을 만든다, 횡단 관심사는 이벤트로)
 - persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.platform`(인프라 leaf)에 추가 — 다른 `com.kista` 모듈 참조 시 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 빌드를 깬다
 - 주문생성 알고리즘 커널(전략 계산·position 값객체·`PlannedOrder`·`AccountBalance` 등)은 `com.kista.matching`에 추가, `"kernel"` NamedInterface로 공개 — `com.kista.sharedkernel` 외 다른 `com.kista` 모듈 의존 금지(`HexagonalArchitectureTest.matching_must_not_depend_on_other_modules` — privacy 데이터는 커널 소유 `PrivacyPlan`으로 받는다)
 
@@ -181,11 +181,12 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - allowedMethods에 **PATCH 필수** — 미포함 시 전략중지/재개 등 PATCH 엔드포인트 403
 - **`SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint` 반드시 설정** — 미설정 시 인증 실패가 401 대신 403 반환
 - **`JwtAuthFilter` catch 절은 `Exception`으로** — `JwtException`만 잡으면 NPE·IAE 미처리 → 익명 사용자 → 403
+- **라우트 규칙 순서(첫 매치 우선)**: 공통 permitAll → `/api/internal/**` → `/api/admin/**` → 셸 기여 `SecurityRoutePolicy`(root `web.RootSecurityPolicy`) → `anyRequest().authenticated()`. 프로세스 고유 permitAll은 `SecurityConfig`에 직접 쓰지 말고 셸 정책으로 기여한다 — internal/admin 규칙이 먼저라 정책이 그 경로를 permitAll로 뚫을 수 없다(`SecurityConfigOrderingTest`가 잠금). `@Import(SecurityConfig.class)` `@WebMvcTest`가 permitAll 경로를 검증하려면 `RootSecurityPolicy.class`도 함께 `@Import`
 
 ### @Transactional 내부 외부 시스템 호출 금지
 - RestTemplate(텔레그램, KIS 등)을 `@Transactional` 내부에서 호출 금지 — 롤백 시 취소 불가
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)`
-- 이벤트 위치: `application/event/`, 리스너 위치: `adapter/out/` (ArchUnit: adapter.out → application 의존 허용)
+- 이벤트 위치: `application/event/`, 리스너 위치: `adapter/out/` (ArchUnit: adapter.out → application 의존 허용) — 단, 이벤트가 외부 시스템 호출이 아니라 **저장 트리거**(인바운드 성격, 예: admin `AppErrorRaisedListener`가 `AppErrorRaisedEvent`를 받아 `app_error_logs` 저장)면 `adapter/in/event/`에 둔다. 발행 지점이 트랜잭션 밖이면 `@TransactionalEventListener` 대신 동기 `@EventListener`(AFTER_COMMIT은 트랜잭션 없을 때 이벤트를 버린다)
 
 ### 포트 인터페이스 위치 규칙
 - 인바운드 포트(UseCase/Query 인터페이스)는 `application/usecase/`, 아웃바운드 포트(`*Port`)는 `application/port/output/`에 위치 — `domain/port/{in,out}`은 더 이상 사용하지 않는다

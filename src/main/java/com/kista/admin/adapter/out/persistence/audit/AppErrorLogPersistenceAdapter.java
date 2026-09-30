@@ -2,13 +2,12 @@ package com.kista.admin.adapter.out.persistence.audit;
 
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -17,33 +16,30 @@ import java.util.UUID;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE) // AppErrorLogJpaRepository가 package-private
 class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
 
     private final AppErrorLogJpaRepository repo; // app_error_logs 테이블 JPA 저장소
+    private final TransactionTemplate requiresNewTx; // 저장 전용 독립 트랜잭션(REQUIRES_NEW)
 
     private static final int MAX_STACK_LINES = 30;
 
-    @Override
-    public void save(Exception e, String caller) {
-        // 저장 실패가 호출부(예외 핸들러·AOP 인터셉터)로 전파되지 않도록 이 메서드 계약 자체가 격리를 보장
-        try {
-            // 스택트레이스 첫 30줄만 저장 (프레임워크 내부 라인 제외)
-            StringWriter sw = new StringWriter();
-            e.printStackTrace(new PrintWriter(sw));
-            String stackTrace = truncateStackTrace(sw.toString());
-
-            repo.save(buildEntity(e.getClass().getSimpleName(), e.getMessage(), stackTrace, Map.of("caller", caller)));
-        } catch (Exception saveEx) {
-            log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
-        }
+    // AppErrorLogJpaRepository가 package-private이라 생성자도 package-private
+    AppErrorLogPersistenceAdapter(AppErrorLogJpaRepository repo, PlatformTransactionManager txManager) {
+        this.repo = repo;
+        this.requiresNewTx = new TransactionTemplate(txManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    // 항상 자기 트랜잭션에서 커밋 — AlertNotifier 등 @TransactionalEventListener(AFTER_COMMIT) 리스너 안에서 호출되면
+    // 호출 시점 트랜잭션은 이미 커밋된 뒤라 repo.save()가 flush되지 않고 조용히 유실되므로 REQUIRES_NEW로 분리.
+    // @Transactional 대신 TransactionTemplate을 try 안에서 쓰는 이유: 커밋 시점 실패까지 이 메서드가 삼켜야
+    // "저장 실패를 던지지 않는다"는 포트 계약이 프록시 커밋 단계에서도 지켜진다
     @Override
     public void save(String errorType, String message, String stackTrace, Map<String, String> context) {
-        // 저장 실패가 호출부(클라이언트/내부 API 컨트롤러)로 전파되지 않도록 이 메서드 계약 자체가 격리를 보장
+        // 저장 실패가 호출부(클라이언트/내부 API 컨트롤러·이벤트 리스너)로 전파되지 않도록 이 메서드 계약 자체가 격리를 보장
         try {
-            repo.save(buildEntity(errorType, message, truncateStackTrace(stackTrace), context));
+            requiresNewTx.executeWithoutResult(status ->
+                    repo.save(buildEntity(errorType, message, truncateStackTrace(stackTrace), context)));
         } catch (Exception saveEx) {
             log.warn("오류 로그 저장 실패: {}", saveEx.getMessage());
         }

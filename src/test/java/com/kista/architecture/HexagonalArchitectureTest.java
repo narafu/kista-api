@@ -146,17 +146,29 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("web(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
+    @DisplayName("web·tradingweb(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
     void web_must_stay_pure_inbound_sink() {
-        // com.kista.web은 패키지에 adapter/application/domain 세그먼트가 없어
+        // com.kista.web·com.kista.tradingweb은 패키지에 adapter/application/domain 세그먼트가 없어
         // 위 도메인/application.service 규칙 와일드카드에 안 걸린다(미검사 표면) — 이 규칙으로 직접 강제한다.
+        // tradingweb은 root web과 대칭인 trading-core 앱셸이라 같은 규칙을 적용한다.
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.web..")
+                .that().resideInAnyPackage("com.kista.web..", "com.kista.tradingweb..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
                         "com.kista..application.service..",
                         "com.kista..adapter.out.."
                 );
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("@Aspect는 저장소에 두지 않는다 — 포인트컷 문자열은 모듈 간 숨은 런타임 결합을 만든다")
+    void no_aspects_in_codebase() {
+        // 포인트컷 문자열은 Modulith(ApplicationModules.verify)·ArchUnit이 보지 못하는 모듈 간 런타임 결합을 만든다
+        // (옛 admin ErrorLogAspect가 notify.NotifyPort.notifyError를 문자열로 가로채던 사례) — 횡단 관심사는 이벤트 발행으로 푼다.
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.kista..")
+                .should().beAnnotatedWith("org.aspectj.lang.annotation.Aspect");
         rule.check(classes);
     }
 

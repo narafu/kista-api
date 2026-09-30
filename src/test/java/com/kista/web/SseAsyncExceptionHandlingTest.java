@@ -1,7 +1,7 @@
 package com.kista.web;
 
-import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,10 +38,10 @@ class SseAsyncExceptionHandlingTest {
 
     @Test
     void asyncRequestTimeout_before_first_send_sets_503_without_body() throws Exception {
-        AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
+        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
         TestSseController controller = new TestSseController();
         MockMvc mockMvc = standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler(appErrorLogPort))
+                .setControllerAdvice(new GlobalExceptionHandler(eventPublisher))
                 .build();
 
         // SseEmitterRegistry.connect() 재현 — emitter.send() 호출 없이 반환하므로 응답이 아직 커밋되지 않는다.
@@ -59,14 +59,14 @@ class SseAsyncExceptionHandlingTest {
 
         assertThat(dispatched.getResolvedException()).isSameAs(exception);
         assertThat(dispatched.getResponse().getContentAsString()).isEmpty();
-        verifyNoInteractions(appErrorLogPort);
+        verifyNoInteractions(eventPublisher);
     }
 
     private static void assertAsyncLifecycleErrorIsHandledWithoutResponseBody(Exception exception) throws Exception {
-        AppErrorLogPort appErrorLogPort = mock(AppErrorLogPort.class);
+        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
         TestSseController controller = new TestSseController();
         MockMvc mockMvc = standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler(appErrorLogPort))
+                .setControllerAdvice(new GlobalExceptionHandler(eventPublisher))
                 .build();
 
         MvcResult result = mockMvc.perform(get("/test/sse"))
@@ -86,7 +86,7 @@ class SseAsyncExceptionHandlingTest {
                 .isEqualTo("event:ping\ndata:connected\n\n")
                 .doesNotContain("problem+json")
                 .doesNotContain("Internal Server Error");
-        verifyNoInteractions(appErrorLogPort);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Controller

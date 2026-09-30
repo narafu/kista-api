@@ -2,11 +2,11 @@ package com.kista.platform.security;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -31,29 +31,26 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtFilter;
     private final InternalTokenAuthFilter internalTokenFilter;
 
+    // 규칙은 첫 매치 우선이라 순서가 인가 결과를 결정한다:
+    // 공통 permitAll → /api/internal/** → /api/admin/** → 셸 기여 정책(SecurityRoutePolicy) → anyRequest().authenticated().
+    // 셸 정책을 내부/관리자 규칙 뒤에 두어, 정책이 실수로 /api/admin/**·/api/internal/**을 permitAll로 뚫는 사고를 구조적으로 막는다
+    // (root 셸의 기존 라우트는 어느 것도 이 두 경로와 겹치지 않아 순서 변경이 기존 인가 결과를 바꾸지 않는다)
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, ObjectProvider<SecurityRoutePolicy> policies) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers("/actuator/**").permitAll() // management port(8081) 전용, Render에서 외부 미노출
-                        .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers("/telegram/webhook").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/client-errors").permitAll() // UI 오류 리포트 — 로그인 전 화면도 호출 가능해야 함
-                        .requestMatchers("/api/auth/status-stream").authenticated() // 상태 SSE 연결은 인증 필수
-                        .requestMatchers("/api/trades/stream").authenticated() // 매매 SSE 연결은 인증 필수
-                        .requestMatchers(HttpMethod.DELETE, "/api/auth/me").authenticated() // 회원 탈퇴는 인증 필수
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/market/**").permitAll() // 비인증 대시보드용 공개 엔드포인트
-                        .requestMatchers(HttpMethod.GET, "/api/meta").permitAll() // enum SSOT — 레이아웃 로드 시 인증 불필요
-                        .requestMatchers(HttpMethod.GET, "/api/runtime-config").permitAll() // 동적 가입·생성 설정 — 로그인 전 조회 허용
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/internal/**").hasRole("INTERNAL")
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers("/error").permitAll();
+                    auth.requestMatchers("/actuator/**").permitAll(); // management port(8081) 전용, Render에서 외부 미노출
+                    auth.requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll();
+                    auth.requestMatchers("/api/internal/**").hasRole("INTERNAL");
+                    auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                    // 프로세스 고유 라우트 규칙 — 앱셸(root web)이 SecurityRoutePolicy 빈으로 기여, 없으면 빈 스트림
+                    policies.orderedStream().forEach(policy -> policy.contribute(auth));
+                    auth.anyRequest().authenticated();
+                })
                 // InternalTokenAuthFilter는 JWT 필터보다 먼저 실행 (내부 API는 JWT 불필요)
                 .addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 // JWT 필터를 Spring Security 체인 내부에만 등록

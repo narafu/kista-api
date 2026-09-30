@@ -32,6 +32,8 @@ import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.support.TradingCoreJpaTestConfig;
+import org.springframework.test.context.ContextConfiguration;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -41,6 +43,7 @@ import com.kista.sharedkernel.StrategyCycleSeedType;
         CyclePositionInfiniteDetailPersistenceAdapter.class
 })
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
+@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
 
     // CyclePositionPersistenceAdapter가 요구하는 StrategyPort — strategyconfig 모듈 병합 이후 이 테스트와

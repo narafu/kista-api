@@ -13,12 +13,15 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.EnumMap;
 import java.util.Map;
+import com.kista.support.TradingCoreJpaTestConfig;
+import org.springframework.test.context.ContextConfiguration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 // 실제 로컬 PostgreSQL(kistadb_test) 필요 — docker compose up -d postgres 선행
 @Tag("integration")
 @Execution(ExecutionMode.SAME_THREAD)
+@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class TradingPolicySettingsPersistenceAdapterIT extends DataJpaTestBase {
 
     @Autowired TradingPolicySettingsJpaRepository repository; // 실제 PostgreSQL 저장소

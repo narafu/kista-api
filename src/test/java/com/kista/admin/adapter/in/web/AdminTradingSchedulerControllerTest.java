@@ -17,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
+import com.kista.web.RootSecurityPolicy;
 
 import static com.kista.support.WebMvcTestSupport.*;
 import static org.mockito.Mockito.verify;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // trading 개장/마감 스케쥴러 수동 트리거 — 구 web.AdminSchedulerController open/close 케이스 이관
 // (내부 API 호출이라 scheduler.enabled 게이팅 없이 kista-api role에서도 상시 노출)
 @WebMvcTest(AdminTradingSchedulerController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AdminTradingSchedulerControllerTest {
 

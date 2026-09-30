@@ -6,7 +6,7 @@ import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
 import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.trading.TradingApplication;
+import com.kista.tradingweb.TradingApplication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

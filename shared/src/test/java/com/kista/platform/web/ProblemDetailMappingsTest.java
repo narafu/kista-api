@@ -1,0 +1,103 @@
+package com.kista.platform.web;
+
+import com.kista.platform.web.ProblemDetailMappings.Mapping;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.NoSuchElementException;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ProblemDetailMappingsTest {
+
+    // 테스트용 서브클래스 — 상위 클래스 매핑 탐색 검증
+    private static class CustomIllegalArgument extends IllegalArgumentException {
+        CustomIllegalArgument(String message) { super(message); }
+    }
+
+    @Test
+    void resolve_walksSuperclassHierarchy() {
+        Mapping m = ProblemDetailMappings.resolve(new CustomIllegalArgument("x"), ProblemDetailMappings.GENERIC);
+
+        assertThat(m).isEqualTo(new Mapping(HttpStatus.BAD_REQUEST, "Invalid Request"));
+    }
+
+    @Test
+    void resolve_returnsNullWhenNoMapping() {
+        assertThat(ProblemDetailMappings.resolve(new UnsupportedOperationException(), ProblemDetailMappings.GENERIC)).isNull();
+    }
+
+    @Test
+    void withGeneric_specificOverridesGenericOnDuplicateKey() {
+        Mapping override = new Mapping(HttpStatus.CONFLICT, "Conflict");
+
+        var merged = ProblemDetailMappings.withGeneric(Map.of(IllegalStateException.class, override));
+
+        assertThat(ProblemDetailMappings.resolve(new IllegalStateException(), merged)).isEqualTo(override);
+        // 겹치지 않는 범용 매핑은 유지
+        assertThat(ProblemDetailMappings.resolve(new SecurityException(), merged).status()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void isClientDisconnect_brokenPipeMessage() {
+        assertThat(ProblemDetailMappings.isClientDisconnect(new IOException("Broken pipe"))).isTrue();
+    }
+
+    @Test
+    void isClientDisconnect_detectsNestedCause() {
+        assertThat(ProblemDetailMappings.isClientDisconnect(new RuntimeException("wrap", new IOException("Connection reset by peer")))).isTrue();
+    }
+
+    @Test
+    void isClientDisconnect_unrelatedExceptionIsFalse() {
+        assertThat(ProblemDetailMappings.isClientDisconnect(new IllegalStateException("boom"))).isFalse();
+    }
+
+    @Test
+    void problem_setsStatusTitleAndDetail() {
+        var p = ProblemDetailMappings.problem(HttpStatus.NOT_FOUND, "Not Found", "없음");
+
+        assertThat(p.getStatus()).isEqualTo(404);
+        assertThat(p.getTitle()).isEqualTo("Not Found");
+        assertThat(p.getDetail()).isEqualTo("없음");
+    }
+
+    @Test
+    void catchAll_clientDisconnect_returns503AndSkipsReport() {
+        var reported = new java.util.ArrayList<Exception>();
+
+        var p = ProblemDetailMappings.catchAll(new IOException("Broken pipe"), ProblemDetailMappings.GENERIC, reported::add);
+
+        assertThat(p.getStatus()).isEqualTo(503);
+        assertThat(p.getTitle()).isEqualTo("Client Disconnected");
+        assertThat(p.getDetail()).isEmpty();
+        assertThat(reported).isEmpty();
+    }
+
+    @Test
+    void catchAll_mappedException_returnsMappedStatusAndSkipsReport() {
+        var reported = new java.util.ArrayList<Exception>();
+
+        var p = ProblemDetailMappings.catchAll(new NoSuchElementException("없음"), ProblemDetailMappings.GENERIC, reported::add);
+
+        assertThat(p.getStatus()).isEqualTo(404);
+        assertThat(p.getTitle()).isEqualTo("Resource Not Found");
+        assertThat(p.getDetail()).isEqualTo("없음");
+        assertThat(reported).isEmpty();
+    }
+
+    @Test
+    void catchAll_unmappedException_invokesConsumerAndReturns500() {
+        var reported = new java.util.ArrayList<Exception>();
+        var ex = new UnsupportedOperationException("boom");
+
+        var p = ProblemDetailMappings.catchAll(ex, ProblemDetailMappings.GENERIC, reported::add);
+
+        assertThat(p.getStatus()).isEqualTo(500);
+        assertThat(p.getTitle()).isEqualTo("Internal Server Error");
+        assertThat(p.getDetail()).isEqualTo("예기치 않은 오류가 발생했습니다");
+        assertThat(reported).containsExactly(ex);
+    }
+}

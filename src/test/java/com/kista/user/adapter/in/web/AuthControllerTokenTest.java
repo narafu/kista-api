@@ -34,9 +34,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.sharedkernel.NotificationChannel;
 import com.kista.sharedkernel.UserRole;
+import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class,
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class,
          RefreshTokenCookieHelper.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AuthControllerTokenTest {

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -23,26 +24,12 @@ import static org.mockito.Mockito.when;
 class AppErrorLogPersistenceAdapterTest {
 
     @Mock AppErrorLogJpaRepository repo;
+    @Mock PlatformTransactionManager txManager; // TransactionTemplate이 getTransaction/commit만 호출 — mock으로 충분
     AppErrorLogPersistenceAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new AppErrorLogPersistenceAdapter(repo);
-    }
-
-    @Test
-    void save_stores_entity_with_all_fields() {
-        when(repo.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        ArgumentCaptor<AppErrorLogEntity> captor = ArgumentCaptor.forClass(AppErrorLogEntity.class);
-
-        adapter.save(new RuntimeException("테스트 오류"), "TradingOpenScheduler");
-
-        verify(repo).save(captor.capture());
-        AppErrorLogEntity saved = captor.getValue();
-        assertThat(saved.getErrorType()).isEqualTo("RuntimeException");
-        assertThat(saved.getMessage()).isEqualTo("테스트 오류");
-        assertThat(saved.getStackTrace()).isNotBlank();
-        assertThat(saved.getContext()).containsEntry("caller", "TradingOpenScheduler");
+        adapter = new AppErrorLogPersistenceAdapter(repo, txManager);
     }
 
     @Test
@@ -58,15 +45,6 @@ class AppErrorLogPersistenceAdapterTest {
         assertThat(saved.getMessage()).isEqualTo("cannot read property");
         assertThat(saved.getStackTrace()).isEqualTo("at foo()\nat bar()");
         assertThat(saved.getContext()).containsEntry("pathname", "/login");
-    }
-
-    @Test
-    void save_exceptionOverload_swallowsRepoFailure() {
-        // 이 메서드는 저장 실패해도 예외를 던지지 않는다는 계약(호출부 4곳에서 이관된 격리 책임) 검증
-        doThrow(new RuntimeException("db down")).when(repo).save(any());
-
-        assertThatCode(() -> adapter.save(new RuntimeException("테스트 오류"), "TradingOpenScheduler"))
-                .doesNotThrowAnyException();
     }
 
     @Test

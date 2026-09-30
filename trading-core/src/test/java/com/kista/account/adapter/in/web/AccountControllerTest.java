@@ -16,7 +16,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.kista.trading.TradingApplication;
+import com.kista.tradingweb.TradingApplication;
 
 import java.util.List;
 import java.util.UUID;
@@ -154,10 +154,10 @@ class AccountControllerTest {
 
     @Test
     void delete_notOwned_returns403() throws Exception {
-        // SecurityException은 TradingExceptionHandler의 6종 전용 매핑(resolveMapping) 대상이 아니지만,
-        // GENERIC_MAPPINGS(handleGeneric)가 root GlobalExceptionHandler와 동일하게 403으로 매핑한다 —
+        // SecurityException은 tradingweb.TradingExceptionHandler의 6종 전용 매핑 대상이 아니지만,
+        // ProblemDetailMappings.GENERIC(handleGeneric)이 root GlobalExceptionHandler와 동일하게 403으로 매핑한다 —
         // testConnection_failure_returns422(위, 6종 전용 매핑)와 짝을 이뤄 TradingExceptionHandler
-        // 내부의 두 매핑 경로(전용 6종 vs 범용 GENERIC_MAPPINGS)를 모두 실측한다.
+        // 내부의 두 매핑 경로(전용 6종 vs 범용 GENERIC)를 모두 실측한다.
         UUID accountId = UUID.randomUUID();
         doThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"))
                 .when(accountUseCase).delete(eq(accountId), any());

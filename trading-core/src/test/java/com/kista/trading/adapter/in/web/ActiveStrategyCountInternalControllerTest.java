@@ -25,6 +25,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.UUID;
+import com.kista.tradingweb.TradingApplication;
+import org.springframework.test.context.ContextConfiguration;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -36,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @TestPropertySource(properties = "internal.api.token=test-internal-token")
 @Execution(ExecutionMode.SAME_THREAD)
+@ContextConfiguration(classes = TradingApplication.class)
 class ActiveStrategyCountInternalControllerTest {
 
     @Autowired MockMvc mockMvc;

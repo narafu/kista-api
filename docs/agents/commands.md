@@ -29,7 +29,7 @@ curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  
 ```
 
 ### 로컬 2-프로세스 부팅 (root + trading-core, 4a Task 10 스모크 테스트 실측)
-2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Pub/Sub 등)을 검증할 때 사용. 최소 필요 환경변수는 `docs/agents/commands.md`가 자동 로드하는 CLAUDE.md 필수 목록보다 많다 — 실측 결과:
+2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`tradingweb.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Pub/Sub 등)을 검증할 때 사용. 최소 필요 환경변수는 `docs/agents/commands.md`가 자동 로드하는 CLAUDE.md 필수 목록보다 많다 — 실측 결과:
 ```bash
 # 두 jar 빌드
 ./gradlew bootJar                       # root -> build/libs/app.jar

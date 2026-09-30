@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StatsControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean AppErrorLogPort appErrorLogPort; // GlobalExceptionHandler 의존성
+    @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserStatsUseCase userStats;

@@ -49,9 +49,10 @@ import com.kista.sharedkernel.UserStatus;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(AdminTradeController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AdminTradeControllerTest {
 

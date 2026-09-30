@@ -1,6 +1,6 @@
 package com.kista.tradingstats.adapter.in.web;
 
-import com.kista.trading.TradingApplication;
+import com.kista.tradingweb.TradingApplication;
 import org.springframework.test.context.ContextConfiguration;
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;

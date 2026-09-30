@@ -8,10 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public interface AppErrorLogPort {
-    // 예외 발생 시 DB 저장 — caller는 호출 클래스 단순명
-    // 계약: 저장 자체가 실패해도 이 메서드는 예외를 던지지 않는다(구현체가 격리 책임을 짐) — 호출부에서 별도 try/catch 불필요
-    void save(Exception e, String caller);
-    // 클라이언트(UI) 오류 리포트 저장 — 서버 Exception이 없는 브라우저 오류 전용
+    // 오류 로그 DB 저장 — 서버 예외(AppErrorRaisedEvent)·클라이언트(UI) 오류 리포트 공용
     // 계약: 저장 자체가 실패해도 이 메서드는 예외를 던지지 않는다(구현체가 격리 책임을 짐) — 호출부에서 별도 try/catch 불필요
     void save(String errorType, String message, String stackTrace, Map<String, String> context);
     // 기간 범위 조회 (최신순, limit건) — from/to 기본값은 호출부가 결정(컨트롤러가 EPOCH/now 대입)

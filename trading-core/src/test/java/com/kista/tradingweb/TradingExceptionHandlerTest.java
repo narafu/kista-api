@@ -1,4 +1,4 @@
-package com.kista.trading.adapter.in.web;
+package com.kista.tradingweb;
 
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerCredentialException;

@@ -18,12 +18,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import com.kista.support.TradingCoreJpaTestConfig;
+import org.springframework.test.context.ContextConfiguration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 // sumFilledBuyAmountByCycleId SQL 필터(direction/status/cycle) 실효성 검증 — 실 DB 왕복 테스트
 @Import(OrderPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
+@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;

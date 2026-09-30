@@ -2,14 +2,20 @@ package com.kista.notify.adapter.out.gateway;
 
 import com.kista.platform.telegram.TelegramHttpClient;
 import com.kista.platform.telegram.TelegramProperties;
+import com.kista.sharedkernel.AppErrorRaisedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 // HTTP 전송 상세(URL·빈 토큰 가드·오류 삼킴)는 platform TelegramHttpClientTest가 검증 — 여기선 어댑터의 위임 인자만 확인한다
@@ -17,6 +23,7 @@ import static org.mockito.Mockito.verify;
 class TelegramAdapterTest {
 
     @Mock TelegramHttpClient telegramHttpClient;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     TelegramAdapter adapter;
 
@@ -25,7 +32,7 @@ class TelegramAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new TelegramAdapter(telegramHttpClient, PROPS);
+        adapter = new TelegramAdapter(telegramHttpClient, PROPS, eventPublisher);
     }
 
     @Test
@@ -46,5 +53,25 @@ class TelegramAdapterTest {
         assertThat(textCaptor.getValue())
                 .contains("⚠️ 관리자 알림")
                 .contains("KIS API 호출 실패");
+    }
+
+    @Test
+    void notifyError_AppErrorRaisedEvent를_발행해_오류_로그_저장을_위임한다() {
+        adapter.notifyError(new RuntimeException("KIS API 호출 실패"));
+
+        ArgumentCaptor<AppErrorRaisedEvent> captor = ArgumentCaptor.forClass(AppErrorRaisedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().errorType()).isEqualTo("RuntimeException");
+        assertThat(captor.getValue().message()).isEqualTo("KIS API 호출 실패");
+        assertThat(captor.getValue().context()).containsEntry("caller", "TelegramAdapter");
+    }
+
+    @Test
+    void notifyError_리스너_예외에도_관리자_알림은_발송된다() {
+        doThrow(new IllegalStateException("리스너 실패")).when(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
+
+        adapter.notifyError(new RuntimeException("KIS API 호출 실패"));
+
+        verify(telegramHttpClient).sendMessage(eq("chat-123"), contains("KIS API 호출 실패"), eq("test-token"));
     }
 }

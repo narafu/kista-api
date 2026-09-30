@@ -4,6 +4,10 @@ import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.support.DataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -24,12 +28,21 @@ class AppErrorLogPersistenceAdapterIT extends DataJpaTestBase {
 
     @Autowired AppErrorLogJpaRepository repo;
     @Autowired EntityManager entityManager;
+    @Autowired PlatformTransactionManager txManager; // 어댑터의 REQUIRES_NEW 저장은 테스트 트랜잭션 밖에서 커밋된다
 
     AppErrorLogPersistenceAdapter adapter;
 
     @BeforeEach
     void setUp() {
-        adapter = new AppErrorLogPersistenceAdapter(repo);
+        adapter = new AppErrorLogPersistenceAdapter(repo, txManager);
+    }
+
+    // REQUIRES_NEW로 커밋된 행은 @DataJpaTest 롤백 대상이 아니라 별도 트랜잭션으로 정리
+    @AfterEach
+    void cleanUpCommittedRows() {
+        TransactionTemplate tx = new TransactionTemplate(txManager);
+        tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        tx.executeWithoutResult(status -> repo.deleteAll());
     }
 
     @Test
@@ -51,23 +64,5 @@ class AppErrorLogPersistenceAdapterIT extends DataJpaTestBase {
         assertThat(saved.errorType()).isEqualTo("TypeError");
         assertThat(saved.message()).isEqualTo("cannot read property");
         assertThat(saved.context()).containsEntry("pathname", "/login").containsEntry("caller", "TradingService");
-    }
-
-    @Test
-    @DisplayName("save(Exception, caller) — caller 컨텍스트가 jsonb 왕복 후에도 유지")
-    void save_exceptionOverload_roundtrips_context() {
-        Instant from = Instant.now().minusSeconds(60);
-
-        adapter.save(new RuntimeException("테스트 오류"), "TradingOpenScheduler");
-        entityManager.flush();
-        entityManager.clear();
-
-        Instant to = Instant.now().plusSeconds(1);
-        List<AppErrorLog> result = adapter.findRecent(50, from, to);
-
-        assertThat(result).isNotEmpty();
-        AppErrorLog saved = result.getFirst();
-        assertThat(saved.errorType()).isEqualTo("RuntimeException");
-        assertThat(saved.context()).containsEntry("caller", "TradingOpenScheduler");
     }
 }
