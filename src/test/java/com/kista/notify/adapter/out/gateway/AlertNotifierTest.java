@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.market.application.event.FearGreedFetchFailedEvent;
-import com.kista.stats.application.event.StatsAlertRaisedEvent;
+import com.kista.benchmark.application.event.BenchmarkAlertRaisedEvent;
 import com.kista.notify.application.port.output.NotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,8 +29,8 @@ class AlertNotifierTest {
     }
 
     @Test
-    void onStatsAlertRaised_callsNotifyPortWithMessage() {
-        notifier().onStatsAlertRaised(new StatsAlertRaisedEvent("kbland api down"));
+    void onBenchmarkAlertRaised_callsNotifyPortWithMessage() {
+        notifier().onBenchmarkAlertRaised(new BenchmarkAlertRaisedEvent("kbland api down"));
 
         verify(notifyPort).notifyError(argThat(e -> "kbland api down".equals(e.getMessage())));
     }

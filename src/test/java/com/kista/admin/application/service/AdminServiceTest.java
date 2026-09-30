@@ -1,11 +1,9 @@
 package com.kista.admin.application.service;
 
-import com.kista.user.domain.model.AdminUserView;
-import com.kista.user.domain.model.User;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.user.application.usecase.UserUseCase;
-import com.kista.user.application.port.output.AdminUserViewPort;
+import com.kista.user.application.port.output.UserSummaryPort;
 import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.Test;
@@ -15,7 +13,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import com.kista.sharedkernel.UserRole;
@@ -35,10 +33,9 @@ import com.kista.sharedkernel.UserStatus;
 class AdminServiceTest {
 
     @Mock UserPort userPort;
-    @Mock AdminUserViewPort adminUserViewPort;
+    @Mock UserSummaryPort userSummaryPort;
     @Mock UserUseCase userUseCase;
     @Mock AuditLogPort auditLogPort;
-    @Mock BlacklistPort blacklistPort;
 
     @InjectMocks AdminService adminService;
 
@@ -76,20 +73,14 @@ class AdminServiceTest {
     }
 
     @Test
-    void changeRole_updatesRoleAndLogsAudit() {
+    void changeRole_delegatesToUserUseCaseAndLogsAudit() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        User existing = DomainFixtures.userWithStatus(targetId, UserStatus.ACTIVE);
-        when(userPort.findByIdOrThrow(targetId)).thenReturn(existing);
-        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService.changeRole(adminId, targetId, UserRole.ADMIN);
 
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userPort).save(captor.capture());
-        assertThat(captor.getValue().role()).isEqualTo(UserRole.ADMIN);
+        // 역할 저장 + AT 무효화는 user 모듈(UserUseCase.changeRole)이 담당 — admin은 검증과 감사 로그만
+        verify(userUseCase).changeRole(targetId, UserRole.ADMIN);
         verify(auditLogPort).log(eq(adminId), eq("USER_ROLE_CHANGE"), eq("USER"), eq(targetId), any());
-        // role 변경 시각 기록 — JwtAuthFilter가 이전 발급 AT를 stale로 판정하는 기준
-        verify(blacklistPort).markRoleChanged(eq(targetId), any(Instant.class), any(Duration.class));
     }
 
     @Test
@@ -99,6 +90,7 @@ class AdminServiceTest {
         assertThatThrownBy(() -> adminService.changeRole(adminId, adminId, UserRole.USER))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("자기 자신");
+        verify(userUseCase, never()).changeRole(any(), any());
     }
 
     @Test
@@ -109,21 +101,17 @@ class AdminServiceTest {
         assertThatThrownBy(() -> adminService.changeRole(adminId, targetId, UserRole.USER))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("최소 1명");
+        verify(userUseCase, never()).changeRole(any(), any());
     }
 
     @Test
     void changeRole_allowsDemotionWhenMultipleAdmins() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
-        User existing = DomainFixtures.userWithStatus(targetId, UserStatus.ACTIVE);
         when(userPort.countByRole(UserRole.ADMIN)).thenReturn(2L);
-        when(userPort.findByIdOrThrow(targetId)).thenReturn(existing);
-        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         adminService.changeRole(adminId, targetId, UserRole.USER);
 
-        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        verify(userPort).save(captor.capture());
-        assertThat(captor.getValue().role()).isEqualTo(UserRole.USER);
+        verify(userUseCase).changeRole(targetId, UserRole.USER);
     }
 
     @Test
@@ -141,10 +129,10 @@ class AdminServiceTest {
     @Test
     void findUser_존재하는_사용자ID로_조회시_반환한다() {
         UUID targetId = UUID.randomUUID();
-        AdminUserView view = new AdminUserView(targetId, "테스트", UserStatus.ACTIVE, UserRole.USER, Instant.now());
-        when(adminUserViewPort.findById(targetId)).thenReturn(Optional.of(view));
+        UserSummary view = new UserSummary(targetId, "테스트", UserStatus.ACTIVE, UserRole.USER, Instant.now());
+        when(userSummaryPort.findById(targetId)).thenReturn(Optional.of(view));
 
-        Optional<AdminUserView> result = adminService.findUser(targetId);
+        Optional<UserSummary> result = adminService.findUser(targetId);
 
         assertThat(result).isPresent();
         assertThat(result.get().id()).isEqualTo(targetId);
@@ -153,9 +141,9 @@ class AdminServiceTest {
     @Test
     void findUser_존재하지_않는_사용자ID로_조회시_empty를_반환한다() {
         UUID otherId = UUID.randomUUID();
-        when(adminUserViewPort.findById(otherId)).thenReturn(Optional.empty());
+        when(userSummaryPort.findById(otherId)).thenReturn(Optional.empty());
 
-        Optional<AdminUserView> result = adminService.findUser(otherId);
+        Optional<UserSummary> result = adminService.findUser(otherId);
 
         assertThat(result).isEmpty();
     }

@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
@@ -16,12 +16,12 @@ public record AdminUserResponse(
         @Schema(description = "역할") UserRole role,
         @Schema(description = "가입 일시") Instant createdAt
 ) {
-    public static AdminUserResponse from(AdminUserView view) {
+    public static AdminUserResponse from(UserSummary view) {
         return new AdminUserResponse(view.id(), view.nickname(), view.status(),
                 view.role(), view.createdAt());
     }
 
-    public static List<AdminUserResponse> fromList(List<AdminUserView> views) {
+    public static List<AdminUserResponse> fromList(List<UserSummary> views) {
         return views.stream().map(AdminUserResponse::from).toList();
     }
 }

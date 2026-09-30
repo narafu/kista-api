@@ -1,5 +1,6 @@
 package com.kista.user.application.usecase;
 
+import com.kista.sharedkernel.UserRole;
 import com.kista.user.domain.model.User;
 
 import java.util.UUID;
@@ -19,6 +20,9 @@ public interface UserUseCase {
     void approve(UUID userId);
     void reject(UUID userId, String reason); // reason은 optional (blank -> null 정규화는 구현체 책임)
     void reapply(UUID userId);
+
+    // --- 역할 변경 ---
+    void changeRole(UUID userId, UserRole role); // 역할 저장 + 기존 AT 무효화 (자기 강등·마지막 ADMIN 검증은 호출자 정책)
 
     // --- 탈퇴 ---
     void deleteMe(UUID userId);

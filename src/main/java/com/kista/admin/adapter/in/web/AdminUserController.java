@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.admin.adapter.in.web.dto.AdminRoleRequest;
 import com.kista.admin.adapter.in.web.dto.AdminStatusRequest;
 import com.kista.admin.adapter.in.web.dto.AdminUserResponse;
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,7 +35,7 @@ public class AdminUserController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @AuthenticationPrincipal UUID adminId) {
-        List<AdminUserView> views = status == null
+        List<UserSummary> views = status == null
                 ? adminUser.listAll(from, to)
                 : adminUser.listByStatus(status, from, to);
         return AdminUserResponse.fromList(views);

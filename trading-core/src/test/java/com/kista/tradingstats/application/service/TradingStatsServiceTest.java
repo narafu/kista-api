@@ -35,7 +35,7 @@ import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyCycleSeedType;
 
-// StatsService(com.kista.stats)에서 이관된 trading 소유 통계(summary/equity-curve/cycles) 테스트 —
+// StatsService(com.kista.benchmark)에서 이관된 trading 소유 통계(summary/equity-curve/cycles) 테스트 —
 // housing/ETF 벤치마크 비교 테스트는 api의 StatsServiceTest에 잔류
 @ExtendWith(MockitoExtension.class)
 class TradingStatsServiceTest {

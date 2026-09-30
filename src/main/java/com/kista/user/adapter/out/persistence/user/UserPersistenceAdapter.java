@@ -49,6 +49,11 @@ public class UserPersistenceAdapter implements UserPort {
     }
 
     @Override
+    public List<UUID> findIdsByStatus(UserStatus status) {
+        return jpaRepository.findIdsByStatus(status);
+    }
+
+    @Override
     public Map<UserStatus, Long> countGroupByStatus() {
         // GROUP BY 프로젝션을 EnumMap으로 수집 — 결과에 없는 상태는 호출측 getOrDefault(0)로 처리
         Map<UserStatus, Long> result = new EnumMap<>(UserStatus.class);

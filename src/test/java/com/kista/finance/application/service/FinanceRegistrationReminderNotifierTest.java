@@ -1,28 +1,25 @@
 package com.kista.finance.application.service;
 
+import com.kista.finance.application.port.output.AssetSnapshotPort;
+import com.kista.finance.application.port.output.FinanceGroupPort;
+import com.kista.finance.application.port.output.FinanceTransactionPort;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
 import com.kista.sharedkernel.NotificationType;
-import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.user.domain.model.UserSettings;
-import com.kista.finance.application.port.output.AssetSnapshotPort;
-import com.kista.finance.application.port.output.FinanceGroupPort;
-import com.kista.finance.application.port.output.FinanceTransactionPort;
-import com.kista.notify.application.port.output.UserNotificationPort;
+import com.kista.sharedkernel.UserNotificationRequestedEvent;
+import com.kista.sharedkernel.UserStatus;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.user.application.port.output.UserSettingsPort;
-import com.kista.support.DomainFixtures;
-import static com.kista.support.DomainFixtures.recipientOf;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.YearMonth;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -30,66 +27,57 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.UserStatus;
 
 class FinanceRegistrationReminderNotifierTest {
 
     @Test
-    void 이번달_등록이_없는_유저에게만_알림을_보낸다() {
+    void 이번달_등록이_없는_유저에게만_알림을_요청한다() {
         UserPort userPort = mock(UserPort.class);
         FinanceGroupPort financeGroupPort = mock(FinanceGroupPort.class);
-        UserSettingsPort userSettingsPort = mock(UserSettingsPort.class);
-        UserNotificationPort notificationPort = mock(UserNotificationPort.class);
         AssetSnapshotPort assetSnapshotPort = mock(AssetSnapshotPort.class);
         FinanceTransactionPort financeTransactionPort = mock(FinanceTransactionPort.class);
+        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 
-        User userWithData = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
-        User userWithoutData = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
+        UUID userWithData = UUID.randomUUID();
+        UUID userWithoutData = UUID.randomUUID();
 
-        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(List.of(userWithData, userWithoutData));
-        when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(Map.of(
-                userWithData.id(), UserSettings.defaultFor(userWithData.id()),
-                userWithoutData.id(), UserSettings.defaultFor(userWithoutData.id())));
+        when(userPort.findIdsByStatus(UserStatus.ACTIVE)).thenReturn(List.of(userWithData, userWithoutData));
         when(financeGroupPort.findCurrentGroupId(any())).thenReturn(Optional.empty());
         AssetSnapshot existingSnapshot = new AssetSnapshot(UUID.randomUUID(), null, UUID.randomUUID(), null,
-                userWithData.id(), java.time.LocalDate.of(2026, 8, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1000L, null);
-        when(assetSnapshotPort.findMyScope(eq(userWithData.id()), any(), any(), any(), any()))
+                userWithData, java.time.LocalDate.of(2026, 8, 1), AssetClass.CASH, Market.DOMESTIC, null, null, 1000L, null);
+        when(assetSnapshotPort.findMyScope(eq(userWithData), any(), any(), any(), any()))
                 .thenReturn(List.of(existingSnapshot));
-        when(assetSnapshotPort.findMyScope(eq(userWithoutData.id()), any(), any(), any(), any()))
+        when(assetSnapshotPort.findMyScope(eq(userWithoutData), any(), any(), any(), any()))
                 .thenReturn(List.of());
-        when(financeTransactionPort.findMyScope(eq(userWithoutData.id()), any(), any(), any(), any(), any()))
+        when(financeTransactionPort.findMyScope(eq(userWithoutData), any(), any(), any(), any(), any()))
                 .thenReturn(List.of());
 
         var notifier = new FinanceRegistrationReminderNotifier(
-                userPort, financeGroupPort, userSettingsPort, notificationPort,
-                assetSnapshotPort, financeTransactionPort);
+                userPort, financeGroupPort, assetSnapshotPort, financeTransactionPort, eventPublisher);
 
         notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.of(2026, 8));
 
-        verify(notificationPort, never()).notifyFinanceRegistrationReminder(eq(recipientOf(userWithData)), any());
-        verify(notificationPort, times(1)).notifyFinanceRegistrationReminder(eq(recipientOf(userWithoutData)), eq("8월"));
+        ArgumentCaptor<UserNotificationRequestedEvent> captor = ArgumentCaptor.forClass(UserNotificationRequestedEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        UserNotificationRequestedEvent event = captor.getValue();
+        assertThat(event.userId()).isEqualTo(userWithoutData);
+        assertThat(event.type()).isEqualTo(NotificationType.FINANCE_REMINDER);
+        assertThat(event.title()).isEqualTo("가계부 등록을 아직 안 하셨어요");
+        assertThat(event.body()).isEqualTo("8월 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
     }
 
     @Test
-    void 알림_비활성_유저에게는_보내지_않는다() {
+    void ACTIVE_유저가_없으면_이벤트를_발행하지_않는다() {
         UserPort userPort = mock(UserPort.class);
-        FinanceGroupPort financeGroupPort = mock(FinanceGroupPort.class);
-        UserSettingsPort userSettingsPort = mock(UserSettingsPort.class);
-        UserNotificationPort notificationPort = mock(UserNotificationPort.class);
-        AssetSnapshotPort assetSnapshotPort = mock(AssetSnapshotPort.class);
-        FinanceTransactionPort financeTransactionPort = mock(FinanceTransactionPort.class);
-
-        User user = DomainFixtures.activeUser(UUID.randomUUID(), NotificationChannel.FCM);
-        when(userPort.findAllByStatus(UserStatus.ACTIVE)).thenReturn(List.of(user));
-        when(userSettingsPort.findOrDefaultByUserIds(any())).thenReturn(Map.of(
-                user.id(), UserSettings.defaultFor(user.id()).withNotificationPrefs(Map.of(NotificationType.FINANCE_REMINDER, false))));
+        ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+        when(userPort.findIdsByStatus(UserStatus.ACTIVE)).thenReturn(List.of());
 
         var notifier = new FinanceRegistrationReminderNotifier(
-                userPort, financeGroupPort, userSettingsPort, notificationPort,
-                assetSnapshotPort, financeTransactionPort);
+                userPort, mock(FinanceGroupPort.class), mock(AssetSnapshotPort.class),
+                mock(FinanceTransactionPort.class), eventPublisher);
 
         notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.of(2026, 8));
 
-        verify(notificationPort, never()).notifyFinanceRegistrationReminder(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }

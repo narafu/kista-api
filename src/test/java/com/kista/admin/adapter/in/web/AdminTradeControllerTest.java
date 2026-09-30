@@ -110,7 +110,7 @@ class AdminTradeControllerTest {
                 )
         ));
         when(adminUser.findUser(UUID.fromString("00000000-0000-0000-0000-000000000010"))).thenReturn(Optional.of(
-                new com.kista.user.domain.model.AdminUserView(
+                new com.kista.user.domain.model.UserSummary(
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         "privacy-user",
                         UserStatus.ACTIVE,

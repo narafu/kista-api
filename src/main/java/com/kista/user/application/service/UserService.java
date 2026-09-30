@@ -5,6 +5,7 @@ import com.kista.user.application.event.NewUserRegisteredEvent;
 import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
+import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.*;
@@ -183,6 +184,15 @@ class UserService implements UserUseCase {
         if (user.lastReappliedAt() != null &&
                 now.isBefore(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS)))
             throw new User.CooldownException(user.lastReappliedAt().plus(cooldownHours, ChronoUnit.HOURS));
+    }
+
+    @Override
+    public void changeRole(UUID userId, UserRole role) {
+        // 1단계: 역할 저장
+        User user = userPort.findByIdOrThrow(userId);
+        userPort.save(user.withRole(role));
+        // 2단계: 기존 AT 무효화 — 변경 시각 이전 발급 토큰은 JwtAuthFilter가 401 처리 (refresh로 새 role AT 발급)
+        blacklistPort.markRoleChanged(userId, Instant.now(), TokenConstants.AT_TTL);
     }
 
     @Override

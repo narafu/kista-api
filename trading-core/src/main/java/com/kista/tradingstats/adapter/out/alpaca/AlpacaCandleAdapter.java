@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 
-// HistoricalCandlePort(sharedkernel)는 원래 root com.kista.stats.adapter.out.alpaca.AlpacaIndexPriceAdapter가
+// HistoricalCandlePort(sharedkernel)는 원래 root com.kista.benchmark.adapter.out.alpaca.AlpacaIndexPriceAdapter가
 // IndexPriceFeedPort와 함께 구현했으나, root는 trading-core 정의 인터페이스를 구현할 수 없는 컴파일
 // 경계(root→trading-core 단방향)라 own-type HTTP 브릿지가 필요해 보였다. 하지만 이 포트는 외부 API(Alpaca)
 // 호출일 뿐 root 소유 상태가 아니므로, root를 거치는 브릿지보다 trading-core가 직접 Alpaca를 호출하는 쪽이

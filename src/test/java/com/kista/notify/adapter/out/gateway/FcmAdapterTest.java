@@ -63,14 +63,14 @@ class FcmAdapterTest {
     }
 
     @Test
-    void 가계부_미등록_알림을_전송한다() throws Exception {
+    void 승인_알림을_전송한다() throws Exception {
         UUID userId = UUID.randomUUID();
         when(fcmDeviceTokenPort.findTokensByUserId(userId)).thenReturn(List.of("token-1"));
         BatchResponse batchResponse = mock(BatchResponse.class);
         when(batchResponse.getResponses()).thenReturn(List.of());
         when(firebaseMessaging.sendEachForMulticast(any(MulticastMessage.class))).thenReturn(batchResponse);
 
-        adapter.notifyFinanceRegistrationReminder(user(userId), "8월");
+        adapter.notifyApproved(user(userId));
 
         verify(firebaseMessaging).sendEachForMulticast(any(MulticastMessage.class));
     }

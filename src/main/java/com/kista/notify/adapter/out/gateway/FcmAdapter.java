@@ -43,14 +43,8 @@ public class FcmAdapter implements UserNotificationPort {
         send(user.userId(), "KISTA 알림", "❌ 가입이 거절되었습니다.");
     }
 
-    @Override
-    public void notifyFinanceRegistrationReminder(NotificationRecipient user, String month) {
-        send(user.userId(), "가계부 등록을 아직 안 하셨어요",
-                month + " 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.");
-    }
-
-    // package-private — PushNotificationRelayListener(같은 패키지)가 trading-core 위임 발송에 재사용
-    void send(UUID userId, String title, String body) {
+    // public — UserNotificationRequestedListener(같은 패키지)와 push 스트림 컨슈머(notify.adapter.in.redis)가 재사용
+    public void send(UUID userId, String title, String body) {
         if (firebaseMessaging.isEmpty()) {
             return;
         }

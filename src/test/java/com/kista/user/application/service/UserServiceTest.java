@@ -5,6 +5,7 @@ import com.kista.user.application.event.NewUserRegisteredEvent;
 import com.kista.user.application.event.UserApprovedEvent;
 import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
+import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.NotificationChannel;
 import com.kista.user.application.usecase.UserUseCase;
@@ -333,6 +334,19 @@ class UserServiceTest {
 
         verify(blacklistPort).add(eq(userId), eq(Duration.ofMinutes(15)));
         verify(refreshTokenPort).deleteAllByUserId(userId);
+    }
+
+    @Test
+    @DisplayName("역할 변경 시 저장 후 role 변경 시각을 블랙리스트에 기록 (이전 발급 AT stale 판정 기준)")
+    void changeRole_savesRoleAndMarksRoleChanged() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.changeRole(userId, UserRole.ADMIN);
+
+        verify(userPort).save(argThat(u -> u.role() == UserRole.ADMIN));
+        verify(blacklistPort).markRoleChanged(eq(userId), any(Instant.class), eq(TokenConstants.AT_TTL));
     }
 
     @Test

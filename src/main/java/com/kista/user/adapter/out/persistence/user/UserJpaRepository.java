@@ -17,6 +17,8 @@ interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByTelegramChatId(String chatId); // 텔레그램 봇 명령 발신자 식별용
     List<UserEntity> findAllByOrderByCreatedAtDesc(); // 관리자 전체 조회 — 최신순
     List<UserEntity> findAllByStatus(UserStatus status); // 상태별 조회 (관리자용)
+    @Query("SELECT u.id FROM UserEntity u WHERE u.status = :status")
+    List<UUID> findIdsByStatus(@Param("status") UserStatus status); // 상태별 id만 조회
     List<UserEntity> findAllByStatusOrderByCreatedAtDesc(UserStatus status); // 상태별 최신순
     long countByRole(UserRole role); // 역할별 사용자 수 (Spring Data JPA 자동 파생)
 

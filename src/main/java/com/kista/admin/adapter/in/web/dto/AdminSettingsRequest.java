@@ -10,7 +10,7 @@ import com.kista.sharedkernel.TradingPolicySettings;
 import com.kista.sharedkernel.RecurringMode;
 import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.sharedkernel.StrategyFieldSettings;
-import com.kista.stats.domain.model.EtfBenchmarkSymbol;
+import com.kista.benchmark.domain.model.EtfBenchmarkSymbol;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 import io.swagger.v3.oas.annotations.media.Schema;

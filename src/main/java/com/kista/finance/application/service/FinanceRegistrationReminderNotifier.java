@@ -1,70 +1,61 @@
 package com.kista.finance.application.service;
 
-import com.kista.sharedkernel.NotificationType;
-import com.kista.user.domain.model.User;
-import com.kista.user.domain.model.UserSettings;
-import com.kista.finance.application.usecase.FinanceRegistrationReminderUseCase;
 import com.kista.finance.application.port.output.AssetSnapshotPort;
 import com.kista.finance.application.port.output.FinanceGroupPort;
 import com.kista.finance.application.port.output.FinanceTransactionPort;
-import com.kista.notify.application.port.output.UserNotificationPort;
-import com.kista.notify.domain.model.NotificationRecipient;
+import com.kista.finance.application.usecase.FinanceRegistrationReminderUseCase;
+import com.kista.sharedkernel.NotificationType;
+import com.kista.sharedkernel.UserNotificationRequestedEvent;
+import com.kista.sharedkernel.UserStatus;
 import com.kista.user.application.port.output.UserPort;
-import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
-import com.kista.sharedkernel.UserStatus;
 
-// 이번 달 가계부(자산/거래) 등록이 전혀 없는 ACTIVE 사용자에게 알림 — MarketEventNotifier와 동일한
-// 배치 조회 + virtual thread 팬아웃 패턴. 그룹 소속 유저는 findMyScope가 이미 groupId 스코프로 조회하므로
-// 그룹 내 누구든 등록했으면 자동으로 스킵된다(별도 그룹 스코프 분기 불필요).
+// 이번 달 가계부(자산/거래) 등록이 전혀 없는 ACTIVE 사용자에게 알림을 요청한다 — MarketEventNotifier와 동일한
+// 배치 조회 + virtual thread 팬아웃 패턴. 이 모듈은 등록 여부만 판단하고 발송(채널 라우팅·사용자 알림 설정 게이트)은
+// UserNotificationRequestedEvent 구독자(notify)가 맡는다. 그룹 소속 유저는 findMyScope가 이미 groupId 스코프로
+// 조회하므로 그룹 내 누구든 등록했으면 자동으로 스킵된다(별도 그룹 스코프 분기 불필요).
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminderUseCase {
 
-    private static final int MAX_CONCURRENT_SENDS = 10;
+    private static final int MAX_CONCURRENT_CHECKS = 10;
+    private static final String REMINDER_TITLE = "가계부 등록을 아직 안 하셨어요";
 
-    private final UserPort userPort;
+    private final UserPort userPort;                            // ACTIVE 사용자 id 목록만 조회 (identity 조회)
     private final FinanceGroupPort financeGroupPort;
-    private final UserSettingsPort userSettingsPort;
-    private final UserNotificationPort userNotificationPort;
     private final AssetSnapshotPort assetSnapshotPort;
     private final FinanceTransactionPort financeTransactionPort;
+    private final ApplicationEventPublisher eventPublisher;     // 사용자 알림 요청 이벤트 발행
 
     @Override
     public void notifyUsersWithoutThisMonthRegistration(YearMonth month) {
         LocalDate from = month.atDay(1);
         LocalDate to = month.atEndOfMonth();
 
-        List<User> users = userPort.findAllByStatus(UserStatus.ACTIVE);
-        List<UUID> userIds = users.stream().map(User::id).toList();
-        Map<UUID, UserSettings> settingsMap = userSettingsPort.findOrDefaultByUserIds(userIds);
-        String monthLabel = month.getMonthValue() + "월";
+        List<UUID> userIds = userPort.findIdsByStatus(UserStatus.ACTIVE);
+        String body = month.getMonthValue() + "월 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.";
 
-        Semaphore limiter = new Semaphore(MAX_CONCURRENT_SENDS);
+        Semaphore limiter = new Semaphore(MAX_CONCURRENT_CHECKS);
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            users.forEach(user -> {
-                UserSettings settings = settingsMap.get(user.id());
-                if (!settings.isNotificationEnabled(NotificationType.FINANCE_REMINDER)) return;
-                executor.submit(() -> checkAndSendWithLimit(limiter, user, monthLabel, from, to));
-            });
+            userIds.forEach(userId -> executor.submit(() -> checkAndRequestWithLimit(limiter, userId, body, from, to)));
         }
     }
 
-    // 스코프 조회(2회 DB 왕복)와 발송을 함께 virtual thread로 팬아웃 — 조회만 호출 스레드에서 순차 실행하면
-    // 세마포어가 발송만 병렬화하고 정작 느린 조회는 직렬로 남는다
-    private void checkAndSendWithLimit(Semaphore limiter, User user, String monthLabel, LocalDate from, LocalDate to) {
+    // 스코프 조회(2회 DB 왕복)를 virtual thread로 팬아웃 — 조회를 호출 스레드에서 순차 실행하면 직렬로 남는다.
+    // 트랜잭션 밖 스케쥴러 경로라 구독자는 동기 @EventListener로 받는다
+    private void checkAndRequestWithLimit(Semaphore limiter, UUID userId, String body, LocalDate from, LocalDate to) {
         try {
             limiter.acquire();
         } catch (InterruptedException e) {
@@ -72,19 +63,14 @@ class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminder
             return;
         }
         try {
-            if (hasRegistrationThisMonth(user.id(), from, to)) return;
-            userNotificationPort.notifyFinanceRegistrationReminder(toRecipient(user), monthLabel);
+            if (hasRegistrationThisMonth(userId, from, to)) return;
+            eventPublisher.publishEvent(new UserNotificationRequestedEvent(
+                    userId, NotificationType.FINANCE_REMINDER, REMINDER_TITLE, body));
         } catch (Exception e) {
-            log.warn("[userId={}] 가계부 등록 알림 발송 실패: {}", user.id(), e.getMessage());
+            log.warn("[userId={}] 가계부 등록 알림 요청 실패: {}", userId, e.getMessage());
         } finally {
             limiter.release();
         }
-    }
-
-    // User → notify 수신자 투영 — notify는 User 애그리게이트를 모르므로 호출자가 변환한다
-    private static NotificationRecipient toRecipient(User user) {
-        return new NotificationRecipient(user.id(), user.nickname(), user.notificationChannel(),
-                user.telegramBotToken(), user.telegramChatId(), user.rejectReason());
     }
 
     private boolean hasRegistrationThisMonth(UUID userId, LocalDate from, LocalDate to) {

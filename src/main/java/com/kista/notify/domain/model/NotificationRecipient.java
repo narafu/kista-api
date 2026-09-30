@@ -5,7 +5,7 @@ import com.kista.sharedkernel.NotificationChannel;
 import java.util.UUID;
 
 // 사용자 알림 수신자 — notify가 알림 발송에 실제로 읽는 필드만 담은 notify 소유 투영(User 애그리게이트 비의존).
-// trading-core의 TradingUserProfile과 같은 접근 — 변환은 호출자(user 이벤트 리스너·finance 리마인더)가 맡는다
+// trading-core의 TradingUserProfile과 같은 접근 — 변환은 gateway 어댑터의 NotificationRecipients.from(User)가 맡는다
 public record NotificationRecipient(
         UUID userId,                          // 수신자 사용자 ID (FCM 토큰 조회·승인/거절 버튼 payload)
         String nickname,                      // 관리자 알림에 표시할 닉네임

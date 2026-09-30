@@ -49,7 +49,7 @@ dependencies {
     // Apache HttpClient 5 — platform.internalapi(InternalApiClientConfig)
     implementation(libs.httpclient5)
 
-    // platform.redis(RedisPubSubConfig) — trade.event/push-notification 채널 공통 배선
+    // platform.redis(RedisPubSubConfig) — trade.event 채널 공통 배선
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
     // com.kista.contract 요청 record의 Bean Validation·Swagger 어노테이션 — 소비 프로세스(root/trading-core)가 런타임 구현을 가진다

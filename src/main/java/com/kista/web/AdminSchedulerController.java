@@ -1,7 +1,7 @@
 package com.kista.web;
 
-import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
-import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
+import com.kista.benchmark.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
+import com.kista.benchmark.adapter.in.schedule.KbLandPriceIndexScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

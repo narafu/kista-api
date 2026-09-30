@@ -1,21 +1,17 @@
 package com.kista.admin.application.service;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.user.domain.model.AdminUserView;
-import com.kista.user.domain.auth.TokenConstants;
-import com.kista.user.domain.model.User;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import com.kista.user.application.usecase.UserUseCase;
-import com.kista.user.application.port.output.AdminUserViewPort;
+import com.kista.user.application.port.output.UserSummaryPort;
 import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.UserPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -31,24 +27,23 @@ import com.kista.sharedkernel.UserStatus;
 class AdminService implements AdminUserUseCase {
 
     private final UserPort userPort;
-    private final AdminUserViewPort adminUserViewPort;   // 관리자 화면 전용 read-model
+    private final UserSummaryPort userSummaryPort;   // 관리자 화면 전용 read-model
     private final UserUseCase userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
-    private final BlacklistPort blacklistPort;           // role 변경 시 stale AT 무효화 기록
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminUserView> listAll(LocalDate from, LocalDate to) {
-        return filterByDate(adminUserViewPort.findAll(), from, to);
+    public List<UserSummary> listAll(LocalDate from, LocalDate to) {
+        return filterByDate(userSummaryPort.findAll(), from, to);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminUserView> listByStatus(UserStatus status, LocalDate from, LocalDate to) {
-        return filterByDate(adminUserViewPort.findAllByStatus(status), from, to);
+    public List<UserSummary> listByStatus(UserStatus status, LocalDate from, LocalDate to) {
+        return filterByDate(userSummaryPort.findAllByStatus(status), from, to);
     }
 
-    private List<AdminUserView> filterByDate(List<AdminUserView> views, LocalDate from, LocalDate to) {
+    private List<UserSummary> filterByDate(List<UserSummary> views, LocalDate from, LocalDate to) {
         if (from == null && to == null) return views;
         return views.stream()
                 .filter(v -> {
@@ -88,10 +83,8 @@ class AdminService implements AdminUserUseCase {
                 throw new IllegalStateException("최소 1명의 관리자가 존재해야 합니다");
             }
         }
-        User user = userPort.findByIdOrThrow(targetUserId);
-        userPort.save(user.withRole(role));
-        // 기존 AT 무효화 — 변경 시각 이전 발급 토큰은 JwtAuthFilter가 401 처리 (refresh로 새 role AT 발급)
-        blacklistPort.markRoleChanged(targetUserId, Instant.now(), TokenConstants.AT_TTL);
+        // 역할 저장 + 기존 AT 무효화는 user 모듈이 캡슐화한다
+        userUseCase.changeRole(targetUserId, role);
         log.info("관리자 역할 변경: adminId={}, targetUserId={}, role={}", adminId, targetUserId, role);
         auditLogPort.log(adminId, "USER_ROLE_CHANGE", "USER", targetUserId,
                 Map.of("newRole", role.name()));
@@ -107,8 +100,8 @@ class AdminService implements AdminUserUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<AdminUserView> findUser(UUID userId) {
+    public Optional<UserSummary> findUser(UUID userId) {
         // 단건 조회 — 전체 풀스캔 대신 ID 기반 직접 조회
-        return adminUserViewPort.findById(userId);
+        return userSummaryPort.findById(userId);
     }
 }

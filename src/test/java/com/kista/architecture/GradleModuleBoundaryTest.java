@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GradleModuleBoundaryTest {
 
-    // trading-core 서브프로젝트 소스만 스캔해, api 전용 모듈(user/admin/stats/finance/notify/market/web)을
+    // trading-core 서브프로젝트 소스만 스캔해, api 전용 모듈(user/admin/benchmark/finance/notify/market/web)을
     // 컴파일 타임에 참조하지 않는지 고정한다. 이 테스트가 실패하면 :api → :trading-core 단방향이 깨진 것.
     @Test
     void tradingCoreMustNotDependOnApiOnlyModules() {
@@ -27,7 +27,7 @@ class GradleModuleBoundaryTest {
         ArchRuleDefinition.noClasses()
                 .that().resideInAPackage("com.kista..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "com.kista.user..", "com.kista.admin..", "com.kista.stats..",
+                        "com.kista.user..", "com.kista.admin..", "com.kista.benchmark..",
                         "com.kista.finance..", "com.kista.notify..", "com.kista.market..",
                         "com.kista.web..")
                 .check(importedClasses);
@@ -47,7 +47,7 @@ class GradleModuleBoundaryTest {
         ArchRuleDefinition.noClasses()
                 .that().resideInAPackage("com.kista..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "com.kista.user..", "com.kista.admin..", "com.kista.stats..",
+                        "com.kista.user..", "com.kista.admin..", "com.kista.benchmark..",
                         "com.kista.finance..", "com.kista.notify..", "com.kista.market..",
                         "com.kista.web..")
                 .check(importedClasses);

@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-// root com.kista.stats.adapter.out.alpaca.AlpacaIndexPriceAdapterTest에서 fetchDailyCandles 관련
+// root com.kista.benchmark.adapter.out.alpaca.AlpacaIndexPriceAdapterTest에서 fetchDailyCandles 관련
 // 5개 테스트를 그대로 이관 — HistoricalCandlePort 구현이 AlpacaCandleAdapter(trading-core)로
 // 옮겨졌기 때문(4a Task 10, root→trading-core 프로세스 분리로 root가 trading-core 정의 포트를
 // 구현할 수 없게 되며 발견된 갭)

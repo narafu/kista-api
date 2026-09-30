@@ -93,7 +93,7 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
         notify(profile, "장 마감", "🔴 미국 장이 마감되었습니다.");
     }
 
-    // 텔레그램 직접 발송 + FCM은 root PushNotificationRelayListener(Redis 구독)에 위임
+    // 텔레그램 직접 발송 + FCM은 root PushNotificationStreamConsumer(Redis Stream 구독)에 위임
     private void notify(TradingUserProfile profile, String title, String text) {
         sendIfLinked(profile, text);
         pushNotificationPublisher.publish(new UserPushNotificationRequestedEvent(profile.userId(), title, text));

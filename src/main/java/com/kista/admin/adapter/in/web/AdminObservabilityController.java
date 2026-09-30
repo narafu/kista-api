@@ -5,7 +5,7 @@ import com.kista.admin.adapter.in.web.dto.AnomaliesResponse;
 import com.kista.admin.adapter.in.web.dto.AuditLogResponse;
 import com.kista.admin.adapter.in.web.dto.ErrorLogResponse;
 import com.kista.admin.domain.model.AdminAnomalies;
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -84,7 +84,7 @@ public class AdminObservabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         AdminAnomalies anomalies = adminQuery.getAnomalies(inactiveDays, from, to);
-        Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
+        Map<UUID, UserSummary> userMap = UserSummaries.mapById(adminUser);
 
         List<AdminAccountItem> paused = anomalies.pausedAccounts().stream()
                 .map(a -> AdminAccountItem.from(a, userMap))

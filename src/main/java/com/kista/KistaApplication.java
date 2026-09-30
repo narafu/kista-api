@@ -14,7 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.kista.finance",
         "com.kista.market",
         "com.kista.notify",
-        "com.kista.stats",
+        "com.kista.benchmark",
         "com.kista.user",
         "com.kista.web",
         "com.kista.sharedkernel",

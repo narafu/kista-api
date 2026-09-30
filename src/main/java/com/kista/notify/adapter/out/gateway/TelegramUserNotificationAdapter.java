@@ -53,11 +53,6 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
         sendIfLinked(user, text);
     }
 
-    @Override
-    public void notifyFinanceRegistrationReminder(NotificationRecipient user, String month) {
-        sendIfLinked(user, String.format("📒 %s 가계부(자산·수입·소비·저축) 등록이 아직 없어요. 지금 등록해보세요.", month));
-    }
-
     // 사용자 봇 연결 시에만 발송 — 미연결 시 조용히 skip
     private void sendIfLinked(NotificationRecipient user, String text) {
         if (!user.hasTelegramBot()) return;

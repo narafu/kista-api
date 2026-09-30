@@ -10,9 +10,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 // @SpringBootApplication에 두면 @WebMvcTest 슬라이스가 깨지므로 별도 @Configuration으로 분리(슬라이스는 스캔에서 제외).
 // 패키지 목록은 KistaApplication.scanBasePackages와 동기화 — root 소유 패키지가 늘면 함께 갱신할 것.
 @Configuration
-@EntityScan({"com.kista.admin", "com.kista.finance", "com.kista.market", "com.kista.notify", "com.kista.stats",
+@EntityScan({"com.kista.admin", "com.kista.finance", "com.kista.market", "com.kista.notify", "com.kista.benchmark",
         "com.kista.user", "com.kista.web", "com.kista.sharedkernel", "com.kista.platform"})
-@EnableJpaRepositories({"com.kista.admin", "com.kista.finance", "com.kista.market", "com.kista.notify", "com.kista.stats",
+@EnableJpaRepositories({"com.kista.admin", "com.kista.finance", "com.kista.market", "com.kista.notify", "com.kista.benchmark",
         "com.kista.user", "com.kista.web", "com.kista.sharedkernel", "com.kista.platform"})
 class RootJpaScanConfig {
 }

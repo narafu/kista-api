@@ -9,7 +9,7 @@ import com.kista.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
 import com.kista.contract.account.AccountSummaryResponse;
 import com.kista.contract.trading.OrderResponse;
 import com.kista.contract.trading.StrategySummaryResponse;
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
@@ -81,10 +81,10 @@ public class AdminTradeController {
         // 단일 계좌만 조회 — 전체 풀스캔 불필요
         AccountSummaryResponse account = adminQuery.findAccount(accountId)
                 .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
-        AdminUserView user = adminUser.findUser(account.userId())
+        UserSummary user = adminUser.findUser(account.userId())
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + account.userId()));
         Map<UUID, AccountSummaryResponse> accountMap = Map.of(accountId, account);
-        Map<UUID, AdminUserView> userMap = Map.of(account.userId(), user);
+        Map<UUID, UserSummary> userMap = Map.of(account.userId(), user);
         Set<UUID> cycleIds = orders.stream().map(OrderResponse::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<UUID, StrategySummaryResponse> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
         return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap)).toList();
@@ -125,7 +125,7 @@ public class AdminTradeController {
     // 주문 목록 → AdminTradeResponse 목록 변환 (accountMap/userMap/strategyTypeMap 공통 조립)
     private List<AdminTradeResponse> toResponses(List<OrderResponse> orders) {
         Map<UUID, AccountSummaryResponse> accountMap = buildAccountMap();
-        Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
+        Map<UUID, UserSummary> userMap = UserSummaries.mapById(adminUser);
         Set<UUID> cycleIds = orders.stream()
                 .map(OrderResponse::strategyCycleId)
                 .filter(Objects::nonNull)

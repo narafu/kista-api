@@ -3,6 +3,7 @@
 // 자체 검증만 하는 정책 record(TradingPolicySettings/BrokerSettings/StrategyCreationSettings/StrategyFieldSettings).
 // 정책 record의 소유자는 trading-core(집행 주체)이고 root admin은 편집 UI로서 같은 shape을 내부 API body로 주고받는다 —
 // 두 프로세스가 합의한 어휘라 여기 둔다. 프로세스 간 통합 이벤트(UserDeletedEvent/AppErrorRaisedEvent 등)도 같은 이유.
+// 모듈 간 통합 이벤트: UserNotificationRequestedEvent(root 내부 — 발행 모듈이 notify를 모른 채 사용자 알림을 요청).
 // 포트 인터페이스는 두지 않는다 — 포트는 그것을 필요로 하는 모듈이 소유한다(과거 sharedkernel.port는 폐지됨).
 // US 거래일 변환 유틸(UsTradeDates)은 어댑터 전용이라 com.kista.platform.time으로 분리됐다.
 // 이 패키지가 다른 모듈을 참조하는 순간 sharedkernel 전제가 깨진다.

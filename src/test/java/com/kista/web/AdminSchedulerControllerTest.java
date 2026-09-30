@@ -1,7 +1,7 @@
 package com.kista.web;
 
-import com.kista.stats.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
-import com.kista.stats.adapter.in.schedule.KbLandPriceIndexScheduler;
+import com.kista.benchmark.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
+import com.kista.benchmark.adapter.in.schedule.KbLandPriceIndexScheduler;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;

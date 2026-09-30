@@ -4,7 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import com.kista.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
@@ -49,9 +49,9 @@ class AdminUserControllerTest {
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-    // 테스트용 샘플 AdminUserView 생성
-    private AdminUserView sampleUser(UUID id) {
-        return new AdminUserView(id, "테스트유저", UserStatus.PENDING, UserRole.USER, Instant.now());
+    // 테스트용 샘플 UserSummary 생성
+    private UserSummary sampleUser(UUID id) {
+        return new UserSummary(id, "테스트유저", UserStatus.PENDING, UserRole.USER, Instant.now());
     }
 
     @Test

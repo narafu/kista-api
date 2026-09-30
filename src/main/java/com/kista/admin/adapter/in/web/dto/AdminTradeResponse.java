@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web.dto;
 import com.kista.contract.account.AccountSummaryResponse;
 import com.kista.contract.trading.OrderResponse;
 import com.kista.contract.trading.StrategySummaryResponse;
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -49,12 +49,12 @@ public record AdminTradeResponse(
         BigDecimal filledPrice
 ) {
     public static AdminTradeResponse from(OrderResponse t, Map<UUID, AccountSummaryResponse> accountMap,
-                                          Map<UUID, AdminUserView> userMap,
+                                          Map<UUID, UserSummary> userMap,
                                           Map<UUID, StrategySummaryResponse> strategySummaryMap) {
         // accountId → userId → nickname 순서로 역방향 조회
         AccountSummaryResponse account = t.accountId() != null ? accountMap.get(t.accountId()) : null;
         UUID userId = account != null ? account.userId() : null;
-        AdminUserView user = userId != null ? userMap.get(userId) : null;
+        UserSummary user = userId != null ? userMap.get(userId) : null;
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
         StrategySummaryResponse strategySummary = t.strategyCycleId() != null ? strategySummaryMap.get(t.strategyCycleId()) : null;
         return new AdminTradeResponse(

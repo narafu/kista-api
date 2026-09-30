@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
-// stats 모듈 com.kista.stats.adapter.out.alpaca.AlpacaConfig와 클래스명이 같아 빈 이름 충돌 방지용으로 명시적 이름 지정
+// benchmark 모듈 com.kista.benchmark.adapter.out.alpaca.AlpacaConfig와 클래스명이 같아 빈 이름 충돌 방지용으로 명시적 이름 지정
 @Configuration("marketAlpacaConfig")
 @EnableConfigurationProperties(AlpacaProperties.class)
 public class AlpacaConfig {

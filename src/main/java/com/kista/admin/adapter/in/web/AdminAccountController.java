@@ -4,7 +4,7 @@ import com.kista.admin.adapter.in.web.dto.AdminAccountResponse;
 import com.kista.admin.adapter.in.web.dto.AdminStrategyResponse;
 import com.kista.admin.adapter.in.web.dto.StrategyStatusRequest;
 import com.kista.contract.account.AccountSummaryResponse;
-import com.kista.user.domain.model.AdminUserView;
+import com.kista.user.domain.model.UserSummary;
 import com.kista.contract.trading.StrategyResponse;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminStrategyUseCase;
@@ -46,7 +46,7 @@ public class AdminAccountController {
     public List<AdminAccountResponse> listAccounts(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        Map<UUID, AdminUserView> userMap = AdminUserViews.mapById(adminUser);
+        Map<UUID, UserSummary> userMap = UserSummaries.mapById(adminUser);
         List<AccountSummaryResponse> accounts = adminQuery.listAccounts(from, to);
         Set<UUID> accountIds = accounts.stream().map(AccountSummaryResponse::id).collect(Collectors.toSet());
         Map<UUID, List<StrategyResponse>> strategyMap = adminQuery.listStrategiesByAccountIds(accountIds);
