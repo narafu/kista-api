@@ -57,12 +57,6 @@ class TradingService {
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
 
-    void execute(Strategy strategy, TradingAccount account, TradingUserProfile userProfile) throws InterruptedException {
-        // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
-        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
-        executeBatch(List.of(new BatchContext(strategy, currentCycle, account, userProfile)));
-    }
-
     void executeBatch(List<BatchContext> contexts) throws InterruptedException {
         executeBatch(contexts, DstInfo.calculate());
     }

@@ -1,5 +1,6 @@
 package com.kista.broker.domain.model;
 
+import com.kista.sharedkernel.AccountNumberMasker;
 import com.kista.sharedkernel.Broker;
 
 import java.util.UUID;
@@ -15,4 +16,12 @@ public record BrokerAccountRef(
         String brokerAccountCode, // KIS: null, TOSS: accountSeq
         Broker broker              // 라우팅 키
 ) {
+
+    // record 기본 toString은 appKey/secretKey/accountNo를 평문 출력(로그·예외 메시지·단언 실패 메시지) — 마스킹으로 재정의
+    @Override
+    public String toString() {
+        return "BrokerAccountRef[id=" + id + ", broker=" + broker
+                + ", accountNo=" + AccountNumberMasker.mask(accountNo)
+                + ", appKey=***, secretKey=***]";
+    }
 }

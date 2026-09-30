@@ -1,13 +1,10 @@
 package com.kista.trading.application.service;
 
-import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.DstInfo;
-import com.kista.trading.domain.model.Strategy;
-import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,11 +23,6 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     private final ManualTradingService manualTradingService;
     private final OrderCancelService orderCancelService;
     private final TradingPreviewService tradingPreviewService;
-
-    @Override
-    public void execute(Strategy strategy, TradingAccount account, TradingUserProfile userProfile) throws InterruptedException {
-        tradingService.execute(strategy, account, userProfile);
-    }
 
     @Override
     public void executeBatch(List<BatchContext> contexts) throws InterruptedException {

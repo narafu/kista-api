@@ -8,6 +8,7 @@ import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.domain.model.BatchContext;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,8 +72,9 @@ class TradingPriceFetcher {
     // 가격 조회에 사용할 계좌 선택 — Toss 계좌가 있으면 우선 사용 (토스 시세 API 일관성)
     BrokerAccountRef selectPriceAccount(List<BatchContext> contexts) {
         return contexts.stream()
-                .map(ctx -> ctx.account().brokerRef())
-                .filter(ref -> ref.broker() == Broker.TOSS)
+                .map(BatchContext::account)
+                .filter(account -> account.broker() == Broker.TOSS)
+                .map(TradingAccount::brokerRef)
                 .findFirst()
                 .orElseGet(() -> contexts.getFirst().account().brokerRef());
     }

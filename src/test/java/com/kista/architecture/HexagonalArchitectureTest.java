@@ -20,6 +20,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPac
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("Hexagonal Architecture 규칙")
 class HexagonalArchitectureTest {
@@ -174,35 +175,37 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("trading 배치·프리뷰·리포트 경로는 Account 애그리게이트를 들고 다니지 않는다 — TradingAccount 투영만 사용")
+    @DisplayName("trading application.service·BatchContext는 Account 애그리게이트를 들고 다니지 않는다 — TradingAccount 투영만 사용")
     void trading_batch_path_must_not_carry_account_aggregate() {
         // BatchContext가 복호화된 자격증명을 담은 Account 전체를 들고 배치·프리뷰·리포트 경로를 흘러다니던 결합(리뷰 F8)을 잠근다.
-        // 이 경로는 id/userId/nickname/brokerRef 4필드만 쓰므로 trading 소유 투영 TradingAccount(변환 TradingAccount.from 1곳)만 받는다.
-        // 대상에서 제외: 소유권 검증(account.verifyOwnedBy)이 필요한 요청 경로(ManualTradingService/SelectionChain/ReorderService 등)와
-        // AccountPort로 Account를 받아 변환하는 경계(BatchContextFactory/TradingPreviewService)는 Account가 정당하게 남는다.
-        Set<String> batchPath = Set.of(
-                "com.kista.trading.domain.model.BatchContext",
-                "com.kista.trading.application.service.TradingService",
-                "com.kista.trading.application.service.TradingCandidatePlanner",
-                "com.kista.trading.application.service.TradingOrderBudgetAllocator",
-                "com.kista.trading.application.service.TradingOrderExecutor",
-                "com.kista.trading.application.service.TradingReporter",
-                "com.kista.trading.application.service.TradingPriceFetcher",
-                "com.kista.trading.application.service.TradingExecutionFacade",
-                "com.kista.trading.application.usecase.TradingExecutionUseCase",
-                "com.kista.trading.application.service.BuyOrderPriceCapper",
-                "com.kista.trading.application.service.CyclePositionPersistor",
-                "com.kista.trading.application.service.CycleRotationService",
-                "com.kista.trading.application.service.VrCycleRolloverService",
-                "com.kista.trading.application.service.StrategyOrderPlanBuilder",
-                "com.kista.trading.application.service.PreviewDepositCache",
-                "com.kista.trading.application.service.TradingBuyCompetitionSimulator",
-                "com.kista.trading.application.service.TradingSellSufficiencySimulator",
-                "com.kista.trading.application.service.support.TradingOrderPlanner",
-                "com.kista.trading.application.service.support.TradingBatchGuard");
-        // 중첩 클래스(TradingService$X 등)도 바깥 클래스와 같은 대상으로 취급
+        // 이 경로는 id/userId/nickname/brokerRef 4필드만 쓰므로 trading 소유 투영 TradingAccount만 받는다.
+        // TradingAccount.from()은 정의 1곳이며 호출 경계는 3곳(BatchContextFactory / ManualTradingService / TradingPreviewService)이다.
+        // 타입 표면을 좁히는 것이지 자격증명 은닉이 아니다 — brokerRef는 여전히 자격증명을 담고 toString만 마스킹한다.
+        // 대상은 application.service 전체 + BatchContext(denylist 방식 — 신규·개명 클래스가 조용히 검사에서 빠지지 않는다).
+        // BatchContextFactory는 adapter.in.schedule이라 대상 밖이다.
+        // 아래 제외 목록은 Account를 실제로 참조하는 소유권 검증·계좌 조회 경로 클래스만 남긴다(실측으로 확인).
+        // ManualTradingService/TradingPreviewService는 requireOwnedAccount 결과를 곧바로 TradingAccount.from()에 넘겨
+        // Account 타입을 선언·보관하지 않으므로 제외 대상이 아니다 — 나중에 Account를 직접 다루게 되면 이 규칙이 잡는다.
+        Set<String> accountAllowed = Set.of(
+                "com.kista.trading.application.service.support.SelectionChain",      // 소유권 검증(verifyOwnedBy)
+                "com.kista.trading.application.service.ReorderService",              // 소유권 검증
+                "com.kista.trading.application.service.OrderCancelService",           // 소유권 검증
+                "com.kista.trading.application.service.VrReconfigureService",        // 소유권 검증
+                "com.kista.trading.application.service.StrategyCreationService",     // 계좌 소유권·브로커 검증
+                "com.kista.trading.application.service.StrategyService",             // 계좌 소유권 검증
+                "com.kista.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
+                "com.kista.trading.application.service.ManualTradeCorrectionService" // 소유권 검증
+        );
+        // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다
+        Set<String> existing = new java.util.HashSet<>();
+        classes.forEach(c -> existing.add(c.getName()));
+        assertThat(existing).containsAll(accountAllowed);
+        // 중첩 클래스(TradingService$X 등)는 바깥 클래스 기준으로 제외 판정
         DescribedPredicate<JavaClass> isBatchPath = DescribedPredicate.describe(
-                "trading 배치 경로 클래스", c -> batchPath.contains(c.getName().split("\\$")[0]));
+                "trading 배치 경로 클래스(application.service 전체 + BatchContext, 제외 목록 제외)",
+                c -> (c.getPackageName().startsWith("com.kista.trading.application.service")
+                        || c.getName().equals("com.kista.trading.domain.model.BatchContext"))
+                        && !accountAllowed.contains(c.getName().split("\\$")[0]));
         ArchRule rule = noClasses()
                 .that(isBatchPath)
                 .should().dependOnClassesThat().haveFullyQualifiedName("com.kista.account.domain.model.Account");
