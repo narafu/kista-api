@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
@@ -28,7 +28,7 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     private final TradingPreviewService tradingPreviewService;
 
     @Override
-    public void execute(Strategy strategy, Account account, TradingUserProfile userProfile) throws InterruptedException {
+    public void execute(Strategy strategy, TradingAccount account, TradingUserProfile userProfile) throws InterruptedException {
         tradingService.execute(strategy, account, userProfile);
     }
 

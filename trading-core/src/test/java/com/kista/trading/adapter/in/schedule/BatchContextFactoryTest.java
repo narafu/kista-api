@@ -6,6 +6,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.account.application.port.output.AccountPort;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.trading.application.port.output.TradingUserProfilePort;
@@ -81,7 +82,7 @@ class BatchContextFactoryTest {
 
         List<BatchContext> result = factory.buildAll(List.of(strategy));
 
-        assertThat(result).containsExactly(new BatchContext(strategy, cycle, account, userProfile));
+        assertThat(result).containsExactly(new BatchContext(strategy, cycle, TradingAccount.from(account), userProfile));
     }
 
     @Test

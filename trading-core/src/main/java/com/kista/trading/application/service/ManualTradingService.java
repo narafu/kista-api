@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 
 import com.kista.account.application.port.output.AccountPort;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.*;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.matching.domain.model.*;
@@ -46,7 +46,8 @@ class ManualTradingService {
     List<Order> execute(UUID strategyId, UUID requesterId, DstInfo dst) {
         // 동기 검증: 소유권·상태
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 실행 경로는 투영(TradingAccount)만 사용
+        TradingAccount account = TradingAccount.from(accountPort.requireOwnedAccount(strategy.accountId(), requesterId));
         if (!strategy.isActive())
             throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
 
@@ -120,9 +121,9 @@ class ManualTradingService {
     }
 
     // BUY 가격 캡 판단용 현재가 — 조회 실패 시 캡 미적용(null이면 prepareForAllocation이 원본 그대로 반환)
-    private BigDecimal fetchStartPriceOrNull(Strategy strategy, Account account) {
+    private BigDecimal fetchStartPriceOrNull(Strategy strategy, TradingAccount account) {
         try {
-            return priceFetcher.fetchPrices(List.of(strategy.ticker()), account).get(strategy.ticker());
+            return priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
         } catch (Exception e) {
             log.warn("[{}] 캡 판단용 현재가 조회 실패 — 캡 미적용: {}", account.nickname(), e.getMessage());
             return null;
@@ -133,13 +134,13 @@ class ManualTradingService {
     // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
-    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, Account account, UUID cycleId, LocalDate today,
+    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, UUID cycleId, LocalDate today,
                                                InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
         if (Instant.now().isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
             if (orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today).isEmpty()) return;
             // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
-            BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account).get(strategy.ticker());
+            BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
             log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
             orderExecutor.placeAtOpenOrders(today, account, cycleId, currentPrice, position, vrPosition, strategy);
         }

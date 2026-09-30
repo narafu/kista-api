@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -41,7 +41,7 @@ class CycleRotationService {
     private final ApplicationEventPublisher eventPublisher;    // 새 사이클 시작 이벤트 발행 (재등록 완료) + 관리자 알림 이벤트 (잔고 부족·오류)
     private final CycleOrderStrategies cycleStrategies;        // 전략 타입별 최소금액 정책
 
-    void rotate(Strategy strategy, StrategyCycle currentCycle, Account account, TradingUserProfile userProfile,
+    void rotate(Strategy strategy, StrategyCycle currentCycle, TradingAccount account, TradingUserProfile userProfile,
                 BigDecimal price, PrivacyTradeBase privacyTradeBase) {
 
         if (strategy.cycleSeedType() == StrategyCycleSeedType.NONE) {
@@ -125,7 +125,7 @@ class CycleRotationService {
     }
 
     // 잔고검증 설정에 따라 가용 잔고 결정 — 가용 잔고를 반환, 증권사 조회 실패·오류 시 Optional.empty() (호출부는 rotate 중단)
-    private Optional<BigDecimal> resolveAvailableBalance(TradingUserProfile userProfile, Account account, Strategy strategy,
+    private Optional<BigDecimal> resolveAvailableBalance(TradingUserProfile userProfile, TradingAccount account, Strategy strategy,
                                                           BigDecimal maintainSeed, BigDecimal maxSeed) {
         if (!userProfile.balanceCheckEnabled()) {
             // OFF: 내부 원장만 사용 (증권사 조회 없음)
@@ -143,9 +143,9 @@ class CycleRotationService {
     }
 
     // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
-    private BigDecimal fetchUsdBalance(Strategy strategy, Account account) {
+    private BigDecimal fetchUsdBalance(Strategy strategy, TradingAccount account) {
         try {
-            BigDecimal usdAmount = marginPort.getUsdBuyableAmount(account.toBrokerRef());
+            BigDecimal usdAmount = marginPort.getUsdBuyableAmount(account.brokerRef());
             if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
                 eventPublisher.publishEvent(new TradingErrorEvent(null,

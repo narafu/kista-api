@@ -1,5 +1,6 @@
 package com.kista.architecture;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaConstructor;
@@ -169,6 +170,42 @@ class HexagonalArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista..")
                 .should().beAnnotatedWith("org.aspectj.lang.annotation.Aspect");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("trading 배치·프리뷰·리포트 경로는 Account 애그리게이트를 들고 다니지 않는다 — TradingAccount 투영만 사용")
+    void trading_batch_path_must_not_carry_account_aggregate() {
+        // BatchContext가 복호화된 자격증명을 담은 Account 전체를 들고 배치·프리뷰·리포트 경로를 흘러다니던 결합(리뷰 F8)을 잠근다.
+        // 이 경로는 id/userId/nickname/brokerRef 4필드만 쓰므로 trading 소유 투영 TradingAccount(변환 TradingAccount.from 1곳)만 받는다.
+        // 대상에서 제외: 소유권 검증(account.verifyOwnedBy)이 필요한 요청 경로(ManualTradingService/SelectionChain/ReorderService 등)와
+        // AccountPort로 Account를 받아 변환하는 경계(BatchContextFactory/TradingPreviewService)는 Account가 정당하게 남는다.
+        Set<String> batchPath = Set.of(
+                "com.kista.trading.domain.model.BatchContext",
+                "com.kista.trading.application.service.TradingService",
+                "com.kista.trading.application.service.TradingCandidatePlanner",
+                "com.kista.trading.application.service.TradingOrderBudgetAllocator",
+                "com.kista.trading.application.service.TradingOrderExecutor",
+                "com.kista.trading.application.service.TradingReporter",
+                "com.kista.trading.application.service.TradingPriceFetcher",
+                "com.kista.trading.application.service.TradingExecutionFacade",
+                "com.kista.trading.application.usecase.TradingExecutionUseCase",
+                "com.kista.trading.application.service.BuyOrderPriceCapper",
+                "com.kista.trading.application.service.CyclePositionPersistor",
+                "com.kista.trading.application.service.CycleRotationService",
+                "com.kista.trading.application.service.VrCycleRolloverService",
+                "com.kista.trading.application.service.StrategyOrderPlanBuilder",
+                "com.kista.trading.application.service.PreviewDepositCache",
+                "com.kista.trading.application.service.TradingBuyCompetitionSimulator",
+                "com.kista.trading.application.service.TradingSellSufficiencySimulator",
+                "com.kista.trading.application.service.support.TradingOrderPlanner",
+                "com.kista.trading.application.service.support.TradingBatchGuard");
+        // 중첩 클래스(TradingService$X 등)도 바깥 클래스와 같은 대상으로 취급
+        DescribedPredicate<JavaClass> isBatchPath = DescribedPredicate.describe(
+                "trading 배치 경로 클래스", c -> batchPath.contains(c.getName().split("\\$")[0]));
+        ArchRule rule = noClasses()
+                .that(isBatchPath)
+                .should().dependOnClassesThat().haveFullyQualifiedName("com.kista.account.domain.model.Account");
         rule.check(classes);
     }
 

@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.Order;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
@@ -39,7 +39,7 @@ class TradingOrderExecutor {
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
     // AT_OPEN PLANNED만 재조회해 접수한다 — 동일 사이클에 공존 가능한 AT_CLOSE PLANNED(미도래)는 건드리지 않는다
     // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)
-    List<Order> placeAtOpenOrders(LocalDate tradeDate, Account account, UUID strategyCycleId,
+    List<Order> placeAtOpenOrders(LocalDate tradeDate, TradingAccount account, UUID strategyCycleId,
                                   BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         applyCap(true, tradeDate, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(strategyCycleId, tradeDate);
@@ -54,7 +54,7 @@ class TradingOrderExecutor {
 
     // BuyOrderPriceCapper.capIfNeeded 적용 여부는 전략의 needsCapCheck()로 결정 — position/vrPosition
     // null 가드는 applyCap에 있다 (capIfNeeded는 @Transactional이라 내부에 두면 skip 케이스마다 빈 트랜잭션이 열림)
-    List<Order> placeOrders(LocalDate today, Account account, UUID strategyCycleId,
+    List<Order> placeOrders(LocalDate today, TradingAccount account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         applyCap(false, today, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
@@ -65,7 +65,7 @@ class TradingOrderExecutor {
 
     // AT_OPEN/AT_CLOSE 공용 BUY 가격 캡 디스패치 — needsCapCheck() skip 가드를 여기서 걸어
     // BuyOrderPriceCapper.capIfNeeded(@Transactional)가 skip 케이스에 호출되지 않도록 한다(빈 트랜잭션 오픈 방지)
-    private void applyCap(boolean atOpen, LocalDate date, Account account, UUID strategyCycleId,
+    private void applyCap(boolean atOpen, LocalDate date, TradingAccount account, UUID strategyCycleId,
                           BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         if (currentPrice == null) return;
         CycleOrderStrategy orderStrategy = cycleOrderStrategies.of(strategy.type());
@@ -75,7 +75,7 @@ class TradingOrderExecutor {
 
     // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)
     // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
-    private List<Order> placeEach(List<Order> orders, Account account) {
+    private List<Order> placeEach(List<Order> orders, TradingAccount account) {
         List<Order> placed = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {
             // 주문 간격이 이미 충분히 벌어져(정상적인 왕복 지연) 게이트가 대기 없이 즉시 반환하는 경우
@@ -89,7 +89,7 @@ class TradingOrderExecutor {
                     p.orderType(), p.quantity(), p.price());
             OrderResult result;
             try {
-                result = brokerOrderCorrectionPort.place(instruction, account.toBrokerRef());
+                result = brokerOrderCorrectionPort.place(instruction, account.brokerRef());
             } catch (Exception e) {
                 // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
                 log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());

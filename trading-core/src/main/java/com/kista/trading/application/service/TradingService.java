@@ -3,7 +3,6 @@ import com.kista.trading.application.service.support.TradingBatchGuard;
 import com.kista.trading.application.service.support.TradingParallelRunner;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -58,7 +57,7 @@ class TradingService {
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
 
-    void execute(Strategy strategy, Account account, TradingUserProfile userProfile) throws InterruptedException {
+    void execute(Strategy strategy, TradingAccount account, TradingUserProfile userProfile) throws InterruptedException {
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, userProfile)));
@@ -174,7 +173,7 @@ class TradingService {
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
-    void execute(Strategy strategy, Account account, TradingUserProfile userProfile, DstInfo dst) throws InterruptedException {
+    void execute(Strategy strategy, TradingAccount account, TradingUserProfile userProfile, DstInfo dst) throws InterruptedException {
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         executeBatch(List.of(new BatchContext(strategy, currentCycle, account, userProfile)), dst);
     }

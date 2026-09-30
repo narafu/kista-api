@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ class PreviewDepositCache {
         }
     }
 
-    BigDecimal getUsdDeposit(Account account, StrategyTicker probeTicker) {
+    BigDecimal getUsdDeposit(TradingAccount account, StrategyTicker probeTicker) {
         Instant now = Instant.now();
         Entry cached = cache.get(account.id());
         if (cached != null && cached.isValid(now)) {
@@ -49,7 +49,7 @@ class PreviewDepositCache {
                 return doubleChecked.usdDeposit();
             }
             BigDecimal fresh = liveBalancePort
-                    .getLiveBalance(account.toBrokerRef(), probeTicker)
+                    .getLiveBalance(account.brokerRef(), probeTicker)
                     .usdDeposit();
             cache.put(account.id(), new Entry(fresh, Instant.now().plus(TTL)));
             return fresh;

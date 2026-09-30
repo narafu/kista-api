@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.OrderTiming;
@@ -50,13 +50,13 @@ class TradingOrderBudgetAllocatorTest {
 
     TradingOrderBudgetAllocator allocator;
 
-    Account account;
+    TradingAccount account;
     TradingUserProfile user;
     LocalDate tradeDate;
 
     @BeforeEach
     void setUp() {
-        account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+        account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
         user = TradingFixtures.tradingUserProfile(account.userId());
         tradeDate = LocalDate.of(2026, 7, 15);
         when(infiniteCycleOrderStrategy.cycleType()).thenReturn(StrategyType.INFINITE);
@@ -69,13 +69,13 @@ class TradingOrderBudgetAllocatorTest {
                 infiniteCycleOrderStrategy, privacyCycleOrderStrategy, vrCycleOrderStrategy));
         allocator = new TradingOrderBudgetAllocator(liveBalancePort, sellableQuantityPort, orderPort, cycleOrderStrategies);
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(eq(account.id()), eq(tradeDate))).thenReturn(BigDecimal.ZERO);
-        lenient().when(sellableQuantityPort.getSellableQuantity(any(), eq(account.toBrokerRef())))
+        lenient().when(sellableQuantityPort.getSellableQuantity(any(), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 100));
     }
 
     @Test
     void allocate_prioritizesVrThenInfiniteThenPrivacyWithLimitedCash() {
-        when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("3000.00")));
 
         TradingOrderBudgetAllocator.Candidate vr = candidate(StrategyType.VR, "1500.00");
@@ -90,7 +90,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_sameStrategyTypeApprovesSmallerBuyTotalFirst() {
-        when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("1000.00")));
 
         TradingOrderBudgetAllocator.Candidate large = candidate(StrategyType.INFINITE, "1200.00");
@@ -104,7 +104,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_prioritizesVrThenInfiniteThenPrivacyForLimitedSellableQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 3));
 
         TradingOrderBudgetAllocator.Candidate vr = candidate(
@@ -128,7 +128,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_sameStrategyTypeApprovesSmallerSellQuantityFirst() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 4));
 
         TradingOrderBudgetAllocator.Candidate large = candidate(
@@ -148,7 +148,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_sameStrategyTypeAndSellQuantityApprovesLowerStrategyUuidFirst() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 2));
 
         TradingOrderBudgetAllocator.Candidate lowerStrategyId = candidate(
@@ -169,7 +169,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_sameStrategyTypeAndSellQuantityAndStrategyUuidUsesLowerCycleUuid() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 2));
 
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -191,7 +191,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_buyIsAllOrNothingWithinCycle() {
-        when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("1000.00")));
 
         TradingOrderBudgetAllocator.Candidate candidate = candidate(StrategyType.INFINITE,
@@ -205,7 +205,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_sellDoesNotConsumeBuyBudget() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 10));
 
         TradingOrderBudgetAllocator.Candidate sellOnly = candidate(StrategyType.PRIVACY,
@@ -220,7 +220,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_rejectsSellWhenSellableQuantityIsInsufficient() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 2));
 
         TradingOrderBudgetAllocator.Candidate tooMuchSell = candidate(StrategyType.VR,
@@ -234,7 +234,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_rejectsSellWhenExistingReservationsLeaveInsufficientQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
                 account.id(), tradeDate, StrategyTicker.SOXL)).thenReturn(3);
@@ -249,7 +249,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_rejectsLaterSellsWhenAccountTickerTotalExceedsSellableQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.toBrokerRef())))
+        when(sellableQuantityPort.getSellableQuantity(eq(StrategyTicker.SOXL), eq(account.brokerRef())))
                 .thenReturn(new SellableQuantity("SOXL", 5));
 
         TradingOrderBudgetAllocator.Candidate first = candidate(
@@ -269,7 +269,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_preservesOriginalOrderSequenceWhenBothDirectionsAreApproved() {
-        when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("1000.00")));
 
         PlannedOrder firstBuy = buy("100.00");
@@ -287,7 +287,7 @@ class TradingOrderBudgetAllocatorTest {
 
     @Test
     void allocate_keepsOnlyApprovedDirectionInOriginalOrderForPartialApproval() {
-        when(liveBalancePort.getLiveBalance(eq(account.toBrokerRef()), eq(StrategyTicker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("150.00")));
 
         PlannedOrder firstBuy = buy("100.00");

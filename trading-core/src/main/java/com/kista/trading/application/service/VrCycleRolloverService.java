@@ -79,7 +79,7 @@ class VrCycleRolloverService {
         BigDecimal evaluationClosingPrice;
         try {
             evaluationClosingPrice = brokerPricePort
-                    .getClosingPrice(strategy.ticker(), evaluationDate, ctx.account().toBrokerRef());
+                    .getClosingPrice(strategy.ticker(), evaluationDate, ctx.account().brokerRef());
         } catch (Exception e) {
             log.error("[strategyId={}] VR 롤오버 — due일({}) 확정 종가 조회 실패, 다음 매매일 재시도",
                     strategy.id(), evaluationDate, e);

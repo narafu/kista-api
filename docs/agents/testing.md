@@ -8,7 +8,7 @@
 - Mockito 테스트 클래스에서 static 상수가 다른 static 상수를 참조할 때 선언 순서 중요 — `CYCLE.id()`를 참조하는 `NORMAL_HISTORY` 등은 반드시 `CYCLE` 선언 뒤에 위치해야 함 (위반 시 `illegal forward reference` 컴파일 오류)
 
 ### TradingService execute() 가격 주입 패턴
-- `execute(strategy, account, user, DstInfo)` — price=null로 전달 (lazy getPrice 없음)
+- `execute(strategy, tradingAccount, user, DstInfo)` — price=null로 전달 (lazy getPrice 없음). 배치 경로 테스트의 계좌는 `TradingFixtures.tradingAccount(id, userId)`(=`TradingAccount.from(kisAccount(...))`)·`tossTradingAccount`를 쓰고, 브로커 포트 stub 매처는 `tradingAccount.brokerRef()`를 쓴다. 소유권 검증 경로(`AccountPort.requireOwnedAccount` 등)만 `kisAccount`(Account)를 유지
 - holdings=0 && price=null → `IllegalStateException("현재가 조회 실패")` — holdings=0 테스트는 `executeBatch` 경로 사용, `getPrices` stub으로 주입
 - `executeBatch(List, DstInfo)` package-private 오버로드 — DstInfo 직접 주입으로 sleep 우회
 

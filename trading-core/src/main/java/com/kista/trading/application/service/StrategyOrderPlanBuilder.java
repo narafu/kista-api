@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 
 import com.kista.broker.application.service.BrokerCallGuard;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.AccountBalance;
@@ -43,7 +43,7 @@ class StrategyOrderPlanBuilder {
     // prevCloseCache: 배치 미리보기(TradingPreviewService.previewBatch) 전용 — 계좌 내 종목별 전일종가를
     // 1회 일괄 조회(getPrevCloses)해 넘기면 전략마다 개별 KIS 호출을 생략한다. 캐시에 없는 종목은
     // 기존과 동일하게 단건 라이브 조회로 폴백한다. 호출부가 항상 previewBatch 경로를 거치므로 이제 필수 인자다.
-    PlanResult build(Strategy strategy, Account account, StrategyCycle currentCycle, LocalDate today, String label,
+    PlanResult build(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today, String label,
                       Map<StrategyTicker, BigDecimal> prevCloseCache) {
         // 잔고 이력 없으면 계산 자체가 불가능한 skip
         TradingBalanceLoader.BalanceLoad load = balanceLoader.tryLoadBalance(strategy);
@@ -58,7 +58,7 @@ class StrategyOrderPlanBuilder {
             prevClosePrice = prevCloseCache.containsKey(strategy.ticker())
                     ? prevCloseCache.get(strategy.ticker())
                     : BrokerCallGuard.wrap("전일종가 조회",
-                            () -> brokerPricePort.getPrevClose(strategy.ticker(), account.toBrokerRef()));
+                            () -> brokerPricePort.getPrevClose(strategy.ticker(), account.brokerRef()));
         }
         // PrivacyTradePort에는 이 조합 전용 헬퍼가 없어 동일 로직을 인라인
         PrivacyTradeBase privacyBase = strategy.isPrivacy() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;

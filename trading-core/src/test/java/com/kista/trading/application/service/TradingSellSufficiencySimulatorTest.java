@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderType;
@@ -39,7 +39,7 @@ class TradingSellSufficiencySimulatorTest {
 
     TradingSellSufficiencySimulator simulator;
 
-    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
     Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
@@ -55,7 +55,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sufficient_whenSellableQuantityCoversRequiredAndReserved() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 10));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(2);
@@ -72,7 +72,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenRequiredAloneExceedsSellableQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 2));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
@@ -87,7 +87,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_insufficient_whenExistingReservationsLeaveNotEnoughQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(3);
@@ -101,7 +101,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_sumsMultipleSellOrderQuantities_asRequiredQuantity() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
                 .thenReturn(new SellableQuantity("SOXL", 20));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
                 .thenReturn(0);
@@ -117,7 +117,7 @@ class TradingSellSufficiencySimulatorTest {
 
     @Test
     void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
-        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.toBrokerRef()))
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
                 .thenThrow(new com.kista.broker.domain.model.toss.TossApiException("Toss API 토큰 재시도 실패: 401", null));
         List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
 

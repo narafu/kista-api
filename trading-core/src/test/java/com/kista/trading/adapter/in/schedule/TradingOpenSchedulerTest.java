@@ -2,7 +2,7 @@ package com.kista.trading.adapter.in.schedule;
 
 import com.kista.platform.scheduling.SchedulerJobRunner;
 import com.kista.platform.scheduling.SchedulerLockService;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.BatchContext;
@@ -59,8 +59,8 @@ class TradingOpenSchedulerTest {
     private static final UUID USER_ID    = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
-    private Account mockAccount(UUID accountId) {
-        return TradingFixtures.kisAccount(accountId, USER_ID);
+    private TradingAccount mockAccount(UUID accountId) {
+        return TradingFixtures.tradingAccount(accountId, USER_ID);
     }
 
     private Strategy mockStrategy(UUID accountId, StrategyType type) {
@@ -101,7 +101,7 @@ class TradingOpenSchedulerTest {
         // INFINITE + PRIVACY 모두 포함 — 장 개시 스케쥴러 전략 타입 불문 모두 처리
         Strategy infinite = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
         Strategy privacy  = mockStrategy(ACCOUNT_ID, StrategyType.PRIVACY);
-        Account account   = mockAccount(ACCOUNT_ID);
+        TradingAccount account   = mockAccount(ACCOUNT_ID);
         TradingUserProfile user         = mockUser();
         BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), account, user);
         BatchContext privacyCtx  = new BatchContext(privacy,  mockCycle(privacy.id()),  account, user);
@@ -187,7 +187,7 @@ class TradingOpenSchedulerTest {
         Strategy infinite = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
         UUID privacyAccountId = UUID.randomUUID();
         Strategy privacy = mockStrategy(privacyAccountId, StrategyType.PRIVACY);
-        Account infiniteAccount = mockAccount(ACCOUNT_ID);
+        TradingAccount infiniteAccount = mockAccount(ACCOUNT_ID);
         TradingUserProfile user = mockUser();
         BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), infiniteAccount, user);
         PrivacyTradeBase invalidBase = new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("225.75"),

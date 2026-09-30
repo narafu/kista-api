@@ -2,6 +2,7 @@ package com.kista.trading.application.service.support;
 
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.sharedkernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
@@ -36,10 +37,10 @@ class TradingOrderPlannerTest {
 
     static final LocalDate TODAY = LocalDate.now();
 
-    static final Account ACCOUNT = new Account(
+    static final TradingAccount ACCOUNT = TradingAccount.from(new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", null,
-            Broker.KIS, null);
+            Broker.KIS, null));
 
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 

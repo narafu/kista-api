@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
@@ -56,8 +56,8 @@ class CycleRotationServiceTest {
     static final BigDecimal PRICE = new BigDecimal("22.00");
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
-    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
+    static final TradingAccount ACCOUNT = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.brokerRef();
 
     // 잔고검증 ON(기본값) — 증권사 실잔고 경로로 진행
     static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(ACCOUNT.userId());

@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.TradingFixtures;
@@ -32,7 +32,7 @@ class TradingPriceFetcherTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock PrivacyTradePort privacyTradePort;
     TradingPriceFetcher priceFetcher;
-    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
 
     @BeforeEach
     void setUp() {
@@ -44,10 +44,10 @@ class TradingPriceFetcherTest {
     void fetchPrices_bulkResultContainsNull_fallsBackToSingleFetch() {
         Map<StrategyTicker, BigDecimal> bulkResult = new HashMap<>();
         bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함
-        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.toBrokerRef())).thenReturn(bulkResult);
-        when(pricePort.getPrice(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(new BigDecimal("25.50"));
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenReturn(bulkResult);
+        when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("25.50"));
 
-        Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account);
+        Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account.brokerRef());
 
         assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
     }
@@ -57,11 +57,11 @@ class TradingPriceFetcherTest {
     void fetchPriceSnapshots_bothNull_excludedFromResultWithoutThrowing() {
         Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> bulkResult = new HashMap<>();
         bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(null 값 제외 회귀 방지)
-        when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), account.toBrokerRef())).thenReturn(bulkResult);
-        when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(null);
+        when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), account.brokerRef())).thenReturn(bulkResult);
+        when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, account.brokerRef())).thenReturn(null);
 
         Map<StrategyTicker, com.kista.broker.domain.model.PriceSnapshot> result =
-                priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account);
+                priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account.brokerRef());
 
         assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
     }

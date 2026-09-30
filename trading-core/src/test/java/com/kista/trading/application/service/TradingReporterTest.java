@@ -3,7 +3,7 @@ package com.kista.trading.application.service;
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.Execution;
 import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.OrderType;
@@ -57,8 +57,8 @@ class TradingReporterTest {
     static final LocalDate TODAY = LocalDate.of(2026, 7, 9);
     static final BigDecimal CLOSE = new BigDecimal("22.00");
 
-    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
+    static final TradingAccount ACCOUNT = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.brokerRef();
     static final Strategy STRATEGY = new Strategy(
             UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
@@ -72,8 +72,8 @@ class TradingReporterTest {
     static final AccountBalance BALANCE = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 
     // 마감 후 잔여 주문 취소는 Toss 전용(KIS는 정규장 종료 시 자동 취소) — 취소 검증 테스트만 별도 Toss 계좌 사용
-    static final Account TOSS_ACCOUNT = TradingFixtures.tossAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef TOSS_ACCOUNT_REF = TOSS_ACCOUNT.toBrokerRef();
+    static final TradingAccount TOSS_ACCOUNT = TradingFixtures.tossTradingAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final BrokerAccountRef TOSS_ACCOUNT_REF = TOSS_ACCOUNT.brokerRef();
     static final Strategy TOSS_STRATEGY = new Strategy(
             UUID.randomUUID(), TOSS_ACCOUNT.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE

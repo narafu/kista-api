@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
@@ -48,7 +48,7 @@ class TradingBuyCompetitionSimulator {
                          Map<UUID, List<Order>> todayOrdersByStrategyId,
                          Map<UUID, StrategyOrderPlanBuilder.PlanResult> planResultsByStrategyId) {}
 
-    BuyCompetitionPreview simulate(Strategy currentStrategy, Account account, StrategyCycle currentCycle,
+    BuyCompetitionPreview simulate(Strategy currentStrategy, TradingAccount account, StrategyCycle currentCycle,
                                     List<PlannedOrder> currentBuyOrders, LocalDate today,
                                     BigDecimal otherStrategiesPlannedBuyUsd, BatchContext context) {
         BigDecimal requiredForThis = AccountBalance.buyTotal(currentBuyOrders);

@@ -1,11 +1,11 @@
 package com.kista.trading.adapter.in.schedule;
 
-import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.account.application.port.output.AccountPort;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.trading.application.port.output.TradingUserProfilePort;
@@ -34,9 +34,11 @@ class BatchContextFactory {
     // 전략별 현재 사이클·계좌·사용자 조회 — 조회 실패한 전략은 skip + notifyError
     List<BatchContext> buildAll(List<Strategy> strategies) {
         // 계좌·사용자·사이클은 전략 수만큼 개별 조회하지 않고 배치로 1회씩 조회해 N+1 제거
-        Map<UUID, Account> accountsById = accountPort.findAll().stream()
-                .collect(Collectors.toMap(Account::id, a -> a));
-        var userIds = accountsById.values().stream().map(Account::userId).distinct().toList();
+        // Account 애그리게이트는 여기서 TradingAccount 투영으로 변환 — 배치 경로에는 투영만 흐른다
+        Map<UUID, TradingAccount> accountsById = accountPort.findAll().stream()
+                .map(TradingAccount::from)
+                .collect(Collectors.toMap(TradingAccount::id, a -> a));
+        var userIds = accountsById.values().stream().map(TradingAccount::userId).distinct().toList();
         Map<UUID, TradingUserProfile> profilesByUserId = tradingUserProfilePort.findAllByUserIds(userIds);
         var strategyIds = strategies.stream().map(Strategy::id).toList();
         Map<UUID, StrategyCycle> cyclesById = strategyCyclePort.findLatestByStrategyIds(strategyIds);
@@ -57,7 +59,7 @@ class BatchContextFactory {
                     errorReportPort.reportError(zombie);
                     continue;
                 }
-                Account account = accountsById.get(strategy.accountId());
+                TradingAccount account = accountsById.get(strategy.accountId());
                 if (account == null) {
                     throw new NoSuchElementException("계좌를 찾을 수 없습니다: " + strategy.accountId());
                 }

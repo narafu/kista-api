@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.InfinitePosition;
@@ -58,7 +58,7 @@ class BuyOrderPriceCapper {
     // capIfNeeded는 @Transactional이라 needsCapCheck() 가드는 TradingOrderExecutor.applyCap에서 미리 걸러
     // 스킵 케이스마다 빈 트랜잭션이 열리지 않도록 한다.
     @Transactional
-    void capIfNeeded(StrategyType type, boolean atOpen, LocalDate date, Account account, UUID strategyCycleId,
+    void capIfNeeded(StrategyType type, boolean atOpen, LocalDate date, TradingAccount account, UUID strategyCycleId,
                      BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, StrategyTicker ticker) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         List<Order> buyOrders = loadBuyOrders(strategyCycleId, date, atOpen);
@@ -81,7 +81,7 @@ class BuyOrderPriceCapper {
     // PRIVACY 전용 — 값이 바뀐 행만 취소·재저장(변하지 않은 행은 DB에 그대로 둔다)
     // 개별 취소는 원본·재산정 목록이 같은 개수·순서라는 전제 위에서만 안전하다(현재 capsIndividualOrders()=true는 PRIVACY 하나뿐이고,
     // PrivacyCycleOrderStrategy.capBuyOrders()는 단순 가격 치환이라 개수·순서를 바꾸지 않는다) — 위반 시 조용히 잘못된 행을 취소하는 대신 즉시 실패시킨다
-    private void applyIndividualCap(Account account, UUID strategyCycleId, List<Order> buyOrders,
+    private void applyIndividualCap(TradingAccount account, UUID strategyCycleId, List<Order> buyOrders,
                                     List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected, BigDecimal cap) {
         if (corrected.size() != plannedBuyOrders.size()) {
             throw new IllegalStateException("개별 취소 대상 개수 불일치 — capsIndividualOrders() 구현체는 개수·순서를 바꾸면 안 됨: "
@@ -101,7 +101,7 @@ class BuyOrderPriceCapper {
     }
 
     // INFINITE/VR 전용 — 사다리 전체를 취소하고 재산정 결과 전체를 재저장(개별 행 대응이 무의미)
-    private void applyBatchCap(Account account, UUID strategyCycleId, List<Order> buyOrders,
+    private void applyBatchCap(TradingAccount account, UUID strategyCycleId, List<Order> buyOrders,
                                List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected) {
         if (plannedBuyOrders.equals(corrected)) return; // 예: VR bootstrap — 캡 재산정 대상 아님
         log.info("[{}] BUY 가격 보정 필요 — 원래 주문: {}", account.nickname(), describePlannedOrders(plannedBuyOrders));

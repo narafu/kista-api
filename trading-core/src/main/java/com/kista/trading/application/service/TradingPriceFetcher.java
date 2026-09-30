@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -35,7 +35,7 @@ class TradingPriceFetcher {
     // 배치 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 결과 — executeBatch/placeOpenOrders 공통
     record PriceContext(
             List<StrategyTicker> cycleTickers,
-            Account priceAccount,
+            BrokerAccountRef priceAccount,
             Map<StrategyTicker, PriceSnapshot> startPriceSnapshots,
             PrivacyTradeBase privacyBase
     ) {}
@@ -46,7 +46,7 @@ class TradingPriceFetcher {
         List<StrategyTicker> cycleTickers = contexts.stream()
                 .map(c -> c.strategy().ticker())
                 .distinct().toList();
-        Account priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
+        BrokerAccountRef priceAccount = selectPriceAccount(contexts); // Toss 계좌 우선
         Map<StrategyTicker, PriceSnapshot> startPriceSnapshots = fetchPriceSnapshots(cycleTickers, priceAccount);
 
         // 기준 매매표 조회 (PRIVACY)
@@ -64,54 +64,54 @@ class TradingPriceFetcher {
         List<StrategyTicker> tickers = states.stream()
                 .map(state -> state.ctx().strategy().ticker())
                 .distinct().toList();
-        Account priceAccount = selectPriceAccount(states.stream().map(TradingCandidatePlanner.CycleState::ctx).toList());
+        BrokerAccountRef priceAccount = selectPriceAccount(states.stream().map(TradingCandidatePlanner.CycleState::ctx).toList());
         return fetchPrices(tickers, priceAccount);
     }
 
     // 가격 조회에 사용할 계좌 선택 — Toss 계좌가 있으면 우선 사용 (토스 시세 API 일관성)
-    Account selectPriceAccount(List<BatchContext> contexts) {
+    BrokerAccountRef selectPriceAccount(List<BatchContext> contexts) {
         return contexts.stream()
-                .map(BatchContext::account)
-                .filter(a -> a.broker() == Broker.TOSS)
+                .map(ctx -> ctx.account().brokerRef())
+                .filter(ref -> ref.broker() == Broker.TOSS)
                 .findFirst()
-                .orElseGet(() -> contexts.getFirst().account());
+                .orElseGet(() -> contexts.getFirst().account().brokerRef());
     }
 
     // 현재가만 필요한 경우 (종가 조회 등)
-    Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, Account account) {
+    Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return fetchWithFallback(tickers, account, "현재가",
-                (t, acc) -> brokerPricePort.getPrices(t, acc.toBrokerRef()),
-                (t, acc) -> brokerPricePort.getPrice(t, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getPrices(t, acc),
+                (t, acc) -> brokerPricePort.getPrice(t, acc));
     }
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
-    Map<StrategyTicker, PriceSnapshot> fetchPriceSnapshots(List<StrategyTicker> tickers, Account account) {
+    Map<StrategyTicker, PriceSnapshot> fetchPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
         Map<StrategyTicker, PriceSnapshot> snapshots = fetchWithFallback(tickers, account, "스냅샷",
-                (t, acc) -> brokerPricePort.getPriceSnapshots(t, acc.toBrokerRef()),
-                (t, acc) -> brokerPricePort.getPriceSnapshot(t, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getPriceSnapshots(t, acc),
+                (t, acc) -> brokerPricePort.getPriceSnapshot(t, acc));
         // snap==null(일괄+단건 fallback 모두 실패)인 종목은 제외 — 호출부(collectCycleCandidate 등)가 맵에 키 부재를 이미 null-tolerant하게 처리함
         snapshots.entrySet().removeIf(entry -> entry.getValue() == null);
         return snapshots;
     }
 
     // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
-    Map<StrategyTicker, BigDecimal> fetchPrevCloses(List<StrategyTicker> tickers, Account account) {
+    Map<StrategyTicker, BigDecimal> fetchPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
         return fetchWithFallback(tickers, account, "전일종가",
-                (t, acc) -> brokerPricePort.getPrevCloses(t, acc.toBrokerRef()),
-                (t, acc) -> brokerPricePort.getPrevClose(t, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getPrevCloses(t, acc),
+                (t, acc) -> brokerPricePort.getPrevClose(t, acc));
     }
 
     // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용)
-    Map<StrategyTicker, BigDecimal> fetchClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, Account account) {
+    Map<StrategyTicker, BigDecimal> fetchClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         return fetchWithFallback(tickers, account, "확정종가",
-                (t, acc) -> brokerPricePort.getClosingPrices(t, tradeDate, acc.toBrokerRef()),
-                (t, acc) -> brokerPricePort.getClosingPrice(t, tradeDate, acc.toBrokerRef()));
+                (t, acc) -> brokerPricePort.getClosingPrices(t, tradeDate, acc),
+                (t, acc) -> brokerPricePort.getClosingPrice(t, tradeDate, acc));
     }
 
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격
-    private <T> Map<StrategyTicker, T> fetchWithFallback(List<StrategyTicker> tickers, Account account, String label,
-                                                  BiFunction<List<StrategyTicker>, Account, Map<StrategyTicker, T>> bulkFetch,
-                                                  BiFunction<StrategyTicker, Account, T> singleFetch) {
+    private <T> Map<StrategyTicker, T> fetchWithFallback(List<StrategyTicker> tickers, BrokerAccountRef account, String label,
+                                                  BiFunction<List<StrategyTicker>, BrokerAccountRef, Map<StrategyTicker, T>> bulkFetch,
+                                                  BiFunction<StrategyTicker, BrokerAccountRef, T> singleFetch) {
         Map<StrategyTicker, T> result;
         try {
             result = new HashMap<>(bulkFetch.apply(tickers, account));

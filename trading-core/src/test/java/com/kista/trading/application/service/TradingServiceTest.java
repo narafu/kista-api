@@ -13,7 +13,7 @@ import com.kista.trading.application.event.MarketClosedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.sharedkernel.TimeZones;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.sharedkernel.OrderDirection;
@@ -100,8 +100,8 @@ class TradingServiceTest {
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
-    static final Account ACCOUNT = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
+    static final TradingAccount ACCOUNT = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.brokerRef();
 
     // Strategy + StrategyCycle — 기존 TradingCycle을 두 레이어로 분리
     static final Strategy STRATEGY = new Strategy(
@@ -892,8 +892,8 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_liveBalanceFailure_doesNotStopOtherAccount() throws InterruptedException {
-        Account failingAccount = account("00000000-0000-0000-0000-000000000001");
-        Account succeedingAccount = account("00000000-0000-0000-0000-000000000002");
+        TradingAccount failingAccount = account("00000000-0000-0000-0000-000000000001");
+        TradingAccount succeedingAccount = account("00000000-0000-0000-0000-000000000002");
         Strategy failingStrategy = strategy(failingAccount);
         Strategy succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
@@ -905,20 +905,20 @@ class TradingServiceTest {
         RuntimeException balanceFailure = new RuntimeException("account A balance failure");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.toBrokerRef())))
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.brokerRef())))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
-        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount.toBrokerRef()))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount.brokerRef()))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(buy.toPlanned()));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(any(), any())).thenReturn(List.of());
-        when(liveBalancePort.getLiveBalance(eq(failingAccount.toBrokerRef()), eq(StrategyTicker.SOXL))).thenThrow(balanceFailure);
-        when(liveBalancePort.getLiveBalance(eq(succeedingAccount.toBrokerRef()), eq(StrategyTicker.SOXL)))
+        when(liveBalancePort.getLiveBalance(eq(failingAccount.brokerRef()), eq(StrategyTicker.SOXL))).thenThrow(balanceFailure);
+        when(liveBalancePort.getLiveBalance(eq(succeedingAccount.brokerRef()), eq(StrategyTicker.SOXL)))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00")));
         when(orderPort.findPlannedByCycleAndDate(eq(succeedingCycle.id()), any())).thenReturn(List.of(succeedingPlanned));
-        when(brokerOrderPort.place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.toBrokerRef())))
+        when(brokerOrderPort.place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.brokerRef())))
                 .thenReturn(brokerResult("ORD-B-SUCCESS"));
-        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(succeedingAccount.toBrokerRef()))).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(succeedingAccount.brokerRef()))).thenReturn(List.of());
 
         service.executeBatch(List.of(
                 new BatchContext(failingStrategy, failingCycle, failingAccount, failingUser),
@@ -926,15 +926,15 @@ class TradingServiceTest {
 
         verify(orderPort).saveAll(argThat(saved -> saved.stream()
                 .allMatch(order -> order.accountId().equals(succeedingAccount.id()))));
-        verify(brokerOrderPort).place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.toBrokerRef()));
+        verify(brokerOrderPort).place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.brokerRef()));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null && tee.message().equals(balanceFailure.getMessage())));
     }
 
     @Test
     void executeBatch_saveFailure_doesNotStopOtherAccount() throws InterruptedException {
-        Account failingAccount = account("00000000-0000-0000-0000-000000000001");
-        Account succeedingAccount = account("00000000-0000-0000-0000-000000000002");
+        TradingAccount failingAccount = account("00000000-0000-0000-0000-000000000001");
+        TradingAccount succeedingAccount = account("00000000-0000-0000-0000-000000000002");
         Strategy failingStrategy = strategy(failingAccount);
         Strategy succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
@@ -946,9 +946,9 @@ class TradingServiceTest {
         RuntimeException saveFailure = new RuntimeException("account A save failure");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.toBrokerRef())))
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.brokerRef())))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
-        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount.toBrokerRef()))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount.brokerRef()))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(buy.toPlanned()));
@@ -961,24 +961,24 @@ class TradingServiceTest {
             return null;
         }).when(orderPort).saveAll(anyList());
         when(orderPort.findPlannedByCycleAndDate(eq(succeedingCycle.id()), any())).thenReturn(List.of(succeedingPlanned));
-        when(brokerOrderPort.place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.toBrokerRef())))
+        when(brokerOrderPort.place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.brokerRef())))
                 .thenReturn(brokerResult("ORD-B-SUCCESS"));
-        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(succeedingAccount.toBrokerRef()))).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(succeedingAccount.brokerRef()))).thenReturn(List.of());
 
         service.executeBatch(List.of(
                 new BatchContext(failingStrategy, failingCycle, failingAccount, failingUser),
                 new BatchContext(succeedingStrategy, succeedingCycle, succeedingAccount, succeedingUser)), PAST_DST);
 
         verify(orderPort, times(2)).saveAll(anyList());
-        verify(brokerOrderPort).place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.toBrokerRef()));
+        verify(brokerOrderPort).place(eq(instructionOf(succeedingPlanned)), eq(succeedingAccount.brokerRef()));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null && tee.message().equals(saveFailure.getMessage())));
     }
 
     @Test
     void executeBatch_rejectionNotificationFailure_doesNotStopOtherAccount() throws InterruptedException {
-        Account failingAccount = account("00000000-0000-0000-0000-000000000001");
-        Account succeedingAccount = account("00000000-0000-0000-0000-000000000002");
+        TradingAccount failingAccount = account("00000000-0000-0000-0000-000000000001");
+        TradingAccount succeedingAccount = account("00000000-0000-0000-0000-000000000002");
         Strategy failingStrategy = strategy(failingAccount);
         Strategy succeedingStrategy = strategy(succeedingAccount);
         StrategyCycle failingCycle = cycle(failingStrategy);
@@ -991,7 +991,7 @@ class TradingServiceTest {
         RuntimeException notificationFailure = new RuntimeException("account A notification failure");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.toBrokerRef())))
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.brokerRef())))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -1827,12 +1827,12 @@ class TradingServiceTest {
         verify(vrRolloverService).rollIfDue(any(), any(), any(), any());
     }
 
-    private Account account(String accountId) {
+    private TradingAccount account(String accountId) {
         UUID id = UUID.fromString(accountId);
-        return TradingFixtures.kisAccount(id, UUID.nameUUIDFromBytes(("user-" + accountId).getBytes()));
+        return TradingFixtures.tradingAccount(id, UUID.nameUUIDFromBytes(("user-" + accountId).getBytes()));
     }
 
-    private Strategy strategy(Account account) {
+    private Strategy strategy(TradingAccount account) {
         return new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     }
@@ -1842,13 +1842,13 @@ class TradingServiceTest {
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
     }
 
-    private Order plannedBuy(Account account, StrategyCycle cycle, String price) {
+    private Order plannedBuy(TradingAccount account, StrategyCycle cycle, String price) {
         return new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 1, new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
-    private Order placedOrder(Account account, StrategyCycle cycle) {
+    private Order placedOrder(TradingAccount account, StrategyCycle cycle) {
         return new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 1, new BigDecimal("25.00"), OrderStatus.PLACED, "ORD-EXISTING", null, null);

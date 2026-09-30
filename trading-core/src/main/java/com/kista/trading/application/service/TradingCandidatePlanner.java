@@ -4,7 +4,7 @@ import com.kista.trading.application.service.support.TradingBatchGuard;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 import com.kista.trading.application.service.support.TradingParallelRunner;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.matching.domain.model.*;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
@@ -101,7 +101,7 @@ class TradingCandidatePlanner {
     }
 
     // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
-    private AccountBalance loadBalance(Strategy strategy, Account account) {
+    private AccountBalance loadBalance(Strategy strategy, TradingAccount account) {
         AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
         log.info("잔고 조회: [{}] {} {}주, 통합주문가능금액 ${}",
                 account.nickname(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
@@ -122,7 +122,7 @@ class TradingCandidatePlanner {
             Map<StrategyTicker, PriceSnapshot> startPriceSnapshots, PrivacyTradeBase privacyBase,
             LocalDate tradeDate, Set<OrderTiming> creatableTimings) {
         Strategy strategy = ctx.strategy();
-        Account account = ctx.account();
+        TradingAccount account = ctx.account();
         AccountBalance balance = loadBalance(strategy, account);
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
@@ -174,7 +174,7 @@ class TradingCandidatePlanner {
             PriceSnapshot priceSnapshot, PrivacyTradeBase privacyBase, LocalDate today, int existingCount,
             boolean recalculateInfinitePosition) {
         Strategy strategy = ctx.strategy();
-        Account account = ctx.account();
+        TradingAccount account = ctx.account();
         BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
         log.info("[{}] 오늘 주문 {}건 존재 — 재계산 skip", account.nickname(), existingCount);
         if (strategy.isInfinite() && recalculateInfinitePosition) {

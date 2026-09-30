@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
@@ -26,13 +26,13 @@ class TradingSellSufficiencySimulator {
     private final SellableQuantityPort sellableQuantityPort; // live 판매가능수량 조회
     private final OrderPort orderPort;             // 동일 계좌·종목·거래일 기존 예약 SELL 수량 조회
 
-    SellSufficiencyPreview simulate(Strategy strategy, Account account, List<PlannedOrder> sellOrders, LocalDate tradeDate) {
+    SellSufficiencyPreview simulate(Strategy strategy, TradingAccount account, List<PlannedOrder> sellOrders, LocalDate tradeDate) {
         int requiredQuantity = sellOrders.stream().mapToInt(PlannedOrder::quantity).sum();
 
         int sellableQuantity;
         try {
             sellableQuantity = sellableQuantityPort
-                    .getSellableQuantity(strategy.ticker(), account.toBrokerRef())
+                    .getSellableQuantity(strategy.ticker(), account.brokerRef())
                     .quantity();
         } catch (BrokerApiException e) {
             log.warn("대상 전략 판매가능수량 조회 실패, 충족 판정 생략: strategyId={}, error={}", strategy.id(), e.getMessage());

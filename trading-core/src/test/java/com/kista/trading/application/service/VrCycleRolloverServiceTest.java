@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
@@ -62,8 +62,8 @@ class VrCycleRolloverServiceTest {
     // 10주 보유, 평단가=45.00
     static final AccountBalance POST_BALANCE = new AccountBalance(10, new BigDecimal("45.00"), USD_DEPOSIT);
 
-    static final Account ACCOUNT = TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
-    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.toBrokerRef();
+    static final TradingAccount ACCOUNT = TradingFixtures.tradingAccount(ACCOUNT_ID, USER_ID);
+    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.brokerRef();
 
     static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(USER_ID);
 

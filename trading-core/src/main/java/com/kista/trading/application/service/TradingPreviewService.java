@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.Order;
@@ -64,7 +64,8 @@ class TradingPreviewService {
     // 다른 전략 전체를 처음부터 다시 계산해 KIS 시세 조회·DB 조회가 O(N²)로 증폭됐다.
     @Transactional(readOnly = true)
     Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
+        TradingAccount account = TradingAccount.from(accountPort.requireOwnedAccount(accountId, requesterId));
         LocalDate today = DstInfo.nextTradeDate();
         List<Strategy> strategies = strategyPort.findByAccountId(accountId);
 
@@ -90,7 +91,7 @@ class TradingPreviewService {
                 .map(Strategy::ticker)
                 .distinct()
                 .toList();
-        Map<StrategyTicker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account);
+        Map<StrategyTicker, BigDecimal> prevCloseCache = tickers.isEmpty() ? Map.of() : priceFetcher.fetchPrevCloses(tickers, account.brokerRef());
 
         // 계좌 내 당일 PLANNED BUY 합계 — accountId+today로만 결정되는 값(전략 무관)이라 1회만 조회해 재사용
         BigDecimal totalAccountPlannedBuy = orderPort.sumPlannedBuyByAccountAndDate(accountId, today);
@@ -154,7 +155,7 @@ class TradingPreviewService {
         return previews;
     }
 
-    private NextOrdersPreview buildPreview(Strategy strategy, Account account, StrategyCycle currentCycle, LocalDate today,
+    private NextOrdersPreview buildPreview(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> todayOrders,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
                                             TradingBuyCompetitionSimulator.BatchContext context,

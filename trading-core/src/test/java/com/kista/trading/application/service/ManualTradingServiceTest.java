@@ -7,6 +7,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.OrderType;
@@ -412,7 +413,7 @@ class ManualTradingServiceTest {
         // VR 수동실행 plan.position()은 항상 null(VrCycleOrderStrategy.plan()), vrPosition은 non-null,
         // currentPrice는 위에서 재조회한 21.00, cycleId/account/strategy도 실제 값과 일치해야 한다
         verify(orderExecutor, times(1)).placeAtOpenOrders(
-                any(LocalDate.class), eq(ACCOUNT), eq(fx.vrCycle().id()),
+                any(LocalDate.class), eq(TradingAccount.from(ACCOUNT)), eq(fx.vrCycle().id()),
                 eq(new BigDecimal("21.00")), isNull(), any(VrPosition.class), eq(fx.vrStrat()));
     }
 

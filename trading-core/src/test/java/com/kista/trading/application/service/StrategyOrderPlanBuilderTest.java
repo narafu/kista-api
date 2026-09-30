@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
@@ -49,7 +49,7 @@ class StrategyOrderPlanBuilderTest {
 
     StrategyOrderPlanBuilder builder;
 
-    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
     Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
     StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
@@ -80,7 +80,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
-        when(pricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(new BigDecimal("21.00"));
+        when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("21.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
                 .thenReturn(Optional.of(plan));
@@ -103,7 +103,7 @@ class StrategyOrderPlanBuilderTest {
         when(cycleOrderStrategies.of(vrStrategy.type())).thenReturn(vrOrderStrategy);
         when(balanceLoader.tryLoadBalance(vrStrategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
-        when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
+        when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.brokerRef())).thenReturn(new BigDecimal("100.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(eq(balance), eq(vrStrategy), nullable(BigDecimal.class),
                 eq(today), eq(vrCycle), eq(null), eq("vr-preview"), eq(null)))
@@ -113,7 +113,7 @@ class StrategyOrderPlanBuilderTest {
 
         assertThat(result.isSkip()).isFalse();
         assertThat(result.plan()).isSameAs(plan);
-        verify(pricePort).getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef());
+        verify(pricePort).getPrevClose(StrategyTicker.TQQQ, account.brokerRef());
         verify(orderComputer).compute(balance, vrStrategy, new BigDecimal("100.00"),
                 today, vrCycle, null, "vr-preview", null);
     }
@@ -158,7 +158,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
-        when(pricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef())).thenReturn(new BigDecimal("21.00"));
+        when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("21.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
                 .thenReturn(Optional.of(plan));
@@ -166,7 +166,7 @@ class StrategyOrderPlanBuilderTest {
         StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
 
         assertThat(result.isSkip()).isFalse();
-        verify(pricePort).getPrevClose(StrategyTicker.SOXL, account.toBrokerRef());
+        verify(pricePort).getPrevClose(StrategyTicker.SOXL, account.brokerRef());
     }
 
     @Test

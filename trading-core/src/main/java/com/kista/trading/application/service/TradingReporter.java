@@ -6,7 +6,6 @@ import com.kista.trading.domain.model.TradingReport;
 import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.sharedkernel.TradeLegSummary;
 import com.kista.trading.application.event.TradingErrorEvent;
-import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.OrderDirection;
@@ -48,13 +47,13 @@ class TradingReporter {
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
         Strategy strategy = ctx.strategy();
-        Account account = ctx.account();
+        TradingAccount account = ctx.account();
         TradingUserProfile userProfile = ctx.userProfile();
         // 장마감 후에도 체결 가능한 잔여 PLACED 주문을 취소 — 애프터마켓 체결이 CANCELLED로 오기록되는 것을 방지
         cancelUnresolvedOrders(mainOrders, account);
 
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
-        List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.toBrokerRef());
+        List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
@@ -81,13 +80,13 @@ class TradingReporter {
     // 실패해도 흐름은 계속되며(다음 getExecutions로 실제 상태를 확정), 취소 자체 실패만 관리자에게 알린다.
     // Toss 전용 — 정규장 지정가 주문이 애프터장까지 이어져 다음날 09:00 KST에야 자동 취소되므로 명시적 취소가 필요.
     // KIS는 정규장 종료 시 자동 취소되어 이 호출이 불필요 — 스킵해 마감 시점 KIS API 호출량(rate-limit 위험)도 함께 줄인다.
-    private void cancelUnresolvedOrders(List<Order> mainOrders, Account account) {
-        if (account.broker() != Broker.TOSS) return;
+    private void cancelUnresolvedOrders(List<Order> mainOrders, TradingAccount account) {
+        if (account.brokerRef().broker() != Broker.TOSS) return;
         for (Order order : mainOrders) {
             if (order.status() != OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {
                 brokerOrderCorrectionPort
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
+                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.brokerRef());
             } catch (Exception e) {
                 if (isAlreadyFilled(e)) {
                     // 취소 요청 직전/직후 체결 확정 — 브로커 주석대로 예상된 경합, 관리자 알림 불필요

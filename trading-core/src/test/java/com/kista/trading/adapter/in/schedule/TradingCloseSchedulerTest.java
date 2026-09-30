@@ -3,7 +3,7 @@ package com.kista.trading.adapter.in.schedule;
 import com.kista.platform.scheduling.SchedulerJobRunner;
 import com.kista.platform.scheduling.SchedulerLifecycleEvent;
 import com.kista.platform.scheduling.SchedulerLockService;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -52,8 +52,8 @@ class TradingCloseSchedulerTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID CYCLE_ID   = UUID.randomUUID();
 
-    private Account mockAccount() {
-        return TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+    private TradingAccount mockAccount() {
+        return TradingFixtures.tradingAccount(ACCOUNT_ID, USER_ID);
     }
 
     private Strategy mockStrategy() {
@@ -92,7 +92,7 @@ class TradingCloseSchedulerTest {
     void run_callsExecuteBatchWithAllContexts() throws InterruptedException {
         Strategy strategy = mockStrategy();
         StrategyCycle cycle = mockStrategyCycle(strategy.id());
-        Account account = mockAccount();
+        TradingAccount account = mockAccount();
         TradingUserProfile user = mockUser();
         BatchContext context = new BatchContext(strategy, cycle, account, user);
 

@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
@@ -43,7 +43,7 @@ class TradingBuyCompetitionSimulatorTest {
 
     TradingBuyCompetitionSimulator simulator;
 
-    Account account = TradingFixtures.kisAccount(UUID.randomUUID(), UUID.randomUUID());
+    TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
     LocalDate today = LocalDate.now();
 
     Strategy currentStrategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.INFINITE,

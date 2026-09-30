@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
@@ -59,7 +59,7 @@ class TradingOrderBudgetAllocator {
     // 한 계좌 스코프의 브로커 선조회 — 잔고는 BUY 후보 존재 시만, 판매가능수량은 SELL 후보의 종목별로만 조회한다
     // candidates는 항상 단일 계좌 스코프여야 한다(호출부가 이미 계좌별로 묶어서 넘긴다)
     private AccountQuote fetchQuote(List<Candidate> accountCandidates) {
-        Account account = accountCandidates.getFirst().ctx().account();
+        TradingAccount account = accountCandidates.getFirst().ctx().account();
 
         List<Candidate> buyCandidates = accountCandidates.stream()
                 .map(candidate -> candidate.withOrders(
@@ -70,7 +70,7 @@ class TradingOrderBudgetAllocator {
         if (!buyCandidates.isEmpty()) {
             Candidate probe = buyCandidates.stream().sorted(buyPriorityComparator()).findFirst().orElseThrow();
             BrokerBalance bb = liveBalancePort
-                    .getLiveBalance(account.toBrokerRef(), probe.ctx().strategy().ticker());
+                    .getLiveBalance(account.brokerRef(), probe.ctx().strategy().ticker());
             liveBalance = new AccountBalance(bb.holdings(), bb.avgPrice(), bb.usdDeposit());
         }
 
@@ -82,7 +82,7 @@ class TradingOrderBudgetAllocator {
         Map<StrategyTicker, Integer> sellableByTicker = new LinkedHashMap<>();
         for (StrategyTicker ticker : sellTickers) {
             int sellable = sellableQuantityPort
-                    .getSellableQuantity(ticker, account.toBrokerRef())
+                    .getSellableQuantity(ticker, account.brokerRef())
                     .quantity();
             sellableByTicker.put(ticker, sellable);
         }
@@ -123,7 +123,7 @@ class TradingOrderBudgetAllocator {
     private void allocateSellsForTicker(StrategyTicker ticker, List<SellRequest> requests, LocalDate tradeDate,
                                                 AccountQuote quote, List<Candidate> approved, List<Candidate> rejected) {
         List<SellRequest> sorted = requests.stream().sorted(sellPriorityComparator()).toList();
-        Account account = sorted.getFirst().candidate().ctx().account();
+        TradingAccount account = sorted.getFirst().candidate().ctx().account();
         Integer sellableQuantityBoxed = quote.sellableByTicker().get(ticker);
         if (sellableQuantityBoxed == null) {
             throw new IllegalStateException("판매가능수량 선조회 결과 없음: accountId=" + account.id() + ", ticker=" + ticker);
@@ -158,7 +158,7 @@ class TradingOrderBudgetAllocator {
         if (buyCandidates.isEmpty()) return new BuyAllocation(List.of(), List.of());
 
         List<Candidate> sorted = buyCandidates.stream().sorted(buyPriorityComparator()).toList();
-        Account account = sorted.getFirst().ctx().account();
+        TradingAccount account = sorted.getFirst().ctx().account();
         AccountBalance live = quote.liveBalance();
         if (live == null) {
             throw new IllegalStateException("BUY 잔고 선조회 결과 없음: accountId=" + account.id());

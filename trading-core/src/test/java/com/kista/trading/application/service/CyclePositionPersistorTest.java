@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.application.event.CycleCompletedEvent;
-import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
@@ -56,7 +56,7 @@ class CyclePositionPersistorTest {
     static final LocalDate TODAY = LocalDate.of(2026, 6, 29);
     static final BigDecimal PRICE = new BigDecimal("50.00");
 
-    static final Account ACCOUNT = TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID);
+    static final TradingAccount ACCOUNT = TradingFixtures.tradingAccount(ACCOUNT_ID, USER_ID);
 
     static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(USER_ID);
 
