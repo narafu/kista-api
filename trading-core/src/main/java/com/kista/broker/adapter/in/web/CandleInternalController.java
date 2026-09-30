@@ -2,7 +2,7 @@ package com.kista.broker.adapter.in.web;
 
 import com.kista.broker.application.port.output.CandlePort;
 import com.kista.contract.broker.DailyCandleResponse;
-import com.kista.broker.domain.model.toss.TossCandle;
+import com.kista.broker.domain.model.BrokerCandle;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,8 +29,8 @@ public class CandleInternalController {
                 .toList();
     }
 
-    // TossCandle(broker 도메인 타입) 직접 반환 금지 — contract 응답으로 명시 매핑
-    private static DailyCandleResponse toResponse(TossCandle candle) {
+    // BrokerCandle(broker 도메인 타입) 직접 반환 금지 — contract 응답으로 명시 매핑
+    private static DailyCandleResponse toResponse(BrokerCandle candle) {
         return new DailyCandleResponse(candle.date(), candle.open(), candle.high(), candle.low(), candle.close(), candle.volume());
     }
 }

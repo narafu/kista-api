@@ -165,7 +165,7 @@ class TossHoldingsApi {
         return getExchangeRate().rate();
     }
 
-    // ── TossExchangeRatePort ───────────────────────────────────────────────────
+    // ── ExchangeRatePort(TossBrokerAdapter가 변환해 노출) ───────────────────────────────────────────────────
 
     public TossExchangeRate getExchangeRate() {
         // 60초 TTL 캐시 경유 — 성공 값만 캐싱, ZERO 폴백·예외는 그대로 전파

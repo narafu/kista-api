@@ -1,5 +1,7 @@
 package com.kista.broker.domain.model.toss;
 
+import com.kista.broker.domain.model.BrokerStockInfo;
+
 // Toss 종목 기본 정보 — GET /api/v1/stocks?symbols={symbol}
 // 주의: Toss stocks API는 가격 정보 미제공 — 현재가는 GET /api/v1/prices 별도 조회
 public record TossStockInfo(
@@ -9,4 +11,9 @@ public record TossStockInfo(
     String market,        // 거래소/시장 (예: NYSE ARCA)
     String currency,      // 통화 (예: USD)
     String status         // 종목 상태 (예: NORMAL)
-) {}
+) {
+    // 벤더 중립 종목 정보로 변환
+    public BrokerStockInfo toBrokerStockInfo() {
+        return new BrokerStockInfo(symbol, name, englishName, market, currency, status);
+    }
+}

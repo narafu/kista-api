@@ -5,6 +5,7 @@ import com.kista.broker.application.port.output.BrokerAdapterPort;
 import com.kista.broker.application.port.output.BrokerMarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
+import com.kista.broker.application.port.output.BrokerStatisticsPort;
 import com.kista.broker.application.port.output.CandlePort;
 import com.kista.broker.application.port.output.ExchangeRatePort;
 import com.kista.broker.application.port.output.ExecutionPort;
@@ -73,5 +74,6 @@ class KisBrokerAdapterTest {
         assertThat(adapter).isNotInstanceOf(StockInfoPort.class);
         assertThat(adapter).isNotInstanceOf(BrokerMarketCalendarPort.class);
         assertThat(adapter).isNotInstanceOf(BrokerAccountPort.class);
+        assertThat(adapter).isNotInstanceOf(BrokerStatisticsPort.class);
     }
 }

@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.in.web;
 
 import com.kista.broker.application.port.output.CandlePort;
-import com.kista.broker.domain.model.toss.TossCandle;
+import com.kista.broker.domain.model.BrokerCandle;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
@@ -47,7 +47,7 @@ class CandleInternalControllerTest {
 
     @Test
     void latest_포트에_그대로_위임한다() throws Exception {
-        TossCandle candle = new TossCandle(LocalDate.of(2026, 1, 2),
+        BrokerCandle candle = new BrokerCandle(LocalDate.of(2026, 1, 2),
                 BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN, BigDecimal.TEN, 100L);
         given(candlePort.getLatestCandles("QQQ", "1d", 1)).willReturn(List.of(candle));
 

@@ -12,7 +12,7 @@ import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.*;
-import com.kista.broker.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.CancelInstruction;
@@ -100,9 +100,9 @@ class TradingReporter {
         }
     }
 
-    // 취소 시점 이미 체결 확정 여부 — TossHttpClient가 409 CONFLICT(already-filled) 응답을 판정해 TossApiException에 실어 보낸다
+    // 취소 시점 이미 체결 확정 여부 — 어댑터(TossHttpClient)가 409 CONFLICT(already-filled) 응답을 판정해 BrokerApiException에 실어 보낸다
     private boolean isAlreadyFilled(Exception e) {
-        return e instanceof TossApiException tae && tae.isAlreadyFilledConflict();
+        return e instanceof BrokerApiException bae && bae.isAlreadyFilledConflict();
     }
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록

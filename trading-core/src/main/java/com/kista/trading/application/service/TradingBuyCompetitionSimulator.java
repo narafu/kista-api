@@ -1,14 +1,13 @@
 package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.kis.KisApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -60,7 +59,7 @@ class TradingBuyCompetitionSimulator {
             // requiredForThis가 매번 전체 재계산이라 이미 반영돼 있으므로 이중 차감하지 않는다.
             // PLACED 주문은 브로커에 이미 접수돼 라이브 예수금 자체에 반영돼 있어 별도 차감 불필요.
             liveDeposit = depositCache.getUsdDeposit(account, currentStrategy.ticker());
-        } catch (KisApiException | TossApiException e) {
+        } catch (BrokerApiException e) {
             // 브로커 라이브 예수금 조회 자체가 실패(토큰 재시도 소진 등) — 미리보기 전체를 503으로 막지 않고
             // 경쟁 시뮬레이션만 생략한 채 주문 계획(plan.orders())은 정상 반환한다
             log.warn("대상 전략 라이브 예수금 조회 실패, 경쟁 시뮬레이션 생략: strategyId={}, error={}", currentStrategy.id(), e.getMessage());

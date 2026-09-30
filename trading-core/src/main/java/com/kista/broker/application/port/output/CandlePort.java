@@ -1,12 +1,12 @@
 package com.kista.broker.application.port.output;
 
-import com.kista.broker.domain.model.toss.TossCandle;
+import com.kista.broker.domain.model.BrokerCandle;
 
 import java.time.LocalDate;
 import java.util.List;
 
-// 캔들 조회 (Toss 전용) — 공통 API, Account 토큰 불필요
+// 캔들 조회 (현재 Toss만 구현) — 공통 API, Account 토큰 불필요. 벤더 중립 BrokerCandle 반환
 public interface CandlePort {
-    List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to);
-    List<TossCandle> getLatestCandles(String symbol, String interval, int count);
+    List<BrokerCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to);
+    List<BrokerCandle> getLatestCandles(String symbol, String interval, int count);
 }

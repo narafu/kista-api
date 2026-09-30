@@ -17,6 +17,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 // 컴포넌트 스캔)에서만 정상 활성화된다
 @SpringBootApplication(scanBasePackages = {
         "com.kista.trading",
+        "com.kista.tradingstats",
+        "com.kista.tradingnotify",
         "com.kista.matching",
         "com.kista.broker",
         "com.kista.account",
@@ -34,6 +36,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 })
 @ConfigurationPropertiesScan(basePackages = {
         "com.kista.trading",
+        "com.kista.tradingstats", // AlpacaProperties
+        "com.kista.tradingnotify", // TelegramProperties
         "com.kista.broker",
         "com.kista.platform",
 })

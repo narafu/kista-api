@@ -1,11 +1,10 @@
 package com.kista.trading.application.service;
 
 import com.kista.account.domain.model.Account;
-import com.kista.broker.domain.model.kis.KisApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,7 @@ class TradingSellSufficiencySimulator {
             sellableQuantity = sellableQuantityPort
                     .getSellableQuantity(strategy.ticker(), account.toBrokerRef())
                     .quantity();
-        } catch (KisApiException | TossApiException e) {
+        } catch (BrokerApiException e) {
             log.warn("대상 전략 판매가능수량 조회 실패, 충족 판정 생략: strategyId={}, error={}", strategy.id(), e.getMessage());
             return SellSufficiencyPreview.unavailable(requiredQuantity);
         }

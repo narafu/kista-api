@@ -63,9 +63,10 @@ class TradingExceptionHandlerTest {
 
     @Test
     void kisApiException_mapsTo503AndPublishesErrorReport() {
-        var detail = handler.handleKisApiException(new KisApiException("KIS API 연결 오류", null));
+        var detail = handler.handleBrokerApiException(new KisApiException("KIS API 연결 오류", null));
 
         assertThat(detail.getStatus()).isEqualTo(503);
+        assertThat(detail.getTitle()).isEqualTo("KIS API Error");
         ArgumentCaptor<AppErrorRaisedEvent> captor = ArgumentCaptor.forClass(AppErrorRaisedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().errorType()).isEqualTo("KisApiException");
@@ -76,9 +77,10 @@ class TradingExceptionHandlerTest {
 
     @Test
     void tossApiException_mapsTo503AndPublishesErrorReport() {
-        var detail = handler.handleTossApiException(new TossApiException("invalid-token", null));
+        var detail = handler.handleBrokerApiException(new TossApiException("invalid-token", null));
 
         assertThat(detail.getStatus()).isEqualTo(503);
+        assertThat(detail.getTitle()).isEqualTo("Toss API Error");
         verify(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
     }
 
@@ -87,7 +89,7 @@ class TradingExceptionHandlerTest {
     void kisApiException_publishFails_stillMapsTo503() {
         doThrow(new RuntimeException("발행 실패")).when(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
 
-        var detail = handler.handleKisApiException(new KisApiException("KIS API 연결 오류", null));
+        var detail = handler.handleBrokerApiException(new KisApiException("KIS API 연결 오류", null));
 
         assertThat(detail.getStatus()).isEqualTo(503);
     }

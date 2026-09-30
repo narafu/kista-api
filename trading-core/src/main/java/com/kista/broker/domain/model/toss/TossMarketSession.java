@@ -1,5 +1,7 @@
 package com.kista.broker.domain.model.toss;
 
+import com.kista.broker.domain.model.MarketCalendarDay;
+
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
@@ -13,6 +15,15 @@ public record TossMarketSession(
 ) {
     // 정규장이 있으면 개장일
     public boolean isOpen() { return regularMarket != null; }
+
+    // 벤더 중립 장 운영 정보로 변환 — 세션 null(휴장)은 그대로 null
+    public MarketCalendarDay toMarketCalendarDay() {
+        return new MarketCalendarDay(date, toNeutral(preMarket), toNeutral(regularMarket), toNeutral(afterMarket));
+    }
+
+    private static MarketCalendarDay.SessionHours toNeutral(SessionHours hours) {
+        return hours == null ? null : new MarketCalendarDay.SessionHours(hours.startTime(), hours.endTime());
+    }
 
     // 세션 시작·종료 시각 (ISO 8601 UTC)
     public record SessionHours(OffsetDateTime startTime, OffsetDateTime endTime) {}

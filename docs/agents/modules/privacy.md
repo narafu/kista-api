@@ -4,7 +4,7 @@ com.kista.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기준 매매�
   domain/model/       ← FidaOrderCommand/FidaPlannedOrder/PrivacyCurrentBase/PrivacyDates/PrivacyTradeBase/PrivacyTradeBaseView/PrivacyTradeConflictException/PrivacyTradeSaveResult/PrivacyTradeValidationReport 등. `PrivacyDates.releaseDateFor()/tradeDateOf()`는 FIDA 발행일↔거래일 업무 규칙 헬퍼(시간대 변환 아님)
   application/port/output/ ← PrivacyTradePort
   application/usecase/ ← PrivacyUseCase(FidaOrderController)/PrivacyTradeValidationUseCase(TradingOpenScheduler)
-  application/service/ ← internal — PrivacyService(notify 직접 호출 대신 `application/event/PrivacyAlertRaisedEvent`("event", trading.notify가 소비) 발행)/PrivacyTradeValidationService
+  application/service/ ← internal — PrivacyService(notify 직접 호출 대신 `application/event/PrivacyAlertRaisedEvent`("event", tradingnotify가 소비) 발행)/PrivacyTradeValidationService
   adapter/in/web/     ← internal — FidaOrderController(`POST /api/internal/fida-orders`)/PrivacyInternalQueryController(`GET /api/internal/privacy/trade-bases`)/PrivacyBaseInternalController(`GET|PATCH .../trade-bases/{baseId}`, `PATCH .../orders/{orderId}` — 관리자 수동 보정) + dto/FidaOrderResponse
   adapter/out/persistence/ ← PrivacyTradeBaseEntity + PrivacyTradeBaseOrderEntity + JpaRepository + PrivacyTradePersistenceAdapter
 

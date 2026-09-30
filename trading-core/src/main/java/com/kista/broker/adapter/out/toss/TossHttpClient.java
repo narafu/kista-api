@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.broker.domain.model.BrokerAccountRef;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -133,17 +134,17 @@ class TossHttpClient {
                     // 중복 취소 요청으로 이미 취소된 주문(already-canceled)은 OrderCancelService가 관리자 알림 없이 처리
                     // Toss error.code 필드 값으로 정확히 매칭 — 무관한 오류 메시지에 문자열이 우연히 섞여
                     // 실제 취소되지 않은 주문이 DB에 CANCELLED로 오기록되는 것을 방지 (알림도 함께 억제되므로 오판정 위험 큼)
-                    TossApiException.Conflict conflict = TossApiException.Conflict.NONE;
+                    BrokerApiException.Conflict conflict = BrokerApiException.Conflict.NONE;
                     if (e.getStatusCode().value() == 409) {
                         conflict = ErrorBodyDecoder.decode(objectMapper, body, TossErrorBody.class)
                                 .map(TossErrorBody::error)
                                 .map(TossErrorBody.ErrorDetail::code)
                                 .map(code -> switch (code) {
-                                    case "already-filled" -> TossApiException.Conflict.ALREADY_FILLED;
-                                    case "already-canceled" -> TossApiException.Conflict.ALREADY_CANCELED;
-                                    default -> TossApiException.Conflict.NONE;
+                                    case "already-filled" -> BrokerApiException.Conflict.ALREADY_FILLED;
+                                    case "already-canceled" -> BrokerApiException.Conflict.ALREADY_CANCELED;
+                                    default -> BrokerApiException.Conflict.NONE;
                                 })
-                                .orElse(TossApiException.Conflict.NONE);
+                                .orElse(BrokerApiException.Conflict.NONE);
                     }
                     throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, conflict);
                 }

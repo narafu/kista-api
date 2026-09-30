@@ -28,13 +28,15 @@ com.kista.contract/      :shared    · OPEN · (NamedInterface 없음, wire 스�
 com.kista.platform/      :shared    · OPEN · (NamedInterface 없음, 인프라 leaf) · persistence/crypto/time/scheduling/redis 공용 인프라, outbound 0 → modules/platform.md
 com.kista.matching/      :trading-core · CLOSED · "kernel"                 · 주문생성 커널(순수 계산), CycleOrderStrategy SSOT → modules/matching.md
 com.kista.finance/       :api       · CLOSED · "domain"/"usecase"/"port"   · 가계부 애그리게이트, 마감월 쓰기 차단          → modules/finance.md
-com.kista.notify/        :api       · CLOSED · "port"                     · Telegram/FCM 얇은 게이트웨이. 매매 알림 6종은 trading.notify(trading-core) 소유 → modules/notify.md
+com.kista.notify/        :api       · CLOSED · "port"                     · Telegram/FCM 얇은 게이트웨이. 매매 알림 6종은 tradingnotify(trading-core) 소유 → modules/notify.md
 com.kista.broker/        :trading-core · CLOSED · "domain"/"port"/"application" · KIS/Toss/Mock 연동, Account를 전혀 참조하지 않음(Account.toBrokerRef() 1곳 전담) → modules/broker.md
-com.kista.trading/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"schedule"/"stats" · 주문·사이클 실행·전략 설정 + trading.notify + stats 서브패키지 → modules/trading.md
+com.kista.trading/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"schedule"/"event" · 주문·사이클 실행·전략 설정 (통계·알림은 아래 두 모듈로 분리) → modules/trading.md
+com.kista.tradingstats/  :trading-core · CLOSED · "domain"/"usecase"/"port"  · 계좌·증권사 통계·백테스트·포트폴리오·summary 조회. trading 공개 계약만 읽는 단방향 소비자 → modules/tradingstats.md
+com.kista.tradingnotify/ :trading-core · CLOSED · (NamedInterface 0개, 리스너 sink) · 매매 알림 6종+게이트웨이. trading 이벤트 11종·privacy 이벤트 구독, EPR 재발행 소유 → modules/tradingnotify.md
 com.kista.market/        :api       · CLOSED · "domain"/"port"/"event"     · 공포탐욕지수(CNN/Crypto) 애그리게이트          → modules/market.md
 com.kista.marketcalendar/ :trading-core · CLOSED · "domain"/"port"        · 미국 시장 휴장일 캘린더                        → modules/marketcalendar.md
 com.kista.privacy/       :trading-core · CLOSED · "domain"/"port"/"usecase"/"event" · FIDA 기준 매매표 전역 SSOT                   → modules/privacy.md
-com.kista.stats/         :api       · CLOSED · "domain"/"usecase"/"port"/"event"/"schedule" · 주택/ETF 벤치마크 비교(계좌·Toss 통계는 trading.stats 소유) → modules/stats.md
+com.kista.stats/         :api       · CLOSED · "domain"/"usecase"/"port"/"event"/"schedule" · 주택/ETF 벤치마크 비교(계좌·Toss 통계는 tradingstats 소유) → modules/stats.md
 com.kista.admin/         :api       · CLOSED · "domain"/"usecase"/"port"   · 관리자 조회·정정·재정렬·런타임 설정            → modules/admin.md
 com.kista.user/          :api       · CLOSED · "domain"/"usecase"/"port"/"event" · 가입·승인·프로필·JWT 인증               → modules/user.md
 com.kista.account/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"event" · 계좌 자격증명·브로커 연결. Strategy와 별도 aggregate → modules/account.md
@@ -44,7 +46,7 @@ com.kista.web/           :api       · CLOSED · (NamedInterface 0개, 앱셸 si
 신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read — (b) 허용 사례·단일 소유 포트 타입·narrowing projection 원장(프로세스 경계 wire 타입은 own-type이 아니라 `com.kista.contract`). 자동 로드되지 않는다.
 
 ### Spring Modulith 모듈 구성
-16개 모듈(finance/notify/broker/trading/matching/market/marketcalendar/privacy/stats/admin/user/account/sharedkernel/contract/platform/web — `:api`·`:trading-core`·`:shared`에 나뉘어 위치) 전부 `@ApplicationModule`로 선언돼 있고, 모듈 간 경계는 `ApplicationModules.verify()`(`ModulithArchitectureTest`)가, 모듈 내부 레이어 방향은 `HexagonalArchitectureTest`가 각각 검증한다. 각 모듈의 NamedInterface와 내부 패키지는 위 "모듈 한눈에 보기" 요약과 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)에 기록돼 있다 — 신규 코드 추가 시 해당 모듈 문서에서 위치·공개 범위를 확인할 것.
+18개 모듈(finance/notify/broker/trading/tradingstats/tradingnotify/matching/market/marketcalendar/privacy/stats/admin/user/account/sharedkernel/contract/platform/web — `:api`·`:trading-core`·`:shared`에 나뉘어 위치) 전부 `@ApplicationModule`로 선언돼 있고, 모듈 간 경계는 `ApplicationModules.verify()`(`ModulithArchitectureTest`)가, 모듈 내부 레이어 방향은 `HexagonalArchitectureTest`가 각각 검증한다. 각 모듈의 NamedInterface와 내부 패키지는 위 "모듈 한눈에 보기" 요약과 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)에 기록돼 있다 — 신규 코드 추가 시 해당 모듈 문서에서 위치·공개 범위를 확인할 것.
 
 모듈 간 참조는 원칙적으로 상대 모듈이 공개한 NamedInterface(도메인 타입 또는 own-type projection)만 거쳐야 하며(프로세스 경계를 넘는 wire 타입은 own-type이 아니라 `com.kista.contract`), 서로 참조가 얽히면 포트 역전(own-type 정의 + 상대가 구현) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도) 패턴을 쓴다. 다른 프로세스(trading-core ↔ root) 사이는 EPR이 전달되지 않으므로 내부 HTTP API 또는 Redis(Pub/Sub·Stream)를 쓴다.
 

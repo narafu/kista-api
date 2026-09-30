@@ -7,7 +7,7 @@
 **남아 있는 (a) 성격 own-type — 표지 예외**: `AdminBrokerCredentialException`/`AdminBrokerRateLimitException`/`AdminPrivacyTradeConflictException`(root `com.kista.admin.domain.model`) — trading-core 내부 API의 HTTP 상태코드(422/429/409)를 admin `GlobalExceptionHandler`가 매핑할 수 있는 예외로 되돌리는 표지 클래스. 값 타입이 아니라 예외라 contract 대상이 아니다.
 
 **(b) 외부 계약 분리로 의도적 허용된 복제** (원장에 남는 것):
-- DTO 이중복제: `TossCandleResponse`(market/stats — root UI 응답과 trading-core UI 응답, 내부 wire가 아닌 각자의 외부 HTTP 응답 스키마), `CycleHistoryPageResponse`/`CycleHistoryResponse`(stats/trading) — 각기 다른 HTTP 엔드포인트의 JSON 응답 계약. 통합 시 한 모듈의 엔드포인트 필드 추가가 다른 모듈 응답 스키마에 전이됨
+- DTO 이중복제: `TossCandleResponse`(market/tradingstats — root UI 응답과 trading-core UI 응답, 내부 wire가 아닌 각자의 외부 HTTP 응답 스키마), `CycleHistoryPageResponse`/`CycleHistoryResponse`(tradingstats/trading) — 각기 다른 HTTP 엔드포인트의 JSON 응답 계약. 통합 시 한 모듈의 엔드포인트 필드 추가가 다른 모듈 응답 스키마에 전이됨
 
 **단일 소유 포트 시그니처 타입** (쌍둥이 없음 — own-type 게이트 대상 아님, 참고용 기록):
 - broker `BrokerBalance`/`OrderInstruction`/`OrderResult`/`CancelInstruction`(`com.kista.broker.domain.model`): broker↔trading 간 `LiveBalancePort`/`BrokerOrderCorrectionPort.place()/cancel()` 요청·응답 shape. 복제본 없음 — trading이 직접 소비. `OrderInstruction`/`OrderResult`/`BrokerOrderCorrectionPort.place()` 직접 호출은 Task 7에서 trading-core `ReorderService`로 전부 이관됐다 — root `AdminReorderService`는 더 이상 이 타입들을 참조하지 않고, `TradingCommandPort`(HTTP 내부 API) 경유로 `ReorderCommand`/`ReorderResult`(trading own-type, 위 항목 참고)만 주고받는 얇은 요청/응답 매핑 + 감사 로그 프록시다. broker↔trading 순환은 이 타입들이 아니라 `BrokerAccountRef`(아래)로 끊는다

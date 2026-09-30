@@ -1,10 +1,9 @@
 package com.kista.trading.adapter.in.web;
 
 import com.kista.account.domain.model.Account;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.domain.model.BrokerRateLimitException;
-import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.sharedkernel.AppErrorRaisedEvent;
 import com.kista.trading.domain.model.ManualTradingException;
@@ -45,12 +44,12 @@ import java.util.NoSuchElementException;
 // admin/finance/user 전용 own-type 예외는 trading-core에 해당 없어 제외 — 순수 JDK/Spring 프레임워크
 // 예외만 대상).
 //
-// KisApiException/TossApiException(둘 다 trading-core 소유)은 이 클래스가 직접 처리하되, app_error_logs가
+// BrokerApiException(KIS/Toss 예외의 벤더 중립 상위 타입, trading-core 소유)은 이 클래스가 직접 처리하되, app_error_logs가
 // root 소유 테이블이라 AppErrorRaisedEvent(sharedkernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream
 // (stream:app.error)으로 root에 push한다 — 과거의 동기 HTTP(POST /api/internal/errors) 역방향 호출은 폐지됐다.
 // trading-core는 root를 호출하지 않는다(프로세스 간 단방향 root→trading-core).
 //
-// ManualTradingService.java:118/135가 KisApiException/TossApiException을 cause로 담은
+// ManualTradingService.java:118/135가 BrokerApiException을 cause로 담은
 // ManualTradingException을 던지는 경로에서, root GlobalExceptionHandler.handleAll이 하던
 // "4xx라도 cause가 브로커 API 실패면 saveErrorLog" 동작은 이 클래스에 의도적으로 복제하지 않았다 —
 // :118은 priceFetcher가 내부에서 절대 예외를 던지지 않아 도달 불가(주석 확인), :135는 catch 블록에서
@@ -72,7 +71,7 @@ import java.util.NoSuchElementException;
         "com.kista.trading.adapter.in.web",
         "com.kista.account.adapter.in.web",
         "com.kista.privacy.adapter.in.web",
-        "com.kista.trading.stats.adapter.in.web",
+        "com.kista.tradingstats.adapter.in.web",
         "com.kista.broker.adapter.in.web",
         "com.kista.marketcalendar.adapter.in.web",
         "com.kista.matching.adapter.in.web"
@@ -110,20 +109,12 @@ public class TradingExceptionHandler {
         return problem(m.status(), m.title(), ex.getMessage());
     }
 
-    // root GlobalExceptionHandler.handleKisApiException과 동일 매핑(503) — 저장은 이벤트로 위임
-    @ExceptionHandler(KisApiException.class)
-    public ProblemDetail handleKisApiException(KisApiException ex) {
+    // KIS·Toss 등 모든 증권사 API 실패를 벤더 중립 BrokerApiException 하나로 503 매핑 — title은 벤더 표기로 도출("KIS API Error"/"Toss API Error", 저장은 이벤트로 위임)
+    @ExceptionHandler(BrokerApiException.class)
+    public ProblemDetail handleBrokerApiException(BrokerApiException ex) {
         reportErrorLog(ex);
-        log.error("KIS API 오류: {}", ex.getMessage(), ex);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "KIS API Error", ex.getMessage());
-    }
-
-    // root GlobalExceptionHandler.handleTossApiException과 동일 매핑(503) — 저장은 이벤트로 위임
-    @ExceptionHandler(TossApiException.class)
-    public ProblemDetail handleTossApiException(TossApiException ex) {
-        reportErrorLog(ex);
-        log.error("Toss API 오류: {}", ex.getMessage(), ex);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, "Toss API Error", ex.getMessage());
+        log.error("{} API 오류: {}", ex.vendorLabel(), ex.getMessage(), ex);
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.vendorLabel() + " API Error", ex.getMessage());
     }
 
     // root GlobalExceptionHandler.MAPPINGS 중 trading-core에도 실제로 던져질 수 있는 순수 JDK/Spring

@@ -14,12 +14,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Toss 증권사 어댑터 — 공통 7개 + Toss 전용 5개 Port 구현
+// Toss 증권사 어댑터 — 공통 7개(BrokerCapabilitiesPort) + 통계 5개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
 @Component
 @RequiredArgsConstructor
-public class TossBrokerAdapter implements BrokerCapabilitiesPort,
-        CandlePort, ExchangeRatePort, StockInfoPort,
-        BrokerMarketCalendarPort, BrokerAccountPort {
+public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisticsPort {
 
     private final TossHoldingsApi tossHoldingsApi;  // portfolio/margin/sellable/exchangeRate/account
     private final TossOrderApi tossOrderApi;          // cancel/place/execution
@@ -69,36 +67,36 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort,
         return tossOrderApi.place(instruction, account);
     }
 
-    // --- Toss 전용 Capability ---
+    // --- 통계 Capability (Toss 응답을 벤더 중립 타입으로 변환) ---
 
     @Override
-    public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
-        return tossCandleApi.getCandles(symbol, interval, from, to);
+    public List<BrokerCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
+        return tossCandleApi.getCandles(symbol, interval, from, to).stream().map(TossCandle::toBrokerCandle).toList();
     }
 
     @Override
-    public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
-        return tossCandleApi.getLatestCandles(symbol, interval, count);
+    public List<BrokerCandle> getLatestCandles(String symbol, String interval, int count) {
+        return tossCandleApi.getLatestCandles(symbol, interval, count).stream().map(TossCandle::toBrokerCandle).toList();
     }
 
     @Override
-    public TossExchangeRate getExchangeRate() {
-        return tossHoldingsApi.getExchangeRate();
+    public ExchangeRateQuote getExchangeRate() {
+        return tossHoldingsApi.getExchangeRate().toExchangeRateQuote();
     }
 
     @Override
-    public TossStockInfo getStockInfo(StrategyTicker ticker) {
-        return tossPriceApi.getStockInfo(ticker);
+    public BrokerStockInfo getStockInfo(StrategyTicker ticker) {
+        return tossPriceApi.getStockInfo(ticker).toBrokerStockInfo();
     }
 
     @Override
-    public List<TossMarketSession> getMarketCalendar(LocalDate from, LocalDate to) {
-        return tossMarketApi.getMarketCalendar(from, to);
+    public List<MarketCalendarDay> getMarketCalendar(LocalDate from, LocalDate to) {
+        return tossMarketApi.getMarketCalendar(from, to).stream().map(TossMarketSession::toMarketCalendarDay).toList();
     }
 
     @Override
-    public List<TossAccountInfo> getAccountList(BrokerAccountRef account) {
-        return tossMarketApi.getAccountList(account);
+    public List<BrokerAccountInfo> getAccountList(BrokerAccountRef account) {
+        return tossMarketApi.getAccountList(account).stream().map(TossAccountInfo::toBrokerAccountInfo).toList();
     }
 
     // --- BrokerPricePort (공통 API — account 불필요) ---

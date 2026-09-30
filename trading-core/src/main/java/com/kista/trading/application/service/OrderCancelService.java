@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.trading.domain.model.DstInfo;
-import com.kista.broker.domain.model.toss.TossApiException;
+import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
@@ -127,7 +127,7 @@ class OrderCancelService {
 
     // 중복 취소 요청으로 브로커가 거부한 예상된 경합 여부 — TossHttpClient가 409 CONFLICT(already-canceled) 응답을 판정해 전달
     private boolean isAlreadyCanceled(Exception e) {
-        return e instanceof TossApiException tae && tae.isAlreadyCanceledConflict();
+        return e instanceof BrokerApiException bae && bae.isAlreadyCanceledConflict();
     }
 
 }

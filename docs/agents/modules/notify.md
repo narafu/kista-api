@@ -8,4 +8,4 @@ com.kista.notify/    ← Spring Modulith 모듈(CLOSED) — Telegram/FCM 알림 
   adapter/out/sse/    ← SseEmitterRegistry(사용자별)/TradeSseEmitterRegistry(매매 이벤트) — `sse` 경로 세그먼트 유지 필수(`HexagonalArchitectureTest.sse_emitter_registry_must_not_be_used_in_application_layer`의 `com.kista..adapter.out.sse..` 와일드카드)
   adapter/out/persistence/ ← FcmDeviceTokenEntity + FcmDeviceTokenJpaRepository + FcmDeviceTokenPersistenceAdapter
 
-**매매 알림 6종(TradingAlertNotifier/CycleEndedNotifier/CycleLifecycleNotifier/OrderCancelFailureNotifier/TradingReportNotifier/PrivacyAlertNotifier)은 이 모듈이 아니라 `com.kista.trading.notify`(trading-core) 소유** → `docs/agents/modules/trading.md` "com.kista.trading.notify" 참고.
+**매매 알림 6종(TradingAlertNotifier/CycleEndedNotifier/CycleLifecycleNotifier/OrderCancelFailureNotifier/TradingReportNotifier/PrivacyAlertNotifier)은 이 모듈이 아니라 `com.kista.tradingnotify`(trading-core) 소유** → `docs/agents/modules/tradingnotify.md` 참고.

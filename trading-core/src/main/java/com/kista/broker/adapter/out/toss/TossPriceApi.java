@@ -223,7 +223,7 @@ class TossPriceApi implements CommonMarketPriceFeed {
         return Optional.empty();
     }
 
-    // ── TossStockInfoPort ──────────────────────────────────────────────────────
+    // ── StockInfoPort(TossBrokerAdapter가 변환해 노출) ──────────────────────────────────────────────────────
 
     public TossStockInfo getStockInfo(StrategyTicker ticker) {
         return stockInfoCache.getOrFetch(ticker.name(), () -> fetchStockInfoUncached(ticker))
