@@ -3,7 +3,6 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.TradingPolicyPort;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
-import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.sharedkernel.Broker;
@@ -16,13 +15,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-// 관리자 설정 화면·공개 런타임 설정의 조합 서비스 — root 소유 설정(RuntimeSettingsService, 트랜잭션)과
-// trading-core 소유 정책(TradingPolicyPort, 내부 HTTP)을 한 묶음으로 읽고 쓴다.
+// 관리자 설정 화면의 조합 서비스 — root 소유 설정(RuntimeSettingsService, 트랜잭션)과 trading-core 소유 정책
+// (TradingPolicyPort, 내부 HTTP)을 한 묶음으로 읽고 쓴다. 관리자 조회는 엄격하다(trading-core 장애가 그대로 오류로
+// 드러나야 관리자가 기본값을 실제 설정으로 오인하지 않는다) — 공개 조회의 기본값 강등은 RuntimeConfigService 담당.
 // 트랜잭션을 걸지 않는다: HTTP 호출을 DB 트랜잭션 안에 두지 않기 위해서다. 갱신 순서는 trading 정책 → root 설정이며
 // 후자가 실패하면 정책만 바뀐 부분 반영이 남는다 — PUT은 멱등이라 관리자가 재시도하면 수렴한다.
 @Service
 @RequiredArgsConstructor
-class AdminSettingsService implements AdminSettingsUseCase, RuntimeSettingsUseCase {
+class AdminSettingsService implements AdminSettingsUseCase {
 
     private final RuntimeSettingsService runtimeSettingsService; // root 소유 설정 트랜잭션 경계
     private final TradingPolicyPort tradingPolicyPort; // trading-core 소유 정책 위임

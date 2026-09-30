@@ -1,5 +1,6 @@
 package com.kista.admin.adapter.out.internal;
 
+import com.kista.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.TradingPolicySettings;
@@ -99,5 +100,21 @@ class TradingPolicyHttpAdapterTest {
         assertThatThrownBy(() -> adapter.replace(TradingPolicySettings.defaults()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("kista-trading 배포 후");
+    }
+
+    // 연결 거부·5xx 같은 전송 실패는 admin 표지 예외로 바뀐다(503 매핑, 공개 조회는 기본값 강등)
+    @Test
+    void load_500이면_TradingPolicyUnavailableException을_던진다() {
+        server.enqueue(new MockResponse.Builder().code(500).build());
+
+        assertThatThrownBy(() -> adapter.load()).isInstanceOf(TradingPolicyUnavailableException.class);
+    }
+
+    @Test
+    void replace_500이면_TradingPolicyUnavailableException을_던진다() {
+        server.enqueue(new MockResponse.Builder().code(500).build());
+
+        assertThatThrownBy(() -> adapter.replace(TradingPolicySettings.defaults()))
+                .isInstanceOf(TradingPolicyUnavailableException.class);
     }
 }

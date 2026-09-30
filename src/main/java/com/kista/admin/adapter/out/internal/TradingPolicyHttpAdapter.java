@@ -1,6 +1,7 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.TradingPolicyPort;
+import com.kista.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.sharedkernel.TradingPolicySettings;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 // trading-core TradingPolicyInternalController(GET|PUT /api/internal/trading/policy-settings) 호출 —
 // 매매 런타임 정책의 소유자는 trading-core라 admin은 읽고 쓰기를 위임만 한다. TradingPolicySettings는
@@ -35,6 +37,9 @@ class TradingPolicyHttpAdapter implements TradingPolicyPort {
         } catch (HttpClientErrorException.NotFound e) {
             log.warn("trading-core가 아직 정책 API를 제공하지 않아 기본 정책으로 응답 — kista-trading 배포 전환기 (404)");
             return TradingPolicySettings.defaults();
+        } catch (RestClientException e) {
+            // 연결 거부·타임아웃·5xx — 전송 예외를 admin 어휘로 바꿔 application 계층이 spring-web에 의존하지 않게 한다
+            throw new TradingPolicyUnavailableException(e.getMessage(), e);
         }
     }
 
@@ -52,6 +57,10 @@ class TradingPolicyHttpAdapter implements TradingPolicyPort {
             return saved;
         } catch (HttpClientErrorException.NotFound e) {
             throw new IllegalStateException("trading-core가 아직 정책 API를 제공하지 않습니다 — kista-trading 배포 후 다시 시도하세요");
+        } catch (IllegalArgumentException e) {
+            throw e; // 400 → badRequestAsIllegalArgument가 이미 변환 — 그대로 관리자에게 400
+        } catch (RestClientException e) {
+            throw new TradingPolicyUnavailableException(e.getMessage(), e);
         }
     }
 }

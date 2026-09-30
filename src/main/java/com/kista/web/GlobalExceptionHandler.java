@@ -3,6 +3,7 @@ package com.kista.web;
 import com.kista.admin.domain.model.AdminBrokerCredentialException;
 import com.kista.admin.domain.model.AdminBrokerRateLimitException;
 import com.kista.admin.domain.model.AdminPrivacyTradeConflictException;
+import com.kista.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceCategory;
@@ -53,6 +54,8 @@ public class GlobalExceptionHandler {
         // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
         Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
         Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
+        // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
+        Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable")),
         Map.entry(IllegalStateException.class,                     new Mapping(HttpStatus.BAD_REQUEST,            "Invalid State")),
         Map.entry(NoSuchElementException.class,                    new Mapping(HttpStatus.NOT_FOUND,              "Resource Not Found")),
         Map.entry(IllegalArgumentException.class,                  new Mapping(HttpStatus.BAD_REQUEST,            "Invalid Request")),
