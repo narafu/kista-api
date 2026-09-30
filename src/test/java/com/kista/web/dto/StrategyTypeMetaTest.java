@@ -2,8 +2,6 @@ package com.kista.web.dto;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import com.kista.sharedkernel.StrategyType;
 
@@ -11,8 +9,7 @@ class StrategyTypeMetaTest {
 
     @Test
     void infinite_meta_has_capabilities() {
-        var capability = new StrategyCapability(false, true, List.of(20, 30, 40));
-        var meta = StrategyTypeMeta.from(StrategyType.INFINITE, capability);
+        var meta = StrategyTypeMeta.from(StrategyType.INFINITE);
         assertThat(meta.requiresPrivacyBase()).isFalse();
         assertThat(meta.tickerFixed()).isFalse();        // INFINITE: availableTickers > 1
         assertThat(meta.supportsReverseMode()).isTrue();
@@ -21,8 +18,7 @@ class StrategyTypeMetaTest {
 
     @Test
     void privacy_meta_has_capabilities() {
-        var capability = new StrategyCapability(true, false, List.of());
-        var meta = StrategyTypeMeta.from(StrategyType.PRIVACY, capability);
+        var meta = StrategyTypeMeta.from(StrategyType.PRIVACY);
         assertThat(meta.requiresPrivacyBase()).isTrue();
         assertThat(meta.tickerFixed()).isTrue();          // PRIVACY: SOXL 단일
         assertThat(meta.supportsReverseMode()).isFalse();
@@ -31,8 +27,7 @@ class StrategyTypeMetaTest {
 
     @Test
     void vr_meta_has_capabilities() {
-        var capability = new StrategyCapability(false, false, List.of());
-        var meta = StrategyTypeMeta.from(StrategyType.VR, capability);
+        var meta = StrategyTypeMeta.from(StrategyType.VR);
         assertThat(meta.code()).isEqualTo("VR");
         assertThat(meta.availableTickers()).containsExactly("TQQQ"); // VR: TQQQ 단일
         assertThat(meta.tickerFixed()).isTrue();                     // 단일 ticker → 고정

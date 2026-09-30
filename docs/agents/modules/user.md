@@ -11,6 +11,7 @@ com.kista.user/     ← Spring Modulith 모듈(CLOSED) — 가입·승인·프�
   adapter/in/web/security/ ← internal — JwtAuthFilter/InternalTokenAuthFilter/SecurityConfig/JwtDecoderConfig/JwtIssuerService/OpenApiConfig/RefreshTokenCookieHelper
   adapter/in/schedule/ ← RefreshTokenCleanupScheduler(platform `SchedulerJobRunner` 재사용)
   adapter/out/kakao/  ← KakaoOAuthAdapter/KakaoConfig/KakaoProperties
+  adapter/out/internal/ ← ActiveStrategyCountAdapter(`ActiveStrategyCountPort` 구현 — trading-core 내부 API `GET /api/internal/trading/active-strategy-count`를 호출하는 순수 HTTP 어댑터, 타입 의존 없음. 과거 `com.kista.web.trading`에 있던 것을 2026-09-30 여기로 이전 — 인바운드 패키지의 RestClient 금지 규칙 때문)
   adapter/out/redis/  ← RedisBlacklistAdapter + UserEventStreamPublisher(trading-core 복제본 동기화용 Redis Stream 발행)
   adapter/out/persistence/user/    ← UserEntity + UserJpaRepository + UserPersistenceAdapter, AdminUserViewAdapter
   adapter/out/persistence/auth/    ← RefreshTokenEntity + JpaRepository + PersistenceAdapter

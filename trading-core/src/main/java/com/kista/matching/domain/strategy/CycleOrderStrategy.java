@@ -2,7 +2,7 @@ package com.kista.matching.domain.strategy;
 
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.VrPosition;
@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import com.kista.sharedkernel.StrategyCapability;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
@@ -22,24 +23,27 @@ public interface CycleOrderStrategy {
     // 이 전략이 담당하는 사이클 타입
     StrategyType cycleType();
 
+    // 정적 capability 상수 — SSOT는 StrategyType.capability()(sharedkernel), 구현체는 재정의하지 않는다
+    default StrategyCapability capability() { return cycleType().capability(); }
+
     // 미리보기 실행 전 전일종가 조회 필요 여부 (INFINITE만 true — 0회차 평단가 대용)
     default boolean requiresPrevClose() { return false; }
 
     // 미리보기 실행 전 기준매매표 조회 필요 여부 (PRIVACY만 true)
-    default boolean requiresPrivacyBase() { return false; }
+    default boolean requiresPrivacyBase() { return capability().requiresPrivacyBase(); }
 
     // 리버스모드(소진 후 모드) 지원 여부 (INFINITE만 true) — UI 배지/표시 가드
-    default boolean supportsReverseMode() { return false; }
+    default boolean supportsReverseMode() { return capability().supportsReverseMode(); }
 
     // 지원하는 분할 수 옵션 — 빈 목록이면 분할 개념 없음 (PRIVACY). UI 분할 선택지·divisionCount 전송 여부 결정
-    default List<Integer> availableDivisionCounts() { return List.of(); }
+    default List<Integer> availableDivisionCounts() { return capability().divisionCounts(); }
 
     // 주문 계획 — Optional.empty()는 "전략 차원에서 skip" (예: PRIVACY 기준매매표 미수신)
     // INFINITE: position non-null / PRIVACY: position null
     Optional<OrderPlan> plan(PlanContext ctx);
 
     // 사이클 재등록 최소금액 — null이면 가드 미적용
-    BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount);
+    BigDecimal minRequiredDeposit(BigDecimal price, PrivacyPlan privacyPlan, int divisionCount);
 
     // holdings=0(전량 청산) 시 사이클 종료 여부 — VR만 false(사이클 유지), 나머지 true(종료)
     default boolean endsCycleOnLiquidation() { return true; }
@@ -105,11 +109,11 @@ public interface CycleOrderStrategy {
 
         // PRIVACY 전략 전용 입력 묶음
         // initialUsdDeposit: 현재 StrategyCycle의 시작 시드 (buildOrders 호출 시 필요)
-        // privacyBase: 당일 기준매매표 (미수신 시 null → 전략 차원 skip)
+        // privacyPlan: 당일 기준매매표(커널 입력 변환본) (미수신 시 null → 전략 차원 skip)
         // currentPrice: 스케쥴러 시작 시점 현재가 (allocateRemainingBudget 분모 산출용 — preview/수동실행 시 null)
         public record PrivacyInputs(
                 BigDecimal initialUsdDeposit,
-                PrivacyTradeBase privacyBase,
+                PrivacyPlan privacyPlan,
                 BigDecimal currentPrice
         ) {}
 

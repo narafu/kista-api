@@ -336,7 +336,8 @@ public class BacktestEngine {
 
         // currentPrice 자리의 전일종가는 PrivacyCycleOrderStrategy.plan()이 소비하지 않는다 — VR/INFINITE와의 조립 일관성 목적
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
-                new CycleOrderStrategy.PlanContext.PrivacyInputs(state.initialUsdDeposit, base, prevClose);
+                new CycleOrderStrategy.PlanContext.PrivacyInputs(
+                        state.initialUsdDeposit, base == null ? null : base.toPlan(), prevClose);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, command.ticker(), candle.date(), "backtest", null, privacyInputs, null);
 

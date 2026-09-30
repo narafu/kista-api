@@ -78,7 +78,8 @@ class CycleRotationService {
             int divisionCount = strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
                     .map(StrategyInfiniteDetail::divisionCount)
                     .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);
-            minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(price, privacyTradeBase, divisionCount);
+            minRequired = cycleStrategies.of(strategy.type()).minRequiredDeposit(
+                    price, privacyTradeBase == null ? null : privacyTradeBase.toPlan(), divisionCount);
 
             // 새 StrategyCycle + 시작 스냅샷 원자적 생성 (시드 결정 방식 stamp)
             StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())

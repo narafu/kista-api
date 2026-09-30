@@ -3,8 +3,8 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.OrderType;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
+import com.kista.matching.domain.model.PrivacyPlan;
+import com.kista.matching.domain.model.PrivacyPlan.PrivacyPlannedTrade;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.sharedkernel.StrategyTicker;
 import lombok.extern.slf4j.Slf4j;
@@ -24,21 +24,21 @@ import static com.kista.sharedkernel.OrderTiming.AT_CLOSE;
 @Slf4j
 public class PrivacyStrategy {
 
-    // initialUsdDeposit ÷ privacyTradeBase.currentCycleStart() 로 배수를 동적 산출
-    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyTradeBase privacyTradeBase) {
+    // initialUsdDeposit ÷ plan.currentCycleStart() 로 배수를 동적 산출
+    public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyPlan plan) {
         if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
             throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
         }
-        BigDecimal start = privacyTradeBase.currentCycleStart();
+        BigDecimal start = plan.currentCycleStart();
         BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR);
         log.info("[PRIVACY] 배수 산출: initialUsdDeposit={}, currentCycleStart={}, multiple={}", initialUsdDeposit, start, multiple);
 
         List<BuyEntry> buyEntries = new ArrayList<>();
-        List<PrivacyTrade> explicitSells = new ArrayList<>();
-        PrivacyTrade nullSellTemplate = null; // null quantity SELL — "잔량 전부 매도" 후보
+        List<PrivacyPlannedTrade> explicitSells = new ArrayList<>();
+        PrivacyPlannedTrade nullSellTemplate = null; // null quantity SELL — "잔량 전부 매도" 후보
 
         // BUY/SELL 분리 — BUY null은 skip, SELL null은 단 1개만 허용
-        for (PrivacyTrade t : privacyTradeBase.trades()) {
+        for (PrivacyPlannedTrade t : plan.trades()) {
             if (t.direction() == OrderDirection.BUY) {
                 if (t.quantity() == null) {
                     log.warn("[PRIVACY] BUY 수량 미정 건너뜀: ticker={}, price={}", t.ticker(), t.price());
@@ -60,7 +60,7 @@ public class PrivacyStrategy {
         }
 
         // 기준표 목표 보유량과 현재 잔량의 차이로 BUY 가감 (실수 기준 — 버림 전)
-        BigDecimal target = BigDecimal.valueOf(privacyTradeBase.holdings()).multiply(multiple);
+        BigDecimal target = BigDecimal.valueOf(plan.holdings()).multiply(multiple);
         BigDecimal diff = target.subtract(BigDecimal.valueOf(balance.holdings()));
         log.info("[PRIVACY] 보유 보정: target={}, current={}, diff={}", target, balance.holdings(), diff);
         adjustBuyQuantities(buyEntries, diff);
@@ -114,7 +114,7 @@ public class PrivacyStrategy {
     }
 
     // 명시 SELL + null SELL("잔량 전부") 합산하여 PlannedOrder 리스트 반환
-    private List<PlannedOrder> buildSellOrders(List<PrivacyTrade> explicit, PrivacyTrade nullTemplate,
+    private List<PlannedOrder> buildSellOrders(List<PrivacyPlannedTrade> explicit, PrivacyPlannedTrade nullTemplate,
                                         AccountBalance balance, BigDecimal multiple) {
         // 명시 SELL — 버림 전 실수 수량 보존 (fraction 보정을 위해)
         List<BigDecimal> rawQtys = explicit.stream()
@@ -123,7 +123,7 @@ public class PrivacyStrategy {
 
         List<PlannedOrder> result = new ArrayList<>();
         for (int i = 0; i < explicit.size(); i++) {
-            PrivacyTrade t = explicit.get(i);
+            PrivacyPlannedTrade t = explicit.get(i);
             int qty = rawQtys.get(i).setScale(0, RoundingMode.DOWN).intValue();
             result.add(PlannedOrder.of(t.tradeDate(), t.ticker(), t.orderType(), SELL, qty, t.price(), AT_CLOSE));
         }

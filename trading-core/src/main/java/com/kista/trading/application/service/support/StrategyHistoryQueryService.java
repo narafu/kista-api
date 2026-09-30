@@ -7,7 +7,7 @@ import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.TimeZones;
@@ -61,9 +61,9 @@ public class StrategyHistoryQueryService {
         if (strategy.requiresPrivacyBase() && currentBase == null) {
             return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
         }
-        // PrivacyCycleOrderStrategy.minRequiredDeposit()은 currentCycleStart만 사용 — avgPrice 접근 없음
-        PrivacyTradeBase privacyBase = currentBase != null
-                ? new PrivacyTradeBase(null, null, 0, currentBase.currentCycleStart(), List.of())
+        // PrivacyCycleOrderStrategy.minRequiredDeposit()은 currentCycleStart만 사용 — 나머지 필드는 빈 값
+        PrivacyPlan privacyPlan = currentBase != null
+                ? new PrivacyPlan(0, currentBase.currentCycleStart(), List.of())
                 : null;
 
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
@@ -71,9 +71,9 @@ public class StrategyHistoryQueryService {
                 ? null
                 : brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
         BigDecimal basePrice = strategy.requiresPrivacyBase()
-                ? privacyBase.currentCycleStart()
+                ? privacyPlan.currentCycleStart()
                 : price;
-        BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyBase, divisionCount);
+        BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyPlan, divisionCount);
 
         return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null);
     }

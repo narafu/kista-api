@@ -29,7 +29,7 @@ import java.util.NoSuchElementException;
 
 // trading-core 네이티브 컨트롤러(TradingCycleController/OrderCancelController/FidaOrderController/
 // AccountController/TradingInternalQueryController/CandleInternalController/
-// MarketCalendarInternalController/StrategyCapabilityInternalController 등, 아래 basePackages 7개) 전용
+// MarketCalendarInternalController 등, 아래 basePackages 6개) 전용
 // 예외 매핑.
 //
 // 과거(4a 패키징 분리 이전)엔 이 클래스가 trading-core 고유 6종만 처리하고, SecurityException/
@@ -73,8 +73,7 @@ import java.util.NoSuchElementException;
         "com.kista.privacy.adapter.in.web",
         "com.kista.tradingstats.adapter.in.web",
         "com.kista.broker.adapter.in.web",
-        "com.kista.marketcalendar.adapter.in.web",
-        "com.kista.matching.adapter.in.web"
+        "com.kista.marketcalendar.adapter.in.web"
 })
 @RequiredArgsConstructor
 public class TradingExceptionHandler {

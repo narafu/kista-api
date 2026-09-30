@@ -1,7 +1,7 @@
 package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.VrPosition;
 import lombok.RequiredArgsConstructor;
@@ -24,15 +24,6 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public StrategyType cycleType() { return StrategyType.VR; }
-
-    @Override
-    public boolean supportsReverseMode() { return false; }
-
-    @Override
-    public List<Integer> availableDivisionCounts() { return List.of(); }
-
-    @Override
-    public boolean requiresPrivacyBase() { return false; }
 
     @Override
     public boolean requiresPrevClose() { return true; }
@@ -70,7 +61,7 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     @Override
-    public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
+    public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyPlan privacyPlan, int divisionCount) {
         // VR은 최소 시드 가드 미적용 (poolLimit 기반 자체 제한 — poolLimit=0인 무일푼 개장 사이클은 라이브 pool()로 폴백, VrStrategy.governanceLimit 참고)
         return null;
     }

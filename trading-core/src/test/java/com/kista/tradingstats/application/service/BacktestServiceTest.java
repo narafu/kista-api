@@ -7,6 +7,7 @@ import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
+import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.tradingstats.application.port.output.HistoricalCandlePort;
@@ -297,8 +298,8 @@ class BacktestServiceTest {
         ArgumentCaptor<CycleOrderStrategy.PlanContext> ctxCaptor =
                 ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
         verify(planner, org.mockito.Mockito.times(2)).plan(ctxCaptor.capture());
-        assertThat(ctxCaptor.getAllValues().get(0).privacy().privacyBase()).isNull();
-        assertThat(ctxCaptor.getAllValues().get(1).privacy().privacyBase()).isNotNull();
+        assertThat(ctxCaptor.getAllValues().get(0).privacy().privacyPlan()).isNull();
+        assertThat(ctxCaptor.getAllValues().get(1).privacy().privacyPlan()).isNotNull();
     }
 
     @Test
@@ -400,8 +401,8 @@ class BacktestServiceTest {
 
     // 엔진에 실제로 전달된 기준표의 적용 거래일 — null이면 그날은 매매 없음으로 떨어진 것
     private static LocalDate appliedBaseTradeDate(CycleOrderStrategy.PlanContext ctx) {
-        PrivacyTradeBase base = ctx.privacy().privacyBase();
-        return base == null ? null : base.trades().getFirst().tradeDate();
+        PrivacyPlan plan = ctx.privacy().privacyPlan();
+        return plan == null ? null : plan.trades().getFirst().tradeDate();
     }
 
     // 적용 거래일이 tradeDate인 기준 매매표 (주문 명세는 비워도 tradeDate 판별에는 1건이면 충분)

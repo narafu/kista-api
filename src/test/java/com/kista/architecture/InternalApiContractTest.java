@@ -47,10 +47,6 @@ class InternalApiContractTest {
     private static final Set<Class<?>> WRAPPERS = Set.of(
             ResponseEntity.class, List.class, Set.class, Collection.class, Optional.class, Map.class);
 
-    // 4단계(F5)에서 엔드포인트째 삭제될 예정인 임시 예외 — 상수 조회용 StrategyCapabilityResponse는 contract로 옮기지 않는다
-    private static final Set<String> PENDING_REMOVAL_CONTROLLERS = Set.of(
-            "com.kista.matching.adapter.in.web.StrategyCapabilityInternalController");
-
     private static JavaClasses classes;
 
     @BeforeAll
@@ -65,7 +61,6 @@ class InternalApiContractTest {
         int handlerCount = 0;
         for (JavaClass controller : classes) {
             if (!controller.isAnnotatedWith(RestController.class)) continue;
-            if (PENDING_REMOVAL_CONTROLLERS.contains(controller.getName())) continue;
             String[] classPaths = classPaths(controller);
             for (JavaMethod method : controller.getMethods()) {
                 Method reflected = method.reflect();

@@ -72,7 +72,8 @@ class CycleOrderComputer {
                 new CycleOrderStrategy.PlanContext.InfiniteInputs(
                         divisionCount, prevClosePrice, starPointPrice, isReverseMode, isFirstReverseDay);
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
-                new CycleOrderStrategy.PlanContext.PrivacyInputs(initialUsdDeposit, privacyBase, currentPrice);
+                new CycleOrderStrategy.PlanContext.PrivacyInputs(
+                        initialUsdDeposit, privacyBase == null ? null : privacyBase.toPlan(), currentPrice);
 
         // VR 전략 전용 입력 조립 — 사이클·버전 상세를 DB에서 조회, 미존재 시 데이터 무결성 오류로 fail-fast
         CycleOrderStrategy.PlanContext.VrInputs vrInputs = null;

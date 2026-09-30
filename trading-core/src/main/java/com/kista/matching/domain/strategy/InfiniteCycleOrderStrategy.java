@@ -3,7 +3,7 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
+import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.ReverseModePosition;
 import com.kista.matching.domain.model.VrPosition;
@@ -43,14 +43,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public boolean requiresPrevClose() { return true; }
 
     @Override
-    public boolean supportsReverseMode() { return true; }
-
-    @Override
     public boolean tracksReverseMode() { return true; }
-
-    // RuntimeSettings 기본 허용값(20/30/40)과 동기화 — 기본값은 20
-    @Override
-    public List<Integer> availableDivisionCounts() { return List.of(20, 30, 40); }
 
     @Override
     public int allocationPriority() { return 1; }
@@ -167,7 +160,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     @Override
-    public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyTradeBase privacyBase, int divisionCount) {
+    public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyPlan privacyPlan, int divisionCount) {
         if (price == null) return null;
         BigDecimal multiplier = BigDecimal.valueOf(divisionCount * MIN_DEPOSIT_FACTOR);
         return price.multiply(multiplier).setScale(2, HALF_UP);

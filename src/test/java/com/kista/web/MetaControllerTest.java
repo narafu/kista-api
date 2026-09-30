@@ -1,25 +1,16 @@
 package com.kista.web;
 
 import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.web.dto.StrategyCapability;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
-import org.mockito.Answers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.client.RestClient;
-
-import java.util.List;
 
 import static com.kista.support.WebMvcTestSupport.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,17 +28,6 @@ class MetaControllerTest {
     @MockitoBean AppErrorLogPort appErrorLogPort;
     @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
-    @MockitoBean(answers = Answers.RETURNS_DEEP_STUBS) RestClient internalApiRestClient;
-
-    @BeforeEach
-    void setUp() {
-        var capability = new StrategyCapability(false, true, List.of(20, 30, 40));
-        when(internalApiRestClient.get()
-                .uri(anyString(), any(Object[].class))
-                .retrieve()
-                .body(StrategyCapability.class))
-                .thenReturn(capability);
-    }
 
     @Test
     void getBundle_anonymous_returns401() throws Exception {
@@ -69,6 +49,26 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.tickers.length()").value(tickerCount))
                 .andExpect(jsonPath("$.brokers").isArray())
                 .andExpect(jsonPath("$.strategyStatuses").isArray());
+    }
+
+    // capability는 sharedkernel 상수에서 직접 조립한다 — 내부 API(RestClient) 없이 JSON shape 유지
+    // StrategyType 선언 순서(INFINITE, PRIVACY, VR)대로 직렬화된다
+    @Test
+    void getBundle_authenticated_strategyTypesCarryCapabilityFields() throws Exception {
+        mockMvc.perform(get("/api/meta")
+                        .with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.strategyTypes[0].code").value("INFINITE"))
+                .andExpect(jsonPath("$.strategyTypes[0].requiresPrivacyBase").value(false))
+                .andExpect(jsonPath("$.strategyTypes[0].supportsReverseMode").value(true))
+                .andExpect(jsonPath("$.strategyTypes[0].tickerFixed").value(false))
+                .andExpect(jsonPath("$.strategyTypes[0].divisionCounts.length()").value(3))
+                .andExpect(jsonPath("$.strategyTypes[0].divisionCounts[0]").value(20))
+                .andExpect(jsonPath("$.strategyTypes[1].code").value("PRIVACY"))
+                .andExpect(jsonPath("$.strategyTypes[1].requiresPrivacyBase").value(true))
+                .andExpect(jsonPath("$.strategyTypes[1].tickerFixed").value(true))
+                .andExpect(jsonPath("$.strategyTypes[2].code").value("VR"))
+                .andExpect(jsonPath("$.strategyTypes[2].availableTickers[0]").value("TQQQ"));
     }
 
     @Test

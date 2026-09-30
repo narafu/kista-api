@@ -64,4 +64,17 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.needsCapCheck(null, VR_POSITION)).isTrue();
         assertThat(vr.allocationPriority()).isZero();
     }
+
+    // capability 기본 메서드는 구현체별 재정의 없이 StrategyType.capability()(sharedkernel SSOT)로 위임한다
+    @Test
+    void capability_methods_delegate_to_strategy_type_constant() {
+        for (CycleOrderStrategy strategy : new CycleOrderStrategy[]{
+                new InfiniteCycleOrderStrategy(null, null), new PrivacyCycleOrderStrategy(null), new VrCycleOrderStrategy(null)}) {
+            var capability = strategy.cycleType().capability();
+            assertThat(strategy.capability()).isEqualTo(capability);
+            assertThat(strategy.requiresPrivacyBase()).isEqualTo(capability.requiresPrivacyBase());
+            assertThat(strategy.supportsReverseMode()).isEqualTo(capability.supportsReverseMode());
+            assertThat(strategy.availableDivisionCounts()).isEqualTo(capability.divisionCounts());
+        }
+    }
 }

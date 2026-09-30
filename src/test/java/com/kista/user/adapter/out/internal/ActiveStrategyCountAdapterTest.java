@@ -1,4 +1,4 @@
-package com.kista.web.trading;
+package com.kista.user.adapter.out.internal;
 
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;

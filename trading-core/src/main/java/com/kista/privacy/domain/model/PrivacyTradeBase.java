@@ -1,5 +1,6 @@
 package com.kista.privacy.domain.model;
 
+import com.kista.matching.domain.model.PrivacyPlan;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -19,6 +20,15 @@ public record PrivacyTradeBase(
         if (currentCycleStart == null || currentCycleStart.signum() <= 0) {
             throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + currentCycleStart);
         }
+    }
+
+    // 커널 입력 타입으로 변환 — 데이터 소유자(privacy)가 matching 커널 계약에 맞춰 준다(matching은 privacy 비참조)
+    public PrivacyPlan toPlan() {
+        List<PrivacyPlan.PrivacyPlannedTrade> planned = trades.stream()
+                .map(t -> new PrivacyPlan.PrivacyPlannedTrade(
+                        t.tradeDate(), t.ticker(), t.orderType(), t.direction(), t.quantity(), t.price()))
+                .toList();
+        return new PrivacyPlan(holdings, currentCycleStart, planned);
     }
 
     public record PrivacyTrade(

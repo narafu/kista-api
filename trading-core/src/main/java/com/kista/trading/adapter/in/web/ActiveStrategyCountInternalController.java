@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-// user.ActiveStrategyCountPort 구현체(web.trading.ActiveStrategyCountAdapter)가 소비하는
+// user.ActiveStrategyCountPort 구현체(user.adapter.out.internal.ActiveStrategyCountAdapter)가 소비하는
 // 내부 전용 엔드포인트 — account/trading 타입을 root에 노출하지 않기 위함
 @Tag(name = "내부 API", description = "서버 간 내부 호출 전용 엔드포인트 (X-Internal-Token 인증)")
 @RestController

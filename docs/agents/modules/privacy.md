@@ -1,7 +1,7 @@
 ## com.kista.privacy (`:trading-core`)
 
 com.kista.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기준 매매표(PRIVACY 전략의 전역 SSOT 매매 계획). "domain"·"port"·"usecase"·"event" 4개 NamedInterface, service·adapter internal. PRIVACY *전략 실행* 로직은 matching/trading 소유 — 이 모듈은 계획 데이터만
-  domain/model/       ← FidaOrderCommand/FidaPlannedOrder/PrivacyCurrentBase/PrivacyDates/PrivacyTradeBase/PrivacyTradeBaseView/PrivacyTradeConflictException/PrivacyTradeSaveResult/PrivacyTradeValidationReport 등. `PrivacyDates.releaseDateFor()/tradeDateOf()`는 FIDA 발행일↔거래일 업무 규칙 헬퍼(시간대 변환 아님)
+  domain/model/       ← FidaOrderCommand/FidaPlannedOrder/PrivacyCurrentBase/PrivacyDates/PrivacyTradeBase/PrivacyTradeBaseView/PrivacyTradeConflictException/PrivacyTradeSaveResult/PrivacyTradeValidationReport 등. `PrivacyDates.releaseDateFor()/tradeDateOf()`는 FIDA 발행일↔거래일 업무 규칙 헬퍼(시간대 변환 아님). `PrivacyTradeBase.toPlan()`은 matching 커널 입력 `matching.domain.model.PrivacyPlan`(holdings·currentCycleStart·trades)으로 변환한다 — 데이터 소유자가 커널 계약에 맞춰 주는 방향이라 privacy → matching("kernel") 단방향 엣지이고 matching은 privacy를 참조하지 않는다. 호출부: trading `CycleOrderComputer`/`CycleRotationService`, tradingstats `BacktestEngine`(null-safe 삼항으로 `toPlan()` 호출)
   application/port/output/ ← PrivacyTradePort
   application/usecase/ ← PrivacyUseCase(FidaOrderController)/PrivacyTradeValidationUseCase(TradingOpenScheduler)
   application/service/ ← internal — PrivacyService(notify 직접 호출 대신 `application/event/PrivacyAlertRaisedEvent`("event", tradingnotify가 소비) 발행)/PrivacyTradeValidationService
@@ -16,4 +16,4 @@ com.kista.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기준 매매�
   - direction/orderType은 `sharedkernel.OrderDirection`{BUY/SELL} / `OrderType`{LOC/MOC/LIMIT} — VARCHAR + `@Enumerated(STRING)`
   - 저장 순서: **BUY → SELL**, BUY는 price **내림차순**, SELL은 price **오름차순** — `PrivacyTradePersistenceAdapter` 정렬 처리
 - FIDA 수신 흐름: `(tradeDate, ticker)` 없음 → 201 / 내용 동일 → 200(멱등) / 내용 다름 → `PrivacyTradeConflictException` → 409
-- 스케쥴러: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.plan()` → `PrivacyStrategy.buildOrders()` (`CycleOrderComputer`가 전략별 분기, 스케쥴러 배치 흐름 상세는 `docs/agents/workflow.md`)
+- 스케쥴러: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.plan()` → `PrivacyStrategy.buildOrders(balance, initialUsdDeposit, PrivacyPlan)` (`CycleOrderComputer`가 전략별 분기, 스케쥴러 배치 흐름 상세는 `docs/agents/workflow.md`)

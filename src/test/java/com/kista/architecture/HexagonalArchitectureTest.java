@@ -95,19 +95,28 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("matching 커널은 sharedkernel·privacy 외 다른 모듈에 의존하지 않는다")
+    @DisplayName("matching 커널은 sharedkernel 외 다른 com.kista 모듈에 의존하지 않는다")
     void matching_must_not_depend_on_other_modules() {
-        // matching은 주문생성 순수 계산 커널만 담는다는 전제로 outbound를 sharedkernel·privacy로 한정한다
-        // (privacy는 PRIVACY 전략이 FidaPlannedOrder 등 계획 데이터를 읽어야 해 sharedkernel과 별개로 허용).
+        // matching은 주문생성 순수 계산 커널만 담는다 — outbound는 sharedkernel(공용 어휘)뿐이다.
+        // PRIVACY 기준 매매표는 커널 소유 PrivacyPlan으로 받고, 변환은 privacy(PrivacyTradeBase.toPlan())가 맡는다.
+        // 허용 목록 방식이라 신규 모듈(contract/tradingstats/tradingnotify 등)이 생겨도 자동으로 차단된다.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista.matching..")
-                .should().dependOnClassesThat()
-                .resideInAnyPackage(
-                        "com.kista.finance..", "com.kista.notify..", "com.kista.broker..",
-                        "com.kista.trading..", "com.kista.tradingstats..", "com.kista.tradingnotify..",
-                        "com.kista.market..", "com.kista.stats..",
-                        "com.kista.admin..", "com.kista.user..", "com.kista.account..",
-                        "com.kista.web..", "com.kista.platform..");
+                .should().dependOnClassesThat(
+                        resideInAPackage("com.kista..")
+                                .and(resideOutsideOfPackage("com.kista.matching.."))
+                                .and(resideOutsideOfPackage("com.kista.sharedkernel..")));
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("인바운드 어댑터(adapter.in·web)는 org.springframework.web.client(RestClient 등)에 의존하지 않는다")
+    void inbound_adapters_must_not_perform_outbound_http() {
+        // 컨트롤러가 직접 다른 프로세스를 호출하면 포트 없이 아웃바운드 I/O를 하게 되고, 호출 대상 장애가
+        // 공개 엔드포인트 장애로 전파된다 — 외부 호출은 adapter.out의 *HttpAdapter(포트 구현)만 맡는다.
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage("com.kista..adapter.in..", "com.kista.web..")
+                .should().dependOnClassesThat().resideInAPackage("org.springframework.web.client..");
         rule.check(classes);
     }
 

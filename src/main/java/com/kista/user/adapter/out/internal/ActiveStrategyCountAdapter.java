@@ -1,4 +1,4 @@
-package com.kista.web.trading;
+package com.kista.user.adapter.out.internal;
 
 import com.kista.user.application.port.output.ActiveStrategyCountPort;
 import lombok.RequiredArgsConstructor;
