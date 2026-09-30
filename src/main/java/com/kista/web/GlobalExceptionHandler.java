@@ -125,7 +125,7 @@ public class GlobalExceptionHandler {
 
     // ── 5xx — 서버 오류, DB 저장 ────────────────────────────────────────────────
     // KisApiException/TossApiException(trading-core 소유) 핸들러는 TradingExceptionHandler로 이관됐다 —
-    // app_error_logs 저장은 POST /api/internal/errors(ErrorLogInternalController)로 위임
+    // trading-core의 app_error_logs 저장은 Redis Stream(stream:app.error → admin AppErrorStreamConsumer)으로 전달된다
 
     // catch-all — MAPPINGS 테이블 우선 조회, 매핑 있으면 4xx 응답(saveErrorLog 없음) / 없으면 500 처리
     @ExceptionHandler(Exception.class)

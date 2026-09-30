@@ -4,12 +4,17 @@ import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+// 내부 API를 "나가는" 프로세스(root)에만 존재하는 클라이언트 빈 — internal.api.base-url이 설정된 경우에만 등록된다.
+// trading-core는 root를 호출하지 않으므로(프로세스 간 단방향 root→trading-core) base-url을 설정하지 않아 이 빈이 없다 —
+// GradleModuleBoundaryTest가 trading-core→platform.internalapi 참조 자체를 금지한다.
 @Configuration
+@ConditionalOnProperty(prefix = "internal.api", name = "base-url")
 @EnableConfigurationProperties(InternalApiProperties.class)
 public class InternalApiClientConfig {
 

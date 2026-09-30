@@ -1,6 +1,7 @@
 package com.kista.trading.adapter.in.redis;
 
 import com.kista.platform.redis.RedisStreamConfig;
+import com.kista.platform.redis.RedisStreams;
 import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,7 @@ public class UserEventStreamBridge {
     }
 
     private String payload(MapRecord<String, String, String> record) {
-        return record.getValue().get("payload");
+        return RedisStreams.payload(record);
     }
 
     private void ack(String streamKey, RecordId recordId) {

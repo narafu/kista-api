@@ -1,40 +1,29 @@
 package com.kista.admin.application.service;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.user.application.event.ApprovalRequirementDisabledEvent;
-import com.kista.admin.application.usecase.AdminSettingsUseCase;
-import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
-import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.admin.application.port.output.RuntimeSettingsPort;
-import com.kista.sharedkernel.port.BrokerEnabledPort;
 import com.kista.user.application.port.output.ApprovalPolicyPort;
-import com.kista.sharedkernel.port.StrategyCreationPolicyPort;
-import com.kista.sharedkernel.StrategyCreationSettings;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-
+// root 소유 런타임 설정(가입 승인·벤치마크)의 트랜잭션 경계 — 승인 판정(ApprovalPolicyPort)과 관리자 변경이 같은 행 잠금을 공유한다.
+// 증권사 등록 허용·전략 생성 정책은 trading-core 소유라 여기 없다(AdminSettingsService가 TradingPolicyPort로 위임).
 @Service
 @RequiredArgsConstructor
 @Transactional
-class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUseCase, ApprovalPolicyPort, BrokerEnabledPort,
-        StrategyCreationPolicyPort {
+class RuntimeSettingsService implements ApprovalPolicyPort {
 
-    private final RuntimeSettingsPort settingsPort; // 런타임 설정 영속화 포트
-    private final AuditLogPort auditLogPort; // 관리자 설정 변경 감사 로그 포트
+    private final RuntimeSettingsPort settingsPort; // root 런타임 설정 영속화 포트
     private final ApplicationEventPublisher eventPublisher; // 트랜잭션 커밋 후 이벤트 발행용
 
-    @Override
+    // 갱신 결과 — 감사 로그 diff 계산용으로 이전·저장 값을 함께 돌려준다
+    record Updated(RuntimeSettings previous, RuntimeSettings saved) {}
+
     @Transactional(readOnly = true)
-    public RuntimeSettings getSettings() {
+    public RuntimeSettings load() {
         return settingsPort.load();
     }
 
@@ -44,62 +33,17 @@ class RuntimeSettingsService implements RuntimeSettingsUseCase, AdminSettingsUse
         return settingsPort.loadForUpdate().approvalRequired();
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public boolean enabled(Broker broker) {
-        return settingsPort.load().brokers().get(broker).enabled();
-    }
-
-    // strategy-config가 소비하는 포트 구현 — StrategyCreationSettings가 sharedkernel 공용 타입이라 매핑 없이 그대로 반환한다.
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<StrategyCreationSettings> find(StrategyType type) {
-        return Optional.ofNullable(settingsPort.load().strategies().get(type));
-    }
-
-    @Override
-    public RuntimeSettings updateSettings(UUID adminId, RuntimeSettings settings, boolean benchmarksProvided) {
+    // benchmarksProvided=false면 요청에서 benchmarks가 생략된 것으로 보고 기존 값을 유지한다(문서화된 예외 규칙).
+    // 요청 도메인 변환 단계에서 null이 이미 기본값으로 치환되므로 컨트롤러가 전달한 플래그로만 판별 가능하다.
+    public Updated update(RuntimeSettings requested, boolean benchmarksProvided) {
         RuntimeSettings previous = settingsPort.loadForUpdate();
-
-        // benchmarks는 생략 시 기존 값 유지가 문서화된 예외 규칙 — auth/brokers/strategies는 여전히 전체 교체.
-        // settings.benchmarks()는 toDomain() 변환 과정에서 이미 기본값으로 치환되어 null 여부로 생략을 판별할 수 없으므로
-        // 컨트롤러가 전달한 benchmarksProvided(요청 DTO 단계의 null 여부)를 기준으로 판단한다.
-        RuntimeSettings effective = benchmarksProvided
-                ? settings
-                : new RuntimeSettings(settings.approvalRequired(), settings.brokers(), settings.strategies(),
-                        previous.benchmarks());
-
-        // 검증 완료된 전체 설정을 단일 저장 호출로 반영한다.
+        RuntimeSettings effective = benchmarksProvided ? requested : requested.withBenchmarks(previous.benchmarks());
         RuntimeSettings saved = settingsPort.save(effective);
-
         // 승인 설정을 끄는 순간 PENDING 사용자 일괄 승인이 필요 — admin↔user 빈 순환을 피하려
         // UserUseCase를 직접 호출하지 않고 커밋 후 이벤트로 위임한다(user 모듈이 구독해 처리).
         if (previous.approvalRequired() && !saved.approvalRequired()) {
             eventPublisher.publishEvent(new ApprovalRequirementDisabledEvent());
         }
-
-        auditLogPort.log(adminId, "RUNTIME_SETTINGS_UPDATE", "RUNTIME_SETTINGS", null, diff(previous, saved));
-        return saved;
-    }
-
-    // approvalRequired 외에 브로커·전략 활성화 상태 변경도 감사 로그에서 추적 가능하도록 diff만 담는다.
-    private Map<String, Object> diff(RuntimeSettings previous, RuntimeSettings saved) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("approvalRequired", saved.approvalRequired());
-        Map<String, Boolean> brokerChanges = new LinkedHashMap<>();
-        for (Broker broker : Broker.values()) {
-            boolean before = previous.brokers().get(broker).enabled();
-            boolean after = saved.brokers().get(broker).enabled();
-            if (before != after) brokerChanges.put(broker.name(), after);
-        }
-        if (!brokerChanges.isEmpty()) payload.put("brokers", brokerChanges);
-        Map<String, Boolean> strategyChanges = new LinkedHashMap<>();
-        for (StrategyType type : StrategyType.values()) {
-            boolean before = previous.strategies().get(type).enabled();
-            boolean after = saved.strategies().get(type).enabled();
-            if (before != after) strategyChanges.put(type.name(), after);
-        }
-        if (!strategyChanges.isEmpty()) payload.put("strategies", strategyChanges);
-        return payload;
+        return new Updated(previous, saved);
     }
 }

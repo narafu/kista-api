@@ -1,11 +1,11 @@
 package com.kista.trading.adapter.in.redis;
 
 import com.kista.platform.redis.RedisStreamConfig;
+import com.kista.platform.redis.RedisStreams;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -61,15 +61,9 @@ public class UserEventStreamConsumerConfig implements DisposableBean {
         }
     }
 
-    // 스트림이 아직 없으면 MKSTREAM으로 함께 생성, 그룹이 이미 있으면(BUSYGROUP) 무시
+    // 스트림·그룹 보장 규약은 platform RedisStreams(root app.error 구독과 공용)
     private void ensureGroup(String streamKey) {
-        try {
-            redisTemplate.opsForStream().createGroup(streamKey, ReadOffset.from("0"), RedisStreamConfig.TRADING_CONSUMER_GROUP);
-        } catch (RedisSystemException e) {
-            if (!String.valueOf(e.getCause()).contains("BUSYGROUP")) {
-                throw e;
-            }
-        }
+        RedisStreams.ensureGroup(redisTemplate, streamKey, RedisStreamConfig.TRADING_CONSUMER_GROUP);
     }
 
     @Override

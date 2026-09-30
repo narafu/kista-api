@@ -6,6 +6,8 @@ import com.kista.platform.security.SecurityConfig;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
+import com.kista.admin.domain.model.RuntimeSettingsBundle;
+import com.kista.sharedkernel.TradingPolicySettings;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
@@ -52,7 +54,7 @@ class AdminSettingsControllerTest {
 
     @Test
     void getSettings_returnsTypedSettingsForAdmin() throws Exception {
-        when(adminSettingsUseCase.getSettings()).thenReturn(RuntimeSettings.defaults());
+        when(adminSettingsUseCase.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
 
         mockMvc.perform(get("/api/admin/settings").with(authentication(adminToken(ADMIN_ID))))
                 .andExpect(status().isOk())
@@ -82,8 +84,8 @@ class AdminSettingsControllerTest {
 
     @Test
     void putSettings_savesCompletePayload() throws Exception {
-        RuntimeSettings defaults = RuntimeSettings.defaults();
-        RuntimeSettings updated = new RuntimeSettings(false, defaults.brokers(), defaults.strategies(), null);
+        RuntimeSettingsBundle updated = new RuntimeSettingsBundle(
+                new RuntimeSettings(false, null), TradingPolicySettings.defaults());
         when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(false))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")
@@ -109,11 +111,10 @@ class AdminSettingsControllerTest {
 
     @Test
     void putSettings_savesProvidedBenchmarks() throws Exception {
-        RuntimeSettings defaults = RuntimeSettings.defaults();
         BenchmarkSettings customBenchmarks = new BenchmarkSettings(
                 new BenchmarkFieldSettings<>(List.of("SPY", "QQQ"), "QQQ"));
-        RuntimeSettings updated = new RuntimeSettings(true, defaults.brokers(), defaults.strategies(),
-                customBenchmarks);
+        RuntimeSettingsBundle updated = new RuntimeSettingsBundle(
+                new RuntimeSettings(true, customBenchmarks), TradingPolicySettings.defaults());
         when(adminSettingsUseCase.updateSettings(eq(ADMIN_ID), any(), eq(true))).thenReturn(updated);
 
         mockMvc.perform(put("/api/admin/settings")

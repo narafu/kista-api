@@ -5,6 +5,7 @@ import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
+import com.kista.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.sharedkernel.StrategyFieldSettings;
 import com.kista.sharedkernel.StrategyType;
@@ -26,12 +27,13 @@ public record RuntimeSettingsResponse(
         @Schema(description = "ETF 벤치마크 비교 자산 설정")
         BenchmarkResponse benchmarks
 ) {
-    public static RuntimeSettingsResponse from(RuntimeSettings settings) {
-        // 도메인 enum 키를 유지하면서 웹 응답 타입으로 변환한다.
+    public static RuntimeSettingsResponse from(RuntimeSettingsBundle bundle) {
+        // 도메인 enum 키를 유지하면서 웹 응답 타입으로 변환한다 — root 설정과 trading-core 정책을 한 응답으로 합친다.
+        RuntimeSettings settings = bundle.runtime();
         Map<Broker, BrokerResponse> brokers = new EnumMap<>(Broker.class);
-        settings.brokers().forEach((key, value) -> brokers.put(key, new BrokerResponse(value.enabled())));
+        bundle.tradingPolicy().brokers().forEach((key, value) -> brokers.put(key, new BrokerResponse(value.enabled())));
         Map<StrategyType, StrategyResponse> strategies = new EnumMap<>(StrategyType.class);
-        settings.strategies().forEach((key, value) -> strategies.put(key, StrategyResponse.from(value)));
+        bundle.tradingPolicy().strategies().forEach((key, value) -> strategies.put(key, StrategyResponse.from(value)));
         return new RuntimeSettingsResponse(new AuthResponse(settings.approvalRequired()),
                 Map.copyOf(brokers), Map.copyOf(strategies), BenchmarkResponse.from(settings.benchmarks()));
     }

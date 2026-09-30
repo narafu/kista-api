@@ -1,6 +1,9 @@
 package com.kista.admin.application.service;
 
+import com.kista.admin.application.port.output.TradingPolicyPort;
 import com.kista.admin.domain.model.RuntimeSettings;
+import com.kista.admin.domain.model.RuntimeSettingsBundle;
+import com.kista.sharedkernel.TradingPolicySettings;
 import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.user.application.usecase.UserUseCase;
@@ -12,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -23,6 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 
 @Tag("integration")
 @SpringBootTest
@@ -35,6 +41,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
     @Autowired UserUseCase userUseCase; // 실제 가입 트랜잭션
     @Autowired JdbcTemplate jdbcTemplate; // 경합 제어와 최종 상태 검증
     @Autowired PlatformTransactionManager transactionManager; // advisory lock 보유 트랜잭션
+    @MockitoBean TradingPolicyPort tradingPolicyPort; // trading-core 정책은 별도 프로세스라 대역 — 이 테스트는 root 승인 잠금만 본다
 
     private final ExecutorService executor = Executors.newFixedThreadPool(3); // 경합 참여 스레드
     private UUID adminId; // 감사 로그 FK용 관리자
@@ -42,12 +49,14 @@ class RuntimeSettingsApprovalConcurrencyIT {
 
     @BeforeEach
     void setUp() {
+        given(tradingPolicyPort.load()).willReturn(TradingPolicySettings.defaults());
+        given(tradingPolicyPort.replace(any())).willAnswer(inv -> inv.getArgument(0));
         adminId = UUID.randomUUID();
         signupId = UUID.randomUUID();
         jdbcTemplate.update("INSERT INTO users (id, kakao_id, nickname, status, role, notification_channel, created_at, updated_at) " +
                         "VALUES (?, ?, ?, 'ACTIVE', 'ADMIN', 'TELEGRAM', now(), now())",
                 adminId, "admin-" + adminId, "admin");
-        adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults(), true);
+        adminSettingsUseCase.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
 
         // 가입 INSERT를 승인 설정 판정 뒤에 일시 정지시키는 테스트 전용 트리거다.
         jdbcTemplate.execute("CREATE OR REPLACE FUNCTION block_runtime_settings_signup() RETURNS trigger AS $$ " +
@@ -60,7 +69,7 @@ class RuntimeSettingsApprovalConcurrencyIT {
     void tearDown() {
         jdbcTemplate.execute("DROP TRIGGER IF EXISTS block_runtime_settings_signup_trigger ON users");
         jdbcTemplate.execute("DROP FUNCTION IF EXISTS block_runtime_settings_signup()");
-        adminSettingsUseCase.updateSettings(adminId, RuntimeSettings.defaults(), true);
+        adminSettingsUseCase.updateSettings(adminId, RuntimeSettingsBundle.defaults(), true);
         // UserService.register()가 가입 시 개인 그룹(finance_groups + OWNER 멤버십)을 자동 생성하므로,
         // users를 하드 삭제하기 전에 그 그룹 자체와 멤버십부터 지워야 FK 위반이 나지 않는다
         // (finance_group_members_user_id_fkey, finance_groups_owner_user_id_fkey).
@@ -87,9 +96,9 @@ class RuntimeSettingsApprovalConcurrencyIT {
                 userUseCase.register("signup-" + signupId, "signup", signupId, null));
         awaitWaitingAdvisoryLock();
 
-        RuntimeSettings defaults = RuntimeSettings.defaults();
-        RuntimeSettings approvalDisabled = new RuntimeSettings(false, defaults.brokers(), defaults.strategies());
-        Future<RuntimeSettings> disable = executor.submit(() ->
+        RuntimeSettingsBundle approvalDisabled = new RuntimeSettingsBundle(
+                new RuntimeSettings(false, RuntimeSettings.defaults().benchmarks()), TradingPolicySettings.defaults());
+        Future<RuntimeSettingsBundle> disable = executor.submit(() ->
                 adminSettingsUseCase.updateSettings(adminId, approvalDisabled, true));
 
         releaseGate.countDown();

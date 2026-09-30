@@ -10,8 +10,6 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Iterator;
-import java.util.Map;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
@@ -58,31 +56,19 @@ class RuntimeSettingsPersistenceAdapter implements RuntimeSettingsPort {
 
     private RuntimeSettings deserialize(String json) {
         try {
-            JsonNode root = backfillMissingEnumKeys(objectMapper.readTree(json));
-            return objectMapper.treeToValue(root, RuntimeSettings.class);
+            return objectMapper.treeToValue(dropLegacyTradingSections(objectMapper.readTree(json)), RuntimeSettings.class);
         } catch (JacksonException | IllegalArgumentException e) {
             throw new IllegalStateException("runtime settings deserialization failed", e);
         }
     }
 
-    // DB 행 저장 이후 Broker/StrategyType에 신규 enum 상수가 추가된 경우, 관리자가 아직 값을
-    // 채워넣지 않은 새 키를 defaults()로 보충해 전체 앱 장애(누락 키 검증 실패) 대신 안전하게 로드되게 한다.
-    private JsonNode backfillMissingEnumKeys(JsonNode root) {
-        JsonNode defaultsNode = objectMapper.valueToTree(RuntimeSettings.defaults());
-        backfillSection((ObjectNode) root, defaultsNode, "brokers");
-        backfillSection((ObjectNode) root, defaultsNode, "strategies");
-        return root;
-    }
-
-    private void backfillSection(ObjectNode root, JsonNode defaultsNode, String section) {
-        ObjectNode sectionNode = (ObjectNode) root.get(section);
-        ObjectNode defaultsSection = (ObjectNode) defaultsNode.get(section);
-        Iterator<Map.Entry<String, JsonNode>> defaultFields = defaultsSection.properties().iterator();
-        while (defaultFields.hasNext()) {
-            Map.Entry<String, JsonNode> entry = defaultFields.next();
-            if (!sectionNode.has(entry.getKey())) {
-                sectionNode.set(entry.getKey(), entry.getValue());
-            }
+    // brokers/strategies 섹션은 trading-core 소유(trading.trading_runtime_settings)로 이동했다 — 이동 이전에 저장된
+    // 행에 남아 있는 두 키는 무시한다(다음 save()에서 자연히 사라진다). benchmarks 누락은 RuntimeSettings 생성자가 보충한다.
+    private static JsonNode dropLegacyTradingSections(JsonNode root) {
+        if (root instanceof ObjectNode node) {
+            node.remove("brokers");
+            node.remove("strategies");
         }
+        return root;
     }
 }

@@ -6,7 +6,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
 import com.kista.account.application.port.output.AccountPort;
-import com.kista.sharedkernel.port.BrokerEnabledPort;
+import com.kista.account.application.port.output.BrokerEnabledPort;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.sharedkernel.Broker;
 import org.junit.jupiter.api.DisplayName;

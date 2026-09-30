@@ -43,10 +43,10 @@ TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' \
 INTERNAL_API_TOKEN='local-token' INTERNAL_API_BASE_URL=http://localhost:8081 \
 SPRING_PROFILES_ACTIVE=local java -jar build/libs/app.jar &
 
-# trading-core (8081) — INTERNAL_API_BASE_URL은 반대로 root(8080)를 가리킴
+# trading-core (8081) — root를 호출하지 않으므로 INTERNAL_API_BASE_URL 불필요(토큰은 수신 검증용으로만 필요)
 JWT_SIGNING_KEY='...' AES_ENCRYPTION_KEY='...' \
 TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' \
-INTERNAL_API_TOKEN='local-token' INTERNAL_API_BASE_URL=http://localhost:8080 SERVER_PORT=8081 \
+INTERNAL_API_TOKEN='local-token' SERVER_PORT=8081 \
 SPRING_PROFILES_ACTIVE=local java -jar trading-core/build/libs/trading-core-0.0.1-SNAPSHOT.jar &
 ```
 - `SPRING_PROFILES_ACTIVE=local` 누락 시 `DevAuthController`(`/api/auth/dev-token`)가 `@Profile("local")`로 비활성화돼 404 — 양쪽 프로세스 모두 필요

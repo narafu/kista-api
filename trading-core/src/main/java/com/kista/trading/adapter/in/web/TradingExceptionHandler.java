@@ -6,11 +6,12 @@ import com.kista.broker.domain.model.BrokerRateLimitException;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.privacy.domain.model.PrivacyTradeConflictException;
+import com.kista.sharedkernel.AppErrorRaisedEvent;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.OrderCancelException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -20,12 +21,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -48,8 +46,9 @@ import java.util.NoSuchElementException;
 // 예외만 대상).
 //
 // KisApiException/TossApiException(둘 다 trading-core 소유)은 이 클래스가 직접 처리하되, app_error_logs가
-// root 소유 테이블이라 POST /api/internal/errors(ErrorLogInternalController, root)를 호출해 저장을 위임한다 —
-// 이 계획의 다른 내부 API는 전부 root->trading-core였으나 이 건은 방향이 반대다.
+// root 소유 테이블이라 AppErrorRaisedEvent(sharedkernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream
+// (stream:app.error)으로 root에 push한다 — 과거의 동기 HTTP(POST /api/internal/errors) 역방향 호출은 폐지됐다.
+// trading-core는 root를 호출하지 않는다(프로세스 간 단방향 root→trading-core).
 //
 // ManualTradingService.java:118/135가 KisApiException/TossApiException을 cause로 담은
 // ManualTradingException을 던지는 경로에서, root GlobalExceptionHandler.handleAll이 하던
@@ -57,9 +56,9 @@ import java.util.NoSuchElementException;
 // :118은 priceFetcher가 내부에서 절대 예외를 던지지 않아 도달 불가(주석 확인), :135는 catch 블록에서
 // eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()))를 먼저 호출하는데
 // 이 이벤트를 구독하는 TradingAlertNotifier.onTradingError가 userId==null이면
-// notifyPort.notifyError(...)를 호출하고, 이는 com.kista.admin.adapter.out.aop.ErrorLogAspect가
-// AOP로 가로채 appErrorLogPort.save(...)를 실행한다 — 즉 app_error_logs 저장은 이미
-// 예외 처리기와 무관한 별도 경로로 보장되어 있어 여기서 재현할 필요가 없다.
+// notifyPort.notifyError(...)를 호출하고, TradingNotifyAdapter.notifyError가 AppErrorRaisedEvent를 함께
+// 발행해 같은 스트림으로 app_error_logs에 저장된다 — 즉 저장은 이미 예외 처리기와 무관한 별도 경로로
+// 보장되어 있어 여기서 재현할 필요가 없다.
 //
 // @Order(HIGHEST_PRECEDENCE)는 방어적 명시가 아니라 실질적 불변식이다: root
 // GlobalExceptionHandler.handleAll은 @ExceptionHandler(Exception.class) catch-all이라 모든
@@ -81,21 +80,11 @@ import java.util.NoSuchElementException;
 @RequiredArgsConstructor
 public class TradingExceptionHandler {
 
-    // root ErrorLogInternalController(/api/internal/errors) 호출용 — 순수 로그 저장이라 공용 짧은 타임아웃 빈 재사용.
-    // 이 클래스는 @RestControllerAdvice라 basePackages와 무관하게 모든 @WebMvcTest 슬라이스에서
-    // 빈으로 생성된다 — RestClient를 직접 주입하면 두 모듈의 웹 슬라이스 테스트 전체가 빈 미제공으로
-    // 컨텍스트 로드에 실패한다. ObjectProvider로 늦춰 받으면 빈이 없어도(테스트 슬라이스 등) 생성 자체는
-    // 성공하고, 실제 호출 시점(getIfAvailable)에만 없으면 null로 스킵한다 — 런타임에는
-    // InternalApiClientConfig(:shared)의 빈이 정상 해석된다
-    private final ObjectProvider<RestClient> internalApiRestClient;
+    // AppErrorRaisedEvent 발행용 — 저장은 AppErrorStreamPublisher(Redis Stream) → root admin이 담당
+    private final ApplicationEventPublisher eventPublisher;
 
     // status·title 쌍 튜플 — 테이블 값 타입 (root GlobalExceptionHandler와 동일 패턴)
     private record Mapping(HttpStatus status, String title) {}
-
-    // root ErrorLogInternalController의 ErrorLogRequest와 JSON 필드가 구조적으로 일치하는 own-type —
-    // 컴파일 경계상 root DTO를 직접 import할 수 없어 JSON 계약만 맞춰 별도 선언(다른 내부 API의
-    // 요청/응답 own-type 이중복제와 동일 패턴)
-    private record ErrorLogRequest(String errorType, String message, String stackTrace, Map<String, String> context) {}
 
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.of(
             BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials"),
@@ -121,7 +110,7 @@ public class TradingExceptionHandler {
         return problem(m.status(), m.title(), ex.getMessage());
     }
 
-    // root GlobalExceptionHandler.handleKisApiException과 동일 매핑(503) — 저장만 내부 API로 위임
+    // root GlobalExceptionHandler.handleKisApiException과 동일 매핑(503) — 저장은 이벤트로 위임
     @ExceptionHandler(KisApiException.class)
     public ProblemDetail handleKisApiException(KisApiException ex) {
         reportErrorLog(ex);
@@ -129,7 +118,7 @@ public class TradingExceptionHandler {
         return problem(HttpStatus.SERVICE_UNAVAILABLE, "KIS API Error", ex.getMessage());
     }
 
-    // root GlobalExceptionHandler.handleTossApiException과 동일 매핑(503) — 저장만 내부 API로 위임
+    // root GlobalExceptionHandler.handleTossApiException과 동일 매핑(503) — 저장은 이벤트로 위임
     @ExceptionHandler(TossApiException.class)
     public ProblemDetail handleTossApiException(TossApiException ex) {
         reportErrorLog(ex);
@@ -162,7 +151,7 @@ public class TradingExceptionHandler {
     }
 
     // root GlobalExceptionHandler.handleAll과 동일 구조의 catch-all — GENERIC_MAPPINGS 우선 조회,
-    // 매핑 있으면 4xx(에러 로그 없음) / 없으면 500 + 내부 API로 에러 로그 저장(reportErrorLog 재사용).
+    // 매핑 있으면 4xx(에러 로그 없음) / 없으면 500 + 이벤트로 에러 로그 보고(reportErrorLog 재사용).
     // isClientDisconnect 가드는 root GlobalExceptionHandler.handleAll에서 그대로 이식 — AccountController/
     // TradingCycleController 등 이 basePackages 안에는 kista-ui가 직접 호출하는 브라우저·모바일 라우트가
     // 섞여있어(내부 전용 API만 있는 게 아님), 클라이언트 중도 이탈(broken pipe)이 app_error_logs를
@@ -200,23 +189,14 @@ public class TradingExceptionHandler {
         return detail;
     }
 
-    // app_error_logs가 root 소유라 내부 API로 저장 위임 — 호출 실패가 원래 응답을 막지 않도록 격리
+    // app_error_logs가 root 소유라 이벤트로 보고 — 발행 실패(리스너 예외)가 원래 응답을 막지 않도록 격리
     // (root AppErrorLogPersistenceAdapter.save(Exception,String)과 동일하게 스택트레이스 전체를 보내고
     // 30줄 truncate는 저장 측(root)에서 수행)
     private void reportErrorLog(Exception ex) {
         try {
-            RestClient client = internalApiRestClient.getIfAvailable();
-            if (client == null) return; // 내부 API 클라이언트 미구성(웹 슬라이스 테스트 등) — 저장 생략
-            StringWriter sw = new StringWriter();
-            ex.printStackTrace(new PrintWriter(sw));
-            client.post()
-                    .uri("/api/internal/errors")
-                    .body(new ErrorLogRequest(ex.getClass().getSimpleName(), ex.getMessage(), sw.toString(),
-                            Map.of("caller", "TradingExceptionHandler")))
-                    .retrieve()
-                    .toBodilessEntity();
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, "TradingExceptionHandler"));
         } catch (Exception reportEx) {
-            log.warn("오류 로그 저장 실패: {}", reportEx.getMessage());
+            log.warn("오류 보고 이벤트 발행 실패: {}", reportEx.getMessage());
         }
     }
 

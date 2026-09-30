@@ -112,7 +112,7 @@ cd ../kista-infra
 ./scripts/env.sh edit kista-api      # 복호화 → 편집 → 저장 시 자동 재암호화 → commit/push하면 다음 배포에 반영
 ```
 - 필수/선택 키 전체 목록은 `kista-infra/.env.example` 참고(JWT_SIGNING_KEY·AES_ENCRYPTION_KEY·ADMIN_KAKAO_IDS·INTERNAL_API_TOKEN·INTERNAL_API_BASE_URL·카카오 OAuth·텔레그램 봇·DB_URL/USERNAME/PASSWORD·CORS_ALLOWED_ORIGINS·HEARTBEAT_*_URL·GRAFANA_CLOUD_OTLP_* 등)
-- `INTERNAL_API_BASE_URL`(admin adapter가 trading-core `/api/internal/**`를 호출할 base URL, 기본값 `http://localhost:8080`)은 런타임 프로세스 분리 없이 단일 `app.jar`(kista-api role)로 배포되는 한 자기 자신(`server.port`)을 가리켜야 한다 — `server.port`를 바꾸면 이 값도 같이 갱신할 것, 안 하면 admin 재정렬/수동 체결 보정 내부 API 호출이 전부 실패한다
+- `INTERNAL_API_BASE_URL`(root가 trading-core `/api/internal/**`를 호출할 base URL — kista-api·kista-scheduler만 설정, 기본값 `http://localhost:8081`)은 root→trading-core 단방향이다. kista-trading에는 두지 않는다 — trading-core는 root를 호출하지 않으며(`GradleModuleBoundaryTest.tradingCoreMustNotCallRootInternalApi`), 이 값이 없으면 `InternalApiClientConfig` 빈 자체가 등록되지 않는다(`@ConditionalOnProperty`). trading-core→root 방향 전달은 Redis Stream(`stream:app.error`)뿐
 - `SPRING_PROFILES_ACTIVE=prod`는 `deploy/server/docker-compose.yml`의 `environment:`에 고정
 - 편집한 시크릿은 push해야 서버에 반영된다 — kista-infra의 `server-deploy.yml`이 매 배포마다 복호화해 `/opt/kista-api/.env`를 렌더링·덮어쓰지만, 재시작 대상은 caddy/postgres/redis뿐이라 kista-api에 실제로 반영하려면 kista-api 자체 배포도 별도로 트리거해야 함
 

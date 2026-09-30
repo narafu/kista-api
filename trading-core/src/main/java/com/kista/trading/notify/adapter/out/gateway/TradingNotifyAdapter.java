@@ -1,8 +1,10 @@
 package com.kista.trading.notify.adapter.out.gateway;
 
+import com.kista.sharedkernel.AppErrorRaisedEvent;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -15,9 +17,14 @@ class TradingNotifyAdapter implements TradingNotifyPort {
 
     private final TelegramHttpClient telegramHttpClient;
     private final TelegramProperties props; // 관리자 봇 설정 — botToken()/chatId()
+    private final ApplicationEventPublisher eventPublisher; // 오류 보고 이벤트 발행 — root app_error_logs 저장 경로
+
+    // root TelegramAdapter.notifyError는 admin ErrorLogAspect가 가로채 app_error_logs에 저장하지만 이 프로세스엔
+    // 그 aspect가 없다 — 같은 보장을 위해 AppErrorRaisedEvent를 발행해 Redis Stream으로 root에 넘긴다
 
     @Override
     public void notifyError(Exception e) {
+        eventPublisher.publishEvent(AppErrorRaisedEvent.of(e, "TradingNotifyAdapter"));
         send(String.format("<b>⚠️ 관리자 알림</b>%n%s", e.getMessage()));
     }
 

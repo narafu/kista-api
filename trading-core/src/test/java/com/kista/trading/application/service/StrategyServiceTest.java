@@ -10,7 +10,7 @@ import com.kista.matching.domain.model.*; import com.kista.trading.domain.model.
 import com.kista.sharedkernel.RecurringMode;
 import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.sharedkernel.StrategyFieldSettings;
-import com.kista.sharedkernel.port.StrategyCreationPolicyPort;
+import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.trading.application.port.output.StrategyPort; import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.MarginPort;

@@ -4,6 +4,9 @@ import com.kista.sharedkernel.Broker;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
+import com.kista.admin.domain.model.RuntimeSettingsBundle;
+import com.kista.sharedkernel.BrokerSettings;
+import com.kista.sharedkernel.TradingPolicySettings;
 import com.kista.sharedkernel.RecurringMode;
 import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.sharedkernel.StrategyFieldSettings;
@@ -30,16 +33,18 @@ public record AdminSettingsRequest(
         @Schema(description = "ETF 벤치마크 비교 자산 설정 (생략 시 기존 값 유지)")
         @Valid BenchmarkRequest benchmarks
 ) {
-    public RuntimeSettings toDomain() {
-        // 모든 enum 키와 전략별 필수 필드를 먼저 변환·검증한 뒤 도메인 설정을 생성한다.
-        Map<Broker, RuntimeSettings.BrokerSettings> brokerSettings = new EnumMap<>(Broker.class);
+    public RuntimeSettingsBundle toDomain() {
+        // 모든 enum 키와 전략별 필수 필드를 먼저 변환·검증한 뒤 도메인 설정을 생성한다 — brokers/strategies는
+        // trading-core 소유 정책(TradingPolicySettings), auth/benchmarks는 root 소유(RuntimeSettings)로 갈라 담는다.
+        Map<Broker, BrokerSettings> brokerSettings = new EnumMap<>(Broker.class);
         brokers.forEach((key, value) -> brokerSettings.put(key,
-                new RuntimeSettings.BrokerSettings(require(value, "broker").enabled())));
+                new BrokerSettings(require(value, "broker").enabled())));
         Map<StrategyType, StrategyCreationSettings> strategySettings = new EnumMap<>(StrategyType.class);
         strategies.forEach((key, value) -> strategySettings.put(key,
                 require(value, "strategy").toDomain(key)));
         BenchmarkSettings benchmarkSettings = benchmarks != null ? benchmarks.toDomain() : null;
-        return new RuntimeSettings(auth.approvalRequired(), brokerSettings, strategySettings, benchmarkSettings);
+        return new RuntimeSettingsBundle(new RuntimeSettings(auth.approvalRequired(), benchmarkSettings),
+                new TradingPolicySettings(brokerSettings, strategySettings));
     }
 
     private static <T> T require(T value, String label) {

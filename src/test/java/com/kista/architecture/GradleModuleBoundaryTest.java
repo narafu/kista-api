@@ -94,4 +94,22 @@ class GradleModuleBoundaryTest {
                 .should().dependOnClassesThat().resideInAPackage("..adapter.in.schedule..")
                 .check(importedClasses);
     }
+
+    // trading-core는 root를 호출하지 않는다 — 프로세스 간 런타임 의존은 root→trading-core 단방향(HTTP)이고, 반대 방향은
+    // Redis Stream push(stream:app.error)뿐이다. 과거 BrokerEnabledHttpAdapter/StrategyCreationPolicyHttpAdapter/
+    // TradingExceptionHandler가 root 내부 API를 동기 호출하던 역방향 의존이 재발하지 않도록 내부 API 클라이언트 패키지
+    // (platform.internalapi — InternalApiClientConfig/RestClient 빈) 참조 자체를 컴파일 산출물 기준으로 금지한다.
+    @Test
+    void tradingCoreMustNotCallRootInternalApi() {
+        var importedClasses = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPath(Path.of("trading-core/build/classes/java/main"));
+
+        assertThat(importedClasses).isNotEmpty();
+
+        ArchRuleDefinition.noClasses()
+                .that().resideInAPackage("com.kista..")
+                .should().dependOnClassesThat().resideInAPackage("com.kista.platform.internalapi..")
+                .check(importedClasses);
+    }
 }

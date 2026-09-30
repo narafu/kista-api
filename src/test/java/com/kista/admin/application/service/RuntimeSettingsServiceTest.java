@@ -1,14 +1,11 @@
 package com.kista.admin.application.service;
 
+import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.user.application.event.ApprovalRequirementDisabledEvent;
-import com.kista.sharedkernel.Broker;
-import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.admin.application.port.output.RuntimeSettingsPort;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -16,130 +13,85 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyDefaults;
-import com.kista.sharedkernel.StrategyType;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class RuntimeSettingsServiceTest {
 
     @Mock RuntimeSettingsPort settingsPort; // 설정 저장소 대역
-    @Mock AuditLogPort auditLogPort; // 감사 로그 대역
     @Mock ApplicationEventPublisher eventPublisher; // 커밋 후 이벤트 발행 대역
 
     private RuntimeSettingsService service; // 테스트 대상
 
     @BeforeEach
     void setUp() {
-        service = new RuntimeSettingsService(settingsPort, auditLogPort, eventPublisher);
+        service = new RuntimeSettingsService(settingsPort, eventPublisher);
     }
 
     @Test
-    void getSettings_loadsCurrentSettings() {
+    void load_returnsCurrentSettings() {
         RuntimeSettings settings = RuntimeSettings.defaults();
         when(settingsPort.load()).thenReturn(settings);
 
-        assertThat(service.getSettings()).isEqualTo(settings);
+        assertThat(service.load()).isEqualTo(settings);
     }
 
     @Test
-    void updateSettings_whenApprovalTurnsOff_savesOnceAndPublishesApprovalDisabledEvent() {
-        UUID adminId = UUID.randomUUID();
+    void update_whenApprovalTurnsOff_savesOnceAndPublishesApprovalDisabledEvent() {
         RuntimeSettings previous = RuntimeSettings.defaults();
-        RuntimeSettings updated = new RuntimeSettings(false, previous.brokers(), previous.strategies());
+        RuntimeSettings updated = new RuntimeSettings(false, previous.benchmarks());
         when(settingsPort.loadForUpdate()).thenReturn(previous);
         when(settingsPort.save(updated)).thenReturn(updated);
 
-        assertThat(service.updateSettings(adminId, updated, true)).isEqualTo(updated);
+        RuntimeSettingsService.Updated result = service.update(updated, true);
 
+        assertThat(result.previous()).isEqualTo(previous);
+        assertThat(result.saved()).isEqualTo(updated);
         verify(settingsPort, times(1)).save(updated);
         verify(eventPublisher).publishEvent(any(ApprovalRequirementDisabledEvent.class));
-        verify(auditLogPort).log(eq(adminId), eq("RUNTIME_SETTINGS_UPDATE"), eq("RUNTIME_SETTINGS"),
-                isNull(), anyMap());
     }
 
     @Test
-    void updateSettings_whenBenchmarksOmitted_keepsPreviousBenchmarks() {
-        UUID adminId = UUID.randomUUID();
+    void update_whenBenchmarksOmitted_keepsPreviousBenchmarks() {
         BenchmarkSettings customBenchmarks = new BenchmarkSettings(
                 new BenchmarkFieldSettings<>(List.of("VOO", "TQQQ"), "VOO"));
-        RuntimeSettings previous = new RuntimeSettings(true, RuntimeSettings.defaults().brokers(),
-                RuntimeSettings.defaults().strategies(), customBenchmarks);
+        RuntimeSettings previous = new RuntimeSettings(true, customBenchmarks);
         // 요청 DTO에 benchmarks가 없었던 상황을 재현 — toDomain()이 이미 null을 defaults()로 치환한 상태
-        RuntimeSettings requested = new RuntimeSettings(false, previous.brokers(), previous.strategies(), null);
-        RuntimeSettings expectedSaved = new RuntimeSettings(false, previous.brokers(), previous.strategies(),
-                customBenchmarks);
+        RuntimeSettings requested = new RuntimeSettings(false, null);
+        RuntimeSettings expectedSaved = new RuntimeSettings(false, customBenchmarks);
         when(settingsPort.loadForUpdate()).thenReturn(previous);
         when(settingsPort.save(expectedSaved)).thenReturn(expectedSaved);
 
-        RuntimeSettings saved = service.updateSettings(adminId, requested, false);
+        RuntimeSettingsService.Updated result = service.update(requested, false);
 
-        assertThat(saved.benchmarks()).isEqualTo(customBenchmarks);
+        assertThat(result.saved().benchmarks()).isEqualTo(customBenchmarks);
         verify(settingsPort).save(expectedSaved);
         verify(settingsPort, never()).save(requested);
     }
 
     @Test
     void approvalRequiredForUpdate_delegatesToLoadForUpdate() {
-        when(settingsPort.loadForUpdate()).thenReturn(settingsWithApprovalRequired(true));
+        when(settingsPort.loadForUpdate()).thenReturn(RuntimeSettings.defaults());
 
-        boolean result = service.approvalRequiredForUpdate();
-
-        assertThat(result).isTrue();
+        assertThat(service.approvalRequiredForUpdate()).isTrue();
         verify(settingsPort).loadForUpdate();
     }
 
     @Test
-    @DisplayName("enabled는 저장된 브로커 설정을 그대로 반환한다")
-    void enabled_delegatesToLoadedSettings() {
-        when(settingsPort.load()).thenReturn(settingsWithBroker(Broker.KIS, false));
-
-        boolean result = service.enabled(Broker.KIS);
-
-        assertThat(result).isFalse();
-    }
-
-    @Test
-    @DisplayName("find() — 활성 전략 타입의 설정을 trading 소유 타입으로 매핑해 반환한다")
-    void find_mapsAdminSettingsToTradingType() {
-        RuntimeSettings settings = RuntimeSettings.defaults();
-        when(settingsPort.load()).thenReturn(settings);
-
-        Optional<com.kista.sharedkernel.StrategyCreationSettings> result =
-                service.find(StrategyType.INFINITE);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().enabled()).isTrue();
-        assertThat(result.get().divisionCount().defaultValue()).isEqualTo(StrategyDefaults.DEFAULT_DIVISION_COUNT);
-    }
-
-    @Test
-    void updateSettings_whenApprovalRemainsOff_doesNotApproveUsersAgain() {
-        UUID adminId = UUID.randomUUID();
-        RuntimeSettings defaults = RuntimeSettings.defaults();
-        RuntimeSettings disabled = new RuntimeSettings(false, defaults.brokers(), defaults.strategies());
+    void update_whenApprovalRemainsOff_doesNotPublishEvent() {
+        RuntimeSettings disabled = new RuntimeSettings(false, BenchmarkSettings.defaults());
         when(settingsPort.loadForUpdate()).thenReturn(disabled);
         when(settingsPort.save(disabled)).thenReturn(disabled);
 
-        service.updateSettings(adminId, disabled, true);
+        service.update(disabled, true);
 
         verifyNoInteractions(eventPublisher);
-    }
-
-    private RuntimeSettings settingsWithApprovalRequired(boolean approvalRequired) {
-        RuntimeSettings defaults = RuntimeSettings.defaults();
-        return new RuntimeSettings(approvalRequired, defaults.brokers(), defaults.strategies());
-    }
-
-    private RuntimeSettings settingsWithBroker(Broker broker, boolean enabled) {
-        RuntimeSettings defaults = RuntimeSettings.defaults();
-        // 지정된 broker의 enabled 상태를 변경한 새 설정 반환
-        var brokers = new java.util.EnumMap<>(defaults.brokers());
-        brokers.put(broker, new RuntimeSettings.BrokerSettings(enabled));
-        return new RuntimeSettings(defaults.approvalRequired(), brokers, defaults.strategies());
     }
 }

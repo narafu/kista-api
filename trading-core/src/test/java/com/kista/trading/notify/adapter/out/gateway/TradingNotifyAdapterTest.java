@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClient;
 
@@ -27,13 +28,15 @@ class TradingNotifyAdapterTest {
 
     TradingNotifyAdapter adapter;
 
+    @Mock ApplicationEventPublisher eventPublisher; // AppErrorRaisedEvent 발행 대역
+
     static final TelegramProperties PROPS = new TelegramProperties("admin-token", "admin-chat");
     static final TelegramProperties EMPTY_PROPS = new TelegramProperties("", "admin-chat");
 
     @BeforeEach
     void setUp() {
         TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
-        adapter = new TradingNotifyAdapter(httpClient, PROPS);
+        adapter = new TradingNotifyAdapter(httpClient, PROPS, eventPublisher);
     }
 
     @Test
@@ -68,7 +71,7 @@ class TradingNotifyAdapterTest {
     @Test
     void notifyError_withEmptyToken_skipsRestClientCall() {
         TelegramHttpClient httpClient = new TelegramHttpClient(restClient);
-        TradingNotifyAdapter noTokenAdapter = new TradingNotifyAdapter(httpClient, EMPTY_PROPS);
+        TradingNotifyAdapter noTokenAdapter = new TradingNotifyAdapter(httpClient, EMPTY_PROPS, eventPublisher);
 
         noTokenAdapter.notifyError(new RuntimeException("실패"));
 

@@ -1,76 +1,24 @@
 package com.kista.admin.domain.model;
 
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyFieldSettings;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyDefaults;
-
-import java.math.BigDecimal;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
+// root가 소유하는 런타임 설정 — 가입 승인 정책(user 불변식) + ETF 벤치마크 비교 자산(stats 소비).
+// 증권사 신규 등록 허용·전략 생성 정책은 집행 주체인 trading-core가 소유한다(sharedkernel.TradingPolicySettings) —
+// 관리자 화면·공개 설정 응답에서는 RuntimeSettingsBundle이 둘을 합쳐 보여준다.
 public record RuntimeSettings(
         boolean approvalRequired, // 신규 가입 승인 필요 여부
-        Map<Broker, BrokerSettings> brokers, // 증권사별 신규 등록 설정
-        Map<StrategyType, StrategyCreationSettings> strategies, // 전략별 신규 생성 설정
         BenchmarkSettings benchmarks // ETF 벤치마크 비교 자산 설정
 ) {
     public RuntimeSettings {
-        brokers = immutableEnumMap(Broker.class, brokers, "broker");
-        strategies = immutableEnumMap(StrategyType.class, strategies, "strategy");
         // benchmarks 도입 이전에 저장된 행에는 이 필드가 없으므로 역직렬화 시 기본값으로 보충한다.
         if (benchmarks == null) benchmarks = BenchmarkSettings.defaults();
     }
 
-    // benchmarks 도입 이전 호출부와의 호환을 위한 생성자 — 기본값을 적용한다.
-    public RuntimeSettings(boolean approvalRequired, Map<Broker, BrokerSettings> brokers,
-            Map<StrategyType, StrategyCreationSettings> strategies) {
-        this(approvalRequired, brokers, strategies, null);
-    }
-
+    // 현재 운영 동작을 보존하는 기본값 — 저장 행이 없을 때 적용
     public static RuntimeSettings defaults() {
-        // 현재 운영 동작을 보존하는 증권사 기본값을 구성한다.
-        Map<Broker, BrokerSettings> brokers = new EnumMap<>(Broker.class);
-        for (Broker broker : Broker.values()) {
-            brokers.put(broker, new BrokerSettings(true));
-        }
-
-        // 전략별 현재 생성 옵션과 기본값을 구성한다.
-        Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
-        strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
-                field(true, List.of(StrategyTicker.values()), StrategyTicker.SOXL),
-                field(true, List.of(20, 30, 40), StrategyDefaults.DEFAULT_DIVISION_COUNT), null, null, null));
-        strategies.put(StrategyType.PRIVACY, new StrategyCreationSettings(true,
-                field(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL), null, null, null, null));
-        strategies.put(StrategyType.VR, new StrategyCreationSettings(true,
-                field(false, List.of(StrategyTicker.TQQQ), StrategyTicker.TQQQ), null,
-                field(true, List.of(RecurringMode.values()), RecurringMode.HOLD),
-                field(true, List.of(BigDecimal.valueOf(10), BigDecimal.valueOf(15), BigDecimal.valueOf(20)), BigDecimal.valueOf(15)),
-                field(true, List.of(1, 2, 4), 2)));
-        return new RuntimeSettings(true, brokers, strategies);
+        return new RuntimeSettings(true, BenchmarkSettings.defaults());
     }
 
-    private static <T> StrategyFieldSettings<T> field(boolean customizable, List<T> values, T defaultValue) {
-        return new StrategyFieldSettings<>(customizable, values, defaultValue);
-    }
-
-    private static <K extends Enum<K>, V> Map<K, V> immutableEnumMap(
-            Class<K> keyType, Map<K, V> values, String label) {
-        Objects.requireNonNull(values, label + " settings");
-        EnumMap<K, V> copy = new EnumMap<>(keyType);
-        copy.putAll(values);
-        // 알 수 없는 문자열 키는 JSON 역직렬화에서 거부되고 누락된 enum 키도 여기서 거부한다.
-        if (copy.size() != keyType.getEnumConstants().length || copy.values().stream().anyMatch(Objects::isNull)) {
-            throw new IllegalArgumentException(label + " settings must contain every known key");
-        }
-        return Map.copyOf(copy);
-    }
-
-    public record BrokerSettings(boolean enabled) { // 증권사 신규 등록 허용 값
+    // benchmarks만 교체 — 요청에서 benchmarks가 생략됐을 때 기존 값을 유지하는 데 쓴다
+    public RuntimeSettings withBenchmarks(BenchmarkSettings newBenchmarks) {
+        return new RuntimeSettings(approvalRequired, newBenchmarks);
     }
 }

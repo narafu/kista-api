@@ -1,20 +1,13 @@
 package com.kista.admin.domain.model;
 
-import com.kista.sharedkernel.Broker;
-import com.kista.trading.domain.model.Strategy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyFieldSettings;
 
+// 증권사 등록 허용·전략 생성 정책은 sharedkernel.TradingPolicySettings(trading-core 소유)로 이동했다 —
+// 그 검증은 shared 모듈의 TradingPolicySettingsTest가 담당하고 여기서는 root 소유 필드만 본다.
 class RuntimeSettingsTest {
 
     @Test
@@ -22,74 +15,33 @@ class RuntimeSettingsTest {
         RuntimeSettings settings = RuntimeSettings.defaults();
 
         assertThat(settings.approvalRequired()).isTrue();
-        assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
-        assertThat(settings.brokers().values()).allMatch(RuntimeSettings.BrokerSettings::enabled);
-        assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
-        assertThat(settings.strategies().values()).allMatch(StrategyCreationSettings::enabled);
-        assertThat(settings.strategies().get(StrategyType.INFINITE).divisionCount())
-                .isEqualTo(new StrategyFieldSettings<>(true, List.of(20, 30, 40), 20));
-        assertThat(settings.strategies().get(StrategyType.PRIVACY).ticker())
-                .isEqualTo(new StrategyFieldSettings<>(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL));
-        assertThat(settings.strategies().get(StrategyType.VR).recurringMode().defaultValue())
-                .isEqualTo(RecurringMode.HOLD);
+        assertThat(settings.benchmarks()).isEqualTo(BenchmarkSettings.defaults());
     }
 
     @Test
-    void rejectsMissingKnownBrokerOrStrategyKeys() {
-        RuntimeSettings defaults = RuntimeSettings.defaults();
+    void nullBenchmarksFallBackToDefaults() {
+        // benchmarks 도입 이전 저장 행(필드 없음)의 역직렬화와 같은 경로 — 기본값으로 보충된다.
+        RuntimeSettings settings = new RuntimeSettings(false, null);
 
-        assertThatThrownBy(() -> new RuntimeSettings(true,
-                Map.of(Broker.KIS, new RuntimeSettings.BrokerSettings(true)), defaults.strategies()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("broker");
-        assertThatThrownBy(() -> new RuntimeSettings(true, defaults.brokers(),
-                Map.of(StrategyType.INFINITE, defaults.strategies().get(StrategyType.INFINITE))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("strategy");
+        assertThat(settings.approvalRequired()).isFalse();
+        assertThat(settings.benchmarks()).isEqualTo(BenchmarkSettings.defaults());
     }
 
     @Test
-    void backwardCompatConstructorFillsBenchmarksDefaults() {
-        // benchmarks 도입 이전 호출부(3-arg 생성자)도 기본값을 채워야 한다.
-        RuntimeSettings defaults = RuntimeSettings.defaults();
-        RuntimeSettings viaThreeArg = new RuntimeSettings(true, defaults.brokers(), defaults.strategies());
+    void withBenchmarksReplacesOnlyBenchmarks() {
+        BenchmarkSettings custom = new BenchmarkSettings(new BenchmarkFieldSettings<>(List.of("VOO"), "VOO"));
 
-        assertThat(viaThreeArg.benchmarks()).isEqualTo(BenchmarkSettings.defaults());
+        RuntimeSettings replaced = new RuntimeSettings(false, null).withBenchmarks(custom);
+
+        assertThat(replaced.approvalRequired()).isFalse();
+        assertThat(replaced.benchmarks()).isEqualTo(custom);
     }
 
     @Test
-    void fieldRequiresAllowedDefaultAndSingleValueWhenFixed() {
-        assertThatThrownBy(() -> new StrategyFieldSettings<>(true, List.of(10, 20), 30))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("default");
-        assertThatThrownBy(() -> new StrategyFieldSettings<>(false, List.of(10, 20), 10))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-customizable");
-    }
+    void bundleDefaultsCombineRootAndTradingDefaults() {
+        RuntimeSettingsBundle bundle = RuntimeSettingsBundle.defaults();
 
-    @Test
-    void fixedFieldAppliesDefaultForOmissionAndRejectsExplicitChange() {
-        StrategyFieldSettings<String> field = new StrategyFieldSettings<>(false, List.of("SOXL"), "SOXL");
-
-        assertThat(field.resolve(null)).isEqualTo("SOXL");
-        assertThatThrownBy(() -> field.resolve("TQQQ"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-customizable");
-    }
-
-    @Test
-    void fixedRecurringModeMustBeHold() {
-        StrategyCreationSettings vr = RuntimeSettings.defaults().strategies().get(StrategyType.VR);
-
-        assertThatThrownBy(() -> new StrategyCreationSettings(true, vr.ticker(), null,
-                new StrategyFieldSettings<>(false, List.of(RecurringMode.DEPOSIT), RecurringMode.DEPOSIT),
-                vr.bandWidth(), vr.intervalWeeks()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HOLD");
-        assertThatThrownBy(() -> new StrategyCreationSettings(true, vr.ticker(), null,
-                new StrategyFieldSettings<>(false, List.of(RecurringMode.WITHDRAW), RecurringMode.WITHDRAW),
-                vr.bandWidth(), vr.intervalWeeks()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HOLD");
+        assertThat(bundle.runtime()).isEqualTo(RuntimeSettings.defaults());
+        assertThat(bundle.tradingPolicy()).isEqualTo(com.kista.sharedkernel.TradingPolicySettings.defaults());
     }
 }

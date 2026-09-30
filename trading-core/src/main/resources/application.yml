@@ -52,8 +52,7 @@ server:
 
 internal:
   api:
-    token: ${INTERNAL_API_TOKEN:}
-    base-url: ${INTERNAL_API_BASE_URL:http://localhost:8080} # 이 프로세스가 나가는 내부 API 호출 대상(root) — root의 동일 키는 반대 방향(trading-core)을 가리켜야 함
+    token: ${INTERNAL_API_TOKEN:} # X-Internal-Token 수신 검증용 — 이 프로세스는 내부 API를 호출하지 않으므로 base-url을 두지 않는다(root→trading-core 단방향)
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

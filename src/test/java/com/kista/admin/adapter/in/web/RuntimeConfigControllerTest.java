@@ -3,7 +3,7 @@ package com.kista.admin.adapter.in.web;
 import com.kista.platform.security.InternalTokenAuthFilter;
 import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
-import com.kista.admin.domain.model.RuntimeSettings;
+import com.kista.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
@@ -34,7 +34,7 @@ class RuntimeConfigControllerTest {
 
     @Test
     void getRuntimeConfig_isPublicAndDisablesCaching() throws Exception {
-        when(runtimeSettingsUseCase.getSettings()).thenReturn(RuntimeSettings.defaults());
+        when(runtimeSettingsUseCase.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
 
         mockMvc.perform(get("/api/runtime-config"))
                 .andExpect(status().isOk())

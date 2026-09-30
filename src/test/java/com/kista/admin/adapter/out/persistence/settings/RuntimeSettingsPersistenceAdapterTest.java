@@ -1,6 +1,5 @@
 package com.kista.admin.adapter.out.persistence.settings;
 
-import com.kista.sharedkernel.Broker;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -86,21 +85,18 @@ class RuntimeSettingsPersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("brokers 맵에 신규 enum 키(MOCK)가 없는 저장된 JSON도 defaults로 보충되어 로드된다")
-    void loadBackfillsMissingBrokerEnumKey() throws Exception {
-        // MOCK 도입 이전에 저장된 것처럼 KIS/TOSS만 있는 brokers 맵을 가진 JSON을 직접 구성
+    @DisplayName("brokers/strategies 섹션이 trading-core로 이동하기 전 저장된 JSON(두 키 잔존)도 root 필드만 읽어 로드된다")
+    void loadDropsLegacyTradingSections() throws Exception {
         ObjectNode root = (ObjectNode) objectMapper.valueToTree(RuntimeSettings.defaults());
-        ((ObjectNode) root.get("brokers")).remove("MOCK");
-        String staleJson = objectMapper.writeValueAsString(root);
-
+        root.put("approvalRequired", false);
+        root.putObject("brokers").putObject("KIS").put("enabled", false);
+        root.putObject("strategies");
         RuntimeSettingsEntity entity = new RuntimeSettingsEntity(
-                RuntimeSettingsPersistenceAdapter.SETTING_KEY, staleJson);
+                RuntimeSettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root));
         when(repository.findById(RuntimeSettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(entity));
-
         RuntimeSettings loaded = adapter.load();
-
-        assertThat(loaded.brokers()).containsKey(Broker.MOCK);
-        assertThat(loaded.brokers().get(Broker.MOCK).enabled()).isTrue();
+        assertThat(loaded.approvalRequired()).isFalse();
+        assertThat(loaded.benchmarks()).isEqualTo(RuntimeSettings.defaults().benchmarks());
     }
 
     @Test

@@ -8,7 +8,7 @@ import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
 import com.kista.account.application.usecase.AccountUseCase;
 import com.kista.account.application.port.output.AccountPort;
-import com.kista.sharedkernel.port.BrokerEnabledPort;
+import com.kista.account.application.port.output.BrokerEnabledPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,7 +30,7 @@ class AccountService implements AccountUseCase {
 
     private final AccountPort accountPort;
     private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
-    private final BrokerEnabledPort brokerEnabledPort; // 증권사 신규 등록 허용 여부 (admin RuntimeSettingsService가 구현)
+    private final BrokerEnabledPort brokerEnabledPort; // 증권사 신규 등록 허용 여부 (trading TradingPolicyService가 구현 — 정책 소유자)
     private final ApplicationEventPublisher eventPublisher; // 계좌 삭제 cascade 이벤트 발행
 
     @Override

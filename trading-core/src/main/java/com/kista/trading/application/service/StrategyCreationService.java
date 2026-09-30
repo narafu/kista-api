@@ -8,7 +8,7 @@ import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.matching.domain.model.BootstrapPosition;
 import com.kista.matching.domain.model.StrategyVrDetail;
 import com.kista.sharedkernel.*;
-import com.kista.sharedkernel.port.StrategyCreationPolicyPort;
+import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.trading.domain.model.*;
