@@ -93,7 +93,10 @@ jobs:
 
   build:
     name: Build & Push Image
-    runs-on: ubuntu-latest
+    # 배포 대상(OCI)이 arm64라 네이티브 arm64 러너에서 빌드한다(public 레포 무료). 2026-09-30 QEMU 에뮬레이션에서 전환 —
+    # kista-ui가 같은 구조(x86 + QEMU)에서 빌드 워커 SIGILL 크래시·무한 대기를 겪어 선제 적용.
+    # 주의: 레포를 private으로 바꾸면 이 러너는 유료/미할당이라 job이 시작조차 안 되고 무한 대기한다.
+    runs-on: ubuntu-24.04-arm
     needs: [changes, verify]
     if: needs.changes.outputs.api == 'true' || needs.changes.outputs.scheduler == 'true' || needs.changes.outputs.trading == 'true'
     outputs:
@@ -108,9 +111,6 @@ jobs:
           repo="ghcr.io/${GITHUB_REPOSITORY,,}"
           echo "image=${repo}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "latest=${repo}:latest" >> "$GITHUB_OUTPUT"
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
