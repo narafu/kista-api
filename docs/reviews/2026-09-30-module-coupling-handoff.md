@@ -1,6 +1,6 @@
 # 모듈 결합도 리팩토링 — 세션 인계 메모 (2026-09-30)
 
-다른 세션이 이어서 진행하기 위한 상태 기록. 설계 근거와 결함 목록(F1~F10)은 `docs/reviews/2026-09-30-module-coupling-review.md`, 단계별 변경 경위는 `docs/agents/modulith-migration-history.md` 끝의 "결합도 재검토 N단계" 절들이 SSOT다.
+다른 세션이 이어서 진행하기 위한 상태 기록. 전체 결과 브리핑(단계 요약·개선 지표·향후 과제)은 `2026-10-01-module-coupling-briefing.md`. 설계 근거와 결함 목록(F1~F10)은 `docs/reviews/2026-09-30-module-coupling-review.md`, 단계별 변경 경위는 `docs/agents/modulith-migration-history.md` 끝의 "결합도 재검토 N단계" 절들이 SSOT다.
 
 ## 1. 현재 상태
 
