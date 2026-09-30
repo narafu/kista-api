@@ -1,10 +1,10 @@
 ## com.kista.privacy (`:trading-core`)
 
-com.kista.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기준 매매표(PRIVACY 전략의 전역 SSOT 매매 계획). "domain"·"port"·"usecase" 3개 NamedInterface, service·adapter internal. PRIVACY *전략 실행* 로직은 matching/trading 소유 — 이 모듈은 계획 데이터만
+com.kista.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기준 매매표(PRIVACY 전략의 전역 SSOT 매매 계획). "domain"·"port"·"usecase"·"event" 4개 NamedInterface, service·adapter internal. PRIVACY *전략 실행* 로직은 matching/trading 소유 — 이 모듈은 계획 데이터만
   domain/model/       ← FidaOrderCommand/FidaPlannedOrder/PrivacyCurrentBase/PrivacyDates/PrivacyTradeBase/PrivacyTradeBaseView/PrivacyTradeConflictException/PrivacyTradeSaveResult/PrivacyTradeValidationReport 등. `PrivacyDates.releaseDateFor()/tradeDateOf()`는 FIDA 발행일↔거래일 업무 규칙 헬퍼(시간대 변환 아님)
   application/port/output/ ← PrivacyTradePort
   application/usecase/ ← PrivacyUseCase(FidaOrderController)/PrivacyTradeValidationUseCase(TradingOpenScheduler)
-  application/service/ ← internal — PrivacyService(notify 직접 호출 대신 sharedkernel `PrivacyAlertRaisedEvent` 발행)/PrivacyTradeValidationService
+  application/service/ ← internal — PrivacyService(notify 직접 호출 대신 `application/event/PrivacyAlertRaisedEvent`("event", trading.notify가 소비) 발행)/PrivacyTradeValidationService
   adapter/in/web/     ← internal — FidaOrderController(`POST /api/internal/fida-orders`)/PrivacyInternalQueryController(`GET /api/internal/privacy/trade-bases`)/PrivacyBaseInternalController(`GET|PATCH .../trade-bases/{baseId}`, `PATCH .../orders/{orderId}` — 관리자 수동 보정) + dto/FidaOrderResponse
   adapter/out/persistence/ ← PrivacyTradeBaseEntity + PrivacyTradeBaseOrderEntity + JpaRepository + PrivacyTradePersistenceAdapter
 

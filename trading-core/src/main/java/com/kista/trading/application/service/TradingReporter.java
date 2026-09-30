@@ -2,10 +2,10 @@ package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.TradingReport;
-import com.kista.sharedkernel.TradingReportReadyEvent;
+import com.kista.trading.domain.model.TradingReport;
+import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.sharedkernel.TradeLegSummary;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.Execution;

@@ -1,6 +1,6 @@
 package com.kista.trading.notify.adapter.out.gateway;
 
-import com.kista.sharedkernel.OrderCancelFailedEvent;
+import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

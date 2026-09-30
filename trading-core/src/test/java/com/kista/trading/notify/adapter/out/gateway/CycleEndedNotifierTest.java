@@ -3,7 +3,7 @@ package com.kista.trading.notify.adapter.out.gateway;
 import com.kista.trading.application.port.output.TradingUserProfilePort;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.notify.application.port.output.TradingUserNotificationPort;
-import com.kista.sharedkernel.CycleEndedEvent;
+import com.kista.trading.application.event.CycleEndedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

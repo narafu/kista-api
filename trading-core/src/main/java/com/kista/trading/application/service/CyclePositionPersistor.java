@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.CycleCompletedEvent;
+import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.sharedkernel.StrategyDefaults;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.*;

@@ -1,6 +1,6 @@
 package com.kista.trading.stats.adapter.out.alpaca;
 
-import com.kista.sharedkernel.DailyCandle;
+import com.kista.trading.stats.domain.model.DailyCandle;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;

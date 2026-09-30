@@ -2,7 +2,7 @@ package com.kista.trading.stats.domain.backtest;
 
 import com.kista.trading.stats.domain.model.backtest.BacktestCommand;
 import com.kista.trading.stats.domain.model.backtest.BacktestPoint;
-import com.kista.sharedkernel.DailyCandle;
+import com.kista.trading.stats.domain.model.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderType;

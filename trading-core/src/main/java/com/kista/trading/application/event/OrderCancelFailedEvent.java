@@ -1,4 +1,4 @@
-package com.kista.sharedkernel;
+package com.kista.trading.application.event;
 
 import java.util.UUID;
 

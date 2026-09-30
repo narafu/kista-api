@@ -3,7 +3,7 @@ package com.kista.trading.notify.adapter.out.gateway;
 import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.TradingReport;
+import com.kista.trading.domain.model.TradingReport;
 import com.kista.sharedkernel.UserPushNotificationRequestedEvent;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.notify.application.port.output.TradingUserNotificationPort;

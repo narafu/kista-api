@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.OrderCancelFailedEvent;
+import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;

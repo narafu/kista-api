@@ -5,7 +5,7 @@ import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.notify.application.port.output.TradingRealtimeNotificationPort;
 import com.kista.trading.notify.application.port.output.TradingUserNotificationPort;
 import com.kista.trading.notify.domain.model.TradeEventView;
-import com.kista.sharedkernel.TradingReportReadyEvent;
+import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.sharedkernel.TradeLegSummary;
 import lombok.RequiredArgsConstructor;

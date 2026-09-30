@@ -1,4 +1,7 @@
-package com.kista.sharedkernel;
+package com.kista.trading.application.event;
+
+import com.kista.sharedkernel.TradeLegSummary;
+import com.kista.trading.domain.model.TradingReport;
 
 import java.util.List;
 import java.util.UUID;

@@ -1,6 +1,6 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.NewCycleStartedEvent;
+import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
@@ -10,7 +10,7 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.application.port.output.*;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

@@ -1,6 +1,6 @@
 package com.kista.trading.application.service.support;
 
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;

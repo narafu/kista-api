@@ -7,7 +7,7 @@ import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.sharedkernel.Broker;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package com.kista.trading.notify.adapter.out.gateway;
 
-import com.kista.sharedkernel.PrivacyAlertRaisedEvent;
+import com.kista.privacy.application.event.PrivacyAlertRaisedEvent;
 import com.kista.trading.notify.application.port.output.TradingNotifyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

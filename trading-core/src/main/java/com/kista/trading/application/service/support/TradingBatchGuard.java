@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
-import com.kista.sharedkernel.BatchInterruptedEvent;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.BatchInterruptedEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.domain.model.BatchContext;
 
 import java.util.List;

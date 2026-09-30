@@ -24,7 +24,7 @@ import com.kista.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.trading.domain.strategy.*;
 import com.kista.matching.domain.strategy.*;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

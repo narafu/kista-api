@@ -1,8 +1,8 @@
 package com.kista.trading.stats.adapter.out.alpaca;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.sharedkernel.DailyCandle;
-import com.kista.sharedkernel.port.HistoricalCandlePort;
+import com.kista.trading.stats.domain.model.DailyCandle;
+import com.kista.trading.stats.application.port.output.HistoricalCandlePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

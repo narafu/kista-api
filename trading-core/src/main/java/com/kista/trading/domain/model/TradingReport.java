@@ -1,4 +1,7 @@
-package com.kista.sharedkernel;
+package com.kista.trading.domain.model;
+
+import com.kista.sharedkernel.StrategyType;
+import com.kista.sharedkernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

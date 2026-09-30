@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.TradingReportReadyEvent;
+import com.kista.trading.application.event.TradingReportReadyEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.account.domain.model.Account;
@@ -18,7 +18,7 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.sharedkernel.NotificationType;
 import com.kista.trading.domain.model.TradingUserProfile;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;

@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.NewCycleStartedEvent;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.NewCycleStartedEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.account.domain.model.Account;

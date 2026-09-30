@@ -1,4 +1,4 @@
-package com.kista.sharedkernel;
+package com.kista.privacy.application.event;
 
 // FIDA 기준 매매표 검증 경보 — privacy→notify 직접 호출을 끊기 위한 이벤트(market FearGreedFetchFailedEvent와 동일 패턴).
 // severity로 관리자 알림 채널 구분: BLOCKING=저장 차단(NotifyPort.notifyError), WARNING=경고 후 저장 진행(notifyInfo).

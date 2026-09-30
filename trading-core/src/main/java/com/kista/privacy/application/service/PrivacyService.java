@@ -1,6 +1,6 @@
 package com.kista.privacy.application.service;
 
-import com.kista.sharedkernel.PrivacyAlertRaisedEvent;
+import com.kista.privacy.application.event.PrivacyAlertRaisedEvent;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.privacy.application.usecase.PrivacyUseCase;
 import com.kista.privacy.domain.model.FidaOrderCommand;

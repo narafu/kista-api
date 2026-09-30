@@ -1,6 +1,6 @@
-package com.kista.sharedkernel.port;
+package com.kista.trading.stats.application.port.output;
 
-import com.kista.sharedkernel.DailyCandle;
+import com.kista.trading.stats.domain.model.DailyCandle;
 
 import java.time.LocalDate;
 import java.util.List;

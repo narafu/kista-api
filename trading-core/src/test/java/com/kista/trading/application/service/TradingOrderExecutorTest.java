@@ -14,7 +14,7 @@ import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.matching.domain.model.VrPosition;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.broker.domain.model.OrderInstruction;

@@ -1,8 +1,8 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.NewCycleStartedEvent;
-import com.kista.sharedkernel.TradingErrorEvent;
-import com.kista.sharedkernel.InsufficientBalanceEvent;
+import com.kista.trading.application.event.NewCycleStartedEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
+import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.broker.application.service.BrokerAdapterRegistry;
 import com.kista.account.domain.model.Account;
 import com.kista.privacy.domain.model.PrivacyTradeBase;

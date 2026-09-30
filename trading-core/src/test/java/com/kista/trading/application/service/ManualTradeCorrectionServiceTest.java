@@ -1,7 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.CycleEndedEvent;
+import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.trading.domain.model.ManualTradeCorrectionResult;

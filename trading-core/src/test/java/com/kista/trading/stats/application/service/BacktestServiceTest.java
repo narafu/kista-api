@@ -2,14 +2,14 @@ package com.kista.trading.stats.application.service;
 
 import com.kista.trading.stats.domain.model.backtest.BacktestCommand;
 import com.kista.trading.stats.domain.model.backtest.BacktestResult;
-import com.kista.sharedkernel.DailyCandle;
+import com.kista.trading.stats.domain.model.DailyCandle;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.sharedkernel.OrderType;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.sharedkernel.port.HistoricalCandlePort;
+import com.kista.trading.stats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;

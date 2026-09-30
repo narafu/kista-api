@@ -32,7 +32,7 @@ com.kista.broker/        :trading-core · CLOSED · "domain"/"port"/"application
 com.kista.trading/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"schedule"/"stats" · 주문·사이클 실행·전략 설정 + trading.notify + stats 서브패키지 → modules/trading.md
 com.kista.market/        :api       · CLOSED · "domain"/"port"/"event"     · 공포탐욕지수(CNN/Crypto) 애그리게이트          → modules/market.md
 com.kista.marketcalendar/ :trading-core · CLOSED · "domain"/"port"        · 미국 시장 휴장일 캘린더                        → modules/marketcalendar.md
-com.kista.privacy/       :trading-core · CLOSED · "domain"/"port"/"usecase" · FIDA 기준 매매표 전역 SSOT                   → modules/privacy.md
+com.kista.privacy/       :trading-core · CLOSED · "domain"/"port"/"usecase"/"event" · FIDA 기준 매매표 전역 SSOT                   → modules/privacy.md
 com.kista.stats/         :api       · CLOSED · "domain"/"usecase"/"port"/"event"/"schedule" · 주택/ETF 벤치마크 비교(계좌·Toss 통계는 trading.stats 소유) → modules/stats.md
 com.kista.admin/         :api       · CLOSED · "domain"/"usecase"/"port"   · 관리자 조회·정정·재정렬·런타임 설정            → modules/admin.md
 com.kista.user/          :api       · CLOSED · "domain"/"usecase"/"port"/"event" · 가입·승인·프로필·JWT 인증               → modules/user.md

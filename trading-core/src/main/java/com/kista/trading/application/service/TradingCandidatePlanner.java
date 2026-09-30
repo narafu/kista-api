@@ -12,7 +12,7 @@ import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.sharedkernel.OrderTiming;
 import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.InsufficientBalanceEvent;
+import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Order;

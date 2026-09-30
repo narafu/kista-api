@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.matching.domain.model.*;
 import com.kista.trading.application.port.output.*;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.sharedkernel.TradingErrorEvent;
+import com.kista.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

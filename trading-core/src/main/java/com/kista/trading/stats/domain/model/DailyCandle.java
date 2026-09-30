@@ -1,4 +1,4 @@
-package com.kista.sharedkernel;
+package com.kista.trading.stats.domain.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

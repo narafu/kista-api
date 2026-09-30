@@ -2,8 +2,8 @@ package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.NotificationType;
 import com.kista.trading.domain.model.TradingUserProfile;
-import com.kista.sharedkernel.MarketCloseEvent;
-import com.kista.sharedkernel.MarketOpenEvent;
+import com.kista.trading.application.event.MarketCloseEvent;
+import com.kista.trading.application.event.MarketOpenEvent;
 import com.kista.trading.application.port.output.TradingUserProfilePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
