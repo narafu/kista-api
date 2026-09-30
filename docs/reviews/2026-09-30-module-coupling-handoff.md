@@ -14,7 +14,7 @@
 | 4단계 — matching 커널 `PrivacyPlan`, `StrategyCapability` sharedkernel 승격, `/api/meta` HTTP 제거 (F4·F5) | 완료·검수·커밋 | `main` `a64aa3b` |
 | 5단계 — notify 순수 게이트웨이화 + 인프라 공용화 (F6) | 완료·검수·커밋 (리뷰 지적 6건 반영: 봇 토큰 로그 마스킹, getMe 방어 파싱, chat-id 이중 바인딩 제거, 타임아웃 단언 복원, 테스트 헬퍼 통합, 원장 갱신) | `main` |
 | 6단계 — 앱셸 대칭화 (F7) | 완료·검수(high)·커밋 | `main` |
-| 7단계 — 잔여 정리 (F8~F10 + 문서 드리프트) | 미착수 | — |
+| 7단계 — 잔여 정리 (F8~F10 + 문서 드리프트) | 완료·검수(medium ×2)·커밋 | `main` |
 
 5단계는 검수 후 `main`에 반영됐다(`wip/coupling-phase5`는 역할을 다해 삭제 — 원격에 남아 있으면 지워도 된다). 주의: 인계 메모 커밋 `e137b9b`에 5단계 파일 이동·삭제가 실수로 섞여 들어가 그 커밋 단독으로는 컴파일되지 않는다(직후 5단계 커밋이 복구). 이력 재작성 없이 그대로 둔다.
 
@@ -86,6 +86,11 @@ EOF
 - **1단계**: `kista-trading`의 `INTERNAL_API_BASE_URL` 제거(compose 반영됨). kista-infra `.env`에는 해당 키가 없음을 확인했다.
 - **3단계 EPR**: 매매 알림 리스너가 `com.kista.trading.notify` → `com.kista.tradingnotify`로 이동해 `trading.event_publication.listener_id`가 바뀌었다. deploy-trading 직전(매매 시간대 밖) `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`로 확인하고 0이 아니면 같은 조건으로 DELETE(`docs/agents/constraints.md`에 기재).
 - **5단계**: trading-core Telegram 빈 이름 변경 — 배포 전 로컬 2-프로세스 기동(`docs/agents/commands.md`)으로 부팅 확인 권장.
+
+- **6단계**: `TradingApplication` FQCN이 `com.kista.tradingweb.TradingApplication`으로 변경 — Dockerfile은 `java -jar trading-core.jar`라 영향 없음(bootJar `Start-Class` 실측). 이벤트·리스너 FQCN 변경 없어 EPR 정리 불필요.
+- **7단계(root)**: kista-scheduler 이미지 교체 직전 `SELECT count(*) FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'` 확인, 0이 아니면 같은 조건 DELETE(`constraints.md` Flyway 절 "benchmark 패키지 개명"). 체결 푸시 Pub/Sub→Stream 전환은 Legacy 구독자가 남아 root·trading-core 어느 순서로 배포해도 유실 없음.
+- **7단계(trading-core)**: `BatchContext`/배치 경로 시그니처 변경 — `deploy-trading` 매매 시간대 가드 대상. 로컬 2-프로세스 기동 + 수동 프리뷰(`GET /api/trading-cycles/{id}/preview`) 1회로 `TradingAccount` 경로 확인 권장.
+- **공통(미해소)**: 1~7단계 전부 이 클라우드 환경에서는 Postgres·Redis 없이 단위 테스트만 GREEN이다. 배포 전 로컬에서 `docker compose up -d postgres redis` 후 `./gradlew test integration`과 2-프로세스 기동(`docs/agents/commands.md`)을 반드시 한 번 수행할 것.
 
 ## 6. 알려진 후속 과제 (범위 밖으로 남긴 것)
 
