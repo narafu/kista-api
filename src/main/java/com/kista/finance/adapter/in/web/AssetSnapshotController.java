@@ -3,6 +3,7 @@ package com.kista.finance.adapter.in.web;
 import com.kista.finance.adapter.in.web.dto.AssetSnapshotRequest;
 import com.kista.finance.adapter.in.web.dto.AssetSnapshotResponse;
 import com.kista.finance.domain.model.AssetSnapshot;
+import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.application.usecase.AssetSnapshotUseCase;
 import com.kista.finance.application.port.output.FinanceAccountPort;
@@ -131,12 +132,15 @@ public class AssetSnapshotController {
             root = financeCategoryPort.findByIdOrThrow(root.parentId());
         }
         UUID rootCategoryId = root.id();
-        String accountName = snapshot.accountId() != null
-                ? financeAccountPort.findByIdOrThrow(snapshot.accountId()).name()
+        // 그룹 공유 스냅샷이 다른 멤버 계좌를 가리켜도 이름·기관이 채워지도록 서버에서 조인한다
+        FinanceAccount account = snapshot.accountId() != null
+                ? financeAccountPort.findByIdOrThrow(snapshot.accountId())
                 : null;
+        String accountName = account != null ? account.name() : null;
+        String accountInstitution = account != null ? account.institution() : null;
         return new AssetSnapshotResponse(
                 snapshot.id(), snapshot.groupId(), snapshot.categoryId(), rootCategoryId, category.name(),
-                snapshot.accountId(), accountName, snapshot.entryDate(),
+                snapshot.accountId(), accountName, accountInstitution, snapshot.entryDate(),
                 snapshot.assetClass().name(), snapshot.market().name(), snapshot.strategy(), snapshot.memo(), snapshot.amount());
     }
 }

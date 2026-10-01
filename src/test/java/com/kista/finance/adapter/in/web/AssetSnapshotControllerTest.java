@@ -71,7 +71,8 @@ class AssetSnapshotControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].rootCategoryId").value(categoryId.toString()))
                 .andExpect(jsonPath("$[0].categoryName").value("주식"))
-                .andExpect(jsonPath("$[0].accountName").value(nullValue()));
+                .andExpect(jsonPath("$[0].accountName").value(nullValue()))
+                .andExpect(jsonPath("$[0].accountInstitution").value(nullValue()));
     }
 
     @Test
@@ -128,13 +129,14 @@ class AssetSnapshotControllerTest {
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(category);
         FinanceAccount account = new FinanceAccount(accountId, null, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, null, null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, "토스증권", null, Instant.now());
         when(financeAccountPort.findByIdOrThrow(accountId)).thenReturn(account);
 
         mockMvc.perform(get("/api/finance/asset-snapshots")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].accountName").value("토스증권 일반계좌"));
+                .andExpect(jsonPath("$[0].accountName").value("토스증권 일반계좌"))
+                .andExpect(jsonPath("$[0].accountInstitution").value("토스증권"));
     }
 
     @Test

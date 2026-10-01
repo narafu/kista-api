@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.UUID;
 
-// categoryName/accountName/rootCategoryId는 UI가 카테고리·계좌 목록을 재조회하지 않고 이름 표시·순자산/총부채
+// categoryName/accountName/accountInstitution/rootCategoryId는 UI가 카테고리·계좌 목록을 재조회하지 않고 이름 표시·순자산/총부채
 // 판정(rootCategoryId == FinanceCategory.SYSTEM_LOAN_ID)을 할 수 있도록 컨트롤러가 조회해 채운다.
 // 도메인 AssetSnapshot record에는 없는 필드라 여기서는 from() 팩토리 없이 컨트롤러가 직접 생성한다.
 public record AssetSnapshotResponse(
@@ -23,6 +23,8 @@ public record AssetSnapshotResponse(
         UUID accountId,
         @Schema(description = "계좌명 (없으면 null)")
         String accountName,
+        @Schema(description = "계좌 기관 (계좌가 없거나 기관 미입력이면 null)")
+        String accountInstitution,
         @Schema(description = "기준 날짜", example = "2026-08-01")
         LocalDate entryDate,
         @Schema(description = "자산군", example = "EQUITY")
