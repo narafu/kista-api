@@ -1,0 +1,38 @@
+name: ssh-setup
+description: 배포 서버 SSH 키·known_hosts 구성 — 호스트 키는 secret에 고정된 값만 신뢰한다(ssh-keyscan TOFU 금지)
+
+inputs:
+  ssh-key:
+    description: 배포용 SSH 개인키
+    required: true
+  host:
+    description: 서버 호스트
+    required: true
+  port:
+    description: SSH 포트
+    required: false
+    default: '22'
+  host-keys:
+    description: '서버 공개 호스트 키 목록 ("<keytype> <base64>" 한 줄씩, 호스트명 없이 — SERVER_SSH_HOST_KEYS)'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        SSH_KEY: ${{ inputs.ssh-key }}
+        HOST: ${{ inputs.host }}
+        PORT: ${{ inputs.port }}
+        HOST_KEYS: ${{ inputs.host-keys }}
+      run: |
+        [ -n "$HOST_KEYS" ] || { echo "::error::SERVER_SSH_HOST_KEYS secret 미설정 — 서버 호스트 키를 고정해야 배포할 수 있습니다"; exit 1; }
+        install -m 700 -d ~/.ssh
+        printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        # known_hosts 호스트 필드: 22번 포트는 호스트명 그대로, 그 외는 [host]:port 형식
+        if [ "$PORT" = "22" ]; then entry="$HOST"; else entry="[$HOST]:$PORT"; fi
+        while IFS= read -r key; do
+          if [ -n "$key" ]; then printf '%s %s\n' "$entry" "$key"; fi
+        done < <(tr -d '\r' <<<"$HOST_KEYS") > ~/.ssh/known_hosts   # CRLF로 붙여넣은 secret 방어
+        chmod 600 ~/.ssh/known_hosts

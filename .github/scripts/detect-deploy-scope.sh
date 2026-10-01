@@ -32,8 +32,13 @@ while IFS= read -r f; do
     # 그 외 app.jar — 스케쥴러가 서비스·어댑터를 그대로 호출하므로 둘 다
     src/main/*)
       verify=true; api=true; scheduler=true ;;
-    # 양쪽 jar에 들어가거나 3역할이 공유하는 입력 — 전부
-    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore|deploy/*|.github/scripts/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
+    # Caddy 라우팅 스니펫 — 어느 role 배포든 caddy reload를 수행하므로 재기동 부담이 가장 작은 api로 싣는다.
+    # verify는 CaddyRoutingTest가 이 파일의 regex를 컨트롤러 경로와 대조하기 때문
+    deploy/server/caddy/*)
+      verify=true; api=true ;;
+    # 양쪽 jar에 들어가거나 3역할이 공유하는 입력 — 전부.
+    # deploy/ 아래는 compose 파일만 해당 — case 패턴의 *는 /도 매치하므로 deploy/*로 쓰면 런북·대시보드 문서 수정까지 3역할을 재기동한다
+    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore|deploy/server/docker-compose.yml|.github/scripts/*|.github/actions/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
       verify=true; api=true; scheduler=true; trading=true ;;
   esac
 done

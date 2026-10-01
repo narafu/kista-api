@@ -26,14 +26,15 @@ services:
       SCHEDULER_ENABLED: "false"
       REDIS_URL: redis://redis:6379  # kista-infra가 소유하는 data_net의 redis alias — depends_on 미사용 (Spring Data Redis lazy connection)
       INTERNAL_API_BASE_URL: http://kista-trading:8080  # root→trading-core 내부 API(admin/stats/market/notify/web 어댑터) — shared_net 내부 DNS. 프로세스 간 동기 호출은 이 방향뿐(trading-core는 root를 호출하지 않는다)
-      JAVA_OPTS: ${JAVA_OPTS:--Xmx3072m -Xms256m -XX:MaxMetaspaceSize=384m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
+      JAVA_OPTS: ${JAVA_OPTS:--Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize=96m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom}
     expose:
       - "8080"
     networks:
       - shared_net   # kista-infra Caddy 리버스 프록시 라우팅용
       - data_net     # kista-infra postgres/redis 접근용
     stop_grace_period: 35s   # Spring graceful shutdown 30s + 여유 5s
-    mem_limit: 4096m         # 힙3072m + 메타384m + 코드캐시96m + 네이티브 여유 (OCI 12GB 인스턴스, 2 OCPU — 나머지는 OS/Docker/kista-infra용)
+    mem_limit: 2048m         # 힙1280m + 메타320m + 코드캐시96m + 네이티브 여유. 매매·통계가 kista-trading으로 이관된 뒤 실측 RSS ~530MiB(2026-10-01)라
+                              # 모놀리스 시절 4096m에서 축소 — 앱 3종+인프라+UI limit 합계를 호스트 12GB(11.6GiB) 이하로 유지
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging
@@ -55,14 +56,15 @@ services:
       SPRING_MODULITH_EVENTS_REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART: "true"
       REDIS_URL: redis://redis:6379
       # 요청 부하 없는 배치 전용 — 힙 작게. OOM 회피가 중요(OOM-kill 시 scheduler_locks 락 2h 홀드)
-      JAVA_OPTS: "-Xmx1536m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+      JAVA_OPTS: "-Xmx896m -Xms128m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseG1GC -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
     expose:
       - "8080"
     networks:
       - shared_net   # Caddy 가 /api/admin/scheduler/* 라우팅 (kista-infra)
       - data_net     # postgres/redis
-    stop_grace_period: 200s   # 매매 배치 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + rethrow → 락 해제 시도 시간 확보 목적(잠정값, 최초 배포 실측 후 조정 — spring.task.scheduling.shutdown.await-termination 미설정 상태라 보장은 아님. application-prod.yml의 spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 실제로 쓰이지 않을 가능성 있음 — 최초 배포 시 실측 확인)
-    mem_limit: 2048m
+    stop_grace_period: 200s   # 배치(KbLand·finance 등) 인터럽트 → SchedulerJobRunner FAILED 이벤트 발행 + 락 해제 시도 시간 확보. 매매 배치는 kista-trading 소유라 여기엔 없다
+                              # (spring.lifecycle.timeout-per-shutdown-phase=30s가 먼저 종료를 강제할 수 있어 200s 전체가 쓰이지 않을 수 있음)
+    mem_limit: 1536m          # 실측 RSS ~485MiB(2026-10-01) — 힙896m + 메타256m + 코드캐시64m + 네이티브 여유
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging
@@ -94,9 +96,8 @@ services:
       - shared_net   # Caddy 라우팅(trading-cycles/accounts/stats/backtest 등) + kista-api의 내부 API 호출 대상
       - data_net
     stop_grace_period: 200s   # 매매 배치 인터럽트 대응 — kista-scheduler와 동일 근거
-    mem_limit: 2816m         # kista-api(4096m)+kista-scheduler(2048m)+이 컨테이너=8960m, OCI 12GB 인스턴스 기준 여유 ~3GB뿐
-                              # (postgres/redis/prometheus/grafana는 kista-infra 소유) — kista-scheduler는 매매 배치가
-                              # 이 컨테이너로 이동해 부하가 가벼워졌으니 최초 배포 실측 후 kista-scheduler mem_limit 축소 검토
+    mem_limit: 2816m         # 백테스트 캔들 적재 피크 대비 유지(실측 RSS ~530MiB, 2026-10-01). limit 합계: 앱 2048+1536+2816=6400m,
+                              # kista-infra(postgres 3072+redis 256+caddy 64)+kista-ui 1536 포함 11328m — 호스트 11.6GiB 이하
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging

@@ -50,6 +50,14 @@ spring:
 server:
   port: ${SERVER_PORT:8081}
 
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          # 배포 헬스 게이트가 readiness로 DB·Redis 연결까지 확인한다(liveness는 연결 불능이어도 UP) — root application.yml과 동일
+          include: readinessState, db, redis
+
 internal:
   api:
     token: ${INTERNAL_API_TOKEN:} # X-Internal-Token 수신 검증용 — 이 프로세스는 내부 API를 호출하지 않으므로 base-url을 두지 않는다(root→trading-core 단방향)

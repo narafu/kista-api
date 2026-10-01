@@ -60,6 +60,11 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      group:
+        readiness:
+          # 배포 헬스 게이트가 readiness로 DB·Redis 연결까지 확인한다(liveness는 연결 불능이어도 UP).
+          # 전 프로필에 두는 이유: 존재하지 않는 인디케이터를 넣으면 부팅이 실패하므로 테스트 컨텍스트 로드가 이 구성을 같이 검증한다
+          include: readinessState, db, redis
   metrics:
     tags:
       application: ${spring.application.name}

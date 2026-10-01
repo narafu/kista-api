@@ -20,7 +20,9 @@ permissions:
   packages: write
 
 jobs:
-  # 변경 경로로 배포 범위 판정 — 판정 불가(수동 실행·최초 push·force push로 base 소실)면 전부 true
+  # 변경 경로로 배포 범위 판정 — 기준점은 직전 push가 아니라 서버에서 각 role이 "지금 실행 중인" 이미지 SHA.
+  # 직전 push 기준이면 가드 차단·헬스 롤백으로 배포가 빠진 커밋을 다음 push가 영영 놓친다(조용한 드리프트).
+  # 판정 불가(수동 실행·컨테이너 없음·SHA가 히스토리에 없음)면 그 role은 true, 실행 중인 SHA가 더 새것이면 false
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
@@ -33,17 +35,46 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - name: Classify changed paths
+      - uses: ./.github/actions/ssh-setup
+        with:
+          ssh-key: ${{ secrets.SERVER_SSH_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_SSH_PORT || '22' }}
+          host-keys: ${{ secrets.SERVER_SSH_HOST_KEYS }}
+      - name: Classify changed paths per role
         id: scope
         env:
           EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
         run: |
-          if [ "$EVENT" = "workflow_dispatch" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+          if [ "$EVENT" = "workflow_dispatch" ]; then
             printf 'verify=true\napi=true\nscheduler=true\ntrading=true\n' | tee -a "$GITHUB_OUTPUT"
-          else
-            git diff --name-only "$BEFORE" "$GITHUB_SHA" | bash .github/scripts/detect-deploy-scope.sh | tee -a "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # role별 실행 중 이미지 태그(= 커밋 SHA) 조회 — SSH 실패·컨테이너 부재는 빈 값으로 두고 아래에서 전부 배포로 처리
+          declare -A running
+          while read -r name image; do running[${name#/}]=${image##*:}; done < <(
+            ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
+              "docker inspect -f '{{.Name}} {{.Config.Image}}' kista-api kista-scheduler kista-trading" 2>/dev/null || true)
+          verify=false
+          for role in api scheduler trading; do
+            sha=${running[kista-$role]:-}
+            if [ -n "$sha" ] && git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+              if git merge-base --is-ancestor "$GITHUB_SHA" "$sha"; then
+                flags="verify=false"$'\n'"$role=false"   # 이미 이 커밋 이상이 실행 중 — 옛 run 재실행이 롤백하는 것 방지
+              else
+                flags=$(git diff --name-only "$sha" "$GITHUB_SHA" | bash .github/scripts/detect-deploy-scope.sh)
+              fi
+            else
+              flags="verify=true"$'\n'"$role=true"
+            fi
+            echo "kista-$role: running=${sha:-none}"
+            grep "^$role=" <<<"$flags" | tee -a "$GITHUB_OUTPUT"
+            grep -q '^verify=true' <<<"$flags" && verify=true
+          done
+          echo "verify=$verify" | tee -a "$GITHUB_OUTPUT"
 
   verify:
     name: Full Test Suite
@@ -86,8 +117,9 @@ jobs:
         run: psql -h localhost -U kista -d kistadb -c "CREATE DATABASE kistadb_test OWNER kista;"
         env:
           PGPASSWORD: kista
-      - name: Run all tests (ArchUnit 포함)
-        run: ./gradlew test --no-daemon
+      - name: Run all tests (ArchUnit 포함) + integration
+        # ci.yml(PR 전용)과 달리 main 직접 push 경로에서도 @Tag("integration")을 돌린다 — 대부분 PR 없이 push하므로 여기 없으면 사실상 미실행
+        run: ./gradlew test integration --no-daemon
         env:
           SPRING_PROFILES_ACTIVE: test
 
@@ -101,16 +133,14 @@ jobs:
     if: needs.changes.outputs.api == 'true' || needs.changes.outputs.scheduler == 'true' || needs.changes.outputs.trading == 'true'
     outputs:
       image: ${{ steps.image.outputs.image }}
-      latest: ${{ steps.image.outputs.latest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set image name
         id: image
         run: |
-          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "image=${repo}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          echo "latest=${repo}:latest" >> "$GITHUB_OUTPUT"
+          # SHA 태그만 — 배포·변경감지·롤백 모두 SHA로 식별하고 :latest는 어디서도 쓰지 않는다
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
@@ -127,9 +157,10 @@ jobs:
           context: .
           push: true
           platforms: linux/arm64
-          tags: |
-            ${{ steps.image.outputs.image }}
-            ${{ steps.image.outputs.latest }}
+          # Gradle 의존성 레이어(./gradlew dependencies) 재사용 — 없으면 매 빌드 콜드 다운로드
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.image.outputs.image }}
 
   deploy-api:
     name: Deploy API

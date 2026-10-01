@@ -119,6 +119,8 @@ tasks.named<Test>("test") {
     systemProperty("junit.jupiter.execution.parallel.enabled", "true")
     systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
     systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")
+    // CaddyRoutingTest가 읽는 비-클래스패스 파일 — 입력 선언이 없으면 스니펫만 바뀐 경우 테스트가 up-to-date로 생략된다
+    inputs.file("deploy/server/caddy/kista-api.caddy")
 }
 
 // Docker + Testcontainers 통합 테스트 전용 태스크 — ./gradlew integration

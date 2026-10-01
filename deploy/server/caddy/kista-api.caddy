@@ -1,0 +1,40 @@
+# kista-api 도메인 라우팅 — kista-api 레포 소유. 배포 시 /opt/kista-api/caddy/에 올라가고
+# kista-infra Caddyfile이 `import /etc/caddy/apps/kista-api/*.caddy`로 읽는다(_deploy-role.yml이 교체 후 caddy reload).
+# 라우팅이 컨트롤러 경로와 어긋나 404가 나던 사고(2026-09-16 2단 경로, 2026-09-17 fida-orders)를 막기 위해
+# CaddyRoutingTest가 아래 @scheduler·@trading regex를 trading-core·root 컨트롤러 경로와 대조한다 — 경로 추가 시 테스트가 알려준다.
+{$API_DOMAIN} {
+	encode zstd gzip
+	# 스케쥴러 수동 트리거 — `/**`는 2단 이상 깊이(kbland-price-index/full-refresh)에서 매치 실패해 kista-api로 새던 것을 path_regexp로 교체(2026-10-01 실측)
+	@scheduler path_regexp ^/api/admin/scheduler/.+$
+	handle @scheduler {
+		reverse_proxy kista-scheduler:8080 {
+			lb_try_duration 120s
+			lb_try_interval 500ms
+			health_uri /actuator/health/liveness
+			health_interval 10s
+			health_timeout 5s
+		}
+	}
+	# trading-core(kista-trading) 공개 경로. path matcher의 `**`는 2단 이상 깊이에서 매치 실패(caddy v2.9.1 실측)라 path_regexp 사용.
+	# /api/stats는 kista-api(housing-benchmark)와 kista-trading(summary/equity-curve/cycles)이 prefix를 공유해 하위 경로로만 가른다.
+	# /api/internal/** 중 외부(FIDA)가 공인 도메인으로 호출하는 fida-orders만 여기로 — 나머지 internal은 kista-api가 내부망으로 직접 호출
+	@trading path_regexp ^/api/(trading-cycles(/.*)?|accounts(/.*)?|backtest|daily-trades|orders(/.*)?|stats/(summary|equity-curve|cycles)|internal/fida-orders)$
+	handle @trading {
+		reverse_proxy kista-trading:8080 {
+			lb_try_duration 120s
+			lb_try_interval 500ms
+			health_uri /actuator/health/liveness
+			health_interval 10s
+			health_timeout 5s
+		}
+	}
+	handle {
+		reverse_proxy kista-api:8080 {
+			lb_try_duration 120s
+			lb_try_interval 500ms
+			health_uri /actuator/health/liveness
+			health_interval 10s
+			health_timeout 5s
+		}
+	}
+}

@@ -134,7 +134,7 @@ graph TB
     SchedApp --> Grafana
 ```
 
-- `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다.
+- `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시 — API 도메인 라우팅 규칙만은 이 레포 `deploy/server/caddy/kista-api.caddy`가 소유하고 `CaddyRoutingTest`로 컨트롤러 경로와 대조)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다.
 - `kista-api`·`kista-scheduler`·`kista-trading`은 **같은 GHCR 이미지**(arm64 네이티브 러너에서 빌드)를 띄운다 — api/scheduler는 `app.jar`를 `SCHEDULER_ENABLED`로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`를 쓴다. 매매 시간대 배포 가드는 `deploy-trading` 잡에만 있고 API·스케쥴러 배포는 시간대 제약이 없다. API 크래시·OOM·요청경로 버그가 매매 배치를 건드리지 않는다 (상세 → `docs/agents/docker-infra.md`).
 - 백업 메커니즘·주기 상세는 `docs/agents/docker-infra.md` 참고.
 - 외부 모니터링은 서로 다른 실패 모드를 감지한다: 가동 모니터링(서버 다운) / 생존 확인(스케쥴러 정지) / 메트릭 추세(리소스 악화).
