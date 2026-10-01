@@ -111,25 +111,25 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 4. `deploy-api`·`deploy-scheduler`·`deploy-trading` 세 독립 잡(`_deploy-role.yml`)이 각자 role을 배포한다. 각 잡의 흐름:
    - SSH 호스트 키는 secret `SERVER_SSH_HOST_KEYS`로 고정(`.github/actions/ssh-setup`) — keyscan TOFU 없음
    - 서버에 더 새 커밋이 이미 돌고 있으면 생략(옛 run Re-run이 과거로 되돌리는 것 방지)
-   - 매매 가드 — `deploy-trading`만: 시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 살아 있으면 차단(락은 성공 후에도 TTL 2h·3h까지 유지돼 기동 후 TTL 만료까지 막힌다, 조회 실패도 차단). `workflow_dispatch` force=true로 우회
+   - 매매 가드 — `deploy-trading`만: 시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 실행 중(`lock_until > now()` + 완료 기록 `finished_at`이 없거나 이번 획득 `locked_at`보다 이전)이면 차단(락은 중복 실행 방지로 성공 후에도 TTL까지 유지되지만 완료 시 `finished_at`이 기록돼 가드는 풀린다, 조회 실패도 차단). `workflow_dispatch` force=true로 우회
    - 필수 환경변수 존재 검증 (서버 `.env` 기준)
    - Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`) 교체 + `caddy reload` — 실패 시 스니펫 원복·배포 중단
    - 롤백 기록(`/opt/kista-api/rollback/<service>.{image,compose.yml,run}`) 후 compose 교체 → `docker compose pull/up -d --no-deps <service>` (GHCR public이라 로그인 없음)
    - 헬스 게이트: Docker 헬스(liveness) healthy **+** `/actuator/health/readiness`(readinessState·db·redis) UP을 10초 간격 최대 5분 폴링
-   - 실패 시 해당 role만 이전 이미지 **+ 이전 compose 파일**로 자동 롤백. 성공 시 `docker image prune -af --filter until=168h`
+   - 실패 시 해당 role만 이전 이미지 **+ 이전 compose 파일 + 이전 Caddy 스니펫**으로 자동 롤백. 성공 시 이 레포의 미사용 이미지 태그 정리
 5. 세 잡은 서버의 같은 `docker-compose.yml`·`caddy/`를 공유하므로 교체·up 구간을 flock으로 직렬화한다
 6. Caddy `lb_try_duration 120s`가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
 
 ## 배포 시간 제한
 
 매매 시간대 배포 가드는 `deploy-trading` 잡에만 적용된다 — `deploy-api`·`deploy-scheduler`는 시간대 무관하게 항상 배포 가능하다(`docs/agents/docker-infra.md` 참고).
-시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 살아 있으면 차단(락은 성공 후에도 TTL 2h·3h까지 유지돼 기동 후 TTL 만료까지 막힌다, 조회 실패도 차단) — `workflow_dispatch` `force=true`로 긴급 우회 가능. 차단된 잡은 해제 후 Re-run 하면 되고, 그 사이 더 새 커밋이 배포됐으면 자동 생략된다.
+시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 실행 중(`lock_until > now()` + 완료 기록 `finished_at`이 없거나 이번 획득 `locked_at`보다 이전)이면 차단(락은 중복 실행 방지로 성공 후에도 TTL까지 유지되지만 완료 시 `finished_at`이 기록돼 가드는 풀린다, 조회 실패도 차단) — `workflow_dispatch` `force=true`로 긴급 우회 가능. 차단된 잡은 해제 후 Re-run 하면 되고, 그 사이 더 새 커밋이 배포됐으면 자동 생략된다.
 - `TradingOpenScheduler`: 월~금 22:30 KST
 - `TradingCloseScheduler`: 화~토 04:30 KST + 최대 60분 대기 (비DST 시 ~05:30까지)
 
 ## 롤백 Runbook
 
-**자동 롤백**: 헬스 게이트 실패 시 해당 role의 Actions 잡이 그 role만 이전 이미지와 이전 compose 파일로 자동 복구 — 다른 role은 영향받지 않는다. 기록은 서버 `/opt/kista-api/rollback/<service>.image`·`<service>.compose.yml`(교체 직전 상태)·`<service>.run`(기록한 run 식별자 — 게이트는 자기 run의 기록일 때만 롤백)에 남는다. Caddy 스니펫은 롤백 대상이 아니다. 자동 롤백 후 롤백된 컨테이너의 헬스는 재검증되지 않으므로, Actions 실패 알림을 받으면 서버에서 `docker inspect --format '{{.State.Health.Status}}' <service>`로 수동 확인 필요.
+**자동 롤백**: 헬스 게이트 실패 시 해당 role의 Actions 잡이 그 role만 이전 이미지와 이전 compose 파일로 자동 복구 — 다른 role은 영향받지 않는다. 기록은 서버 `/opt/kista-api/rollback/<service>.image`·`<service>.compose.yml`(교체 직전 상태)·`<service>.run`(기록한 run 식별자 — 게이트는 자기 run의 기록일 때만 롤백)에 남는다. Caddy 스니펫도 `<service>.caddy`로 기록돼 롤백 시 원복·reload된다. 자동 롤백 후 롤백된 컨테이너의 헬스는 재검증되지 않으므로, Actions 실패 알림을 받으면 서버에서 `docker inspect --format '{{.State.Health.Status}}' <service>`로 수동 확인 필요.
 
 **수동 롤백**: GHCR에 SHA 태그 이미지가 보존됨. `kista-api`/`kista-scheduler` 어느 role이든 동일 절차 — `<service>`를 해당 role 이름으로 치환.
 ```bash
@@ -147,7 +147,7 @@ docker compose up -d --no-deps kista-scheduler
 
 **Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요. **스키마 재편 이행 릴리스는 자동 롤백 불가** — 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 롤백도 옛 스키마명을 기대해 무력화된다. 수동 SSH 런북 `schema-reorg/RUNBOOK.md`(정방향·역방향 SQL)를 따른다. Flyway 이력 테이블은 서비스별로 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)이다.
 
-**이미지 디스크 정리 참고**: 배포 성공 시 `docker image prune -af --filter "until=168h"`로 컨테이너가 쓰지 않는 7일 지난 이미지를 정리한다(예전 `prune -f`는 dangling만 지워 SHA 태그 이미지가 누적됐다 — 2026-10-01 실측 181개·35GB). 정리된 이미지로 롤백해도 GHCR이 public이라 compose가 다시 pull한다.
+**이미지 디스크 정리 참고**: 배포 성공 시 이 레포 이미지(`ghcr.io/narafu/<repo>`) 중 컨테이너가 쓰지 않는 태그를 `docker rmi`로 지우고 dangling 레이어를 `prune -f`로 정리한다(예전 `prune -f`만으로는 SHA 태그 이미지가 누적됐다 — 2026-10-01 실측 181개·35GB. `prune -a`는 다른 레포가 막 pull한 이미지까지 지울 수 있어 쓰지 않는다). 정리된 이미지로 롤백해도 GHCR이 public이라 compose가 다시 pull한다.
 
 ## Flyway 배포 주의사항
 

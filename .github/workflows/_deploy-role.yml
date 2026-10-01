@@ -79,12 +79,14 @@ jobs:
           # 개장 스케쥴러: 월~금 22:30 기동, 비DST 23:30 개장 접수 / 마감 스케쥴러: 화~토 04:30 기동, 비DST 06:10 리포트
           if [ "$dow" -le 5 ] && [ "$now" -ge 2220 ] && [ "$now" -le 2340 ]; then blocked=yes; fi
           if [ "$dow" -ge 2 ] && [ "$dow" -le 6 ] && [ "$now" -ge 420 ] && [ "$now" -le 620 ]; then blocked=yes; fi
-          # 락: 배치가 시각 창을 넘겨 길어져도 보호. SchedulerLockService는 성공 시에도 락을 TTL(개장 2h·마감 3h)까지 유지하므로
-          # 실제 차단 구간은 기동 후 TTL 만료까지다(배치가 일찍 끝나도 해제되지 않음 — 보수적 판정). 수동 트리거도 같은 락을 쓴다.
-          # 조회 실패 시 판정 불가로 보고 차단(fail-closed)
+          # 락: 배치가 시각 창을 넘겨 길어져도 보호. SchedulerLockService는 성공 후에도 락을 TTL까지 유지(중복 실행 방지)하므로
+          # 완료 기록이 없거나(finished_at NULL) 이번 획득(locked_at)보다 이전 것(구 이미지가 재획득해 리셋 못 한 값)이면 "실행 중"으로 본다.
+          # to_jsonb로 읽는 이유: 컬럼을 추가하는 trading 마이그레이션은
+          # kista-trading 기동 때 적용되는데 이 가드는 그보다 먼저 돈다 — 컬럼이 없으면 NULL로 읽혀 기존 판정(lock_until만)으로 동작.
+          # 수동 트리거도 같은 락을 쓴다. 조회 실패 시 판정 불가로 보고 차단(fail-closed)
           locks=$(ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" 'bash -s' <<'ENDSSH'
           docker exec kista-postgres psql -U kista -d kistadb -tAc \
-            "SELECT coalesce(string_agg(name, ','), '') FROM trading.scheduler_locks WHERE name IN ('trading-open','trading-close') AND lock_until > now()"
+            "SELECT coalesce(string_agg(name, ','), '') FROM trading.scheduler_locks l WHERE name IN ('trading-open','trading-close') AND lock_until > now() AND coalesce((to_jsonb(l) ->> 'finished_at')::timestamptz < locked_at, true)"
           ENDSSH
           ) || { echo "::error::scheduler_locks 조회 실패 — 매매 배치 실행 여부를 판정할 수 없어 차단합니다. 확인 후 workflow_dispatch force=true로 우회하세요."; exit 1; }
           if [ -n "$locks" ]; then blocked=yes; fi
@@ -131,6 +133,7 @@ jobs:
             rm -f caddy/kista-api.caddy.prev
             if [ -f caddy/kista-api.caddy ]; then cp -p caddy/kista-api.caddy caddy/kista-api.caddy.prev; fi
             mv "caddy/kista-api.caddy.${SERVICE}" caddy/kista-api.caddy
+            cp -p caddy/kista-api.caddy "rollback/${SERVICE}.caddy.installed"   # 롤백 시 다른 role이 그사이 바꿨는지 판별용
             CADDY=$(docker ps -q --filter label=com.docker.compose.project=kista-infra --filter label=com.docker.compose.service=caddy)
             if [ -n "$CADDY" ] && ! docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile; then
               # 원복 대상이 없으면(최초 배포) 잘못된 스니펫을 지워 다음 caddy 재기동이 이 파일 때문에 실패하지 않게 한다
@@ -139,8 +142,10 @@ jobs:
               exit 1
             fi
 
-            # 롤백 기록: 교체 직전 compose 파일·실행 이미지. /tmp가 아닌 배포 디렉토리에 둬 재부팅에도 유지
+            # 롤백 기록: 교체 직전 compose 파일·Caddy 스니펫·실행 이미지. /tmp가 아닌 배포 디렉토리에 둬 재부팅에도 유지
             cp docker-compose.yml "rollback/${SERVICE}.compose.yml" 2>/dev/null || true
+            rm -f "rollback/${SERVICE}.caddy" "rollback/${SERVICE}.caddy.installed"
+            if [ -f caddy/kista-api.caddy.prev ]; then cp -p caddy/kista-api.caddy.prev "rollback/${SERVICE}.caddy"; fi
             docker inspect -f '{{.Config.Image}}' "${SERVICE}" > "rollback/${SERVICE}.image" 2>/dev/null || : > "rollback/${SERVICE}.image"
             mv "docker-compose.yml.${SERVICE}" docker-compose.yml
 
@@ -180,9 +185,15 @@ jobs:
               if [ "$STATUS" = "healthy" ]; then
                 if docker exec "${SERVICE}" wget -qO- http://localhost:8080/actuator/health/readiness >/dev/null 2>&1; then
                   echo "✓ ${SERVICE} liveness·readiness 통과 (${i}회 시도)"
-                  # 미사용 이미지 중 7일 지난 것만 정리 — dangling만 지우는 prune -f로는 SHA 태그 이미지가 무한 누적된다.
-                  # 다른 레포 prune이 롤백 대상 이미지를 지워도 compose up이 GHCR(public)에서 다시 pull한다
-                  docker image prune -af --filter "until=168h" || true
+                  # 이 레포 이미지 중 컨테이너가 안 쓰는 태그만 정리(사용 중이면 rmi가 거부) + dangling 레이어 —
+                  # prune -f(dangling만)로는 SHA 태그가 무한 누적되고, prune -a는 다른 레포(kista-infra 등)가 막 pull한 이미지까지 지울 수 있다.
+                  # 롤백·수동 복구는 GHCR(public)에서 다시 pull된다
+                  # 배포 락 안에서 — 겹친 다른 run의 잡이 pull만 하고 아직 up 전인 이미지를 지우지 않도록
+                  (
+                    flock 200
+                    docker image ls --format '{{.Repository}}:{{.Tag}}' ghcr.io/narafu/kista-api | xargs -r docker rmi >/dev/null 2>&1 || true
+                    docker image prune -f >/dev/null || true
+                  ) 200>"${DEPLOY_PATH}/.deploy.lock"
                   exit 0
                 fi
                 STATUS="healthy, readiness 미충족"
@@ -197,7 +208,7 @@ jobs:
 
             PREV_IMAGE=$(cat "rollback/${SERVICE}.image" 2>/dev/null || echo "")
             if [ -n "$PREV_IMAGE" ]; then
-              # 이미지뿐 아니라 compose 파일(환경변수·JAVA_OPTS·mem_limit)까지 교체 직전 상태로 되돌린다
+              # 이미지뿐 아니라 compose 파일(환경변수·JAVA_OPTS·mem_limit)과 Caddy 스니펫까지 교체 직전 상태로 되돌린다
               COMPOSE_FILE_PREV="rollback/${SERVICE}.compose.yml"
               [ -f "$COMPOSE_FILE_PREV" ] || COMPOSE_FILE_PREV=docker-compose.yml
               echo "✗ ${SERVICE} 헬스 게이트 실패 — 롤백: $PREV_IMAGE ($COMPOSE_FILE_PREV)"
@@ -205,6 +216,14 @@ jobs:
                 flock 200
                 KISTA_API_IMAGE="$PREV_IMAGE" docker compose -p "$(basename "${DEPLOY_PATH}")" \
                   --project-directory "${DEPLOY_PATH}" -f "$COMPOSE_FILE_PREV" up -d --no-deps "${SERVICE}"
+                # 스니펫 원복 — 롤백한 role이 새 라우팅의 경로를 아직 모를 수 있다. 단 그사이 다른 role이 스니펫을 바꿨으면(설치본과 다르면)
+                # 그 role의 라우팅을 덮지 않도록 건너뛴다. 원복 reload 실패는 기존 설정 유지라 무시
+                if [ -f "rollback/${SERVICE}.caddy" ] && cmp -s "rollback/${SERVICE}.caddy.installed" caddy/kista-api.caddy \
+                   && ! cmp -s "rollback/${SERVICE}.caddy" caddy/kista-api.caddy; then
+                  cp -p "rollback/${SERVICE}.caddy" caddy/kista-api.caddy
+                  CADDY=$(docker ps -q --filter label=com.docker.compose.project=kista-infra --filter label=com.docker.compose.service=caddy)
+                  [ -z "$CADDY" ] || docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile || true
+                fi
               ) 200>"${DEPLOY_PATH}/.deploy.lock"
             else
               echo "✗ ${SERVICE} 헬스 게이트 실패 — 이전 이미지 정보 없음, 수동 복구 필요"
