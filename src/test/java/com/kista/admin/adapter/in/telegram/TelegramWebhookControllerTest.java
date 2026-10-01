@@ -5,6 +5,8 @@ import com.kista.platform.security.JwtAuthFilter;
 import com.kista.platform.security.SecurityConfig;
 import com.kista.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -19,6 +21,7 @@ import com.kista.admin.application.port.output.AppErrorLogPort;
 import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(TelegramWebhookController.class)
+@Execution(ExecutionMode.SAME_THREAD)
 @Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 class TelegramWebhookControllerTest {
 
