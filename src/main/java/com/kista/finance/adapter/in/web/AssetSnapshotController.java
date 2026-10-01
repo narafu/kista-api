@@ -132,15 +132,16 @@ public class AssetSnapshotController {
             root = financeCategoryPort.findByIdOrThrow(root.parentId());
         }
         UUID rootCategoryId = root.id();
-        // 그룹 공유 스냅샷이 다른 멤버 계좌를 가리켜도 이름·기관이 채워지도록 서버에서 조인한다
+        // 그룹 공유 스냅샷이 다른 멤버 계좌를 가리켜도 이름·기관·소유자가 채워지도록 서버에서 조인한다
         FinanceAccount account = snapshot.accountId() != null
                 ? financeAccountPort.findByIdOrThrow(snapshot.accountId())
                 : null;
         String accountName = account != null ? account.name() : null;
         String accountInstitution = account != null ? account.institution() : null;
+        String accountOwner = account != null ? account.owner() : null;
         return new AssetSnapshotResponse(
                 snapshot.id(), snapshot.groupId(), snapshot.categoryId(), rootCategoryId, category.name(),
-                snapshot.accountId(), accountName, accountInstitution, snapshot.entryDate(),
+                snapshot.accountId(), accountName, accountInstitution, accountOwner, snapshot.entryDate(),
                 snapshot.assetClass().name(), snapshot.market().name(), snapshot.strategy(), snapshot.memo(), snapshot.amount());
     }
 }
