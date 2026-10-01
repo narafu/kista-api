@@ -30,7 +30,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(
         classes = HousingBenchmarkApiDocsTest.TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "springdoc.api-docs.path=/api-docs")
+        properties = {
+                "springdoc.api-docs.path=/api-docs",
+                // DataSource 자동구성을 뺀 슬라이스라 readiness 그룹의 db 인디케이터가 없다 — 그룹 구성 검증은 전체 컨텍스트 테스트가 맡는다
+                "management.endpoint.health.validate-group-membership=false"})
 class HousingBenchmarkApiDocsTest {
     @LocalServerPort
     int port;
