@@ -2,7 +2,7 @@ package com.kista.benchmark.adapter.out.persistence.housingbenchmark;
 
 import com.kista.benchmark.domain.model.HousingBenchmarkRegion;
 import com.kista.benchmark.domain.model.HousingPriceIndex;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import(HousingPriceIndexPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class HousingPriceIndexPersistenceAdapterTest extends DataJpaTestBase {
+class HousingPriceIndexPersistenceAdapterTest extends RootDataJpaTestBase {
 
     @Autowired HousingPriceIndexPersistenceAdapter adapter;
     @Autowired JdbcTemplate jdbcTemplate;

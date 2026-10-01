@@ -3,7 +3,7 @@ package com.kista.finance.adapter.out.persistence;
 import com.kista.finance.domain.model.AssetClass;
 import com.kista.finance.domain.model.AssetSnapshot;
 import com.kista.finance.domain.model.Market;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import(AssetSnapshotPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class AssetSnapshotPersistenceAdapterTest extends DataJpaTestBase {
+class AssetSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
 
     // V13 시드값 — 시스템 카테고리 (ASSET L1) '투자'
     private static final UUID CATEGORY_ASSET = UUID.fromString("f1000000-0000-4000-8000-000000000403");

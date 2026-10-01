@@ -3,7 +3,7 @@ package com.kista.admin.adapter.out.persistence.settings;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Tag("integration")
-class RuntimeSettingsPersistenceAdapterIT extends DataJpaTestBase {
+class RuntimeSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
 
     @Autowired RuntimeSettingsJpaRepository repository; // 실제 PostgreSQL 저장소
 

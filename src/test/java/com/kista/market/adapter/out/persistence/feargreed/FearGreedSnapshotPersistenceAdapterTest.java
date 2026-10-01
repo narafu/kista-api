@@ -2,7 +2,7 @@ package com.kista.market.adapter.out.persistence.feargreed;
 
 import com.kista.market.domain.model.FearGreedRating;
 import com.kista.market.domain.model.FearGreedSnapshot;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import(FearGreedSnapshotPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
-class FearGreedSnapshotPersistenceAdapterTest extends DataJpaTestBase {
+class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
 
     @Autowired FearGreedSnapshotPersistenceAdapter snapshotAdapter;
 

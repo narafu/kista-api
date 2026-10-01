@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.FinanceBudget;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 // aborted 상태로 만든다 — 예외를 기대하는 각 테스트는 그 save() 호출을 메서드의 마지막 DB 접촉으로 둔다.
 @Import(FinanceBudgetPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class FinanceBudgetPersistenceAdapterTest extends DataJpaTestBase {
+class FinanceBudgetPersistenceAdapterTest extends RootDataJpaTestBase {
 
     // V13 시드값 — 시스템 카테고리 (EXPENSE L1) 두 개, 예산 FK 대상으로만 사용
     private static final UUID CATEGORY_A = UUID.fromString("f1000000-0000-4000-8000-000000000201"); // 주거비

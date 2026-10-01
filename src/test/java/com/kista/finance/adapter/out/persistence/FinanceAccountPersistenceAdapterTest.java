@@ -3,7 +3,7 @@ package com.kista.finance.adapter.out.persistence;
 import com.kista.platform.crypto.AccountNoHasher;
 import com.kista.platform.crypto.AesCryptoService;
 import com.kista.finance.domain.model.FinanceAccount;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // accountNo AES-256 암/복호화 round-trip 검증이 핵심 — 평문이 컬럼에 그대로 저장되면 안 된다
 @Import({FinanceAccountPersistenceAdapter.class, AesCryptoService.class, AccountNoHasher.class})
 @Execution(ExecutionMode.SAME_THREAD)
-class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
+class FinanceAccountPersistenceAdapterTest extends RootDataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired FinanceAccountPersistenceAdapter adapter;

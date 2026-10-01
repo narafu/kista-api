@@ -1,7 +1,7 @@
 package com.kista.user.adapter.out.persistence.settings;
 
 import com.kista.sharedkernel.NotificationType;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import com.kista.user.domain.model.UserSettings;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("integration")
 @Import(UserSettingsPersistenceAdapter.class)
 @DisplayName("UserSettingsPersistenceAdapter — PG 통합 테스트")
-class UserSettingsPersistenceAdapterIT extends DataJpaTestBase {
+class UserSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
 
     @Autowired UserSettingsJpaRepository settingsRepo;
     @Autowired UserNotificationPrefJpaRepository prefRepo;

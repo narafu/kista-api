@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.user;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -15,7 +15,7 @@ import com.kista.sharedkernel.UserStatus;
 
 // countGroupByStatus — 상태별 사용자 수 단일 GROUP BY 집계 검증 (soft delete 제외 포함)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
-class UserJpaRepositoryCountTest extends DataJpaTestBase {
+class UserJpaRepositoryCountTest extends RootDataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired UserJpaRepository userJpaRepository;

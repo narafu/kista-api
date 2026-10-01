@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.FinanceTransaction;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Import(FinanceTransactionPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class FinanceTransactionPersistenceAdapterTest extends DataJpaTestBase {
+class FinanceTransactionPersistenceAdapterTest extends RootDataJpaTestBase {
 
     // V13 시드값 — 시스템 카테고리 (EXPENSE L1) 두 개
     private static final UUID CATEGORY_A = UUID.fromString("f1000000-0000-4000-8000-000000000201"); // 주거비

@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.MonthlyClosing;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // (group_id, month)/(user_id, month) 유니크 partial index 위 네이티브 upsert 검증 — race 없는 in-place 갱신이 핵심
 @Import(FinanceMonthlyClosingPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class FinanceMonthlyClosingPersistenceAdapterTest extends DataJpaTestBase {
+class FinanceMonthlyClosingPersistenceAdapterTest extends RootDataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired EntityManager entityManager;

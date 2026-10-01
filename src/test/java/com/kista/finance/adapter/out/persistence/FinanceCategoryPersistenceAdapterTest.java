@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.FinanceCategory;
-import com.kista.support.DataJpaTestBase;
+import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 3-state 소유축(system/personal/group) 조회·소프트삭제 dual-read-mode 검증
 @Import(FinanceCategoryPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-class FinanceCategoryPersistenceAdapterTest extends DataJpaTestBase {
+class FinanceCategoryPersistenceAdapterTest extends RootDataJpaTestBase {
 
     // V13 시드값 — 시스템 카테고리 (EXPENSE L1 '주거비')
     private static final UUID SYSTEM_EXPENSE_L1 = UUID.fromString("f1000000-0000-4000-8000-000000000201");
