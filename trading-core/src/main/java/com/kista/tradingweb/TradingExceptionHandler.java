@@ -79,6 +79,7 @@ public class TradingExceptionHandler {
     public ProblemDetail handleBrokerApiException(BrokerApiException ex) {
         reportErrorLog(ex);
         log.error("{} API 오류: {}", ex.vendorLabel(), ex.getMessage(), ex);
+        // title("<vendorLabel> API Error")은 kista-ui relayUpstreamError가 503 본문 relay 여부를 판별하는 계약 — 변경 시 UI 동시 수정
         // detail은 사용자 노출용 고정 문구 — 원본 메시지(응답 바디·accountId 등 내부 정보)는 로그·에러 로그에만 남긴다
         return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.vendorLabel() + " API Error", BROKER_UNAVAILABLE_DETAIL);
     }
