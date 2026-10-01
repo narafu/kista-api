@@ -88,7 +88,7 @@ EOF
 - **5단계**: trading-core Telegram 빈 이름 변경 — 배포 전 로컬 2-프로세스 기동(`docs/agents/commands.md`)으로 부팅 확인 권장.
 
 - **6단계**: `TradingApplication` FQCN이 `com.kista.tradingweb.TradingApplication`으로 변경 — Dockerfile은 `java -jar trading-core.jar`라 영향 없음(bootJar `Start-Class` 실측). 이벤트·리스너 FQCN 변경 없어 EPR 정리 불필요.
-- **7단계(root)**: kista-scheduler 이미지 교체 직전 `SELECT count(*) FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'` 확인, 0이 아니면 같은 조건 DELETE(`constraints.md` Flyway 절 "benchmark 패키지 개명"). 체결 푸시 Pub/Sub→Stream 전환은 2026-10-01 후속 릴리스에서 완료(옛 Pub/Sub 구독자 제거) — trading-core가 Stream 발행 버전이므로 순서 제약 없음.
+- **7단계(root)**: kista-scheduler 이미지 교체 직전 `SELECT count(*) FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'` 확인, 0이 아니면 같은 조건 DELETE(`docker-infra.md` "배포 직전 EPR 정리 런북" — 2026-10-01 이동, 같은 날 운영 확인 결과 0건). 체결 푸시 Pub/Sub→Stream 전환은 2026-10-01 후속 릴리스에서 완료(옛 Pub/Sub 구독자 제거) — trading-core가 Stream 발행 버전이므로 순서 제약 없음.
 - **후속 릴리스(2026-10-01, trading-core)**: user 이벤트 컨슈머가 `RedisStreamSubscriber` 서브클래스로 교체됐다. 컨슈머 이름 규약(`trading-core-<UUID>`, 복구 `trading-core-recovery`)과 그룹 `trading-core`는 불변이라 기존 pending은 새 복구 경로가 XCLAIM으로 이어받는다. 처리(republish) 예외는 이제 베이스가 삼키고 ack하므로(이전엔 미ack → 60초 후 재시도) 재발행 중 일시 오류는 재시도되지 않는다.
 - **7단계(trading-core)**: `BatchContext`/배치 경로 시그니처 변경 — `deploy-trading` 매매 시간대 가드 대상. 로컬 2-프로세스 기동 + 수동 프리뷰(`GET /api/trading-cycles/{id}/preview`) 1회로 `TradingAccount` 경로 확인 권장.
 - **공통(미해소)**: 1~7단계 전부 이 클라우드 환경에서는 Postgres·Redis 없이 단위 테스트만 GREEN이다. 배포 전 로컬에서 `docker compose up -d postgres redis` 후 `./gradlew test integration`과 2-프로세스 기동(`docs/agents/commands.md`)을 반드시 한 번 수행할 것.

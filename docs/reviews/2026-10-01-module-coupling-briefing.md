@@ -51,7 +51,7 @@
 
 인계 메모 §6의 명시적 후속 과제는 0건이다. 그 외에 알아둘 것.
 
-- **운영 확인 1건.** `stats→benchmark` 개명으로 이벤트 FQCN이 바뀌었다. kista-scheduler 로그에 `ClassNotFoundException`(옛 `com.kista.stats.application.event.StatsAlertRaisedEvent`)이 보이면 `docs/agents/constraints.md` Flyway 절 "benchmark 패키지 개명"의 DELETE를 1회 실행한다. 세 번의 재기동에서 헬스는 모두 정상이었다.
+- **운영 확인 1건.** `stats→benchmark` 개명으로 이벤트 FQCN이 바뀌었다. kista-scheduler 로그에 `ClassNotFoundException`(옛 `com.kista.stats.application.event.StatsAlertRaisedEvent`)이 보이면 `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북"의 DELETE를 1회 실행한다. 세 번의 재기동에서 헬스는 모두 정상이었다. → **2026-10-01 운영 확인 완료**: 세 컨테이너 로그 `ClassNotFoundException` 0건, `public`·`trading` `event_publication` 미완료 row 0건 — 정리 불필요.
 - **정책 결정이 필요한 트레이드오프 2건.** (1) 가계부 리마인더의 알림 설정 게이트가 notify로 이동해 알림을 꺼둔 사용자도 등록 여부 조회(DB 3회)를 한다 — 초대제 소규모 전제, 사용자가 늘면 user 포트에 "알림 활성 사용자 id" 조회를 추가한다. (2) `notify-profile.changed` Stream은 last-write upsert 특성 때문에 일시 오류 시 재시도하지 않고 다음 변경이 바로잡는다 — 정확한 재시도가 필요해지면 이벤트에 버전(단조 증가값)을 실어야 한다.
 - **의도적으로 남긴 의존.** trading → account(26)·broker(44)·matching(67)·privacy(17)는 매매 실행이 그 도메인들을 조합하는 본질적 의존이라 유지. admin → user(18)·notify → user(15)는 관리자 화면과 알림 게이트웨이가 사용자 정보를 읽는 정상 방향(customer/supplier). `TradingAccount.from(Account)` 정의 1곳은 trading 도메인 → account 도메인 의존으로 허용(호출 경계 3곳에 생성자를 복제하는 것보다 낫다).
 - **다음 설계 후보.** (1) 신규 브로커가 `BrokerStatisticsPort`를 구현하면 환율 소스 상수(`Broker.TOSS`)를 정책 객체로 승격. (2) `UserPushNotificationRequestedEvent`(프로세스 간 FCM 위임)와 root 내부 채널 라우팅(`UserChannelNotifier`)을 하나의 알림 계약으로 합칠 여지. (3) Stream 컨슈머의 재시도 한도 초과 포기(ack)를 관리자 알림으로 노출.
