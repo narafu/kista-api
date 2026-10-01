@@ -133,7 +133,6 @@ jobs:
             rm -f caddy/kista-api.caddy.prev
             if [ -f caddy/kista-api.caddy ]; then cp -p caddy/kista-api.caddy caddy/kista-api.caddy.prev; fi
             mv "caddy/kista-api.caddy.${SERVICE}" caddy/kista-api.caddy
-            cp -p caddy/kista-api.caddy "rollback/${SERVICE}.caddy.installed"   # 롤백 시 다른 role이 그사이 바꿨는지 판별용
             CADDY=$(docker ps -q --filter label=com.docker.compose.project=kista-infra --filter label=com.docker.compose.service=caddy)
             if [ -n "$CADDY" ] && ! docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile; then
               # 원복 대상이 없으면(최초 배포) 잘못된 스니펫을 지워 다음 caddy 재기동이 이 파일 때문에 실패하지 않게 한다
@@ -144,8 +143,9 @@ jobs:
 
             # 롤백 기록: 교체 직전 compose 파일·Caddy 스니펫·실행 이미지. /tmp가 아닌 배포 디렉토리에 둬 재부팅에도 유지
             cp docker-compose.yml "rollback/${SERVICE}.compose.yml" 2>/dev/null || true
-            rm -f "rollback/${SERVICE}.caddy" "rollback/${SERVICE}.caddy.installed"
+            rm -f "rollback/${SERVICE}.caddy"
             if [ -f caddy/kista-api.caddy.prev ]; then cp -p caddy/kista-api.caddy.prev "rollback/${SERVICE}.caddy"; fi
+            cp -p caddy/kista-api.caddy "rollback/${SERVICE}.caddy.installed"   # 롤백 시 다른 role이 그사이 바꿨는지 판별용(이번에 설치한 스니펫)
             docker inspect -f '{{.Config.Image}}' "${SERVICE}" > "rollback/${SERVICE}.image" 2>/dev/null || : > "rollback/${SERVICE}.image"
             mv "docker-compose.yml.${SERVICE}" docker-compose.yml
 
