@@ -68,7 +68,7 @@ class AccountStatisticsServiceTest {
 
     @Test
     void getPresentBalance_brokerFailure_wrappedAsIllegalStateException() {
-        // getMargin()과 동일하게 BrokerCallGuard로 감싸져야 함 — 브로커 예외가 503 대신 400으로 통일
+        // getMargin()과 동일하게 BrokerCallGuard로 감싸져야 함 — 증권사 타입 외 예상 밖 예외는 사용자용 메시지로 래핑
         when(portfolioPort.getPresentBalance(any())).thenThrow(new RuntimeException("Toss 매수가능금액 응답 없음"));
 
         assertThatThrownBy(() -> service.getPresentBalance(accountId, userId))

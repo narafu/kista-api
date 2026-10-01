@@ -49,6 +49,8 @@ public class TradingExceptionHandler {
     private final ApplicationEventPublisher eventPublisher;
 
     // trading-core 고유 예외 6종 매핑
+    private static final String BROKER_UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요"; // 503 응답 detail
+
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.of(
             BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials"),
             BrokerRateLimitException.class,          new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "KIS Rate Limit"),
@@ -77,7 +79,8 @@ public class TradingExceptionHandler {
     public ProblemDetail handleBrokerApiException(BrokerApiException ex) {
         reportErrorLog(ex);
         log.error("{} API 오류: {}", ex.vendorLabel(), ex.getMessage(), ex);
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.vendorLabel() + " API Error", ex.getMessage());
+        // detail은 사용자 노출용 고정 문구 — 원본 메시지(응답 바디·accountId 등 내부 정보)는 로그·에러 로그에만 남긴다
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.vendorLabel() + " API Error", BROKER_UNAVAILABLE_DETAIL);
     }
 
     // 필드 오류 메시지 집계 — 공용 유틸 사용

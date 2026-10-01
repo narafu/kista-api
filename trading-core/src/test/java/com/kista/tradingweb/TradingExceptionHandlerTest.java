@@ -67,6 +67,8 @@ class TradingExceptionHandlerTest {
 
         assertThat(detail.getStatus()).isEqualTo(503);
         assertThat(detail.getTitle()).isEqualTo("KIS API Error");
+        // 내부 메시지는 응답에 노출하지 않고 고정 문구만 내려준다(에러 로그에는 원본 보존 — 아래 검증)
+        assertThat(detail.getDetail()).isEqualTo("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요");
         ArgumentCaptor<AppErrorRaisedEvent> captor = ArgumentCaptor.forClass(AppErrorRaisedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().errorType()).isEqualTo("StubBrokerApiException");

@@ -134,7 +134,7 @@ class StrategyCreationService {
     }
 
     // 중간부터 시작 시 시장가(전일종가) 조회 — startAmount·초기 포지션·VR V값을 동일 기준으로 정합
-    // 조회 실패 시 등록 자체가 실패한다 — BrokerCallGuard가 IllegalStateException으로 래핑해 GlobalExceptionHandler 400 매핑
+    // 조회 실패 시 등록 자체가 실패한다 — 증권사 예외는 BrokerCallGuard가 그대로 전파해 TradingExceptionHandler가 503/422/429 매핑
     private BigDecimal fetchMarketPrice(Account account, StrategyTicker ticker) {
         return BrokerCallGuard.wrap("전일종가 조회",
                 () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef()));

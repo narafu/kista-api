@@ -1,5 +1,8 @@
 package com.kista.broker.application.service;
 
+import com.kista.broker.domain.model.BrokerApiException;
+import com.kista.broker.domain.model.BrokerCredentialException;
+import com.kista.broker.domain.model.BrokerRateLimitException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,5 +31,19 @@ class BrokerCallGuardTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("증권사 API")
                 .hasCause(cause);
+    }
+
+    @Test
+    @DisplayName("증권사 타입 예외는 래핑하지 않고 그대로 전파한다 — 503/422/429 상태코드 보존")
+    void wrap_brokerTypedException_rethrownAsIs() {
+        RuntimeException apiFailure = new com.kista.support.StubBrokerApiException("KIS", "KIS 토큰 발급 실패", BrokerApiException.Conflict.NONE);
+        RuntimeException credential = new BrokerCredentialException();
+        RuntimeException rateLimit = new BrokerRateLimitException();
+
+        for (RuntimeException e : new RuntimeException[]{apiFailure, credential, rateLimit}) {
+            assertThatThrownBy(() -> BrokerCallGuard.wrap("전일종가 조회", () -> {
+                throw e;
+            })).isSameAs(e);
+        }
     }
 }
