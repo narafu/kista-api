@@ -1,5 +1,5 @@
 name: ssh-setup
-description: 배포 서버 SSH 키·known_hosts 구성 — 호스트 키는 secret에 고정된 값만 신뢰한다(ssh-keyscan TOFU 금지)
+description: 배포 서버 SSH 키·known_hosts 구성 + remote/upload 헬퍼 설치 — 호스트 키는 secret에 고정된 값만 신뢰한다(ssh-keyscan TOFU 금지)
 
 inputs:
   ssh-key:
@@ -7,6 +7,9 @@ inputs:
     required: true
   host:
     description: 서버 호스트
+    required: true
+  user:
+    description: SSH 사용자
     required: true
   port:
     description: SSH 포트
@@ -23,6 +26,7 @@ runs:
       env:
         SSH_KEY: ${{ inputs.ssh-key }}
         HOST: ${{ inputs.host }}
+        USER_NAME: ${{ inputs.user }}
         PORT: ${{ inputs.port }}
         HOST_KEYS: ${{ inputs.host-keys }}
       run: |
@@ -36,3 +40,11 @@ runs:
           if [ -n "$key" ]; then printf '%s %s\n' "$entry" "$key"; fi
         done < <(tr -d '\r' <<<"$HOST_KEYS") > ~/.ssh/known_hosts   # CRLF로 붙여넣은 secret 방어
         chmod 600 ~/.ssh/known_hosts
+
+        # 이후 스텝용 헬퍼 — remote "<서버 명령>", upload <로컬 파일...> <서버 경로>
+        bin="$HOME/.local/deploy-bin"
+        mkdir -p "$bin"
+        printf '#!/usr/bin/env bash\nexec ssh -i ~/.ssh/deploy_key -p %q %q "$@"\n' "$PORT" "$USER_NAME@$HOST" > "$bin/remote"
+        printf '#!/usr/bin/env bash\nexec scp -i ~/.ssh/deploy_key -P %q "${@:1:$#-1}" %q:"${@: -1}"\n' "$PORT" "$USER_NAME@$HOST" > "$bin/upload"
+        chmod +x "$bin/remote" "$bin/upload"
+        echo "$bin" >> "$GITHUB_PATH"

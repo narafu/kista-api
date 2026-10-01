@@ -106,12 +106,13 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 ## 배포 흐름
 
 1. `changes` 잡이 서버에서 role별 **실행 중 이미지 SHA**를 읽어 그 SHA부터의 diff로 배포 대상 role을 판정(`docs/agents/docker-infra.md` "변경 경로 게이팅")
-2. `verify` job (전체 테스트 스위트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)
-3. Docker 이미지 빌드 → GHCR push (3 role 공용 단일 이미지, SHA 태그만, gha 레이어 캐시)
+2. `deploy-checks` job (배포 스크립트 shellcheck·bats + Flyway 마이그레이션 검사) — 통과해야 빌드
+3. `verify` job (전체 테스트 스위트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)과 Docker 이미지 빌드(3 role 공용 단일 이미지, SHA 태그만, gha 레이어 캐시)가 병렬 — 배포 잡은 둘 다 기다린다
 4. `deploy-api`·`deploy-scheduler`·`deploy-trading` 세 독립 잡(`_deploy-role.yml`)이 각자 role을 배포한다. 각 잡의 흐름:
    - SSH 호스트 키는 secret `SERVER_SSH_HOST_KEYS`로 고정(`.github/actions/ssh-setup`) — keyscan TOFU 없음
    - 서버에 더 새 커밋이 이미 돌고 있으면 생략(옛 run Re-run이 과거로 되돌리는 것 방지)
    - 매매 가드 — `deploy-trading`만: 시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 실행 중(`lock_until > now()` + 완료 기록 `finished_at`이 없거나 이번 획득 `locked_at`보다 이전)이면 차단(락은 중복 실행 방지로 성공 후에도 TTL까지 유지되지만 완료 시 `finished_at`이 기록돼 가드는 풀린다, 조회 실패도 차단). `workflow_dispatch` force=true로 우회
+   - EPR 고아 검사 — `deploy-trading`·`deploy-scheduler`만: 미완료 `event_publication` row가 참조하는 이벤트·리스너가 배포 커밋에 없으면 차단(`docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북")
    - 필수 환경변수 존재 검증 (서버 `.env` 기준)
    - Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`) 교체 + `caddy reload` — 실패 시 스니펫 원복·배포 중단
    - 롤백 기록(`/opt/kista-api/rollback/<service>.{image,compose.yml,run}`) 후 compose 교체 → `docker compose pull/up -d --no-deps <service>` (GHCR public이라 로그인 없음)

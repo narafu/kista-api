@@ -108,6 +108,16 @@ tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName.set("app.jar")
 }
 
+// 로컬에선 서브프로젝트 테스트 JVM을 한 번에 하나만 띄운다 — org.gradle.parallel로 root(힙 2g)·trading-core 테스트 JVM이
+// Gradle 데몬(2g)과 동시에 떠 개발 PC 메모리를 고갈시킨다(전체 스위트가 메모리 부족으로 강제 종료된 사례). CI(CI=true)는 제한 없음
+abstract class TestJvmSlot : BuildService<BuildServiceParameters.None>
+val testJvmSlot = gradle.sharedServices.registerIfAbsent("testJvmSlot", TestJvmSlot::class) {
+    maxParallelUsages.set(if (System.getenv("CI") == null) 1 else Int.MAX_VALUE)
+}
+allprojects {
+    tasks.withType<Test>().configureEach { usesService(testJvmSlot) }
+}
+
 tasks.named<Test>("test") {
     useJUnitPlatform {
         // Docker/Testcontainers 필요 테스트는 기본 test 태스크에서 제외 — 별도 integration 태스크 사용

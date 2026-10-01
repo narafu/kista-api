@@ -5,6 +5,20 @@ on:
     branches: [main]
 
 jobs:
+  # server-deploy.yml deploy-checks와 같은 검사 — PR 단계에서 미리 잡는다
+  deploy-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - run: shellcheck .github/scripts/*.sh deploy/server/bin/*.sh .github/tests/stub/docker
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bats >/dev/null
+          bats .github/tests
+      - name: Flyway 마이그레이션 검사 (적용 이력 불변 + root expand/contract)
+        run: bash .github/scripts/check-migrations.sh "origin/${{ github.base_ref }}"
+
   test:
     runs-on: ubuntu-latest
 

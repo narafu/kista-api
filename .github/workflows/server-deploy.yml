@@ -41,40 +41,41 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_SSH_PORT || '22' }}
           host-keys: ${{ secrets.SERVER_SSH_HOST_KEYS }}
+          user: ${{ secrets.SERVER_USER }}
       - name: Classify changed paths per role
         id: scope
         env:
           EVENT: ${{ github.event_name }}
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
-          SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
         run: |
           if [ "$EVENT" = "workflow_dispatch" ]; then
             printf 'verify=true\napi=true\nscheduler=true\ntrading=true\n' | tee -a "$GITHUB_OUTPUT"
             exit 0
           fi
-          # role별 실행 중 이미지 태그(= 커밋 SHA) 조회 — SSH 실패·컨테이너 부재는 빈 값으로 두고 아래에서 전부 배포로 처리
-          declare -A running
-          while read -r name image; do running[${name#/}]=${image##*:}; done < <(
-            ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
-              "docker inspect -f '{{.Name}} {{.Config.Image}}' kista-api kista-scheduler kista-trading" 2>/dev/null || true)
-          verify=false
-          for role in api scheduler trading; do
-            sha=${running[kista-$role]:-}
-            if [ -n "$sha" ] && git cat-file -e "${sha}^{commit}" 2>/dev/null; then
-              if git merge-base --is-ancestor "$GITHUB_SHA" "$sha"; then
-                flags="verify=false"$'\n'"$role=false"   # 이미 이 커밋 이상이 실행 중 — 옛 run 재실행이 롤백하는 것 방지
-              else
-                flags=$(git diff --name-only "$sha" "$GITHUB_SHA" | bash .github/scripts/detect-deploy-scope.sh)
-              fi
-            else
-              flags="verify=true"$'\n'"$role=true"
-            fi
-            echo "kista-$role: running=${sha:-none}"
-            grep "^$role=" <<<"$flags" | tee -a "$GITHUB_OUTPUT"
-            grep -q '^verify=true' <<<"$flags" && verify=true
-          done
-          echo "verify=$verify" | tee -a "$GITHUB_OUTPUT"
+          # SSH 실패·컨테이너 부재는 빈 입력 → plan-deploy.sh가 해당 role을 배포로 판정.
+          # 파이프로 tee에 바로 넘기지 않는다 — 기본 셸(bash -e)은 pipefail이 없어 plan-deploy.sh 실패가 tee 성공에 가려
+          # 출력 없이 초록불이 되고, 모든 배포가 조용히 생략된다
+          inspect=$(remote "docker inspect -f '{{.Name}} {{.Config.Image}}' kista-api kista-scheduler kista-trading" 2>/dev/null || true)
+          plan=$(bash .github/scripts/plan-deploy.sh "$GITHUB_SHA" <<<"$inspect")
+          echo "$plan" | tee -a "$GITHUB_OUTPUT"
+
+  # 배포 스크립트 정적 분석·단위 테스트 + 마이그레이션 안전 검사 — 서버를 건드리는 모든 스크립트가 여길 통과해야 이미지를 만든다
+  deploy-checks:
+    name: Deploy Scripts & Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: shellcheck
+        run: shellcheck .github/scripts/*.sh deploy/server/bin/*.sh .github/tests/stub/docker
+      - name: bats
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bats >/dev/null
+          bats .github/tests
+      - name: Flyway 마이그레이션 검사 (적용 이력 불변 + root expand/contract)
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: bash .github/scripts/check-migrations.sh "$BEFORE"
 
   verify:
     name: Full Test Suite
@@ -129,7 +130,8 @@ jobs:
     # kista-ui가 같은 구조(x86 + QEMU)에서 빌드 워커 SIGILL 크래시·무한 대기를 겪어 선제 적용.
     # 주의: 레포를 private으로 바꾸면 이 러너는 유료/미할당이라 job이 시작조차 안 되고 무한 대기한다.
     runs-on: ubuntu-24.04-arm
-    needs: [changes, verify]
+    # verify(테스트 ~4분)와 병렬로 빌드 — 배포 잡이 verify 성공을 따로 기다리므로 테스트 실패 이미지는 push돼도 배포되지 않는다
+    needs: [changes, deploy-checks]
     if: needs.changes.outputs.api == 'true' || needs.changes.outputs.scheduler == 'true' || needs.changes.outputs.trading == 'true'
     outputs:
       image: ${{ steps.image.outputs.image }}
@@ -164,7 +166,7 @@ jobs:
 
   deploy-api:
     name: Deploy API
-    needs: [changes, build]
+    needs: [changes, verify, build]
     if: needs.changes.outputs.api == 'true' && github.event.inputs.build_only != 'true'
     uses: ./.github/workflows/_deploy-role.yml
     with:
@@ -176,24 +178,26 @@ jobs:
 
   deploy-scheduler:
     name: Deploy Scheduler
-    needs: [changes, build]
+    needs: [changes, verify, build]
     if: needs.changes.outputs.scheduler == 'true' && github.event.inputs.build_only != 'true'   # kista-api와 같은 app.jar이지만 스케쥴러 전용 빈만 바뀐 경우는 이 잡만 실행
     uses: ./.github/workflows/_deploy-role.yml
     with:
       image: ${{ needs.build.outputs.image }}
       service: kista-scheduler
+      epr_schema: public       # root event_publication 재발행 소유
       apply_trading_guard: false
       force: ${{ github.event.inputs.force || 'false' }}
     secrets: inherit
 
   deploy-trading:
     name: Deploy Trading
-    needs: [changes, build]
+    needs: [changes, verify, build]
     if: needs.changes.outputs.trading == 'true' && github.event.inputs.build_only != 'true'
     uses: ./.github/workflows/_deploy-role.yml
     with:
       image: ${{ needs.build.outputs.image }}
       service: kista-trading
+      epr_schema: trading      # trading event_publication 재발행 소유
       apply_trading_guard: true
       force: ${{ github.event.inputs.force || 'false' }}
     secrets: inherit

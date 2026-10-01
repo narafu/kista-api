@@ -17,6 +17,17 @@
 grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 ```
 
+### 배포 스크립트 검증 (Docker)
+```bash
+# bats(.github/tests) — 판정 스크립트·원격 배포 스크립트(docker 스텁)
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(cygpath -aw .):/code" -w /code --entrypoint sh bats/bats:latest \
+  -c "apk add -q git; git config --global --add safe.directory '*'; bats .github/tests"
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(cygpath -aw .):/mnt" -w /mnt koalaman/shellcheck:stable .github/scripts/*.sh deploy/server/bin/*.sh
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(cygpath -aw .):/repo" -w /repo rhysd/actionlint:latest
+bash .github/scripts/check-migrations.sh origin/main   # 마이그레이션 불변·expand/contract
+```
+- 로컬 테스트 JVM은 Gradle `testJvmSlot` 빌드 서비스로 한 번에 하나만 뜬다(`CI` 환경변수 없을 때) — `test integration`처럼 여러 테스트 태스크를 한 번에 돌려도 순차 실행
+
 ### 로컬 admin 토큰 발급 (DevAuthController, local 프로파일 전용)
 ```bash
 # 일반 사용자 토큰

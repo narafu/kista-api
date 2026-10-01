@@ -16,8 +16,8 @@ trading=false
 
 while IFS= read -r f; do
   case "$f" in
-    # 테스트 소스 — 산출물 무관, 검증만
-    src/test/*|src/testFixtures/*|*/src/test/*|*/src/testFixtures/*)
+    # 테스트 소스(배포 스크립트 bats 포함) — 산출물 무관, 검증만
+    src/test/*|src/testFixtures/*|*/src/test/*|*/src/testFixtures/*|.github/tests/*)
       verify=true ;;
     # trading-core.jar 전용
     trading-core/src/main/*)
@@ -37,8 +37,8 @@ while IFS= read -r f; do
     deploy/server/caddy/*)
       verify=true; api=true ;;
     # 양쪽 jar에 들어가거나 3역할이 공유하는 입력 — 전부.
-    # deploy/ 아래는 compose 파일만 해당 — case 패턴의 *는 /도 매치하므로 deploy/*로 쓰면 런북·대시보드 문서 수정까지 3역할을 재기동한다
-    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore|deploy/server/docker-compose.yml|.github/scripts/*|.github/actions/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
+    # deploy/ 아래는 compose 파일·원격 배포 스크립트(bin)만 해당 — case 패턴의 *는 /도 매치하므로 deploy/*로 쓰면 런북·대시보드 문서 수정까지 3역할을 재기동한다
+    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore|deploy/server/docker-compose.yml|deploy/server/bin/*|.github/scripts/*|.github/actions/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
       verify=true; api=true; scheduler=true; trading=true ;;
   esac
 done

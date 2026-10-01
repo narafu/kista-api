@@ -1,5 +1,8 @@
 name: _deploy-role
 
+# role 1개 배포. 판정 로직은 .github/scripts/*.sh(러너), 서버 작업은 deploy/server/bin/*.sh(원격)에 있고 둘 다 bats로 검증한다
+# (.github/tests) — 이 파일은 순서와 입출력 배선만 담당한다.
+
 on:
   workflow_call:
     inputs:
@@ -15,8 +18,13 @@ on:
         description: '매매 시간대 배포 가드 적용 여부'
         required: true
         type: boolean
+      epr_schema:
+        description: '이 role이 재발행하는 event_publication 스키마(trading | public) — 비우면 EPR 고아 검사 생략'
+        required: false
+        type: string
+        default: ''
       force:
-        description: 'workflow_dispatch force 입력 (가드 무시)'
+        description: 'workflow_dispatch force 입력 (매매 가드·EPR 검사 무시)'
         required: false
         type: string
         default: 'false'
@@ -32,9 +40,6 @@ jobs:
     environment:
       name: production
     env:
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
-      SERVER_USER: ${{ secrets.SERVER_USER }}
-      SERVER_SSH_PORT: ${{ secrets.SERVER_SSH_PORT || '22' }}
       SERVICE: ${{ inputs.service }}
       KISTA_API_IMAGE: ${{ inputs.image }}
       # 롤백 기록을 이 run 시도에 묶는 식별자 — 다른 run이 남긴 기록으로 엉뚱하게 롤백하는 것 방지
@@ -50,183 +55,58 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_SSH_PORT || '22' }}
           host-keys: ${{ secrets.SERVER_SSH_HOST_KEYS }}
+          user: ${{ secrets.SERVER_USER }}
 
-      # 옛 run의 Re-run(가드 차단 후 재실행 등)이 더 새 버전을 과거로 되돌리는 것 방지.
-      # 3개 role 중 하나라도 더 새 커밋이면 생략 — compose 파일·Caddy 스니펫은 role 공유라 옛 run이 덮어쓰면 다른 role의 새 설정까지 되돌린다.
-      # 생략해도 안전: 더 새 push의 changes 잡이 이 role의 실행 중 SHA부터 diff했으므로 이 run의 변경을 이미 포함해 배포(또는 대기)한다
+      # 옛 run의 Re-run(가드 차단 후 재실행 등)이 더 새 버전을 과거로 되돌리는 것 방지 — 판정 근거는 newer-running.sh 주석
       - name: Skip if a newer commit is already running
         id: fresh
         run: |
-          target=${KISTA_API_IMAGE##*:}
-          while read -r name image; do
-            sha=${image##*:}
-            if [ -n "$sha" ] && [ "$sha" != "$target" ] && git cat-file -e "${sha}^{commit}" 2>/dev/null \
-               && git merge-base --is-ancestor "$target" "$sha"; then
-              echo "::notice::${name#/}에 더 새 커밋(${sha})이 실행 중 — ${SERVICE} ${target} 배포 생략"
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              break
-            fi
-          done < <(ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
-            "docker inspect -f '{{.Name}} {{.Config.Image}}' kista-api kista-scheduler kista-trading" 2>/dev/null || true)
-
-      - name: 매매 시간대 배포 가드 (KST 시각 + 매매 배치 락)
-        if: inputs.apply_trading_guard && inputs.force != 'true' && steps.fresh.outputs.skip != 'true'
-        run: |
-          now=$((10#$(TZ=Asia/Seoul date +%H%M)))
-          dow=$(TZ=Asia/Seoul date +%u)   # 1=월 ... 7=일
-          blocked=no
-          # 시각 창: 배치 기동 10분 전부터 차단(락은 기동 후에야 잡히므로 직전 구간은 시각으로만 막는다)
-          # 개장 스케쥴러: 월~금 22:30 기동, 비DST 23:30 개장 접수 / 마감 스케쥴러: 화~토 04:30 기동, 비DST 06:10 리포트
-          if [ "$dow" -le 5 ] && [ "$now" -ge 2220 ] && [ "$now" -le 2340 ]; then blocked=yes; fi
-          if [ "$dow" -ge 2 ] && [ "$dow" -le 6 ] && [ "$now" -ge 420 ] && [ "$now" -le 620 ]; then blocked=yes; fi
-          # 락: 배치가 시각 창을 넘겨 길어져도 보호. SchedulerLockService는 성공 후에도 락을 TTL까지 유지(중복 실행 방지)하므로
-          # 완료 기록이 없거나(finished_at NULL) 이번 획득(locked_at)보다 이전 것(구 이미지가 재획득해 리셋 못 한 값)이면 "실행 중"으로 본다.
-          # to_jsonb로 읽는 이유: 컬럼을 추가하는 trading 마이그레이션은
-          # kista-trading 기동 때 적용되는데 이 가드는 그보다 먼저 돈다 — 컬럼이 없으면 NULL로 읽혀 기존 판정(lock_until만)으로 동작.
-          # 수동 트리거도 같은 락을 쓴다. 조회 실패 시 판정 불가로 보고 차단(fail-closed)
-          locks=$(ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" 'bash -s' <<'ENDSSH'
-          docker exec kista-postgres psql -U kista -d kistadb -tAc \
-            "SELECT coalesce(string_agg(name, ','), '') FROM trading.scheduler_locks l WHERE name IN ('trading-open','trading-close') AND lock_until > now() AND coalesce((to_jsonb(l) ->> 'finished_at')::timestamptz < locked_at, true)"
-          ENDSSH
-          ) || { echo "::error::scheduler_locks 조회 실패 — 매매 배치 실행 여부를 판정할 수 없어 차단합니다. 확인 후 workflow_dispatch force=true로 우회하세요."; exit 1; }
-          if [ -n "$locks" ]; then blocked=yes; fi
-          if [ "$blocked" = yes ]; then
-            echo "::error::현재 KST $(TZ=Asia/Seoul date +%H:%M), 활성 매매 락: ${locks:-없음} — kista-trading 재기동이 sleep 중인 매매 스레드를 강제 종료하거나 재기동 중 EPR이 미완료 매매 이벤트를 재발행(kista-trading이 REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART 소유)해 주문 접수 유실·알림 중복이 생길 수 있어 차단합니다. 차단 해제 후 이 잡만 Re-run 하면 됩니다(더 새 커밋이 이미 배포됐으면 자동 생략). 긴급 시 workflow_dispatch force=true."
-            exit 1
+          if newer=$(remote "docker inspect -f '{{.Name}} {{.Config.Image}}' kista-api kista-scheduler kista-trading" 2>/dev/null \
+                     | bash .github/scripts/newer-running.sh "${KISTA_API_IMAGE##*:}"); then
+            echo "::notice::더 새 커밋이 실행 중(${newer}) — ${SERVICE} 배포 생략"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "매매 시간대 아님 (KST $(TZ=Asia/Seoul date +%H:%M)) — 배포 진행"
 
+      # 원격 스크립트는 role별 디렉토리로 올린다 — 세 role 잡이 같은 파일을 덮어쓰면 실행 중인 bash가 깨진다.
+      # compose·스니펫도 role별 스테이징 파일명으로 올리고 실제 교체는 deploy-role.sh가 배포 락 안에서 한다
       - name: Upload deployment files
         if: steps.fresh.outputs.skip != 'true'
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '${DEPLOY_PATH}/caddy' '${DEPLOY_PATH}/rollback'"
-          # role별 스테이징 파일명 — 실제 교체는 restart 스텝의 flock 안에서만 수행
-          # (deploy-api / deploy-scheduler / deploy-trading 동시 실행 시 공유 파일 truncate 경쟁 회피)
-          scp -i ~/.ssh/deploy_key -P "$SERVER_SSH_PORT" \
-            deploy/server/docker-compose.yml \
-            "$SERVER_USER@$SERVER_HOST:${DEPLOY_PATH}/docker-compose.yml.${SERVICE}"
-          scp -i ~/.ssh/deploy_key -P "$SERVER_SSH_PORT" \
-            deploy/server/caddy/kista-api.caddy \
-            "$SERVER_USER@$SERVER_HOST:${DEPLOY_PATH}/caddy/kista-api.caddy.${SERVICE}"
+          remote "mkdir -p '${DEPLOY_PATH}/caddy' '${DEPLOY_PATH}/rollback' '${DEPLOY_PATH}/bin/${SERVICE}'"
+          upload deploy/server/bin/*.sh "${DEPLOY_PATH}/bin/${SERVICE}/"
+          upload deploy/server/docker-compose.yml "${DEPLOY_PATH}/docker-compose.yml.${SERVICE}"
+          upload deploy/server/caddy/kista-api.caddy "${DEPLOY_PATH}/caddy/kista-api.caddy.${SERVICE}"
+
+      - name: 매매 시간대 배포 가드 (KST 시각 + 실행 중 매매 배치 락)
+        if: inputs.apply_trading_guard && inputs.force != 'true' && steps.fresh.outputs.skip != 'true'
+        run: |
+          locks=$(remote "bash '${DEPLOY_PATH}/bin/${SERVICE}/trading-locks.sh'") \
+            || { echo "::error::scheduler_locks 조회 실패 — 매매 배치 실행 여부를 판정할 수 없어 차단합니다(fail-closed). 확인 후 workflow_dispatch force=true로 우회하세요."; exit 1; }
+          if ! reason=$(bash .github/scripts/trading-guard.sh "$(TZ=Asia/Seoul date +%u)" "$(TZ=Asia/Seoul date +%H%M)" "$locks" 2>&1); then
+            echo "::error::KST $(TZ=Asia/Seoul date +%H:%M) 차단 — ${reason}. kista-trading 재기동이 sleep 중인 매매 스레드를 강제 종료하거나 재기동 중 EPR이 미완료 매매 이벤트를 재발행해 주문 접수 유실·알림 중복이 생길 수 있습니다. 차단 해제 후 이 잡만 Re-run(더 새 커밋이 이미 배포됐으면 자동 생략). 긴급 시 workflow_dispatch force=true."
+            exit 1
+          fi
+          echo "매매 가드 통과 (KST $(TZ=Asia/Seoul date +%H:%M))"
+
+      # 이벤트·리스너 패키지 이동/개명 커밋이 재발행 role 재기동 시 고아 row(ClassNotFoundException 반복·영구 미매칭)를 만들지 않는지 확인
+      - name: EPR 고아 검사 (${{ inputs.epr_schema }})
+        if: inputs.epr_schema != '' && inputs.force != 'true' && steps.fresh.outputs.skip != 'true'
+        run: |
+          pending=$(remote "bash '${DEPLOY_PATH}/bin/${SERVICE}/epr-pending.sh' '${{ inputs.epr_schema }}'") \
+            || { echo "::error::event_publication 조회 실패 — 고아 여부를 판정할 수 없어 차단합니다. 확인 후 workflow_dispatch force=true로 우회하세요."; exit 1; }
+          if ! orphans=$(bash .github/scripts/epr-orphans.sh <<<"$pending"); then
+            echo "$orphans"
+            echo "::error::미완료 EPR row가 이 커밋에 없는 이벤트·리스너를 참조합니다 — docs/agents/docker-infra.md '배포 직전 EPR 정리 런북'대로 ${{ inputs.epr_schema }}.event_publication을 정리한 뒤 Re-run 하세요."
+            exit 1
+          fi
+          echo "EPR 고아 없음"
 
       - name: Verify .env and restart ${{ inputs.service }}
         id: restart
         if: steps.fresh.outputs.skip != 'true'
-        run: |
-          ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
-            "DEPLOY_PATH='${DEPLOY_PATH}' KISTA_API_IMAGE='${KISTA_API_IMAGE}' SERVICE='${SERVICE}' RUN_TAG='${RUN_TAG}' bash -s" << 'ENDSSH'
-            set -e
-            cd "${DEPLOY_PATH}"
+        run: remote "DEPLOY_PATH='${DEPLOY_PATH}' SERVICE='${SERVICE}' KISTA_API_IMAGE='${KISTA_API_IMAGE}' RUN_TAG='${RUN_TAG}' bash '${DEPLOY_PATH}/bin/${SERVICE}/deploy-role.sh'"
 
-            # deploy-api / deploy-scheduler / deploy-trading 잡이 동시에 같은 디렉토리에서 파일 교체·pull·up 하므로 직렬화
-            exec 200>"${DEPLOY_PATH}/.deploy.lock"
-            flock 200
-
-            # 기본값이 있어 누락돼도 부팅은 되지만 조용히 오동작하는 키(INTERNAL_API_TOKEN·CORS·ADMIN_KAKAO_IDS 등)까지 포함
-            for key in DB_URL DB_USERNAME DB_PASSWORD JWT_SIGNING_KEY AES_ENCRYPTION_KEY INTERNAL_API_TOKEN KAKAO_CLIENT_ID CORS_ALLOWED_ORIGINS TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID API_DOMAIN ADMIN_KAKAO_IDS; do
-              grep -q "^${key}=" .env || { echo "::error::필수 환경변수 누락: ${key}"; exit 1; }
-            done
-
-            # Caddy 라우팅 스니펫 교체 + reload — kista-infra Caddyfile이 caddy/*.caddy를 import한다.
-            # reload 실패(문법 오류 등) 시 caddy는 기존 설정을 계속 서빙하므로 파일만 되돌리고 배포를 중단한다
-            # .prev는 매번 새로 만든다 — 남아 있던 다른 배포의 .prev로 원복하거나, 최초 배포에 잘못된 스니펫이 남는 것 방지
-            rm -f caddy/kista-api.caddy.prev
-            if [ -f caddy/kista-api.caddy ]; then cp -p caddy/kista-api.caddy caddy/kista-api.caddy.prev; fi
-            mv "caddy/kista-api.caddy.${SERVICE}" caddy/kista-api.caddy
-            CADDY=$(docker ps -q --filter label=com.docker.compose.project=kista-infra --filter label=com.docker.compose.service=caddy)
-            if [ -n "$CADDY" ] && ! docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile; then
-              # 원복 대상이 없으면(최초 배포) 잘못된 스니펫을 지워 다음 caddy 재기동이 이 파일 때문에 실패하지 않게 한다
-              if [ -f caddy/kista-api.caddy.prev ]; then mv caddy/kista-api.caddy.prev caddy/kista-api.caddy; else rm -f caddy/kista-api.caddy; fi
-              echo "::error::Caddy reload 실패 — 스니펫 원복, 배포 중단"
-              exit 1
-            fi
-
-            # 롤백 기록: 교체 직전 compose 파일·Caddy 스니펫·실행 이미지. /tmp가 아닌 배포 디렉토리에 둬 재부팅에도 유지
-            cp docker-compose.yml "rollback/${SERVICE}.compose.yml" 2>/dev/null || true
-            rm -f "rollback/${SERVICE}.caddy"
-            if [ -f caddy/kista-api.caddy.prev ]; then cp -p caddy/kista-api.caddy.prev "rollback/${SERVICE}.caddy"; fi
-            cp -p caddy/kista-api.caddy "rollback/${SERVICE}.caddy.installed"   # 롤백 시 다른 role이 그사이 바꿨는지 판별용(이번에 설치한 스니펫)
-            docker inspect -f '{{.Config.Image}}' "${SERVICE}" > "rollback/${SERVICE}.image" 2>/dev/null || : > "rollback/${SERVICE}.image"
-            mv "docker-compose.yml.${SERVICE}" docker-compose.yml
-
-            # GHCR 패키지가 public이라 로그인 없이 pull — 토큰을 원격 커맨드라인(/proc)에 싣지 않는다
-            # 예전 배포가 남긴 만료 토큰이 ~/.docker/config.json에 있으면 익명 대신 그걸로 인증해 'denied'가 난다 — 매번 제거
-            docker logout ghcr.io >/dev/null 2>&1 || true
-            export KISTA_API_IMAGE
-            docker compose pull "${SERVICE}"
-
-            for net in shared_net data_net; do docker network create "$net" 2>/dev/null || true; done
-
-            # 이 시점부터 컨테이너가 교체되므로 헬스 게이트가 롤백 대상으로 인식하도록 run 식별자 기록
-            echo "${RUN_TAG}" > "rollback/${SERVICE}.run"
-            docker compose up -d --no-deps "${SERVICE}"
-          ENDSSH
-
-      # restart가 실패해도(up 도중 실패 등) 컨테이너 교체가 시작됐다면 롤백해야 하므로 실행 — 교체 여부는 run 식별자로 판정
+      # restart가 실패해도(up 도중 실패 등) 컨테이너 교체가 시작됐다면 롤백해야 하므로 실행 — 교체 여부는 health-gate.sh가 run 식별자로 판정
       - name: Health gate & auto-rollback (${{ inputs.service }})
         if: ${{ !cancelled() && steps.restart.outcome != 'skipped' }}
-        run: |
-          ssh -i ~/.ssh/deploy_key -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" \
-            "DEPLOY_PATH='${DEPLOY_PATH}' KISTA_API_IMAGE='${KISTA_API_IMAGE}' SERVICE='${SERVICE}' RUN_TAG='${RUN_TAG}' bash -s" << 'ENDSSH'
-            set -e
-            cd "${DEPLOY_PATH}"
-            export KISTA_API_IMAGE   # docker compose가 image: ${KISTA_API_IMAGE:?...}를 interpolate하려면 필요
-
-            if [ "$(cat "rollback/${SERVICE}.run" 2>/dev/null)" != "${RUN_TAG}" ]; then
-              echo "✗ 이번 run에서 ${SERVICE} 컨테이너 교체가 시작되지 않음 — 게이트·롤백 생략"
-              exit 1
-            fi
-
-            # 통과 조건: Docker 헬스(liveness) healthy + readiness(readinessState·db·redis) UP.
-            # liveness만으로는 DB/Redis 연결 불능 상태도 통과하므로 readiness를 함께 본다(그룹 구성은 application.yml)
-            echo "헬스 게이트 시작 — ${SERVICE} (최대 5분)..."
-            for i in $(seq 1 30); do
-              STATUS=$(docker inspect --format '{{.State.Health.Status}}' "${SERVICE}" 2>/dev/null || echo "unknown")
-              if [ "$STATUS" = "healthy" ]; then
-                if docker exec "${SERVICE}" wget -qO- http://localhost:8080/actuator/health/readiness >/dev/null 2>&1; then
-                  echo "✓ ${SERVICE} liveness·readiness 통과 (${i}회 시도)"
-                  # 이 레포 이미지 중 컨테이너가 안 쓰는 태그만 정리(사용 중이면 rmi가 거부) + dangling 레이어 —
-                  # prune -f(dangling만)로는 SHA 태그가 무한 누적되고, prune -a는 다른 레포(kista-infra 등)가 막 pull한 이미지까지 지울 수 있다.
-                  # 롤백·수동 복구는 GHCR(public)에서 다시 pull된다
-                  # 배포 락 안에서 — 겹친 다른 run의 잡이 pull만 하고 아직 up 전인 이미지를 지우지 않도록
-                  (
-                    flock 200
-                    docker image ls --format '{{.Repository}}:{{.Tag}}' ghcr.io/narafu/kista-api | xargs -r docker rmi >/dev/null 2>&1 || true
-                    docker image prune -f >/dev/null || true
-                  ) 200>"${DEPLOY_PATH}/.deploy.lock"
-                  exit 0
-                fi
-                STATUS="healthy, readiness 미충족"
-              fi
-              if [ "$STATUS" = "unhealthy" ]; then
-                echo "✗ ${SERVICE} 헬스체크 실패 (unhealthy, ${i}회)"
-                break
-              fi
-              echo "  대기 중... (${i}/30, 상태: ${STATUS})"
-              sleep 10
-            done
-
-            PREV_IMAGE=$(cat "rollback/${SERVICE}.image" 2>/dev/null || echo "")
-            if [ -n "$PREV_IMAGE" ]; then
-              # 이미지뿐 아니라 compose 파일(환경변수·JAVA_OPTS·mem_limit)과 Caddy 스니펫까지 교체 직전 상태로 되돌린다
-              COMPOSE_FILE_PREV="rollback/${SERVICE}.compose.yml"
-              [ -f "$COMPOSE_FILE_PREV" ] || COMPOSE_FILE_PREV=docker-compose.yml
-              echo "✗ ${SERVICE} 헬스 게이트 실패 — 롤백: $PREV_IMAGE ($COMPOSE_FILE_PREV)"
-              (
-                flock 200
-                KISTA_API_IMAGE="$PREV_IMAGE" docker compose -p "$(basename "${DEPLOY_PATH}")" \
-                  --project-directory "${DEPLOY_PATH}" -f "$COMPOSE_FILE_PREV" up -d --no-deps "${SERVICE}"
-                # 스니펫 원복 — 롤백한 role이 새 라우팅의 경로를 아직 모를 수 있다. 단 그사이 다른 role이 스니펫을 바꿨으면(설치본과 다르면)
-                # 그 role의 라우팅을 덮지 않도록 건너뛴다. 원복 reload 실패는 기존 설정 유지라 무시
-                if [ -f "rollback/${SERVICE}.caddy" ] && cmp -s "rollback/${SERVICE}.caddy.installed" caddy/kista-api.caddy \
-                   && ! cmp -s "rollback/${SERVICE}.caddy" caddy/kista-api.caddy; then
-                  cp -p "rollback/${SERVICE}.caddy" caddy/kista-api.caddy
-                  CADDY=$(docker ps -q --filter label=com.docker.compose.project=kista-infra --filter label=com.docker.compose.service=caddy)
-                  [ -z "$CADDY" ] || docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile || true
-                fi
-              ) 200>"${DEPLOY_PATH}/.deploy.lock"
-            else
-              echo "✗ ${SERVICE} 헬스 게이트 실패 — 이전 이미지 정보 없음, 수동 복구 필요"
-            fi
-            exit 1
-          ENDSSH
+        run: remote "DEPLOY_PATH='${DEPLOY_PATH}' SERVICE='${SERVICE}' KISTA_API_IMAGE='${KISTA_API_IMAGE}' RUN_TAG='${RUN_TAG}' bash '${DEPLOY_PATH}/bin/${SERVICE}/health-gate.sh'"
