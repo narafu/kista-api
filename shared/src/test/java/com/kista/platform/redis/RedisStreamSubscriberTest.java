@@ -2,6 +2,7 @@ package com.kista.platform.redis;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.connection.stream.StreamRecords;
@@ -33,7 +34,11 @@ class RedisStreamSubscriberTest {
         boolean ackOnFailure = true; // 처리 실패 시 ack 여부 — false면 pending 유지
 
         TestSubscriber(StringRedisTemplate redisTemplate) {
-            super(mock(RedisConnectionFactory.class), redisTemplate, STREAM, GROUP, "test");
+            this(mock(RedisConnectionFactory.class), redisTemplate);
+        }
+
+        TestSubscriber(RedisConnectionFactory connectionFactory, StringRedisTemplate redisTemplate) {
+            super(connectionFactory, redisTemplate, STREAM, GROUP, "test");
         }
 
         @Override
@@ -57,6 +62,23 @@ class RedisStreamSubscriberTest {
 
     private static MapRecord<String, String, String> record(String payload) {
         return StreamRecords.newRecord().in(STREAM).withId(RecordId.of("1-0")).ofMap(Map.of("payload", payload));
+    }
+
+    // 연결 팩토리가 정지되면 폴링 구독을 취소해 종료 시 즉시 실패 무한 반복(로그 폭주)을 막는다
+    @Test
+    void connectionFactoryStopped_팩토리_정지_여부를_판정한다() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        LettuceConnectionFactory lettuce = mock(LettuceConnectionFactory.class);
+        TestSubscriber subscriber = new TestSubscriber(lettuce, redisTemplate);
+
+        when(lettuce.isRunning()).thenReturn(true);
+        assertThat(subscriber.connectionFactoryStopped()).isFalse();
+
+        when(lettuce.isRunning()).thenReturn(false);
+        assertThat(subscriber.connectionFactoryStopped()).isTrue();
+
+        // Lifecycle 미구현 팩토리는 정지 판정 불가 — 기존처럼 구독 유지
+        assertThat(new TestSubscriber(redisTemplate).connectionFactoryStopped()).isFalse();
     }
 
     @Test

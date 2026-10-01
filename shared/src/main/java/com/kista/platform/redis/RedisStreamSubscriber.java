@@ -2,6 +2,7 @@ package com.kista.platform.redis;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.context.Lifecycle;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
@@ -71,12 +72,13 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
                     .pollTimeout(Duration.ofSeconds(2))
                     .build();
             container = StreamMessageListenerContainer.create(connectionFactory, options);
-            // cancelOnError=false — 폴링·ack의 일시 오류로 구독이 조용히 끊기지 않게 한다(Spring Data Redis 기본값은 취소)
+            // 일시 오류로는 구독을 취소하지 않는다(Spring Data Redis 기본값은 취소) — 단 연결 팩토리가 정지되면 취소한다.
+            // 팩토리는 Lifecycle 정지 단계에서 먼저 멈추고 destroy()는 그 뒤라, 취소하지 않으면 폴링이 즉시 실패를 무한 반복한다
             var request = StreamMessageListenerContainer.StreamReadRequest
                     .builder(StreamOffset.create(streamKey, ReadOffset.lastConsumed()))
                     .consumer(Consumer.from(group, consumerName))
                     .autoAcknowledge(false)
-                    .cancelOnError(t -> false)
+                    .cancelOnError(t -> connectionFactoryStopped())
                     .errorHandler(t -> log.warn("{} 스트림 폴링 오류 — 구독 유지: {}", streamKey, t.getMessage()))
                     .build();
             subscription = container.register(request, this::handle);
@@ -86,6 +88,11 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
             stop(); // 부분 생성물 폐기 — 다음 recoverPending()이 처음부터 재시도한다
             log.error("{} 스트림 컨슈머 시작 실패 — 다음 복구 주기까지 소비가 지연된다", streamKey, e);
         }
+    }
+
+    // 연결 팩토리가 Lifecycle을 구현하고 정지(STOPPING/STOPPED 포함) 상태인지 — 종료 시 폴링 구독 취소 판정
+    boolean connectionFactoryStopped() {
+        return connectionFactory instanceof Lifecycle lifecycle && !lifecycle.isRunning();
     }
 
     // onRecord 처리 → ack. 처리 예외와 ack 예외를 각각 삼켜 리스너가 절대 예외를 던지지 않게 한다
