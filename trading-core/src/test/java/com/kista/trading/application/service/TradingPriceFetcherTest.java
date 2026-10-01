@@ -6,6 +6,7 @@ import com.kista.trading.domain.model.TradingAccount;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.support.TradingFixtures;
+import com.kista.trading.application.event.TradingErrorEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -64,5 +67,28 @@ class TradingPriceFetcherTest {
                 priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account.brokerRef());
 
         assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
+    }
+
+    @Test
+    @DisplayName("fetchPrevCloses: 일괄+단건 모두 실패해도 이벤트 미발행 — readOnly 미리보기 트랜잭션에서 EPR insert 500 회귀 방지")
+    void fetchPrevCloses_allFailed_noEvent() {
+        when(pricePort.getPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
+        when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
+
+        Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef());
+
+        assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("fetchPrices: 일괄+단건 모두 실패하면 TradingErrorEvent 발행 유지")
+    void fetchPrices_allFailed_publishesEvent() {
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
+        when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenThrow(new RuntimeException("토큰 발급 실패"));
+
+        priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account.brokerRef());
+
+        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
     }
 }

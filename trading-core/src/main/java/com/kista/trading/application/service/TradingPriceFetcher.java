@@ -81,14 +81,14 @@ class TradingPriceFetcher {
 
     // 현재가만 필요한 경우 (종가 조회 등)
     Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return fetchWithFallback(tickers, account, "현재가",
+        return fetchWithFallback(tickers, account, "현재가", true,
                 (t, acc) -> brokerPricePort.getPrices(t, acc),
                 (t, acc) -> brokerPricePort.getPrice(t, acc));
     }
 
     // 현재가 + 전일종가 함께 필요한 경우 (0회차 진입 방향 판단)
     Map<StrategyTicker, PriceSnapshot> fetchPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        Map<StrategyTicker, PriceSnapshot> snapshots = fetchWithFallback(tickers, account, "스냅샷",
+        Map<StrategyTicker, PriceSnapshot> snapshots = fetchWithFallback(tickers, account, "스냅샷", true,
                 (t, acc) -> brokerPricePort.getPriceSnapshots(t, acc),
                 (t, acc) -> brokerPricePort.getPriceSnapshot(t, acc));
         // snap==null(일괄+단건 fallback 모두 실패)인 종목은 제외 — 호출부(collectCycleCandidate 등)가 맵에 키 부재를 이미 null-tolerant하게 처리함
@@ -97,21 +97,25 @@ class TradingPriceFetcher {
     }
 
     // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
+    // 관리자 알림 없음: 유일한 호출부인 미리보기는 readOnly 트랜잭션이라 EPR insert가 실패해 500이 되고,
+    // 실패는 이후 StrategyOrderPlanBuilder 단건 재조회(BrokerCallGuard)가 사용자 응답으로 직접 드러낸다
     Map<StrategyTicker, BigDecimal> fetchPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        return fetchWithFallback(tickers, account, "전일종가",
+        return fetchWithFallback(tickers, account, "전일종가", false,
                 (t, acc) -> brokerPricePort.getPrevCloses(t, acc),
                 (t, acc) -> brokerPricePort.getPrevClose(t, acc));
     }
 
     // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용)
     Map<StrategyTicker, BigDecimal> fetchClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        return fetchWithFallback(tickers, account, "확정종가",
+        return fetchWithFallback(tickers, account, "확정종가", true,
                 (t, acc) -> brokerPricePort.getClosingPrices(t, tradeDate, acc),
                 (t, acc) -> brokerPricePort.getClosingPrice(t, tradeDate, acc));
     }
 
     // 복수종목 일괄 조회 실패(또는 일부 누락) 시 종목별 단건 fallback — 두 메서드 공용 골격
+    // alertOnFailure: 일괄+단건 모두 실패 시 TradingErrorEvent 발행 여부 (readOnly 트랜잭션 호출부는 false)
     private <T> Map<StrategyTicker, T> fetchWithFallback(List<StrategyTicker> tickers, BrokerAccountRef account, String label,
+                                                  boolean alertOnFailure,
                                                   BiFunction<List<StrategyTicker>, BrokerAccountRef, Map<StrategyTicker, T>> bulkFetch,
                                                   BiFunction<StrategyTicker, BrokerAccountRef, T> singleFetch) {
         Map<StrategyTicker, T> result;
@@ -134,7 +138,7 @@ class TradingPriceFetcher {
                 }
             }
         }
-        if (!failedTickers.isEmpty()) {
+        if (alertOnFailure && !failedTickers.isEmpty()) {
             eventPublisher.publishEvent(new TradingErrorEvent(null,
                     failedTickers + " " + label + " 조회 실패(일괄+단건 모두 실패)"));
         }
