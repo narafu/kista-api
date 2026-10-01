@@ -3,7 +3,7 @@ package com.kista.sharedkernel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-// 사이클 종료 후 자동 재등록 정책 — Strategy 도메인 nested enum(CycleSeedType)에서 sharedkernel로 이관(constraints.md "nested enum 정책 개정").
+// 사이클 종료 후 자동 재등록 정책 — Strategy 도메인 nested enum(CycleSeedType)에서 sharedkernel로 이관(constraints.md "User/Account/Strategy 공유 enum").
 // 상수명 byte-identical 유지 필수 — StrategyEntity.cycle_seed_type @Enumerated(STRING) DB 컬럼과 직결.
 @Getter
 @RequiredArgsConstructor

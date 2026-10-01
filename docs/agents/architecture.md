@@ -47,7 +47,7 @@ com.kista.tradingweb/    :trading-core · CLOSED · (NamedInterface 0개, 앱셸
 신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read — (b) 허용 사례·단일 소유 포트 타입·narrowing projection 원장(프로세스 경계 wire 타입은 own-type이 아니라 `com.kista.contract`). 자동 로드되지 않는다.
 
 ### Spring Modulith 모듈 구성
-19개 모듈(finance/notify/broker/trading/tradingstats/tradingnotify/tradingweb/matching/market/marketcalendar/privacy/benchmark/admin/user/account/sharedkernel/contract/platform/web/tradingweb — `:api`·`:trading-core`·`:shared`에 나뉘어 위치) 전부 `@ApplicationModule`로 선언돼 있고, 모듈 간 경계는 `ApplicationModules.verify()`(`ModulithArchitectureTest`)가, 모듈 내부 레이어 방향은 `HexagonalArchitectureTest`가 각각 검증한다. 각 모듈의 NamedInterface와 내부 패키지는 위 "모듈 한눈에 보기" 요약과 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)에 기록돼 있다 — 신규 코드 추가 시 해당 모듈 문서에서 위치·공개 범위를 확인할 것.
+19개 모듈(finance/notify/broker/trading/tradingstats/tradingnotify/matching/market/marketcalendar/privacy/benchmark/admin/user/account/sharedkernel/contract/platform/web/tradingweb — `:api`·`:trading-core`·`:shared`에 나뉘어 위치) 전부 `@ApplicationModule`로 선언돼 있고, 모듈 간 경계는 `ApplicationModules.verify()`(`ModulithArchitectureTest`)가, 모듈 내부 레이어 방향은 `HexagonalArchitectureTest`가 각각 검증한다. 각 모듈의 NamedInterface와 내부 패키지는 위 "모듈 한눈에 보기" 요약과 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)에 기록돼 있다 — 신규 코드 추가 시 해당 모듈 문서에서 위치·공개 범위를 확인할 것.
 
 모듈 간 참조는 원칙적으로 상대 모듈이 공개한 NamedInterface(도메인 타입 또는 own-type projection)만 거쳐야 하며(프로세스 경계를 넘는 wire 타입은 own-type이 아니라 `com.kista.contract`), 서로 참조가 얽히면 포트 역전(own-type 정의 + 상대가 구현) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도) 패턴을 쓴다. 다른 프로세스(trading-core ↔ root) 사이는 EPR이 전달되지 않으므로 내부 HTTP API 또는 Redis(Pub/Sub·Stream)를 쓴다.
 
@@ -56,22 +56,21 @@ com.kista.tradingweb/    :trading-core · CLOSED · (NamedInterface 0개, 앱셸
 - `JwtAuthFilter`: principal을 `UUID` 타입으로 저장 (`String` 아님)
 
 ### 소유권 검증 패턴
-- `account.verifyOwnedBy(requesterId)` — 불일치 시 `SecurityException` (컨트롤러에서 403 매핑)
-- `tradingCycle.verifyOwnedBy(account)` — `cycle.accountId().equals(account.id())` 검증, 마찬가지로 `SecurityException`
-- 사이클 소유권 확인 순서: `cycleRepository.findByIdOrThrow(id)` → `accountRepository.findByIdOrThrow(cycle.accountId())` → `account.verifyOwnedBy(requesterId)`
-- `accountRepository.findByIdOrThrow(id)` / `cycleRepository.findByIdOrThrow(id)` — 없으면 `NoSuchElementException` (컨트롤러에서 404 매핑)
-- Service 내 반복 검증은 `private Account requireOwnedAccount(UUID accountId, UUID requesterId)` 헬퍼로 추출 — `AccountStatisticsService` 패턴 참고
+- `account.verifyOwnedBy(requesterId)` — 불일치 시 `SecurityException` (403 매핑은 `ProblemDetailMappings.GENERIC`이 공급)
+- `AccountPort.requireOwnedAccount(accountId, requesterId)`(default) — `findByIdOrThrow` + `verifyOwnedBy` 한 번에. 소유권 검증이 필요한 서비스는 이것을 쓴다(`AccountStatisticsService` 등)
+- `accountPort.findByIdOrThrow(id)` — 없으면 `NoSuchElementException` (404 매핑)
+- 전략·사이클 소유권은 `strategy.accountId()`가 요청 계좌와 일치하는지로 검증한다(예: `TradingInternalQueryController.requireStrategyOwnedByAccount`) — 별도 `verifyOwnedBy`는 없다
 - Controller에 try/catch 추가 금지 — `ResponseStatusException` 등 Spring HTTP 클래스는 application layer 사용 불가 (ArchUnit 규칙)
 
 ### JPA Auditing
-- `BaseAuditEntity` (`@MappedSuperclass`): `UserEntity`, `AccountEntity`가 상속 — `@CreatedDate`/`@LastModifiedDate`로 `createdAt`/`updatedAt` 자동 관리
-- 새 엔티티에 타임스탬프 필요 시 `BaseAuditEntity`(`createdAt`+`updatedAt`) 또는 `BaseCreatedAtEntity`(`createdAt`만) 상속 — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 사용 금지 (`ddl-auto: validate` 실패); `KisTokenEntity` 등 DB DEFAULT(`insertable=false, updatable=false`) 방식 엔티티는 그대로 유지
+- `BaseAuditEntity` (`@MappedSuperclass`, `com.kista.platform.persistence`): 각 모듈 Entity가 상속(`UserEntity`/`AccountEntity`/`OrderEntity` 등) — `@CreatedDate`/`@LastModifiedDate`로 `createdAt`/`updatedAt` 자동 관리
+- 새 엔티티에 타임스탬프 필요 시 `BaseAuditEntity`(`createdAt`+`updatedAt`) 또는 `BaseCreatedAtEntity`(`createdAt`만) 상속 — `updated_at` 컬럼 없는 엔티티에 `BaseAuditEntity` 사용 금지 (`ddl-auto: validate` 실패)
 - 서비스에서 domain record 생성 시: `updatedAt=null` (adapter가 무시, `@LastModifiedDate`가 처리), `createdAt`은 update 시 기존 값 보존 / register 시 `null` (`@CreatedDate`가 처리)
 - `toEntity()` 내에서 `setCreatedAt()`/`setUpdatedAt()` 명시적 호출 금지 — 호출 자체가 dead code이며 `@Setter(PACKAGE)` 범위 제약과도 충돌
 
-### 텔레그램 알림 (notifyTradingReport)
-- 계좌별 텔레그램 설정 제거됨 — `User.telegramBotToken/chatId` 사용자봇만 사용 → 미설정 시 생략 (`log.warn`)
-- `UserPersistenceAdapter`: telegramBotToken AES-256 암호화/복호화 적용
+### 텔레그램 알림 (사용자 봇)
+- 계좌별 텔레그램 설정은 없다 — 사용자 봇(`telegramBotToken`/`chatId`)만 사용. 봇 토큰은 persistence 경계에서만 AES-256 암호화/복호화(root `UserPersistenceAdapter`, trading-core `UserNotifyProfilePersistenceAdapter`/`UserNotifyProfileSyncListener`)
+- 매매 알림(`notifyTradingReport` 등)은 trading-core `tradingnotify`가 `trading.user_notify_profile` 복제본(`TradingUserProfile`)의 토큰·chatId로 발송하고, 둘 중 하나라도 없으면 조용히 건너뛴다(`TradingUserNotificationAdapter.sendIfLinked`) → `modules/tradingnotify.md`
 
 ### 전략 패턴 (모듈별 문서로 이동)
 BrokerCapabilitiesPort/BrokerRouter 패턴·TDA 전략 패턴(InfiniteStrategy)·CycleOrderStrategy Capability 패턴·PRIVACY 전략 패턴·VR 전략 패턴은 각각 `modules/broker.md`·`modules/trading.md`·`modules/matching.md`·`modules/privacy.md`·`modules/trading.md`로 이동했다.

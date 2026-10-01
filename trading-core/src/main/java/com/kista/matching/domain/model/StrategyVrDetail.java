@@ -5,7 +5,7 @@ import java.math.RoundingMode;
 import java.util.UUID;
 
 // VR 전략 버전 상세 — strategy_vr_version 테이블과 매핑
-// gradient(G)·poolLimitRate는 전략 최초 시작일부터 경과한 주수에 따라 점진적으로 변하는 "램프" 값이다 (constraints.md "VR 공식" 후속)
+// gradient(G)·poolLimitRate는 전략 최초 시작일부터 경과한 주수에 따라 점진적으로 변하는 "램프" 값이다 (docs/agents/modules/trading-formulas.md "VR 공식" 후속)
 public record StrategyVrDetail(
         UUID strategyVersionId,          // FK → strategy_version.id
         int intervalWeeks,               // 리밸런싱 주기 (주 단위, 1 이상)

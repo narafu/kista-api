@@ -10,7 +10,7 @@ import com.kista.matching.domain.model.StrategyVrDetail;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// StrategyVrDetail.gradientAt(long)/poolLimitRateAt(long) 경과주수 기반 램프 공식 검증 (constraints.md "VR 공식" 후속)
+// StrategyVrDetail.gradientAt(long)/poolLimitRateAt(long) 경과주수 기반 램프 공식 검증 (docs/agents/modules/trading-formulas.md "VR 공식" 후속)
 @DisplayName("StrategyVrDetail 램프 공식 검증")
 class StrategyVrDetailTest {
 

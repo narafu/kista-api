@@ -27,7 +27,7 @@ mockMvc.perform(post("/api/...").with(csrf()).with(authentication(...)))
 
 ### MockBean
 ```java
-// Spring Boot 3.4+: @MockitoBean 권장
+// Spring Boot 4: @MockitoBean 사용 (코드베이스는 @MockBean 미사용)
 @MockitoBean
 private SomeUseCase someUseCase;
 // 컨트롤러에 새 필드 추가 시 여기도 반드시 추가
@@ -38,20 +38,16 @@ private SomeUseCase someUseCase;
 @Execution(ExecutionMode.SAME_THREAD)  // 클래스 레벨 필수
 ```
 
-## @SpringBootTest 패턴
+## @SpringBootTest / @DataJpaTest 패턴
 
 ### 타 패키지 FK 삽입 (JpaRepository package-private 우회)
+서비스별 스키마가 분리돼 있다 — `accounts`는 trading 스키마(`:trading-core`)라 root `users`를 참조하는 FK가 없다. trading-core 테스트는 users 삽입 없이 accounts만 넣는다 (`CyclePositionPersistenceAdapterTest` 참고). 테스트 지원 클래스는 `trading-core/src/testFixtures/java/com/kista/support`(`DataJpaTestBase`/`WebMvcTestSupport`/`TradingFixtures`).
 ```java
 @Autowired JdbcTemplate jdbcTemplate;
 
-// users 먼저 삽입
 jdbcTemplate.update(
-    "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())",
-    userId, "kakao_" + userId, "ACTIVE", "USER");
-// accounts 삽입
-jdbcTemplate.update(
-    "INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-    accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
+    "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+    accountId, userId, "테스트계좌", "KIS", "74420614", null, "key", "secret");
 ```
 
 ## Mockito 주의사항
@@ -75,13 +71,12 @@ static final CyclePositionHistoryEntry HISTORY = new CyclePositionHistoryEntry(C
 서비스에 `private final` 필드 추가 → 해당 테스트에 `@Mock` 추가 필수:
 ```java
 @Mock
-private RealtimeNotificationPort realtimeNotificationPort; // 누락 시 NPE
+private TradingRealtimeNotificationPort realtimeNotificationPort; // 누락 시 NPE
 ```
 
 ## TradingService 테스트 특이사항
 
 - `holdings=0` (신규 계좌) 테스트 → `executeBatch` 경로 필수 (`getPrices` stub으로 price 주입)
-- `portfolioSnapshotPort.save()`는 `price != null` 조건 가드 → 단건 경로에서 `verify(…, never()).save(any())` 정상
 - `executeBatch(List, DstInfo)` package-private 오버로드로 DST 대기 우회 가능
 
 ## 테스트 DB
@@ -91,14 +86,14 @@ private RealtimeNotificationPort realtimeNotificationPort; // 누락 시 NPE
 docker compose up -d postgres
 ```
 
-`application-test.yml`: `jdbc:postgresql://localhost:5432/kistadb` (kista/kista)
+`application-test.yml`(`trading-core/src/testFixtures/resources`): `jdbc:postgresql://localhost:5432/kistadb_test`
 
 ## 테스트 실행
 
 ```bash
-bash gradlew test --tests "com.kista.domain.*"      # 도메인 단위 테스트
-bash gradlew test --tests "com.kista.architecture.*" # ArchUnit
-bash gradlew test --tests "com.kista.SomeTest"       # 단일 테스트
+bash gradlew test --tests "com.kista.architecture.*"                # ArchUnit (root)
+bash gradlew :trading-core:test --tests "com.kista.trading.domain.*" # trading 도메인 단위 테스트
+bash gradlew :trading-core:test --tests "com.kista.SomeTest"         # trading-core 단일 테스트 (root 테스트는 :trading-core: 접두사 없이)
 ```
 
 실패 진단 (XML이 stdout보다 신뢰성 높음):

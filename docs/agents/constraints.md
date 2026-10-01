@@ -29,9 +29,9 @@
 
 **포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`StrategyCreationPolicyPort`(trading 정의·trading 자체 구현이라 포트 역전 아님, 나열은 이력 참고용)/`ActiveStrategyCountPort`(user 정의·`com.kista.user.adapter.out.internal.ActiveStrategyCountAdapter` 구현 — trading-core 내부 HTTP 호출)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingstats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingstats.application.port.output` 소유 일반 출력 포트다(한때 sharedkernel로 승격됐다가 환원). `TradingUserProfilePort`는 한때 이 계열이었으나 지금은 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다(아래 "폐기된 전례" 참고).
 
-**폐기된 전례 — 제3자(web) 구현은 컴파일 경계와 양립 불가**: `TradingUserProfilePort`는 한때 "정의자(trading)도 데이터 소유자(user)도 아닌 `com.kista.web`이 구현"하는 유일한 형태였다(`TradingUserProfileAdapter`). Modulith 슬라이스 순환(`Slice trading -> Slice user -> Slice trading`)은 그렇게 피할 수 있었지만, root(`:api`)의 `:trading-core` 컴파일 의존이 0이 되는 순간 root는 trading-core가 정의한 인터페이스를 구현하는 것 자체가 불가능해진다 — 스타일 문제가 아니라 컴파일 불가다. Task 12에서 이 메커니즘을 통째로 교체했다: trading-core가 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·잔고검증·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. `TradingUserProfileAdapter`는 삭제됐다.
+**폐기된 전례 — 제3자(web) 구현은 컴파일 경계와 양립 불가**: `TradingUserProfilePort`를 정의자(trading)도 데이터 소유자(user)도 아닌 `com.kista.web`이 구현하던 방식은, root(`:api`)의 `:trading-core` 컴파일 의존이 0이 되는 순간 trading-core 정의 인터페이스를 root가 구현할 수 없어 불가능해졌다(스타일 문제가 아니라 컴파일 불가). 지금은 trading-core가 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·잔고검증·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다.
 
-**따라서 "제3자 구현"을 새 설계의 선례로 삼지 말 것** — 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다. `ActiveStrategyCountAdapter`는 한때 web 구현으로 남아 있었으나 trading-core 내부 HTTP API를 호출하는 순수 HTTP 어댑터라 타입 의존이 없어, 2026-09-30 소유 모듈(`user.adapter.out.internal`)로 이전됐다.
+**따라서 "제3자 구현"을 새 설계의 선례로 삼지 말 것** — 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `user.adapter.out.internal.ActiveStrategyCountAdapter` — trading-core 내부 HTTP 호출).
 
 **복제본을 쓸 때의 필수 조건 2가지**(user_notify_profile 사례에서 실측):
 - **(a) 신규 복제 테이블은 마이그레이션에서 기존 데이터를 반드시 백필한다.** 복제본이 비면 소비처가 빈 결과를 정상 응답으로 받아 기능이 멈춘다. `TradingUserProfilePort` 3개 메서드의 실제 실패 양상이 서로 다르다는 점에 주의: `findAllByUserIds()` 빈 맵 → `BatchContextFactory`가 전략마다 `NoSuchElementException`을 던지고 잡아 `errorReportPort.reportError()`로 관리자 알림을 내보낸다(**시끄럽게** 전면 중단 — 전략 수만큼 알림이 쏟아진다). `findByUserId()` 빈 Optional → 전략 등록이 "사용자를 찾을 수 없습니다"로 거부된다. `findAllActive()` 빈 리스트 → `MarketEventNotifier`가 **조용히** 아무에게도 안 보낸다(예외·로그 없음). 셋 중 마지막이 발견이 가장 늦다.
@@ -52,8 +52,10 @@
 - Controller에서 별도 catch/rethrow 불필요 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT (예외별 코드는 코드가 SSOT)
 - async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 
-### Account ↔ Strategy 분리 / 잔고검증 토글 / 스케쥴러 주문 예산 배정
-Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnabled)·스케쥴러 주문 예산 배정 규칙은 `docs/agents/modules/trading.md`(account.md·user.md에서 cross-link)로 이동했다.
+### 모듈 문서가 SSOT인 규칙 (해당 모듈 작업 시 자동 로드, 그 외엔 직접 Read)
+- Account ↔ Strategy 분리·잔고검증 토글(`balanceCheckEnabled`)·스케쥴러 주문 예산 배정, 런타임 매매 정책 적용 → `modules/trading.md`
+- 매매 공식·VR 공식(변경 금지 — 단위 테스트로 검증) → `modules/trading-formulas.md`
+- 런타임 설정 API 엔드포인트 규칙 → `modules/admin.md`
 
 ### MetaController (enum SSOT)
 - `GET /api/meta` — enum 메타(label/description 포함) 단일 번들 제공 — UI에서 enum 리터럴 하드코딩 금지
@@ -92,9 +94,6 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - **JPA 매핑**: `@Enumerated(EnumType.STRING)` 단독 사용 — `@JdbcTypeCode(SqlTypes.NAMED_ENUM)` 사용 금지
 - **Flyway**: `CREATE TYPE` 구문 작성 금지, 컬럼 정의는 `VARCHAR(20)` (값 길이 여유 있게)
 
-### 매매 공식 / VR 공식 (변경 금지 — 단위 테스트로 검증)
-매매 공식·VR 공식은 `docs/agents/modules/trading-formulas.md`로 이동했다 — `matching/`·`trading/` 작업 시 자동 로드, 그 외에는 직접 Read.
-
 ### 계좌번호 마스킹 (AccountNumberMasker)
 - `com.kista.sharedkernel.AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)
 - KIS(하이픈 1개)·TOSS(하이픈 2개) 포맷 모두 대응 — 하이픈 위치별 개별 마스킹을 DTO 3곳에 중복 구현하던 방식은 부분 노출 결함으로 폐기됨
@@ -116,9 +115,7 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - `ddl-auto: validate` — Hibernate DDL 자동 생성 비활성화
 - **2-role 배포 backward-compat (expand/contract)** — root(`db/migration`) 마이그레이션에만 해당하며 trading-core(`db/migration-trading`)는 자기 스키마·이력을 독립으로 가져 이 제약 밖이다: `kista-api`·`kista-scheduler`가 독립 배포되므로, root 새 마이그레이션은 직전 배포 이미지와 호환돼야 한다 — 컬럼 추가는 nullable 또는 DEFAULT, 컬럼/테이블 드롭·리네임은 두 배포에 분리(먼저 코드 참조 제거 → 다음 배포에서 스키마 변경). 이를 못 지키는 마이그레이션을 실은 커밋은 두 role을 함께 배포한다. `ddl-auto: validate`는 기동 시에만 검사하므로, 스큐 상태의 스케쥴러는 드롭된 컬럼을 매매 도중 런타임에 만날 때까지 계속 돈다
   - **스키마뿐 아니라 "이벤트로 채워지는 복제 테이블"도 순서 제약을 만든다**: 복제본을 채우는 발행이 한쪽 role에만 있으면, 그 role이 구버전인 채로 반대쪽만 신버전이 되면 복제본이 비어 신버전이 깨진다. `user_notify_profile`이 그 사례 — 발행은 `kista-api` 경로(가입·승인·거절·재신청·설정변경)에만 있으므로 **`kista-api`를 `kista-scheduler`보다 먼저(또는 동시에) 배포해야 한다**. 반대 순서는 무해하다(구 스케쥴러는 `users`/`user_settings`를 직접 읽음) — 단방향 제약이다. 새 복제 테이블을 추가할 때 "발행 주체가 어느 role인가"를 먼저 확인하고 마이그레이션 헤더에 순서를 명시할 것
-  - **이벤트 클래스 패키지 이동은 `event_publication`에 `ClassNotFoundException`을 남긴다**(`event_publication`은 서비스별 2개 — root `public`·trading `trading`이라 이벤트를 발행·구독하는 서비스 쪽 테이블에서 확인·정리한다. 이 이동의 대상은 trading 이벤트라 `trading.event_publication`): Modulith EPR은 이벤트를 FQCN으로 저장하고 재기동 republish 시 그 이름으로 클래스를 resolve한다. 매매·privacy 알림 이벤트 12개(`BatchInterrupted`/`CycleCompleted`/`CycleEnded`/`InsufficientBalance`/`MarketClose`/`MarketClosed`/`MarketOpen`/`NewCycleStarted`/`OrderCancelFailed`/`TradingError`/`TradingReportReady`/`PrivacyAlertRaised` + `Event` 접미사)가 `com.kista.sharedkernel.*`에서 소비자 모듈 `com.kista.trading.application.event.*`(11개)/`com.kista.privacy.application.event.PrivacyAlertRaisedEvent`로 환원됐다 — 배포 직전 옛 FQCN(`com.kista.sharedkernel.*`)으로 남은 미완료 row는 `ClassNotFoundException`으로 매 재기동마다 반복 실패하며 자연 치유되지 않는다. 새 FQCN은 Task17 이전 옛 패키지명과 같으므로, 그 시절 미완료 row가 남아 있으면 옛 shape 그대로 resolve되어 역직렬화가 어긋날 수 있다 — 아래 두 확인이 모두 0건이어야 한다. 이 확인·정리는 반드시 deploy-trading 이미지 교체 직전(매매 시간대 밖)에 수행하고, 새 이미지가 기동된 뒤에는 절대 하지 않는다 — 새 FQCN 패턴이 정상 신규 row와 일치해 유효 알림을 지우게 된다. 배포 직전 `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND event_type IN ('com.kista.sharedkernel.BatchInterruptedEvent', 'com.kista.sharedkernel.CycleCompletedEvent', 'com.kista.sharedkernel.CycleEndedEvent', 'com.kista.sharedkernel.InsufficientBalanceEvent', 'com.kista.sharedkernel.MarketCloseEvent', 'com.kista.sharedkernel.MarketClosedEvent', 'com.kista.sharedkernel.MarketOpenEvent', 'com.kista.sharedkernel.NewCycleStartedEvent', 'com.kista.sharedkernel.OrderCancelFailedEvent', 'com.kista.sharedkernel.TradingErrorEvent', 'com.kista.sharedkernel.TradingReportReadyEvent', 'com.kista.sharedkernel.PrivacyAlertRaisedEvent')`와 `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND (event_type LIKE 'com.kista.trading.application.event.%' OR event_type = 'com.kista.privacy.application.event.PrivacyAlertRaisedEvent')`(옛 시대 잔재)로 확인하고, 0건이 아니면 같은 조건의 `DELETE FROM trading.event_publication WHERE ...`로 정리한다(해당 미완료 알림은 유실 — 배포 공지에 "이 시점 진행 중이던 사이클/오류 알림 일부가 유실될 수 있음" 명시). `completion_date`를 임의로 채워 "완료"로 위장하는 방식은 실제 리스너 실행 없이 완료 처리되므로 피하고 삭제(재시도 포기)로 처리할 것
-  - **리스너 패키지 이동은 `event_publication.listener_id`에 고아 row를 남긴다**(2026-09-30 `trading.notify` → `tradingnotify` 분리): Modulith EPR은 미완료 row를 리스너 FQCN+메서드(`listener_id`)로 저장하고 재기동 republish 시 그 id로 리스너를 찾는다. 매매 알림 리스너 6종(`TradingAlertNotifier`/`CycleEndedNotifier`/`CycleLifecycleNotifier`/`OrderCancelFailureNotifier`/`TradingReportNotifier`/`PrivacyAlertNotifier`)이 `com.kista.trading.notify.adapter.out.gateway.*` → `com.kista.tradingnotify.adapter.out.gateway.*`로 옮겨져, 배포 시점에 옛 id로 남은 미완료 row는 새 이미지가 어떤 리스너와도 매칭하지 못해 재발행되지 않고 영구히 남는다. 이벤트 FQCN(위 항목)은 그대로라 별개 문제다. **deploy-trading 이미지 교체 직전**(매매 시간대 밖) `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`로 확인해 0건이 아니면 같은 조건으로 `DELETE FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`를 실행한다(해당 알림은 유실 — 배포 공지에 명시). 새 이미지 기동 후에는 새 id(`com.kista.tradingnotify.%`)의 정상 신규 row가 생기므로 이 정리를 다시 실행해도 무해하지만(옛 패턴만 지운다) 확인 목적 외에는 불필요하다. 완료(`completion_date IS NOT NULL`) row는 건드리지 않는다 — Modulith가 자체 정리한다
-  - **benchmark 패키지 개명(2026-09-30, `com.kista.stats` → `com.kista.benchmark`)도 같은 `ClassNotFoundException`을 만든다** — root 이벤트 `StatsAlertRaisedEvent`가 `BenchmarkAlertRaisedEvent`로 개명되며 FQCN이 `com.kista.stats.application.event.StatsAlertRaisedEvent` → `com.kista.benchmark.application.event.BenchmarkAlertRaisedEvent`로 바뀌었다(KB Land·시장지수 수집 실패 알림, notify `AlertNotifier`가 구독). 대상은 root `public.event_publication`이고 EPR 재발행 소유는 kista-scheduler(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`)다. 옛 FQCN 미완료 row가 남은 채 배포하면 kista-scheduler 재기동마다 반복 실패하며 자연 치유되지 않는다. 새 FQCN은 이전에 존재한 적이 없어 trading 사례와 달리 "옛 시대 잔재" 충돌 확인은 필요 없다. 배포 직전 `SELECT count(*) FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'`로 확인하고, 0건이 아니면 `DELETE FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'`로 정리한다(해당 수집 실패 알림 일부는 유실 — 관리자 텔레그램 알림 1~2건 수준이라 배포 공지 불필요). `completion_date`를 채워 완료로 위장하지 않고 삭제로 처리한다. 확인·정리는 kista-scheduler 이미지 교체 직전에 하며, 옛 FQCN 패턴은 정상 신규 row와 겹치지 않으므로 새 이미지 기동 후 발견해도 같은 DELETE로 안전하게 정리할 수 있다
+  - **이벤트 클래스·리스너 패키지 이동/개명은 `event_publication`에 고아 row를 남긴다**: Modulith EPR은 이벤트를 FQCN(`event_type`), 리스너를 FQCN+메서드(`listener_id`)로 저장해 재기동 republish 시 그 이름으로 resolve한다 — 옛 이름으로 남은 미완료 row는 `ClassNotFoundException`으로 반복 실패하거나 어떤 리스너와도 매칭되지 않아 자연 치유되지 않는다. 이런 커밋은 소유 서비스(`trading.event_publication`=kista-trading, `public.event_publication`=kista-scheduler) 이미지 교체 직전에 확인·정리해야 한다. `completion_date`를 채워 완료로 위장하지 말고 삭제(재시도 포기)로 처리. 절차와 이관 건별 SQL → `docker-infra.md` "배포 직전 EPR 정리 런북"
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale` 변경 시 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 불일치만 런타임 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException`
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, JPA 1차 캐시에는 원본 BigDecimal 유지 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤 — 특정 위치 강제는 테이블 재생성 패턴 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME`)
@@ -136,9 +133,6 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
 - 예: `com.kista.broker.adapter.out.kis.KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
-
-### Lombok 패턴
-- `RestTemplate` 빈이 여러 개(`kisRestTemplate`, `telegramRestTemplate`)이므로 필드명을 빈 이름과 반드시 일치 — 불일치 시 `NoUniqueBeanDefinitionException`
 
 ### AES-256 암호화 위치
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
@@ -185,7 +179,7 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - **라우트 규칙 순서(첫 매치 우선)**: 공통 permitAll → `/api/internal/**` → `/api/admin/**` → 셸 기여 `SecurityRoutePolicy`(root `web.RootSecurityPolicy`) → `anyRequest().authenticated()`. 프로세스 고유 permitAll은 `SecurityConfig`에 직접 쓰지 말고 셸 정책으로 기여한다 — internal/admin 규칙이 먼저라 정책이 그 경로를 permitAll로 뚫을 수 없다(`SecurityConfigOrderingTest`가 잠금). `@Import(SecurityConfig.class)` `@WebMvcTest`가 permitAll 경로를 검증하려면 `RootSecurityPolicy.class`도 함께 `@Import`
 
 ### @Transactional 내부 외부 시스템 호출 금지
-- RestTemplate(텔레그램, KIS 등)을 `@Transactional` 내부에서 호출 금지 — 롤백 시 취소 불가
+- 외부 HTTP 호출(텔레그램, KIS 등)을 `@Transactional` 내부에서 호출 금지 — 롤백 시 취소 불가
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)`
 - 이벤트 위치: `application/event/`, 리스너 위치: `adapter/out/` (ArchUnit: adapter.out → application 의존 허용) — 단, 이벤트가 외부 시스템 호출이 아니라 **저장 트리거**(인바운드 성격, 예: admin `AppErrorRaisedListener`가 `AppErrorRaisedEvent`를 받아 `app_error_logs` 저장)면 `adapter/in/event/`에 둔다. 발행 지점이 트랜잭션 밖이면 `@TransactionalEventListener` 대신 동기 `@EventListener`(AFTER_COMMIT은 트랜잭션 없을 때 이벤트를 버린다)
 
@@ -196,10 +190,8 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - `application.service`도 마찬가지로 `adapter` 패키지 import 금지 (`application → adapter` 규칙, 변경 없음)
 - 컨트롤러 DTO와 겹치는 타입이 있으면 `domain/model/<도메인>` 패키지로 이동 후 DTO에서 re-import (변경 없음)
 
-### 공유 DTO @Valid 제약
-- `AccountRequest`는 register/update 공용 — `@Valid` 추가 시 `@NotNull strategyType`이 update에도 강제됨 (Breaking Change)
-- register에만 필수인 필드는 `@NotNull` + register 메서드에만 `@Valid` 적용, update는 `@Valid` 없이 유지
-- `AccountService.update()`는 strategyType 변경 지원 — null 전달 시 기존값 유지, PRIVACY 선택 시 ticker는 SOXL 강제 (register와 동일 규칙)
+### 공유 요청 DTO @Valid 제약
+- `AccountRequest`는 계좌 register/update 공용 — `@Valid`는 register(`AccountController` POST)에만 적용하고 update(nickname만 사용)는 `@Valid` 없이 유지. 등록 전용 제약(`@Pattern` 계좌번호 형식 등)이 update에 강제되면 Breaking Change
 
 ### FCM 디바이스 토큰 저장 규칙
 - 한 사용자가 같은 플랫폼의 여러 디바이스 토큰을 가질 수 있다. 신규 토큰 저장 시 같은 사용자·플랫폼 토큰을 일괄 삭제하지 않고, 동일 토큰의 기존 소유 레코드만 삭제한 뒤 현재 사용자에게 저장한다
@@ -208,9 +200,6 @@ Account ↔ Strategy 분리·잔고검증 토글(UserSettings.balanceCheckEnable
 - ADMIN seed: `ADMIN_KAKAO_IDS` 환경변수 (쉼표 구분) — 로그인 시 idempotent promote
 - `/api/admin/**` → `hasRole("ADMIN")`, `audit_logs`에 관리자 액션 영구 기록
 - 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 발급
-
-### 런타임 설정 API 규칙
-런타임 설정 API 규칙은 `docs/agents/modules/admin.md`로 이동했다 — admin 단독 소유.
 
 ### 시간 기준 정책 (KST 단일 기준)
 - **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (과거 US 거래일 기준에서 KST 기준으로 전환 완료됨)

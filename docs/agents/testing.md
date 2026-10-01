@@ -2,14 +2,13 @@
 
 ### 네이밍·구성
 - 단위 테스트 `*Test`, 통합 테스트 `*IT` + Docker 필요 테스트는 `@Tag("integration")` (`./gradlew integration`으로 실행)
-- 테스트 지원 코드는 `src/test/java/com/kista/support`
+- 테스트 지원 코드(`com.kista.support`): `DataJpaTestBase`/`WebMvcTestSupport`/`TradingFixtures`는 `trading-core/src/testFixtures`, `DomainFixtures`(User)는 루트 `src/testFixtures`, `TradingCoreJpaTestConfig`/`StubBrokerApiException`은 `trading-core/src/test`
 
 ### static 필드 forward reference 주의
 - Mockito 테스트 클래스에서 static 상수가 다른 static 상수를 참조할 때 선언 순서 중요 — `CYCLE.id()`를 참조하는 `NORMAL_HISTORY` 등은 반드시 `CYCLE` 선언 뒤에 위치해야 함 (위반 시 `illegal forward reference` 컴파일 오류)
 
 ### TradingService execute() 가격 주입 패턴
-- `execute(strategy, tradingAccount, user, DstInfo)` — price=null로 전달 (lazy getPrice 없음). 배치 경로 테스트의 계좌는 `TradingFixtures.tradingAccount(id, userId)`(=`TradingAccount.from(kisAccount(...))`)·`tossTradingAccount`를 쓰고, 브로커 포트 stub 매처는 `tradingAccount.brokerRef()`를 쓴다. 소유권 검증 경로(`AccountPort.requireOwnedAccount` 등)만 `kisAccount`(Account)를 유지
-- holdings=0 && price=null → `IllegalStateException("현재가 조회 실패")` — holdings=0 테스트는 `executeBatch` 경로 사용, `getPrices` stub으로 주입
+- `execute(strategy, tradingAccount, userProfile, DstInfo)`는 단건 래퍼로 `executeBatch`에 위임한다 — 현재가는 `TradingPriceFetcher`가 `BrokerPricePort`로 일괄 조회하므로 테스트는 `BrokerPricePort` mock을 stub한다. 배치 경로 테스트의 계좌는 `TradingFixtures.tradingAccount(id, userId)`(=`TradingAccount.from(kisAccount(...))`)·`tossTradingAccount`를 쓰고, 브로커 포트 stub 매처는 `tradingAccount.brokerRef()`를 쓴다. 소유권 검증 경로(`AccountPort.requireOwnedAccount` 등)만 `kisAccount`(Account)를 유지
 - `executeBatch(List, DstInfo)` package-private 오버로드 — DstInfo 직접 주입으로 sleep 우회
 
 ### @WebMvcTest + Spring Security 패턴
@@ -17,7 +16,7 @@
 - POST 요청 테스트: `.with(csrf())` 추가 필수 (없으면 403) — `import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf`
 - **`@WithMockUser` 사용 금지** (principal이 UserDetails → `@AuthenticationPrincipal UUID`로 바인딩 시 ClassCastException) — 대신 `.with(authentication(new UsernamePasswordAuthenticationToken(UUID.fromString(uuidString), null, List.of())))` 패턴 사용
 - `JwtAuthFilter`는 principal을 `UUID` 타입으로 저장 — 테스트 mock도 반드시 `UUID` 사용 (`String` 사용 시 컨트롤러에서 ClassCastException)
-- JwtAuthFilter를 `@Import`하는 `@WebMvcTest`: `@MockBean JwtDecoder jwtDecoder` 필수 — `JwtDecoderConfig`가 슬라이스 컨텍스트에 자동 로드되지 않으므로
+- JwtAuthFilter를 `@Import`하는 `@WebMvcTest`: `@MockitoBean JwtDecoder jwtDecoder` 필수 — `JwtDecoderConfig`가 슬라이스 컨텍스트에 자동 로드되지 않으므로
 - `@SpringBootTest @ActiveProfiles("test")`: `application-test.yml`에 `jwt.signing-key` EC JWK 추가 필요 (`JwtDecoderConfig` 단일 빈이 이 값으로 검증)
 - role 기반 인가 규칙(`hasRole`) 검증이 필요한 `@WebMvcTest`는 `@Import({SecurityConfig.class, JwtAuthFilter.class})` 추가 필수 — 미추가 시 `AuthorizationFilter`가 로드되지 않아 ROLE 검사 없이 200 반환 (`AdminPingControllerTest` 패턴 참고)
 
@@ -36,14 +35,9 @@
 - `ArgumentCaptor<Map>` (raw) + `any()` — concurrent 모드에서 오작동 → `ArgumentCaptor.forClass(Map.class)` + `@SuppressWarnings("unchecked")` 사용
 - `AccountBalance(q>0, 전반)` 잔고는 전략 계산 시 최대 4건 (LOC매수×2 + LOC매도 + 지정가매도)
 
-### 통합 테스트에서 타 패키지 FK 삽입 패턴
-- `AccountJpaRepository`·`UserJpaRepository`는 package-private → `trade` 등 다른 패키지의 `@SpringBootTest`에서 직접 주입 불가
-- FK 제약이 필요한 선행 행은 `@Autowired JdbcTemplate`으로 직접 SQL 삽입 후 `@Transactional` 롤백 활용:
-  ```java
-  jdbcTemplate.update("INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, ?, ?, now(), now())", userId, "kakao_" + userId, "ACTIVE", "USER");
-  jdbcTemplate.update("INSERT INTO accounts (id, user_id, nickname, account_no, app_key, secret_key, kis_account_type, broker, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())", accountId, userId, "테스트계좌", "74420614", "key", "secret", "01", "KIS");
-  ```
-- 타 패키지 FK 삽입 패턴: `OrderPersistenceAdapterTest` 참고 (TradeHistoryPersistenceAdapterTest 삭제됨)
+### 통합 테스트 FK 선행 행 삽입 패턴
+- `*JpaRepository`는 package-private → 다른 패키지의 테스트에서 직접 주입 불가. FK 선행 행은 `@Autowired JdbcTemplate`으로 직접 SQL 삽입 후 `@Transactional` 롤백 활용
+- 서비스별 스키마가 분리돼(`users`=root `public`, `accounts`·`strategy*`·`orders`=trading-core `trading`) `users` 행은 루트 테스트에서만, trading-core 테스트는 `accounts`부터 삽입한다 — `accounts.user_id`에 users FK가 없다. 선행 행 순서·컬럼은 `OrderPersistenceAdapterDbTest`(accounts → strategy → strategy_version → strategy_cycle) 참고, root 쪽 `users` 삽입은 `UserSettingsPersistenceAdapterIT` 참고
 
 ### 테스트 DB
 
@@ -59,18 +53,18 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 - trading-core 테스트도 `broker.domain.model.kis/toss` 벤더 타입을 쓰지 않는다(`TradingCoreTestVendorModelTest`, broker 모듈 테스트 제외) — broker 밖 테스트의 외부 API 실패는 `com.kista.support.StubBrokerApiException`(벤더 중립 `BrokerApiException` 최소 서브클래스)으로 만든다
 
 ### 전략 테스트 분리 원칙
-- `InfinitePositionTest` (`com.kista.trading.domain.model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
-- `InfiniteStrategyTypeTest` (`com.kista.trading.domain.strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)
+- `InfinitePositionTest` (`com.kista.matching.domain.model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
+- `InfiniteStrategyTypeTest` (`com.kista.matching.domain.strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)
 
 ### InfiniteStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`
 - `TradingServiceTest`는 `when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))` 패턴 사용
-- `TradingService` 단위 테스트는 실제 `TradingOrderBudgetAllocator(liveBalancePort, sellableQuantityPort, orderPort, cycleOrderStrategies)`(4-인자, 병렬 러너 없음 — 단일계좌 전용화로 계좌별 조회+배정을 한 번에 수행)를 주입하고, `LiveBalancePort`·`SellableQuantityPort` mock을 직접 주입해 stub하고, 기존 BUY/SELL 예약량도 stub한다. 계좌별 병렬 실행은 이제 `TradingCandidatePlanner`가 맡는다 — `TradingCandidatePlanner`(마지막 생성자 인자)와 `TradingService` 양쪽에 `new TradingParallelRunner(0)`(순차 인라인 모드)을 주입해 기존 51개 테스트의 결정적 호출 순서를 보존한다 — 병렬 의미론(동시 상한·그룹 격리·순서 보존·인터럽트 승격)은 별도 `TradingParallelRunnerTest`가 검증한다. `TradingOrderBudgetAllocator.allocate(candidates, tradeDate)`는 2-인자 단일 진입점이며, candidates는 항상 단일 계좌 스코프여야 한다.
+- `TradingService` 단위 테스트는 실제 `TradingOrderBudgetAllocator(liveBalancePort, sellableQuantityPort, orderPort, cycleOrderStrategies)`(4-인자, 병렬 러너 없음 — 단일계좌 전용화로 계좌별 조회+배정을 한 번에 수행)를 주입하고, `LiveBalancePort`·`SellableQuantityPort` mock을 직접 주입해 stub하고, 기존 BUY/SELL 예약량도 stub한다. 계좌별 병렬 실행은 이제 `TradingCandidatePlanner`가 맡는다 — `TradingCandidatePlanner`(마지막 생성자 인자)와 `TradingService` 양쪽에 `new TradingParallelRunner(0)`(순차 인라인 모드)을 주입해 기존 테스트의 결정적 호출 순서를 보존한다 — 병렬 의미론(동시 상한·그룹 격리·순서 보존·인터럽트 승격)은 별도 `TradingParallelRunnerTest`가 검증한다. `TradingOrderBudgetAllocator.allocate(candidates, tradeDate)`는 2-인자 단일 진입점이며, candidates는 항상 단일 계좌 스코프여야 한다.
 - scheduler leg recovery 테스트는 `Order.withLeg(...)`로 concrete leg를 명시한다. legacy 호환 케이스는 `Order.UNKNOWN_LEG`를 사용하고, `UNKNOWN`은 `timing + direction` coarse 슬롯이라는 점을 검증한다.
 - INFINITE compute skip 테스트는 correction 포함 complete concrete leg와 partial concrete leg를 모두 둔다. complete는 `buildOrders(...)` 미호출, partial은 호출을 검증해 누락 leg 복구가 막히지 않게 한다. 개장 스케쥴러 회귀는 기존 `AT_CLOSE` BUY만 있을 때 `AT_OPEN` SELL 복구가 막히지 않는지도 검증한다. VR/PRIVACY는 variable ladder라 concrete compute skip을 가정하지 않는다.
 - cap 예산 회귀 테스트는 `buildCappedBuyOrders(...)`가 반환하는 base+correction BUY 총액이 원본 BUY보다 커지는 경우를 만들고, allocator가 최종 총액으로 BUY를 거절하는지 검증한다.
 - BUY/SELL 부분 승인 테스트는 저장된 주문의 방향뿐 아니라 원본 후보 내 상대 순서가 유지되는지도 검증한다.
-- 배치 실패 격리 테스트는 서로 다른 account의 context를 함께 전달하고 allocator 잔고 조회·`saveAll`·잔고 부족 알림을 각각 예외 처리해 성공 계좌의 저장·접수와 `NotifyPort.notifyError` 호출을 함께 검증한다.
+- 배치 실패 격리 테스트는 서로 다른 account의 context를 함께 전달하고 allocator 잔고 조회·`saveAll`·잔고 부족 알림을 각각 예외 처리해 성공 계좌의 저장·접수와 `TradingErrorEvent` 발행(`eventPublisher.publishEvent`)을 함께 검증한다.
 - 신규 양방향 거절 또는 저장 실패 시 기존 주문이 없는 사이클은 접수·포지션 저장·리포트가 호출되지 않아야 하며, 기존 PLANNED/PLACED 주문이 있는 사이클은 후속 처리를 유지해야 한다.
 - 수동 SELL 테스트는 `sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker` 예약량과 신규 SELL 합계가 판매가능수량을 넘는 경계를 stub한다.
 - `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음

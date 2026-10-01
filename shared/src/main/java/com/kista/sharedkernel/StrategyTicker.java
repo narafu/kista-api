@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import java.math.BigDecimal;
 import java.util.Optional;
 
-// 거래 종목 — Strategy 도메인 nested enum(Ticker)에서 sharedkernel로 이관(constraints.md "nested enum 정책 개정").
+// 거래 종목 — Strategy 도메인 nested enum(Ticker)에서 sharedkernel로 이관(constraints.md "User/Account/Strategy 공유 enum").
 // 상수명 byte-identical 유지 필수 — StrategyEntity.ticker @Enumerated(STRING) DB 컬럼과 직결.
 @Getter
 @RequiredArgsConstructor

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 // VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService(등록)·VrReconfigureService(재설정) 공유
-// (constraints.md "VR 공식" 변경 금지 대상 — 검증 조건 자체는 옮기기 전과 byte-for-byte 동일)
+// (docs/agents/modules/trading-formulas.md "VR 공식" 변경 금지 대상 — 검증 조건 자체는 옮기기 전과 byte-for-byte 동일)
 final class VrRampValidator {
 
     private VrRampValidator() {

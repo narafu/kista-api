@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
-Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finance·notify·broker·trading·tradingstats·tradingnotify·matching·market·privacy·stats·admin·user·account 13개 애그리게이트 이전 완료(strategyconfig는 2026-09-07 trading으로 병합, matching은 주문생성 커널 추출로 신설) + 레거시 `adapter`/`application` shim 해소로 `com.kista.web`(앱셸 CLOSED sink)·`com.kista.platform`(인프라 leaf OPEN) 신설, `common` 모듈도 2026-09-10 완전 소멸(잔여 4파일 각자 목적지로 이전). `ApplicationModules.verify()` GREEN).
+Java 21 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 모듈 경계는 `ApplicationModules.verify()`가 검증한다.
 
 이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
 
@@ -23,7 +23,7 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finan
 
 빌드·실행·테스트 명령어는 `docs/agents/commands.md`(자동 로드) 참고.
 
-필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`), `INTERNAL_API_BASE_URL` (admin→trading-core 내부 HTTP 호출 base URL, 기본값 `http://localhost:8080` — 이 기본값은 `application.yml`의 `server.port: 8080`과 우연히 일치하는 값이라 포트를 바꾸면 이 변수도 같이 갱신해야 함)
+필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`), `INTERNAL_API_BASE_URL` (root→trading-core 내부 HTTP 호출 base URL, 기본값 `http://localhost:8081` = trading-core 로컬 포트 — 운영은 compose가 kista-api에 주입)
 
 로컬 환경: `src/main/resources/application-local.yml` (.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 설정 필수
 
@@ -57,3 +57,4 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture (Spring Modulith — finan
 - KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
 - 토스증권 API 작업: `docs/agents/toss-api.md`
 - Docker/배포/인프라 작업: `docs/agents/docker-infra.md`
+- 배치 스케줄러 실행 시각: `docs/agents/scheduler-time-table.md`

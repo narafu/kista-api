@@ -9,27 +9,23 @@ description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파
 
 ## 레이어 규칙 (HexagonalArchitectureTest 기준)
 
+패키지는 `com.kista.<module>.{domain, application, adapter}` 구조다 (모듈 목록·소속 서브프로젝트는 `docs/agents/architecture.md` "모듈 한눈에 보기").
+
 ### 허용된 의존 방향
-- `adapter.in` → `application.usecase` (UseCase/Query 인터페이스, 레거시 `domain.port.in` 폐지됨)
-- `adapter.out` → `application.port.output` (Port 구현, 레거시 `domain.port.out` 폐지됨)
-- `application` → `domain` (model + port)
-- `adapter.out` → `application` (이벤트 리스너용, ArchUnit 예외 처리됨)
+- `adapter.in` → `application.usecase` (UseCase/Query 인터페이스), `application.port.output` 인터페이스
+- `adapter.out` → `application.port.output` (Port 구현), 이벤트 리스너용 `application.event`
+- `application` → `domain`
 
 ### 금지된 의존 방향
-- `domain` → Spring, JPA, 외부 프레임워크 (순수 Java record/class만 허용)
-  - 예외: `domain/strategy/`의 `@Component`는 ArchUnit 예외 처리됨
+- `domain` → `application`/`adapter`/`org.springframework.stereotype`/`jakarta.persistence` (예외 없음 — 전략 구현체 Spring 배선은 `CycleStrategyBeanConfig` 팩토리가 전담)
 - `application` → `adapter.*` (Spring HTTP 클래스 포함: ResponseStatusException 등)
-- `adapter.in` → `adapter.out` 직접 참조
-
-### 패키지 구조
-- `com.kista.domain.*` — 도메인 레이어
-- `com.kista.application.*` — 애플리케이션 레이어
-- `com.kista.adapter.in.*` — 인바운드 어댑터 (web, schedule, telegram)
-- `com.kista.adapter.out.*` — 아웃바운드 어댑터 (kis, persistence, notify, sse, kakao, alpaca, crypto)
+- `adapter.in` → `application.service` (구현체), `adapter.out` 직접 참조
+- 모듈 간: 상대 모듈의 NamedInterface로 공개된 타입만 참조 (`ModulithArchitectureTest`의 `ApplicationModules.verify()`)
+- 모듈별 추가 규칙: `sharedkernel`/`contract`/`platform`/`matching`은 다른 `com.kista` 모듈 의존 금지, `notify`는 순수 아웃바운드 게이트웨이, `web`은 순수 inbound sink, `@Aspect` 금지, 벤더 모델(`broker.domain.model.kis/toss`)은 broker 밖 유출 금지
 
 ## 검증 절차
 
-1. 파일의 패키지 경로로 레이어 판별
+1. 파일의 패키지 경로(`com.kista.<module>.<layer>`)로 모듈·레이어 판별
 2. import 목록에서 `com.kista.*` import만 추출
 3. 위 규칙 대조하여 위반 여부 판정
 4. 위반 발견 시: 올바른 의존 방향 안내 (포트 인터페이스 경유 등)
@@ -39,9 +35,10 @@ description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파
 | 위반 | 올바른 해결 |
 |------|------------|
 | `application` 레이어에서 `ResponseStatusException` import | Controller에서 변환, service는 순수 예외만 throw |
-| `adapter.out.*` 에서 다른 `adapter.out.*` JpaRepository 직접 참조 | Port 경유 (legacy는 `application.port.output.*Port`, broker/finance/notify/trading 등 모듈 소속은 해당 모듈 자체 `domain.port.out.*Port`) |
+| `adapter.out.*` 에서 다른 `adapter.out.*` JpaRepository 직접 참조 | 해당 모듈 `application.port.output.*Port` 경유 |
 | `domain.model.*` 에 `@Component`, `@Service` 등 Spring 어노테이션 | application 또는 adapter 레이어로 이동 |
 | `adapter.in.web.dto.*` 타입을 포트 파라미터로 사용 | `domain.model.*` 로 타입 이동 |
+| 프로세스 경계(root↔trading-core)를 넘는 타입을 own-type으로 복제 | `com.kista.contract`(`:shared`)에 선언 (→ `docs/agents/constraints.md` "모듈 경계 own-type") |
 
 ## 실행 방법
 
@@ -51,3 +48,4 @@ description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파
 
 ArchUnit 규칙 전체 확인:
   src/test/java/com/kista/architecture/HexagonalArchitectureTest.java
+  (모듈 경계: `ModulithArchitectureTest`, Gradle 경계: `GradleModuleBoundaryTest`)

@@ -7,7 +7,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-// 매매 전략 종류 — Strategy 도메인 nested enum(Type)에서 sharedkernel로 이관(constraints.md "nested enum 정책 개정").
+// 매매 전략 종류 — Strategy 도메인 nested enum(Type)에서 sharedkernel로 이관(constraints.md "User/Account/Strategy 공유 enum").
 // 상수명 byte-identical 유지 필수 — StrategyEntity.type @Enumerated(STRING) DB 컬럼과 직결.
 @Getter
 @RequiredArgsConstructor

@@ -6,20 +6,20 @@
 
 ### 어댑터 구조
 
-- `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`에서 RestTemplate 빈 주입
+- `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`의 `tossRestClient`(RestClient) 빈 주입
 - API 클래스 6개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`, `TossMarketApi`
-- `TossBrokerAdapter`: `BrokerAdapterPort` + 공통 7개 Port + Toss 전용 5개 Port 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
-  - Toss 전용(통계 capability, `BrokerStatisticsPort`로 묶임 — 벤더 중립 `BrokerCandle`/`BrokerStockInfo`/`ExchangeRateQuote`/`MarketCalendarDay`/`BrokerAccountInfo` 반환): `CandlePort`, `ExchangeRatePort`, `StockInfoPort`, `BrokerMarketCalendarPort`, `BrokerAccountPort`
+- `TossBrokerAdapter`: `BrokerCapabilitiesPort`(어댑터 식별 + 공통 7개 Port) + `BrokerStatisticsPort`(통계 5개 Port) 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
+  - 통계 capability(`BrokerStatisticsPort`로 묶임, 현재 Toss만 구현 — 벤더 중립 `BrokerCandle`/`BrokerStockInfo`/`ExchangeRateQuote`/`MarketCalendarDay`/`BrokerAccountInfo` 반환): `CandlePort`, `ExchangeRatePort`, `StockInfoPort`, `BrokerMarketCalendarPort`, `BrokerAccountPort`
 
 ### 계좌번호 포맷
 
-- `XXX-XX-XXXXXX` (하이픈 포함) — KIS `XXXXXXXX-XX`와 다름, `AccountInfoStep` 분기 처리 필요
+- `XXX-XX-XXXXXX` (하이픈 포함) — KIS `XXXXXXXX-XX`와 다름. 하이픈 분리(`KisHttpClient.splitAccountNo`)는 KIS 전용이고 Toss 호출은 `accounts.broker_account_code`(accountSeq)를 헤더에 쓴다(`TossHttpClient.buildHeaders`)
 
 ### 토큰·인증
 
-- 계좌 토큰 조정(`obtain`/`recover`)은 `com.kista.broker.adapter.out.internal.TokenCoordinator` 공통 계약을 `TossDistributedTokenCoordinator`가 구현한다 — KIS(`KisTokenCoordinator`, JVM 내 로컬 락)와 같은 형태의 인터페이스지만 메커니즘은 다르다(→ root ARCHITECTURE.md "브로커별 토큰 조정 메커니즘은 다르지만 계약은 공유한다"). 관리자(admin) 토큰은 Account가 없어 대응 개념이 없으므로 `getAdminToken`/`recoverAdminToken`으로 인터페이스 밖에 별도 노출한다.
+- 계좌 토큰 조정(`obtain`/`recover`)은 `com.kista.broker.adapter.out.internal.TokenCoordinator` 공통 계약을 `TossDistributedTokenCoordinator`가 구현한다 — KIS(`KisTokenCoordinator`, JVM 내 로컬 락)와 같은 형태의 인터페이스지만 메커니즘은 다르다(→ `modules/broker.md`의 `adapter/out/internal` 항목). 관리자(admin) 토큰은 Account가 없어 대응 개념이 없으므로 `getAdminToken`/`recoverAdminToken`으로 인터페이스 밖에 별도 노출한다.
 - Toss 계좌·관리자 access token의 canonical 저장소는 모두 Redis다. 계좌 hash key는 `toss:token:canonical:account:<UUID>`, 관리자는 `toss:token:canonical:admin`이며 access token, expiry epoch, fencing generation을 저장한다. TTL은 OAuth `expires_in`보다 5분 짧다. Toss는 PostgreSQL `broker_tokens`를 읽거나 무효화하거나 저장하지 않으며, 해당 DB 경로는 KIS 전용이다.
-- scope별 발급 owner는 Lua로 20초 lease `SET NX PX`(OAuth RestTemplate 타임아웃 최악 케이스 ~13초보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`를 원자 실행한다. follower polling ceiling은 25초(POLL_INTERVAL 50ms × 500회)로 lease TTL을 5초 여유로 초과해, 정상 owner 완료나 lease 자연 만료보다 먼저 포기하지 않는다. lease는 중복 OAuth를 줄일 뿐 correctness를 보장하지 않는다. canonical write Lua가 incoming generation을 현재 generation counter와 저장된 canonical generation 모두와 비교해 stale owner write를 거절하는 fencing CAS가 correctness 경계다.
+- scope별 발급 owner는 Lua로 20초 lease `SET NX PX`(OAuth HTTP 타임아웃(`TossConfig` 연결 3초 + 읽기 10초 = ~13초) 최악 케이스보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`를 원자 실행한다. follower polling ceiling은 25초(POLL_INTERVAL 50ms × 500회)로 lease TTL을 5초 여유로 초과해, 정상 owner 완료나 lease 자연 만료보다 먼저 포기하지 않는다. lease는 중복 OAuth를 줄일 뿐 correctness를 보장하지 않는다. canonical write Lua가 incoming generation을 현재 generation counter와 저장된 canonical generation 모두와 비교해 stale owner write를 거절하는 fencing CAS가 correctness 경계다.
 - lease 만료 후 successor가 더 큰 generation을 받으면 지연된 owner는 자신의 token을 저장·반환하지 않는다. successor의 더 큰 generation canonical token을 bounded polling해 반환하며 저장이 완료되지 않으면 503으로 fail-closed 한다.
 - canonical CAS와 최근 발급 SHA-256 fingerprint(2초 TTL)는 같은 Lua script에서 원자 저장한다. 같은 fingerprint의 401은 리소스 서버 전파 중으로 보고 해당 token을 보존한다. raw bearer token은 canonical hash에만 저장하고 로그/fingerprint key에는 저장하지 않는다. 이 경로는 정상 전파 지연에서도 흔히 타는 경로라 `TossDistributedTokenCoordinator`는 DEBUG로만 기록한다. `com.kista` 기본 로깅 레벨은 prod에서 INFO라 이 DEBUG 로그는 `application-prod.yml`에 클래스 단위 레벨 override(`com.kista.broker.adapter.out.toss.TossDistributedTokenCoordinator: DEBUG`)가 없으면 실제로 찍히지 않는다 — 신규 클래스에 DEBUG 로그를 추가할 때는 prod 로깅 레벨과 반드시 대조할 것.
 - **`forceReissue` 에스컬레이션(2026-08-11 PRIVACY BUY 주문 접수 실패 사례로 도입)**: `reusableToken()`은 `forceReissue=true`로 호출되면 지문 보호 재사용 분기를 건너뛰고(`null` 반환) lease 획득 → 실제 OAuth 재발급 경로로 강제 진입한다. `TossHttpClient`는 **같은 rejectedToken이 연속으로 다시 거절되면**(직전 지문 보호 대기가 전파 지연을 해소하지 못했다는 뜻) 이 플래그를 세운다 — 진짜 불량 토큰이 지문 보호 구간(2초) 내내 재시도만 소진하고 확정 실패하던 문제를 막는다. `TokenCoordinator` 공유 인터페이스(KIS와 공유)는 건드리지 않고 `TossDistributedTokenCoordinator`/`TossAuthApi`의 `recover(...,forceReissue)` 전용 오버로드로만 존재한다.
@@ -33,7 +33,7 @@
 - `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — 변환 없이 KST 날짜 그대로 전달
 - **`queryFrom = from - 1일`**: 전날 저녁 선접수 주문이 당일 장마감에 체결될 수 있어 1일 앞당겨 조회 후, `filledAt(KST)` 기반 필터링
 - KIS(US 거래일 기준, `UsTradeDates` 변환 필요)와 반대 방향 — 혼용 금지
-- **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙). 과거 변환 누락으로 MOCK/Toss 계좌 확정 종가가 거의 항상 라이브 현재가로 폴백되던 버그 있었음
+- **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙).
 
 ### 주의사항
 

@@ -15,6 +15,8 @@ Read the relevant shared documents before changing related code:
 - `docs/agents/kis-api.md`: KIS adapter/API work.
 - `docs/agents/toss-api.md`: Toss adapter/API work.
 - `docs/agents/docker-infra.md`: OCI server, Docker, and deployment operations.
+- `docs/agents/scheduler-time-table.md`: batch scheduler run times per module.
+- `docs/agents/modulith-migration-history.md`: module migration history (not auto-loaded; read only when investigating boundary history).
 - `docs/agents/modules/<module>.md`: per-module package tree and strategy patterns — Read the relevant one before changing that module's code (Claude Code loads these automatically via nested `CLAUDE.md`; Codex does not, so read explicitly).
 - `docs/agents/own-type-ledger.md`: ledger of allowed own-type duplicates across module boundaries — required reading before proposing a new one.
 - `docs/agents/modules/trading-formulas.md`: trading/VR formulas (change-controlled SSOT).

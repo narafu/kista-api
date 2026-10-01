@@ -8,19 +8,12 @@
 
 ### 서버 배포 방식 (현재 OCI)
 - 배포 설정 변경은 커밋으로 끝난 게 아니라 **실제 적용 여부를 반드시 확인**할 것 — 과거 Fly.io 시절 `fly.toml`의 배포 전략 섹션 키가 오타(`[deployment]` — 올바른 키는 `[deploy]`)라 조용히 무시되고 한 번도 적용되지 않은 사고 이력이 있음. 플랫폼은 바뀌었지만 "커밋했다"≠"적용됐다"는 원칙은 현행 OCI 배포에도 동일하게 적용
-- `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → `linux/arm64` GHCR 이미지 빌드·push → SSH로 서버에 배포 (매매 시간대 가드는 `deploy-trading` 잡에만 적용, 변경 경로 게이팅 — 아래 참고)
+- `.github/workflows/server-deploy.yml` — `main` push 시 GitHub Actions가 전체 테스트 스위트(ArchUnit 포함) 검증 → 네이티브 arm64 러너(`ubuntu-24.04-arm`, QEMU 미사용 — 레포를 private으로 바꾸면 이 러너가 없어 `build` 잡이 시작조차 못 하고 대기)에서 `linux/arm64` GHCR 이미지 빌드·push → SSH로 서버에 배포 (매매 시간대 가드는 `deploy-trading` 잡에만 적용, 변경 경로 게이팅 — 아래 참고)
 - **변경 경로 게이팅**: `changes` 잡이 `git diff --name-only <push 이전 커밋>..HEAD`를 `.github/scripts/detect-deploy-scope.sh`로 분류해 `verify`/`api`/`scheduler`/`trading` 플래그를 낸다. `trading-core/src/main/**`(trading 소유 `db/migration-trading` 포함)→`deploy-trading`만, `src/main/**/adapter/in/schedule/*`·`web/AdminSchedulerController.java`(`@ConditionalOnProperty(scheduler.enabled)`라 kista-api role엔 빈이 아예 없는 스케쥴러 전용 파일 — 이 분류의 전제는 `SchedulerDisabledContextTest`(schedule 패키지 빈이 kista-api 컨텍스트에 0개)와 `GradleModuleBoundaryTest`(패키지 밖에서 이 패키지 참조 금지, `AdminSchedulerController` 예외)가 강제한다)→`deploy-scheduler`만, 그 외 `src/main/**`→`deploy-api`+`deploy-scheduler`(같은 `app.jar` — 스케쥴러가 서비스·어댑터를 그대로 호출하므로 공용 코드는 둘 다; root 소유 `src/main/resources/db/migration/**`도 여기 해당 — trading은 자체 `migration-trading`을 소유하고 root 테이블에 의존하지 않으므로 root 마이그레이션만으론 `deploy-trading`이 켜지지 않는다), `shared/src/main`·`deploy/**`·`Dockerfile`·빌드 파일·`server-deploy.yml`/`_deploy-role.yml`/스크립트 자체→전부. 테스트 전용 경로(`**/src/test/**`, `**/src/testFixtures/**`)는 jar에 안 들어가므로 `verify`만 돌고 배포는 생략, `docs/**`·`*.md` 등은 전부 생략(green). `workflow_dispatch`·최초 push·force push로 base 소실은 전부 배포. **판정 기준이 "직전 push와의 diff"라 마지막 성공 배포 대비가 아니다** — 가드에 막힌 `deploy-trading`은 그 실행에서 해당 잡만 Re-run 해야 하고, 뒤이은 docs 커밋이 대신 배포해 주지 않는다. 스크립트는 `printf '<경로>\n' | bash .github/scripts/detect-deploy-scope.sh`로 로컬 검증 가능
 - **3-role 배포**: 같은 GHCR 이미지를 컨테이너 3개로 띄운다 — `kista-api`(HTTP, `scheduler.enabled=false`, 가드 없이 잦은 배포)·`kista-scheduler`(`SCHEDULER_ENABLED=true`, 비-매매 스케쥴러 KbLand/finance/user/market, 가드 없음)는 `app.jar`, `kista-trading`(`APP_JAR=trading-core.jar`, 매매 배치 + trading-core HTTP)은 `trading-core.jar`. `server-deploy.yml`은 `changes`·`verify`·`build` 후 `deploy-api`·`deploy-scheduler`·`deploy-trading` 세 독립 잡(`_deploy-role.yml` 재사용 워크플로)을 호출하며 각 잡은 위 게이팅 플래그로 실행 여부가 갈린다. 매매 시간대 가드는 `deploy-trading`에만 있다 — 그 시간대에 trading-core 변경을 push하면 `deploy-trading`만 `exit 1`이고, 장 마감 후 Actions에서 해당 잡만 Re-run. EPR 미완료 이벤트 재발행은 `event_publication`이 서비스별 2개라 소유자도 둘이다 — `kista-trading`이 `trading.event_publication`(매매 알림 리스너가 trading-core로 이관돼 있음), `kista-scheduler`가 root `public.event_publication`을 재발행한다(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`가 docker-compose.yml에서 이 두 컨테이너에만 설정, `kista-api`는 false — 셋 중 둘 이상이 같은 테이블에 true면 이중 claim. 세부 → constraints.md Git 규칙). 수동 트리거(`/api/admin/scheduler/*`)는 Caddy가 `kista-scheduler`로 라우팅(kista-infra 레포). 또한 세 배포 잡이 각각 `production` GitHub 환경을 참조하므로, `production`에 protection rule(필수 리뷰어·wait timer)을 걸면 push 1건당 승인이 최대 3회 필요해진다 — 현재는 protection rule 없음.
 - **Flyway 마이그레이션 backward-compat 필수(root 마이그레이션 한정 — trading-core `migration-trading`은 독립)**: 2-role은 독립 배포라 `kista-scheduler`가 이전 이미지로 새 스키마를 물 수 있다. 컬럼 추가는 nullable/DEFAULT, 드롭·리네임은 두 배포로 나눠 코드가 참조를 먼저 끊는다(expand/contract). 이 조건을 못 지키는 마이그레이션은 두 role을 같은 커밋에서 함께 배포 **롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true`라 이전 이미지로 롤백하면 기동 실패할 수 있다(이력 테이블은 root `flyway_schema_history_api`·trading `flyway_schema_history_trading`으로 서비스별). 스키마 재편 이행 릴리스(`kista`→`trading` 등 스키마 이름 변경)는 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 자동 롤백도 무력화되므로 **자동 롤백이 불가능**하다 — 수동 SSH 런북 `deploy/server/schema-reorg/RUNBOOK.md`(정방향·역방향 SQL 포함)를 따른다.
-- **이벤트 클래스 패키지 이동 배포 전 필수 체크(`event_publication` 정리)**: Modulith EPR은 이벤트를 FQCN으로 저장하고 재기동 republish 시 그 이름으로 클래스를 resolve한다 — 이벤트 클래스를 다른 패키지로 옮기는 커밋(예: trading/privacy 알림 이벤트 12개 `com.kista.sharedkernel.*` → `com.kista.trading.application.event.*`/`com.kista.privacy.application.event.*` 환원 — 정확한 SELECT/DELETE는 constraints.md Flyway 절 — deploy-trading 이미지 교체 직전(매매 시간대 밖)에만 실행, 새 이미지 기동 후에는 금지(새 FQCN 패턴이 정상 row와 일치))을 배포하기 직전, 옛 패키지로 남아있는 미완료 row가 있는지 반드시 확인한다. 남아있으면 배포 후 매 재기동마다 `ClassNotFoundException`으로 반복 실패하며 자연 치유되지 않는다.
-  ```sql
-  -- 배포 직전 서버 DB에서 실행 (옛 FQCN을 실제 이관 대상으로 치환)
-  SELECT count(*) FROM event_publication WHERE completion_date IS NULL AND event_type LIKE '<옛 패키지>.%';
-  -- 0건이 아니면 배포 전 삭제(재시도 포기 — 해당 미완료 알림은 유실됨을 배포 공지에 명시)
-  DELETE FROM event_publication WHERE completion_date IS NULL AND event_type LIKE '<옛 패키지>.%';
-  ```
-  `completion_date`를 임의로 채워 "완료"로 위장하는 방식은 리스너 실행 없이 완료 처리되므로 금지 — 삭제(재시도 포기)로 처리할 것. 상세 배경은 `constraints.md`의 "이벤트 클래스 패키지 이동은 event_publication에 ClassNotFoundException을 남긴다" 참고
-- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + kista-scheduler 2-role — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
+- **이벤트·리스너 패키지 이동 커밋 배포 전 필수 체크**: `event_publication` 고아 row 정리 — 절차·SQL은 아래 "배포 직전 EPR 정리 런북" (규칙 배경은 `constraints.md` Flyway 절)
+- 배포 파일: `deploy/server/docker-compose.yml`(kista-api + kista-scheduler + kista-trading 3-role — caddy·redis는 kista-infra 레포가 전담), `deploy/server/README.md`(초기 서버 설정·롤백 runbook·커트오버 체크리스트 전체 — 상세 절차는 이 README 참고)
 - `kista-infra`(private, `/opt/kista-infra/`) 레포가 caddy(양 도메인 리버스 프록시)·postgres·redis·백업 cron을 전담한다. `shared_net`(caddy↔kista-api/kista-ui)·`data_net`(postgres·redis↔kista-api만, kista-ui 미가입) 두 개의 external Docker 네트워크로 앱↔인프라 경계를 분리한다. **인스턴스 재편·컷오버 완료(2026-08-07)** — kista-api-server(A)가 caddy·postgres·redis·kista-api·kista-ui를 모두 올인원으로 호스팅, kista-ui-server는 삭제됨, DB는 Supabase에서 자체호스팅 postgres(`postgres:5432/kistadb`)로 이관 완료. fida-server만 별도 유지.
 - **현재 인스턴스는 OCI `VM.Standard.A1.Flex`(Ampere arm64), 2 OCPU, 12GB RAM, 부트 볼륨 50GB, Ubuntu 24.04** — 워크플로 `platforms` 값(`linux/arm64`)과 인스턴스 아키텍처가 항상 일치해야 하며, 인스턴스를 다른 아키텍처로 재생성하면 `server-deploy.yml`의 `platforms` 값도 함께 변경 필요
 - **OCI 볼륨은 in-place 축소 불가, OCPU·메모리는 가능** — 최초 12GB/부트 200GB로 생성했다가 free-tier 리전 스토리지(200GB) 전량을 부트 볼륨 하나가 점유해 다른 인스턴스를 만들 여유가 없어져 부트 볼륨만 50GB로 재생성함(2026-08-03). 볼륨을 줄여야 하면 재생성이 유일한 방법 — 아래 무중단 재생성 노하우 참고. 반면 OCPU·메모리는 Flexible shape 속성이라 `oci compute instance update --shape-config '{"ocpus":N,"memoryInGBs":M}'`로 살아있는 인스턴스에서 바로 변경 가능(적용에 재부팅 필요, IP·볼륨 유지) — 재생성 없이 스펙만 조정할 땐 이 경로를 우선 검토
@@ -47,7 +40,7 @@
 
 ### 다중 인스턴스 Toss 토큰 조정
 - 모든 인스턴스의 Toss 계좌·관리자 canonical token은 자체호스팅 Redis hash로 공유한다. OAuth 실제 만료보다 5분 짧은 TTL, fencing generation, expiry epoch를 저장한다. Toss는 PostgreSQL `broker_tokens`와 JPA pool을 사용하지 않는다. KIS는 기존 PostgreSQL token cache를 유지한다.
-- scope별 20초 Redis owner lease(OAuth RestTemplate 타임아웃 최악 케이스보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.
+- scope별 20초 Redis owner lease(OAuth HTTP 타임아웃(`TossConfig` 연결 3초·읽기 10초) 최악 케이스보다 여유 있게, owner crash 시 blast radius 최소화 목적)와 generation `INCR`는 하나의 Lua script로 실행한다. lease expiry 뒤 successor가 더 큰 generation을 받으면 canonical CAS가 늦은 이전 owner write를 거절한다. owner-safe Lua unlock은 successor lease를 보존한다.
 - Redis에는 canonical raw token 외에 영구 generation counter와 최근 SHA-256 fingerprint(2초)가 존재한다. raw bearer token을 로그 또는 fingerprint key에 기록하지 않는다. Redis 연결·script 실패는 로컬/DB fallback 없이 503으로 fail-closed 하며 운영 인스턴스는 모두 같은 Redis를 보아야 한다.
 
 ### Docker 빌드 OOM
@@ -55,13 +48,10 @@
 - 증상: `docker compose up` 빌드 중 `failed to receive status: ... error reading from server: EOF`
 - 해결: `Dockerfile` builder 스테이지에 `ENV JAVA_TOOL_OPTIONS="-Xmx768m"` (이미 적용됨)
 
-### 로컬 Docker Compose 환경변수 주입 방식
-- `.env`는 `${VAR}` 치환용 — 컨테이너에 직접 주입되지 않음, `environment:` 섹션에 명시된 것만 주입됨
-- `DB_URL`은 하드코딩(로컬 postgres) — `.env`의 DB_URL 무시됨
+### 로컬 Docker Compose / .env 주의
 - 컨테이너 필수 env: `AES_ENCRYPTION_KEY`(복호화), `JWT_SIGNING_KEY`(JWT 검증) — **빈 문자열로 주입 시 기동 불가** (`AesCryptoService: Empty key`), `.env`에 반드시 실제 값 설정
 - `.env` DB 자격증명은 docker-compose postgres 계정과 반드시 일치: `DB_USERNAME=kista` / `DB_PASSWORD=kista` (`postgres`/`postgres` 아님) — 불일치 시 `FATAL: password authentication failed for user "postgres"`
 - `.env`의 `DB_NAME`은 순수 DB 이름만 (`kistadb`) — `jdbc:kistadb` 같은 JDBC URL 형식 입력 시 `POSTGRES_DB` 인식 불가, `kistadb` DB 생성 실패
-- SQL 마이그레이션 파일 수정 후 반드시 이미지 재빌드: `docker compose build app && docker compose up -d --force-recreate app` — `--force-recreate`만으론 부족, JAR에 구 SQL이 남아있음
 
 ### 로컬 포트 할당
 - Grafana: `3030:3000` (호스트 3030 → 컨테이너 내부 3000) — `3030:3030`은 동작 안 함, kista-ui와 3000 충돌 방지
@@ -73,11 +63,11 @@
 - 새 루트 설정 파일 추가 시 동일하게 COPY 라인에 포함할 것
 
 ### docker-compose 서비스
-- `postgres:17` (kistadb/kista/kista, 포트 5432)
+- 로컬 `docker-compose.yml`: `postgres:17`(kistadb/kista/kista, 포트 5432)·`redis:7-alpine`·`prometheus`·`grafana` — 앱 서비스는 없다(IntelliJ/bootRun으로 실행)
 
 ### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
 - PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패
-- 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop app postgres && docker compose rm -f postgres app` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ `docker compose up -d app` (Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
+- 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop postgres && docker compose rm -f postgres` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ 앱 기동(bootRun, Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
 - 복원 시 이력 테이블(`flyway_schema_history_api`/`flyway_schema_history_trading`) duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
 - `${DB_NAME:-}` 환경변수 미설정 시 `POSTGRES_DB=""` → kistadb 자동 생성 안 됨, postgres 기본 DB는 POSTGRES_USER값("kista") — 새 볼륨 후 반드시 `CREATE DATABASE kistadb OWNER kista;` 수동 실행
 
@@ -86,7 +76,7 @@
 ### 서버(OCI) 운영 모니터링
 ```bash
 # 운영 로그 실시간 조회 (SSH 접속 후, /opt/kista-api 또는 /opt/kista-ui에서)
-docker compose logs -f kista-api                                # kista-api 운영 로그
+docker compose logs -f kista-api                                # kista-api 운영 로그 (kista-scheduler·kista-trading도 같은 방식)
 docker compose logs -f kista-ui                                 # kista-ui 운영 로그
 
 # 헬스 체크 / 배포 상태
@@ -159,6 +149,21 @@ docker exec kista-api-postgres-1 pg_restore -U kista -d kistadb --data-only --di
 # 로컬에 기존 데이터가 있으면 먼저 TRUNCATE (FK 순서 주의: orders → bases)
 # docker exec kista-api-postgres-1 psql -U kista -d kistadb -c "TRUNCATE trading_ref.privacy_trade_base_orders, trading_ref.privacy_trade_bases, kista_ref.fear_greed_snapshots;"
 ```
+
+### 배포 직전 EPR 정리 런북
+이벤트 클래스 또는 리스너(`@TransactionalEventListener`/`@EventListener` 메서드 소유 클래스)를 다른 패키지로 옮기거나 개명한 커밋은, 해당 이벤트를 재발행하는 role(`trading.event_publication`=kista-trading, `public.event_publication`=kista-scheduler)의 이미지 교체 **직전**에 옛 이름으로 남은 미완료 row를 확인·삭제한다. 삭제된 미완료 알림은 유실되므로 필요하면 배포 공지에 명시한다. `completion_date`를 채워 "완료"로 위장하는 방식은 리스너 실행 없이 완료 처리되므로 금지.
+
+```sql
+-- 배포 직전 서버 DB에서 실행 (옛 FQCN을 실제 이관 대상으로 치환, 테이블은 소유 서비스 쪽 — trading 이벤트는 trading.event_publication, root 이벤트는 public.event_publication)
+SELECT count(*) FROM event_publication WHERE completion_date IS NULL AND event_type LIKE '<옛 패키지>.%';
+-- 0건이 아니면 배포 전 삭제(재시도 포기 — 해당 미완료 알림은 유실됨을 배포 공지에 명시)
+DELETE FROM event_publication WHERE completion_date IS NULL AND event_type LIKE '<옛 패키지>.%';
+```
+
+**이관 건별 SQL** (해당 배포가 끝나면 이력으로만 남는다 — 새 이미지 기동 후 재실행 시 주의사항은 각 항목 참고):
+- **이벤트 클래스 패키지 이동은 `event_publication`에 `ClassNotFoundException`을 남긴다**(`event_publication`은 서비스별 2개 — root `public`·trading `trading`이라 이벤트를 발행·구독하는 서비스 쪽 테이블에서 확인·정리한다. 이 이동의 대상은 trading 이벤트라 `trading.event_publication`): Modulith EPR은 이벤트를 FQCN으로 저장하고 재기동 republish 시 그 이름으로 클래스를 resolve한다. 매매·privacy 알림 이벤트 12개(`BatchInterrupted`/`CycleCompleted`/`CycleEnded`/`InsufficientBalance`/`MarketClose`/`MarketClosed`/`MarketOpen`/`NewCycleStarted`/`OrderCancelFailed`/`TradingError`/`TradingReportReady`/`PrivacyAlertRaised` + `Event` 접미사)가 `com.kista.sharedkernel.*`에서 소비자 모듈 `com.kista.trading.application.event.*`(11개)/`com.kista.privacy.application.event.PrivacyAlertRaisedEvent`로 환원됐다 — 배포 직전 옛 FQCN(`com.kista.sharedkernel.*`)으로 남은 미완료 row는 `ClassNotFoundException`으로 매 재기동마다 반복 실패하며 자연 치유되지 않는다. 새 FQCN은 Task17 이전 옛 패키지명과 같으므로, 그 시절 미완료 row가 남아 있으면 옛 shape 그대로 resolve되어 역직렬화가 어긋날 수 있다 — 아래 두 확인이 모두 0건이어야 한다. 이 확인·정리는 반드시 deploy-trading 이미지 교체 직전(매매 시간대 밖)에 수행하고, 새 이미지가 기동된 뒤에는 절대 하지 않는다 — 새 FQCN 패턴이 정상 신규 row와 일치해 유효 알림을 지우게 된다. 배포 직전 `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND event_type IN ('com.kista.sharedkernel.BatchInterruptedEvent', 'com.kista.sharedkernel.CycleCompletedEvent', 'com.kista.sharedkernel.CycleEndedEvent', 'com.kista.sharedkernel.InsufficientBalanceEvent', 'com.kista.sharedkernel.MarketCloseEvent', 'com.kista.sharedkernel.MarketClosedEvent', 'com.kista.sharedkernel.MarketOpenEvent', 'com.kista.sharedkernel.NewCycleStartedEvent', 'com.kista.sharedkernel.OrderCancelFailedEvent', 'com.kista.sharedkernel.TradingErrorEvent', 'com.kista.sharedkernel.TradingReportReadyEvent', 'com.kista.sharedkernel.PrivacyAlertRaisedEvent')`와 `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND (event_type LIKE 'com.kista.trading.application.event.%' OR event_type = 'com.kista.privacy.application.event.PrivacyAlertRaisedEvent')`(옛 시대 잔재)로 확인하고, 0건이 아니면 같은 조건의 `DELETE FROM trading.event_publication WHERE ...`로 정리한다(해당 미완료 알림은 유실 — 배포 공지에 "이 시점 진행 중이던 사이클/오류 알림 일부가 유실될 수 있음" 명시). `completion_date`를 임의로 채워 "완료"로 위장하는 방식은 실제 리스너 실행 없이 완료 처리되므로 피하고 삭제(재시도 포기)로 처리할 것
+- **리스너 패키지 이동은 `event_publication.listener_id`에 고아 row를 남긴다**(2026-09-30 `trading.notify` → `tradingnotify` 분리): Modulith EPR은 미완료 row를 리스너 FQCN+메서드(`listener_id`)로 저장하고 재기동 republish 시 그 id로 리스너를 찾는다. 매매 알림 리스너 6종(`TradingAlertNotifier`/`CycleEndedNotifier`/`CycleLifecycleNotifier`/`OrderCancelFailureNotifier`/`TradingReportNotifier`/`PrivacyAlertNotifier`)이 `com.kista.trading.notify.adapter.out.gateway.*` → `com.kista.tradingnotify.adapter.out.gateway.*`로 옮겨져, 배포 시점에 옛 id로 남은 미완료 row는 새 이미지가 어떤 리스너와도 매칭하지 못해 재발행되지 않고 영구히 남는다. 이벤트 FQCN(위 항목)은 그대로라 별개 문제다. **deploy-trading 이미지 교체 직전**(매매 시간대 밖) `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`로 확인해 0건이 아니면 같은 조건으로 `DELETE FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`를 실행한다(해당 알림은 유실 — 배포 공지에 명시). 새 이미지 기동 후에는 새 id(`com.kista.tradingnotify.%`)의 정상 신규 row가 생기므로 이 정리를 다시 실행해도 무해하지만(옛 패턴만 지운다) 확인 목적 외에는 불필요하다. 완료(`completion_date IS NOT NULL`) row는 건드리지 않는다 — Modulith가 자체 정리한다
+- **benchmark 패키지 개명(2026-09-30, `com.kista.stats` → `com.kista.benchmark`)도 같은 `ClassNotFoundException`을 만든다** — root 이벤트 `StatsAlertRaisedEvent`가 `BenchmarkAlertRaisedEvent`로 개명되며 FQCN이 `com.kista.stats.application.event.StatsAlertRaisedEvent` → `com.kista.benchmark.application.event.BenchmarkAlertRaisedEvent`로 바뀌었다(KB Land·시장지수 수집 실패 알림, notify `AlertNotifier`가 구독). 대상은 root `public.event_publication`이고 EPR 재발행 소유는 kista-scheduler(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`)다. 옛 FQCN 미완료 row가 남은 채 배포하면 kista-scheduler 재기동마다 반복 실패하며 자연 치유되지 않는다. 새 FQCN은 이전에 존재한 적이 없어 trading 사례와 달리 "옛 시대 잔재" 충돌 확인은 필요 없다. 배포 직전 `SELECT count(*) FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'`로 확인하고, 0건이 아니면 `DELETE FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'`로 정리한다(해당 수집 실패 알림 일부는 유실 — 관리자 텔레그램 알림 1~2건 수준이라 배포 공지 불필요). `completion_date`를 채워 완료로 위장하지 않고 삭제로 처리한다. 확인·정리는 kista-scheduler 이미지 교체 직전에 하며, 옛 FQCN 패턴은 정상 신규 row와 겹치지 않으므로 새 이미지 기동 후 발견해도 같은 DELETE로 안전하게 정리할 수 있다
 
 ## 백업/복구 런북
 

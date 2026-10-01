@@ -6,13 +6,12 @@
 ./gradlew bootRun --args='--spring.profiles.active=local'      # 로컬 실행
 ./gradlew test                                                  # 전체 테스트
 ./gradlew compileJava                                           # 컴파일만
-./gradlew test --tests 'com.kista.architecture.*'               # ArchUnit 규칙만
-./gradlew test --tests 'com.kista.domain.*'                     # 도메인 단위 테스트 (레거시 잔류분)
-./gradlew test --tests 'com.kista.trading.domain.*'              # trading 도메인 단위 테스트 (order/strategy 실행 이력)
-./gradlew test --tests 'com.kista.broker.adapter.out.kis.*'     # KIS Adapter 테스트
+./gradlew test --tests 'com.kista.architecture.*'               # 루트 ArchUnit·Modulith 규칙 (HexagonalArchitectureTest 등)
+./gradlew :trading-core:test --tests 'com.kista.trading.domain.*'  # trading 도메인 단위 테스트 (trading-core 소속 — 루트 test 태스크엔 없음)
+./gradlew :trading-core:test --tests 'com.kista.broker.adapter.out.kis.*'  # KIS Adapter 테스트 (trading-core 소속)
 ./gradlew test --rerun-tasks                                    # 캐시 무시 강제 재실행
 ./gradlew :trading-core:test                                     # trading-core 서브프로젝트만 테스트
-./gradlew clean compileJava                                     # QueryDSL 생성파일 캐시 오염 시 (QXxxEntity.java "error reading")
+./gradlew clean compileJava                                     # 빌드 캐시 오염 시 클린 컴파일
 # 테스트 실패 진단: stdout보다 XML이 신뢰성 높음
 grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 ```
@@ -28,12 +27,12 @@ ADMIN_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-admin-token | jq -r .a
 curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  # 200 기대
 ```
 
-### 로컬 2-프로세스 부팅 (root + trading-core, 4a Task 10 스모크 테스트 실측)
-2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`tradingweb.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Pub/Sub 등)을 검증할 때 사용. 최소 필요 환경변수는 `docs/agents/commands.md`가 자동 로드하는 CLAUDE.md 필수 목록보다 많다 — 실측 결과:
+### 로컬 2-프로세스 부팅 (root + trading-core)
+2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`tradingweb.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 최소 필요 환경변수는 CLAUDE.md의 필수 목록보다 많다 — 실측 결과:
 ```bash
 # 두 jar 빌드
 ./gradlew bootJar                       # root -> build/libs/app.jar
-./gradlew :trading-core:bootJar         # trading-core -> trading-core/build/libs/trading-core-0.0.1-SNAPSHOT.jar
+./gradlew :trading-core:bootJar         # trading-core -> trading-core/build/libs/trading-core.jar
 
 docker compose up -d postgres redis
 
@@ -47,7 +46,7 @@ SPRING_PROFILES_ACTIVE=local java -jar build/libs/app.jar &
 JWT_SIGNING_KEY='...' AES_ENCRYPTION_KEY='...' \
 TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' \
 INTERNAL_API_TOKEN='local-token' SERVER_PORT=8081 \
-SPRING_PROFILES_ACTIVE=local java -jar trading-core/build/libs/trading-core-0.0.1-SNAPSHOT.jar &
+SPRING_PROFILES_ACTIVE=local java -jar trading-core/build/libs/trading-core.jar &
 ```
 - `SPRING_PROFILES_ACTIVE=local` 누락 시 `DevAuthController`(`/api/auth/dev-token`)가 `@Profile("local")`로 비활성화돼 404 — 양쪽 프로세스 모두 필요
 - `INTERNAL_API_TOKEN`은 양쪽에 동일 값 필수(`X-Internal-Token` 상호 검증)

@@ -1,7 +1,8 @@
 ## 스케쥴러 실행 흐름
+- 매매 스케쥴러(`TradingOpenScheduler`/`TradingCloseScheduler`)는 `:trading-core`의 `kista-trading` 프로세스에서 실행된다(`kista-scheduler`엔 매매 빈이 없음 — 시간표 → `scheduler-time-table.md`)
 - 스케쥴러 기동: `TradingCloseScheduler` 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 orderAt 05:30까지 대기) → `StrategyPort.findAllActive()`로 ACTIVE 사이클 목록 조회
-- context 리스트 빌드: 사이클별 계좌·사용자 조회 (실패 시 해당 사이클 skip + `notifyError`) → `ExecuteTradingUseCase.executeBatch(contexts)` 1회 호출
-- `TradingService.executeBatch()`: 고유 ticker 수집 → 가격 1회 일괄 조회 → leg-aware 슬롯별 후보 수집 → 신규 BUY 가격 cap·correction 사전 계산 → 계좌별 예산 배정 → 사이클별 접수·리포트 병렬 실행 (`TradingParallelRunner`, 계좌 groupKey별 동시 상한 `app.trading.parallel-per-account`=2, 각 실패 격리 catch + `notifyError`, 결과는 제출 순서 보존). 상한 0 이하이면 호출 스레드 순차 인라인 실행 — 단위 테스트는 `new TradingParallelRunner(0)`으로 결정성 확보
+- context 리스트 빌드: 사이클별 계좌·사용자 조회 (실패 시 해당 사이클 skip + `TradingErrorReportPort.reportError`) → `TradingExecutionUseCase.executeBatch(contexts)` 1회 호출(`TradingExecutionFacade` → `TradingService`)
+- `TradingService.executeBatch()`: 고유 ticker 수집 → 가격 1회 일괄 조회 → leg-aware 슬롯별 후보 수집 → 신규 BUY 가격 cap·correction 사전 계산 → 계좌별 예산 배정 → 사이클별 접수·리포트 병렬 실행 (`TradingParallelRunner`, 계좌 groupKey별 동시 상한 `app.trading.parallel-per-account`=2, 각 실패 격리 catch + 오류 알림, 결과는 제출 순서 보존). 상한 0 이하이면 호출 스레드 순차 인라인 실행 — 단위 테스트는 `new TradingParallelRunner(0)`으로 결정성 확보
 - **leg-aware 주문 생성**: 신규 전략 주문은 내부 `orders.order_leg`로 주문 leg를 식별한다. concrete leg는 `timing + direction + orderLeg` 슬롯을 점유하고, 기존 `UNKNOWN` leg 행은 과거 데이터 호환을 위해 `timing + direction` coarse 슬롯으로 처리한다. 기존 주문이 있더라도 점유되지 않은 concrete leg만 후보로 남겨 `PLANNED` 저장한다. **`AT_CLOSE` 슬롯(INFINITE BUY, PRIVACY BUY/SELL, VR bootstrap 등)은 마감 스케쥴러가 전담 생성**하며, 개장 스케쥴러는 `AT_OPEN` 슬롯만 생성·선접수한다 — AT_CLOSE 캡이 개장 시점 가격으로 고정돼 마감 접수까지 재평가되지 않는 stale-cap 문제를 막기 위한 설계다.
 - 계좌별 예산 배정: `TradingOrderBudgetAllocator`가 BUY와 SELL을 독립적으로 처리한다. BUY와 SELL 모두 계좌별 `CycleOrderStrategy.allocationPriority()` 기준 `VR → INFINITE → PRIVACY` 우선순위를 따른다. BUY는 같은 전략 타입에서 총 매수금액이 작은 사이클 우선, SELL은 같은 전략 타입에서 필요 매도수량이 작은 사이클 우선이며 동률이면 strategyId, cycleId 오름차순으로 결정한다. 한 사이클의 BUY 주문은 all-or-nothing으로 처리하며, 기존 당일 PLANNED BUY 금액도 예산에서 차감한다. SELL은 계좌·종목별 판매가능수량과 기존 PLANNED/PLACED 예약분을 기준으로 별도 배정한다. 승인된 방향만 남기되 후보 내부의 원래 주문 순서를 보존한다. `TradingOrderBudgetAllocator`는 단일계좌 전용 — `allocate(candidates, tradeDate)` 2-인자 진입점 하나가 계좌별 라이브 잔고(`getLiveBalance`)·종목별 판매가능수량(`getSellableQuantity`) 조회와 예산 차감 계산을 한 번에 수행한다(내부 재그룹 없음). 계좌 간 병렬화는 한 단계 위 `TradingCandidatePlanner.saveAllocatedOrders()`가 계좌별 "조회+배정" 전체를 `TradingParallelRunner` 태스크 하나로 묶어 담당하며(`batchGuard.runSafely`로 격리), 계좌 내부(한 계좌의 우선순위 예산 차감)는 여전히 순차 수행이다.
 - 마감 경로: 잔고 조회 → 현재가(배치 캐시 or 단건 fallback) → 전략 계산·BUY cap 사전 계산 → 누락된 `AT_CLOSE` 주문만 예산 배정 후 `orders`에 PLANNED 저장 → `DstInfo.waitUntilOrderTime()` 대기 (cron 04:30 발화 기준 DST≈0분, 비DST=60분 — orderAt은 DST=04:30/비DST=05:30) → 접수 대상 ticker 현재가를 다시 일괄 재조회(`reloadPlacementPrices`, 조회 실패 시 배치 시작 가격으로 폴백) → `BuyOrderPriceCapper`로 BUY cap 재보정 → AT_CLOSE 주문 접수 (PLACED 기록) → 체결 리포트. 신규 BUY·SELL이 모두 거절되거나 신규 주문 저장이 실패하고 기존 주문도 없는 사이클은 접수·리포트 대상에서 제외하며, 기존 PLANNED/PLACED 주문이 있으면 후속 흐름을 유지한다.
@@ -9,9 +10,9 @@
 - 재계산 skip: correction까지 포함된 complete INFINITE concrete leg 조합 또는 direction-aware legacy `UNKNOWN` 양방향 점유처럼 안전한 경우에만 전략 주문 계산을 생략한다. 리버스 `AT_CLOSE`는 `REVERSE_INFINITE_LOC_BUY` BUY 슬롯과 `REVERSE_INFINITE_LOC_SELL` SELL 슬롯이 모두 있어야 complete로 본다. partial concrete leg는 항상 계산해 누락 leg를 복구한다. 개장 스케쥴러는 `AT_OPEN`만 생성 대상이라 이 스킵 판정도 `AT_OPEN` 슬롯 완전성만 본다. VR/PRIVACY concrete compute skip은 ladder 길이가 variable이라 비활성화한다.
 - `BuyOrderPriceCapper.buildCappedBuyOrders`(INFINITE)는 재진입(같은 close 배치 내 접수 직전 재조회 가격이 최초 계산 시점보다 추가로 하락해 캡이 다시 트리거되는 경우) 시 입력에 이미 `INFINITE_CORRECTION_*` leg가 섞여 있으면 base 주문(평단가/기준가)만 추출해 재산정한다 — correction leg를 base로 오인해 잘못 계산하는 것을 방지.
 - 계좌별 브로커 토큰: KIS는 `broker_tokens` 테이블에 account_id(PK) 기준 독립 관리 (`KisTokenEntity`), Toss 계좌·관리자 토큰은 Redis canonical hash에 공유 (`TossDistributedTokenCoordinator` + `TossRedisTokenStore`)
-- 실행 결과: `UserNotificationPort.notifyTradingReport(user, account, report)` — 사용자봇 미설정 시 생략
-- 오류 시: `NotifyPort.notifyError(e)`로 관리자 알림 + 다음 사이클 계속 실행. 계좌별 예산 배정, 사이클별 PLANNED 저장, 잔고 부족 사용자 알림 실패는 각각 격리되어 다른 계좌·사이클 처리를 막지 않는다.
-- `waitFor()` 대기 중 `InterruptedException`(배포·재시작으로 인한 강제 종료) 발생 시 `notifyPort.notifyError()`로 관리자 알림 후 rethrow — PLANNED 주문 접수 미실행 가능성 알림
+- 실행 결과: `TradingReporter`가 `TradingReportReadyEvent`를 발행 → `tradingnotify`의 `TradingReportNotifier`가 알림 — 사용자봇 미설정 시 생략
+- 오류 시: `TradingErrorEvent` 발행(`TradingBatchGuard.notifyErrorSafely`/`TradingErrorReportPort`)으로 관리자·사용자 알림 + 다음 사이클 계속 실행. 계좌별 예산 배정, 사이클별 PLANNED 저장, 잔고 부족 사용자 알림 실패는 각각 격리되어 다른 계좌·사이클 처리를 막지 않는다.
+- `waitFor()` 대기 중 `InterruptedException`(배포·재시작으로 인한 강제 종료) 발생 시 `TradingErrorEvent`로 관리자 알림 후 rethrow — PLANNED 주문 접수 미실행 가능성 알림(주문 시각 대기 중이면 `TradingBatchGuard.notifyBatchInterrupted`가 미접수 전략 사용자에게 `BatchInterruptedEvent`도 발행)
 - **병렬 접수 인터럽트 리스크(운영 주의)**: 접수 병렬화로 배포·재시작 인터럽트 시 torn-order 범위가 확대된다. Virtual Thread는 인터럽트 시 진행 중 소켓을 강제 종료(JDK21 `Socket` 계약)하므로, 접수 HTTP 응답 대기 중 인터럽트되면 `SocketException`이 `TradingOrderExecutor.placeEach`의 `catch(Exception)`에서 브로커 거절과 구분 없이 `markFailed`로 처리된다 — 브로커는 이미 접수·체결했을 수 있어 DB=FAILED / 브로커=체결 불일치 가능. 순차 시 최대 1건이던 이 위험이 병렬 시 동시 진행 중이던 `계좌수 × parallel-per-account(2)`건으로 늘어난다. 저빈도(배포 시점 접수창 겹칠 때)이나, 배포 타이밍을 접수창(개장 22:30·마감 04:30 KST 직후) 밖으로 두거나 후속으로 `placeEach`에서 인터럽트 기인 실패를 "수동 확인 필요"로 격상하는 완화가 권장된다.
 - `TradingService`에 INFO 로그 있음 — 사이클별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
 - `KbLandHousingBenchmarkScheduler`: 매주 토요일 08:00 KST `kbland-housing-benchmark` 분산 락으로 실행 — KB Land 최근 1년치 아파트 5분위 매매평균가격을 자연키(source+metric+region+baseMonth) 기준 upsert
@@ -22,7 +23,6 @@
 - `BLOCKED`: 장마감~프리마켓 전 — 주문 불가 (DST: 05:00~17:00 / 비DST: 06:00~18:00 KST)
 - `ManualTradingService.execute()` 수동 실행 진입 시 BLOCKED이면 `IllegalStateException` → 컨트롤러 503; DIRECT(개장 후)이면 AT_OPEN PLANNED 주문(INFINITE는 매도 선접수, VR은 매수·매도 사다리)을 `TradingOrderExecutor.placeAtOpenOrders()`로 즉시 접수한다 — 개장 스케쥴러와 동일하게 BUY cap 보정(`BuyOrderPriceCapper`)을 거친 뒤 접수되며, 반환은 `findPlannedOrPlacedByCycleAndDate`. SELL 가능수량 검증은 같은 계좌·거래일·ticker의 기존 PLANNED/PLACED 예약 수량과 신규 SELL 합계를 사용한다.
 - `GET /api/market/session`: UI 수동 실행 버튼 활성화 판단용, `{ session: "DIRECT"|"BLOCKED", isDst: boolean }` 반환
-- kista-ui `NextOrderPreviewCard`: BLOCKED이거나 오늘이 휴장일이면 "지금 실행" 버튼 disabled + title 툴팁
 
 ### BuyOrderPriceCapper 보정 주문
 

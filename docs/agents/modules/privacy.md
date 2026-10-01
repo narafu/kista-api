@@ -5,7 +5,7 @@ com.kista.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기준 매매�
   application/port/output/ ← PrivacyTradePort
   application/usecase/ ← PrivacyUseCase(FidaOrderController)/PrivacyTradeValidationUseCase(TradingOpenScheduler)
   application/service/ ← internal — PrivacyService(notify 직접 호출 대신 `application/event/PrivacyAlertRaisedEvent`("event", tradingnotify가 소비) 발행)/PrivacyTradeValidationService
-  adapter/in/web/     ← internal — FidaOrderController(`POST /api/internal/fida-orders`)/PrivacyInternalQueryController(`GET /api/internal/privacy/trade-bases`)/PrivacyBaseInternalController(`GET|PATCH .../trade-bases/{baseId}`, `PATCH .../orders/{orderId}` — 관리자 수동 보정) + dto/FidaOrderResponse
+  adapter/in/web/     ← internal — FidaOrderController(`POST /api/internal/fida-orders`)/PrivacyInternalQueryController(`GET /api/internal/privacy/trade-bases`)/PrivacyBaseInternalController(`GET|PATCH .../trade-bases/{baseId}`, `POST .../orders`, `PATCH|DELETE .../orders/{orderId}` — 관리자 수동 보정)/PrivacyContractMapper(도메인↔contract 매핑)
   adapter/out/persistence/ ← PrivacyTradeBaseEntity + PrivacyTradeBaseOrderEntity + JpaRepository + PrivacyTradePersistenceAdapter
 
 ### PRIVACY 전략 패턴 (기준 매매표)

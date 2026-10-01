@@ -10,7 +10,7 @@ KISTA(Key Investment Strategy & Trading Automation) — 정밀한 투자 전략�
 
 ## 기술 스택
 
-Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith(점진 도입) · PostgreSQL · Redis · Flyway · OCI
+Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith · PostgreSQL · Redis · Flyway · OCI
 
 ## 아키텍처
 
@@ -20,7 +20,7 @@ Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith(점진 도
 
 ### 계층 구조 (Hexagonal Architecture)
 
-레이어 의존 방향(`adapter → application → domain`)은 ArchUnit(`HexagonalArchitectureTest`)이 빌드 시 강제 검증한다. 아래 다이어그램은 레이어 관계를 보여주는 일반 도해다. 실제로는 13개 애그리게이트(`finance`·`notify`·`broker`·`trading`·`tradingstats`·`tradingnotify`·`matching`·`market`·`privacy`·`benchmark`·`admin`·`user`·`account`)가 전부 Spring Modulith 모듈로 이전됐고(`strategyconfig`는 2026-09-07 `trading`으로 병합, `matching`은 주문생성 커널 추출로 신설, `tradingstats`·`tradingnotify`는 2026-09-30 `trading`에서 분리), 레거시 최상위 shim(`com.kista.{domain,application,adapter,common}`)은 전부 소멸했다 — 크로스모듈 컨트롤러·전역 예외 핸들러는 `com.kista.web`(앱셸 CLOSED sink — trading-core 쪽 대칭 앱셸은 `com.kista.tradingweb`: 부팅 진입점·전역 예외 핸들러), persistence base·암호화·스케쥴러 골격·순수 공용 유틸은 `com.kista.platform`(인프라 leaf OPEN)·`com.kista.sharedkernel`(전역 공용 어휘 OPEN)에 있고, 프로세스 경계(root↔trading-core)를 넘는 내부 API·Redis 요청/응답 타입은 `com.kista.contract`(Published Language, OPEN)를 양쪽이 컴파일 타임에 공유한다. `ApplicationModules.verify()`가 모듈 경계까지 GREEN으로 검증한다 (상세 → `docs/agents/architecture.md` "Spring Modulith 모듈 구성", 마이그레이션 경위는 `docs/agents/modulith-migration-history.md`).
+레이어 의존 방향(`adapter → application → domain`)은 ArchUnit(`HexagonalArchitectureTest`)이 빌드 시 강제 검증한다. 아래 다이어그램은 레이어 관계를 보여주는 일반 도해다. 애그리게이트는 전부 Spring Modulith 모듈이며(현재 모듈 목록 → `docs/agents/architecture.md` "모듈 한눈에 보기"), 크로스모듈 컨트롤러·전역 예외 핸들러는 앱셸 `com.kista.web`(trading-core 쪽 대칭 앱셸은 `com.kista.tradingweb`), persistence base·암호화·스케쥴러 골격은 `com.kista.platform`·`com.kista.sharedkernel`에 있고, 프로세스 경계(root↔trading-core)를 넘는 내부 API·Redis 요청/응답 타입은 `com.kista.contract`를 양쪽이 컴파일 타임에 공유한다. `ApplicationModules.verify()`가 모듈 경계까지 검증한다 (상세 → `docs/agents/architecture.md` "Spring Modulith 모듈 구성", 이관 경위는 `docs/agents/modulith-migration-history.md`).
 
 각 모듈(예: `trading`/`user`/`notify`) 내부는 동일한 레이어 구조를 반복한다:
 
@@ -64,12 +64,12 @@ graph TB
 sequenceDiagram
     participant S1 as TradingOpenScheduler<br/>(월~금 22:30 KST)
     participant S2 as TradingCloseScheduler<br/>(화~토 04:30 KST, 장마감 30분 전)
-    participant TF as TradingExecutionFacade
+    participant TF as TradingExecutionFacade<br/>(TradingExecutionUseCase 구현)
     participant KIS as KIS API
     participant DB as PostgreSQL
     participant Noti as Telegram / FCM
 
-    S1->>TF: executeBatch() — 전략 전체 순회
+    S1->>TF: placeOpenOrders() — 활성 전략 전체 순회
     TF->>KIS: 잔고/보유수량 조회 (BrokerRouter 경유)
     TF->>TF: CycleOrderStrategy.plan()<br/>(INFINITE/PRIVACY/VR 별 주문 계산)
     TF->>DB: Order 저장 (계획 상태)
@@ -82,7 +82,7 @@ sequenceDiagram
         TF->>DB: 사이클 종료 + cycleSeedType 기반 재등록<br/>(VR은 유지 — endsCycleOnLiquidation=false)
     end
     TF->>Noti: 리포트/오류 알림
-    Noti->>Noti: SseEmitterRegistry로 실시간 거래 알림 push
+    Noti->>Noti: Redis로 root notify에 전달 → SseEmitterRegistry로 실시간 거래 알림 push
 ```
 
 ## 배포
@@ -134,7 +134,7 @@ graph TB
     SchedApp --> Grafana
 ```
 
-- `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다(2026-08-07 인스턴스 재편·DB 이관 완료 — 기존 Fly.io·Vercel·Supabase는 폐지).
-- `kista-api`와 `kista-scheduler`는 **같은 GHCR 이미지**를 `SCHEDULER_ENABLED` 환경변수로 역할만 갈라 띄운다. API 배포는 매매 시간대 제약 없이 잦게, 스케쥴러 배포는 매매 시간대 가드 유지. API 크래시·OOM·요청경로 버그가 매매 배치를 건드리지 않는다 (상세 → `docs/agents/docker-infra.md`).
+- `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다.
+- `kista-api`·`kista-scheduler`·`kista-trading`은 **같은 GHCR 이미지**(arm64 네이티브 러너에서 빌드)를 띄운다 — api/scheduler는 `app.jar`를 `SCHEDULER_ENABLED`로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`를 쓴다. 매매 시간대 배포 가드는 `deploy-trading` 잡에만 있고 API·스케쥴러 배포는 시간대 제약이 없다. API 크래시·OOM·요청경로 버그가 매매 배치를 건드리지 않는다 (상세 → `docs/agents/docker-infra.md`).
 - 백업 메커니즘·주기 상세는 `docs/agents/docker-infra.md` 참고.
 - 외부 모니터링은 서로 다른 실패 모드를 감지한다: 가동 모니터링(서버 다운) / 생존 확인(스케쥴러 정지) / 메트릭 추세(리소스 악화).

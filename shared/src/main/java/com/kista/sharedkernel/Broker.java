@@ -3,7 +3,7 @@ package com.kista.sharedkernel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-// 증권사 식별자 — Account 도메인 nested enum(Broker)에서 sharedkernel로 이관(constraints.md "nested enum 정책").
+// 증권사 식별자 — Account 도메인 nested enum(Broker)에서 sharedkernel로 이관(constraints.md "User/Account/Strategy 공유 enum").
 // 상수명 byte-identical 유지 필수 — accounts.broker @Enumerated(STRING) DB 컬럼과 직결.
 @Getter
 @RequiredArgsConstructor
