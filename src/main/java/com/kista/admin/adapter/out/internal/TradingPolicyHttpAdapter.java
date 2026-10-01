@@ -39,7 +39,8 @@ class TradingPolicyHttpAdapter implements TradingPolicyPort {
             return TradingPolicySettings.defaults();
         } catch (RestClientException e) {
             // 연결 거부·타임아웃·5xx — 전송 예외를 admin 어휘로 바꿔 application 계층이 spring-web에 의존하지 않게 한다
-            throw new TradingPolicyUnavailableException(e.getMessage(), e);
+            log.warn("trading-core 정책 조회 실패: {}", e.getMessage());
+            throw new TradingPolicyUnavailableException(e);
         }
     }
 
@@ -60,7 +61,8 @@ class TradingPolicyHttpAdapter implements TradingPolicyPort {
         } catch (IllegalArgumentException e) {
             throw e; // 400 → badRequestAsIllegalArgument가 이미 변환 — 그대로 관리자에게 400
         } catch (RestClientException e) {
-            throw new TradingPolicyUnavailableException(e.getMessage(), e);
+            log.warn("trading-core 정책 교체 실패: {}", e.getMessage());
+            throw new TradingPolicyUnavailableException(e);
         }
     }
 }

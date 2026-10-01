@@ -107,7 +107,10 @@ class TradingPolicyHttpAdapterTest {
     void load_500이면_TradingPolicyUnavailableException을_던진다() {
         server.enqueue(new MockResponse.Builder().code(500).build());
 
-        assertThatThrownBy(() -> adapter.load()).isInstanceOf(TradingPolicyUnavailableException.class);
+        // 내부 URL이 응답 detail로 새지 않도록 메시지는 고정 문구여야 한다
+        assertThatThrownBy(() -> adapter.load()).isInstanceOf(TradingPolicyUnavailableException.class)
+                .hasMessageNotContaining("http")
+                .hasMessageNotContaining("/api/internal");
     }
 
     @Test
@@ -115,6 +118,8 @@ class TradingPolicyHttpAdapterTest {
         server.enqueue(new MockResponse.Builder().code(500).build());
 
         assertThatThrownBy(() -> adapter.replace(TradingPolicySettings.defaults()))
-                .isInstanceOf(TradingPolicyUnavailableException.class);
+                .isInstanceOf(TradingPolicyUnavailableException.class)
+                .hasMessageNotContaining("http")
+                .hasMessageNotContaining("/api/internal");
     }
 }

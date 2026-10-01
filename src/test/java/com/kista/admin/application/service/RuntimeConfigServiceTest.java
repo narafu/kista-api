@@ -50,7 +50,7 @@ class RuntimeConfigServiceTest {
     // trading-core 장애(연결 거부·타임아웃·5xx)는 공개 엔드포인트를 500으로 무너뜨리지 않고 기본 정책으로 강등한다
     @Test
     void getSettings_whenTradingCoreUnreachable_fallsBackToDefaultPolicy() {
-        when(tradingPolicyPort.load()).thenThrow(new TradingPolicyUnavailableException("Connection refused", null));
+        when(tradingPolicyPort.load()).thenThrow(new TradingPolicyUnavailableException(new RuntimeException("Connection refused")));
 
         RuntimeSettingsBundle bundle = service.getSettings();
 
