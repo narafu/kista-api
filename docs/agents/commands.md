@@ -6,12 +6,13 @@
 ./gradlew bootRun --args='--spring.profiles.active=local'      # 로컬 실행
 ./gradlew test                                                  # 전체 테스트
 ./gradlew compileJava                                           # 컴파일만
-./gradlew test --tests 'com.kista.architecture.*'               # 루트 ArchUnit·Modulith 규칙 (HexagonalArchitectureTest 등)
+./gradlew :test --tests 'com.kista.architecture.*'              # 루트 ArchUnit·Modulith 규칙 (HexagonalArchitectureTest 등)
 ./gradlew :trading-core:test --tests 'com.kista.trading.domain.*'  # trading 도메인 단위 테스트 (trading-core 소속 — 루트 test 태스크엔 없음)
 ./gradlew :trading-core:test --tests 'com.kista.broker.adapter.out.kis.*'  # KIS Adapter 테스트 (trading-core 소속)
 ./gradlew test --rerun-tasks                                    # 캐시 무시 강제 재실행
 ./gradlew :trading-core:test                                     # trading-core 서브프로젝트만 테스트
 ./gradlew clean compileJava                                     # 빌드 캐시 오염 시 클린 컴파일
+# --tests 필터는 반드시 서브프로젝트 지정(:test / :trading-core:test) — 접두사 없는 `test --tests X`는 모든 서브프로젝트에 적용돼 X가 없는 :shared가 "No tests found"로 BUILD FAILED
 # 테스트 실패 진단: stdout보다 XML이 신뢰성 높음
 grep -oP 'failures="\K[^"]+' build/test-results/test/TEST-*.xml | grep -v ':0'
 ```

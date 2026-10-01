@@ -91,9 +91,9 @@ docker compose up -d postgres
 ## 테스트 실행
 
 ```bash
-bash gradlew test --tests "com.kista.architecture.*"                # ArchUnit (root)
+bash gradlew :test --tests "com.kista.architecture.*"               # ArchUnit (root)
 bash gradlew :trading-core:test --tests "com.kista.trading.domain.*" # trading 도메인 단위 테스트
-bash gradlew :trading-core:test --tests "com.kista.SomeTest"         # trading-core 단일 테스트 (root 테스트는 :trading-core: 접두사 없이)
+bash gradlew :trading-core:test --tests "com.kista.SomeTest"         # trading-core 단일 테스트 (root 테스트는 `:test` — 접두사 없는 `test --tests`는 일치 테스트가 없는 `:shared`에서 실패)
 ```
 
 실패 진단 (XML이 stdout보다 신뢰성 높음):
