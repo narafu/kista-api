@@ -145,6 +145,8 @@ jobs:
             mv "docker-compose.yml.${SERVICE}" docker-compose.yml
 
             # GHCR 패키지가 public이라 로그인 없이 pull — 토큰을 원격 커맨드라인(/proc)에 싣지 않는다
+            # 예전 배포가 남긴 만료 토큰이 ~/.docker/config.json에 있으면 익명 대신 그걸로 인증해 'denied'가 난다 — 매번 제거
+            docker logout ghcr.io >/dev/null 2>&1 || true
             export KISTA_API_IMAGE
             docker compose pull "${SERVICE}"
 
