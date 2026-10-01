@@ -8,6 +8,7 @@ import com.kista.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.matching.domain.model.*;
 import com.kista.trading.application.port.output.*;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.broker.application.service.BrokerCallGuard;
 import com.kista.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,9 +70,7 @@ class ManualTradingService {
         } catch (Exception e) {
             log.warn("[{}] 계획 계산 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
-            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
+            throw queryFailure(e);
         }
         if (result.isSkip()) {
             // NO_CYCLE_HISTORY(사이클 이력 없음)는 데이터 무결성 오류에 준하므로 조용한 무동작이 아닌 시끄러운 실패로 승격 —
@@ -100,9 +99,7 @@ class ManualTradingService {
         } catch (Exception e) {
             log.warn("[{}] 예산 배정 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
-            // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-            throw new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
+            throw queryFailure(e);
         }
         if (!allocation.rejectedBuy().isEmpty()) throw new ManualTradingException("예수금이 부족합니다");
         if (!allocation.rejectedSell().isEmpty()) throw new ManualTradingException("보유 수량이 부족합니다");
@@ -144,5 +141,14 @@ class ManualTradingService {
             log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
             orderExecutor.placeAtOpenOrders(today, account, cycleId, currentPrice, position, vrPosition, strategy);
         }
+    }
+
+    // 바로주문 조회 실패 응답 변환 — 증권사 타입 예외는 다른 화면과 동일하게 503/422/429로 그대로 전파
+    // (503은 TradingExceptionHandler가 app_error_logs에 기록), 그 외 예외만 409 + 관리자 알림
+    private RuntimeException queryFailure(Exception e) {
+        if (BrokerCallGuard.isBrokerTyped(e)) return (RuntimeException) e;
+        // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
+        eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
+        return new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
     }
 }

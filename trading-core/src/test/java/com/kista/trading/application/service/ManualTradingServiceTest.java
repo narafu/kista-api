@@ -163,8 +163,26 @@ class ManualTradingServiceTest {
     }
 
     @Test
+    void execute_liveBalanceBrokerApiFailure_propagatesAsIsFor503() {
+        // 증권사 타입 예외는 409로 감싸지 않고 그대로 전파 — TradingExceptionHandler가 503 매핑·에러 로그 기록
+        Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_OPEN,
+                OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                OrderStatus.PLANNED, null, null, null);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyOrder.toPlanned()));
+        RuntimeException brokerFailure = new com.kista.support.StubBrokerApiException("Toss", "Toss API 오류",
+                com.kista.broker.domain.model.BrokerApiException.Conflict.NONE);
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL))).thenThrow(brokerFailure);
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isSameAs(brokerFailure);
+
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    @Test
     void execute_liveBalanceFetchFails_notifiesAdminAndThrowsManualTradingException() {
-        // 브로커 API 실패는 4xx(ManualTradingException)로 승격되지만, GlobalExceptionHandler가
+        // 증권사 타입이 아닌 예상 밖 예외는 4xx(ManualTradingException)로 승격되지만, GlobalExceptionHandler가
         // 4xx는 app_error_logs에 남기지 않으므로 서비스가 직접 TradingErrorEvent를 발행해야 함
         Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,

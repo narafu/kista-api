@@ -14,14 +14,20 @@ public final class BrokerCallGuard {
 
     private BrokerCallGuard() {}
 
+    // 증권사 타입 예외 여부 — 원인별 상태코드(503/422/429)를 보존해야 하는 예외는 래핑하지 않는다
+    public static boolean isBrokerTyped(Throwable e) {
+        return e instanceof BrokerApiException || e instanceof BrokerCredentialException || e instanceof BrokerRateLimitException;
+    }
+
     // label: 로그 메시지에 표시할 작업 설명 (예: "전일종가 조회")
     public static <T> T wrap(String label, Supplier<T> call) {
         try {
             return call.get();
-        } catch (BrokerApiException | BrokerCredentialException | BrokerRateLimitException e) {
-            log.warn("[{}] 증권사 API 조회에 실패했습니다: {}", label, e.getMessage());
-            throw e;
         } catch (Exception e) {
+            if (isBrokerTyped(e)) {
+                log.warn("[{}] 증권사 API 조회에 실패했습니다: {}", label, e.getMessage());
+                throw (RuntimeException) e;
+            }
             log.warn("[{}] 증권사 API 조회에 실패했습니다: {}", label, e.getMessage(), e);
             throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
         }
