@@ -57,7 +57,7 @@ class FinanceAccountControllerTest {
     void create_returns201WithLocationHeader() throws Exception {
         UUID savedId = UUID.randomUUID();
         FinanceAccount saved = new FinanceAccount(savedId, null, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, null, null, Instant.now());
         when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/accounts")
@@ -73,7 +73,7 @@ class FinanceAccountControllerTest {
         UUID savedId = UUID.randomUUID();
         UUID groupId = UUID.randomUUID();
         FinanceAccount saved = new FinanceAccount(savedId, groupId, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, null, null, Instant.now());
         when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/accounts")
@@ -111,7 +111,7 @@ class FinanceAccountControllerTest {
     void create_withNumericAccountNo_returns201() throws Exception {
         UUID savedId = UUID.randomUUID();
         FinanceAccount saved = new FinanceAccount(savedId, null, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", "12345678", null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", "12345678", null, null, null, Instant.now());
         when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
 
         mockMvc.perform(post("/api/finance/accounts")
@@ -123,10 +123,41 @@ class FinanceAccountControllerTest {
     }
 
     @Test
+    void create_normalizesBlankInstitutionAndOwner_andReturnsThem() throws Exception {
+        UUID savedId = UUID.randomUUID();
+        FinanceAccount saved = new FinanceAccount(savedId, null, USER_ID,
+                FinanceAccount.Type.BANK, "월급통장", null, null, "카카오뱅크", null, Instant.now());
+        when(accountUseCase.create(any(), anyBoolean(), any(FinanceAccountCommand.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/finance/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountType\":\"BANK\",\"name\":\"월급통장\",\"institution\":\"카카오뱅크\",\"owner\":\"  \"}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.institution").value("카카오뱅크"))
+                .andExpect(jsonPath("$.owner").value(nullValue()));
+
+        // 공백만 입력된 owner는 null로 정규화돼 유스케이스에 전달된다
+        verify(accountUseCase).create(eq(USER_ID), eq(false),
+                eq(new FinanceAccountCommand(FinanceAccount.Type.BANK, "월급통장", null, null, "카카오뱅크", null)));
+    }
+
+    @Test
+    void create_withTooLongInstitution_returns400() throws Exception {
+        mockMvc.perform(post("/api/finance/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"accountType\":\"BANK\",\"name\":\"월급통장\",\"institution\":\"" + "가".repeat(51) + "\"}")
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(accountUseCase);
+    }
+
+    @Test
     void update_returns200() throws Exception {
         UUID id = UUID.randomUUID();
         FinanceAccount updated = new FinanceAccount(id, null, USER_ID,
-                FinanceAccount.Type.BANK, "은행계좌(수정)", null, null, Instant.now());
+                FinanceAccount.Type.BANK, "은행계좌(수정)", null, null, null, null, Instant.now());
         when(accountUseCase.update(any(), any(), any(FinanceAccountCommand.class))).thenReturn(updated);
 
         mockMvc.perform(put("/api/finance/accounts/{id}", id)
@@ -153,7 +184,7 @@ class FinanceAccountControllerTest {
         UUID id = UUID.randomUUID();
         UUID groupId = UUID.randomUUID();
         FinanceAccount shared = new FinanceAccount(id, groupId, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, null, null, Instant.now());
         when(accountUseCase.shareToGroup(id, USER_ID)).thenReturn(shared);
 
         mockMvc.perform(patch("/api/finance/accounts/{id}/share", id)
@@ -177,7 +208,7 @@ class FinanceAccountControllerTest {
     void unshare_returns200WithNullGroupId() throws Exception {
         UUID id = UUID.randomUUID();
         FinanceAccount personal = new FinanceAccount(id, null, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, null, null, Instant.now());
         when(accountUseCase.unshare(id, USER_ID)).thenReturn(personal);
 
         mockMvc.perform(patch("/api/finance/accounts/{id}/unshare", id)

@@ -75,7 +75,6 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
         if (raw.accountNo() == null) {
             return raw;
         }
-        return new FinanceAccount(raw.id(), raw.groupId(), raw.userId(), raw.accountType(), raw.name(),
-                crypto.decrypt(raw.accountNo()), raw.memo(), raw.createdAt());
+        return raw.withAccountNo(crypto.decrypt(raw.accountNo()));
     }
 }

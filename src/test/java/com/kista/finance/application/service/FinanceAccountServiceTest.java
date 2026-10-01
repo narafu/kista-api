@@ -36,11 +36,11 @@ class FinanceAccountServiceTest {
 
     private FinanceAccount personalAccount() {
         return new FinanceAccount(accountId, null, userId, FinanceAccount.Type.SECURITIES,
-                "토스증권", "1234", null, null);
+                "토스증권", "1234", null, null, null, null);
     }
 
     private FinanceAccountCommand command() {
-        return new FinanceAccountCommand(FinanceAccount.Type.BANK, "카카오뱅크", "5678", "메모");
+        return new FinanceAccountCommand(FinanceAccount.Type.BANK, "카카오뱅크", "5678", "메모", null, null);
     }
 
     @Test
@@ -110,7 +110,7 @@ class FinanceAccountServiceTest {
     @DisplayName("update 시 접근 불가한 계좌면 SecurityException")
     void update_notAccessible_throwsSecurityException() {
         FinanceAccount othersAccount = new FinanceAccount(accountId, null, UUID.randomUUID(),
-                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null, null, null);
         when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(othersAccount);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
 
@@ -201,7 +201,7 @@ class FinanceAccountServiceTest {
     @DisplayName("shareToGroup은 본인 소유가 아니면 SecurityException")
     void shareToGroup_notOwner_throwsSecurityException() {
         FinanceAccount othersAccount = new FinanceAccount(accountId, null, UUID.randomUUID(),
-                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null, null, null);
         when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(othersAccount);
 
         assertThatThrownBy(() -> accountService.shareToGroup(accountId, userId))
@@ -226,7 +226,7 @@ class FinanceAccountServiceTest {
     @DisplayName("shareToGroup은 이미 다른 그룹에 공유돼 있으면 IllegalStateException")
     void shareToGroup_alreadySharedToAnotherGroup_throwsIllegalState() {
         FinanceAccount alreadyShared = new FinanceAccount(accountId, UUID.randomUUID(), userId,
-                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null, null, null);
         when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(alreadyShared);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
 
@@ -243,7 +243,7 @@ class FinanceAccountServiceTest {
     void unshare_groupSharedAccount_movesToPersonalKeepingOwner() {
         UUID ownerId = UUID.randomUUID();
         FinanceAccount sharedAccount = new FinanceAccount(accountId, groupId, ownerId,
-                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null, null, null);
         when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(sharedAccount);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -259,7 +259,7 @@ class FinanceAccountServiceTest {
     void unshare_nonOwnerSameGroupMember_allowed() {
         UUID ownerId = UUID.randomUUID();
         FinanceAccount sharedAccount = new FinanceAccount(accountId, groupId, ownerId,
-                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null, null, null);
         when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(sharedAccount);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -273,7 +273,7 @@ class FinanceAccountServiceTest {
     @DisplayName("unshare는 소유자도 아니고 같은 그룹도 아니면 SecurityException")
     void unshare_notOwnerAndNotSameGroup_throwsSecurityException() {
         FinanceAccount sharedAccount = new FinanceAccount(accountId, UUID.randomUUID(), UUID.randomUUID(),
-                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null);
+                FinanceAccount.Type.SECURITIES, "토스증권", "1234", null, null, null, null);
         when(accountPort.findActiveByIdOrThrow(accountId)).thenReturn(sharedAccount);
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
 

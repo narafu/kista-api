@@ -14,6 +14,8 @@ public record FinanceAccount(
         String name,         // 계좌명 (예: 토스증권 일반계좌)
         String accountNo,    // 계좌번호(복호화된 값), null 허용
         String memo,         // null 허용
+        String institution,  // 기관(자유 입력), null 허용
+        String owner,        // 소유자(자유 입력), null 허용
         Instant createdAt    // DB created_at, 신규 등록 시 null
 ) implements GroupShareable<FinanceAccount> {
     // 접근 불가 시 SecurityException → 컨트롤러에서 403 매핑
@@ -27,7 +29,11 @@ public record FinanceAccount(
 
     @Override
     public FinanceAccount withGroupId(UUID groupId) {
-        return new FinanceAccount(id, groupId, userId, accountType, name, accountNo, memo, createdAt);
+        return new FinanceAccount(id, groupId, userId, accountType, name, accountNo, memo, institution, owner, createdAt);
+    }
+
+    public FinanceAccount withAccountNo(String accountNo) {
+        return new FinanceAccount(id, groupId, userId, accountType, name, accountNo, memo, institution, owner, createdAt);
     }
 
     @Getter

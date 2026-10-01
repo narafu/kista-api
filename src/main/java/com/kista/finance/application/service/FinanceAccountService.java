@@ -42,7 +42,7 @@ class FinanceAccountService implements FinanceAccountUseCase {
         GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
         UUID ownerGroupId = shareToGroup ? currentGroupId : null;
         FinanceAccount account = new FinanceAccount(null, ownerGroupId, userId, command.accountType(),
-                command.name(), command.accountNo(), command.memo(), null);
+                command.name(), command.accountNo(), command.memo(), command.institution(), command.owner(), null);
         FinanceAccount saved = accountPort.save(account);
         log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
         return saved;
@@ -58,7 +58,8 @@ class FinanceAccountService implements FinanceAccountUseCase {
             throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
         }
         FinanceAccount updated = new FinanceAccount(existing.id(), existing.groupId(), existing.userId(),
-                command.accountType(), command.name(), command.accountNo(), command.memo(), existing.createdAt());
+                command.accountType(), command.name(), command.accountNo(), command.memo(),
+                command.institution(), command.owner(), existing.createdAt());
         return accountPort.save(updated);
     }
 

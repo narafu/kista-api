@@ -46,11 +46,11 @@ class FinanceAccountPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     private FinanceAccount groupAccount(String name, String accountNo) {
-        return new FinanceAccount(null, groupId, userId, FinanceAccount.Type.SECURITIES, name, accountNo, null, null);
+        return new FinanceAccount(null, groupId, userId, FinanceAccount.Type.SECURITIES, name, accountNo, null, null, null, null);
     }
 
     private FinanceAccount personalAccount(UUID owner, String name, String accountNo) {
-        return new FinanceAccount(null, null, owner, FinanceAccount.Type.SECURITIES, name, accountNo, null, null);
+        return new FinanceAccount(null, null, owner, FinanceAccount.Type.SECURITIES, name, accountNo, null, null, null, null);
     }
 
     @Test

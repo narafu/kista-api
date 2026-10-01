@@ -128,7 +128,7 @@ class AssetSnapshotControllerTest {
                 FinanceCategory.Type.ASSET, "주식", 0, Instant.now());
         when(financeCategoryPort.findByIdOrThrow(categoryId)).thenReturn(category);
         FinanceAccount account = new FinanceAccount(accountId, null, USER_ID,
-                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, Instant.now());
+                FinanceAccount.Type.SECURITIES, "토스증권 일반계좌", null, null, null, null, Instant.now());
         when(financeAccountPort.findByIdOrThrow(accountId)).thenReturn(account);
 
         mockMvc.perform(get("/api/finance/asset-snapshots")

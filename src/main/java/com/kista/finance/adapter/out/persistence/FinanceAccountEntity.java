@@ -50,6 +50,12 @@ class FinanceAccountEntity extends BaseAuditEntity {
     @Column(length = 255)
     private String memo;                  // 선택
 
+    @Column(length = 50)
+    private String institution;           // 기관(자유 입력), 선택
+
+    @Column(length = 50)
+    private String owner;                 // 소유자(자유 입력), 선택
+
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 
@@ -63,11 +69,14 @@ class FinanceAccountEntity extends BaseAuditEntity {
         e.name = a.name();
         e.accountNo = a.accountNo();
         e.memo = a.memo();
+        e.institution = a.institution();
+        e.owner = a.owner();
         return e;
     }
 
     static FinanceAccount toDomain(FinanceAccountEntity e) {
         return new FinanceAccount(
-                e.id, e.groupId, e.userId, e.accountType, e.name, e.accountNo, e.memo, e.getCreatedAt());
+                e.id, e.groupId, e.userId, e.accountType, e.name, e.accountNo, e.memo, e.institution, e.owner,
+                e.getCreatedAt());
     }
 }

@@ -5,5 +5,7 @@ public record FinanceAccountCommand(
         FinanceAccount.Type accountType,
         String name,
         String accountNo, // null 허용
-        String memo        // null 허용
+        String memo,       // null 허용
+        String institution, // 기관, null 허용
+        String owner        // 소유자, null 허용
 ) {}

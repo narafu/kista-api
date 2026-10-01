@@ -17,9 +17,14 @@ public record FinanceAccountResponse(
         @Schema(description = "계좌번호")
         String accountNo,
         @Schema(description = "메모")
-        String memo
+        String memo,
+        @Schema(description = "기관")
+        String institution,
+        @Schema(description = "소유자")
+        String owner
 ) {
     public static FinanceAccountResponse from(FinanceAccount a) {
-        return new FinanceAccountResponse(a.id(), a.groupId(), a.accountType(), a.name(), a.accountNo(), a.memo());
+        return new FinanceAccountResponse(a.id(), a.groupId(), a.accountType(), a.name(), a.accountNo(), a.memo(),
+                a.institution(), a.owner());
     }
 }
