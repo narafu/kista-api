@@ -3,7 +3,7 @@
 ### Gradle
 ```bash
 ./gradlew bootJar                                               # app.jar 빌드
-./gradlew bootRun --args='--spring.profiles.active=local'      # 로컬 실행
+./gradlew :bootRun --args='--spring.profiles.active=local'     # 로컬 실행 (root 지정 필수 — 접두사 없으면 :shared:bootRun이 mainClass 없음으로 실패)
 ./gradlew test                                                  # 전체 테스트
 ./gradlew compileJava                                           # 컴파일만
 ./gradlew :test --tests 'com.kista.architecture.*'              # 루트 ArchUnit·Modulith 규칙 (HexagonalArchitectureTest 등)

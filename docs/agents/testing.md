@@ -49,6 +49,8 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 
 서비스별 Flyway baseline이 각자 자기 스키마에 적용된다(root `db/migration`→`public`/`finance`/`kista_ref`, trading-core `db/migration-trading`→`trading`/`trading_ref`). 옛 레이아웃(`kista`/`reference` 스키마 + 공용 `flyway_schema_history`)으로 만들어진 `kistadb_test`가 로컬에 남아 있으면 baseline 판정이 어긋나므로 재생성한다: `DROP DATABASE kistadb_test; CREATE DATABASE kistadb_test OWNER kista;`. trading-core `test` 태스크는 `workingDir = rootProject.projectDir`로 실행된다.
 
+루트 `@DataJpaTest`가 `Schema validation: missing table [trading.xxx]`로 일제히 실패하면 trading-core 신규 마이그레이션이 `kistadb_test`에 아직 적용되지 않은 것이다(trading 스키마 Flyway는 trading-core 테스트만 실행) — `./gradlew :trading-core:test --tests '*OrderPersistenceAdapterDbTest'`를 한 번 돌려 적용한 뒤 재실행.
+
 ### trading-core 테스트 벤더 타입 금지
 - trading-core 테스트도 `broker.domain.model.kis/toss` 벤더 타입을 쓰지 않는다(`TradingCoreTestVendorModelTest`, broker 모듈 테스트 제외) — broker 밖 테스트의 외부 API 실패는 `com.kista.support.StubBrokerApiException`(벤더 중립 `BrokerApiException` 최소 서브클래스)으로 만든다
 
