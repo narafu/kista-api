@@ -19,7 +19,7 @@ description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파
 ### 금지된 의존 방향
 - `domain` → `application`/`adapter`/`org.springframework.stereotype`/`jakarta.persistence` (예외 없음 — 전략 구현체 Spring 배선은 `CycleStrategyBeanConfig` 팩토리가 전담)
 - `application` → `adapter.*` (Spring HTTP 클래스 포함: ResponseStatusException 등)
-- `adapter.in` → `application.service` (구현체), `adapter.out` 직접 참조
+- `adapter.in` → `application.service` (구현체) — ArchUnit 강제. `adapter.in` → `adapter.out` 직접 참조는 관례상 금지(포트 경유)이며 ArchUnit은 앱셸 `web`·`tradingweb`에만 강제(`web_must_stay_pure_inbound_sink`)
 - 모듈 간: 상대 모듈의 NamedInterface로 공개된 타입만 참조 (`ModulithArchitectureTest`의 `ApplicationModules.verify()`)
 - 모듈별 추가 규칙: `sharedkernel`/`contract`/`platform`/`matching`은 다른 `com.kista` 모듈 의존 금지, `notify`는 순수 아웃바운드 게이트웨이, `web`은 순수 inbound sink, `@Aspect` 금지, 벤더 모델(`broker.domain.model.kis/toss`)은 broker 밖 유출 금지
 
