@@ -22,11 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.UUID;
 import com.kista.sharedkernel.StrategyTicker;
 
@@ -52,8 +52,12 @@ class TradingPreviewService {
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return Optional.ofNullable(previewBatch(strategy.accountId(), requesterId).get(strategyId))
-                .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategyId));
+        // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
+        Map<UUID, RuntimeException> failures = new HashMap<>();
+        NextOrdersPreview preview = previewBatch(strategy.accountId(), requesterId, failures).get(strategyId);
+        if (preview != null) return preview;
+        if (failures.containsKey(strategyId)) throw failures.get(strategyId);
+        throw new NoSuchElementException("활성 사이클 없음: strategyId=" + strategyId);
     }
 
     // 계좌 내 전략 전체를 한 번의 트랜잭션·요청으로 미리보기 — 목록 화면에서 전략 N개를 개별 호출하던 것을 1회로 축소
@@ -64,6 +68,11 @@ class TradingPreviewService {
     // 다른 전략 전체를 처음부터 다시 계산해 KIS 시세 조회·DB 조회가 O(N²)로 증폭됐다.
     @Transactional(readOnly = true)
     Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId) {
+        return previewBatch(accountId, requesterId, new HashMap<>());
+    }
+
+    // failures: 재시도까지 실패해 결과에서 생략된 전략의 예외 — 단건 preview가 원인을 그대로 응답하도록 수집
+    private Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId, Map<UUID, RuntimeException> failures) {
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
         TradingAccount account = TradingAccount.from(accountPort.requireOwnedAccount(accountId, requesterId));
         LocalDate today = DstInfo.nextTradeDate();
@@ -146,6 +155,7 @@ class TradingPreviewService {
                     planResult = planBuilder.build(strategy, account, cycle, today, "preview:" + strategy.id(), prevCloseCache);
                 } catch (RuntimeException e) {
                     log.warn("배치 미리보기 재시도도 실패 — 이 전략만 생략: strategyId={}, error={}", strategy.id(), e.getMessage());
+                    failures.put(strategy.id(), e);
                     continue;
                 }
             }

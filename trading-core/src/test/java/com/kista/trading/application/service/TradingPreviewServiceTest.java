@@ -214,6 +214,20 @@ class TradingPreviewServiceTest {
         verify(planBuilder, times(2)).build(eq(sibling), eq(TRADING_ACCOUNT), eq(siblingCycle), any(), anyString(), any());
     }
 
+    // 대상 전략 자체의 계산이 지속 실패하면 404(활성 사이클 없음)로 가리지 않고 원래 예외를 전파해야 한다
+    // (증권사 조회 실패가 "사이클 없음"으로 오인되던 회귀 방지)
+    @Test
+    void preview_propagatesTargetComputationFailure_insteadOfNotFound() {
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE));
+        IllegalStateException brokerFailure = new IllegalStateException("증권사 API 조회에 실패했습니다");
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
+                .thenThrow(brokerFailure);
+
+        assertThatThrownBy(() -> service.preview(STRATEGY.id(), ACCOUNT.userId()))
+                .isSameAs(brokerFailure);
+    }
+
     // 시작예정일 미도래 사이클 — TradingService.filterScheduledStart와 동일 기준으로 미리보기도 skip해야 함
     @Test
     void preview_returnsScheduledStartNotReached_whenCycleStartDateIsFuture() {
