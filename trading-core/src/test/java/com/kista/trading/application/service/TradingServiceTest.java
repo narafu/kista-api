@@ -3,6 +3,8 @@ import com.kista.trading.application.service.support.TradingBatchGuard;
 import com.kista.trading.application.service.support.TradingParallelRunner;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
+import com.kista.trading.application.service.support.TradingBatchRunState;
+import com.kista.trading.application.port.output.TradingBatchRunPort;
 
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.trading.application.event.TradingReportReadyEvent;
@@ -44,11 +46,13 @@ import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -91,6 +95,8 @@ class TradingServiceTest {
     @Mock VrStrategy vrStrategy; // VR 전략 주문 생성 mock (VrCycleOrderStrategy 조립용)
     @Mock VrCycleRolloverService vrRolloverService; // VR 롤오버 mock — 마감 리포트 도달 여부 검증용
     @Mock ApplicationEventPublisher eventPublisher; // 사이클 완료/시작·리포트 이벤트 발행 (헬퍼 컴포넌트 조립용)
+    @Mock TradingBatchRunPort batchRunPort; // 재개 체크포인트 — 단계 기록·리포트 마커
+    TradingBatchRunState runState; // 협조적 종료 상태 — 실인스턴스
     TradingService service;
 
     static final DstInfo PAST_DST = new DstInfo(true,
@@ -137,6 +143,7 @@ class TradingServiceTest {
         // USER(TradingUserProfile) — balanceCheckEnabled=true, notificationPrefs 비어있어 isNotificationEnabled()도 기본 true(활성)
 
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
+        runState = new TradingBatchRunState();
         TradingBalanceLoader balanceLoader = new TradingBalanceLoader(cycleHistoryPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
@@ -157,7 +164,7 @@ class TradingServiceTest {
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService);
+                strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService, batchRunPort);
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, brokerOrderPort, orderPort,
                 positionPersistor, eventPublisher);
@@ -205,7 +212,7 @@ class TradingServiceTest {
                 priceFetcher, orderExecutor, reporter,
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
-                batchGuard, candidatePlanner);
+                batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader);
     }
 
     @Test
@@ -1987,5 +1994,98 @@ class TradingServiceTest {
         verify(cycleHistoryPort).findLatestOneByStrategyId(STRATEGY.id());
         verify(orderPort).saveAll(anyList());
     }
-}
 
+    // --- 재기동 재개: 단계 체크포인트·종료 인터럽트·리포트 재개 ---
+
+    // 기존 PLANNED 주문이 있는 정상 흐름 stub — 계획 skip 후 접수·리포트까지 진행
+    private void stubExistingPlannedFlow() {
+        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLANNED, null, null, null);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
+        when(orderPort.findPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of());
+        when(brokerOrderPort.place(any(), eq(ACCOUNT_REF))).thenReturn(brokerResult("ORD-001"));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+    }
+
+    @Test
+    void executeBatch_normalFlow_recordsPhasesInOrder() throws InterruptedException {
+        stubExistingPlannedFlow();
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        InOrder inOrder = inOrder(batchRunPort, brokerOrderPort, kisExecutionPort);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLANNED);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLACING);
+        inOrder.verify(brokerOrderPort).place(any(), eq(ACCOUNT_REF));
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLACED);
+        inOrder.verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT_REF));
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    @Test
+    void executeBatch_holiday_recordsDone() throws InterruptedException {
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.DONE);
+        verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.PLANNED));
+    }
+
+    @Test
+    void executeBatch_stoppingDuringOrderWait_suppressesUserNotice() {
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLANNED, null, null, null);
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
+        runState.requestStop(Duration.ZERO); // 종료 요청 상태 — 대기 진입 즉시 중단
+        DstInfo futureOrder = new DstInfo(true, Instant.now().plusSeconds(3600),
+                Instant.now().plusSeconds(7200), Instant.now());
+
+        assertThrows(InterruptedException.class, () -> service.executeBatch(
+                List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), futureOrder));
+
+        verify(eventPublisher, never()).publishEvent(any(BatchInterruptedEvent.class));
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof TradingErrorEvent t
+                && t.message().startsWith("[재기동]")));
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.PLANNED);
+        verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.PLACING));
+        verify(brokerOrderPort, never()).place(any(), any());
+    }
+
+    @Test
+    void resumeCloseReport_skipsReportedStrategy_reportsOthers_recordsDone() throws InterruptedException {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        // 두 번째 전략 — 같은 계좌·종목, 리포트 미완료
+        Strategy pendingStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle pendingCycle = new StrategyCycle(UUID.randomUUID(), pendingStrategy.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        BatchContext reported = new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER);
+        BatchContext pending = new BatchContext(pendingStrategy, pendingCycle, ACCOUNT, USER);
+        when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(true);
+        when(batchRunPort.isReported(today, pendingStrategy.id())).thenReturn(false);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(pendingStrategy.id())).thenReturn(Optional.of(new CyclePosition(
+                null, pendingCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null)));
+        when(orderPort.findPlacedByCycleAndDate(pendingCycle.id(), today)).thenReturn(List.of());
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+
+        service.resumeCloseReport(List.of(reported, pending), PAST_DST);
+
+        verify(kisExecutionPort, times(1)).getExecutions(any(), any(), any(), eq(ACCOUNT_REF)); // pending 1건만
+        verify(cycleHistoryPort).save(argThat(p -> p.strategyCycleId().equals(pendingCycle.id())));
+        verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(STRATEGY_CYCLE.id())));
+        verify(cycleHistoryPort, never()).findLatestOneByStrategyId(STRATEGY.id());
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+}
