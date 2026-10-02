@@ -12,8 +12,18 @@
 - 계좌별 브로커 토큰: KIS는 `broker_tokens` 테이블에 account_id(PK) 기준 독립 관리 (`KisTokenEntity`), Toss 계좌·관리자 토큰은 Redis canonical hash에 공유 (`TossDistributedTokenCoordinator` + `TossRedisTokenStore`)
 - 실행 결과: `TradingReporter`가 `TradingReportReadyEvent`를 발행 → `tradingnotify`의 `TradingReportNotifier`가 알림 — 사용자봇 미설정 시 생략
 - 오류 시: `TradingErrorEvent` 발행(`TradingBatchGuard.notifyErrorSafely`/`TradingErrorReportPort`)으로 관리자·사용자 알림 + 다음 사이클 계속 실행. 계좌별 예산 배정, 사이클별 PLANNED 저장, 잔고 부족 사용자 알림 실패는 각각 격리되어 다른 계좌·사이클 처리를 막지 않는다.
-- `waitFor()` 대기 중 `InterruptedException`(배포·재시작으로 인한 강제 종료) 발생 시 `TradingErrorEvent`로 관리자 알림 후 rethrow — PLANNED 주문 접수 미실행 가능성 알림(주문 시각 대기 중이면 `TradingBatchGuard.notifyBatchInterrupted`가 미접수 전략 사용자에게 `BatchInterruptedEvent`도 발행)
-- **병렬 접수 인터럽트 리스크(운영 주의)**: 접수 병렬화로 배포·재시작 인터럽트 시 torn-order 범위가 확대된다. Virtual Thread는 인터럽트 시 진행 중 소켓을 강제 종료(JDK21 `Socket` 계약)하므로, 접수 HTTP 응답 대기 중 인터럽트되면 `SocketException`이 `TradingOrderExecutor.placeEach`의 `catch(Exception)`에서 브로커 거절과 구분 없이 `markFailed`로 처리된다 — 브로커는 이미 접수·체결했을 수 있어 DB=FAILED / 브로커=체결 불일치 가능. 순차 시 최대 1건이던 이 위험이 병렬 시 동시 진행 중이던 `계좌수 × parallel-per-account(2)`건으로 늘어난다. 저빈도(배포 시점 접수창 겹칠 때)이나, 배포 타이밍을 접수창(개장 22:30·마감 04:30 KST 직후) 밖으로 두거나 후속으로 `placeEach`에서 인터럽트 기인 실패를 "수동 확인 필요"로 격상하는 완화가 권장된다.
+- **재기동 종료·재개** (spec `docs/superpowers/specs/2026-10-02-trading-batch-resume-design.md`):
+  - 종료 처리: 배치는 `TradingBatchRunState`에 스레드와 임계구역(마감 `placeAll`·리포트, 개장 계획~AT_OPEN 접수)을 등록한다. 종료 시 `TradingBatchShutdownCoordinator`(SmartLifecycle, 웹 graceful보다 먼저 stop)가 임계구역 완료를 최대 150s 기다린 뒤 대기 구간만 인터럽트한다. 이때 `waitFor`는 사용자 "미접수" 알림(`BatchInterruptedEvent`)을 억제하고 관리자 "[재기동] … 재개 예정"만 보낸다. 종료 요청이 아닌 인터럽트는 기존대로 "[스케쥴러 인터럽트]" 관리자 알림과 사용자 알림을 보낸다.
+    - 배경: Boot 기본 스케쥴러(VT `SimpleAsyncTaskScheduler`, `await-termination` 미설정)는 종료 시 실행 중 배치를 인터럽트하지 않는다. 코디네이터가 없으면 배치는 JVM 종료와 함께 조용히 사라진다.
+  - 체크포인트: 단계는 `trading.trading_batch_run`(job·KST 거래일)에 남는다. 마감은 `PLANNED → PLACING → PLACED → DONE`, 개장은 `PLACING → DONE`이고 조기 반환도 `DONE`으로 기록한다.
+  - 리포트 마커: 전략별 리포트 완료는 `trading.trading_batch_report`에 남는다. `CyclePositionPersistor`가 포지션 저장 직후 기록하며, 키가 전략인 이유는 rotation 후에도 유효해야 하기 때문이다.
+  - 기동 시 재개: `TradingBatchResumer`(ApplicationReadyEvent)가 처리한다.
+    - 마감 배치(화~토 04:30~22:30): 행 없음·`PLANNED`·`PLACING`이고 장마감 10분 전 이전이면 전체 재실행한다(`PLACING`은 이중 접수 경고). `PLACED`면 리포트만 재개한다(`resumeCloseReport` — 사전 잔고는 최신 `cycle_position`, 대상 주문은 DB PLACED). 접수 마감을 지났으면 관리자 알림만 보낸다.
+    - 개장 배치(월~금 22:30~ / 화~토 ~04:30): 행 없음·`PLACING`이면 재실행한다(`DstInfo.forOpenBatch` — 자정 이후 재개도 지난 개장을 기다리지 않음).
+    - 락: 재개는 `SchedulerLockService.takeOver`로 이전 프로세스 락을 인수한다. 자기 프로세스 락(기동 직후 cron 선발화)은 인수하지 않는다.
+  - 전제: **`kista-trading` 단일 인스턴스 + 이전 컨테이너 종료 후 기동(겹침 없음)**.
+  - 남은 위험: SIGKILL·OOM·임계구역 150s 초과 시에는 접수 도중 torn-order(브로커 접수 / DB PLANNED·FAILED)가 남을 수 있다. 이 경우 `PLACING` 경고를 보고 수동 확인한다.
+- **병렬 접수 인터럽트 리스크(운영 주의)**: 접수 병렬화로 배포·재시작 인터럽트 시 torn-order 범위가 확대된다. Virtual Thread는 인터럽트 시 진행 중 소켓을 강제 종료(JDK21 `Socket` 계약)하므로, 접수 HTTP 응답 대기 중 인터럽트되면 `SocketException`이 `TradingOrderExecutor.placeEach`의 `catch(Exception)`에서 브로커 거절과 구분 없이 `markFailed`로 처리된다 — 브로커는 이미 접수·체결했을 수 있어 DB=FAILED / 브로커=체결 불일치 가능. 순차 시 최대 1건이던 이 위험이 병렬 시 동시 진행 중이던 `계좌수 × parallel-per-account(2)`건으로 늘어난다. 저빈도(배포 시점 접수창 겹칠 때)이나, 배포 타이밍을 접수창(개장 22:30·마감 04:30 KST 직후) 밖으로 두거나 후속으로 `placeEach`에서 인터럽트 기인 실패를 "수동 확인 필요"로 격상하는 완화가 권장된다. graceful 재기동은 접수 임계구역 완료를 기다리므로(위 "재기동 종료·재개") 이 위험은 SIGKILL·OOM·150s 초과 시로 한정된다.
 - `TradingService`에 INFO 로그 있음 — 사이클별 단계(개장 확인, 잔고, 주문, 체결)마다 찍힘
 - `KbLandHousingBenchmarkScheduler`: 매주 토요일 08:00 KST `kbland-housing-benchmark` 분산 락으로 실행 — KB Land 최근 1년치 아파트 5분위 매매평균가격을 자연키(source+metric+region+baseMonth) 기준 upsert
 - `KbLandPriceIndexScheduler`: 매주 토요일 08:10 KST `kbland-price-index` 분산 락(5분위와 별도)으로 실행 — KB Land 최근 2년치 아파트 주간 매매가격지수를 자연키(source+metric+region+baseDate) 기준 upsert. 매월 1일 08:20 KST `kbland-price-index-full` 분산 락으로 20년 전체를 다시 받아 과거 기준일 값 사후 보정을 반영(수동 트리거: `POST /api/admin/scheduler/kbland-price-index/full-refresh`)
