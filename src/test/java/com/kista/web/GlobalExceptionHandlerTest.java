@@ -1,6 +1,11 @@
 package com.kista.web;
 
+import com.kista.admin.domain.model.AdminBrokerCredentialException;
+import com.kista.admin.domain.model.AdminBrokerRateLimitException;
+import com.kista.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.finance.domain.model.MonthlyClosing;
+import com.kista.platform.web.ErrorCode;
+import com.kista.user.domain.model.User;
 import com.kista.sharedkernel.AppErrorRaisedEvent;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.catalina.connector.ClientAbortException;
@@ -15,6 +20,7 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
+import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
@@ -126,5 +132,51 @@ class GlobalExceptionHandlerTest {
         handler.handleAll(ex);
 
         verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void monthClosed_hasCode() {
+        var handler = new GlobalExceptionHandler(mock(ApplicationEventPublisher.class));
+        var p = handler.handleAll(new MonthlyClosing.MonthClosedException("2026-08"));
+        assertThat(p.getStatus()).isEqualTo(409);
+        assertThat(p.getProperties()).containsEntry("code", ErrorCode.MONTH_CLOSED.name());
+        assertThat(p.getDetail()).endsWith("다시 시도해주세요.");
+    }
+
+    @Test
+    void adminBrokerExceptions_shareTradingCoreCodes() {
+        var handler = new GlobalExceptionHandler(mock(ApplicationEventPublisher.class));
+        assertThat(handler.handleAll(new AdminBrokerCredentialException()).getProperties())
+                .containsEntry("code", ErrorCode.BROKER_CREDENTIAL_INVALID.name());
+        assertThat(handler.handleAll(new AdminBrokerRateLimitException()).getProperties())
+                .containsEntry("code", ErrorCode.BROKER_RATE_LIMITED.name());
+    }
+
+    @Test
+    void tradingPolicyUnavailable_hasCode() {
+        var handler = new GlobalExceptionHandler(mock(ApplicationEventPublisher.class));
+        var p = handler.handleAll(new TradingPolicyUnavailableException(new RuntimeException("I/O error on GET http://internal:8081")));
+        assertThat(p.getStatus()).isEqualTo(503);
+        assertThat(p.getProperties()).containsEntry("code", ErrorCode.TRADING_CORE_UNAVAILABLE.name());
+        assertThat(p.getDetail()).doesNotContain("http");
+    }
+
+    @Test
+    void cooldown_keepsRetryAfterAndAddsCode() {
+        var handler = new GlobalExceptionHandler(mock(ApplicationEventPublisher.class));
+        Instant retryAfter = Instant.parse("2026-10-03T00:00:00Z");
+        var res = handler.handleCooldown(new User.CooldownException(retryAfter));
+        assertThat(res.getStatusCode().value()).isEqualTo(429);
+        assertThat(res.getBody().getProperties())
+                .containsEntry("code", ErrorCode.COOLDOWN_ACTIVE.name())
+                .containsEntry("retryAfter", retryAfter.toString());
+        assertThat(res.getBody().getDetail()).isEqualTo("재신청 대기 중입니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    @Test
+    void securityException_hasAccessDeniedCode() {
+        var handler = new GlobalExceptionHandler(mock(ApplicationEventPublisher.class));
+        assertThat(handler.handleAll(new SecurityException("접근 권한이 없습니다")).getProperties())
+                .containsEntry("code", ErrorCode.ACCESS_DENIED.name());
     }
 }

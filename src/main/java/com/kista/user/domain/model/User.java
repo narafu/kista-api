@@ -29,7 +29,7 @@ public record User(
         private final Instant retryAfter; // 재신청 가능 시각
 
         public CooldownException(Instant retryAfter) {
-            super("재신청 대기 중입니다. 가능 시각: " + retryAfter);
+            super("재신청 대기 중입니다. 잠시 후 다시 시도해주세요.");
             this.retryAfter = retryAfter;
         }
 

@@ -5,6 +5,6 @@ package com.kista.admin.domain.model;
 // 메시지는 응답 detail로 그대로 노출되므로 고정 문구만 쓴다 — 전송 예외 메시지(내부 URL·포트)는 cause와 어댑터 로그에만 남긴다
 public class TradingPolicyUnavailableException extends RuntimeException {
     public TradingPolicyUnavailableException(Throwable cause) {
-        super("매매 런타임 정책을 처리할 수 없습니다. 잠시 후 다시 시도해주세요", cause);
+        super("매매 런타임 정책을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.", cause);
     }
 }

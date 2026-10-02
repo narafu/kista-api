@@ -11,6 +11,7 @@ import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
+import com.kista.platform.web.ErrorCode;
 import com.kista.platform.web.ProblemDetailMappings;
 import com.kista.platform.web.ProblemDetailMappings.Mapping;
 import com.kista.sharedkernel.AppErrorRaisedEvent;
@@ -49,10 +50,11 @@ public class GlobalExceptionHandler {
         // trading-core 네이티브 컨트롤러(AccountController 등)에서만 던져지므로 trading-core 소유
         // com.kista.tradingweb.TradingExceptionHandler로 이관됨 — 아래는 admin이
         // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
-        Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials")),
-        Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit")),
+        // 코드는 trading-core 원본(BrokerCredential/RateLimit)과 동일 — 내부 API가 status만 전달하므로 root가 같은 코드를 다시 붙인다
+        Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
+        Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit", ErrorCode.BROKER_RATE_LIMITED)),
         // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
-        Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable")),
+        Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable", ErrorCode.TRADING_CORE_UNAVAILABLE)),
         // Account.DuplicateAccountException/ManualTradingException/OrderCancelException/
         // PrivacyTradeConflictException(trading-core 소유 원본)은 TradingExceptionHandler로 이관됨 —
         // 아래는 admin이 PrivacyQueryHttpAdapter(내부 API 409 응답 복원)에서 던지는 own-type만 남는다
@@ -62,14 +64,14 @@ public class GlobalExceptionHandler {
         Map.entry(FinanceAccount.LinkedAssetSnapshotsException.class,  new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict")),
-        Map.entry(MonthlyClosing.MonthClosedException.class,           new Mapping(HttpStatus.CONFLICT,           "Conflict"))
+        Map.entry(MonthlyClosing.MonthClosedException.class,           new Mapping(HttpStatus.CONFLICT,           "Conflict", ErrorCode.MONTH_CLOSED))
     ));
 
     // Retry-After 헤더 포함 — 단순 ProblemDetail 반환 불가, 개별 유지
     @ExceptionHandler(User.CooldownException.class)
     public ResponseEntity<ProblemDetail> handleCooldown(User.CooldownException ex) {
         // Retry-After 헤더에 재신청 가능 시각(Unix epoch 초) 포함
-        ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Cooldown Active", ex.getMessage());
+        ProblemDetail detail = problem(HttpStatus.TOO_MANY_REQUESTS, "Cooldown Active", ex.getMessage(), ErrorCode.COOLDOWN_ACTIVE);
         detail.setProperty("retryAfter", ex.getRetryAfter().toString());
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfter().getEpochSecond()));
