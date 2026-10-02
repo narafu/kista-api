@@ -39,6 +39,15 @@ ADMIN_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-admin-token | jq -r .a
 curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  # 200 기대
 ```
 
+### 로컬 dev 시드 (kista-ui 화면 검증용)
+```bash
+scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태에서 실행, 재실행 가능
+```
+- dev 유저(`...0001`)에만 적용: `[시드] 모의계좌`(MOCK) + ACTIVE INFINITE SOXL·VR TQQQ(API 등록), 가계부, KIS `[시드]` 전략(PAUSED) 일별 포지션(equity-curve — MOCK은 집계 제외)·종결 주문(관리자 주문 관리)
+- MOCK 시세는 Toss 공용 피드라 trading-core `application-local.yml`에 `toss.admin-client-id`/`admin-client-secret` 필요 — 없으면 MOCK 전략 등록·preview가 422/503
+- trading-core local은 스케쥴러가 켜져 있어 ACTIVE MOCK 전략이 실제로 돈다(DB 주문만 생성, 실패 시 관리자 텔레그램 알림)
+- 벤치마크(`kista_ref`)는 가짜 행 없이 kbland 수집기 트리거 — root를 `SCHEDULER_ENABLED=true`로 잠시 띄워야 엔드포인트가 열린다. ETF 시계열(`market_index_prices`)은 수동 트리거가 없어 09:00 KST cron 전용
+
 ### 로컬 2-프로세스 부팅 (root + trading-core)
 2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`tradingweb.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 최소 필요 환경변수는 CLAUDE.md의 필수 목록보다 많다 — 실측 결과:
 ```bash
