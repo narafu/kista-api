@@ -30,6 +30,11 @@
 	}
 	handle {
 		reverse_proxy kista-api:8080 {
+			# upstream keep-alive 끔 — blue/green 교체 때 옛 컨테이너가 graceful 종료로 닫은 유휴 연결을 재사용하면 POST가 재시도 없이 502(EOF)가 난다
+			# (2026-10-02 첫 교체 실측 1건). 요청마다 새 연결이면 종료 중 컨테이너는 connection refused(dial 오류)라 method 무관하게 재시도된다
+			transport http {
+				keepalive off
+			}
 			lb_try_duration 120s
 			lb_try_interval 500ms
 			health_uri /actuator/health/liveness
