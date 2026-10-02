@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.Assert;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,8 +26,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${cors.allowed-origins:http://localhost:3000}")
-    private String allowedOrigins; // 쉼표 구분 허용 origin 목록 (ex: https://kista-ui.vercel.app)
+    @Value("${cors.allowed-origins}")
+    private String allowedOrigins; // 쉼표 구분 허용 origin 목록 (ex: https://kista-ui.vercel.app) — 기본값 없음, 누락 시 기동 실패
 
     private final JwtAuthFilter jwtFilter;
     private final InternalTokenAuthFilter internalTokenFilter;
@@ -64,10 +65,13 @@ public class SecurityConfig {
 
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .toList());
+                .toList();
+        // 빈값이면 브라우저 요청이 전부 CORS 거부되므로 filterChain 빈 생성 단계에서 기동 실패시킨다
+        Assert.notEmpty(origins, "cors.allowed-origins가 비어 있음 — CORS_ALLOWED_ORIGINS 설정 필요");
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(true);

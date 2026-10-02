@@ -85,9 +85,9 @@ server:
   port: 8080
   shutdown: graceful
 
-telegram:
-  bot-token: ${TELEGRAM_BOT_TOKEN}
-  chat-id: ${TELEGRAM_CHAT_ID}
+telegram: # 빈 기본값 — @ConfigurationProperties는 해석 안 되는 ${X}를 문자열 그대로 바인딩하므로, 누락을 ""로 만들어 record @NotBlank가 기동 실패시키게 한다
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  chat-id: ${TELEGRAM_CHAT_ID:}
 
 crypto:
   aes-key: ${AES_ENCRYPTION_KEY}
@@ -101,7 +101,7 @@ jwt:
   signing-key: ${JWT_SIGNING_KEY}
 
 kakao:
-  client-id: ${KAKAO_CLIENT_ID}
+  client-id: ${KAKAO_CLIENT_ID:} # 빈 기본값 — telegram과 동일 이유(KakaoProperties @NotBlank)
   client-secret: ${KAKAO_CLIENT_SECRET:}
 
 admin:

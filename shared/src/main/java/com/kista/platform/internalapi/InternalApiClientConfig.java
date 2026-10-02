@@ -13,6 +13,9 @@ import org.springframework.web.client.RestClient;
 // 내부 API를 "나가는" 프로세스(root)에만 존재하는 클라이언트 빈 — internal.api.base-url이 설정된 경우에만 등록된다.
 // trading-core는 root를 호출하지 않으므로(프로세스 간 단방향 root→trading-core) base-url을 설정하지 않아 이 빈이 없다 —
 // GradleModuleBoundaryTest가 trading-core→platform.internalapi 참조 자체를 금지한다.
+// root의 InternalApiProperties(token @NotBlank) 등록도 이 조건에 묶이지만, base-url이 없으면 이 빈을 무조건 주입받는
+// admin.adapter.out.internal.*HttpAdapter가 기동 실패하므로 토큰 검증이 조용히 빠지는 경로는 없다.
+// trading-core는 @ConfigurationPropertiesScan(com.kista.platform)으로 같은 record를 등록해 토큰을 검증한다.
 @Configuration
 @ConditionalOnProperty(prefix = "internal.api", name = "base-url")
 @EnableConfigurationProperties(InternalApiProperties.class)

@@ -23,7 +23,7 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 빌드·실행·테스트 명령어는 `docs/agents/commands.md`(자동 로드) 참고.
 
-필수 환경변수: `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — ADMIN 자동 승격), `INTERNAL_API_TOKEN` (서버 간 내부 인증, 미설정 시 `/api/internal/**` 항상 401), `CORS_ALLOWED_ORIGINS` (쉼표 구분, 기본값 `http://localhost:3000`), `INTERNAL_API_BASE_URL` (root→trading-core 내부 HTTP 호출 base URL, 기본값 `http://localhost:8081` = trading-core 로컬 포트 — 운영은 compose가 kista-api에 주입)
+필수 환경변수(누락·빈값이면 기동 실패 — `@Validated @NotBlank` 또는 기본값 없는 placeholder): `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `INTERNAL_API_TOKEN` (서버 간 내부 인증), `TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID` (관리자 봇, root·trading-core 공통), `KAKAO_CLIENT_ID` (root만), `CORS_ALLOWED_ORIGINS` (쉼표 구분 — root는 항상 필수, trading-core는 prod만 필수·그 외 기본값 `http://localhost:3000`). 선택: `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — 로그인 시 ADMIN 자동 승격 seed, 강등 경로가 없어 bootstrap 후 비어도 무해), `INTERNAL_API_BASE_URL` (root→trading-core 내부 HTTP 호출 base URL, 기본값 `http://localhost:8081` = trading-core 로컬 포트 — 운영은 compose가 kista-api에 주입)
 
 로컬 환경: `src/main/resources/application-local.yml` (.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 설정 필수
 

@@ -79,7 +79,7 @@ toss:
   admin-client-id: ${TOSS_ADMIN_CLIENT_ID:}
   admin-client-secret: ${TOSS_ADMIN_CLIENT_SECRET:}
 
-telegram: # root와 동일 관리자 봇 공유(TelegramProperties 클래스 주석 참고) — 미설정 시 조용히 발송 생략
+telegram: # root와 동일 관리자 봇 공유(TelegramProperties 클래스 주석 참고) — 누락·빈값이면 @NotBlank로 기동 실패
   bot-token: ${TELEGRAM_BOT_TOKEN:}
   chat-id: ${TELEGRAM_CHAT_ID:}
 

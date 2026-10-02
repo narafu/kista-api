@@ -11,6 +11,10 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s  # docker stop_grace_period 200s와 쌍으로 관리(root application-prod.yml과 동일 관례)
 
+# prod는 기본값(localhost:3000) 없이 강제 — 누락 시 placeholder 해석 실패로 기동 중단(빈값은 SecurityConfig가 차단)
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
 management:
   health:
     probes:

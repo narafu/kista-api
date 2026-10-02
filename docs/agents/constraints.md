@@ -149,7 +149,7 @@
 - `SecurityConfig`에 새 Filter 추가 시 `@Import(SecurityConfig.class)` 사용하는 **모든** `@WebMvcTest`에도 해당 Filter `@Import` 필수 — 누락 시 `NoSuchBeanDefinitionException` → 다른 테스트까지 `IllegalStateException` 전파
 
 ### 서버 간 내부 인증 (InternalTokenAuthFilter)
-- `/api/internal/**` 경로: `X-Internal-Token` 헤더 검증 — 환경변수 `INTERNAL_API_TOKEN` 값과 일치해야 통과 (미설정 시 항상 401)
+- `/api/internal/**` 경로: `X-Internal-Token` 헤더 검증 — 환경변수 `INTERNAL_API_TOKEN` 값과 일치해야 통과 (누락·빈값이면 `InternalApiProperties` `@NotBlank`로 기동 실패)
 - `SecurityConfig`: `/api/internal/**` → `hasRole("INTERNAL")`, `InternalTokenAuthFilter` JWT 필터보다 먼저 실행
 - `@WebMvcTest`에서 `/api/internal/**` 경로 테스트: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` 패턴 (`FidaOrderControllerTest` 참고)
 
@@ -173,7 +173,7 @@
 - Javadoc·블록 주석 금지 — `//` 인라인만 사용
 
 ### CORS (SecurityConfig)
-- `CORS_ALLOWED_ORIGINS` 환경변수 (쉼표 구분), 기본값 `http://localhost:3000`
+- `CORS_ALLOWED_ORIGINS` 환경변수 (쉼표 구분) — `SecurityConfig` `@Value`에 기본값 없음, 빈 목록이면 기동 실패. trading-core만 비-prod 기본값 `http://localhost:3000`(yml)
 - allowedMethods에 **PATCH 필수** — 미포함 시 전략중지/재개 등 PATCH 엔드포인트 403
 - **`SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint` 반드시 설정** — 미설정 시 인증 실패가 401 대신 403 반환
 - **`JwtAuthFilter` catch 절은 `Exception`으로** — `JwtException`만 잡으면 NPE·IAE 미처리 → 익명 사용자 → 403

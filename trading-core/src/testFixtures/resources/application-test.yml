@@ -34,5 +34,9 @@ kakao:
 cors:
   allowed-origins: http://localhost:3000
 
+internal:
+  api:
+    token: test-internal-token # InternalApiProperties @NotBlank 충족용 — 내부 API 테스트는 @TestPropertySource로 자기 토큰을 덮어쓴다
+
 toss:
   base-url: https://openapi.tossinvest.com
