@@ -139,6 +139,21 @@ class AccountControllerTest {
     }
 
     @Test
+    void register_duplicate_returns409WithCodeInBody() throws Exception {
+        when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
+                .thenThrow(new Account.DuplicateAccountException("74420614-01"));
+
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"KIS계좌\",\"accountNo\":\"74420614-01\"," +
+                                "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DUPLICATE_ACCOUNT"))
+                .andExpect(jsonPath("$.detail").value("이미 등록된 계좌번호입니다."));
+    }
+
+    @Test
     void register_disabledBroker_returns400() throws Exception {
         // 신규 계좌 등록도 연결 테스트와 동일한 사용자 입력 오류 응답을 사용한다.
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))

@@ -181,9 +181,20 @@ class ManualTradingServiceTest {
     }
 
     @Test
-    void execute_liveBalanceFetchFails_notifiesAdminAndThrowsManualTradingException() {
-        // 증권사 타입이 아닌 예상 밖 예외는 4xx(ManualTradingException)로 승격되지만, GlobalExceptionHandler가
-        // 4xx는 app_error_logs에 남기지 않으므로 서비스가 직접 TradingErrorEvent를 발행해야 함
+    void execute_existingOrderToday_throwsAlreadyOrderedToday() {
+        Order existing = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_OPEN,
+                OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                OrderStatus.PLANNED, null, null, null);
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(AlreadyOrderedTodayException.class);
+    }
+
+    @Test
+    void execute_liveBalanceFetchFails_notifiesAdminAndThrowsManualTradingFailed() {
+        // 증권사 타입이 아닌 예상 밖 예외는 500(ManualTradingFailedException)으로 승격 — 핸들러는 보고하지 않으므로 서비스가 TradingErrorEvent를 발행
         Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
                 OrderDirection.BUY, 1, new BigDecimal("22.00"),
@@ -194,7 +205,7 @@ class ManualTradingServiceTest {
                 .thenThrow(new RuntimeException("Toss API 오류"));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
-                .isInstanceOf(ManualTradingException.class);
+                .isInstanceOf(ManualTradingFailedException.class).hasCauseInstanceOf(RuntimeException.class);
 
         verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
     }

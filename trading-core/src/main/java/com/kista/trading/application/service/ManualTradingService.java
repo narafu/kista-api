@@ -60,7 +60,7 @@ class ManualTradingService {
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
         if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())
-            throw new ManualTradingException("오늘 이미 주문이 등록된 전략입니다");
+            throw new AlreadyOrderedTodayException();
 
         // 잔고 로드~전일종가~privacyBase~전략 계산을 배치와 동일한 StrategyOrderPlanBuilder에 위임한다
         // (전일종가 조회는 내부적으로 BrokerCallGuard.wrap 경유 브로커 호출이라 실패 시 raw 예외가 나올 수 있음 — 아래서 동일 패턴으로 흡수)
@@ -144,11 +144,11 @@ class ManualTradingService {
     }
 
     // 바로주문 조회 실패 응답 변환 — 증권사 타입 예외는 다른 화면과 동일하게 503/422/429로 그대로 전파
-    // (503은 TradingExceptionHandler가 app_error_logs에 기록), 그 외 예외만 409 + 관리자 알림
+    // (503은 TradingExceptionHandler가 app_error_logs에 기록), 그 외 예외는 500(ManualTradingFailedException) + 관리자 알림
     private RuntimeException queryFailure(Exception e) {
         if (BrokerCallGuard.isBrokerTyped(e)) return (RuntimeException) e;
-        // 4xx(ManualTradingException)는 GlobalExceptionHandler가 app_error_logs에 남기지 않으므로 여기서 직접 기록
+        // ManualTradingFailedException은 핸들러 전용 매핑이라 catch-all 보고를 타지 않으므로 여기서 직접 기록
         eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-        return new ManualTradingException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요", e);
+        return new ManualTradingFailedException(e);
     }
 }

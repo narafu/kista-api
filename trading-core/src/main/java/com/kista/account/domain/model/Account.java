@@ -39,7 +39,8 @@ public record Account(
     // 동일 사용자가 같은 계좌번호를 중복 등록 시도한 경우
     public static class DuplicateAccountException extends RuntimeException {
         public DuplicateAccountException(String accountNo) {
-            super("이미 등록된 계좌번호입니다: " + accountNo);
+            // accountNo는 메시지에 싣지 않는다 — detail이 사용자 응답으로 나가므로 계좌번호 원문 노출 방지
+            super("이미 등록된 계좌번호입니다.");
         }
     }
 }

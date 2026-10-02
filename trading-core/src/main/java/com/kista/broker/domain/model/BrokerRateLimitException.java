@@ -4,6 +4,6 @@ package com.kista.broker.domain.model;
 // account.Account.KisRateLimitException 복제(순환 방지) — broker는 이 예외를 자체 소유한다
 public class BrokerRateLimitException extends RuntimeException {
     public BrokerRateLimitException() {
-        super("KIS API 호출 한도를 초과했습니다. 잠시 후 다시 시도하세요");
+        super("증권사 API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.");
     }
 }

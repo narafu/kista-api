@@ -109,7 +109,8 @@ class OrderCancelService {
 
         // PLACED 상태: 증권사 취소 후 DB 상태 변경
         if (order.status() != OrderStatus.PLACED) {
-            throw new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: " + order.status());
+            log.info("취소 불가 상태 주문 취소 요청: orderId={}, status={}", orderId, order.status());
+            throw new OrderCancelException("취소 가능한 상태가 아닙니다.");
         }
 
         try {

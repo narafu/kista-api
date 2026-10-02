@@ -4,11 +4,14 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.domain.model.BrokerRateLimitException;
+import com.kista.platform.web.ErrorCode;
 import com.kista.platform.web.ProblemDetailMappings;
 import com.kista.platform.web.ProblemDetailMappings.Mapping;
 import com.kista.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.trading.domain.model.AlreadyOrderedTodayException;
 import com.kista.trading.domain.model.ManualTradingException;
+import com.kista.trading.domain.model.ManualTradingFailedException;
 import com.kista.trading.domain.model.OrderCancelException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +30,7 @@ import static com.kista.platform.web.ProblemDetailMappings.problem;
 
 // trading-core 프로세스 전역 예외→HTTP 매핑 advice(앱셸 tradingweb 소속 — root com.kista.web.GlobalExceptionHandler와 대칭).
 // 이 프로세스엔 root advice가 없으므로 컨트롤러 패키지 제약 없이 모든 컨트롤러의 예외를 처리한다:
-// trading-core 고유 6종 + BrokerApiException(503) + 범용 JDK/Spring 예외(ProblemDetailMappings.GENERIC) + catch-all 500.
+// trading-core 고유 예외 + BrokerApiException(503) + 범용 JDK/Spring 예외(ProblemDetailMappings.GENERIC) + catch-all 500.
 //
 // BrokerApiException(KIS/Toss 예외의 벤더 중립 상위 타입, trading-core 소유)은 app_error_logs가 root 소유 테이블이라
 // AppErrorRaisedEvent(sharedkernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream(stream:app.error)으로 root에 push한다.
@@ -48,16 +51,19 @@ public class TradingExceptionHandler {
     // AppErrorRaisedEvent 발행용 — 저장은 AppErrorStreamPublisher(Redis Stream) → root admin이 담당
     private final ApplicationEventPublisher eventPublisher;
 
-    // trading-core 고유 예외 6종 매핑
-    private static final String BROKER_UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요"; // 503 응답 detail
+    // trading-core 고유 예외 매핑 — 서브클래스(AlreadyOrderedToday/ManualTradingFailed)는 resolve()의 계층 탐색이 상위 ManualTradingException보다 먼저 찾는다
+    private static final String BROKER_UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요."; // 503 응답 detail
 
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.of(
-            BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials"),
-            BrokerRateLimitException.class,          new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "KIS Rate Limit"),
+            BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID),
+            BrokerRateLimitException.class,          new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "KIS Rate Limit", ErrorCode.BROKER_RATE_LIMITED),
+            AlreadyOrderedTodayException.class,      new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ALREADY_ORDERED_TODAY),
+            ManualTradingFailedException.class,      new Mapping(HttpStatus.INTERNAL_SERVER_ERROR, "Manual Trading Failed", null,
+                                                             "주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
             ManualTradingException.class,            new Mapping(HttpStatus.CONFLICT,              "Conflict"),
-            OrderCancelException.class,              new Mapping(HttpStatus.CONFLICT,              "Conflict"),
+            OrderCancelException.class,              new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ORDER_NOT_CANCELLABLE),
             PrivacyTradeConflictException.class,     new Mapping(HttpStatus.CONFLICT,              "Conflict"),
-            Account.DuplicateAccountException.class, new Mapping(HttpStatus.CONFLICT,              "Conflict")
+            Account.DuplicateAccountException.class, new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.DUPLICATE_ACCOUNT)
     );
 
     @ExceptionHandler({
@@ -71,7 +77,7 @@ public class TradingExceptionHandler {
             // 위 6종(또는 그 서브클래스)만 이 메서드로 라우팅되므로 도달 불가 — 방어적 가드
             throw new IllegalStateException("매핑 없는 예외가 TradingExceptionHandler로 라우팅됨: " + ex.getClass());
         }
-        return problem(m.status(), m.title(), ex.getMessage());
+        return ProblemDetailMappings.toProblem(m, ex);
     }
 
     // KIS·Toss 등 모든 증권사 API 실패를 벤더 중립 BrokerApiException 하나로 503 매핑 — title은 벤더 표기로 도출("KIS API Error"/"Toss API Error", 저장은 이벤트로 위임)
@@ -79,9 +85,9 @@ public class TradingExceptionHandler {
     public ProblemDetail handleBrokerApiException(BrokerApiException ex) {
         reportErrorLog(ex);
         log.error("{} API 오류: {}", ex.vendorLabel(), ex.getMessage(), ex);
-        // title("<vendorLabel> API Error")은 kista-ui relayUpstreamError가 503 본문 relay 여부를 판별하는 계약 — 변경 시 UI 동시 수정
+        // code=BROKER_UNAVAILABLE이 relay 판별 계약 — title("<vendorLabel> API Error")은 kista-ui가 code 판별로 이행할 때까지 함께 유지
         // detail은 사용자 노출용 고정 문구 — 원본 메시지(응답 바디·accountId 등 내부 정보)는 로그·에러 로그에만 남긴다
-        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.vendorLabel() + " API Error", BROKER_UNAVAILABLE_DETAIL);
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, ex.vendorLabel() + " API Error", BROKER_UNAVAILABLE_DETAIL, ErrorCode.BROKER_UNAVAILABLE);
     }
 
     // 필드 오류 메시지 집계 — 공용 유틸 사용

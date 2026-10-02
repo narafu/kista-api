@@ -77,7 +77,7 @@ class OrderCancelControllerTest {
 
     @Test
     void cancelOrder_notCancellable_returns409() throws Exception {
-        doThrow(new OrderCancelException("취소 가능한 상태가 아닙니다. 현재 상태: FILLED"))
+        doThrow(new OrderCancelException("취소 가능한 상태가 아닙니다."))
                 .when(tradingExecution).cancelOrder(any(), any());
 
         mockMvc.perform(delete("/api/orders/{orderId}", ORDER_ID)

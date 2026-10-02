@@ -94,7 +94,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
                 .isInstanceOf(Account.DuplicateAccountException.class)
-                .hasMessageContaining("74420614");
+                .hasMessage("이미 등록된 계좌번호입니다.");
     }
 
     @Test
