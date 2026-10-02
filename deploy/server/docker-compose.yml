@@ -102,6 +102,7 @@ services:
     mem_limit: 2816m         # 백테스트 캔들 적재 피크 대비 유지(실측 RSS ~530MiB, 2026-10-01). limit 합계: 앱 2048+1536+2816=6400m,
                               # kista-infra(postgres 3072+redis 256+caddy 64)+kista-ui 1536 포함 11328m — 호스트 11.6GiB 이하
                               # 예외: kista-api blue/green 교체 중 수 분간은 kista-api 2개(+2048m)로 합계가 호스트를 넘는다 — limit은 예약 아닌 상한, 실측 RSS 기준 여유(2026-10-02 결정)
+                              # kista-ui blue/green 교체 중에도 같은 예외 — kista-ui 2개(+1536m), 교체 직후 실측 호스트 used 2.5GB/11.9GB. 전역 reconcile 락으로 두 앱의 교체는 겹치지 않는다
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging
