@@ -73,7 +73,7 @@ docker ps --format '{{.Names}} {{.Image}} {{.Status}}'                       # �
 ## 2. 컷오버
 
 1. **이미지 빌드(배포 없이)**: GitHub Actions → Server Deploy → Run workflow → 브랜치 `release/schema-reorg`, `build_only=true`. 산출 이미지 태그(`ghcr.io/<repo>:<sha>`)를 메모(`NEW_IMAGE`).
-2. 서버에서 전 서비스 정지: `docker stop kista-trading kista-scheduler kista-api` (compose 대신 plain docker — 이미지 변수 3개 불필요)
+2. 서버에서 전 서비스 정지: `docker stop kista-trading kista-scheduler $(docker ps -qf label=com.docker.compose.service=kista-api)` (compose 대신 plain docker — 이미지 변수 3개 불필요)
 3. 직전 백업(원본 보존): `docker exec kista-postgres pg_dump -U kista kistadb -Fc > /opt/kista-api/pre-reorg-$(date +%Y%m%d-%H%M).dump` (크기 확인, 0바이트면 중단)
 4. 정방향 SQL(리허설과 동일, 트랜잭션 안에서 검증 후 COMMIT):
    ```bash

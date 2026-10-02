@@ -39,7 +39,7 @@ while IFS= read -r f; do
     deploy/server/caddy/*)
       verify=true; config=true ;;
     # reconcile bundle·hook — 이미지 무관
-    deploy/server/docker-compose.yml|deploy/server/roles|deploy/server/readiness|deploy/server/required-env|deploy/hooks/*)
+    deploy/server/docker-compose.yml|deploy/server/roles|deploy/server/readiness|deploy/server/required-env|deploy/server/bluegreen|deploy/hooks/*)
       config=true ;;
     # 양쪽 jar에 들어가는 빌드 입력 — 전부
     shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore)

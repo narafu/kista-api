@@ -18,7 +18,7 @@ x-logging: &logging
 services:
   kista-api:
     image: ${KISTA_API_IMAGE:?KISTA_API_IMAGE is required}
-    container_name: kista-api
+    # container_name 없음 — blue/green 교체 때 새 컨테이너가 kista-api-kista-api-N으로 옆에 뜬다(서비스 DNS 이름 kista-api는 불변)
     env_file:
       - .env
     environment:
@@ -101,6 +101,7 @@ services:
     stop_grace_period: 200s   # 매매 배치 인터럽트 대응 — kista-scheduler와 동일 근거
     mem_limit: 2816m         # 백테스트 캔들 적재 피크 대비 유지(실측 RSS ~530MiB, 2026-10-01). limit 합계: 앱 2048+1536+2816=6400m,
                               # kista-infra(postgres 3072+redis 256+caddy 64)+kista-ui 1536 포함 11328m — 호스트 11.6GiB 이하
+                              # 예외: kista-api blue/green 교체 중 수 분간은 kista-api 2개(+2048m)로 합계가 호스트를 넘는다 — limit은 예약 아닌 상한, 실측 RSS 기준 여유(2026-10-02 결정)
     restart: unless-stopped
     healthcheck: *healthcheck
     logging: *logging

@@ -23,3 +23,8 @@ block() { awk -v s="  $1:" '$0 == s {on=1; next} on && /^  [a-z]/ {exit} on' "$D
   [ "$(grep -vE '^[[:space:]]*(#|$)' "$D/roles" | tr '\n' ' ')" = "kista-trading kista-api kista-scheduler " ]
   [ "$(awk '{print $1}' "$D/readiness" | sort | tr '\n' ' ')" = "kista-api kista-scheduler kista-trading " ]
 }
+
+@test "bluegreen: kista-api만, kista-trading·kista-scheduler 금지 + 대상 서비스는 container_name 없음" {
+  [ "$(grep -vE '^[[:space:]]*(#|$)' "$D/bluegreen")" = kista-api ]
+  [ "$(block kista-api | grep -vE '^[[:space:]]*#' | grep -c container_name)" -eq 0 ]
+}

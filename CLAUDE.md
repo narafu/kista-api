@@ -49,7 +49,7 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 ## 운영 도구
 
-- **API 운영 로그**: OCI 서버 SSH 접속 후 `docker logs -f kista-api` (상세 명령어 → `docs/agents/docker-infra.md`)
+- **API 운영 로그**: OCI 서버 SSH 접속 후 `docker logs -f $(docker ps -qlf label=com.docker.compose.service=kista-api)` (blue/green 교체로 컨테이너 이름이 고정되지 않음 — 교체 중 2개면 최신) (상세 명령어 → `docs/agents/docker-infra.md`)
 - **DB 작업**: 자체호스팅 postgres(`kista-postgres` 컨테이너) — SSH 접속 후 `docker exec kista-postgres psql -U kista -d kistadb` (상세 명령어 → `docs/agents/docker-infra.md`)
 
 ## 참고 문서 (필요시 Read)

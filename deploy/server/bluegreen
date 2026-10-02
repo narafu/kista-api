@@ -1,0 +1,3 @@
+# blue/green 무중단 교체 대상 — kista-infra reconcile.sh가 스케일 1→2→1로 교체한다(옛 컨테이너는 모든 role·Caddy 통과 후 제거)
+# kista-trading·kista-scheduler 추가 금지: 겹쳐 뜨면 매매 배치·@Scheduled가 이중 실행된다(compose-invariants.bats가 잠금)
+kista-api

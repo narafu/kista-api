@@ -9,7 +9,7 @@
 ```text
 /opt/kista-api/
 ├── .env                    ← kista-infra 배포 워크플로가 렌더링·덮어쓴다 (이 레포의 Actions는 관여하지 않음, 아래 "GitHub Secrets" 참고)
-├── releases/<id>/          ← kista-infra가 config SHA의 deploy/server/{docker-compose.yml,roles,readiness,caddy/} + images.env로 구성한 bundle
+├── releases/<id>/          ← kista-infra가 config SHA의 deploy/server/{docker-compose.yml,roles,readiness,bluegreen,caddy/} + images.env로 구성한 bundle
 ├── current → releases/<id> ← 마지막 적용 성공 release
 ├── previous → releases/<id>
 ├── caddy/kista-api.caddy   ← reconcile이 current bundle에서 설치(kista-infra caddy가 ro 마운트 — 경로 변경 금지)
@@ -150,7 +150,7 @@ nohup bash /opt/kista-infra/bin/reconcile.sh kista-api "$(basename "$(readlink /
 - **Redis 영속성**: kista-infra 레포 소유 — 상세 설정(AOF 등)은 kista-infra README 참고. `kista-api`에 `depends_on: redis`는 의도적으로 미사용(Spring Data Redis lazy connection이라 앱 부팅을 막지 않음)
 - **헬스체크**: UptimeRobot → `https://{API_DOMAIN}/actuator/health` 5분 간격 (full health — DB·Redis 포함)
 - **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
-- **로그**: `docker logs -f kista-api` (서버 SSH — 서버 루트엔 compose 파일이 없어 `docker compose logs`는 쓰지 않는다)
+- **로그**: `docker logs -f $(docker ps -qlf label=com.docker.compose.service=kista-api)` (서버 SSH — kista-api는 blue/green이라 컨테이너 이름 미고정, kista-scheduler·kista-trading은 `docker logs -f <이름>` — 서버 루트엔 compose 파일이 없어 `docker compose logs`는 쓰지 않는다)
 
 ## fida
 
