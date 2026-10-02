@@ -40,6 +40,21 @@ public class TradingCloseScheduler {
                         useCase::executeBatchNow));
     }
 
+    // 재기동 재개 — 이전 프로세스 락을 인수해 마감 배치 전체 재실행 (slot 멱등 재계획, 남은 시간만 대기)
+    public void resume() throws InterruptedException {
+        schedulerLockService.takeOver("trading-close", Duration.ofHours(3), this::runLocked);
+    }
+
+    // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 리포트 미완료 전략만 리포트
+    public void resumeReport() throws InterruptedException {
+        schedulerLockService.takeOver("trading-close", Duration.ofHours(3), () -> {
+            jobRunner.run("마감 리포트 재개",
+                    () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                    useCase::resumeCloseReport);
+            heartbeatPort.pingClose(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
+        });
+    }
+
     private void runLocked() throws InterruptedException {
         // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
         jobRunner.run("마감 매매 스케쥴러",

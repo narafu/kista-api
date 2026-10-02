@@ -26,6 +26,7 @@ import org.mockito.stubbing.Answer;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.anyList;
 import com.kista.sharedkernel.StrategyType;
@@ -94,6 +96,12 @@ class TradingOpenSchedulerTest {
                 throw e;
             }
         }).when(schedulerLockService).tryRun(any(), any(), any());
+        // 재개 경로(takeOver)도 같은 방식으로 task 즉시 실행
+        lenient().doAnswer((Answer<Boolean>) invocation -> {
+            SchedulerLockService.LockedTask task = invocation.getArgument(2);
+            task.run();
+            return true;
+        }).when(schedulerLockService).takeOver(any(), any(), any());
     }
 
     @Test
@@ -206,5 +214,16 @@ class TradingOpenSchedulerTest {
         verify(useCase).placeOpenOrders(List.of(infiniteCtx));
         verify(errorReportPort).reportError(argThat(e -> e instanceof IllegalStateException));
         verify(heartbeatPort).pingOpen();
+    }
+
+    @Test
+    void resume_takesOverOpenLock_runsOpenBatch() throws InterruptedException {
+        when(strategyPort.findAllActive()).thenReturn(List.of());
+        when(contextFactory.buildAll(any())).thenReturn(List.of());
+
+        scheduler.resume();
+
+        verify(schedulerLockService).takeOver(eq("trading-open"), eq(Duration.ofHours(2)), any());
+        verify(useCase).placeOpenOrders(List.of());
     }
 }
