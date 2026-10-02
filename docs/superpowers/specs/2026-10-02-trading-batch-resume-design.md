@@ -66,16 +66,19 @@
 - 조기 반환(휴장, 대상 0건, 시작예정일 미도래 전량 제외, 계산 결과 0건)도 `DONE`으로 기록한다. 이렇게 해야 "행 없음 = 아직 실행 안 됨"이 성립한다.
 - `scheduler_locks`는 범용 플랫폼 테이블로 유지한다. 매매 고유 단계는 trading이 소유한다.
 
-`trading.batch_cycle_report`: 사이클별 리포트 완료 마커.
+`trading.trading_batch_report`: 전략별 당일 리포트 완료 마커.
 
 | 컬럼 | 타입 | 비고 |
 |---|---|---|
 | trade_date | DATE | PK |
-| strategy_cycle_id | UUID | PK (FK 없음 — soft delete 테이블 참조 회피) |
+| strategy_id | UUID | PK (FK 없음 — soft delete 테이블 참조 회피) |
 | created_at | TIMESTAMPTZ | NOT NULL DEFAULT now() |
 
-- `cycle_position` 저장과 **같은 트랜잭션**에서 insert한다.
-- 재개 시 마커가 있는 사이클은 리포트를 건너뛴다. 그래서 `cycle_position` 중복 append, `CycleCompletedEvent`·리포트 재발행이 생기지 않는다.
+- 키를 사이클이 아니라 **전략**으로 잡는다. 리포트가 청산을 감지하면 `CycleRotationService`가 새 사이클을 만든다. 사이클 키로 잡으면 재개 시 다시 빌드한 context가 새 사이클을 가리켜 마커를 놓친다.
+- `CyclePositionPersistor`가 `cycle_position`(+ INFINITE 상세) 저장 **직후**에 insert한다.
+  - 같은 트랜잭션으로 묶지 않는다. 현재 저장 경로에 트랜잭션이 없고, 뒤따르는 rotation까지 트랜잭션에 넣으면 범위가 커진다.
+  - 저장과 마커 사이(수 ms)에 SIGKILL이 걸리면 재개 시 position이 중복될 수 있다. graceful 종료는 CRITICAL 대기로 이 창을 밟지 않으므로 허용한다.
+- 재개 시 마커가 있는 전략은 리포트를 건너뛴다. 그래서 `cycle_position` 중복 append, `CycleCompletedEvent`·리포트 재발행이 생기지 않는다.
 
 ### 4.2 컴포넌트 (trading 모듈)
 
@@ -92,8 +95,19 @@
   - 리포트만 재개하는 진입점(`resumeCloseReport`)을 추가한다.
 - `TradingCloseScheduler` / `TradingOpenScheduler`: 재개 진입점을 추가한다. 락을 인수한 뒤 `SchedulerJobRunner`로 실행한다.
 - `CyclePositionPersistor`: 마커 insert를 추가한다.
-- `SchedulerLockService`(shared): `takeOver(lockName, ttl)`을 추가한다. 이전 owner가 반드시 죽었다는 전제의 무조건 인수이며, 실행 결과 처리(markFinished/release)는 `tryRun`과 같다.
-- trading-core `application-prod.yml`: `timeout-per-shutdown-phase`를 30s에서 180s로 올린다. compose `stop_grace_period` 200s 안에 들어간다.
+- `SchedulerLockService`(shared):
+  - `takeOver(lockName, ttl, task)`를 추가한다. 다른 owner가 쥔 락이면 만료 전이어도 인수한다. 단 **자기 프로세스가 쥔 락은 인수하지 않는다**(`lock_until <= now() OR locked_by <> me`). 기동 직후 cron이 먼저 발화해 이미 실행 중인 경우의 이중 실행을 막기 위해서다.
+  - 실행 결과 처리(markFinished/release)는 `tryRun`과 같다.
+  - `ownerId`에 무작위 UUID를 덧붙인다. `docker restart`처럼 hostname·pid가 그대로인 재기동에서도 이전 프로세스와 owner가 달라야 위 조건이 성립한다.
+- `DstInfo`:
+  - `marketCloseAt()`을 추가한다(마감 접수 마감 계산용).
+  - `forOpenBatch(tradeDate)`를 추가한다. 거래일 T의 개장 시각을 T-1일 저녁으로 산출한다. 기존 `calculate()`는 `marketOpen`을 "오늘 날짜"로 고정하므로, 자정 이후 개장 배치를 재개하면 그날 밤 개장까지 약 22시간을 잘못 대기한다.
+  - `TradingService.placeOpenOrders(contexts)`는 `forOpenBatch(nextTradeDate())`를 쓴다.
+  - 테스트 주입용 `calculate(ZonedDateTime)`을 public으로 연다.
+- `TradingOpenScheduler` PRIVACY 장전 가드의 조회일을 `LocalDate.now()`에서 `DstInfo.nextTradeDate()`로 바꾼다. `findTodayTrade`는 KST 거래일을 받는 계약이며, 자정 이후 재개 때 날짜가 어긋나지 않게 하기 위해서다.
+- `application-prod.yml`은 바꾸지 않는다.
+  - 코디네이터 `stop()`은 동기 블로킹이라 `timeout-per-shutdown-phase`(비동기 콜백 대기 상한)의 영향을 받지 않는다.
+  - 대신 CRITICAL 대기 상한을 150s로 둔다. 웹서버 graceful 30s와 합쳐 compose `stop_grace_period` 200s 안에 들어간다.
 
 ## 5. 종료 흐름 (협조적 shutdown)
 
@@ -103,7 +117,7 @@ SIGTERM이 오면 Spring context가 닫히면서 `SmartLifecycle.stop()`이 phas
 |---|---|
 | 없음 | 즉시 반환 |
 | SLEEPING | `stopping=true`로 표시하고 배치 스레드를 `interrupt()`한다 |
-| CRITICAL | `stopping=true`로 표시하고 구간 종료까지 대기한다(상한 `trading.shutdown.critical-wait`, 기본 170s). 구간이 끝나면 체크포인트가 이미 다음 단계로 기록돼 있고, 스레드는 다음 `waitFor`에서 즉시 종료 경로로 빠진다 |
+| CRITICAL | `stopping=true`로 표시하고 구간 종료까지 대기한다(상한 `trading.shutdown.critical-wait`, 기본 150s). 구간이 끝나면 체크포인트가 이미 다음 단계로 기록돼 있고, 스레드는 다음 `waitFor`에서 즉시 종료 경로로 빠진다 |
 | CRITICAL 상한 초과 | 관리자 알림 "[재기동] 접수/리포트 진행 중 강제 종료 — 수동 확인 필요" 후 반환한다. JVM 종료로 스레드가 사라지며, SIGKILL과 같은 상태가 된다 |
 
 - `waitFor` 인터럽트 처리:
@@ -136,7 +150,7 @@ SIGTERM이 오면 Spring context가 닫히면서 `SmartLifecycle.stop()`이 phas
 |---|---|---|
 | 행 없음 / `PLANNED` | `executeBatch` 전체 재실행. slot 멱등으로 재계획하고, 남은 시간만 대기한 뒤 접수·리포트한다 | 관리자 알림 "마감 매매 미접수 — 수동 확인", 실행 안 함 |
 | `PLACING` | 관리자 경고 "접수 도중 중단 — 이중 접수 여부 확인" 후 `executeBatch` 전체 재실행. 남은 PLANNED만 접수된다 | 관리자 경고, 실행 안 함 |
-| `PLACED` | 리포트만 재개: 남은 postClose까지 대기한 뒤 마커 없는 사이클만 리포트한다 | 같음 |
+| `PLACED` | 리포트만 재개: 남은 postClose까지 대기한 뒤 마커 없는 전략만 리포트한다 | 같음 |
 | `DONE` | 없음 | 없음 |
 
 리포트만 재개하는 경로가 쓰는 값:
@@ -163,7 +177,7 @@ SIGTERM이 오면 Spring context가 닫히면서 `SmartLifecycle.stop()`이 phas
 
 - Modulith EPR 재발행 대상은 리스너가 완료되지 않은 publication뿐이다(at-least-once).
 - 중복은 "발송 직후·완료 마킹 전 사망"한 극소수 건으로 한정되므로 별도 대응 없이 문서화만 한다.
-- 실질적인 중복 원인이던 배치 재실행은 사이클별 마커로 막는다. 재개 경로에서 새로 발행되는 리포트·`CycleCompletedEvent`는 사이클당 1회가 보장된다.
+- 실질적인 중복 원인이던 배치 재실행은 전략별 마커로 막는다. 재개 경로에서 새로 발행되는 리포트·`CycleCompletedEvent`는 전략·거래일당 1회가 보장된다.
 
 ## 8. 테스트
 
@@ -179,7 +193,7 @@ SIGTERM이 오면 Spring context가 닫히면서 `SmartLifecycle.stop()`이 phas
   - 종료 인터럽트 시 사용자 알림이 억제되는지 검증한다.
 - persistence(`DataJpaTestBase`):
   - `trading_batch_run` upsert를 검증한다.
-  - `batch_cycle_report` insert가 `cycle_position`과 같은 트랜잭션인지 검증한다.
+  - `trading_batch_report` 마커 insert·조회를 검증한다.
 - `SchedulerLockService.takeOver` 테스트.
 - 로컬 재현 1회:
   1. trading-core를 짧은 대기로 기동한다.
