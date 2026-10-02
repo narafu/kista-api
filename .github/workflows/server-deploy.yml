@@ -39,11 +39,22 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+      # kista-infra 전용 GitHub App의 1시간짜리 설치 토큰 — 장기 PAT 대신(유출돼도 곧 무효, 갱신 불필요)
+      - name: kista-infra 앱 토큰
+        id: infra-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.INFRA_APP_CLIENT_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: narafu
+          repositories: kista-infra
+          permission-contents: write   # state 조회 + repository_dispatch
+          permission-actions: read     # reconcile run 추적
       - name: state 기준 배포 계획
         id: plan
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ steps.infra-token.outputs.token }}
           EVENT: ${{ github.event_name }}
         run: |
           state=$(gh api repos/narafu/kista-infra/contents/state/kista-api.yml -H 'Accept: application/vnd.github.raw')
@@ -174,15 +185,29 @@ jobs:
     environment:
       name: production
     env:
-      GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
       CONFIG: ${{ needs.plan.outputs.config }}
       ROLES: ${{ needs.plan.outputs.roles }}
       FORCE: ${{ github.event.inputs.force || 'false' }}
       REQUEST_ID: kista-api-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # kista-infra 전용 GitHub App의 1시간짜리 설치 토큰 — 장기 PAT 대신(유출돼도 곧 무효, 갱신 불필요)
+      - name: kista-infra 앱 토큰
+        id: infra-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.INFRA_APP_CLIENT_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: narafu
+          repositories: kista-infra
+          permission-contents: write   # state 조회 + repository_dispatch
+          permission-actions: read     # reconcile run 추적
       - name: dispatch
+        env:
+          GH_TOKEN: ${{ steps.infra-token.outputs.token }}
         run: |
           gh api repos/narafu/kista-infra/dispatches -f event_type=deploy-kista-api             -f "client_payload[app]=kista-api" -f "client_payload[config]=$CONFIG" -f "client_payload[roles]=$ROLES"             -f "client_payload[request_id]=$REQUEST_ID" -f "client_payload[force]=$FORCE"
       - name: 서버 적용 대기
+        env:
+          GH_TOKEN: ${{ steps.infra-token.outputs.token }}
         run: bash .github/scripts/wait-reconcile.sh "$REQUEST_ID"

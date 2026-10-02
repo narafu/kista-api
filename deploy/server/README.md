@@ -54,7 +54,7 @@
 
 | Secret | 설명 |
 |--------|------|
-| `INFRA_DISPATCH_TOKEN` | `kista-infra` 대상 fine-grained PAT — Contents read/write(state 조회·dispatch), Actions read(run 추적). 이 레포는 서버 SSH 키를 갖지 않는다 |
+| `INFRA_APP_PRIVATE_KEY` (secret) + `INFRA_APP_CLIENT_ID` (Actions variable) | GitHub App `kista-infra-dispatch`(kista-infra에만 설치, Contents read/write·Actions read) — Actions 변수 `INFRA_APP_CLIENT_ID` + secret `INFRA_APP_PRIVATE_KEY`, 워크플로가 실행마다 `actions/create-github-app-token`으로 1시간짜리 설치 토큰 발급(장기 PAT 없음). 이 레포는 서버 SSH 키를 갖지 않는다 |
 
 `.env`는 이 레포의 Actions가 아니라 `kista-infra` 레포의 배포 워크플로가 관리한다 — `kista-infra`에 GPG로 암호화 커밋된 `secrets/kista-api.env.gpg`를 복호화해 매 배포마다 `/opt/kista-api/.env`를 렌더링·덮어쓴다. 값을 바꾸려면 `kista-infra`의 `scripts/env.sh edit kista-api`로 수정 후 커밋·배포해야 하며, 서버에서 `.env`를 직접 수정해도 다음 kista-infra 배포 시 되돌아간다.
 
