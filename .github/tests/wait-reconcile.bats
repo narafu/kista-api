@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# .github/scripts/wait-reconcile.sh — gh 스텁으로 성공·대체·실패·미발견
+# .github/scripts/wait-reconcile.sh — gh 스텁으로 성공·대체·실패·미발견·시간 초과 이어받기
 
 SCRIPT="$BATS_TEST_DIRNAME/../scripts/wait-reconcile.sh"
 
 setup() {
-  export GH_LOG="$BATS_TEST_TMPDIR/gh.log" PATH="$BATS_TEST_DIRNAME/stub:$PATH" FIND_ATTEMPTS=2 FIND_INTERVAL=0 STUB_RUN_ID=42
+  export GH_LOG="$BATS_TEST_TMPDIR/gh.log" PATH="$BATS_TEST_DIRNAME/stub:$PATH" FIND_ATTEMPTS=2 FIND_INTERVAL=0 STUB_RUN_ID=42 GITHUB_OUTPUT="$BATS_TEST_TMPDIR/out"
 }
 
 @test "성공" {
@@ -35,4 +35,35 @@ setup() {
   STUB_RUN_ID= run bash "$SCRIPT" r
   [ "$status" -eq 1 ]
   [ "$(grep -c 'run list' "$GH_LOG")" -eq 2 ]
+}
+
+@test "WATCH_TIMEOUT 안에 안 끝나면 run_id를 GITHUB_OUTPUT에 남기고 성공" {
+  WATCH_TIMEOUT=1 STUB_WATCH_SLEEP=5 STUB_STATUS=queued run bash "$SCRIPT" r
+  [ "$status" -eq 0 ]
+  grep -qx 'run_id=42' "$GITHUB_OUTPUT"
+}
+
+@test "WATCH_TIMEOUT 안에 끝나면 run_id를 남기지 않음" {
+  WATCH_TIMEOUT=5 run bash "$SCRIPT" r
+  [ "$status" -eq 0 ]
+  [ ! -s "$GITHUB_OUTPUT" ]
+}
+
+@test "RUN_ID가 있으면 탐색 없이 그 run을 대기" {
+  RUN_ID=77 STUB_RUN_ID= run bash "$SCRIPT" r
+  [ "$status" -eq 0 ]
+  ! grep -q 'run list' "$GH_LOG"
+  grep -q 'run watch 77' "$GH_LOG"
+}
+
+@test "WATCH_TIMEOUT이 있어도 완료된 run의 실패는 이어받지 않고 실패" {
+  WATCH_TIMEOUT=5 STUB_WATCH_RC=1 STUB_CONCLUSION=failure run bash "$SCRIPT" r
+  [ "$status" -eq 1 ]
+  [ ! -s "$GITHUB_OUTPUT" ]
+}
+
+@test "WATCH_TIMEOUT 초과 후 status가 진행 중 값이 아니면(조회 실패 등) 이어받지 않고 실패" {
+  WATCH_TIMEOUT=1 STUB_WATCH_SLEEP=5 STUB_STATUS=unknown STUB_CONCLUSION= run bash "$SCRIPT" r
+  [ "$status" -eq 1 ]
+  [ ! -s "$GITHUB_OUTPUT" ]
 }

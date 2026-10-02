@@ -207,7 +207,26 @@ jobs:
           GH_TOKEN: ${{ steps.infra-token.outputs.token }}
         run: |
           gh api repos/narafu/kista-infra/dispatches -f event_type=deploy-kista-api             -f "client_payload[app]=kista-api" -f "client_payload[config]=$CONFIG" -f "client_payload[roles]=$ROLES"             -f "client_payload[request_id]=$REQUEST_ID" -f "client_payload[force]=$FORCE"
+      # 앱 토큰은 1시간이면 만료 — 50분 안에 안 끝나면 run_id를 넘기고 토큰을 재발급해 이어서 대기(job timeout 75분 설계 유지)
       - name: 서버 적용 대기
+        id: wait
         env:
           GH_TOKEN: ${{ steps.infra-token.outputs.token }}
+          WATCH_TIMEOUT: 50m
+        run: bash .github/scripts/wait-reconcile.sh "$REQUEST_ID"
+      - name: kista-infra 앱 토큰 재발급
+        id: infra-token-2
+        if: steps.wait.outputs.run_id != ''
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.INFRA_APP_CLIENT_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: narafu
+          repositories: kista-infra
+          permission-actions: read     # reconcile run 추적
+      - name: 서버 적용 대기 (이어서)
+        if: steps.wait.outputs.run_id != ''
+        env:
+          GH_TOKEN: ${{ steps.infra-token-2.outputs.token }}
+          RUN_ID: ${{ steps.wait.outputs.run_id }}
         run: bash .github/scripts/wait-reconcile.sh "$REQUEST_ID"
