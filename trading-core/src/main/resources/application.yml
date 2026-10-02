@@ -47,6 +47,14 @@ spring:
     redis:
       url: ${REDIS_URL}
 
+# root와 동일 경로 — 공용 SecurityConfig가 /api-docs/**만 permitAll하므로 기본값(/v3/api-docs)은 401. kista-ui fetch:spec이 8081 스펙을 병합
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
 server:
   port: ${SERVER_PORT:8081}
 
