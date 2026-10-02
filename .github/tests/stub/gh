@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# wait-reconcile.bats용 gh 스텁 — STUB_RUN_ID(빈값이면 run 미발견), STUB_CONCLUSION, STUB_WATCH_RC
+# wait-reconcile.bats용 gh 스텁 — STUB_RUN_ID(빈값이면 run 미발견), STUB_CONCLUSION, STUB_WATCH_RC, STUB_NEWER(더 새 같은 앱 run 수)
 echo "gh $*" >> "${GH_LOG:?}"
 case "$1 $2" in
-  "run list") echo "${STUB_RUN_ID:-}" ;;
+  "run list") if [[ "$*" == *startswith* ]]; then echo "${STUB_NEWER:-0}"; else echo "${STUB_RUN_ID:-}"; fi ;;
   "run watch") exit "${STUB_WATCH_RC:-0}" ;;
   "run view") echo "${STUB_CONCLUSION:-success}" ;;
 esac

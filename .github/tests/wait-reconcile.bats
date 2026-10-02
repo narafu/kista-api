@@ -14,10 +14,16 @@ setup() {
   [[ "$output" == *"actions/runs/42"* ]]
 }
 
-@test "cancelled(대체됨)는 생략으로 성공" {
-  STUB_WATCH_RC=1 STUB_CONCLUSION=cancelled run bash "$SCRIPT" r
+@test "cancelled + 같은 앱의 더 새 run이 있으면(대체됨) 생략으로 성공" {
+  STUB_WATCH_RC=1 STUB_CONCLUSION=cancelled STUB_NEWER=1 run bash "$SCRIPT" kista-api-9-1
   [ "$status" -eq 0 ]
   [[ "$output" == *"대체"* ]]
+  grep -q 'startswith("reconcile kista-api ")' "$GH_LOG"
+}
+
+@test "cancelled인데 더 새 run이 없으면(타임아웃·수동 취소) 실패" {
+  STUB_WATCH_RC=1 STUB_CONCLUSION=cancelled STUB_NEWER=0 run bash "$SCRIPT" kista-api-9-1
+  [ "$status" -eq 1 ]
 }
 
 @test "failure는 실패" {

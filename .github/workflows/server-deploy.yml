@@ -165,12 +165,12 @@ jobs:
     name: Deploy (kista-infra reconcile)
     needs: [plan, deploy-checks, verify, build]
     if: >-
-      always() && needs.plan.outputs.deploy == 'true' && github.event.inputs.build_only != 'true'
+      !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.deploy == 'true' && github.event.inputs.build_only != 'true'
       && needs.deploy-checks.result == 'success'
       && contains(fromJSON('["success","skipped"]'), needs.verify.result)
       && contains(fromJSON('["success","skipped"]'), needs.build.result)
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75   # infra reconcile 대기열(앞선 run 최대 30분) + 자기 run 30분 + 여유
     environment:
       name: production
     env:
