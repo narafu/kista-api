@@ -49,6 +49,8 @@ spring:
 
 # root와 동일 경로 — 공용 SecurityConfig가 /api-docs/**만 permitAll하므로 기본값(/v3/api-docs)은 401. kista-ui fetch:spec이 8081 스펙을 병합
 springdoc:
+  # 서버 간 내부 API(X-Internal-Token 전용)는 UI 타입 생성·공개 문서 대상이 아니다 — contract 타입이 UI DTO와 이름 충돌하는 것도 막는다
+  paths-to-exclude: /api/internal/**
   api-docs:
     path: /api-docs
   swagger-ui:
