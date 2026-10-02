@@ -97,7 +97,56 @@ class ProblemDetailMappingsTest {
 
         assertThat(p.getStatus()).isEqualTo(500);
         assertThat(p.getTitle()).isEqualTo("Internal Server Error");
-        assertThat(p.getDetail()).isEqualTo("예기치 않은 오류가 발생했습니다");
+        assertThat(p.getDetail()).isEqualTo("예기치 않은 오류가 발생했습니다.");
         assertThat(reported).containsExactly(ex);
+    }
+
+    @Test
+    void toProblem_withCode_setsCodeProperty() {
+        var p = ProblemDetailMappings.toProblem(
+                new Mapping(HttpStatus.CONFLICT, "Conflict", ErrorCode.MONTH_CLOSED), new IllegalStateException("마감된 달입니다."));
+        assertThat(p.getStatus()).isEqualTo(409);
+        assertThat(p.getDetail()).isEqualTo("마감된 달입니다.");
+        assertThat(p.getProperties()).containsEntry("code", "MONTH_CLOSED");
+    }
+
+    @Test
+    void toProblem_fixedDetail_overridesExceptionMessage() {
+        var p = ProblemDetailMappings.toProblem(
+                new Mapping(HttpStatus.BAD_REQUEST, "Bad Request", null, "요청 형식이 올바르지 않습니다."),
+                new IllegalArgumentException("Failed to convert value of type 'java.lang.String'"));
+        assertThat(p.getDetail()).isEqualTo("요청 형식이 올바르지 않습니다.");
+    }
+
+    @Test
+    void catchAll_mappedWithoutCode_hasNoCodeProperty() {
+        var p = ProblemDetailMappings.catchAll(new IllegalArgumentException("잘못된 값입니다."),
+                ProblemDetailMappings.GENERIC, ex -> {});
+        assertThat(p.getStatus()).isEqualTo(400);
+        assertThat(p.getProperties() == null || !p.getProperties().containsKey("code")).isTrue();
+    }
+
+    @Test
+    void catchAll_securityException_hasAccessDeniedCode() {
+        var p = ProblemDetailMappings.catchAll(new SecurityException("접근 권한이 없습니다."),
+                ProblemDetailMappings.GENERIC, ex -> {});
+        assertThat(p.getStatus()).isEqualTo(403);
+        assertThat(p.getDetail()).isEqualTo("접근 권한이 없습니다.");
+        assertThat(p.getProperties()).containsEntry("code", "ACCESS_DENIED");
+    }
+
+    @Test
+    void catchAll_frameworkException_usesFixedKoreanDetail() {
+        var p = ProblemDetailMappings.catchAll(
+                new java.time.format.DateTimeParseException("Text 'abc' could not be parsed", "abc", 0),
+                ProblemDetailMappings.GENERIC, ex -> {});
+        assertThat(p.getStatus()).isEqualTo(400);
+        assertThat(p.getDetail()).isEqualTo("날짜 형식이 올바르지 않습니다.");
+    }
+
+    @Test
+    void problem_withNullCode_hasNoCodeProperty() {
+        var p = ProblemDetailMappings.problem(HttpStatus.CONFLICT, "Conflict", "충돌입니다.", null);
+        assertThat(p.getProperties() == null || !p.getProperties().containsKey("code")).isTrue();
     }
 }
