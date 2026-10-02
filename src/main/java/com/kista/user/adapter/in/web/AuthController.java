@@ -121,7 +121,7 @@ public class AuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "재신청 성공"),
             @ApiResponse(responseCode = "400", description = "재신청 불가 상태"),
-            @ApiResponse(responseCode = "429", description = "쿨다운 중 — 응답 body에 재신청 가능 시각(ISO-8601) 포함")
+            @ApiResponse(responseCode = "429", description = "쿨다운 중 — 응답 body code=COOLDOWN_ACTIVE, retryAfter에 재신청 가능 시각(ISO-8601) 포함")
     })
     @PostMapping("/approval-requests")
     @ResponseStatus(HttpStatus.NO_CONTENT)

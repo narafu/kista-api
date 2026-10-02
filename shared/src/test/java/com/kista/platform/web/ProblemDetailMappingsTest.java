@@ -3,12 +3,17 @@ package com.kista.platform.web;
 import com.kista.platform.web.ProblemDetailMappings.Mapping;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class ProblemDetailMappingsTest {
 
@@ -148,5 +153,20 @@ class ProblemDetailMappingsTest {
     void problem_withNullCode_hasNoCodeProperty() {
         var p = ProblemDetailMappings.problem(HttpStatus.CONFLICT, "Conflict", "충돌입니다.", null);
         assertThat(p.getProperties() == null || !p.getProperties().containsKey("code")).isTrue();
+    }
+
+    @Test
+    void catchAll_frameworkExceptions_useFixedKoreanDetails() {
+        // 생성자 시그니처가 버전마다 달라 mock 서브클래스로 생성 — resolve()가 클래스 계층을 따라 올라가 GENERIC 매핑을 찾는다
+        Map<Exception, String> expected = Map.of(
+                mock(MissingServletRequestParameterException.class), "필수 요청 값이 누락되었습니다.",
+                mock(MethodArgumentTypeMismatchException.class),     "요청 값의 형식이 올바르지 않습니다.",
+                mock(HttpMessageNotReadableException.class),         "요청 형식이 올바르지 않습니다.",
+                mock(NoResourceFoundException.class),                "요청한 경로를 찾을 수 없습니다.");
+        expected.forEach((ex, detail) -> {
+            var p = ProblemDetailMappings.catchAll(ex, ProblemDetailMappings.GENERIC, e -> {});
+            assertThat(p.getDetail()).as(ex.getClass().getSimpleName()).isEqualTo(detail);
+            assertThat(p.getStatus()).isBetween(400, 404);
+        });
     }
 }

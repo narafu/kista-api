@@ -4,6 +4,6 @@ package com.kista.trading.domain.model;
 // 보고는 ManualTradingService가 TradingErrorEvent로 이미 수행하므로 핸들러 전용 매핑으로 처리해 catch-all 재보고를 피한다
 public class ManualTradingFailedException extends ManualTradingException {
     public ManualTradingFailedException(Throwable cause) {
-        super("바로주문 처리 중 예상 밖 오류: " + cause.getMessage(), cause);
+        super("바로주문 처리 중 예상 밖 오류가 발생했습니다.", cause); // 원인 메시지는 cause로만 보존 — 메시지가 응답 detail로 새지 않게
     }
 }

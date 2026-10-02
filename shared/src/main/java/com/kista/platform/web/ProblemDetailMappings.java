@@ -97,9 +97,9 @@ public final class ProblemDetailMappings {
 
     // 매핑 → ProblemDetail — fixedDetail 우선(원본 메시지는 debug 로그), code 있으면 확장 프로퍼티로 싣는다
     public static ProblemDetail toProblem(Mapping m, Exception ex) {
-        if (m.fixedDetail() != null) log.debug("고정 detail로 대체된 예외 메시지: {}", ex.getMessage());
-        String detail = m.fixedDetail() != null ? m.fixedDetail() : ex.getMessage();
-        return problem(m.status(), m.title(), detail, m.code());
+        if (m.fixedDetail() == null) return problem(m.status(), m.title(), ex.getMessage(), m.code());
+        log.debug("고정 detail로 대체된 예외 메시지: {}", ex.getMessage());
+        return problem(m.status(), m.title(), m.fixedDetail(), m.code());
     }
 
     // ProblemDetail 생성 헬퍼 — 모든 핸들러에서 반복되는 3줄 보일러플레이트 제거
