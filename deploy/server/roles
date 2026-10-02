@@ -1,0 +1,4 @@
+# reconcile 적용 순서 — trading 먼저(kista-api가 trading 내부 API 호출), kista-api가 scheduler보다 먼저(user_notify_profile 발행)
+kista-trading
+kista-api
+kista-scheduler
