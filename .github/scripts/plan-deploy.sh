@@ -6,6 +6,8 @@
 #   - target이 state SHA의 조상(옛 run 재실행) → state 유지
 #   - 그 외 → state..target diff를 detect-deploy-scope.sh로 분류
 set -euo pipefail
+# pick은 $(...) 서브셸에서 돈다 — 그 안의 git diff·범위 판정 실패가 "변경 없음"으로 삼켜지지 않게 errexit를 물려준다
+shopt -s inherit_errexit
 
 target=$1
 scope_script="$(dirname "${BASH_SOURCE[0]}")/detect-deploy-scope.sh"
@@ -23,11 +25,14 @@ trap 'rm -f "$verify_file"' EXIT
 echo false > "$verify_file"
 # $1 기준 SHA, $2 판정할 플래그 키(config|api|scheduler|trading) → target 또는 기준 SHA 출력
 pick() {
-  local base=$1 key=$2 flags
+  local base=$1 key=$2 flags rc=0
   if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
     echo true > "$verify_file"; echo "$target"; return
   fi
-  if git merge-base --is-ancestor "$target" "$base"; then echo "$base"; return; fi
+  # exit 1 = 조상 아님, 그 외(128 등) = 오류 — if로 감싸면 둘이 구분되지 않는다
+  git merge-base --is-ancestor "$target" "$base" || rc=$?
+  if [ "$rc" -eq 0 ]; then echo "$base"; return; fi
+  if [ "$rc" -ne 1 ]; then echo "::error::merge-base 실패(exit $rc): $target vs $base" >&2; return "$rc"; fi
   flags=$(git diff --name-only "$base" "$target" | bash "$scope_script")
   if grep -q '^verify=true' <<<"$flags"; then echo true > "$verify_file"; fi
   if grep -q "^${key}=true" <<<"$flags"; then echo "$target"; else echo "$base"; fi

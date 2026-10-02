@@ -69,3 +69,17 @@ plan() { bash "$SCRIPTS/plan-deploy.sh" "$1" 2>/dev/null | tr '\n' ' '; }
   run bash -c "printf '' | bash '$SCRIPTS/plan-deploy.sh' '$C3'"
   [ "$status" -ne 0 ]
 }
+
+@test "plan: target이 히스토리에 없으면(merge-base 오류) '변경 없음'이 아니라 실패" {
+  make_repo
+  run bash -c "printf 'config: %s\nroles:\n  kista-trading: %s\n' '$C3' '$C3' | bash '$SCRIPTS/plan-deploy.sh' deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+  [ "$status" -ne 0 ]
+}
+
+@test "plan: 범위 판정 스크립트가 실패하면 '변경 없음'이 아니라 실패" {
+  make_repo
+  mkdir -p "$BATS_TEST_TMPDIR/s" && cp "$SCRIPTS/plan-deploy.sh" "$BATS_TEST_TMPDIR/s/"
+  printf 'exit 3\n' > "$BATS_TEST_TMPDIR/s/detect-deploy-scope.sh"
+  run bash -c "printf 'config: %s\nroles:\n  kista-trading: %s\n' '$C1' '$C1' | bash '$BATS_TEST_TMPDIR/s/plan-deploy.sh' '$C3'"
+  [ "$status" -ne 0 ]
+}

@@ -8,7 +8,9 @@
 
 ```bash
 cd /opt/kista-api
-# (docker compose는 KISTA_API_IMAGE 미설정 시 interpolation 오류 — 조회는 plain docker 사용)
+# (docker compose는 KISTA_API_IMAGE·KISTA_SCHEDULER_IMAGE·KISTA_TRADING_IMAGE 중 하나라도 미설정이면 interpolation 오류 — 조회는 plain docker 사용.
+#  reconcile 전환 후 compose가 꼭 필요하면 reconcile.sh와 같은 인자로(/opt/kista-api에서):
+#  docker compose -p kista-api --project-directory . -f current/docker-compose.yml --env-file .env --env-file current/images.env ...)
 docker logs kista-trading 2>&1 | grep -i flyway | tail -20   # 예상: ERROR 'Schema "public" has version 23, but no migration could be resolved' — 옛 이력 22행이 future로 무시돼 기동은 정상(2026-09-21 운영 로그로 확인됨)
 docker exec kista-postgres psql -U kista -d kistadb -c "SELECT version, type, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 3"
 # event_publication 분류 — 어느 쪽에도 안 걸리는 listener_id가 있으면 01-forward.sql 정규식을 보강
@@ -71,7 +73,7 @@ docker ps --format '{{.Names}} {{.Image}} {{.Status}}'                       # �
 ## 2. 컷오버
 
 1. **이미지 빌드(배포 없이)**: GitHub Actions → Server Deploy → Run workflow → 브랜치 `release/schema-reorg`, `build_only=true`. 산출 이미지 태그(`ghcr.io/<repo>:<sha>`)를 메모(`NEW_IMAGE`).
-2. 서버에서 전 서비스 정지: `docker stop kista-trading kista-scheduler kista-api` (compose 대신 plain docker — KISTA_API_IMAGE 불필요)
+2. 서버에서 전 서비스 정지: `docker stop kista-trading kista-scheduler kista-api` (compose 대신 plain docker — 이미지 변수 3개 불필요)
 3. 직전 백업(원본 보존): `docker exec kista-postgres pg_dump -U kista kistadb -Fc > /opt/kista-api/pre-reorg-$(date +%Y%m%d-%H%M).dump` (크기 확인, 0바이트면 중단)
 4. 정방향 SQL(리허설과 동일, 트랜잭션 안에서 검증 후 COMMIT):
    ```bash
@@ -87,7 +89,7 @@ docker ps --format '{{.Names}} {{.Image}} {{.Status}}'                       # �
    SPRING_FLYWAY_BASELINE_ON_MIGRATE=true
    SPRING_FLYWAY_BASELINE_VERSION=1
    ```
-   `docker-compose.yml`은 `release/schema-reorg`의 `deploy/server/docker-compose.yml`로 교체하고 `export KISTA_API_IMAGE=$NEW_IMAGE` 후 **순서대로** 한 서비스씩 기동·헬스 확인:
+   `docker-compose.yml`은 `release/schema-reorg`의 `deploy/server/docker-compose.yml`로 교체하고 `export KISTA_API_IMAGE=$NEW_IMAGE KISTA_SCHEDULER_IMAGE=$NEW_IMAGE KISTA_TRADING_IMAGE=$NEW_IMAGE`(compose가 셋 다 필수) 후 **순서대로** 한 서비스씩 기동·헬스 확인:
    `docker compose up -d --no-deps kista-api` → healthy 대기 → `kista-trading` → `kista-scheduler`.
    (kista-api와 kista-scheduler는 같은 root 이력 테이블을 쓴다 — 동시에 띄우면 baseline이 경합하므로 반드시 순차 기동.)
 6. baseline 확인:
