@@ -75,9 +75,9 @@
 
 ### 서버(OCI) 운영 모니터링
 ```bash
-# 운영 로그 실시간 조회 (SSH 접속 후, /opt/kista-api 또는 /opt/kista-ui에서)
-docker compose logs -f kista-api                                # kista-api 운영 로그 (kista-scheduler·kista-trading도 같은 방식)
-docker compose logs -f kista-ui                                 # kista-ui 운영 로그
+# 운영 로그 실시간 조회 (SSH 접속 후, 아무 디렉토리) — 서버 루트엔 compose 파일이 없다(reconcile이 releases/<id>/ 사용)
+docker logs -f kista-api                                        # kista-api 운영 로그 (kista-scheduler·kista-trading도 같은 방식)
+docker logs -f kista-ui                                         # kista-ui 운영 로그
 
 # 헬스 체크 / 배포 상태
 curl https://api.kista-app.com/actuator/health
