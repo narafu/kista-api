@@ -36,7 +36,7 @@ import static com.kista.platform.web.ProblemDetailMappings.problem;
 // AppErrorRaisedEvent(sharedkernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream(stream:app.error)으로 root에 push한다.
 // trading-core는 root를 호출하지 않는다(프로세스 간 단방향 root→trading-core).
 //
-// ManualTradingException이 BrokerApiException을 cause로 담는 경로는 이 클래스가 에러 로그를 남기지 않는다 —
+// ManualTradingFailedException(바로주문 비증권사 실패, 500)은 이 클래스가 에러 로그를 남기지 않는다 —
 // ManualTradingService가 던지기 전에 TradingErrorEvent를 발행하고 TradingAlertNotifier → TradingNotifyAdapter.notifyError가
 // AppErrorRaisedEvent를 함께 발행해 같은 스트림으로 저장되므로 예외 처리기와 무관한 별도 경로로 이미 보장된다.
 //
