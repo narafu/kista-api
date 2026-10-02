@@ -73,6 +73,8 @@ class TradingService {
 
     private void runCloseBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         LocalDate today = LocalDate.now(TimeZones.KST);
+        // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
+        checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.STARTED);
         // 아래 각 조기 반환은 정상 흐름(휴장·시작 전·계산 skip 등)이라 예외/오류 알림 대상이 아니지만,
         // "리포트가 안 왔는데 원인이 안 보이는" 재발 시 로그만으로 중단 지점을 특정하기 위해 사유를 남긴다.
         // 조기 반환도 DONE 기록 — "체크포인트 행 없음 = 미실행"이 성립해야 재개 판정이 cron 누락을 구분한다
@@ -150,8 +152,10 @@ class TradingService {
     void resumeCloseReport(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         runState.track(() -> {
             LocalDate today = LocalDate.now(TimeZones.KST);
+            // 원래 배치의 리포트 대상(당일 주문이 있는 전략)만 — PRIVACY 기준 미수신·장중 신규 전략은 원래도 리포트하지 않는다
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
                     .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
+                    .filter(ctx -> !orderPort.findByStrategyId(ctx.strategy().id(), today, today).isEmpty())
                     .toList();
             log.info("마감 리포트 재개 — 대상 {}건 (전체 {}건)", targets.size(), contexts.size());
 
@@ -251,6 +255,8 @@ class TradingService {
 
     private void runOpenBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         LocalDate tradeDate = DstInfo.nextTradeDate(); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 KST 거래일 (자정 이후 재개면 당일)
+        // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
+        checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
         // 조기 반환도 DONE 기록 — "체크포인트 행 없음 = 미실행"이 성립해야 재개 판정이 cron 누락을 구분한다
         if (contexts.isEmpty()) {
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);

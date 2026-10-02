@@ -40,8 +40,12 @@ public class TradingBatchRunState {
     }
 
     // 배치 대기 — 종료 요청 상태면 대기 없이 즉시 InterruptedException
+    // 인터럽트 플래그는 지운다 — 남겨두면 이어지는 관리자 알림(텔레그램 HTTP)이 VT 소켓 인터럽트로 실패한다
     public void sleep(Duration duration) throws InterruptedException {
-        if (stopping) throw new InterruptedException("종료 요청 — 대기 중단");
+        if (stopping) {
+            Thread.interrupted();
+            throw new InterruptedException("종료 요청 — 대기 중단");
+        }
         long ms = duration.toMillis();
         if (ms > 0) Thread.sleep(ms);
     }
@@ -71,9 +75,11 @@ public class TradingBatchRunState {
         }
     }
 
-    private boolean register() {
+    // 종료 요청 후에는 새 배치를 시작하지 않는다 (재개 스레드가 등록 전에 종료 요청을 받은 경우)
+    private boolean register() throws InterruptedException {
         lock.lock();
         try {
+            if (stopping) throw new InterruptedException("종료 요청 — 배치 시작 안 함");
             if (batchThread != null) {
                 log.warn("매매 배치 추적 슬롯 사용 중 — 이 배치는 종료 보호 없이 실행");
                 return false;
@@ -97,10 +103,15 @@ public class TradingBatchRunState {
     }
 
     // 추적 중인 배치 스레드에서만 임계구역 상태 변경 — 다른 스레드 호출은 무시(false)
-    private boolean setCritical(boolean value) {
+    // 진입은 requestStop과 같은 락 안에서 stopping을 확인 — 대기 통과 직후 종료 요청이 와도 접수·리포트를 새로 시작하지 않는다
+    private boolean setCritical(boolean value) throws InterruptedException {
         lock.lock();
         try {
             if (batchThread != Thread.currentThread()) return false;
+            if (value && stopping) {
+                Thread.interrupted();
+                throw new InterruptedException("종료 요청 — 임계구역 진입 안 함");
+            }
             critical = value;
             if (!value) criticalExited.signalAll();
             return true;

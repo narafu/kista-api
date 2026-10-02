@@ -2020,6 +2020,7 @@ class TradingServiceTest {
 
         LocalDate today = LocalDate.now(TimeZones.KST);
         InOrder inOrder = inOrder(batchRunPort, brokerOrderPort, kisExecutionPort);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.STARTED);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLANNED);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLACING);
         inOrder.verify(brokerOrderPort).place(any(), eq(ACCOUNT_REF));
@@ -2034,8 +2035,23 @@ class TradingServiceTest {
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.DONE);
+        // 시작 기록이 이전 수동 실행의 DONE을 덮어써야 중단 시 재개 판정이 가려지지 않는다
+        InOrder inOrder = inOrder(batchRunPort);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.STARTED);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.DONE);
         verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.PLANNED));
+    }
+
+    @Test
+    void placeOpenOrders_holiday_recordsStartedThenDone() throws InterruptedException {
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        LocalDate tradeDate = DstInfo.nextTradeDate();
+        InOrder inOrder = inOrder(batchRunPort);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
     }
 
     @Test
@@ -2045,8 +2061,11 @@ class TradingServiceTest {
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLANNED, null, null, null);
-        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
-        runState.requestStop(Duration.ZERO); // 종료 요청 상태 — 대기 진입 즉시 중단
+        // 계획 도중(비임계 구간) 종료 요청 수신 — 이후 주문 시각 대기 진입 즉시 중단
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenAnswer(invocation -> {
+            runState.requestStop(Duration.ZERO);
+            return List.of(alreadyPlanned);
+        });
         DstInfo futureOrder = new DstInfo(true, Instant.now().plusSeconds(3600),
                 Instant.now().plusSeconds(7200), Instant.now());
 
@@ -2069,10 +2088,21 @@ class TradingServiceTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle pendingCycle = new StrategyCycle(UUID.randomUUID(), pendingStrategy.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        // 세 번째 전략 — 당일 주문 없음(원래 배치의 리포트 대상 아님: PRIVACY 기준 미수신·장중 신규 등)
+        Strategy idleStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle idleCycle = new StrategyCycle(UUID.randomUUID(), idleStrategy.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         BatchContext reported = new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER);
         BatchContext pending = new BatchContext(pendingStrategy, pendingCycle, ACCOUNT, USER);
+        BatchContext idle = new BatchContext(idleStrategy, idleCycle, ACCOUNT, USER);
         when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(true);
         when(batchRunPort.isReported(today, pendingStrategy.id())).thenReturn(false);
+        when(batchRunPort.isReported(today, idleStrategy.id())).thenReturn(false);
+        Order pendingOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), pendingCycle.id(), today, StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLACED, "ORD-9", null, null);
+        when(orderPort.findByStrategyId(pendingStrategy.id(), today, today)).thenReturn(List.of(pendingOrder));
+        when(orderPort.findByStrategyId(idleStrategy.id(), today, today)).thenReturn(List.of());
         when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(pendingStrategy.id())).thenReturn(Optional.of(new CyclePosition(
@@ -2080,12 +2110,13 @@ class TradingServiceTest {
         when(orderPort.findPlacedByCycleAndDate(pendingCycle.id(), today)).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
 
-        service.resumeCloseReport(List.of(reported, pending), PAST_DST);
+        service.resumeCloseReport(List.of(reported, pending, idle), PAST_DST);
 
         verify(kisExecutionPort, times(1)).getExecutions(any(), any(), any(), eq(ACCOUNT_REF)); // pending 1건만
         verify(cycleHistoryPort).save(argThat(p -> p.strategyCycleId().equals(pendingCycle.id())));
         verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(STRATEGY_CYCLE.id())));
         verify(cycleHistoryPort, never()).findLatestOneByStrategyId(STRATEGY.id());
+        verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(idleCycle.id())));
         verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
     }
 }

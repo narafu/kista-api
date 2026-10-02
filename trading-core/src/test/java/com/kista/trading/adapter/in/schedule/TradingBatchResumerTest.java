@@ -144,4 +144,22 @@ class TradingBatchResumerTest {
 
         verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("boom")));
     }
+
+    @Test
+    void close_started_beforeCutoff_resumesFullBatch() throws Exception {
+        phase(TradingBatchJob.CLOSE, WED, TradingBatchPhase.STARTED); // 수동 DONE을 덮어쓴 cron 시작 기록
+
+        resumer.resume(kst(10, 7, 4, 40));
+
+        verify(closeScheduler).resume();
+    }
+
+    @Test
+    void open_started_resumes() throws Exception {
+        phase(TradingBatchJob.OPEN, LocalDate.of(2026, 10, 6), TradingBatchPhase.STARTED);
+
+        resumer.resume(kst(10, 5, 23, 0));
+
+        verify(openScheduler).resume();
+    }
 }
