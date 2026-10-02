@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
 # 변경 파일 경로 목록(stdin) → 배포 범위 플래그(stdout, key=value 한 줄씩)
 #   verify    : 코드·테스트·빌드 입력이 바뀜 → 전체 테스트 실행
-#   api       : app.jar 산출물이 바뀜 → kista-api 배포
-#   scheduler : app.jar 산출물이 바뀜 → kista-scheduler 배포 (kista-api와 같은 jar, SCHEDULER_ENABLED=true만 다름)
-#   trading   : trading-core.jar 산출물이 바뀜 → kista-trading 배포
+#   config    : compose·Caddy·reconcile 계약·hook이 바뀜 → 이미지 재빌드 없이 kista-infra가 config SHA로 재적용
+#               (compose가 영향받는 role만 재생성, Caddy만이면 reload만)
+#   api       : app.jar 산출물이 바뀜 → kista-api 이미지 교체
+#   scheduler : app.jar 산출물이 바뀜 → kista-scheduler 이미지 교체 (kista-api와 같은 jar, SCHEDULER_ENABLED=true만 다름)
+#   trading   : trading-core.jar 산출물이 바뀜 → kista-trading 이미지 교체
 # 스케쥴러 전용 빈(@ConditionalOnProperty scheduler.enabled — adapter/in/schedule/* 와 AdminSchedulerController)은
-# kista-api role에 아예 등록되지 않으므로 그 파일만 바뀐 커밋은 scheduler만 배포한다.
-# 테스트 전용 경로는 jar에 들어가지 않으므로 verify만 켠다. 판정 불가한 공용 입력은 전부 켠다.
+# kista-api role에 아예 등록되지 않으므로 그 파일만 바뀐 커밋은 scheduler만 교체한다.
+# 테스트 전용 경로는 jar에 들어가지 않으므로 verify만 켠다. 워크플로·배포 판정 스크립트·bats는 deploy-checks 잡이 매번 검증하므로 아무것도 켜지 않는다.
 set -euo pipefail
 
 verify=false
+config=false
 api=false
 scheduler=false
 trading=false
 
 while IFS= read -r f; do
   case "$f" in
-    # 테스트 소스(배포 스크립트 bats 포함) — 산출물 무관, 검증만
-    src/test/*|src/testFixtures/*|*/src/test/*|*/src/testFixtures/*|.github/tests/*)
+    # 테스트 소스 — 산출물 무관, 검증만
+    src/test/*|src/testFixtures/*|*/src/test/*|*/src/testFixtures/*)
       verify=true ;;
     # trading-core.jar 전용
     trading-core/src/main/*)
@@ -32,18 +35,20 @@ while IFS= read -r f; do
     # 그 외 app.jar — 스케쥴러가 서비스·어댑터를 그대로 호출하므로 둘 다
     src/main/*)
       verify=true; api=true; scheduler=true ;;
-    # Caddy 라우팅 스니펫 — 어느 role 배포든 caddy reload를 수행하므로 재기동 부담이 가장 작은 api로 싣는다.
-    # verify는 CaddyRoutingTest가 이 파일의 regex를 컨트롤러 경로와 대조하기 때문
+    # Caddy 라우팅 스니펫 — verify는 CaddyRoutingTest가 이 파일의 regex를 컨트롤러 경로와 대조하기 때문
     deploy/server/caddy/*)
-      verify=true; api=true ;;
-    # 양쪽 jar에 들어가거나 3역할이 공유하는 입력 — 전부.
-    # deploy/ 아래는 compose 파일·원격 배포 스크립트(bin)만 해당 — case 패턴의 *는 /도 매치하므로 deploy/*로 쓰면 런북·대시보드 문서 수정까지 3역할을 재기동한다
-    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore|deploy/server/docker-compose.yml|deploy/server/bin/*|.github/scripts/*|.github/actions/*|.github/workflows/server-deploy.yml|.github/workflows/_deploy-role.yml)
+      verify=true; config=true ;;
+    # reconcile bundle·hook — 이미지 무관
+    deploy/server/docker-compose.yml|deploy/server/roles|deploy/server/readiness|deploy/server/required-env|deploy/hooks/*)
+      config=true ;;
+    # 양쪽 jar에 들어가는 빌드 입력 — 전부
+    shared/src/main/*|shared/build.gradle.kts|trading-core/build.gradle.kts|build.gradle.kts|settings.gradle.kts|gradle.properties|gradle/*|gradlew|gradlew.bat|lombok.config|Dockerfile|.dockerignore)
       verify=true; api=true; scheduler=true; trading=true ;;
   esac
 done
 
 echo "verify=$verify"
+echo "config=$config"
 echo "api=$api"
 echo "scheduler=$scheduler"
 echo "trading=$trading"

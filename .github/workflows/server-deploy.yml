@@ -1,5 +1,9 @@
 name: Server Deploy
 
+# 배포 = kista-infra에 목표 상태(config SHA + role별 이미지 SHA)를 dispatch하고 서버 적용 결과까지 대기.
+# 판정은 .github/scripts(bats로 검증), 서버 적용·헬스 게이트·롤백은 kista-infra reconcile.yml + deploy/bin/reconcile.sh.
+# 설계: kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md
+
 on:
   push:
     branches:
@@ -7,11 +11,11 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: '매매 시간대 가드를 무시하고 강제 배포'
+        description: 'pre-apply hook(EPR 고아 검사) 생략'
         required: false
         default: 'false'
       build_only:
-        description: '이미지 빌드·푸시만 하고 서버 배포는 건너뜀 (수동 SSH 런북용)'
+        description: '이미지 빌드·푸시만 하고 배포 요청은 건너뜀'
         required: false
         default: 'false'
 
@@ -20,45 +24,36 @@ permissions:
   packages: write
 
 jobs:
-  # 변경 경로로 배포 범위 판정 — 기준점은 직전 push가 아니라 서버에서 각 role이 "지금 실행 중인" 이미지 SHA.
-  # 직전 push 기준이면 가드 차단·헬스 롤백으로 배포가 빠진 커밋을 다음 push가 영영 놓친다(조용한 드리프트).
-  # 판정 불가(수동 실행·컨테이너 없음·SHA가 히스토리에 없음)면 그 role은 true, 실행 중인 SHA가 더 새것이면 false
-  changes:
-    name: Detect Changes
+  # 기준점 = kista-infra state/kista-api.yml(마지막 서버 적용 성공 상태). 직전 push 기준이면 실패·생략된 커밋을 영영 놓친다.
+  # 수동 실행은 state SHA를 0으로 바꿔 "히스토리에 없음 → target"으로 config·전 role을 이 커밋으로 판정
+  plan:
+    name: Plan
     runs-on: ubuntu-latest
     outputs:
-      verify: ${{ steps.scope.outputs.verify }}
-      api: ${{ steps.scope.outputs.api }}
-      scheduler: ${{ steps.scope.outputs.scheduler }}
-      trading: ${{ steps.scope.outputs.trading }}
+      verify: ${{ steps.plan.outputs.verify }}
+      build: ${{ steps.plan.outputs.build }}
+      deploy: ${{ steps.plan.outputs.deploy }}
+      config: ${{ steps.plan.outputs.config }}
+      roles: ${{ steps.plan.outputs.roles }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/ssh-setup
-        with:
-          ssh-key: ${{ secrets.SERVER_SSH_KEY }}
-          host: ${{ secrets.SERVER_HOST }}
-          port: ${{ secrets.SERVER_SSH_PORT || '22' }}
-          host-keys: ${{ secrets.SERVER_SSH_HOST_KEYS }}
-          user: ${{ secrets.SERVER_USER }}
-      - name: Classify changed paths per role
-        id: scope
+      - name: state 기준 배포 계획
+        id: plan
+        shell: bash
         env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
           EVENT: ${{ github.event_name }}
         run: |
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            printf 'verify=true\napi=true\nscheduler=true\ntrading=true\n' | tee -a "$GITHUB_OUTPUT"
-            exit 0
+          state=$(gh api repos/narafu/kista-infra/contents/state/kista-api.yml -H 'Accept: application/vnd.github.raw')
+          if [ "$EVENT" = workflow_dispatch ]; then
+            state=$(sed -E 's/^(config|  [a-z-]+): *[0-9a-f]+$/\1: 0000000000000000000000000000000000000000/' <<<"$state")
           fi
-          # SSH 실패·컨테이너 부재는 빈 입력 → plan-deploy.sh가 해당 role을 배포로 판정.
-          # 파이프로 tee에 바로 넘기지 않는다 — 기본 셸(bash -e)은 pipefail이 없어 plan-deploy.sh 실패가 tee 성공에 가려
-          # 출력 없이 초록불이 되고, 모든 배포가 조용히 생략된다
-          inspect=$(remote "docker inspect -f '{{.Name}} {{.Config.Image}}' kista-api kista-scheduler kista-trading" 2>/dev/null || true)
-          plan=$(bash .github/scripts/plan-deploy.sh "$GITHUB_SHA" <<<"$inspect")
+          plan=$(bash .github/scripts/plan-deploy.sh "$GITHUB_SHA" <<<"$state")
           echo "$plan" | tee -a "$GITHUB_OUTPUT"
 
-  # 배포 스크립트 정적 분석·단위 테스트 + 마이그레이션 안전 검사 — 서버를 건드리는 모든 스크립트가 여길 통과해야 이미지를 만든다
+  # 배포 판정 스크립트·hook 정적 분석·단위 테스트 + 마이그레이션 안전 검사 — 통과해야 이미지를 만들고 배포 요청을 보낸다
   deploy-checks:
     name: Deploy Scripts & Migrations
     runs-on: ubuntu-latest
@@ -67,7 +62,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: shellcheck
-        run: shellcheck .github/scripts/*.sh deploy/server/bin/*.sh .github/tests/stub/docker
+        run: shellcheck .github/scripts/*.sh deploy/hooks/*.sh .github/tests/stub/gh
       - name: bats
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq bats >/dev/null
@@ -79,8 +74,8 @@ jobs:
 
   verify:
     name: Full Test Suite
-    needs: changes
-    if: needs.changes.outputs.verify == 'true'
+    needs: plan
+    if: needs.plan.outputs.verify == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -130,9 +125,9 @@ jobs:
     # kista-ui가 같은 구조(x86 + QEMU)에서 빌드 워커 SIGILL 크래시·무한 대기를 겪어 선제 적용.
     # 주의: 레포를 private으로 바꾸면 이 러너는 유료/미할당이라 job이 시작조차 안 되고 무한 대기한다.
     runs-on: ubuntu-24.04-arm
-    # verify(테스트 ~4분)와 병렬로 빌드 — 배포 잡이 verify 성공을 따로 기다리므로 테스트 실패 이미지는 push돼도 배포되지 않는다
-    needs: [changes, deploy-checks]
-    if: needs.changes.outputs.api == 'true' || needs.changes.outputs.scheduler == 'true' || needs.changes.outputs.trading == 'true'
+    # verify(테스트 ~4분)와 병렬로 빌드 — deploy 잡이 verify 성공을 따로 기다리므로 테스트 실패 이미지는 push돼도 배포되지 않는다
+    needs: [plan, deploy-checks]
+    if: needs.plan.outputs.build == 'true'
     outputs:
       image: ${{ steps.image.outputs.image }}
     steps:
@@ -164,40 +159,30 @@ jobs:
           cache-to: type=gha,mode=max
           tags: ${{ steps.image.outputs.image }}
 
-  deploy-api:
-    name: Deploy API
-    needs: [changes, verify, build]
-    if: needs.changes.outputs.api == 'true' && github.event.inputs.build_only != 'true'
-    uses: ./.github/workflows/_deploy-role.yml
-    with:
-      image: ${{ needs.build.outputs.image }}
-      service: kista-api
-      apply_trading_guard: false
-      force: ${{ github.event.inputs.force || 'false' }}
-    secrets: inherit
-
-  deploy-scheduler:
-    name: Deploy Scheduler
-    needs: [changes, verify, build]
-    if: needs.changes.outputs.scheduler == 'true' && github.event.inputs.build_only != 'true'   # kista-api와 같은 app.jar이지만 스케쥴러 전용 빈만 바뀐 경우는 이 잡만 실행
-    uses: ./.github/workflows/_deploy-role.yml
-    with:
-      image: ${{ needs.build.outputs.image }}
-      service: kista-scheduler
-      epr_schema: public       # root event_publication 재발행 소유
-      apply_trading_guard: false
-      force: ${{ github.event.inputs.force || 'false' }}
-    secrets: inherit
-
-  deploy-trading:
-    name: Deploy Trading
-    needs: [changes, verify, build]
-    if: needs.changes.outputs.trading == 'true' && github.event.inputs.build_only != 'true'
-    uses: ./.github/workflows/_deploy-role.yml
-    with:
-      image: ${{ needs.build.outputs.image }}
-      service: kista-trading
-      epr_schema: trading      # trading event_publication 재발행 소유
-      apply_trading_guard: true
-      force: ${{ github.event.inputs.force || 'false' }}
-    secrets: inherit
+  # 서버 적용은 kista-infra Reconcile App이 한다(검증·신선도 병합·EPR hook·reconcile.sh·state 커밋). 여기선 요청 후 결과까지 대기 —
+  # 커밋의 초록불 = 서버 적용·헬스 게이트 통과. 대기 중 더 새 요청이 대체하면(취소) 생략으로 성공 처리
+  deploy:
+    name: Deploy (kista-infra reconcile)
+    needs: [plan, deploy-checks, verify, build]
+    if: >-
+      always() && needs.plan.outputs.deploy == 'true' && github.event.inputs.build_only != 'true'
+      && needs.deploy-checks.result == 'success'
+      && contains(fromJSON('["success","skipped"]'), needs.verify.result)
+      && contains(fromJSON('["success","skipped"]'), needs.build.result)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment:
+      name: production
+    env:
+      GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+      CONFIG: ${{ needs.plan.outputs.config }}
+      ROLES: ${{ needs.plan.outputs.roles }}
+      FORCE: ${{ github.event.inputs.force || 'false' }}
+      REQUEST_ID: kista-api-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: dispatch
+        run: |
+          gh api repos/narafu/kista-infra/dispatches -f event_type=deploy-kista-api             -f "client_payload[app]=kista-api" -f "client_payload[config]=$CONFIG" -f "client_payload[roles]=$ROLES"             -f "client_payload[request_id]=$REQUEST_ID" -f "client_payload[force]=$FORCE"
+      - name: 서버 적용 대기
+        run: bash .github/scripts/wait-reconcile.sh "$REQUEST_ID"

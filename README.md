@@ -112,10 +112,12 @@ graph TB
         Grafana["메트릭 추세 관찰"]
     end
 
-    RepoUI -->|"main push → 이미지 빌드·GHCR push<br/>→ SSH 배포"| UIApp
-    RepoAPI -->|"main push → 변경 경로 판정<br/>→ 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ deploy-api 잡 (app.jar 변경 시)"| APIApp
-    RepoAPI -->|"deploy-scheduler 잡<br/>(스케쥴러 전용 코드 또는 app.jar 공용 코드 변경 시)"| SchedApp
-    RepoAPI -->|"deploy-trading 잡<br/>(trading-core 변경 시, 매매 시간대 가드)"| TradingApp
+    RepoUI -->|"main push → 이미지 빌드·GHCR push<br/>→ 배포 요청(dispatch)"| RepoInfra
+    RepoAPI -->|"main push → state 기준 role별 변경 판정<br/>→ 전체 테스트(ArchUnit 포함)<br/>→ 이미지 빌드·GHCR push<br/>→ 배포 요청(dispatch)·적용 완료 대기"| RepoInfra
+    RepoInfra -->|"reconcile: role 순서 교체·헬스 게이트·롤백<br/>→ 성공 시 state 커밋"| APIApp
+    RepoInfra --> SchedApp
+    RepoInfra --> TradingApp
+    RepoInfra --> UIApp
     RepoInfra -->|"Caddy·Postgres·Redis·백업 cron 소유"| Caddy
     Caddy --> APIApp
     Caddy -->|"/api/admin/scheduler/*"| SchedApp
@@ -135,6 +137,6 @@ graph TB
 ```
 
 - `kista-infra`(private) 레포가 Caddy(양 도메인 리버스 프록시 — API 도메인 라우팅 규칙만은 이 레포 `deploy/server/caddy/kista-api.caddy`가 소유하고 `CaddyRoutingTest`로 컨트롤러 경로와 대조)·자체 호스팅 PostgreSQL·Redis·백업 cron을 전담하며, kista-api·kista-ui와 같은 OCI 인스턴스에서 Docker Compose로 운영된다.
-- `kista-api`·`kista-scheduler`·`kista-trading`은 **같은 GHCR 이미지**(arm64 네이티브 러너에서 빌드)를 띄운다 — api/scheduler는 `app.jar`를 `SCHEDULER_ENABLED`로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`를 쓴다. 매매 시간대 배포 가드는 `deploy-trading` 잡에만 있고 API·스케쥴러 배포는 시간대 제약이 없다. API 크래시·OOM·요청경로 버그가 매매 배치를 건드리지 않는다 (상세 → `docs/agents/docker-infra.md`).
+- `kista-api`·`kista-scheduler`·`kista-trading`은 **같은 GHCR 이미지**(arm64 네이티브 러너에서 빌드)를 띄운다 — api/scheduler는 `app.jar`를 `SCHEDULER_ENABLED`로 갈라 쓰고, trading은 `APP_JAR=trading-core.jar`를 쓴다. 배포는 kista-infra가 앱별 선언(`state/<app>.yml`)대로 서버에 적용하며(reconcile), 매매 시간대 가드는 없다 — kista-trading이 재기동 시 매매 배치를 재개한다. API 크래시·OOM·요청경로 버그가 매매 배치를 건드리지 않는다 (상세 → `docs/agents/docker-infra.md`).
 - 백업 메커니즘·주기 상세는 `docs/agents/docker-infra.md` 참고.
 - 외부 모니터링은 서로 다른 실패 모드를 감지한다: 가동 모니터링(서버 다운) / 생존 확인(스케쥴러 정지) / 메트릭 추세(리소스 악화).

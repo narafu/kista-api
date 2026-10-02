@@ -6,7 +6,8 @@ D="$BATS_TEST_DIRNAME/../../deploy/server"
 block() { awk -v s="  $1:" '$0 == s {on=1; next} on && /^  [a-z]/ {exit} on' "$D/docker-compose.yml"; }
 
 @test "kista-trading: 단일 인스턴스·겹침 기동 설정 없음" {
-  ! grep -qE 'replicas|scale:|start-first' "$D/docker-compose.yml"
+  # 주석은 제외 — 금지 사유를 설명하는 주석이 이 단어들을 쓴다
+  [ "$(grep -vE '^[[:space:]]*#' "$D/docker-compose.yml" | grep -cE 'replicas|scale:|start-first')" -eq 0 ]
 }
 
 @test "kista-trading: stop_grace_period >= 200s + EPR 재발행 소유" {

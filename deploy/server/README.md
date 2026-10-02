@@ -1,6 +1,6 @@
 # Server deployment (OCI)
 
-`kista-api`(HTTP)와 `kista-scheduler`(배치, 같은 이미지)를 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 리버스 프록시(Caddy)·Postgres·Redis는
+`kista-api`(HTTP)·`kista-scheduler`(배치)·`kista-trading`(trading-core, 같은 이미지 3 role)을 단일 인스턴스(현재 OCI)에서 Docker Compose로 운영한다. 서버 적용은 `kista-infra`의 reconcile이 한다(아래 "배포 흐름"). 리버스 프록시(Caddy)·Postgres·Redis는
 `kista-infra` 레포가 소유하며, 이 레포는 `shared_net`(Caddy 라우팅)·`data_net`(Postgres/Redis 접근) 두 외부
 네트워크에 합류만 한다.
 
@@ -9,7 +9,11 @@
 ```text
 /opt/kista-api/
 ├── .env                    ← kista-infra 배포 워크플로가 렌더링·덮어쓴다 (이 레포의 Actions는 관여하지 않음, 아래 "GitHub Secrets" 참고)
-└── docker-compose.yml      ← GitHub Actions 업로드
+├── releases/<id>/          ← kista-infra가 config SHA의 deploy/server/{docker-compose.yml,roles,readiness,caddy/} + images.env로 구성한 bundle
+├── current → releases/<id> ← 마지막 적용 성공 release
+├── previous → releases/<id>
+├── caddy/kista-api.caddy   ← reconcile이 current bundle에서 설치(kista-infra caddy가 ro 마운트 — 경로 변경 금지)
+└── reconcile.log           ← 마지막 reconcile 출력
 ```
 
 ## 초기 서버 설정 (최초 1회)
@@ -50,14 +54,11 @@
 
 | Secret | 설명 |
 |--------|------|
-| `SERVER_HOST` | 서버 IP 또는 도메인 |
-| `SERVER_USER` | SSH 사용자명 |
-| `SERVER_SSH_KEY` | SSH 개인키 (PEM) |
-| `SERVER_SSH_PORT` | SSH 포트 (기본값 22, 생략 가능) |
+| `INFRA_DISPATCH_TOKEN` | `kista-infra` 대상 fine-grained PAT — Contents read/write(state 조회·dispatch), Actions read(run 추적). 이 레포는 서버 SSH 키를 갖지 않는다 |
 
 `.env`는 이 레포의 Actions가 아니라 `kista-infra` 레포의 배포 워크플로가 관리한다 — `kista-infra`에 GPG로 암호화 커밋된 `secrets/kista-api.env.gpg`를 복호화해 매 배포마다 `/opt/kista-api/.env`를 렌더링·덮어쓴다. 값을 바꾸려면 `kista-infra`의 `scripts/env.sh edit kista-api`로 수정 후 커밋·배포해야 하며, 서버에서 `.env`를 직접 수정해도 다음 kista-infra 배포 시 되돌아간다.
 
-**주의**: kista-infra의 `.env` 렌더링은 이 레포의 배포를 트리거하지 않는다 — `/opt/kista-api/.env` 파일 내용은 바뀌지만, 이미 떠 있는 `kista-api` 컨테이너는 재시작 전까지 구 값을 메모리에 유지한다. 시크릿 로테이션을 실제로 반영하려면 kista-infra 배포 뒤 이 레포의 `server-deploy.yml`도 별도로 실행(재배포)해야 한다.
+`.env`가 바뀌면 kista-infra 배포가 `reconcile.sh kista-api current`로 current release를 재적용한다 — compose가 env_file 내용 변경을 감지해 3 role을 재생성하고 헬스 게이트까지 거친다(이 레포 재배포 불필요).
 
 ## .env 내용
 
@@ -105,50 +106,38 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 
 ## 배포 흐름
 
-1. `changes` 잡이 서버에서 role별 **실행 중 이미지 SHA**를 읽어 그 SHA부터의 diff로 배포 대상 role을 판정(`docs/agents/docker-infra.md` "변경 경로 게이팅")
-2. `deploy-checks` job (배포 스크립트 shellcheck·bats + Flyway 마이그레이션 검사) — 통과해야 빌드
-3. `verify` job (전체 테스트 스위트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)과 Docker 이미지 빌드(3 role 공용 단일 이미지, SHA 태그만, gha 레이어 캐시)가 병렬 — 배포 잡은 둘 다 기다린다
-4. `deploy-api`·`deploy-scheduler`·`deploy-trading` 세 독립 잡(`_deploy-role.yml`)이 각자 role을 배포한다. 각 잡의 흐름:
-   - SSH 호스트 키는 secret `SERVER_SSH_HOST_KEYS`로 고정(`.github/actions/ssh-setup`) — keyscan TOFU 없음
-   - 서버에 더 새 커밋이 이미 돌고 있으면 생략(옛 run Re-run이 과거로 되돌리는 것 방지)
-   - 매매 가드 — `deploy-trading`만: 시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 실행 중(`lock_until > now()` + 완료 기록 `finished_at`이 없거나 이번 획득 `locked_at`보다 이전)이면 차단(락은 중복 실행 방지로 성공 후에도 TTL까지 유지되지만 완료 시 `finished_at`이 기록돼 가드는 풀린다, 조회 실패도 차단). `workflow_dispatch` force=true로 우회
-   - EPR 고아 검사 — `deploy-trading`·`deploy-scheduler`만: 미완료 `event_publication` row가 참조하는 이벤트·리스너가 배포 커밋에 없으면 차단(`docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북")
-   - 필수 환경변수 존재 검증 (서버 `.env` 기준)
-   - Caddy 라우팅 스니펫(`deploy/server/caddy/kista-api.caddy`) 교체 + `caddy reload` — 실패 시 스니펫 원복·배포 중단
-   - 롤백 기록(`/opt/kista-api/rollback/<service>.{image,compose.yml,run}`) 후 compose 교체 → `docker compose pull/up -d --no-deps <service>` (GHCR public이라 로그인 없음)
-   - 헬스 게이트: Docker 헬스(liveness) healthy **+** `/actuator/health/readiness`(readinessState·db·redis) UP을 10초 간격 최대 5분 폴링
-   - 실패 시 해당 role만 이전 이미지 **+ 이전 compose 파일 + 이전 Caddy 스니펫**으로 자동 롤백. 성공 시 이 레포의 미사용 이미지 태그 정리
-5. 세 잡은 서버의 같은 `docker-compose.yml`·`caddy/`를 공유하므로 교체·up 구간을 flock으로 직렬화한다
+설계: `kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md`
+
+1. `plan` 잡 — 기준점은 kista-infra `state/kista-api.yml`(마지막 서버 적용 성공 상태). role별 `state SHA..이 커밋` diff를 `detect-deploy-scope.sh`로 분류해 바뀐 role만 이 커밋 SHA로, `deploy/server/**`·`deploy/hooks/**`가 바뀌면 `config`도 이 커밋으로(이미지 재빌드 없이 compose·Caddy만 재적용). state보다 옛 커밋(옛 run Re-run)이면 아무것도 하지 않는다. 수동 실행은 config·전 role을 이 커밋으로
+2. `deploy-checks` — 배포 판정 스크립트·hook shellcheck·bats(`compose-invariants.bats` 포함) + Flyway 마이그레이션 검사
+3. `verify`(전체 테스트 + `integration`, ArchUnit·`CaddyRoutingTest` 포함)와 이미지 빌드(role 변경 시만, 3 role 공용 단일 이미지, SHA 태그)가 병렬
+4. `deploy` — kista-infra에 `repository_dispatch(deploy-kista-api)`로 `{config, roles(전 role SHA), request_id}`를 보내고 그 `Reconcile App` run이 끝날 때까지 대기(`wait-reconcile.sh`). 커밋의 초록불 = 서버 적용·헬스 게이트 통과. 대기 중 더 새 요청이 자리를 대체하면 생략으로 성공 처리(payload가 전체 상태라 손실 없음)
+5. kista-infra `Reconcile App` — SHA·이미지 검증 → state와 신선도 병합 → config SHA로 bundle 구성 → `deploy/hooks/pre-apply.sh`(EPR 고아 검사 — kista-trading·kista-scheduler 이미지가 바뀔 때, `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북") → 서버 `reconcile.sh`:
+   - `deploy/server/roles` 순서(kista-trading → kista-api → kista-scheduler)로 `docker compose up -d --no-deps <role>` — compose config-hash가 같으면 재생성하지 않는다
+   - 컨테이너가 바뀐 role만 헬스 게이트: Docker 헬스(liveness) healthy **+** `deploy/server/readiness`의 readiness URL(readinessState·db·redis) UP, 10초 간격 최대 5분
+   - 모든 role 통과 후 Caddy 스니펫 설치 + reload 1회
+   - 실패 시 이번에 바꾼 role을 역순으로 직전 release(이미지·compose·스니펫)로 롤백 — 앱 단위 전부 아니면 전무
+   - 성공 시 `current` 전환, 오래된 release·미사용 이미지 태그 정리 → kista-infra가 `state/kista-api.yml` 커밋
 6. Caddy `lb_try_duration 120s`가 컨테이너 재시작 공백을 클라이언트에 투명하게 처리
 
 ## 배포 시간 제한
 
-매매 시간대 배포 가드는 `deploy-trading` 잡에만 적용된다 — `deploy-api`·`deploy-scheduler`는 시간대 무관하게 항상 배포 가능하다(`docs/agents/docker-infra.md` 참고).
-시각 창(월~금 22:20~23:40, 화~토 04:20~06:20 KST) 또는 `trading.scheduler_locks`의 `trading-open`·`trading-close` 락이 실행 중(`lock_until > now()` + 완료 기록 `finished_at`이 없거나 이번 획득 `locked_at`보다 이전)이면 차단(락은 중복 실행 방지로 성공 후에도 TTL까지 유지되지만 완료 시 `finished_at`이 기록돼 가드는 풀린다, 조회 실패도 차단) — `workflow_dispatch` `force=true`로 긴급 우회 가능. 차단된 잡은 해제 후 Re-run 하면 되고, 그 사이 더 새 커밋이 배포됐으면 자동 생략된다.
-- `TradingOpenScheduler`: 월~금 22:30 KST
-- `TradingCloseScheduler`: 화~토 04:30 KST + 최대 60분 대기 (비DST 시 ~05:30까지)
+없다 — kista-trading은 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/superpowers/specs/2026-10-02-trading-batch-resume-design.md`). 전제: kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
 
 ## 롤백 Runbook
 
-**자동 롤백**: 헬스 게이트 실패 시 해당 role의 Actions 잡이 그 role만 이전 이미지와 이전 compose 파일로 자동 복구 — 다른 role은 영향받지 않는다. 기록은 서버 `/opt/kista-api/rollback/<service>.image`·`<service>.compose.yml`(교체 직전 상태)·`<service>.run`(기록한 run 식별자 — 게이트는 자기 run의 기록일 때만 롤백)에 남는다. Caddy 스니펫도 `<service>.caddy`로 기록돼 롤백 시 원복·reload된다. 자동 롤백 후 롤백된 컨테이너의 헬스는 재검증되지 않으므로, Actions 실패 알림을 받으면 서버에서 `docker inspect --format '{{.State.Health.Status}}' <service>`로 수동 확인 필요.
+**자동 롤백**: reconcile 실패 시 그 요청에서 바꾼 role 전부를 직전 release로 되돌린다(exit 1, kista-infra run 실패 + 텔레그램 알림). 롤백된 컨테이너의 헬스는 재검증되지 않으므로 알림을 받으면 `docker inspect --format '{{.State.Health.Status}}' <service>`로 확인. 롤백 불가·롤백 실패는 exit 2 — 아래 수동 절차.
 
-**수동 롤백**: GHCR에 SHA 태그 이미지가 보존됨. `kista-api`/`kista-scheduler` 어느 role이든 동일 절차 — `<service>`를 해당 role 이름으로 치환.
+**수동 롤백**: 서버에서 직전 release를 재적용한다(GHCR이 public이라 정리된 이미지도 다시 pull).
 ```bash
-cd /opt/kista-api
-# 롤백할 이미지 태그 확인
-docker images | grep kista-api
-
-# 이전 이미지로 교체 (kista-api 예시)
-export KISTA_API_IMAGE=ghcr.io/<org>/kista-api:<previous-sha>
-docker compose up -d --no-deps kista-api
-
-# kista-scheduler 롤백은 서비스명만 교체
-docker compose up -d --no-deps kista-scheduler
+ls -l /opt/kista-api/current /opt/kista-api/previous
+nohup bash /opt/kista-infra/bin/reconcile.sh kista-api "$(basename "$(readlink /opt/kista-api/previous)")"
 ```
+그 뒤 kista-infra `state/kista-api.yml`을 실제 적용한 SHA로 커밋한다(안 하면 다음 요청의 기준점이 어긋난다). 특정 옛 SHA로 되돌리려면 state를 그 SHA로 수정·커밋한 뒤 kista-infra `Reconcile App`을 workflow_dispatch(app=kista-api, config/roles에 그 SHA)로 실행 — 신선도 병합은 state보다 옛 요청을 무시하므로 state 수정이 먼저다.
 
 **Flyway 관련 롤백 주의**: 신규 마이그레이션이 포함된 배포는 `validate-on-migrate: true` 때문에 이전 이미지로 롤백 시 기동 실패할 수 있음. 이 경우 DB 마이그레이션 수동 롤백 후 이미지 롤백 필요. Breaking migration 배포는 별도 주의 필요. **스키마 재편 이행 릴리스는 자동 롤백 불가** — 옛 이미지의 `@Table(schema=...)`가 즉시 깨지고 헬스게이트 롤백도 옛 스키마명을 기대해 무력화된다. 수동 SSH 런북 `schema-reorg/RUNBOOK.md`(정방향·역방향 SQL)를 따른다. Flyway 이력 테이블은 서비스별로 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)이다.
 
-**이미지 디스크 정리 참고**: 배포 성공 시 이 레포 이미지(`ghcr.io/narafu/<repo>`) 중 컨테이너가 쓰지 않는 태그를 `docker rmi`로 지우고 dangling 레이어를 `prune -f`로 정리한다(예전 `prune -f`만으로는 SHA 태그 이미지가 누적됐다 — 2026-10-01 실측 181개·35GB. `prune -a`는 다른 레포가 막 pull한 이미지까지 지울 수 있어 쓰지 않는다). 정리된 이미지로 롤백해도 GHCR이 public이라 compose가 다시 pull한다.
+**이미지 디스크 정리 참고**: 적용 성공 시 이 레포 이미지(`ghcr.io/narafu/kista-api`) 중 컨테이너가 쓰지 않는 태그를 `docker rmi`로 지우고 dangling 레이어를 `prune -f`로 정리한다(`prune -a`는 다른 레포가 막 pull한 이미지까지 지울 수 있어 쓰지 않는다).
 
 ## Flyway 배포 주의사항
 
