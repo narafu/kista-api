@@ -12,7 +12,10 @@ scope_script="$(dirname "${BASH_SOURCE[0]}")/detect-deploy-scope.sh"
 state=$(cat)
 old_config=$(sed -n 's/^config: *\([0-9a-f]*\)$/\1/p' <<<"$state")
 mapfile -t pairs < <(sed -n 's/^  \([a-z][a-z-]*\): *\([0-9a-f]*\)$/\1=\2/p' <<<"$state")
-[ -n "$old_config" ] && [ "${#pairs[@]}" -gt 0 ] || { echo "::error::state 파일 형식 오류·비어 있음" >&2; exit 1; }
+if [ -z "$old_config" ] || [ "${#pairs[@]}" -eq 0 ]; then
+  echo "::error::state 파일 형식 오류·비어 있음" >&2
+  exit 1
+fi
 
 # pick은 $(...) 서브셸에서 돌아 변수 대입이 부모에 전파되지 않으므로 verify는 파일로 모은다
 verify_file=$(mktemp)

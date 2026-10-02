@@ -26,7 +26,8 @@ while IFS='|' read -r event_type listener_id; do
     file=$(source_of "$listener")
     if [ -z "$file" ]; then
       missing="${missing:+$missing, }리스너 ${listener}"
-    elif ! git show "${ref}:${file}" | grep -Eq "[[:space:]]${method}[[:space:]]*\("; then
+    # grep -q를 파이프 끝에 두면 pipefail에서 git show가 SIGPIPE로 실패해 오판한다 — here-string으로
+    elif ! grep -Eq "[[:space:]]${method}[[:space:]]*\(" <<<"$(git show "${ref}:${file}")"; then
       missing="${missing:+$missing, }리스너 메서드 ${listener}.${method}"
     fi
   fi
