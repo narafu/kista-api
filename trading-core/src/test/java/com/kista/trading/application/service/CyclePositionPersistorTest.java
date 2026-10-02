@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -45,6 +46,7 @@ class CyclePositionPersistorTest {
     @Mock CycleRotationService cycleRotationService;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock VrCycleRolloverService vrCycleRolloverService;
+    @Mock TradingBatchRunPort batchRunPort;
 
     CyclePositionPersistor persistor;
 
@@ -91,7 +93,7 @@ class CyclePositionPersistorTest {
         persistor = new CyclePositionPersistor(
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCyclePort, cycleRotationService, eventPublisher,
-                cycleOrderStrategies, vrCycleRolloverService);
+                cycleOrderStrategies, vrCycleRolloverService, batchRunPort);
     }
 
     // --- VR 전략 테스트 ---
@@ -139,6 +141,25 @@ class CyclePositionPersistorTest {
 
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         verify(vrCycleRolloverService).rollIfDue(batchCtx, balance, PRICE, TODAY);
+    }
+
+    @Test
+    @DisplayName("포지션 저장 직후 전략 키로 리포트 완료 마커 기록")
+    void saveCyclePosition_marksStrategyReportedAfterPositionSaved() {
+        Strategy strategy = vrStrategy();
+        StrategyCycle cycle = cycle(strategy.id());
+        CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), 10, Instant.now(), null);
+        when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of(savedPos));
+        when(cyclePositionPort.save(any())).thenReturn(savedPos);
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("45.00"), new BigDecimal("1000.00"));
+        BatchContext batchCtx = new BatchContext(strategy, cycle, ACCOUNT, USER);
+
+        persistor.saveCyclePosition(TODAY, balance, batchCtx, PRICE, null);
+
+        InOrder inOrder = inOrder(cyclePositionPort, batchRunPort);
+        inOrder.verify(cyclePositionPort).save(any());
+        inOrder.verify(batchRunPort).markReported(TODAY, STRATEGY_ID);
     }
 
     // --- INFINITE 전략 무회귀 테스트 ---

@@ -101,7 +101,7 @@ public record DstInfo(
         return calculate(ZonedDateTime.now(KST));
     }
 
-    static DstInfo calculate(ZonedDateTime nowKst) {
+    public static DstInfo calculate(ZonedDateTime nowKst) {
         boolean isDst = resolveDst(nowKst.toInstant());
         LocalDate date = nowKst.toLocalDate();
         return new DstInfo(isDst,
@@ -122,6 +122,18 @@ public record DstInfo(
     // 시각 주입식 판단 — 테스트 및 nextTradeDate 공용
     static LocalDate nextTradeDateAt(LocalDate today, LocalTime now) {
         return now.isBefore(SCHEDULER_RUN_TIME) ? today : today.plusDays(1);
+    }
+
+    // 개장 배치용: 거래일 T의 개장 시각(T-1일 저녁) — 자정 이후 재개돼도 이미 지난 개장을 기다리지 않도록 거래일 기준 산출
+    public static DstInfo forOpenBatch(LocalDate tradeDate) {
+        DstInfo now = calculate();
+        return new DstInfo(now.isDst(), now.orderAt(), now.postClose(),
+                atKst(tradeDate.minusDays(1), marketOpenTime(now.isDst())));
+    }
+
+    // orderAt과 같은 KST 일자의 장마감 시각 — 재개 시 마감 접수 마감 판정용
+    public Instant marketCloseAt() {
+        return atKst(orderAt.atZone(KST).toLocalDate(), marketCloseTime(isDst));
     }
 
     // 개장 스케쥴러 수동 트리거용: marketOpen을 과거로 설정해 waitUntilMarketOpen() 스킵

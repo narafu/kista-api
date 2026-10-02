@@ -6,6 +6,7 @@ import com.kista.sharedkernel.TimeZones;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.Strategy;
+import com.kista.trading.domain.model.DstInfo;
 import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.port.output.HeartbeatPort;
@@ -46,29 +47,34 @@ public class TradingOpenScheduler {
 
     // 수동 트리거 — 개장 대기 없이 즉시 실행
     public void runNow() throws InterruptedException {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate tradeDate = DstInfo.nextTradeDate(); // PRIVACY 가드 조회 기준 — KST 거래일 (findTodayTrade 계약)
         schedulerLockService.tryRun("trading-open", Duration.ofHours(2), () ->
                 jobRunner.run("장 개시 스케쥴러 수동",
-                        () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), today)),
+                        () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), tradeDate)),
                         useCase::placeOpenOrdersNow));
     }
 
+    // 재기동 재개 — 이전 프로세스 락을 인수해 개장 배치 재실행 (AT_OPEN slot 멱등, 이미 개장했으면 즉시 접수)
+    public void resume() throws InterruptedException {
+        schedulerLockService.takeOver("trading-open", Duration.ofHours(2), this::runLocked);
+    }
+
     private void runLocked() throws InterruptedException {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate tradeDate = DstInfo.nextTradeDate(); // PRIVACY 가드 조회 기준 — 자정 이후 재개에도 거래일 정합
         jobRunner.run("장 개시 스케쥴러",
-                () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), today)),
+                () -> contextFactory.buildAll(guardPrivacyStrategies(strategyPort.findAllActive(), tradeDate)),
                 useCase::placeOpenOrders);
         heartbeatPort.pingOpen(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
     }
 
     // PRIVACY 기준 매매표가 위험 패턴이면 그 실행에서만 주문 생성 skip + 관리자 알림
-    private List<Strategy> guardPrivacyStrategies(List<Strategy> strategies, LocalDate today) {
+    private List<Strategy> guardPrivacyStrategies(List<Strategy> strategies, LocalDate tradeDate) {
         List<Strategy> privacyStrategies = strategies.stream()
                 .filter(Strategy::isPrivacy)
                 .toList();
         if (privacyStrategies.isEmpty()) return strategies;
 
-        PrivacyTradeBase base = privacyTradePort.findTodayTrade(today).orElse(null);
+        PrivacyTradeBase base = privacyTradePort.findTodayTrade(tradeDate).orElse(null);
         if (base == null) return strategies;
 
         PrivacyTradeValidationReport report = validationService.inspect(base);

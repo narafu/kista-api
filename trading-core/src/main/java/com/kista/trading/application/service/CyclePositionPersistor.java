@@ -30,6 +30,7 @@ class CyclePositionPersistor {
     private final ApplicationEventPublisher eventPublisher;                     // 사이클 완료 이벤트 발행
     private final CycleOrderStrategies cycleOrderStrategies;                    // 전략 타입별 capability 조회
     private final VrCycleRolloverService vrCycleRolloverService;                // VR N주 롤오버
+    private final TradingBatchRunPort batchRunPort;                             // 전략별 당일 리포트 완료 마커 (재개 시 중복 리포트 방지)
 
     // execute() 종료 시 포지션 1건 적재, holdings==0이면 사이클 rotation 정책 처리
     void saveCyclePosition(LocalDate today, AccountBalance balance, BatchContext ctx,
@@ -51,6 +52,8 @@ class CyclePositionPersistor {
         if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), newReverseMode));
         }
+        // 리포트 완료 마커 — rotation이 새 사이클을 만들어도 재개 판정이 유지되도록 전략 키 (저장 직후·rotation 전)
+        batchRunPort.markReported(today, strategy.id());
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
