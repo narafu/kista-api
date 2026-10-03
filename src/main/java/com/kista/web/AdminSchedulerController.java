@@ -2,6 +2,7 @@ package com.kista.web;
 
 import com.kista.benchmark.adapter.in.schedule.KbLandHousingBenchmarkScheduler;
 import com.kista.benchmark.adapter.in.schedule.KbLandPriceIndexScheduler;
+import com.kista.benchmark.adapter.in.schedule.MarketIndexPriceSyncScheduler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -14,10 +15,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 // 2-role 배포에서 kista-scheduler에만 유효 — kista-api role(scheduler.enabled=false)에서는
-// 참조하는 2개 KbLand 스케쥴러 빈과 동일 게이트로 이 컨트롤러 빈 자체가 등록되지 않는다(오라우팅 시 404).
+// 참조하는 3개 벤치마크 스케쥴러 빈과 동일 게이트로 이 컨트롤러 빈 자체가 등록되지 않는다(오라우팅 시 404).
 // trading 개장/마감 트리거는 admin.adapter.in.web.AdminTradingSchedulerController(내부 API 호출)로 분리됨 —
 // 같은 "/api/admin/scheduler" prefix를 공유하지만 하위 경로가 겹치지 않아 라우팅 충돌 없이 공존한다
-// (이 컨트롤러: /kbland-*, 신규 컨트롤러: /open, /close)
+// (이 컨트롤러: /kbland-*, /market-index-prices, 신규 컨트롤러: /open, /close)
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/scheduler")
@@ -26,15 +27,16 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Admin", description = "관리자 API")
 public class AdminSchedulerController {
 
-    // 컨트롤러 빈이 존재하면 동일 게이트로 2개 스케쥴러 빈도 항상 함께 존재 — null 체크 불필요
+    // 컨트롤러 빈이 존재하면 동일 게이트로 3개 스케쥴러 빈도 항상 함께 존재 — null 체크 불필요
     private final KbLandHousingBenchmarkScheduler kbLandScheduler;
     private final KbLandPriceIndexScheduler kbLandPriceIndexScheduler;
+    private final MarketIndexPriceSyncScheduler marketIndexPriceSyncScheduler; // ETF 지수 종가 동기화
 
     private interface InterruptibleAction {
         void run() throws InterruptedException;
     }
 
-    // 3개 트리거 엔드포인트 공통 골격 — 백그라운드 가상 스레드 실행 + 인터럽트/예외 처리
+    // 트리거 엔드포인트 공통 골격 — 백그라운드 가상 스레드 실행 + 인터럽트/예외 처리
     private void triggerAsync(String label, InterruptibleAction action) {
         Thread.ofVirtual().start(() -> {
             try {
@@ -70,5 +72,13 @@ public class AdminSchedulerController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerKbLandPriceIndexFullRefresh() {
         triggerAsync("KB Land 주간 아파트 매매가격지수 월간 풀 리프레시", kbLandPriceIndexScheduler::runFullRefreshNow);
+    }
+
+    // 벤치마크 ETF 지수 종가 동기화 스케쥴러 수동 트리거 — 09:00 크론을 기다리지 않고 즉시 실행, 202 반환 후 백그라운드 실행
+    @Operation(summary = "벤치마크 ETF 지수 종가 동기화 스케쥴러 수동 트리거", description = "운영 이슈 발생 시 다음 크론까지 기다리지 않고 즉시 실행하며, 202 반환 후 백그라운드에서 처리합니다.")
+    @PostMapping("/market-index-prices")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void triggerMarketIndexPriceSync() {
+        triggerAsync("벤치마크 ETF 지수 종가 동기화 스케쥴러", marketIndexPriceSyncScheduler::runNow);
     }
 }
