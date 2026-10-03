@@ -122,7 +122,7 @@ class VrPositionTest {
     // ── StrategyVrDetail: gradientAt(0) / poolLimitRateAt(0) ────────────────
     // gradient()/poolLimitRate() 고정 메서드는 경과주수 기반 램프(gradientAt/poolLimitRateAt)로 대체됨.
     // 경과 0주는 항상 유예기간(gGraceWeeks/pGraceWeeks) 이내이므로 initialGradient/initialPoolLimitRate가 그대로 반환된다 —
-    // 등록 시점 관례값(부호파생 initialGradient=10/20, initialPoolLimitRate=0.75/0.50/0.25)은 StrategyService.normalizeVrRampParams()가 결정하며
+    // 등록 시점 기본값(recurringAmount 부호별 표)은 trading VrRampParams.withDefaults()가 결정하며
     // 여기서는 램프 없음(gMax=initial, floor=initial) 픽스처로 그 결과값이 gradientAt(0)/poolLimitRateAt(0)에 그대로 반영됨만 검증한다.
 
     @Test

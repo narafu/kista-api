@@ -43,7 +43,7 @@ class CycleOrderComputer {
 
     // 전략 계산 + 주문 유효성 검증을 묶어 계산만 수행 (부수효과 없음)
     // currentCycle: PRIVACY는 initialUsdDeposit 산출에, INFINITE은 리버스모드 판단에 사용
-    // currentPrice: PRIVACY allocateRemainingBudget 분모 산출용, VR 실주문 기준가격 — preview/수동실행 시 null
+    // currentPrice: VR 실주문 기준가격(PRIVACY는 소비하지 않음) — preview/수동실행 시 null
     // Optional.empty() = 전략 차원 skip (예: PRIVACY 기준매매표 미수신)
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
