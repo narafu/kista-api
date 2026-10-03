@@ -37,11 +37,10 @@ import com.kista.sharedkernel.StrategyType;
 @RequiredArgsConstructor
 class BacktestService implements BacktestUseCase {
 
-    // INFINITE는 holdings==0일 때 전일종가가 없으면 첫날 주문 자체를 못 만든다 — 미국 최장 연휴+주말도 덮는 워밍업 여유일
-    private static final int INFINITE_WARMUP_DAYS = 10;
     private static final String FILL_MODEL_WARNING =
-            "체결은 일봉 고가/저가 터치 기준으로 판정됩니다 — 매도 주문은 실제보다 낙관적으로(항상 전량 체결 가정), "
-                    + "매수 주문은 가격 캡에 걸릴 경우 실제보다 비관적으로(캡 지정가 그대로 체결 가정) 평가될 수 있습니다.";
+            "체결은 일봉 시가·고가·저가·종가로 판정합니다. 지정가 주문은 장중 가격이 지정가에 닿으면 전량 체결된 것으로 보고"
+                    + "(시가가 더 유리하게 열리면 시가로 체결), LOC·MOC 주문은 종가로 체결합니다. "
+                    + "부분 체결과 호가 대기열은 반영하지 않아 실제보다 낙관적일 수 있습니다.";
     private static final String ORDER_TIMING_WARNING =
             "일봉 단위 시뮬레이션이라 장 시작/장 마감 접수 시점 구분은 반영되지 않습니다.";
     private static final String VR_CASH_FLOW_WARNING =
@@ -160,18 +159,15 @@ class BacktestService implements BacktestUseCase {
     // --- 캔들 조달 ---
 
     private List<DailyCandle> fetchCandles(BacktestCommand command) {
-        // INFINITE만 전일종가 확보용 워밍업 프리픽스를 덧붙인다(엔진이 from 이전 캔들은 시뮬레이션하지 않고 종가만 이월)
-        LocalDate fetchFrom = command.type() == StrategyType.INFINITE
-                ? command.from().minusDays(INFINITE_WARMUP_DAYS)
-                : command.from();
-        return candlePort.fetchDailyCandles(command.ticker().name(), fetchFrom, command.to());
+        return candlePort.fetchDailyCandles(command.ticker().name(), command.from(), command.to());
     }
 
     // --- PRIVACY 기준 매매표 조달 ---
 
     private Map<LocalDate, PrivacyTradeBase> loadPrivacyBases(List<DailyCandle> candles) {
         Map<LocalDate, PrivacyTradeBase> bases = new HashMap<>();
-        for (DailyCandle candle : candles) {
+        // 첫 캔들 세션은 엔진이 계획할 전날이 없어 쓰이지 않는다 — 두 번째 캔들부터 조회
+        for (DailyCandle candle : candles.subList(Math.min(1, candles.size()), candles.size())) {
             // 캔들 날짜는 US 세션일이고 findTodayTrade의 파라미터는 KST 거래일이다 — 세션 D에 적용되는 기준표는
             // 발행일이 D인 표(= KST 거래일 D+1)이므로 발행일→거래일 헬퍼로 기준을 맞춰 조회·판별한다
             LocalDate applied = PrivacyDates.tradeDateOf(candle.date());
@@ -193,7 +189,9 @@ class BacktestService implements BacktestUseCase {
                                       List<String> warnings) {
         if (bases.isEmpty()) return; // 구간 전체 결측은 엔진이 기준 매매표 결측 구간 경고로 이미 요약한다
         LocalDate dataStart = Collections.min(bases.keySet());
-        LocalDate simulationStart = candles.getFirst().date(); // 요청 from이 휴장일이면 첫 캔들이 실제 시작일
+        // 매매 가능한 첫 세션 = 두 번째 캔들(첫 캔들 처리 끝에 계획한 주문이 처음 체결되는 세션)
+        if (candles.size() < 2) return;
+        LocalDate simulationStart = candles.get(1).date();
         if (dataStart.isAfter(simulationStart)) {
             warnings.add("기준 매매표 데이터가 " + dataStart + "부터 존재해 그 이전 구간은 매매하지 않았습니다.");
         }

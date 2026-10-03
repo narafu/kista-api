@@ -101,6 +101,22 @@ class FillSimulatorTest {
     }
 
     @Test
+    @DisplayName("simulate() — LIMIT은 시가가 지정가보다 유리하게 열리면(갭) 시가에 체결된다")
+    void simulateLimitGapFillsAtOpen() {
+        // 매수 지정가 100인데 시가 95로 갭다운 개장 — 개장 즉시 95에 체결된다
+        PlannedOrder buy = order(OrderType.LIMIT, OrderDirection.BUY, new BigDecimal("100.00"));
+        DailyCandle gapDown = new DailyCandle(TRADE_DATE, new BigDecimal("95.00"), new BigDecimal("97.00"),
+                new BigDecimal("94.00"), new BigDecimal("96.00"));
+        assertThat(FillSimulator.simulate(List.of(buy), gapDown).get(0).price()).isEqualByComparingTo("95.00");
+
+        // 매도 지정가 100인데 시가 105로 갭업 개장 — 개장 즉시 105에 체결된다
+        PlannedOrder sell = order(OrderType.LIMIT, OrderDirection.SELL, new BigDecimal("100.00"));
+        DailyCandle gapUp = new DailyCandle(TRADE_DATE, new BigDecimal("105.00"), new BigDecimal("106.00"),
+                new BigDecimal("103.00"), new BigDecimal("104.00"));
+        assertThat(FillSimulator.simulate(List.of(sell), gapUp).get(0).price()).isEqualByComparingTo("105.00");
+    }
+
+    @Test
     @DisplayName("simulate() — LOC/MOC는 OHLC 메서드에서도 종가 기준이며 high/low는 무시한다")
     void simulateLocMocIgnoreHighLow() {
         // LOC 매수: low는 지정가를 훨씬 밑돌지만 종가가 지정가를 초과하면 미체결이어야 한다

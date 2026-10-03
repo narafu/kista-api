@@ -65,11 +65,12 @@ class BacktestEngineTest {
     @DisplayName("look-ahead 방지: 당일 생성한 주문은 당일 캔들로 체결되지 않고 다음 캔들에서만 체결된다")
     void 당일_생성_주문은_다음_캔들에서만_체결된다() {
         // seed=2000 → poolLimit=1000.00, V=1000·밴드15% → lowerBand=850.00
-        // 1일차 주문: LIMIT BUY 1주 @850.00 (m=3은 누적 1275.00 > 1000.00이라 제외)
+        // 1일차 주문: LIMIT BUY 1주 @850.00 (m=3은 누적 1275.00 > 1000.00이라 제외, 캡 = 1일차 종가 900 × 1.05 = 945 미적용)
         // 1일차 캔들 저가(790)는 850을 이미 터치한다 — 엔진이 당일 체결시키면 1일차 총자산이 곧바로 줄어든다
+        // 2일차 시가 860 > 850이라 갭 체결(시가 체결) 없이 지정가 850에 체결된다
         BacktestEngine.Output output = engine.run(List.of(
-                candle("2024-01-02", 800, 810, 790, 800),
-                candle("2024-01-03", 800, 810, 790, 800)
+                candle("2024-01-02", 800, 910, 790, 900),
+                candle("2024-01-03", 860, 870, 790, 800)
         ), vrCommand("2000", "1000", 4, 0));
 
         // 1일차: 체결 없음 — 예수금 2000 그대로
@@ -82,14 +83,14 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("bootstrap 경로: V=0이면 첫날은 전일종가가 없어 주문이 없고, 둘째 날 LOC 매수가 나와 셋째 날 체결된다")
-    void V가_0이면_둘째날_bootstrap_LOC_매수가_생성된다() {
+    @DisplayName("bootstrap 경로: V=0이면 첫날 LOC 매수가 나와 둘째 날 체결되고, 이후 V=0 구간엔 매도 사다리가 없다")
+    void V가_0이면_첫날_bootstrap_LOC_매수가_생성된다() {
         // seed=1000 → poolLimit=750.00(거치식 initialPoolLimitRate=0.75), V=0 → needsBootstrap
-        // 2일차 bootstrap: 캡가 = 전일종가 100 × 1.05 = 105.00, 수량 = 750/105 내림 = 7주
-        // 3일차: LOC은 종가 기준 판정 — 종가 90 ≤ 105 → 7주×90 = 630.00 체결
-        // 3일차 총자산(1000)은 체결가·평가가가 둘 다 종가 90이라 매수수량과 무관하게 항상 seed와 같다 — 수량 자체는 증명하지 못한다
-        // holdings=7가 되는 순간(3일차 주문생성 단계) V=0이라 사다리 생성이 skip된다(VrStrategy value=0 가드) — 매도 주문 없음, 보유 유지
-        // 4일차 총자산 = 3일차 체결 직후 현금(1000 − 7주×90 = 370) + 7주 × 4일차 종가(110) = 370 + 770 = 1140
+        // 1일차 bootstrap: 캡가 = 다음 세션 기준 전일종가(1일차 종가 100) × 1.05 = 105.00, 수량 = 750/105 내림 = 7주
+        // 2일차: LOC은 종가 기준 판정 — 종가 100 ≤ 105 → 7주×100 = 700.00 체결 → 현금 300
+        // 2일차 총자산(1000)은 체결가·평가가가 둘 다 종가 100이라 매수수량과 무관하게 seed와 같다 — 수량은 3·4일차가 증명한다
+        // holdings=7가 되는 순간(2일차 주문생성 단계) V=0이라 사다리 생성이 skip된다(VrStrategy value=0 가드) — 매도 주문 없음, 보유 유지
+        // 3일차 = 300 + 7주×90 = 930, 4일차 = 300 + 7주×110 = 1070
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-02", 100, 105, 95, 100),
                 candle("2024-01-03", 100, 105, 95, 100),
@@ -99,21 +100,21 @@ class BacktestEngineTest {
 
         assertThat(output.points()).extracting(BacktestPoint::totalAsset)
                 .satisfiesExactly(
-                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차: 주문 없음
-                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 아직 미체결(주문만 생성)
-                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 3일차: 예수금 370 + 7주×90 (수량과 무관하게 항상 seed와 동일)
-                        p -> assertThat(p).isEqualByComparingTo("1140")); // 4일차: 매도 사다리 skip → 보유 유지, 370 + 7주×110
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차: 주문만 생성
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 300 + 7주×100
+                        p -> assertThat(p).isEqualByComparingTo("930"),   // 3일차: 300 + 7주×90
+                        p -> assertThat(p).isEqualByComparingTo("1070")); // 4일차: 매도 사다리 skip → 보유 유지, 300 + 7주×110
         assertThat(output.tradeCount()).isEqualTo(1); // bootstrap 매수 1건뿐 — V=0 구간 매도 사다리 없음
     }
 
     @Test
     @DisplayName("사다리 경로: 매도 사다리가 고가를 터치하지 못한 날은 미체결, 터치한 날에 체결된다")
     void 매도_사다리는_고가_터치_여부로_체결이_갈린다() {
-        // 1일차 LIMIT BUY 1주 @850.00 → 2일차 체결(저가 790) → 예수금 1150.00, 1주 보유
-        // 2일차부터 매도 사다리 LIMIT SELL 1주 @1150.00 (upperBand=1150.00 ÷ 1주)
+        // 1일차 LIMIT BUY 1주 @850.00(캡 945 미적용) → 2일차 체결(저가 790, 시가 860이라 지정가 체결) → 예수금 1150.00, 1주 보유
+        // 2일차부터 매도 사다리 LIMIT SELL 1주 @1150.00 (upperBand=1150.00 ÷ 1주) — 4일차 시가 1000 < 1150이라 지정가 체결
         BacktestEngine.Output output = engine.run(List.of(
-                candle("2024-01-02", 800, 810, 790, 800),
-                candle("2024-01-03", 800, 810, 790, 800),
+                candle("2024-01-02", 800, 910, 790, 900),
+                candle("2024-01-03", 860, 870, 790, 800),
                 candle("2024-01-04", 850, 1000, 800, 900),
                 candle("2024-01-05", 1000, 1200, 1000, 1100)
         ), vrCommand("2000", "1000", 4, 0));
@@ -187,22 +188,50 @@ class BacktestEngineTest {
     }
 
     @Test
+    @DisplayName("휴장 due일: 직전 거래일 종가로 평가하고 그날을 새 사이클 시작일로 잡아 N주 스케줄이 밀리지 않는다")
+    void 휴장_due일은_직전_거래일_기준으로_롤오버된다() {
+        RecordingVr recorder = new RecordingVr();
+        BacktestEngine vrEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 2주 주기, 01-01 시작 → due 01-15(캔들 없음 = 휴장). 01-16에 롤오버하되 평가·시작일은 01-12 캔들 기준
+        // 보유 10주 — 평가금 = 10 × 01-12 종가 100 = 1000 (실행일 01-16 종가 110을 쓰면 1100)
+        // 사다리(매수 ≤ 85, 매도 ≥ 115)는 종가 100·110 평탄 캔들에 닿지 않아 체결 없음 → pool 2000 유지
+        // V′ = 1000 + 2000/10 + (1000 − 1000)/(2√10) = 1200.00 (01-16 종가로 평가하면 1200 + 100/6.3246 = 1215.81)
+        // 다음 due = 01-12 + 2주 = 01-26 → 01-26 캔들에서 세 번째 사이클 (실행일 01-16을 시작일로 쓰면 01-30으로 밀린다)
+        BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("2000"),
+                null, BAND_WIDTH, 2, 0, new BigDecimal("1000"), 10, new BigDecimal("100"));
+        BacktestEngine.Output output = vrEngine.run(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-12", 100),
+                flat("2024-01-16", 110),
+                flat("2024-01-26", 110)
+        ), command);
+
+        assertThat(recorder.valueOn("2024-01-16")).isEqualByComparingTo("1200.00");
+        assertThat(output.cycleCount()).isEqualTo(3);
+        assertThat(output.tradeCount()).isZero();
+    }
+
+
+    @Test
     @DisplayName("V′≤0이면 롤오버를 보류하고 사이클을 유지하며 경고는 보류 구간당 1건만 남긴다")
     void V프라임이_0이하면_롤오버가_보류된다() {
-        // V=100, pool=100, G=20(인출식), recurring=−1000 → V′ = 100 + 5 − 1000 − 11.18 = −906.18 ≤ 0
+        // V=100, pool=2000, G=40(인출식 기본값), recurring=−1000 → 인출 반영 예수금 1000 ≥ 0이라 인출 보류는 아니고
+        // V′ = 100 + 2000/40 − 1000 + (0 − 100)/(2√40) = −857.91 ≤ 0 → V′ 보류 (사다리 매수는 저가 95 > 85라 미체결, 평가금 0)
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-01", 100, 105, 95, 100),
                 candle("2024-01-08", 100, 105, 95, 100),
                 candle("2024-01-09", 100, 105, 95, 100),
                 candle("2024-01-10", 100, 105, 95, 100)
-        ), vrCommand("100", "100", 1, -1000));
+        ), vrCommand("2000", "100", 1, -1000));
 
         assertThat(output.cycleCount()).isEqualTo(1);
         // 도래일이 3일(01-08·09·10) 이어져도 경고는 1건 — 보류 상태가 풀릴 때까지 중복 기록하지 않는다
         assertThat(output.warnings()).containsExactly("2024-01-08: 다음 주기 목표 평가금(V)이 0 이하로 계산되어 VR 주기 갱신을 보류했습니다.");
         // 보류 시엔 자본 조정도 하지 않는다 — 원금·예수금 불변
         assertThat(output.points()).extracting(BacktestPoint::principal)
-                .allSatisfy(p -> assertThat(p).isEqualByComparingTo("100"));
+                .allSatisfy(p -> assertThat(p).isEqualByComparingTo("2000"));
     }
 
     @Test
@@ -210,10 +239,11 @@ class BacktestEngineTest {
     void 적립식은_롤오버_시점에_원금이_증가한다() {
         // recurring=+500 → G=10, poolLimitRate=1.0(적립식 기본값) → poolLimit=1000.00
         // V=1000·밴드15% → lowerBand=850.00 ≤ poolLimit(1000) → 1일차에 사다리 LIMIT BUY 1주 @850.00 생성(bootstrap 아님)
-        // V′ = 1000 + 1000/10 + 500 − 158.11 = 1441.89 > 0 → 롤오버 진행
+        // 롤오버(01-08): 1주 @850 체결 후 pool 150, 평가금 1×100 → V′ = 1000 + 150/10 + 500 + (100−1000)/(2√10) = 1372.70 > 0 → 롤오버 진행
+        // 1일차 종가 900 → 캡 945라 @850 그대로, 2일차 시가 900 > 850이라 지정가 850 체결
         BacktestEngine.Output output = engine.run(List.of(
-                candle("2024-01-01", 100, 105, 95, 100),
-                candle("2024-01-08", 100, 105, 95, 100),
+                candle("2024-01-01", 900, 905, 95, 900),
+                candle("2024-01-08", 900, 905, 95, 100),
                 candle("2024-01-09", 200, 210, 190, 200)
         ), vrCommand("1000", "1000", 1, 500));
 
@@ -231,20 +261,19 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("인출식: 인출액이 예수금을 초과하면 예수금은 0에서 멈추고 원금도 실제 차감분만 반영한다")
-    void 인출액이_예수금을_초과하면_0으로_클램프된다() {
-        // seed=300, V=5000, recurring=−1000 → V′ = 5000 + 15 − 1000 − 559.02 = 3455.98 > 0 → 롤오버 진행
-        // 예수금 300 − 1000 = −700 → 0으로 클램프, 원금은 300 − 300 = 0 (요청 인출 1000이 아닌 실제 반영분만)
+    @DisplayName("인출식: 인출 반영 후 예수금이 음수면 V′ 계산 전에 롤오버를 보류한다 (운영 VrCycleRolloverService와 동일)")
+    void 인출액이_예수금을_초과하면_롤오버가_보류된다() {
+        // seed=300, recurring=−1000 → 300 − 1000 < 0 → 보류(V′ 계산 안 함, 예수금·원금 불변, 경고 1건)
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-01", 100, 105, 95, 100),
                 candle("2024-01-08", 100, 105, 95, 100),
                 candle("2024-01-09", 100, 105, 95, 100)
         ), vrCommand("300", "5000", 1, -1000));
 
-        assertThat(output.cycleCount()).isEqualTo(2);
-        assertThat(output.warnings()).containsExactly("2024-01-08: 인출액이 예수금을 초과해 예수금을 0으로 조정했습니다. 부족액은 $700.00입니다.");
-        assertThat(output.points().get(2).principal()).isEqualByComparingTo("0");
-        assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("0");
+        assertThat(output.cycleCount()).isEqualTo(1);
+        assertThat(output.warnings()).containsExactly("2024-01-08: 인출액이 예수금을 초과해 VR 주기 갱신을 보류했습니다.");
+        assertThat(output.points()).extracting(BacktestPoint::principal)
+                .allSatisfy(p -> assertThat(p).isEqualByComparingTo("300"));
     }
 
     @Test
@@ -288,9 +317,31 @@ class BacktestEngineTest {
                 candle("2024-01-05", 100, 105, 95, 100)
         ), vrCommand("1000", "0", 52, 0));
 
-        // 3일차 bootstrap 체결(4주×100=400) 후, 4일차엔 매도 주문이 없어 보유 그대로 평가(4주×종가100=400 + 예수금600)
+        // 1일차 bootstrap LOC 매수 7주가 2일차 종가 100에 체결된 뒤 V=0이라 매도 사다리가 없다 — 3·4일차 = 예수금 300 + 7주×100 = 1000
         assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("1000");
         assertThat(output.points().get(3).totalAsset()).isEqualByComparingTo("1000");
+    }
+
+    // 날짜별 plan() 입력 V값을 붙잡아 두는 VR 기록기 — 롤오버 V′를 주문 가격 역산 없이 직접 단언하기 위함
+    private static final class RecordingVr extends VrCycleOrderStrategy {
+
+        private final Map<LocalDate, BigDecimal> valueByDate = new LinkedHashMap<>();
+
+        RecordingVr() {
+            super(new VrStrategy());
+        }
+
+        @Override
+        public Optional<OrderPlan> plan(PlanContext ctx) {
+            valueByDate.put(ctx.tradeDate(), ctx.vr().value());
+            return super.plan(ctx);
+        }
+
+        BigDecimal valueOn(String date) {
+            BigDecimal value = valueByDate.get(LocalDate.parse(date));
+            assertThat(value).as("%s VR plan() 호출 기록", date).isNotNull();
+            return value;
+        }
     }
 
     // --- INFINITE 픽스처 헬퍼 ---
@@ -313,10 +364,6 @@ class BacktestEngineTest {
             return result;
         }
 
-        // 해당 날짜에 plan()이 호출됐는지 — 워밍업 방어로 주문 생성을 건너뛴 날은 false
-        boolean planned(String date) {
-            return byDate.containsKey(LocalDate.parse(date));
-        }
 
         Recorded on(String date) {
             Recorded recorded = byDate.get(LocalDate.parse(date));
@@ -362,12 +409,12 @@ class BacktestEngineTest {
     // --- INFINITE 경로 ---
 
     @Test
-    @DisplayName("워밍업 없이 from부터 캔들이 시작하면 첫날 주문만 생략하고 경고를 남긴 뒤 둘째 날부터 정상 진행된다")
-    void 전일종가가_없는_첫날은_주문을_생략하고_경고를_남긴다() {
+    @DisplayName("첫날부터 오늘 종가를 다음 세션 기준 전일종가로 써서 0회차 주문이 나온다 (워밍업 프리픽스 불필요)")
+    void 첫날부터_오늘_종가로_0회차_주문을_만든다() {
         RecordingInfinite recorder = new RecordingInfinite();
         BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
 
-        // seed=1000, 4분할 → 1일차는 holdings=0·prevClose=null이라 planNormalMode()가 예외를 던질 상황 → 호출 자체를 막는다
+        // seed=1000, 4분할 → 1일차 종가 100이 다음 세션 주문의 전일종가 — holdings=0이어도 평단가 대용 100으로 계획 가능
         BacktestEngine.Output output = infiniteEngine.run(List.of(
                 flat("2024-01-01", 100),
                 flat("2024-01-02", 100),
@@ -375,25 +422,38 @@ class BacktestEngineTest {
                 candle("2024-01-04", 95, 100, 88, 95)
         ), infiniteCommand("2024-01-01", "1000", 4));
 
-        assertThat(output.warnings()).containsExactly("2024-01-01: 전일 종가가 없어 첫 거래일 주문을 생략했습니다.");
-        // 예외를 잡아서 넘기는 게 아니라 전략 호출 자체가 없었어야 한다
-        assertThat(recorder.planned("2024-01-01")).isFalse();
-
-        // 2일차: prevClose=100 → 평단가 대용 100, unitAmount=1000/4=250.00, 기준가=100×1.15=115.00 → 전반 매수 2건
-        assertThat(recorder.on("2024-01-02").inputs().prevClosePrice()).isEqualByComparingTo("100");
-        assertThat(recorder.on("2024-01-02").legs())
+        assertThat(output.warnings()).isEmpty();
+        // 1일차: 기준가 100 → unitAmount=1000/4=250.00, 기준가=100×1.15=115.00 → 전반 매수 2건 (115는 접수 전 캡 105로 보정)
+        assertThat(recorder.on("2024-01-01").inputs().prevClosePrice()).isEqualByComparingTo("100");
+        assertThat(recorder.on("2024-01-01").legs())
                 .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
 
-        // 3일차 종가 90에 LOC 매수 2건(@100.00 / 캡 105.00) 체결 → 예수금 820, 2주 보유
-        // 4일차 종가 95에 기준가 매수 1건(@99.00)만 체결 → 예수금 725 + 3주×95 = 1010.00
+        // 2일차 종가 100에 LOC 매수 2건(@100 / 캡 105) 체결 → 예수금 800, 2주
+        // 3일차 종가 90에 2일차 LOC 매수 2건(@100 / 109→캡 105) 체결 → 예수금 620, 4주 → 620 + 4×90 = 980
+        // 3일차 계획(기준가 90, 캡 94.50): 매수 @95·@98.80은 캡 94.50으로 보정 → 4일차 종가 95 > 94.50 미체결,
+        // LOC 매도 @98.81·지정가 매도 @109.25도 미체결 → 620 + 4×95 = 1000
         assertThat(output.points()).extracting(BacktestPoint::totalAsset)
                 .satisfiesExactly(
                         p -> assertThat(p).isEqualByComparingTo("1000"),
                         p -> assertThat(p).isEqualByComparingTo("1000"),
-                        p -> assertThat(p).isEqualByComparingTo("1000"),
-                        p -> assertThat(p).isEqualByComparingTo("1010"));
-        assertThat(output.tradeCount()).isEqualTo(3);
+                        p -> assertThat(p).isEqualByComparingTo("980"),
+                        p -> assertThat(p).isEqualByComparingTo("1000"));
+        assertThat(output.tradeCount()).isEqualTo(4);
         assertThat(output.cycleCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("주문 기준가(전일종가)는 오늘 종가다 — 오늘 만든 주문은 다음 세션에 체결되므로 운영의 S-1 확정 종가와 같다")
+    void 주문_기준가는_오늘_종가다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 종가가 100 → 120으로 바뀌는 날 — 하루 묵은 값(100)을 쓰면 캡·0회차 기준가가 전부 어긋난다
+        infiniteEngine.run(List.of(flat("2024-01-01", 100), flat("2024-01-02", 120)),
+                infiniteCommand("2024-01-01", "1000", 4));
+
+        assertThat(recorder.on("2024-01-01").inputs().prevClosePrice()).isEqualByComparingTo("100");
+        assertThat(recorder.on("2024-01-02").inputs().prevClosePrice()).isEqualByComparingTo("120");
     }
 
     @Test
@@ -402,9 +462,8 @@ class BacktestEngineTest {
         RecordingInfinite recorder = new RecordingInfinite();
         BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
 
-        // 01-01은 from(01-02) 이전 워밍업 — prevClose만 100으로 이월, 보유 5주(평단가 80)로 시작
+        // 보유 5주(평단가 80)로 시작
         BacktestEngine.Output output = infiniteEngine.run(List.of(
-                flat("2024-01-01", 100),
                 flat("2024-01-02", 100)
         ), infiniteCommandWithPosition("2024-01-02", "0", 4, 5, "80"));
 
@@ -430,40 +489,6 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("워밍업 프리픽스가 있으면 from 이전 캔들은 전일종가만 채우고 포인트·주문 없이 지나간다")
-    void 워밍업_프리픽스는_전일종가만_채운다() {
-        RecordingInfinite recorder = new RecordingInfinite();
-        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
-
-        // 01-01은 from(01-02) 이전 — 체결·포인트·주문 전부 없이 prevClose만 100으로 이월된다
-        BacktestEngine.Output output = infiniteEngine.run(List.of(
-                flat("2024-01-01", 100),
-                flat("2024-01-02", 100),
-                flat("2024-01-03", 90),
-                candle("2024-01-04", 95, 100, 88, 95)
-        ), infiniteCommand("2024-01-02", "1000", 4));
-
-        // 워밍업 덕에 from 당일부터 정상 주문 — 경고 없음
-        assertThat(output.warnings()).isEmpty();
-        assertThat(recorder.planned("2024-01-01")).isFalse();
-        assertThat(recorder.on("2024-01-02").inputs().prevClosePrice()).isEqualByComparingTo("100");
-        assertThat(recorder.on("2024-01-02").legs())
-                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
-
-        // 포인트는 정확히 from~to 구간(3일)만 — 워밍업 캔들은 자산 곡선에 등장하지 않는다
-        assertThat(output.points()).extracting(BacktestPoint::date)
-                .containsExactly(LocalDate.parse("2024-01-02"), LocalDate.parse("2024-01-03"),
-                        LocalDate.parse("2024-01-04"));
-        // 시드는 from에 그대로 있고 이후 흐름은 워밍업 없는 케이스의 2~4일차와 동일하다
-        assertThat(output.points()).extracting(BacktestPoint::totalAsset)
-                .satisfiesExactly(
-                        p -> assertThat(p).isEqualByComparingTo("1000"),
-                        p -> assertThat(p).isEqualByComparingTo("1000"),
-                        p -> assertThat(p).isEqualByComparingTo("1010"));
-        assertThat(output.tradeCount()).isEqualTo(3);
-    }
-
-    @Test
     @DisplayName("일반모드: currentRound가 divisionCount/2를 넘으면 전반 2건 매수에서 후반 단일 매수로 패턴이 바뀐다")
     void 전반에서_후반으로_주문_패턴이_전환된다() {
         RecordingInfinite recorder = new RecordingInfinite();
@@ -475,23 +500,24 @@ class BacktestEngineTest {
                 flat("2024-01-04", 85), flat("2024-01-05", 80)
         ), infiniteCommand("2024-01-01", "1000", 4));
 
-        // 4일차: 4주·평단 87.5000·예수금 650 → 매입금 350 ÷ 단위금액 250.00 = 1.4회차 (< 2.0) → 전반
-        Recorded early = recorder.on("2024-01-04");
-        assertThat(early.position(4).currentRound()).isEqualTo(1.4);
+        // 3일차: 4주·평단 95.0000·예수금 620 → 매입금 380 ÷ 단위금액 250.00 = 1.52회차 (< 2.0) → 전반
+        Recorded early = recorder.on("2024-01-03");
+        assertThat(early.position(4).currentRound()).isEqualTo(1.52);
         assertThat(early.position(4).isEarlyStage()).isTrue();
         assertThat(early.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
                 "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
 
-        // 5일차: 6주·평단 85.0000·예수금 490 → 매입금 510 ÷ 250.00 = 2.04회차 (≥ 2.0) → 후반 단일 매수
-        Recorded late = recorder.on("2024-01-05");
-        assertThat(late.position(4).currentRound()).isEqualTo(2.04);
+        // 4일차: 캡 보정 매수 2주가 종가 85에 체결 → 6주·평단 91.6667·예수금 450 → 매입금 550 ÷ 250.00 = 2.2회차 (≥ 2.0) → 후반
+        Recorded late = recorder.on("2024-01-04");
+        assertThat(late.position(4).currentRound()).isEqualTo(2.2);
         assertThat(late.position(4).isEarlyStage()).isFalse();
         assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
-        // 후반 매수 수량 = 단위금액 250.00 ÷ 기준가 85.00 내림 = 2주 (기준가 = 평단 85 × (1 + 0.00))
+        // 후반 매수 = 단위금액 250.00 ÷ 기준가 89.83 내림 = 2주 (기준가 = 평단 91.6667 × (1 − 0.02), offset = 0.15×(1−2×2.2/4) = −0.015 → −0.02)
         assertThat(late.orders().getFirst().quantity()).isEqualTo(2);
-        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("85.00");
+        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("89.83");
 
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("970");
+        // 5일차 종가 80에 캡(85×1.05=89.25) 보정 매수 3주 체결 → 예수금 450 − 240 = 210 + 9주×80 = 930
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("930");
         assertThat(output.cycleCount()).isEqualTo(1);
     }
 
@@ -504,14 +530,14 @@ class BacktestEngineTest {
         BacktestEngine.Output output = infiniteEngine.run(List.of(
                 flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 90),
                 flat("2024-01-04", 85), flat("2024-01-05", 80), flat("2024-01-06", 75),
-                flat("2024-01-07", 70), flat("2024-01-08", 65)
+                flat("2024-01-07", 70), flat("2024-01-08", 65), flat("2024-01-09", 65)
         ), infiniteCommand("2024-01-01", "1000", 4));
 
-        // 6일차까지는 일반모드 — 단위금액 250.00 ≤ 예수금 340이라 아직 최종회차가 아니다
-        assertThat(recorder.on("2024-01-06").inputs().isReverseMode()).isFalse();
+        // 7일차는 일반모드 — 8주·예수금 300 ≥ 단위금액 237.22라 아직 최종회차가 아니다
+        assertThat(recorder.on("2024-01-07").inputs().isReverseMode()).isFalse();
 
-        // 7일차: 11주·평단 79.0909·예수금 130 → 단위금액 250.00 > 예수금 130 → isFinalRound 성립 → 리버스모드 진입
-        Recorded firstDay = recorder.on("2024-01-07");
+        // 8일차: 11주·평단 76.7172·예수금 105 → 단위금액 237.22 > 예수금 105 → isFinalRound 성립 → 리버스모드 진입
+        Recorded firstDay = recorder.on("2024-01-08");
         assertThat(firstDay.inputs().isReverseMode()).isTrue();
         assertThat(firstDay.inputs().isFirstReverseDay()).isTrue();
         // 진입 첫날은 별지점을 계산하지 않는다(즉시 청산 시작)
@@ -521,19 +547,19 @@ class BacktestEngineTest {
         assertThat(firstDay.orders().getFirst().quantity()).isEqualTo(5);
         assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(OrderType.MOC);
 
-        // 8일차: 별지점 = 최근 5거래일 종가(85·80·75·70·65) 평균 = 375 ÷ 5 = 75.00
-        Recorded secondDay = recorder.on("2024-01-08");
+        // 9일차: 별지점 = 최근 5거래일 종가(80·75·70·65·65) 평균 = 355 ÷ 5 = 71.00
+        Recorded secondDay = recorder.on("2024-01-09");
         assertThat(secondDay.inputs().isFirstReverseDay()).isFalse();
-        assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("75.00");
+        assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("71.00");
         assertThat(secondDay.legs()).containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
-        // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 455 ÷ 4) ÷ 74.99 내림 = 1주 @별지점−0.01
+        // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 430 ÷ 4) ÷ 70.99 내림 = 1주 @별지점−0.01
         assertThat(secondDay.orders().get(0).quantity()).isEqualTo(3);
-        assertThat(secondDay.orders().get(0).price()).isEqualByComparingTo("75.00");
+        assertThat(secondDay.orders().get(0).price()).isEqualByComparingTo("71.00");
         assertThat(secondDay.orders().get(1).quantity()).isEqualTo(1);
-        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("74.99");
+        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("70.99");
 
-        // 7일차 MOC 매도 5주가 8일차 종가 65에 체결 → 예수금 455 + 6주×65 = 845.00
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("845");
+        // 8일차 MOC 매도 5주가 9일차 종가 65에 체결 → 예수금 105 + 325 = 430 + 6주×65 = 820.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("820");
         assertThat(output.cycleCount()).isEqualTo(1);
     }
 
@@ -543,26 +569,25 @@ class BacktestEngineTest {
         RecordingInfinite recorder = new RecordingInfinite();
         BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
 
-        // 진입 시나리오는 위와 동일하되 8일차 종가만 65 → 68로 올린다
-        // 회복 임계선 = 평단 79.0909 × (1 − 0.15) = 67.23 → 68 ≥ 67.23이라 복귀
+        // 5일차: 9주·평단 87.7778·예수금 210 < 단위금액 250 → 리버스모드 진입(MOC 4주)
+        // 6일차: MOC 4주가 종가 75에 체결, 회복 임계선 = 평단 87.7778 × (1 − 0.15) = 74.61 → 75 ≥ 74.61이라 복귀
         BacktestEngine.Output output = infiniteEngine.run(List.of(
                 flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 90),
-                flat("2024-01-04", 85), flat("2024-01-05", 80), flat("2024-01-06", 75),
-                flat("2024-01-07", 70), flat("2024-01-08", 68)
+                flat("2024-01-04", 85), flat("2024-01-05", 80), flat("2024-01-06", 75)
         ), infiniteCommand("2024-01-01", "1000", 4));
 
-        assertThat(recorder.on("2024-01-07").inputs().isReverseMode()).isTrue();
+        assertThat(recorder.on("2024-01-05").inputs().isReverseMode()).isTrue();
 
-        Recorded back = recorder.on("2024-01-08");
+        Recorded back = recorder.on("2024-01-06");
         assertThat(back.inputs().isReverseMode()).isFalse();
         assertThat(back.inputs().starPointPrice()).isNull();
-        // 일반모드 주문 다리로 복귀 — 6주·평단 79.0909·예수금 470 → 2.01회차라 후반
-        assertThat(back.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
-        assertThat(back.orders().getFirst().quantity()).isEqualTo(2);
-        assertThat(back.orders().getFirst().price()).isEqualByComparingTo("79.09");
+        // 일반모드 주문 다리로 복귀 — 5주·평단 87.7778·예수금 510 → 단위금액 (510 + 438.89)/4 = 237.22, 1.85회차라 전반
+        assertThat(back.position(4).currentRound()).isEqualTo(1.85);
+        assertThat(back.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
 
-        // MOC 매도 5주가 종가 68에 체결 → 예수금 470 + 6주×68 = 878.00
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("878");
+        // 예수금 210 + MOC 4주×75 = 510 + 5주×75 = 885.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("885");
         assertThat(output.cycleCount()).isEqualTo(1);
     }
 
@@ -577,16 +602,17 @@ class BacktestEngineTest {
         BacktestEngine.Output output = infiniteEngine.run(List.of(
                 flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 100),
                 flat("2024-01-04", 95), flat("2024-01-05", 90)
-        ), infiniteCommand("2024-01-02", "1000", 2));
+        ), infiniteCommand("2024-01-01", "1000", 2));
 
-        // 4일차: 10주·평단 97.5·예수금 25 → 단위금액 500.00 > 25 → 리버스모드 진입, 전량(10주) MOC 매도
-        Recorded liquidating = recorder.on("2024-01-04");
+        // 1일차 매수 5주(@100, 캡 보정분 포함)가 2일차 체결 → 1.0회차(후반) 매수 5주 @100이 3일차 체결
+        // 3일차: 10주·평단 100·예수금 0 → 단위금액 500.00 > 0 → 리버스모드 진입, 전량(10주) MOC 매도
+        Recorded liquidating = recorder.on("2024-01-03");
         assertThat(liquidating.inputs().isReverseMode()).isTrue();
         assertThat(liquidating.inputs().isFirstReverseDay()).isTrue();
         assertThat(liquidating.orders().getFirst().quantity()).isEqualTo(10);
 
-        // 5일차: 10주가 종가 90에 전량 체결 → holdings 0 → 사이클 종료·즉시 재시작
-        Recorded restarted = recorder.on("2024-01-05");
+        // 4일차: 10주가 종가 95에 전량 체결 → holdings 0 → 사이클 종료·즉시 재시작
+        Recorded restarted = recorder.on("2024-01-04");
         assertThat(output.cycleCount()).isEqualTo(2);
         assertThat(restarted.balance().holdings()).isZero();
         // 리버스모드·별지점 윈도우 리셋 — 새 사이클은 항상 일반모드 0회차로 시작한다
@@ -595,9 +621,10 @@ class BacktestEngineTest {
         assertThat(restarted.inputs().starPointPrice()).isNull();
         assertThat(restarted.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
 
-        // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 25 + 매도대금 900 = 925.00
-        assertThat(restarted.balance().usdDeposit()).isEqualByComparingTo("925");
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("925");
+        // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 0 + 매도대금 950 = 950.00
+        assertThat(restarted.balance().usdDeposit()).isEqualByComparingTo("950");
+        // 5일차: 새 사이클 매수 5주가 종가 90에 체결 → 예수금 500 + 5주×90 = 950.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("950");
         assertThat(output.warnings()).isEmpty();
     }
 
@@ -610,7 +637,6 @@ class BacktestEngineTest {
         // 사이클 A(01-02~01-04)는 1000달러대 고가 구간, 사이클 B(01-04~)는 그보다 낮은 구간 —
         // 두 구간의 종가 수준을 벌려 놔야 윈도우 오염이 평균값 차이로 드러난다
         BacktestEngine.Output output = infiniteEngine.run(List.of(
-                flat("2024-01-01", 1000),
                 flat("2024-01-02", 1000),
                 flat("2024-01-03", 1000),
                 candle("2024-01-04", 1100, 1200, 1080, 1160), // 지정가 매도 2주@1150 체결 → 전량 청산 → 사이클 종료
@@ -640,6 +666,7 @@ class BacktestEngineTest {
     // --- PRIVACY 픽스처 헬퍼 ---
 
     // 날짜별 plan() 결과를 붙잡아 두는 기록기 — 캡 보정 전 전략 원본 주문을 그대로 담는다
+    // 기록 키는 계획일(캔들 날짜)이고, 기준 매매표 맵 키는 그 표가 적용되는 세션(= 계획일 다음 캔들) 날짜다
     // 기준 매매표가 없는 날도 엔진이 plan()을 호출하므로 "그날 주문이 비었다"까지 직접 단언할 수 있다
     private static final class RecordingPrivacy extends PrivacyCycleOrderStrategy {
 
@@ -701,12 +728,14 @@ class BacktestEngineTest {
         // 예수금 0 + 보유 5주 × 첫날 종가 100 = 자본 500 ÷ currentCycleStart 500 = 배수 1.00 → 기준표 BUY 3주 그대로 유지
         // (보유분 시장가를 빼먹으면 자본이 0이 되어 배수 0.00 → 주문이 통째로 사라진다)
         // 기준표 목표 보유량(5×배수1.00=5)을 현재 보유(5)와 맞춰 보유 보정(diff) 없이 배수 반영만 순수하게 검증한다
+        // 01-02 세션 기준표는 그 전날(01-01) 캔들 처리 끝에 계획된다
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-01", 100),
                 flat("2024-01-02", 100)
         ), privacyCommandWithPosition("0", 5, "70"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 5,
                 trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))));
 
-        assertThat(recorder.on("2024-01-02"))
+        assertThat(recorder.on("2024-01-01"))
                 .filteredOn(o -> o.direction() == OrderDirection.BUY)
                 .extracting(PlannedOrder::quantity)
                 .containsExactly(3);
@@ -718,27 +747,30 @@ class BacktestEngineTest {
         RecordingPrivacy recorder = new RecordingPrivacy();
 
         // seed 1000 ÷ currentCycleStart 500 = 배수 2.00 → 기준표 BUY 3주가 6주로 스케일
+        // 01-02 세션 기준표만 있다 — 01-01 캔들 처리 끝에 계획, 01-02에 체결 판정
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
-                flat("2024-01-02", 100),
-                flat("2024-01-03", 90),
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 90),
+                flat("2024-01-03", 80),
                 flat("2024-01-04", 80)
         ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
                 trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90"))));
 
-        // 1일차: 기준표 있음 → BUY 6주 @90 (전일종가가 없어 캡은 미적용)
-        assertThat(recorder.on("2024-01-02")).singleElement()
+        // 01-01 계획: 01-02 기준표 → BUY 6주 @90 (캡 = 01-01 종가 100 × 1.05 = 105 미적용)
+        assertThat(recorder.on("2024-01-01")).singleElement()
                 .satisfies(o -> assertThat(o.quantity()).isEqualTo(6),
                         o -> assertThat(o.price()).isEqualByComparingTo("90"));
-        // 2·3일차: 기준표 없음 → 주문 자체가 없다
+        // 01-02·01-03 계획: 다음 세션(01-03·01-04) 기준표 없음 → 주문 자체가 없다 (01-04는 마지막 캔들이라 계획 없음)
+        assertThat(recorder.on("2024-01-02")).isEmpty();
         assertThat(recorder.on("2024-01-03")).isEmpty();
-        assertThat(recorder.on("2024-01-04")).isEmpty();
 
-        // 2일차 종가 90에 LOC 6주 체결(540) → 예수금 460, 3일차는 신규 주문이 없어 체결도 없다
+        // 01-02 종가 90에 LOC 6주 체결(540) → 예수금 460, 이후엔 신규 주문이 없어 체결도 없다
         assertThat(output.points()).extracting(BacktestPoint::totalAsset)
                 .satisfiesExactly(
-                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 1일차
-                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 2일차: 460 + 6주×90
-                        p -> assertThat(p).isEqualByComparingTo("940"));  // 3일차: 460 + 6주×80
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 01-01
+                        p -> assertThat(p).isEqualByComparingTo("1000"),  // 01-02: 460 + 6주×90
+                        p -> assertThat(p).isEqualByComparingTo("940"),   // 01-03: 460 + 6주×80
+                        p -> assertThat(p).isEqualByComparingTo("940"));  // 01-04
         assertThat(output.tradeCount()).isEqualTo(1);
         assertThat(output.cycleCount()).isEqualTo(1);
         // 연속 결측 2일은 개별 경고가 아니라 구간 1건으로 요약된다
@@ -752,16 +784,17 @@ class BacktestEngineTest {
         // currentCycleStart=500 기준: seed 1000 → 배수 2.00 → 3주×2 = 6주 / seed 2000 → 배수 4.00 → 3주×4 = 12주
         Map<LocalDate, PrivacyTradeBase> bases = Map.of(LocalDate.parse("2024-01-02"), privacyBase("500", 0,
                 trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 3, "90")));
-        List<DailyCandle> candles = List.of(flat("2024-01-02", 100));
+        List<DailyCandle> candles = List.of(flat("2024-01-01", 100), flat("2024-01-02", 100));
 
         RecordingPrivacy single = new RecordingPrivacy();
         privacyEngine(single).run(candles, privacyCommand("1000"), bases);
         RecordingPrivacy doubled = new RecordingPrivacy();
         privacyEngine(doubled).run(candles, privacyCommand("2000"), bases);
 
-        assertThat(single.on("2024-01-02")).singleElement()
+        // 01-02 세션 기준표는 01-01 계획에서 쓰인다
+        assertThat(single.on("2024-01-01")).singleElement()
                 .satisfies(o -> assertThat(o.quantity()).isEqualTo(6));
-        assertThat(doubled.on("2024-01-02")).singleElement()
+        assertThat(doubled.on("2024-01-01")).singleElement()
                 .satisfies(o -> assertThat(o.quantity()).isEqualTo(12));
     }
 
@@ -770,14 +803,17 @@ class BacktestEngineTest {
     void 청산되면_배수_기준_자산이_청산_시점_예수금으로_갱신된다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
 
-        // 1일차 BUY 1주 @100 → 2일차 종가 100에 체결(예수금 900) → 2일차 잔량 전량 매도 주문(SELL null quantity)
-        // → 3일차 종가 60에 체결 → 예수금 960·보유 0 → 사이클 종료·재시작, 개장 자산 = 960
-        // 3일차 기준표는 currentCycleStart=96 → 올바르면 배수 960/96 = 10.00 → 10주×10 = 100주
+        // 01-01 계획 BUY 1주 @100(01-02 기준표) → 01-02 종가 100에 체결(예수금 900)
+        // → 01-02 계획 잔량 전량 매도(SELL null quantity, 01-03 기준표) → 01-03 종가 60에 체결 → 예수금 960·보유 0
+        // → 01-03 계획에서 사이클 종료·재시작, 개장 자산 = 960
+        // 01-04 기준표는 currentCycleStart=96 → 올바르면 배수 960/96 = 10.00 → 10주×10 = 100주
         // 시드(1000)로 잘못 리셋하면 배수 1000/96 = 10.41 → 104주가 되어 값이 어긋난다
+        // 01-04 종가 70 > 60이라 그 100주 LOC 매수는 체결되지 않는다(예수금 플로어 경고가 섞이지 않게)
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
+                flat("2024-01-01", 100),
                 flat("2024-01-02", 100),
-                flat("2024-01-03", 100),
-                flat("2024-01-04", 60)
+                flat("2024-01-03", 60),
+                flat("2024-01-04", 70)
         ), privacyCommand("1000"), Map.of(
                 LocalDate.parse("2024-01-02"), privacyBase("1000", 0,
                         trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 1, "100")),
@@ -786,15 +822,15 @@ class BacktestEngineTest {
                 LocalDate.parse("2024-01-04"), privacyBase("96", 0,
                         trade("2024-01-04", OrderType.LOC, OrderDirection.BUY, 10, "60"))));
 
-        // 2일차: 보유 1주 전량을 잔량 매도로 내보낸다
-        assertThat(recorder.on("2024-01-03")).singleElement()
+        // 01-02 계획: 보유 1주 전량을 잔량 매도로 내보낸다
+        assertThat(recorder.on("2024-01-02")).singleElement()
                 .satisfies(o -> assertThat(o.direction()).isEqualTo(OrderDirection.SELL),
                         o -> assertThat(o.quantity()).isEqualTo(1));
 
         assertThat(output.cycleCount()).isEqualTo(2);
-        // 3일차 자산 = 예수금 960 (보유 0) — 이 값이 곧 새 사이클의 배수 기준이다
+        // 마지막 자산 = 예수금 960 (보유 0) — 이 값이 곧 새 사이클의 배수 기준이다
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("960");
-        assertThat(recorder.on("2024-01-04")).singleElement()
+        assertThat(recorder.on("2024-01-03")).singleElement()
                 .satisfies(o -> assertThat(o.quantity()).isEqualTo(100));
         assertThat(output.tradeCount()).isEqualTo(2);
         assertThat(output.warnings()).isEmpty();
@@ -805,15 +841,16 @@ class BacktestEngineTest {
     void cap을_넘는_BUY만_가격이_치환되고_수량은_유지된다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
 
-        // 2일차 캡 = 전일종가 100 × 1.05 = 105.00 → BUY @200은 105.00으로 치환, BUY @50은 그대로
-        // 3일차 저가 40이 두 지정가를 모두 터치 → LIMIT은 지정가로 체결되므로 치환된 가격이 그대로 현금에 드러난다
+        // 01-04 세션 기준표를 01-03에 계획 — 캡 = 01-03 종가 100 × 1.05 = 105.00 → BUY @200은 105.00으로 치환, BUY @50은 그대로
+        // 01-04 저가 40이 두 지정가를 모두 터치, 시가 110은 두 지정가보다 높아 갭 체결 없이 지정가로 체결된다
+        // → 치환된 가격이 그대로 현금에 드러난다
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
                 flat("2024-01-02", 100),
                 flat("2024-01-03", 100),
-                candle("2024-01-04", 100, 110, 40, 100)
-        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
-                trade("2024-01-03", OrderType.LIMIT, OrderDirection.BUY, 1, "200"),
-                trade("2024-01-03", OrderType.LIMIT, OrderDirection.BUY, 1, "50"))));
+                candle("2024-01-04", 110, 110, 40, 100)
+        ), privacyCommand("1000"), Map.of(LocalDate.parse("2024-01-04"), privacyBase("1000", 0,
+                trade("2024-01-04", OrderType.LIMIT, OrderDirection.BUY, 1, "200"),
+                trade("2024-01-04", OrderType.LIMIT, OrderDirection.BUY, 1, "50"))));
 
         // 캡 보정 전 원본 — 배수 1.00이라 수량은 둘 다 1주, 가격은 기준표 그대로(BUY는 고가 우선 정렬)
         assertThat(recorder.on("2024-01-03")).satisfiesExactly(
@@ -821,7 +858,7 @@ class BacktestEngineTest {
                 o -> assertThat(o.price()).isEqualByComparingTo("50"));
         assertThat(recorder.on("2024-01-03")).allSatisfy(o -> assertThat(o.quantity()).isEqualTo(1));
 
-        // 3일차 체결액 = 105.00 + 50 = 155.00 → 예수금 845 + 2주×종가 100 = 1045.00
+        // 01-04 체결액 = 105.00 + 50 = 155.00 → 예수금 845 + 2주×종가 100 = 1045.00
         // 캡이 적용되지 않았다면 200 + 50 = 250 체결로 750 + 200 = 950.00이 된다(수량이 바뀌면 이 값도 어긋난다)
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1045.00");
         assertThat(output.tradeCount()).isEqualTo(2);
@@ -840,8 +877,9 @@ class BacktestEngineTest {
                 Map.of(LocalDate.parse("2024-01-21"), privacyBase("1000", 0,
                         trade("2024-01-21", OrderType.LOC, OrderDirection.BUY, 1, "1"))));
 
+        // 결측은 세션 날짜 기준 — 첫 캔들(01-01) 세션은 계획일이 없어 집계 대상이 아니다
         assertThat(output.warnings()).containsExactly(
-                "2024-01-01 ~ 2024-01-20(총 20일): 기준 매매표가 없어 매매하지 않았습니다.",   // 구간이 끝나는 기준표 수신일에 flush
+                "2024-01-02 ~ 2024-01-20(총 19일): 기준 매매표가 없어 매매하지 않았습니다.",   // 구간이 끝나는 기준표 수신일에 flush
                 "2024-01-22 ~ 2024-02-10(총 20일): 기준 매매표가 없어 매매하지 않았습니다.");  // 마지막까지 이어진 구간은 루프 종료 후 flush
         assertThat(output.tradeCount()).isZero();
     }
@@ -849,16 +887,14 @@ class BacktestEngineTest {
     @Test
     @DisplayName("예수금 음수 방지: 연속 3일 플로어 발동이 일별 경고가 아니라 구간당 1건으로 요약된다")
     void 체결_후_예수금이_음수면_0으로_클램프된다() {
-        // 배수 1.00 고정, 기준표 목표 보유를 매일 크게 늘려(100→250→400→550) 보유 보정(diff)이 매일 시드를 넘기게 만든다
-        // 마지막 날(01-05)도 기준표를 채워 "결측 구간" 경고가 섞이지 않게 한다 — 그날 생성된 주문은 체결 기회가 없어 자연히 버려진다
+        // 배수 1.00 고정, 기준표 목표 보유를 매일 크게 늘려(250→400→550) 보유 보정(diff)이 매일 시드를 넘기게 만든다
+        // 마지막 세션(01-05)까지 기준표를 채워 "결측 구간" 경고가 섞이지 않게 한다
         BacktestEngine.Output output = privacyEngine(new RecordingPrivacy()).run(List.of(
                 flat("2024-01-02", 100),
                 flat("2024-01-03", 100),
                 flat("2024-01-04", 100),
                 flat("2024-01-05", 100)
         ), privacyCommand("1000"), Map.of(
-                LocalDate.parse("2024-01-02"), privacyBase("1000", 100,
-                        trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 1, "100")),
                 LocalDate.parse("2024-01-03"), privacyBase("1000", 250,
                         trade("2024-01-03", OrderType.LOC, OrderDirection.BUY, 1, "100")),
                 LocalDate.parse("2024-01-04"), privacyBase("1000", 400,
@@ -866,12 +902,13 @@ class BacktestEngineTest {
                 LocalDate.parse("2024-01-05"), privacyBase("1000", 550,
                         trade("2024-01-05", OrderType.LOC, OrderDirection.BUY, 1, "100"))));
 
-        // 01-02 주문: diff=100-0=100 → 101주@100=10,100.0 → 01-03 체결, 예수금 1000-10100.0=-9100.0 → 0 클램프(플로어 1일차)
-        // 01-03 주문: diff=250-101=149 → 150주@100=15,000.0 → 01-04 체결, 0-15000.0=-15000.0 → 0 클램프(플로어 2일차, 최대부족액 15000.0)
-        // 01-04 주문: diff=400-251=149 → 150주@100=15,000.0 → 01-05 체결, 0-15000.0=-15000.0 → 0 클램프(플로어 3일차)
-        // 01-05 주문은 만들어지지만 이후 캔들이 없어 체결·경고 없이 버려짐 → 구간이 루프 종료 시점에 1건으로 flush
+        // 기준표 키는 적용 세션 — 01-02 세션은 첫 캔들이라 계획일이 없다
+        // 01-02 계획(01-03 표): diff=250-0=250 → 251주@100=25,100.0 → 01-03 체결, 1000-25100.0=-24100.0 → 0 클램프(플로어 1일차, 최대부족액 24100.0)
+        // 01-03 계획(01-04 표): diff=400-251=149 → 150주@100=15,000.0 → 01-04 체결, -15000.0 → 0 클램프(플로어 2일차)
+        // 01-04 계획(01-05 표): diff=550-401=149 → 150주@100=15,000.0 → 01-05 체결, -15000.0 → 0 클램프(플로어 3일차)
+        // 01-05는 마지막 캔들이라 계획 없음 → 구간이 루프 종료 시점에 1건으로 flush
         assertThat(output.warnings()).containsExactly(
-                "2024-01-03 ~ 2024-01-05(총 3일): 체결 후 예수금이 부족해 0으로 조정했습니다. 최대 부족액은 $15,000.00입니다.");
+                "2024-01-03 ~ 2024-01-05(총 3일): 체결 후 예수금이 부족해 0으로 조정했습니다. 최대 부족액은 $24,100.00입니다.");
         // 3영업일 연속 플로어가 발동했는데도 경고는 정확히 1건 — 일수에 비례하지 않는다
         assertThat(output.tradeCount()).isEqualTo(3);
     }

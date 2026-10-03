@@ -34,11 +34,18 @@ public final class FillSimulator {
         List<Execution> executions = new ArrayList<>();
         for (PlannedOrder order : pendingOrders) {
             if (!fillsOhlc(order, candle)) continue;
-            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? order.price() : candle.close();
+            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? limitFillPrice(order, candle) : candle.close();
             executions.add(Execution.ofManualFill(candle.date(), order.ticker(), order.direction(),
                     order.quantity(), fillPrice, order.orderLeg()));
         }
         return executions;
+    }
+
+    // LIMIT 체결가 — 시가가 지정가보다 유리하게 열리면(매수: 시가<지정가, 매도: 시가>지정가) 개장 즉시 시가에 체결된다
+    private static BigDecimal limitFillPrice(PlannedOrder order, DailyCandle candle) {
+        return order.direction() == OrderDirection.BUY
+                ? order.price().min(candle.open())
+                : order.price().max(candle.open());
     }
 
     // 주문타입별 OHLC 체결 조건 — LIMIT만 저가/고가 터치, 나머지(MOC/LOC)는 종가 기준
