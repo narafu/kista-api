@@ -29,7 +29,7 @@ sellPrice(s) = upperBand ÷ (holdings − s + 1)  (scale=2, HALF_UP, s=1..20)
 V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_UP, 중간 scale=10)
      평가금 = holdings × 종가
 ```
-- **gradient(G)·poolLimitRate 램프**: 둘 다 고정값이 아닌 "전략 최초 사이클 startDate부터 경과한 주수(weeks)"에 따라 점진 변화하는 값. 초기값·램프 파라미터(유예·단계주기·상하한) 8개는 전략 등록 시 사용자 입력(`StrategyVrDetail`: `initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor`), 생략 시 recurringMode(적립/거치/인출) 고정값 표(kista-ui `RAMP_DEFAULTS_BY_MODE`와 동기화) + 유예 52주·단계 26주로 채운다 — gGraceWeeks/gStepWeeks/pGraceWeeks/pStepWeeks 4필드만 생략 시 관례값, 나머지 4필드(initialGradient/gMax/initialPoolLimitRate/poolLimitFloor)는 아래 표 그대로
+- **gradient(G)·poolLimitRate 램프**: 둘 다 고정값이 아닌 "전략 최초 사이클 startDate부터 경과한 주수(weeks)"에 따라 점진 변화하는 값. 초기값·램프 파라미터(유예·단계주기·상하한) 8개는 전략 등록 시 사용자 입력(`StrategyVrDetail`: `initialGradient/gGraceWeeks/gStepWeeks/gMax/initialPoolLimitRate/pGraceWeeks/pStepWeeks/poolLimitFloor`), 생략 시 recurringMode(적립/거치/인출) 고정값 표(kista-ui `RAMP_DEFAULTS_BY_MODE`와 동기화) + 유예 52주·단계 26주로 채운다 — gGraceWeeks/gStepWeeks/pGraceWeeks/pStepWeeks 4필드만 생략 시 관례값, 나머지 4필드(initialGradient/gMax/initialPoolLimitRate/poolLimitFloor)는 아래 표 그대로. 기본값 표·검증의 SSOT는 `com.kista.trading.domain.strategy.VrRampParams.withDefaults()`/`VrRampValidator` — 등록(`StrategyCreationService`)·재설정(`VrReconfigureService`, 검증만)·백테스트(tradingstats `BacktestService`/`BacktestEngine`)가 공유
     | recurringMode | initialGradient | gMax | initialPoolLimitRate | poolLimitFloor |
     |---|---|---|---|---|
     | 적립(`recurringAmount>0`) | 10 | 20 | 1.0 | 0.5 |

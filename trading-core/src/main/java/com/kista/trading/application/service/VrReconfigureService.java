@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.trading.domain.strategy.VrRampValidator;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.application.service.BrokerCallGuard;

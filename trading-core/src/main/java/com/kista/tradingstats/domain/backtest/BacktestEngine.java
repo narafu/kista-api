@@ -17,6 +17,7 @@ import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.matching.domain.strategy.InfiniteStrategy;
 import com.kista.matching.domain.strategy.PriceCapPolicy;
 import com.kista.matching.domain.strategy.VrStrategy;
+import com.kista.trading.domain.strategy.VrRampParams;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -44,9 +45,6 @@ public class BacktestEngine {
     private static final VrStrategy VR_STRATEGY = new VrStrategy();
     // 캡 재산정(수량 재계산 + 보정 주문) 전용 — InfiniteStrategy도 무상태
     private static final InfiniteStrategy INFINITE_STRATEGY = new InfiniteStrategy();
-    // VR 램프 유예·단계 주수 기본값 — 운영 StrategyService.normalizeVrRampParams()와 동일
-    private static final int DEFAULT_GRACE_WEEKS = 52;
-    private static final int DEFAULT_STEP_WEEKS = 26;
     // 리버스모드 별지점 산출에 쓰는 최근 종가 개수 — 운영 CycleOrderComputer.STAR_POINT_WINDOW와 동일
     private static final int STAR_POINT_WINDOW = 5;
 
@@ -163,8 +161,8 @@ public class BacktestEngine {
     // --- VR 경로 ---
 
     private Output runVr(List<DailyCandle> candles, BacktestCommand command) {
-        StrategyVrDetail detail = syntheticVrDetail(command);
-        VrState state = new VrState(command, detail, candles.getFirst().date());
+        StrategyVrDetail detail = vrDetail(command);
+        VrState state = new VrState(command, detail, candles.getFirst());
         List<String> warnings = new ArrayList<>();
 
         // VR엔 워밍업 프리픽스 개념이 없다(전일종가 없이도 사다리가 성립) — 첫 캔들을 거래 시작일로 넘겨 pre-start skip을 no-op으로 만든다
@@ -364,16 +362,28 @@ public class BacktestEngine {
 
     // --- 전략 공통 헬퍼 ---
 
-    // 합성 VR 상세 — 램프 8파라미터는 백테스트 입력으로 받지 않고 운영의 recurringMode 고정값 표(RAMP_DEFAULTS_BY_MODE와 동기화)를 그대로 쓴다
-    // gMax=initialGradient, poolLimitFloor=initialPoolLimitRate로 두면 gradientAt()/poolLimitRateAt()의 상하한 클램프가
-    // 항상 초기값을 돌려준다 — 즉 "램프 없음, 초기값 고정"(백테스트는 램프 자체를 모델링하지 않는다는 기존 설계 유지)
-    private static StrategyVrDetail syntheticVrDetail(BacktestCommand command) {
-        int initialGradient = command.vrRecurringAmount() < 0 ? 40 : 10;
-        BigDecimal initialPoolLimitRate = command.vrRecurringAmount() > 0 ? BigDecimal.ONE
-                : command.vrRecurringAmount() == 0 ? new BigDecimal("0.75") : new BigDecimal("0.1");
+    // VR 상세 — 램프 8파라미터는 운영 전략 등록과 같은 기본값 표로 정규화된 값(BacktestCommand.vrRamp())을 그대로 쓴다
+    private static StrategyVrDetail vrDetail(BacktestCommand command) {
+        VrRampParams ramp = command.vrRamp();
         return new StrategyVrDetail(null, command.vrIntervalWeeks(), command.vrBandWidth(),
-                command.vrRecurringAmount(), initialGradient, DEFAULT_GRACE_WEEKS, DEFAULT_STEP_WEEKS,
-                initialGradient, initialPoolLimitRate, DEFAULT_GRACE_WEEKS, DEFAULT_STEP_WEEKS, initialPoolLimitRate);
+                command.vrRecurringAmount(), ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(),
+                ramp.gMax(), ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
+    }
+
+    // 초기 V값 — 운영 StrategyCreationService.resolveVrValue()와 동일 우선순위: 직접 입력(>0)이 있으면 그 값,
+    // 없으면 보유분 평가금(시작 시점 시장가 × 보유수량). 등록 시점 전일종가 대신 첫 캔들 종가로 근사한다(PrivacyState와 동일 근사)
+    // 보유분이 없으면 0 — VrStrategy bootstrap 경로로 첫 포지션을 만든다
+    public static BigDecimal initialVrValue(BacktestCommand command, BigDecimal day0Close) {
+        BigDecimal explicit = command.vrInitialValue();
+        return explicit != null && explicit.signum() > 0 ? explicit : initialStockValue(command, day0Close);
+    }
+
+    // 시작 보유분 시장가 평가금 = 첫 캔들 종가 × 보유수량 (보유 없으면 0)
+    public static BigDecimal initialStockValue(BacktestCommand command, BigDecimal day0Close) {
+        int holdings = command.initialHoldings() != null ? command.initialHoldings() : 0;
+        return holdings > 0
+                ? day0Close.multiply(BigDecimal.valueOf(holdings)).setScale(2, HALF_UP)
+                : BigDecimal.ZERO;
     }
 
     // 보유분 시장가 평가액 = 종가 × 보유수량
@@ -435,11 +445,11 @@ public class BacktestEngine {
         BigDecimal poolUsed = BigDecimal.ZERO; // 이번 사이클 매수 체결 누계
         boolean valueHoldWarned;               // V′≤0 보류 경고 중복 방지 플래그
 
-        VrState(BacktestCommand command, StrategyVrDetail detail, LocalDate startDate) {
+        VrState(BacktestCommand command, StrategyVrDetail detail, DailyCandle firstCandle) {
             super(command);
-            this.value = command.vrInitialValue() != null ? command.vrInitialValue() : BigDecimal.ZERO;
-            this.firstCycleStartDate = startDate;
-            this.cycleStartDate = startDate;
+            this.value = initialVrValue(command, firstCandle.close());
+            this.firstCycleStartDate = firstCandle.date();
+            this.cycleStartDate = firstCandle.date();
             this.poolLimit = poolLimitOf(command.seedOrZero(), detail.poolLimitRateAt(0));
         }
 

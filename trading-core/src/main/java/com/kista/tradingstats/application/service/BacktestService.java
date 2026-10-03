@@ -11,6 +11,11 @@ import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.sharedkernel.ReturnMetrics;
 import com.kista.matching.domain.model.BootstrapPosition;
 import com.kista.trading.domain.model.Strategy;
+import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
+import com.kista.trading.domain.strategy.VrRampValidator;
+import com.kista.trading.domain.strategy.StrategyCreationResolver;
+import com.kista.sharedkernel.RecurringMode;
+import com.kista.sharedkernel.StrategyCreationSettings;
 import com.kista.tradingstats.application.usecase.BacktestUseCase;
 import com.kista.tradingstats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -19,7 +24,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -35,8 +39,6 @@ class BacktestService implements BacktestUseCase {
 
     // INFINITE는 holdings==0일 때 전일종가가 없으면 첫날 주문 자체를 못 만든다 — 미국 최장 연휴+주말도 덮는 워밍업 여유일
     private static final int INFINITE_WARMUP_DAYS = 10;
-    // 인출식 최소자산 계수 — StrategyService.validateVrCommand()와 동일한 식(백테스트라고 완화하지 않는다)
-    private static final BigDecimal WITHDRAW_MIN_ASSET_MULTIPLIER = new BigDecimal("400"); // 100 × 4주
     private static final String FILL_MODEL_WARNING =
             "체결은 일봉 고가/저가 터치 기준으로 판정됩니다 — 매도 주문은 실제보다 낙관적으로(항상 전량 체결 가정), "
                     + "매수 주문은 가격 캡에 걸릴 경우 실제보다 비관적으로(캡 지정가 그대로 체결 가정) 평가될 수 있습니다.";
@@ -49,12 +51,15 @@ class BacktestService implements BacktestUseCase {
     private final HistoricalCandlePort candlePort;         // 과거 일봉 조달 (Alpaca)
     private final PrivacyTradePort privacyTradePort;       // PRIVACY 기준 매매표 조회
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 capability 라우터 (엔진에 그대로 위임)
+    private final StrategyCreationPolicyPort strategyCreationPolicyPort; // VR bandWidth/intervalWeeks 허용값 — 운영 등록과 동일 정책
 
     @Override
     public BacktestResult run(BacktestCommand command) {
         validate(command);
 
         List<DailyCandle> candles = fetchCandles(command); // 비어 있으면 어댑터가 이미 IllegalArgumentException
+        // VR 인출식 최소자산은 시작 시점 시장가가 필요해 캔들 조달 뒤에 검증한다
+        if (command.type() == StrategyType.VR) validateVrWithdrawal(command, candles.getFirst().close());
         List<String> warnings = new ArrayList<>();
 
         // PRIVACY만 날짜별 기준 매매표를 미리 조달한다 — 도메인 엔진은 DB I/O를 할 수 없다
@@ -105,6 +110,7 @@ class BacktestService implements BacktestUseCase {
         if (command.type() == StrategyType.VR) validateVr(command);
     }
 
+    // 운영 StrategyCreationService.validateVrCommand()와 동일 규칙 — 허용값·램프 (인출식 최소자산은 validateVrWithdrawal)
     private void validateVr(BacktestCommand command) {
         if (command.vrBandWidth() == null || command.vrBandWidth().signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭(vrBandWidth)은 0보다 커야 합니다");
@@ -112,24 +118,42 @@ class BacktestService implements BacktestUseCase {
         if (command.vrIntervalWeeks() == null || command.vrIntervalWeeks() <= 0) {
             throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(vrIntervalWeeks)는 1 이상이어야 합니다");
         }
-        BigDecimal initialValue = command.vrInitialValue() != null ? command.vrInitialValue() : BigDecimal.ZERO;
-        // 인출식 최소자산 — 운영 등록 검증(StrategyService)과 동일한 식, BigDecimal 나눗셈이라 정수 절삭 없음
-        if (command.vrRecurringAmount() < 0) {
-            BigDecimal required = BigDecimal.valueOf(Math.abs((long) command.vrRecurringAmount()))
-                    .multiply(WITHDRAW_MIN_ASSET_MULTIPLIER)
-                    .divide(BigDecimal.valueOf(command.vrIntervalWeeks()), 2, RoundingMode.HALF_UP);
-            // 보유분 취득원가도 포함 — holdings만으로 시작하는 인출식 VR을 vrInitialValue 부풀리기 없이 정확히 검증
-            BigDecimal stockCost = command.initialHoldings() != null && command.initialHoldings() > 0
-                    ? command.initialAvgPrice().multiply(BigDecimal.valueOf(command.initialHoldings()))
-                    : BigDecimal.ZERO;
-            if (initialValue.add(command.seedOrZero()).add(stockCost).compareTo(required) < 0) {
-                throw new IllegalArgumentException("인출식 VR 백테스트의 초기 자산은 " + required + " 이상이어야 합니다");
-            }
+        if (command.vrInitialValue() != null && command.vrInitialValue().signum() < 0) {
+            throw new IllegalArgumentException("VR 백테스트의 초기 V값(vrInitialValue)은 0 이상이어야 합니다");
         }
-        // V=0인 채로 보유수량이 생기면 upperBand=0 → 매도 사다리가 $0.00 지정가로 나와 보유분이 증발한다
-        // (운영에선 증권사가 $0 주문을 거부해 드러나지 않는 VrStrategy 사전조건) — API 경계에서 차단
-        if (initialValue.signum() <= 0) {
-            throw new IllegalArgumentException("VR 백테스트의 초기 V값(vrInitialValue)은 0보다 커야 합니다");
+        validateVrAllowedValues(command);
+        command.vrRamp().validate(command.vrIntervalWeeks(), command.vrBandWidth());
+    }
+
+    // 인출식 최소자산·거치식 게이트 — 운영과 동일하게 gate는 V값(직접 입력 우선) 기준, 필요자산 비교는 시장가 평가금 기준
+    private void validateVrWithdrawal(BacktestCommand command, BigDecimal day0Close) {
+        BigDecimal seed = command.seedOrZero();
+        BigDecimal stockValue = BacktestEngine.initialStockValue(command, day0Close);
+        BigDecimal vrValue = BacktestEngine.initialVrValue(command, day0Close);
+        VrRampValidator.validateWithdrawalSufficiency(command.vrRecurringAmount(), command.vrIntervalWeeks(),
+                vrValue.add(seed), stockValue.add(seed));
+    }
+
+    // bandWidth/intervalWeeks/입출금 방향이 런타임 생성 정책 허용값 안인지 — enabled 여부는 백테스트에선 보지 않는다
+    // StrategyFieldSettings.resolve()는 영어 메시지라 쓰지 않고 같은 비교(BigDecimal은 compareTo)를 한국어 문구로 직접 수행한다
+    private void validateVrAllowedValues(BacktestCommand command) {
+        StrategyCreationSettings settings = strategyCreationPolicyPort.find(StrategyType.VR)
+                .orElseThrow(() -> new IllegalArgumentException("VR 전략 생성 정책이 없어 백테스트를 실행할 수 없습니다."));
+        List<BigDecimal> bandWidths = settings.bandWidth().allowedValues();
+        if (bandWidths.stream().noneMatch(v -> v.compareTo(command.vrBandWidth()) == 0)) {
+            throw new IllegalArgumentException("지원하지 않는 밴드 폭(vrBandWidth)입니다: " + command.vrBandWidth()
+                    + ", 허용값=" + bandWidths);
+        }
+        // 적립/거치/인출 방향도 운영 VrCreationResolver와 같은 정책 — 고정 정책이면 allowedValues=[HOLD]라 같은 비교로 막힌다
+        RecurringMode mode = StrategyCreationResolver.recurringModeOf(command.vrRecurringAmount());
+        if (!settings.recurringMode().allowedValues().contains(mode)) {
+            throw new IllegalArgumentException("지원하지 않는 입출금 방식(vrRecurringAmount)입니다: " + mode
+                    + ", 허용값=" + settings.recurringMode().allowedValues());
+        }
+        List<Integer> intervals = settings.intervalWeeks().allowedValues();
+        if (!intervals.contains(command.vrIntervalWeeks())) {
+            throw new IllegalArgumentException("지원하지 않는 리밸런싱 주기(vrIntervalWeeks)입니다: " + command.vrIntervalWeeks()
+                    + ", 허용값=" + intervals);
         }
     }
 

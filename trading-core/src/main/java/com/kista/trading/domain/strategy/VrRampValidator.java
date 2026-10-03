@@ -1,17 +1,17 @@
-package com.kista.trading.application.service;
+package com.kista.trading.domain.strategy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-// VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService(등록)·VrReconfigureService(재설정) 공유
+// VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService(등록)·VrReconfigureService(재설정)·tradingstats BacktestService(백테스트) 공유
 // (docs/agents/modules/trading-formulas.md "VR 공식" 변경 금지 대상 — 검증 조건 자체는 옮기기 전과 byte-for-byte 동일)
-final class VrRampValidator {
+public final class VrRampValidator {
 
     private VrRampValidator() {
     }
 
     // gradient/poolLimitRate 램프 8필드 + intervalWeeks/bandWidth 검증
-    static void validateRampParams(int intervalWeeks, BigDecimal bandWidth,
+    public static void validateRampParams(int intervalWeeks, BigDecimal bandWidth,
                                     int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
                                     BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks, BigDecimal poolLimitFloor) {
         if (intervalWeeks <= 0) {
@@ -57,7 +57,7 @@ final class VrRampValidator {
     // 인출식(recurringAmount<0) 최소자산 검증 — gateCheckAssets: 거치식/인출식 "0보다 커야" 게이트(override 값 허용 가능한 쪽)
     // requiredCheckAssets: 인출액 대비 필요자산 비교 기준(등록 시엔 override 우회 방지를 위해 실제 시장가 기준 값을 별도로 넘김,
     // 재설정 시엔 override 개념이 없어 두 값이 동일)
-    static void validateWithdrawalSufficiency(int recurringAmount, int intervalWeeks,
+    public static void validateWithdrawalSufficiency(int recurringAmount, int intervalWeeks,
                                                BigDecimal gateCheckAssets, BigDecimal requiredCheckAssets) {
         if (recurringAmount <= 0 && gateCheckAssets.signum() <= 0) {
             throw new IllegalArgumentException("VR 거치식/인출식은 초기 V값과 초기 예수금 중 하나는 0보다 커야 합니다");

@@ -14,6 +14,8 @@ import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.trading.domain.model.*;
 import com.kista.trading.domain.strategy.StrategyCreationResolver.ResolvedCreation;
 import com.kista.trading.domain.strategy.StrategyCreationResolvers;
+import com.kista.trading.domain.strategy.VrRampParams;
+import com.kista.trading.domain.strategy.VrRampValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -174,31 +176,14 @@ class StrategyCreationService {
         VrRampValidator.validateWithdrawalSufficiency(normalizedRecurringAmount, intervalWeeks, initialAssets, evaluatedAssets);
 
         // 램프 파라미터 + intervalWeeks/bandWidth 검증 — 정규화된(null 아님) 값 기준
-        VrRampValidator.validateRampParams(intervalWeeks, bandWidth,
-                ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
-                ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
+        ramp.validate(intervalWeeks, bandWidth);
     }
 
-    // VR 램프 파라미터 정규화 — 미지정 필드를 recurringAmount 부호(적립/거치/인출) 고정값 표로 채운다 (kista-ui RAMP_DEFAULTS_BY_MODE와 동기화)
-    // 적립(>0): gradient 10/gMax 20/rate 1.0/floor 0.5, 거치(==0): gradient 10/gMax 20/rate 0.75/floor 0.5, 인출(<0): gradient 40/gMax 50/rate 0.1/floor 0.1
+    // VR 램프 파라미터 정규화 — 기본값 표는 VrRampParams.withDefaults()가 SSOT(백테스트와 공유)
     private VrRampParams normalizeVrRampParams(RegisterStrategyCommand cmd, int normalizedRecurringAmount) {
-        int defaultInitialGradient = normalizedRecurringAmount < 0 ? 40 : 10;
-        int defaultGMax = normalizedRecurringAmount < 0 ? 50 : 20;
-        BigDecimal defaultInitialPoolLimitRate = normalizedRecurringAmount > 0 ? BigDecimal.ONE
-                : normalizedRecurringAmount == 0 ? new BigDecimal("0.75") : new BigDecimal("0.1");
-        BigDecimal defaultPoolLimitFloor = normalizedRecurringAmount < 0 ? new BigDecimal("0.1") : new BigDecimal("0.5");
-
-        int initialGradient = cmd.initialGradient() != null ? cmd.initialGradient() : defaultInitialGradient;
-        int gGraceWeeks = cmd.gGraceWeeks() != null ? cmd.gGraceWeeks() : 52;
-        int gStepWeeks = cmd.gStepWeeks() != null ? cmd.gStepWeeks() : 26;
-        int gMax = cmd.gMax() != null ? cmd.gMax() : defaultGMax;
-        BigDecimal initialPoolLimitRate = cmd.initialPoolLimitRate() != null
-                ? cmd.initialPoolLimitRate() : defaultInitialPoolLimitRate;
-        int pGraceWeeks = cmd.pGraceWeeks() != null ? cmd.pGraceWeeks() : 52;
-        int pStepWeeks = cmd.pStepWeeks() != null ? cmd.pStepWeeks() : 26;
-        BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : defaultPoolLimitFloor;
-        return new VrRampParams(initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
+        return VrRampParams.withDefaults(normalizedRecurringAmount,
+                cmd.initialGradient(), cmd.gGraceWeeks(), cmd.gStepWeeks(), cmd.gMax(),
+                cmd.initialPoolLimitRate(), cmd.pGraceWeeks(), cmd.pStepWeeks(), cmd.poolLimitFloor());
     }
 
     // VR 금액 입력 null은 사용자가 0을 입력한 것과 동일하게 취급
@@ -283,11 +268,6 @@ class StrategyCreationService {
     // 초기 사이클·개장 포지션·VR 전용 cycleVr 저장 결과 — VR 외 cycleVr는 null
     private record InitialCycleResult(StrategyCycle cycle, CyclePosition initialPosition,
                                       StrategyCycleVrDetail cycleVr) {}
-
-    // VR 램프 파라미터 정규화 결과 — 8필드 모두 non-null(int/BigDecimal), normalizeVrRampParams()의 반환 묶음
-    private record VrRampParams(int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
-                                 BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks,
-                                 BigDecimal poolLimitFloor) {}
 
     // 예수금 = 증권사 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {

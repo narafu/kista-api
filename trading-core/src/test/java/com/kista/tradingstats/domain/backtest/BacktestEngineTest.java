@@ -148,6 +148,45 @@ class BacktestEngineTest {
     }
 
     @Test
+    @DisplayName("램프: 입력한 gradient 램프가 롤오버 V′ 계산에 반영된다 (유예 0주·1주마다 G+1)")
+    void 램프_파라미터가_롤오버_gradient에_반영된다() {
+        // 위 롤오버 테스트와 같은 입력에 gGraceWeeks=0, gStepWeeks=1만 추가 — 01-08은 경과 1주,
+        // gradientAt은 유예 경계 주차부터 1단계로 세므로 단계 수 = (1 − 0)/1 + 1 = 2 → G = 10 + 2 = 12
+        // (poolLimitRate 램프는 pStepWeeks=0으로 꺼서 gradient 효과만 분리)
+        // V′ = 1000 + 2000/12 + 0 + (0−1000)/(2√12) = 1166.6666667 − 144.3375673 = 1022.33
+        // → lowerBand = 1022.33 × 0.85 = 868.98 → 3일차 저가 860에 1주 체결 → 2000 − 868.98 + 900 = 2031.02
+        // 램프가 무시되면(G=10 고정) 체결가는 885.61이 되어 총자산이 2014.39로 나온다
+        BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("2000"),
+                null, BAND_WIDTH, 1, 0, new BigDecimal("1000"), null, null,
+                new BacktestCommand.VrRampInput(null, 0, 1, null, null, null, 0, null));
+
+        BacktestEngine.Output output = engine.run(List.of(
+                candle("2024-01-01", 950, 1000, 900, 950),
+                candle("2024-01-08", 950, 1000, 900, 950),
+                candle("2024-01-09", 900, 950, 860, 900)
+        ), command);
+
+        assertThat(output.cycleCount()).isEqualTo(2);
+        assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("2031.02");
+    }
+
+    @Test
+    @DisplayName("초기 V 미입력 + 보유분이 있으면 첫 캔들 종가 × 보유수량을 V로 쓴다 (운영 등록과 동일 우선순위)")
+    void 초기V_미입력이면_보유분_평가금이_V가_된다() {
+        BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), BigDecimal.ZERO,
+                null, BAND_WIDTH, 4, 0, null, 3, new BigDecimal("80"));
+
+        assertThat(BacktestEngine.initialVrValue(command, new BigDecimal("100.005"))).isEqualByComparingTo("300.02");
+        // 직접 입력(>0)이 있으면 그 값이 우선
+        BacktestCommand explicit = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), BigDecimal.ZERO,
+                null, BAND_WIDTH, 4, 0, new BigDecimal("500"), 3, new BigDecimal("80"));
+        assertThat(BacktestEngine.initialVrValue(explicit, new BigDecimal("100"))).isEqualByComparingTo("500");
+    }
+
+    @Test
     @DisplayName("V′≤0이면 롤오버를 보류하고 사이클을 유지하며 경고는 보류 구간당 1건만 남긴다")
     void V프라임이_0이하면_롤오버가_보류된다() {
         // V=100, pool=100, G=20(인출식), recurring=−1000 → V′ = 100 + 5 − 1000 − 11.18 = −906.18 ≤ 0

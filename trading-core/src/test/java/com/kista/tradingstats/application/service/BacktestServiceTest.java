@@ -14,7 +14,12 @@ import com.kista.tradingstats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
+import com.kista.sharedkernel.RecurringMode;
+import com.kista.sharedkernel.StrategyCreationSettings;
+import com.kista.sharedkernel.StrategyFieldSettings;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -33,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,12 +52,25 @@ class BacktestServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
     @Mock CycleOrderStrategy planner;
+    @Mock StrategyCreationPolicyPort strategyCreationPolicyPort;
 
     @InjectMocks BacktestService service;
 
     private static final LocalDate FROM = LocalDate.of(2024, 1, 1);
     private static final LocalDate TO = LocalDate.of(2024, 1, 5);
     private static final BigDecimal SEED = new BigDecimal("1000");
+    // VR 런타임 생성 정책 — bandWidth 10/15/20(15.00과 scale만 다른 값도 허용돼야 함), intervalWeeks 2/4
+    private static final StrategyCreationSettings VR_SETTINGS = new StrategyCreationSettings(true,
+            new StrategyFieldSettings<>(true, List.of(StrategyTicker.TQQQ), StrategyTicker.TQQQ),
+            new StrategyFieldSettings<>(false, List.of(40), 40),
+            new StrategyFieldSettings<>(true, List.of(RecurringMode.HOLD, RecurringMode.DEPOSIT, RecurringMode.WITHDRAW), RecurringMode.HOLD),
+            new StrategyFieldSettings<>(true, List.of(new BigDecimal("10"), new BigDecimal("15"), new BigDecimal("20")), new BigDecimal("15")),
+            new StrategyFieldSettings<>(true, List.of(2, 4), 4));
+
+    @BeforeEach
+    void stubVrPolicy() {
+        lenient().when(strategyCreationPolicyPort.find(StrategyType.VR)).thenReturn(Optional.of(VR_SETTINGS));
+    }
 
     private static BacktestCommand infinite(Integer divisionCount) {
         return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO, SEED,
@@ -193,33 +212,102 @@ class BacktestServiceTest {
 
     @Test
     void VR_인출식_최소자산에_미달하면_거부한다() {
-        // required = 30 × 100 × (4주 / 4주) = 3000.00 > 초기V 1000 + 시드 1000
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+        // required = 30 × 100 × 4 / 4주 = 3000.00 > 시장가 평가금 0 + 시드 1000 (초기 V 1000은 필요자산 비교에 쓰지 않는다)
         assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, -30, "1000")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("3000.00");
     }
 
     @Test
-    void VR_인출식_최소자산_검증은_보유_포지션_취득원가도_합산한다() {
+    void VR_인출식_최소자산_검증은_보유분_시장가_평가금을_합산한다() {
         when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
 
-        // required = 30 × 100 × (4주/4주) = 3000.00, seed=0+V=500만으론 미달이지만 보유 50주×60=3000을 더하면 통과
-        BacktestCommand command = vrWithPosition(BigDecimal.ZERO, -30, "500", 50, new BigDecimal("60"));
+        // required = 3000.00, seed=0이지만 보유 50주 × 첫 캔들 종가 100 = 5000 ≥ 3000 → 통과(평단가 60 기준 취득원가는 무관)
+        BacktestCommand command = vrWithPosition(BigDecimal.ZERO, -30, null, 50, new BigDecimal("60"));
 
         assertThatCode(() -> service.run(command)).doesNotThrowAnyException();
     }
 
     @Test
-    void VR_초기V값이_0이하면_거부한다() {
-        assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, 0, null)))
+    void VR_인출식_최소자산_검증은_초기V_직접입력으로_우회할_수_없다() {
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+
+        // 보유 10주 × 100 = 1000 + 시드 0 < 3000 — 초기 V를 10000으로 부풀려도 필요자산 비교는 시장가 기준
+        BacktestCommand command = vrWithPosition(BigDecimal.ZERO, -30, "10000", 10, new BigDecimal("60"));
+
+        assertThatThrownBy(() -> service.run(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("3000.00");
+    }
+
+    @Test
+    void VR_초기V값이_음수면_거부한다() {
+        assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, 0, "-1")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("초기 V값");
-        assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, 0, "0")))
+    }
+
+    @Test
+    void VR_초기V값_미입력이면_보유분_없이_bootstrap으로_시작한다() {
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+
+        assertThatCode(() -> service.run(vr(new BigDecimal("15"), 4, 0, null))).doesNotThrowAnyException();
+        assertThatCode(() -> service.run(vr(new BigDecimal("15"), 4, 0, "0"))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void VR_허용값_밖의_밴드폭이나_주기는_거부한다() {
+        assertThatThrownBy(() -> service.run(vr(new BigDecimal("12"), 4, 0, "1000")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("초기 V값");
+                .hasMessageContaining("밴드 폭");
+        assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 3, 0, "1000")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("리밸런싱 주기");
+        verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
+    }
+
+    @Test
+    void VR_정책이_허용하지_않는_입출금_방식은_거부한다() {
+        StrategyCreationSettings holdOnly = new StrategyCreationSettings(true,
+                VR_SETTINGS.ticker(), VR_SETTINGS.divisionCount(),
+                new StrategyFieldSettings<>(false, List.of(RecurringMode.HOLD), RecurringMode.HOLD),
+                VR_SETTINGS.bandWidth(), VR_SETTINGS.intervalWeeks());
+        when(strategyCreationPolicyPort.find(StrategyType.VR)).thenReturn(Optional.of(holdOnly));
+
+        assertThatThrownBy(() -> service.run(vr(new BigDecimal("15"), 4, 100, "1000")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("입출금 방식");
+    }
+
+    @Test
+    void VR_밴드폭은_scale이_달라도_허용값과_같으면_통과한다() {
+        when(cycleOrderStrategies.of(StrategyType.VR)).thenReturn(planner);
+        when(planner.plan(any())).thenReturn(Optional.empty());
+        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
+                .thenReturn(List.of(candle(1, "100"), candle(5, "100")));
+
+        assertThatCode(() -> service.run(vr(new BigDecimal("15.00"), 4, 0, "1000"))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void VR_램프_파라미터는_운영_등록과_같은_규칙으로_검증한다() {
+        // poolLimitFloor(0.9) > initialPoolLimitRate(0.75 — 거치식 기본값) → 운영 VrRampValidator와 같은 메시지로 거부
+        BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, SEED,
+                null, new BigDecimal("15"), 4, 0, new BigDecimal("1000"), null, null,
+                new BacktestCommand.VrRampInput(null, null, null, null, null, null, null, new BigDecimal("0.9")));
+
+        assertThatThrownBy(() -> service.run(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("poolLimitFloor");
     }
 
     // --- 캔들 조달 범위 ---
