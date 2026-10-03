@@ -38,20 +38,25 @@ INSERT INTO finance.finance_transactions (id, category_id, user_id, transaction_
 SELECT md5('dev-seed:tx:' || m.month || ':' || t.code)::uuid,
        ('f1000000-0000-4000-8000-000000000' || t.code)::uuid,
        '00000000-0000-0000-0000-000000000001',
-       LEAST(m.month + t.day_offset, (now() AT TIME ZONE 'Asia/Seoul')::date), t.amount + m.i * 1000, t.memo
+       m.month + t.day_offset, t.amount + m.i * 1000, t.memo
 FROM (SELECT i, (date_trunc('month', (now() AT TIME ZONE 'Asia/Seoul')::date) - make_interval(months => 11 - i))::date AS month
       FROM generate_series(0, 11) i) m
 CROSS JOIN (VALUES ('111', 4, 4200000, '월급'), ('122', 5, 85000, '배당'), ('201', 6, 1100000, '관리비'),
                    ('202', 7, 640000, '장보기'), ('203', 8, 300000, NULL), ('301', 9, 500000, 'DCA 적립'),
                    ('302', 10, 100000, NULL))
     AS t(code, day_offset, amount, memo)
+WHERE m.month + t.day_offset <= (now() AT TIME ZONE 'Asia/Seoul')::date -- 아직 오지 않은 날짜는 생략, 재실행 시 추가
 ON CONFLICT (id) DO NOTHING;
 
--- ── 가계부: 예산 — 생활비·주거비, 올해 1월부터 ──
+-- ── 가계부: 예산 — 생활비·주거비, 올해 1월부터(id가 연도별이라 해가 바뀌면 새 행 추가) ──
 INSERT INTO finance.finance_budgets (id, category_id, user_id, apply_start_date, amount)
-SELECT md5('dev-seed:budget:' || b.code)::uuid, ('f1000000-0000-4000-8000-000000000' || b.code)::uuid,
+SELECT md5('dev-seed:budget:' || b.code || ':' || extract(year FROM (now() AT TIME ZONE 'Asia/Seoul')))::uuid, ('f1000000-0000-4000-8000-000000000' || b.code)::uuid,
        '00000000-0000-0000-0000-000000000001', date_trunc('year', (now() AT TIME ZONE 'Asia/Seoul')::date)::date, b.amount
 FROM (VALUES ('202', 700000), ('201', 1000000)) AS b(code, amount)
+WHERE NOT EXISTS (SELECT 1 FROM finance.finance_budgets fb -- 같은 연초 시작 예산이 이미 있으면(이전 id 체계 포함) 생략
+                  WHERE fb.user_id = '00000000-0000-0000-0000-000000000001'
+                    AND fb.category_id = ('f1000000-0000-4000-8000-000000000' || b.code)::uuid
+                    AND fb.apply_start_date = date_trunc('year', (now() AT TIME ZONE 'Asia/Seoul')::date)::date)
 ON CONFLICT (id) DO NOTHING;
 
 -- ── 누적자산추이(equity-curve)용: KIS [시드] 전략(PAUSED)의 진행 중 사이클에 평일 일별 포지션 스냅샷 ──

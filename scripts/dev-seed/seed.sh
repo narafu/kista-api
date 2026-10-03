@@ -4,12 +4,14 @@
 #       trading-core application-local.yml에 toss.admin-client-id/secret 설정(MOCK 시세 피드용)
 # 1) MOCK 계좌·ACTIVE 전략은 API로 등록(계좌 컬럼 AES 암호화 때문에 SQL 직접 삽입 불가)
 # 2) 가계부·equity-curve 스냅샷·관리자 주문 이력은 dev-seed.sql
-# 3) 벤치마크(kista_ref) 전역 데이터는 실제 수집기 트리거(가짜 행 미삽입)
+# 3) 벤치마크(kista_ref) 전역 데이터는 실제 수집기 트리거(가짜 행 미삽입 — kbland 2종 + ETF 지수 종가)
 set -euo pipefail
 
 API=${API:-http://localhost:8080}
 TRADING=${TRADING:-http://localhost:8081}
-PG_CONTAINER=${PG_CONTAINER:-kista-api-postgres-1}
+# 레포 루트 compose의 postgres 컨테이너 — compose 프로젝트명과 무관하게 해석
+PG_CONTAINER=${PG_CONTAINER:-$(docker compose -f "$(cd "$(dirname "$0")/../.." && pwd)/docker-compose.yml" ps -q postgres)}
+[[ -n "$PG_CONTAINER" ]] || { echo "postgres 컨테이너 미기동: docker compose up -d postgres" >&2; exit 1; }
 MOCK_NICKNAME='[시드] 모의계좌'
 DIR=$(cd "$(dirname "$0")" && pwd)
 
@@ -44,7 +46,7 @@ echo "SQL 시드 적용"
 # 벤치마크 수집기 트리거 — 202 후 백그라운드 실행(root 로그 확인)
 # 트리거 엔드포인트는 scheduler.enabled=true일 때만 등록되는데 root local은 false(텔레그램 중복 방지) —
 # 404면 root를 SCHEDULER_ENABLED=true로 잠시 띄워 이 스크립트를 다시 실행한 뒤 원복한다(kista_ref 행이 있으면 생략 가능)
-for path in kbland-housing-benchmark kbland-price-index; do
+for path in kbland-housing-benchmark kbland-price-index market-index-prices; do
   code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "Authorization: Bearer $ADMIN_TOKEN" "$API/api/admin/scheduler/$path")
   case $code in
     202) echo "수집기 트리거: $path" ;;
