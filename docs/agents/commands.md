@@ -47,6 +47,7 @@ scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태�
 - MOCK 시세는 Toss 공용 피드라 trading-core `application-local.yml`에 `toss.admin-client-id`/`admin-client-secret` 필요 — 없으면 MOCK 전략 등록·preview가 422/503
 - trading-core local은 스케쥴러가 켜져 있어 ACTIVE MOCK 전략이 실제로 돈다(DB 주문만 생성, 실패 시 관리자 텔레그램 알림)
 - 벤치마크(`kista_ref`)는 가짜 행 없이 kbland 수집기 트리거 — root를 `SCHEDULER_ENABLED=true`로 잠시 띄워야 엔드포인트가 열린다. ETF 시계열(`market_index_prices`)은 수동 트리거가 없어 09:00 KST cron 전용
+  - 트리거 후 반드시 `SCHEDULER_ENABLED` 없이 재기동할 것 — 켜둔 채 두면 로컬 cron이 운영과 같이 돈다(락은 DB별이라 못 막고 관리자 봇은 공유라 시작 알림이 중복 발송). 2026-10-03 ETF 동기화 중복 알림 사례
 
 ### 로컬 2-프로세스 부팅 (root + trading-core)
 2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`tradingweb.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 최소 필요 환경변수는 CLAUDE.md의 필수 목록보다 많다 — 실측 결과:
