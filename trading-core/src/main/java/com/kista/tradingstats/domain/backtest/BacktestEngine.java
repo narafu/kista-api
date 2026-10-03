@@ -25,6 +25,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -151,7 +152,12 @@ public class BacktestEngine {
 
     // 예수금 플로어 연속구간 1건 요약 — PrivacyState.flushMissingBaseGap과 동일 포맷 관용구
     private static String floorGapWarning(LocalDate from, LocalDate to, int days, BigDecimal maxShortfall) {
-        return "체결 후 예수금 부족으로 0 조정: " + from + "~" + to + ", 총 " + days + "일, 최대 부족액=" + maxShortfall;
+        return from + " ~ " + to + "(총 " + days + "일): 체결 후 예수금이 부족해 0으로 조정했습니다. 최대 부족액은 " + usd(maxShortfall) + "입니다.";
+    }
+
+    // 경고 문구용 달러 금액 표기 — 천 단위 구분 + 소수 2자리
+    private static String usd(BigDecimal amount) {
+        return String.format(Locale.US, "$%,.2f", amount);
     }
 
     // --- VR 경로 ---
@@ -185,7 +191,7 @@ public class BacktestEngine {
         if (newValue.signum() <= 0) {
             // 매 거래일 재판정되므로 경고는 보류 구간당 1회만 남긴다(수년 구간에서 동일 문구 수백 건 누적 방지)
             if (!state.valueHoldWarned) {
-                warnings.add("VR 롤오버 보류(V'<=0): date=" + candle.date());
+                warnings.add(candle.date() + ": 다음 주기 목표 평가금(V)이 0 이하로 계산되어 VR 주기 갱신을 보류했습니다.");
                 state.valueHoldWarned = true;
             }
             return;
@@ -264,7 +270,7 @@ public class BacktestEngine {
                                            BigDecimal prevClose, List<String> warnings) {
         // 0회차(holdings=0)에 전일종가가 없으면 운영 planNormalMode()가 예외를 던진다 — 호출 전에 방어하고 그날만 주문을 생략한다
         if (state.balance.holdings() == 0 && prevClose == null) {
-            warnings.add("전일종가 없음, 첫 거래일 주문 생략: date=" + candle.date());
+            warnings.add(candle.date() + ": 전일 종가가 없어 첫 거래일 주문을 생략했습니다.");
             return List.of();
         }
 
@@ -455,7 +461,7 @@ public class BacktestEngine {
             BigDecimal adjusted = before.add(BigDecimal.valueOf(recurringAmount));
             // 인출액이 예수금을 넘으면 예수금이 음수가 되어 이후 poolLimit·잔여예산 계산이 통째로 무의미해진다 — 0에서 바닥을 둔다
             if (adjusted.signum() < 0) {
-                warnings.add("인출액이 예수금을 초과해 0으로 조정: date=" + date + ", 부족액=" + adjusted.negate());
+                warnings.add(date + ": 인출액이 예수금을 초과해 예수금을 0으로 조정했습니다. 부족액은 " + usd(adjusted.negate()) + "입니다.");
                 adjusted = BigDecimal.ZERO;
             }
             // principal은 클램프 후 실제 반영된 만큼만 증감 — 요청 인출액 전부를 반영하면 원금이 과다 차감된다
@@ -541,7 +547,7 @@ public class BacktestEngine {
         // 결측 구간 종료 — 누적된 구간을 한 줄로 요약해 남기고 커서를 비운다
         void flushMissingBaseGap(List<String> warnings) {
             if (missingBaseFrom == null) return;
-            warnings.add("기준 매매표 없음: " + missingBaseFrom + "~" + missingBaseTo + ", 총 " + missingBaseDays + "일");
+            warnings.add(missingBaseFrom + " ~ " + missingBaseTo + "(총 " + missingBaseDays + "일): 기준 매매표가 없어 매매하지 않았습니다.");
             missingBaseFrom = null;
             missingBaseTo = null;
             missingBaseDays = 0;

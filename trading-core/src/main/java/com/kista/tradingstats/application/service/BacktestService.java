@@ -41,10 +41,10 @@ class BacktestService implements BacktestUseCase {
             "체결은 일봉 고가/저가 터치 기준으로 판정됩니다 — 매도 주문은 실제보다 낙관적으로(항상 전량 체결 가정), "
                     + "매수 주문은 가격 캡에 걸릴 경우 실제보다 비관적으로(캡 지정가 그대로 체결 가정) 평가될 수 있습니다.";
     private static final String ORDER_TIMING_WARNING =
-            "AT_OPEN/AT_CLOSE 접수 시점 구분은 일봉 해상도에서 반영되지 않습니다.";
+            "일봉 단위 시뮬레이션이라 장 시작/장 마감 접수 시점 구분은 반영되지 않습니다.";
     private static final String VR_CASH_FLOW_WARNING =
-            "적립식/인출식 설정 시 수익률 지표(totalReturnRate/cagr/mdd)가 외부 현금흐름을 반영하지 않아 "
-                    + "실제보다 낙관적/비관적일 수 있습니다.";
+            "적립식/인출식 설정 시 누적 수익률·CAGR·MDD가 외부 입출금을 반영하지 않아 "
+                    + "실제보다 낙관적이거나 비관적으로 보일 수 있습니다.";
 
     private final HistoricalCandlePort candlePort;         // 과거 일봉 조달 (Alpaca)
     private final PrivacyTradePort privacyTradePort;       // PRIVACY 기준 매매표 조회
@@ -167,11 +167,11 @@ class BacktestService implements BacktestUseCase {
     // 요청 구간이 실제 기준표 데이터보다 이르면 1건만 요약 경고 — 시작일은 조회 결과에서 계산(상수 하드코딩 금지)
     private void addRangeClampWarning(List<DailyCandle> candles, Map<LocalDate, PrivacyTradeBase> bases,
                                       List<String> warnings) {
-        if (bases.isEmpty()) return; // 구간 전체 결측은 엔진이 "기준 매매표 없음" 경고로 이미 요약한다
+        if (bases.isEmpty()) return; // 구간 전체 결측은 엔진이 기준 매매표 결측 구간 경고로 이미 요약한다
         LocalDate dataStart = Collections.min(bases.keySet());
         LocalDate simulationStart = candles.getFirst().date(); // 요청 from이 휴장일이면 첫 캔들이 실제 시작일
         if (dataStart.isAfter(simulationStart)) {
-            warnings.add("기준 매매표 데이터가 " + dataStart + "부터 존재 — 그 이전 구간은 매매 없음");
+            warnings.add("기준 매매표 데이터가 " + dataStart + "부터 존재해 그 이전 구간은 매매하지 않았습니다.");
         }
     }
 

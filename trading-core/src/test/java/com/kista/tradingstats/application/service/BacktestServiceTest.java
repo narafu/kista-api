@@ -379,7 +379,7 @@ class BacktestServiceTest {
         BacktestResult result = service.run(infinite(null));
 
         assertThat(result.warnings()).anyMatch(w -> w.contains("일봉 고가/저가 터치"));
-        assertThat(result.warnings()).anyMatch(w -> w.contains("AT_OPEN/AT_CLOSE"));
+        assertThat(result.warnings()).anyMatch(w -> w.contains("장 시작/장 마감 접수 시점"));
         assertThat(result.warnings()).noneMatch(w -> w.contains("적립식/인출식"));
     }
 

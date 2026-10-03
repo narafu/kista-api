@@ -160,7 +160,7 @@ class BacktestEngineTest {
 
         assertThat(output.cycleCount()).isEqualTo(1);
         // 도래일이 3일(01-08·09·10) 이어져도 경고는 1건 — 보류 상태가 풀릴 때까지 중복 기록하지 않는다
-        assertThat(output.warnings()).containsExactly("VR 롤오버 보류(V'<=0): date=2024-01-08");
+        assertThat(output.warnings()).containsExactly("2024-01-08: 다음 주기 목표 평가금(V)이 0 이하로 계산되어 VR 주기 갱신을 보류했습니다.");
         // 보류 시엔 자본 조정도 하지 않는다 — 원금·예수금 불변
         assertThat(output.points()).extracting(BacktestPoint::principal)
                 .allSatisfy(p -> assertThat(p).isEqualByComparingTo("100"));
@@ -203,7 +203,7 @@ class BacktestEngineTest {
         ), vrCommand("300", "5000", 1, -1000));
 
         assertThat(output.cycleCount()).isEqualTo(2);
-        assertThat(output.warnings()).containsExactly("인출액이 예수금을 초과해 0으로 조정: date=2024-01-08, 부족액=700");
+        assertThat(output.warnings()).containsExactly("2024-01-08: 인출액이 예수금을 초과해 예수금을 0으로 조정했습니다. 부족액은 $700.00입니다.");
         assertThat(output.points().get(2).principal()).isEqualByComparingTo("0");
         assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("0");
     }
@@ -336,7 +336,7 @@ class BacktestEngineTest {
                 candle("2024-01-04", 95, 100, 88, 95)
         ), infiniteCommand("2024-01-01", "1000", 4));
 
-        assertThat(output.warnings()).containsExactly("전일종가 없음, 첫 거래일 주문 생략: date=2024-01-01");
+        assertThat(output.warnings()).containsExactly("2024-01-01: 전일 종가가 없어 첫 거래일 주문을 생략했습니다.");
         // 예외를 잡아서 넘기는 게 아니라 전략 호출 자체가 없었어야 한다
         assertThat(recorder.planned("2024-01-01")).isFalse();
 
@@ -703,7 +703,7 @@ class BacktestEngineTest {
         assertThat(output.tradeCount()).isEqualTo(1);
         assertThat(output.cycleCount()).isEqualTo(1);
         // 연속 결측 2일은 개별 경고가 아니라 구간 1건으로 요약된다
-        assertThat(output.warnings()).containsExactly("기준 매매표 없음: 2024-01-03~2024-01-04, 총 2일");
+        assertThat(output.warnings()).containsExactly("2024-01-03 ~ 2024-01-04(총 2일): 기준 매매표가 없어 매매하지 않았습니다.");
     }
 
     @Test
@@ -802,8 +802,8 @@ class BacktestEngineTest {
                         trade("2024-01-21", OrderType.LOC, OrderDirection.BUY, 1, "1"))));
 
         assertThat(output.warnings()).containsExactly(
-                "기준 매매표 없음: 2024-01-01~2024-01-20, 총 20일",   // 구간이 끝나는 기준표 수신일에 flush
-                "기준 매매표 없음: 2024-01-22~2024-02-10, 총 20일");  // 마지막까지 이어진 구간은 루프 종료 후 flush
+                "2024-01-01 ~ 2024-01-20(총 20일): 기준 매매표가 없어 매매하지 않았습니다.",   // 구간이 끝나는 기준표 수신일에 flush
+                "2024-01-22 ~ 2024-02-10(총 20일): 기준 매매표가 없어 매매하지 않았습니다.");  // 마지막까지 이어진 구간은 루프 종료 후 flush
         assertThat(output.tradeCount()).isZero();
     }
 
@@ -832,7 +832,7 @@ class BacktestEngineTest {
         // 01-04 주문: diff=400-251=149 → 150주@100=15,000.0 → 01-05 체결, 0-15000.0=-15000.0 → 0 클램프(플로어 3일차)
         // 01-05 주문은 만들어지지만 이후 캔들이 없어 체결·경고 없이 버려짐 → 구간이 루프 종료 시점에 1건으로 flush
         assertThat(output.warnings()).containsExactly(
-                "체결 후 예수금 부족으로 0 조정: 2024-01-03~2024-01-05, 총 3일, 최대 부족액=15000.0");
+                "2024-01-03 ~ 2024-01-05(총 3일): 체결 후 예수금이 부족해 0으로 조정했습니다. 최대 부족액은 $15,000.00입니다.");
         // 3영업일 연속 플로어가 발동했는데도 경고는 정확히 1건 — 일수에 비례하지 않는다
         assertThat(output.tradeCount()).isEqualTo(3);
     }
