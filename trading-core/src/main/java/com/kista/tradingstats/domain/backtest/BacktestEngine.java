@@ -32,6 +32,7 @@ import java.util.Optional;
 
 import static com.kista.sharedkernel.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyDefaults;
@@ -96,11 +97,10 @@ public class BacktestEngine {
     private Output runDays(List<DailyCandle> candles, DayState state, List<String> warnings, DayPlanner planner) {
         List<BacktestPoint> points = new ArrayList<>();
         List<PlannedOrder> pending = List.of(); // 어제 생성한 주문 — 오늘 캔들로 체결 판정
-        // 예수금 플로어 연속 발동구간 커서 — VR valueHoldWarned·PRIVACY 결측요약과 동일 취지로 일별 경고 폭주를 막는다
-        LocalDate floorFrom = null;
-        LocalDate floorTo = null;
-        int floorDays = 0;
-        BigDecimal floorMaxShortfall = BigDecimal.ZERO;
+        // 매수 예산 거절 연속구간 커서 — VR 보류·PRIVACY 결측요약과 동일 취지로 일별 경고 폭주를 막는다
+        LocalDate rejectFrom = null;
+        LocalDate rejectTo = null;
+        int rejectDays = 0;
 
         for (int i = 0; i < candles.size(); i++) {
             DailyCandle candle = candles.get(i);
@@ -108,42 +108,41 @@ public class BacktestEngine {
 
             // (1) 어제 주문을 오늘 캔들로 체결 — 오늘 만든 주문은 오늘 체결하지 않는다(look-ahead 방지 핵심 불변조건)
             state.applyFills(FillSimulator.simulate(pending, candle));
-
-            // 체결 후 예수금이 음수면 0으로 조정 — INFINITE 최소 1주 강제·PRIVACY 배수 과대 산출로 시드를 넘겨 살 수 있다
-            // poolUsed 등 전략별 누계는 이미 applyFills 안에서 클램프 전 실제 체결금액으로 계산이 끝난 뒤라 영향받지 않는다(이월 잔고에만 바닥을 둔다)
-            // PRIVACY는 initialUsdDeposit이 다음 청산 때까지 안 바뀌고 INFINITE는 매일 최소 1주를 강제해 재발 가능 — 연속구간을
-            // 하루 1건씩 쌓지 않고 구간이 끊길 때(또는 루프 종료)만 1건으로 요약한다
-            if (state.balance.usdDeposit().signum() < 0) {
-                BigDecimal shortfall = state.balance.usdDeposit().negate();
-                if (floorFrom == null) floorFrom = candle.date();
-                floorTo = candle.date();
-                floorDays++;
-                if (shortfall.compareTo(floorMaxShortfall) > 0) floorMaxShortfall = shortfall;
-                state.balance = state.balance.withUsdDeposit(BigDecimal.ZERO);
-            } else if (floorFrom != null) {
-                warnings.add(floorGapWarning(floorFrom, floorTo, floorDays, floorMaxShortfall));
-                floorFrom = null;
-                floorMaxShortfall = BigDecimal.ZERO;
-                floorDays = 0;
-            }
+            // 전략 잔고가 모자라 유휴 현금(MAINTAIN 초과분)까지 쓴 매수면 그만큼 유휴 현금에서 메운다
+            // BUY는 예산 검증을 통과한 지정가 이하로만 체결되므로 (전략 잔고 + 유휴 현금)은 음수가 될 수 없다
+            state.coverShortfallFromIdle();
 
             // (2) 오늘 EOD 자산 기록 — 보유분은 평단가가 아닌 종가 시장가로 평가
             points.add(new BacktestPoint(candle.date(),
-                    state.balance.usdDeposit().add(marketValue(candle, state.balance.holdings())),
+                    state.availableCash().add(marketValue(candle, state.balance.holdings())),
                     state.principal));
 
             // (3) 전략별 하루 처리 — 사이클 판정 후 오늘 주문 생성 + 접수 전 BUY 가격 캡 보정
-            pending = planner.planFor(candle, nextSession);
+            List<PlannedOrder> planned = planner.planFor(candle, nextSession);
+
+            // (4) 접수 전 BUY 예산 검증 — 운영 TradingOrderBudgetAllocator와 동일: BUY 지정가 합계(보정 주문 포함)가
+            // 예수금을 넘으면 그 날 BUY를 전부 거절하고 SELL만 접수한다(마지막 캔들 주문은 체결 기회가 없어 판정 생략)
+            if (nextSession != null && AccountBalance.buyTotal(planned).compareTo(state.availableCash()) > 0) {
+                planned = planned.stream().filter(o -> o.direction() != BUY).toList();
+                if (rejectFrom == null) rejectFrom = nextSession;
+                rejectTo = nextSession;
+                rejectDays++;
+            } else if (rejectFrom != null) {
+                warnings.add(buyRejectGapWarning(rejectFrom, rejectTo, rejectDays));
+                rejectFrom = null;
+                rejectDays = 0;
+            }
+            pending = planned;
         }
-        // 마지막 캔들까지 이어진 플로어 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush
-        if (floorFrom != null) warnings.add(floorGapWarning(floorFrom, floorTo, floorDays, floorMaxShortfall));
+        // 마지막 캔들까지 이어진 거절 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush
+        if (rejectFrom != null) warnings.add(buyRejectGapWarning(rejectFrom, rejectTo, rejectDays));
         // 마지막 pending은 체결 기회가 없어 자연히 버려진다
         return new Output(List.copyOf(points), state.tradeCount, state.cycleCount, List.copyOf(warnings));
     }
 
-    // 예수금 플로어 연속구간 1건 요약 — PrivacyState.flushMissingBaseGap과 동일 포맷 관용구
-    private static String floorGapWarning(LocalDate from, LocalDate to, int days, BigDecimal maxShortfall) {
-        return from + " ~ " + to + "(총 " + days + "일): 체결 후 예수금이 부족해 0으로 조정했습니다. 최대 부족액은 " + usd(maxShortfall) + "입니다.";
+    // 매수 예산 거절 연속구간 1건 요약(체결 세션 날짜 기준) — PrivacyState.flushMissingBaseGap과 동일 포맷 관용구
+    private static String buyRejectGapWarning(LocalDate from, LocalDate to, int days) {
+        return from + " ~ " + to + "(총 " + days + "일): 매수 주문 합계가 예수금을 넘어 그날 매수 주문을 모두 거절했습니다.";
     }
 
     // 경고 문구용 달러 금액 표기 — 천 단위 구분 + 소수 2자리
@@ -239,15 +238,17 @@ public class BacktestEngine {
     // --- INFINITE 경로 ---
 
     private Output runInfinite(List<DailyCandle> candles, BacktestCommand command) {
-        InfiniteState state = new InfiniteState(command);
+        InfiniteState state = new InfiniteState(command, candles.getFirst().close());
         List<String> warnings = new ArrayList<>();
 
         return runDays(candles, state, warnings,
-                (candle, nextSession) -> planInfiniteDay(state, command, candle));
+                (candle, nextSession) -> planInfiniteDay(state, command, candle, warnings));
     }
 
     // INFINITE 하루 처리 — 순서 고정: 별지점 윈도우 갱신 → 리버스모드 전이 → 사이클 종료 판정 → 주문 생성
-    private List<PlannedOrder> planInfiniteDay(InfiniteState state, BacktestCommand command, DailyCandle candle) {
+    private List<PlannedOrder> planInfiniteDay(InfiniteState state, BacktestCommand command, DailyCandle candle,
+                                               List<String> warnings) {
+        if (state.stopped) return List.of(); // 사이클 시드 정책으로 매매 중단된 뒤엔 주문 없음
         // 오늘 종가는 리버스모드 여부와 무관하게 매일 윈도우에 쌓는다(사이클 스코프 — 종료 시 함께 비워짐)
         state.pushClose(candle.close());
 
@@ -255,7 +256,10 @@ public class BacktestEngine {
         state.applyReverseModeTransition(command.ticker(), candle.close());
 
         // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클의 0회차 주문이어야 한다
-        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0) state.rotateCycle();
+        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0) {
+            if (!state.restartCycle(command.cycleSeedTypeOrMax(), candle.date(), warnings)) return List.of();
+            state.resetReverseMode();
+        }
         // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다(모든 분기 공통 통과 지점)
         state.prevDayHoldings = state.balance.holdings();
 
@@ -309,10 +313,11 @@ public class BacktestEngine {
     private List<PlannedOrder> planPrivacyDay(PrivacyState state, BacktestCommand command,
                                        Map<LocalDate, PrivacyTradeBase> privacyBases, DailyCandle candle,
                                        LocalDate nextSession, List<String> warnings) {
-        // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클 개장 자산 기준이어야 한다
-        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0) {
-            state.initialUsdDeposit = state.balance.usdDeposit(); // 새 사이클 개장 자산 — 자산 이월이지 시드 리셋이 아니다
-            state.cycleCount++;
+        if (state.stopped) return List.of(); // 사이클 시드 정책으로 매매 중단된 뒤엔 주문 없음
+        // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클 개장 자산(cycleStartAmount) 기준이어야 한다
+        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0
+                && !state.restartCycle(command.cycleSeedTypeOrMax(), candle.date(), warnings)) {
+            return List.of();
         }
         // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다
         state.prevDayHoldings = state.balance.holdings();
@@ -338,7 +343,7 @@ public class BacktestEngine {
         BigDecimal refClose = candle.close();
         CycleOrderStrategy.PlanContext.PrivacyInputs privacyInputs =
                 new CycleOrderStrategy.PlanContext.PrivacyInputs(
-                        state.initialUsdDeposit, base == null ? null : base.toPlan(), refClose);
+                        state.cycleStartAmount, base == null ? null : base.toPlan(), refClose);
         CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
                 state.balance, command.ticker(), candle.date(), "backtest", null, privacyInputs, null);
 
@@ -396,13 +401,17 @@ public class BacktestEngine {
     // 전략 공통 루프 상태 — 잔고·원금·집계 카운터. 전략별 상태는 서브클래스가 얹는다
     private static class DayState {
         AccountBalance balance;   // 현재 잔고
-        BigDecimal principal;     // 원금 (시드 + 실제 반영된 적립/인출 누계)
+        BigDecimal principal;     // 원금 (시드 + 시작 보유분 평가금 + 실제 반영된 적립/인출 누계)
+        BigDecimal idleCash = BigDecimal.ZERO; // 전략 밖 유휴 현금 — MAINTAIN 재시작 때 시작 금액을 넘는 초과분(평가금엔 포함)
+        BigDecimal cycleStartAmount; // 현재 사이클 시작 금액 — 운영 StrategyCycle.startAmount(개장 예수금 + 개장 보유분 시장가)
+        boolean stopped;          // 사이클 시드 정책(NONE·MAINTAIN 잔고 부족)으로 매매를 멈췄는지
         int tradeCount;           // 체결 건수 누계
         int cycleCount = 1;       // 진행된 사이클 수
 
-        // 중간부터 시작 — initialHoldings>0이면 avgPrice를 취득원가로 두고 시작 보유분을 잔고에 반영한다
-        // (원가는 registration의 fetchMarketPrice와 달리 백테스트엔 등록 시점 시장가 조회가 없어 사용자가 직접 입력한 avgPrice를 그대로 쓴다)
-        DayState(BacktestCommand command) {
+        // 중간부터 시작 — initialHoldings>0이면 avgPrice를 평단가로 두고 시작 보유분을 잔고에 반영한다
+        // 원금·사이클 시작 금액의 보유분은 첫 캔들 종가 평가금 — 수익률 기준(첫 포인트 총자산)과 같은 기준이다
+        // (운영 startAmount는 등록 시점 시장가지만 백테스트엔 그 조회가 없어 첫 캔들 종가로 근사)
+        DayState(BacktestCommand command, BigDecimal day0Close) {
             int holdings = command.initialHoldings() != null ? command.initialHoldings() : 0;
             BigDecimal avgPrice = holdings > 0 ? command.initialAvgPrice() : null;
             if (holdings > 0 && avgPrice == null) {
@@ -410,11 +419,47 @@ public class BacktestEngine {
             }
             BigDecimal seed = command.seedOrZero();
             this.balance = new AccountBalance(holdings, avgPrice, seed);
-            // 원금 = 시드 + 기존 보유분 취득원가(시장가 아닌 실제 투입 비용 기준)
-            BigDecimal initialStockCost = holdings > 0
-                    ? avgPrice.multiply(BigDecimal.valueOf(holdings)).setScale(2, HALF_UP)
-                    : BigDecimal.ZERO;
-            this.principal = seed.add(initialStockCost);
+            this.principal = seed.add(initialStockValue(command, day0Close));
+            this.cycleStartAmount = principal;
+        }
+
+        // 주문 가능 현금 = 전략 잔고 예수금 + 유휴 현금 — 운영 예산 검증이 보는 증권사 실잔고에 해당
+        BigDecimal availableCash() {
+            return balance.usdDeposit().add(idleCash);
+        }
+
+        // 체결로 전략 잔고 예수금이 음수가 되면 유휴 현금에서 메운다 (유휴 현금이 없으면 예산 검증상 음수가 될 수 없다)
+        void coverShortfallFromIdle() {
+            if (balance.usdDeposit().signum() >= 0) return;
+            idleCash = idleCash.add(balance.usdDeposit());
+            balance = balance.withUsdDeposit(BigDecimal.ZERO);
+        }
+
+        // 청산 후 사이클 재시작 — 운영 CycleRotationService의 잔고검증 ON 의미론(백테스트 현금은 실제 돈이라 원장만 믿는 OFF는 없는 돈을 만든다)
+        // false면 매매 중단: NONE은 운영처럼 전략 일시정지, MAINTAIN은 가용 현금이 시작 금액에 못 미치면 일시정지
+        boolean restartCycle(StrategyCycleSeedType seedType, LocalDate date, List<String> warnings) {
+            switch (seedType) {
+                case NONE -> {
+                    stopped = true;
+                    warnings.add(date + ": 사이클이 종료되어 이후 매매를 중단했습니다(사이클 종료 후 재시작 안 함).");
+                    return false;
+                }
+                case MAINTAIN -> {
+                    BigDecimal cash = availableCash();
+                    if (cash.compareTo(cycleStartAmount) < 0) {
+                        stopped = true;
+                        warnings.add(date + ": 예수금이 시작 금액(" + usd(cycleStartAmount)
+                                + ")보다 적어 새 사이클을 시작하지 못하고 매매를 중단했습니다.");
+                        return false;
+                    }
+                    // 시작 금액만 전략 잔고로, 나머지는 유휴 현금으로 — 다음 사이클도 같은 시작 금액을 유지한다
+                    balance = balance.withUsdDeposit(cycleStartAmount);
+                    idleCash = cash.subtract(cycleStartAmount);
+                }
+                case MAX -> cycleStartAmount = balance.usdDeposit(); // 청산 시점 예수금 전액 이월
+            }
+            cycleCount++;
+            return true;
         }
 
         // 체결 반영 — 잔고·체결건수 갱신
@@ -444,7 +489,7 @@ public class BacktestEngine {
         DailyCandle dueEvaluationCandle;       // 현재 사이클 due일 이하 마지막 캔들 — 롤오버 평가 기준(휴장 due일 보정)
 
         VrState(BacktestCommand command, StrategyVrDetail detail, DailyCandle firstCandle) {
-            super(command);
+            super(command, firstCandle.close());
             this.value = initialVrValue(command, firstCandle.close());
             this.firstCycleStartDate = firstCandle.date();
             this.cycleStartDate = firstCandle.date();
@@ -487,8 +532,8 @@ public class BacktestEngine {
         int prevDayHoldings;                                      // 어제 이터레이션 종료 시점 보유수량 — 청산(사이클 종료) 판정용
         final Deque<BigDecimal> recentCloses = new ArrayDeque<>(); // 현재 사이클 최근 종가(최대 5개) — 별지점 산출용
 
-        InfiniteState(BacktestCommand command) {
-            super(command);
+        InfiniteState(BacktestCommand command, BigDecimal day0Close) {
+            super(command, day0Close);
             this.divisionCount = command.divisionCount() != null
                     ? command.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
             // 시작 보유분이 있으면 청산 판정 기준선도 그만큼에서 출발 — 0으로 두면 매매 없는 첫날에도 오탐은 없지만(§엔진 주석 참고) 명시적으로 맞춰둔다
@@ -517,32 +562,23 @@ public class BacktestEngine {
             return sum.divide(BigDecimal.valueOf(recentCloses.size()), 2, HALF_UP);
         }
 
-        // 사이클 종료 + 즉시 재시작(백테스트 전용 규칙) — 자산은 이월하고 리버스모드·별지점 윈도우만 리셋
-        void rotateCycle() {
+        // 새 사이클 시작 — 리버스모드·별지점 윈도우 리셋 (자산 처리는 restartCycle의 시드 정책 몫)
+        void resetReverseMode() {
             reverseMode = false;
             isFirstReverseDay = false;
             recentCloses.clear();
-            cycleCount++;
         }
     }
 
-    // PRIVACY 루프의 가변 상태 — 배수 산출 기준 자산 + 결측 구간 요약용 커서
+    // PRIVACY 루프의 가변 상태 — 결측 구간 요약용 커서 (배수 산출 기준 자산은 공통 cycleStartAmount)
     private static final class PrivacyState extends DayState {
-        BigDecimal initialUsdDeposit; // 현재 사이클 개장 자산 — PrivacyStrategy 배수 산출 기준, 사이클 교체 때만 갱신
         int prevDayHoldings;          // 어제 이터레이션 종료 시점 보유수량 — 청산(사이클 종료) 판정용
         LocalDate missingBaseFrom;    // 진행 중인 기준 매매표 결측 구간 시작일 (없으면 null)
         LocalDate missingBaseTo;      // 진행 중인 결측 구간 마지막 날
         int missingBaseDays;          // 진행 중인 결측 구간 일수
 
-        // day0Close: 시작 보유분 시장가 평가 기준 — 운영 currentCycle.startAmount()(개장 예수금+개장 보유분 시장가)와 동일 계약을
-        // 재현하려면 등록 시점 시장가가 필요한데 백테스트엔 그 조회가 없어 첫 캔들 종가로 근사한다(알려진 근사)
         PrivacyState(BacktestCommand command, BigDecimal day0Close) {
-            super(command);
-            BigDecimal seed = command.seedOrZero();
-            BigDecimal initialStockValue = balance.holdings() > 0
-                    ? day0Close.multiply(BigDecimal.valueOf(balance.holdings())).setScale(2, HALF_UP)
-                    : BigDecimal.ZERO;
-            this.initialUsdDeposit = seed.add(initialStockValue);
+            super(command, day0Close);
             this.prevDayHoldings = balance.holdings();
         }
 

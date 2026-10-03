@@ -46,7 +46,7 @@ class AlpacaCandleAdapter implements HistoricalCandlePort {
                 .queryParam("timeframe", "1Day")
                 .queryParam("start", from.toString())
                 .queryParam("end", clampedTo.toString())
-                .queryParam("adjustment", "all")
+                .queryParam("adjustment", "split") // 분할만 수정 — 배당 수정(all)은 과거 가격을 낮춰 FIDA 기준표·평단가 입력(원가격)과 어긋난다
                 .queryParam("feed", "sip")
                 .queryParam("limit", 10000)
                 .toUriString();

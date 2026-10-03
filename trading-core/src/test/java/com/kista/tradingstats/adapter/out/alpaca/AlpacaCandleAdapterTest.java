@@ -38,7 +38,7 @@ class AlpacaCandleAdapterTest {
                 .andExpect(header("APCA-API-KEY-ID", "test-key"))
                 // 백테스트용 조회는 수정주가 sip 피드 사용(증분 동기화용 fetchDailyCloses와 대비되는 회귀 방지 포인트)
                 .andExpect(queryParam("feed", "sip"))
-                .andExpect(queryParam("adjustment", "all"))
+                .andExpect(queryParam("adjustment", "split"))
                 .andRespond(withSuccess("""
                         {"bars":[{"t":"2024-01-02T05:00:00Z","o":100.0,"h":105.5,"l":99.2,"c":104.3,"v":123456},
                                  {"t":"2024-01-03T05:00:00Z","o":104.3,"h":110.0,"l":103.1,"c":108.7,"v":98765}],

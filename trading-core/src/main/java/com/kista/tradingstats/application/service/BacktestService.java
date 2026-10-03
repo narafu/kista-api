@@ -43,6 +43,9 @@ class BacktestService implements BacktestUseCase {
                     + "부분 체결과 호가 대기열은 반영하지 않아 실제보다 낙관적일 수 있습니다.";
     private static final String ORDER_TIMING_WARNING =
             "일봉 단위 시뮬레이션이라 장 시작/장 마감 접수 시점 구분은 반영되지 않습니다.";
+    private static final String COST_WARNING =
+            "수수료·세금·환전 비용과 배당금은 반영하지 않아 실제 수익보다 높거나 낮게 보일 수 있습니다.";
+    private static final int MIN_CAGR_DAYS = 365; // 이보다 짧은 구간은 연환산하면 과대·과소 표시되므로 CAGR을 내지 않는다
     private static final String VR_CASH_FLOW_WARNING =
             "적립식/인출식 설정 시 누적 수익률·CAGR·MDD가 외부 입출금을 반영하지 않아 "
                     + "실제보다 낙관적이거나 비관적으로 보일 수 있습니다.";
@@ -76,6 +79,7 @@ class BacktestService implements BacktestUseCase {
         warnings.addAll(0, output.warnings()); // 엔진 경고를 앞, 항상 붙는 안내를 뒤로
         warnings.add(FILL_MODEL_WARNING);
         warnings.add(ORDER_TIMING_WARNING);
+        warnings.add(COST_WARNING);
         if (command.type() == StrategyType.VR && command.vrRecurringAmount() != 0) warnings.add(VR_CASH_FLOW_WARNING);
 
         return new BacktestResult(output.points(), summarize(output), List.copyOf(warnings));
@@ -210,7 +214,7 @@ class BacktestService implements BacktestUseCase {
         BigDecimal mdd = ReturnMetrics.maxDrawdown(points.stream().map(BacktestPoint::totalAsset).toList()); // scale-invariant
 
         long days = ChronoUnit.DAYS.between(points.getFirst().date(), points.getLast().date());
-        BigDecimal cagr = days == 0 ? null : ReturnMetrics.annualizedReturn(lastIndex, 365.0 / days);
+        BigDecimal cagr = days < MIN_CAGR_DAYS ? null : ReturnMetrics.annualizedReturn(lastIndex, 365.0 / days);
 
         return new BacktestSummary(lastAsset, points.getLast().principal(),
                 ReturnMetrics.cumulativeReturn(lastIndex), cagr, mdd,

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
@@ -31,7 +32,8 @@ public class BacktestController {
     @Operation(summary = "전략 백테스트", description = "과거 일봉으로 전략을 시뮬레이션해 자산 곡선·성과 요약·해석 주의사항을 반환. "
             + "initialHoldings/initialAvgPrice로 기존 보유 포지션부터 시작하는 백테스트도 가능(seed=0 허용, 단 예수금과 보유 중 하나는 있어야 함). "
             + "VR은 운영 전략 등록과 같은 조건 — vrBandWidth/vrIntervalWeeks는 런타임 허용값만, 램프 8파라미터 미지정 시 recurringAmount별 기본값, "
-            + "vrInitialValue 미지정(또는 0)이면 첫 거래일 종가 × initialHoldings(보유 없으면 0에서 bootstrap 매수로 시작).")
+            + "vrInitialValue 미지정(또는 0)이면 첫 거래일 종가 × initialHoldings(보유 없으면 0에서 bootstrap 매수로 시작). "
+            + "cycleSeedType(INFINITE/PRIVACY): NONE=첫 사이클 종료 후 매매 중단, MAINTAIN=시작 금액으로 재시작(초과분은 유휴 현금), MAX(기본)=전액 이월.")
     @GetMapping
     public BacktestResponse run(
             @AuthenticationPrincipal UUID userId, // 로그인 확인 전용 — 백테스트는 계좌와 무관해 소유권 검증 없음
@@ -55,13 +57,15 @@ public class BacktestController {
             @RequestParam(required = false) BigDecimal vrInitialPoolLimitRate,
             @RequestParam(required = false) Integer vrPGraceWeeks,
             @RequestParam(required = false) Integer vrPStepWeeks,
-            @RequestParam(required = false) BigDecimal vrPoolLimitFloor) {
+            @RequestParam(required = false) BigDecimal vrPoolLimitFloor,
+            // INFINITE/PRIVACY 사이클 종료 후 재시작 정책 — 미지정 시 MAX(전액 이월), VR은 무시
+            @RequestParam(required = false) StrategyCycleSeedType cycleSeedType) {
         BacktestCommand.VrRampInput rampInput = new BacktestCommand.VrRampInput(
                 vrInitialGradient, vrGGraceWeeks, vrGStepWeeks, vrGMax,
                 vrInitialPoolLimitRate, vrPGraceWeeks, vrPStepWeeks, vrPoolLimitFloor);
         BacktestCommand command = new BacktestCommand(type, ticker, from, to, seed,
                 divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount, vrInitialValue,
-                initialHoldings, initialAvgPrice, rampInput);
+                initialHoldings, initialAvgPrice, rampInput, cycleSeedType);
         return BacktestResponse.from(backtestUseCase.run(command));
     }
 }

@@ -2,6 +2,7 @@ package com.kista.tradingstats.domain.model.backtest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.trading.domain.strategy.VrRampParams;
@@ -21,7 +22,8 @@ public record BacktestCommand(
         // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)
         Integer initialHoldings,   // 시뮬레이션 시작 시점 기존 보유 수량
         BigDecimal initialAvgPrice, // 시뮬레이션 시작 시점 기존 평단가 (initialHoldings>0이면 필수)
-        VrRampInput vrRampInput     // VR 전용 램프 8파라미터 입력 (null이거나 필드가 null이면 운영 기본값)
+        VrRampInput vrRampInput,    // VR 전용 램프 8파라미터 입력 (null이거나 필드가 null이면 운영 기본값)
+        StrategyCycleSeedType cycleSeedType // INFINITE/PRIVACY 사이클 종료 후 재시작 정책 (null이면 MAX — VR은 무시)
 ) {
     // VR 램프 8파라미터 원본 입력 — 미지정(null) 필드는 vrRamp()에서 recurringAmount별 운영 기본값으로 채운다
     public record VrRampInput(
@@ -35,6 +37,14 @@ public record BacktestCommand(
             BigDecimal poolLimitFloor        // poolLimitRate 램프 하한 (0~1)
     ) {
         static final VrRampInput NONE = new VrRampInput(null, null, null, null, null, null, null, null); // 전부 기본값
+    }
+
+    // 13개 필드 호출부(테스트 등) 호환용 — 사이클 시드 정책 생략 시 MAX
+    public BacktestCommand(StrategyType type, StrategyTicker ticker, LocalDate from, LocalDate to, BigDecimal seed,
+            Integer divisionCount, BigDecimal vrBandWidth, Integer vrIntervalWeeks, int vrRecurringAmount,
+            BigDecimal vrInitialValue, Integer initialHoldings, BigDecimal initialAvgPrice, VrRampInput vrRampInput) {
+        this(type, ticker, from, to, seed, divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount,
+                vrInitialValue, initialHoldings, initialAvgPrice, vrRampInput, null);
     }
 
     // 12개 필드 호출부(테스트 등) 호환용 — 램프 입력 생략 시 운영 기본값
@@ -58,6 +68,11 @@ public record BacktestCommand(
         VrRampInput in = vrRampInput != null ? vrRampInput : VrRampInput.NONE;
         return VrRampParams.withDefaults(vrRecurringAmount, in.initialGradient(), in.gGraceWeeks(), in.gStepWeeks(),
                 in.gMax(), in.initialPoolLimitRate(), in.pGraceWeeks(), in.pStepWeeks(), in.poolLimitFloor());
+    }
+
+    // 사이클 시드 정책 — 미입력이면 MAX(전액 이월, 기존 백테스트 결과 호환)
+    public StrategyCycleSeedType cycleSeedTypeOrMax() {
+        return cycleSeedType != null ? cycleSeedType : StrategyCycleSeedType.MAX;
     }
 
     // seed 미입력(null) 시 0 취급 — holdings만으로 시작하는 백테스트 지원을 위한 null-safe 접근자

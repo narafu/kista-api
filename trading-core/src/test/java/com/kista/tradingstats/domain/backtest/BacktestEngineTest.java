@@ -33,6 +33,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.kista.sharedkernel.StrategyCycleSeedType;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyTicker;
 
@@ -470,8 +471,8 @@ class BacktestEngineTest {
         // 첫날(01-02) 총자산 = 예수금 0 + 보유 5주 × 종가 100 = 500
         assertThat(output.points()).extracting(BacktestPoint::totalAsset)
                 .satisfiesExactly(p -> assertThat(p).isEqualByComparingTo("500"));
-        // 원금 = 시드 0 + 취득원가(5주×80) = 400 — 시장가 아닌 실제 투입 비용 기준
-        assertThat(output.points().getFirst().principal()).isEqualByComparingTo("400");
+        // 원금 = 시드 0 + 시작 보유분 평가금(5주×첫 캔들 종가 100) = 500 — 수익률 기준(첫날 총자산)과 같은 기준
+        assertThat(output.points().getFirst().principal()).isEqualByComparingTo("500");
     }
 
     @Test
@@ -527,17 +528,14 @@ class BacktestEngineTest {
         RecordingInfinite recorder = new RecordingInfinite();
         BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
 
+        // 11주·평단 76.7172·예수금 105로 시작 → 단위금액 (105 + 11×76.7172) ÷ 4 = 237.22 > 예수금 105 → 첫날부터 isFinalRound 성립
+        // (일반모드에서 진입까지 키우는 시나리오는 캡 보정 매수가 예산 검증에 거절돼 최종회차에 닿지 않는다)
+        // 종가는 리버스 종료선(평단 × 0.85 = 65.21) 아래로 둬 2일차에도 리버스모드가 유지되게 한다
         BacktestEngine.Output output = infiniteEngine.run(List.of(
-                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 90),
-                flat("2024-01-04", 85), flat("2024-01-05", 80), flat("2024-01-06", 75),
-                flat("2024-01-07", 70), flat("2024-01-08", 65), flat("2024-01-09", 65)
-        ), infiniteCommand("2024-01-01", "1000", 4));
+                flat("2024-01-01", 64), flat("2024-01-02", 60)
+        ), infiniteCommandWithPosition("2024-01-01", "105", 4, 11, "76.7172"));
 
-        // 7일차는 일반모드 — 8주·예수금 300 ≥ 단위금액 237.22라 아직 최종회차가 아니다
-        assertThat(recorder.on("2024-01-07").inputs().isReverseMode()).isFalse();
-
-        // 8일차: 11주·평단 76.7172·예수금 105 → 단위금액 237.22 > 예수금 105 → isFinalRound 성립 → 리버스모드 진입
-        Recorded firstDay = recorder.on("2024-01-08");
+        Recorded firstDay = recorder.on("2024-01-01");
         assertThat(firstDay.inputs().isReverseMode()).isTrue();
         assertThat(firstDay.inputs().isFirstReverseDay()).isTrue();
         // 진입 첫날은 별지점을 계산하지 않는다(즉시 청산 시작)
@@ -547,19 +545,19 @@ class BacktestEngineTest {
         assertThat(firstDay.orders().getFirst().quantity()).isEqualTo(5);
         assertThat(firstDay.orders().getFirst().orderType()).isEqualTo(OrderType.MOC);
 
-        // 9일차: 별지점 = 최근 5거래일 종가(80·75·70·65·65) 평균 = 355 ÷ 5 = 71.00
-        Recorded secondDay = recorder.on("2024-01-09");
+        // 2일차: 별지점 = 사이클 최근 종가(64·60) 평균 = 62.00
+        Recorded secondDay = recorder.on("2024-01-02");
         assertThat(secondDay.inputs().isFirstReverseDay()).isFalse();
-        assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("71.00");
+        assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("62.00");
         assertThat(secondDay.legs()).containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
-        // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 430 ÷ 4) ÷ 70.99 내림 = 1주 @별지점−0.01
+        // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 405 ÷ 4) ÷ 61.99 내림 = 1주 @별지점−0.01
         assertThat(secondDay.orders().get(0).quantity()).isEqualTo(3);
-        assertThat(secondDay.orders().get(0).price()).isEqualByComparingTo("71.00");
+        assertThat(secondDay.orders().get(0).price()).isEqualByComparingTo("62.00");
         assertThat(secondDay.orders().get(1).quantity()).isEqualTo(1);
-        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("70.99");
+        assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("61.99");
 
-        // 8일차 MOC 매도 5주가 9일차 종가 65에 체결 → 예수금 105 + 325 = 430 + 6주×65 = 820.00
-        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("820");
+        // 1일차 MOC 매도 5주가 2일차 종가 60에 체결 → 예수금 105 + 300 = 405 + 6주×60 = 765.00
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("765");
         assertThat(output.cycleCount()).isEqualTo(1);
     }
 
@@ -672,6 +670,8 @@ class BacktestEngineTest {
 
         private final Map<LocalDate, List<PlannedOrder>> byDate = new LinkedHashMap<>();
 
+        private final Map<LocalDate, AccountBalance> balances = new LinkedHashMap<>(); // 계획 시점 전략 잔고
+
         RecordingPrivacy() {
             super(new PrivacyStrategy());
         }
@@ -680,6 +680,7 @@ class BacktestEngineTest {
         public Optional<OrderPlan> plan(PlanContext ctx) {
             Optional<OrderPlan> result = super.plan(ctx);
             byDate.put(ctx.tradeDate(), result.map(OrderPlan::orders).orElse(List.of()));
+            balances.put(ctx.tradeDate(), ctx.balance());
             return result;
         }
 
@@ -808,7 +809,7 @@ class BacktestEngineTest {
         // → 01-03 계획에서 사이클 종료·재시작, 개장 자산 = 960
         // 01-04 기준표는 currentCycleStart=96 → 올바르면 배수 960/96 = 10.00 → 10주×10 = 100주
         // 시드(1000)로 잘못 리셋하면 배수 1000/96 = 10.41 → 104주가 되어 값이 어긋난다
-        // 01-04 종가 70 > 60이라 그 100주 LOC 매수는 체결되지 않는다(예수금 플로어 경고가 섞이지 않게)
+        // 그 100주 LOC 매수(@60 = 6,000)는 예수금 960을 넘어 예산 검증에서 거절된다(recorder는 거절 전 원본을 기록)
         BacktestEngine.Output output = privacyEngine(recorder).run(List.of(
                 flat("2024-01-01", 100),
                 flat("2024-01-02", 100),
@@ -833,7 +834,8 @@ class BacktestEngineTest {
         assertThat(recorder.on("2024-01-03")).singleElement()
                 .satisfies(o -> assertThat(o.quantity()).isEqualTo(100));
         assertThat(output.tradeCount()).isEqualTo(2);
-        assertThat(output.warnings()).isEmpty();
+        assertThat(output.warnings()).containsExactly(
+                "2024-01-04 ~ 2024-01-04(총 1일): 매수 주문 합계가 예수금을 넘어 그날 매수 주문을 모두 거절했습니다.");
     }
 
     @Test
@@ -885,9 +887,9 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("예수금 음수 방지: 연속 3일 플로어 발동이 일별 경고가 아니라 구간당 1건으로 요약된다")
-    void 체결_후_예수금이_음수면_0으로_클램프된다() {
-        // 배수 1.00 고정, 기준표 목표 보유를 매일 크게 늘려(250→400→550) 보유 보정(diff)이 매일 시드를 넘기게 만든다
+    @DisplayName("매수 예산 거절: BUY 합계가 예수금을 넘는 날은 BUY 전부 거절되고, 연속 3일 거절은 구간당 1건으로 요약된다")
+    void 매수_합계가_예수금을_넘으면_그날_매수를_모두_거절한다() {
+        // 배수 1.00 고정, 기준표 목표 보유를 크게 잡아(250→400→550) 보유 보정(diff) 매수가 매일 시드를 넘기게 만든다
         // 마지막 세션(01-05)까지 기준표를 채워 "결측 구간" 경고가 섞이지 않게 한다
         BacktestEngine.Output output = privacyEngine(new RecordingPrivacy()).run(List.of(
                 flat("2024-01-02", 100),
@@ -902,14 +904,130 @@ class BacktestEngineTest {
                 LocalDate.parse("2024-01-05"), privacyBase("1000", 550,
                         trade("2024-01-05", OrderType.LOC, OrderDirection.BUY, 1, "100"))));
 
-        // 기준표 키는 적용 세션 — 01-02 세션은 첫 캔들이라 계획일이 없다
-        // 01-02 계획(01-03 표): diff=250-0=250 → 251주@100=25,100.0 → 01-03 체결, 1000-25100.0=-24100.0 → 0 클램프(플로어 1일차, 최대부족액 24100.0)
-        // 01-03 계획(01-04 표): diff=400-251=149 → 150주@100=15,000.0 → 01-04 체결, -15000.0 → 0 클램프(플로어 2일차)
-        // 01-04 계획(01-05 표): diff=550-401=149 → 150주@100=15,000.0 → 01-05 체결, -15000.0 → 0 클램프(플로어 3일차)
-        // 01-05는 마지막 캔들이라 계획 없음 → 구간이 루프 종료 시점에 1건으로 flush
+        // 01-03·01-04·01-05 세션 매수(251주·401주·551주 @100)가 모두 예수금 1,000을 넘어 거절 — 운영 배치 예산 배정과 동일
         assertThat(output.warnings()).containsExactly(
-                "2024-01-03 ~ 2024-01-05(총 3일): 체결 후 예수금이 부족해 0으로 조정했습니다. 최대 부족액은 $24,100.00입니다.");
-        // 3영업일 연속 플로어가 발동했는데도 경고는 정확히 1건 — 일수에 비례하지 않는다
-        assertThat(output.tradeCount()).isEqualTo(3);
+                "2024-01-03 ~ 2024-01-05(총 3일): 매수 주문 합계가 예수금을 넘어 그날 매수 주문을 모두 거절했습니다.");
+        assertThat(output.tradeCount()).isZero();
+        // 없는 돈으로 산 체결이 없으니 자산은 시드 그대로다
+        assertThat(output.points()).extracting(BacktestPoint::totalAsset)
+                .allSatisfy(asset -> assertThat(asset).isEqualByComparingTo("1000"));
+    }
+
+    // --- 사이클 시드 정책 (PRIVACY 청산 시나리오 공용) ---
+
+    // 01-02 1주 @100 매수 체결 → 01-03 잔량 매도가 종가 closeOnExit에 체결돼 청산 → 01-03 계획에서 사이클 종료 판정
+    // 01-04 기준표는 currentCycleStart=50 → 배수 = 새 사이클 시작 금액 ÷ 50, 매수 @40은 01-04 종가 70이라 체결되지 않는다
+    private static BacktestEngine.Output runPrivacyExit(RecordingPrivacy recorder, StrategyCycleSeedType seedType,
+                                                        double closeOnExit) {
+        return runPrivacyExit(recorder, seedType, closeOnExit, "40", 70, false);
+    }
+
+    // observeNextDay: 01-05 캔들을 덧붙여 01-04 체결 직후 계획 시점 잔고를 recorder로 관찰한다(01-05 기준표 결측 경고가 추가된다)
+    private static BacktestEngine.Output runPrivacyExit(RecordingPrivacy recorder, StrategyCycleSeedType seedType,
+                                                        double closeOnExit, String nextBuyPrice, double nextClose,
+                                                        boolean observeNextDay) {
+        List<DailyCandle> candles = new ArrayList<>(List.of(
+                flat("2024-01-01", 100),
+                flat("2024-01-02", 100),
+                flat("2024-01-03", closeOnExit),
+                flat("2024-01-04", nextClose)));
+        if (observeNextDay) candles.add(flat("2024-01-05", nextClose));
+        BacktestCommand command = new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("1000"),
+                null, null, null, 0, null, null, null, null, seedType);
+        return privacyEngine(recorder).run(candles, command, Map.of(
+                LocalDate.parse("2024-01-02"), privacyBase("1000", 0,
+                        trade("2024-01-02", OrderType.LOC, OrderDirection.BUY, 1, "100")),
+                LocalDate.parse("2024-01-03"), privacyBase("1000", 0,
+                        trade("2024-01-03", OrderType.LOC, OrderDirection.SELL, null, "50")),
+                LocalDate.parse("2024-01-04"), privacyBase("50", 0,
+                        trade("2024-01-04", OrderType.LOC, OrderDirection.BUY, 1, nextBuyPrice))));
+    }
+
+    @Test
+    @DisplayName("사이클 시드 NONE: 청산되면 새 사이클 없이 매매를 중단한다")
+    void 시드정책_NONE이면_청산_후_매매를_중단한다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.NONE, 150);
+
+        assertThat(recorder.byDate).doesNotContainKey(LocalDate.parse("2024-01-03"));
+        assertThat(output.cycleCount()).isEqualTo(1);
+        assertThat(output.warnings()).containsExactly("2024-01-03: 사이클이 종료되어 이후 매매를 중단했습니다(사이클 종료 후 재시작 안 함).");
+        // 예수금 900 + 매도대금 150 = 1,050이 그대로 남는다
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1050");
+    }
+
+    @Test
+    @DisplayName("사이클 시드 MAINTAIN: 시작 금액으로 재시작하고 초과분은 유휴 현금으로 평가금에만 남는다")
+    void 시드정책_MAINTAIN이면_시작_금액으로_재시작한다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 150);
+
+        // 청산 후 예수금 1,050 중 시작 금액 1,000만 전략 잔고 → 배수 1000/50 = 20 → 20주 (MAX였다면 1050/50 = 21주)
+        assertThat(recorder.on("2024-01-03")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(20));
+        assertThat(output.cycleCount()).isEqualTo(2);
+        assertThat(output.warnings()).isEmpty();
+        // 전략 잔고 1,000 + 유휴 현금 50
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1050");
+    }
+
+    @Test
+    @DisplayName("사이클 시드 MAX: 청산 시점 예수금 전액으로 재시작한다")
+    void 시드정책_MAX면_전액으로_재시작한다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        runPrivacyExit(recorder, null, 150); // null = 기본 MAX
+
+        assertThat(recorder.on("2024-01-03")).singleElement()
+                .satisfies(o -> assertThat(o.quantity()).isEqualTo(21));
+    }
+
+    @Test
+    @DisplayName("사이클 시드 MAINTAIN: 예수금이 시작 금액보다 적으면 운영처럼 재시작하지 못하고 매매를 중단한다")
+    void 시드정책_MAINTAIN인데_예수금이_시작_금액보다_적으면_중단한다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 60);
+
+        assertThat(recorder.byDate).doesNotContainKey(LocalDate.parse("2024-01-03"));
+        assertThat(output.cycleCount()).isEqualTo(1);
+        assertThat(output.warnings()).containsExactly(
+                "2024-01-03: 예수금이 시작 금액($1,000.00)보다 적어 새 사이클을 시작하지 못하고 매매를 중단했습니다.");
+    }
+
+    @Test
+    @DisplayName("사이클 시드 MAINTAIN: 전략 잔고를 넘는 매수 체결분은 유휴 현금에서 메워 전략 예수금이 0에서 멈춘다")
+    void 시드정책_MAINTAIN_매수가_전략_잔고를_넘으면_유휴_현금에서_메운다() {
+        RecordingPrivacy recorder = new RecordingPrivacy();
+        // 재시작 후 전략 잔고 1,000 + 유휴 50, 20주 @51 = 1,020 ≤ 1,050이라 예산 통과 → 01-04 종가 51에 체결(1,020)
+        BacktestEngine.Output output = runPrivacyExit(recorder, StrategyCycleSeedType.MAINTAIN, 150, "51", 51, true);
+
+        // 전략 예수금 1,000 − 1,020 = −20 → 유휴 현금 50에서 20을 메워 전략 예수금 0, 유휴 30
+        assertThat(recorder.balances.get(LocalDate.parse("2024-01-04")).usdDeposit()).isEqualByComparingTo("0");
+        assertThat(output.warnings()).noneMatch(w -> w.contains("매수 주문 합계"));
+        // 총자산 = 전략 예수금 0 + 유휴 30 + 20주 × 51 = 1,050
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("1050");
+    }
+
+    @Test
+    @DisplayName("사이클 시드 NONE(INFINITE): 청산되면 리버스모드 리셋·재시작 없이 매매를 중단한다")
+    void INFINITE_시드정책_NONE이면_청산_후_매매를_중단한다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+        BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
+                LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("1000"),
+                2, null, null, 0, null, null, null, null, StrategyCycleSeedType.NONE);
+
+        // 청산되면_새_사이클이_리버스모드_해제_상태로_시작된다와 같은 경로 — 01-04에 10주 전량 체결로 청산
+        BacktestEngine.Output output = infiniteEngine.run(List.of(
+                flat("2024-01-01", 100), flat("2024-01-02", 100), flat("2024-01-03", 100),
+                flat("2024-01-04", 95), flat("2024-01-05", 90)
+        ), command);
+
+        assertThat(recorder.byDate).containsKey(LocalDate.parse("2024-01-03"))
+                .doesNotContainKeys(LocalDate.parse("2024-01-04"), LocalDate.parse("2024-01-05"));
+        assertThat(output.cycleCount()).isEqualTo(1);
+        assertThat(output.warnings()).containsExactly("2024-01-04: 사이클이 종료되어 이후 매매를 중단했습니다(사이클 종료 후 재시작 안 함).");
+        // 매도대금 950이 그대로 남는다
+        assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("950");
     }
 }

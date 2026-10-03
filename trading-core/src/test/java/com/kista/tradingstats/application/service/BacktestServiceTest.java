@@ -456,9 +456,25 @@ class BacktestServiceTest {
         assertThat(result.summary().totalInvested()).isEqualByComparingTo("1000"); // INFINITE는 외부 현금흐름 없음
         assertThat(result.summary().totalReturnRate()).isEqualByComparingTo("0.01"); // 1000 → 1010
         assertThat(result.summary().mdd()).isEqualByComparingTo("-0.02"); // 고점 1000 → 980
-        // 4일간 +1% → 연환산 (1.01^(365/4) − 1)
-        assertThat(result.summary().cagr()).isCloseTo(bd("1.4791"), within(bd("0.001")));
+        // 4일 구간은 365일 미만 — 연환산하면 +148%로 과대 표시되므로 CAGR을 내지 않는다
+        assertThat(result.summary().cagr()).isNull();
         assertThat(result.summary().tradeCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 구간이_365일_이상이면_cagr을_연환산한다() {
+        when(cycleOrderStrategies.of(StrategyType.INFINITE)).thenReturn(planner);
+        when(candlePort.fetchDailyCandles(anyString(), any(), any())).thenReturn(List.of(
+                new DailyCandle(LocalDate.of(2024, 1, 1), bd("100"), bd("100"), bd("100"), bd("100")),
+                new DailyCandle(LocalDate.of(2024, 1, 2), bd("100"), bd("100"), bd("100"), bd("100")),
+                new DailyCandle(LocalDate.of(2025, 1, 2), bd("121"), bd("121"), bd("121"), bd("121"))));
+        // 1/1 계획 매수 1주 @100이 1/2 체결 → 마지막 자산 900 + 121 = 1,021
+        when(planner.plan(any())).thenReturn(Optional.of(buyOnePlan()), Optional.empty());
+
+        BacktestResult result = service.run(infinite(null));
+
+        // 367일간 +2.1% → 연환산 (1.021^(365/367) − 1)
+        assertThat(result.summary().cagr()).isCloseTo(bd("0.02088"), within(bd("0.0001")));
     }
 
     @Test
@@ -485,6 +501,7 @@ class BacktestServiceTest {
 
         assertThat(result.warnings()).anyMatch(w -> w.contains("일봉 시가·고가·저가·종가"));
         assertThat(result.warnings()).anyMatch(w -> w.contains("장 시작/장 마감 접수 시점"));
+        assertThat(result.warnings()).anyMatch(w -> w.contains("수수료·세금·환전 비용과 배당금"));
         assertThat(result.warnings()).noneMatch(w -> w.contains("적립식/인출식"));
     }
 
