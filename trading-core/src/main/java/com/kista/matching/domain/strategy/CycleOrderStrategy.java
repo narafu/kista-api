@@ -63,6 +63,13 @@ public interface CycleOrderStrategy {
         return buyOrders;
     }
 
+    // live 예산(budget) 안에 못 담는 BUY를 전략별로 축소 — 기본은 축소 없음(호출부가 전체 거절)
+    // 결과가 비었거나 여전히 budget 초과면 호출부가 거절한다
+    // 계약: 입력 주문의 부분집합(같은 인스턴스·값)만 반환 — allocator.mergeApproved가 원본 목록과 equals로 대조해 순서를 복원한다
+    default List<PlannedOrder> fitBuysToBudget(List<PlannedOrder> buyOrders, BigDecimal budget) {
+        return buyOrders;
+    }
+
     // true: capBuyOrders 결과를 buyOrders와 인덱스별로 비교해 값이 바뀐 주문만 개별 취소·재저장(PRIVACY)
     // false: buyOrders 전체를 한 번에 취소하고 결과 전체를 재저장(INFINITE/VR — 사다리 재구성은 개별 대응이 무의미)
     default boolean capsIndividualOrders() { return false; }

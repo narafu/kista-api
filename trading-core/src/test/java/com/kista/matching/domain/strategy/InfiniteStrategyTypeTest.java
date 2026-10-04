@@ -336,4 +336,48 @@ class InfiniteStrategyTypeTest {
                 .containsExactly("INFINITE_LATE_REF_BUY",
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
     }
+
+    // ── 보정 주문 예산 트림 (후반 교착 회귀) ──────────────────────────────────
+
+    private InfinitePosition deadlockSeedPosition() {
+        // 4분할 TQQQ, holdings 8, avg 81.1111, 예수금 300 → unit 237.22, ref 76.24
+        return new InfinitePosition(new AccountBalance(8, new BigDecimal("81.1111"), new BigDecimal("300")),
+                StrategyTicker.TQQQ, new BigDecimal("70"), 4);
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 교착 시드: base+보정합이 예수금 초과면 뒤쪽 보정부터 제거해 [base, 보정1]")
+    void buildCappedBuyOrders_deadlockSeed_trimsTrailingCorrections() {
+        List<PlannedOrder> buyOrders = List.of(PlannedOrder.of(TODAY, StrategyTicker.TQQQ, LOC, BUY, 3,
+                new BigDecimal("76.24"), "INFINITE_LATE_REF_BUY"));
+
+        List<PlannedOrder> result = strategy.buildCappedBuyOrders(
+                deadlockSeedPosition(), TODAY, buyOrders, new BigDecimal("73.50"));
+
+        assertThat(result).extracting(PlannedOrder::orderLeg)
+                .containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01");
+        assertThat(result.get(0).quantity()).isEqualTo(3);
+        assertThat(result.get(0).price()).isEqualByComparingTo("73.50");
+        assertThat(result.get(1).price()).isEqualByComparingTo("59.31");
+        assertThat(AccountBalance.buyTotal(result)).isEqualByComparingTo("279.81");
+    }
+
+    @Test
+    @DisplayName("trimCorrectionsToBudget 예산 넉넉하면 보정 3건 그대로")
+    void trimCorrectionsToBudget_ampleBudget_keepsAll() {
+        List<PlannedOrder> buys = List.of(buy("73.50", 3, "INFINITE_LATE_REF_BUY"),
+                buy("59.31", 1, "INFINITE_CORRECTION_01"), buy("47.44", 1, "INFINITE_CORRECTION_02"),
+                buy("39.54", 1, "INFINITE_CORRECTION_03"));
+
+        assertThat(InfiniteStrategy.trimCorrectionsToBudget(buys, new BigDecimal("400"))).isEqualTo(buys);
+    }
+
+    @Test
+    @DisplayName("trimCorrectionsToBudget base만으로 초과여도 base는 유지")
+    void trimCorrectionsToBudget_baseExceeds_keepsBaseOnly() {
+        PlannedOrder base = buy("73.50", 3, "INFINITE_LATE_REF_BUY");
+        List<PlannedOrder> buys = List.of(base, buy("59.31", 1, "INFINITE_CORRECTION_01"));
+
+        assertThat(InfiniteStrategy.trimCorrectionsToBudget(buys, new BigDecimal("100"))).containsExactly(base);
+    }
 }

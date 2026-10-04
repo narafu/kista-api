@@ -175,6 +175,11 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     @Override
+    public List<PlannedOrder> fitBuysToBudget(List<PlannedOrder> buyOrders, BigDecimal budget) {
+        return InfiniteStrategy.trimCorrectionsToBudget(buyOrders, budget);
+    }
+
+    @Override
     public boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) {
         return position != null;
     }

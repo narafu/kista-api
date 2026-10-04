@@ -1,5 +1,6 @@
 package com.kista.matching.domain.strategy;
 
+import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.InfinitePosition;
 
@@ -50,7 +51,21 @@ public class InfiniteStrategy {
             addCorrectionOrder(tradeDate, position, newBuys, unitAmount, i + 1);
         }
 
-        return newBuys;
+        // 보정 주문이 원장 예수금을 넘으면 뒤쪽부터 생략 — 지정가 합계가 예산 밖이면 접수 전체가 거절돼 교착된다
+        return trimCorrectionsToBudget(newBuys, position.usdDeposit());
+    }
+
+    // BUY 지정가×수량 합이 budget을 넘는 동안 뒤쪽 correction leg부터 제거 — 보정 가격이 누적수량 의존이라 앞쪽(prefix)만 남긴다
+    // base(비-correction) 주문은 건드리지 않는다(수량 축소는 매매 공식 이탈) — 다 빼도 초과면 base만 반환
+    public static List<PlannedOrder> trimCorrectionsToBudget(List<PlannedOrder> buys, BigDecimal budget) {
+        List<PlannedOrder> trimmed = new ArrayList<>(buys);
+        while (AccountBalance.buyTotal(trimmed).compareTo(budget) > 0) {
+            int last = trimmed.size() - 1;
+            while (last >= 0 && !isCorrectionLeg(trimmed.get(last))) last--;
+            if (last < 0) break;
+            trimmed.remove(last);
+        }
+        return trimmed;
     }
 
     // 후반 단일 LOC 매수: unitAmount/referencePrice

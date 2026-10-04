@@ -46,6 +46,10 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 - **보정 주문 (전후반 공통)**: base buy 재산정 후 `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
   - 가격 = `K / (누적수량 + 1)` (HALF_UP, scale=2) — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip
+  - 보정 합계가 원장 예수금(`position.usdDeposit()`)을 넘으면 `InfiniteStrategy.trimCorrectionsToBudget`이 뒤쪽 보정(03→02→01)부터 생략 — base(수량·가격)는 불변, 지정가 합계가 예산 밖이면 allocator가 BUY 전체를 매일 거절해 잔고가 그대로 남고 리버스모드(isFinalRound) 진입도 못 하는 교착이 되기 때문
+  - allocator는 live 예산이 전체 BUY를 못 담을 때 `CycleOrderStrategy.fitBuysToBudget`으로 1회 축소(INFINITE=보정 생략, 그 외 기본=축소 없음)해 예산 안이면 축소안을 승인·저장하고, base조차 못 담을 때만 거절한다
+  - 보정이 생략된 날은 `canSkipOrderComputation`의 correctionComplete(보정 3건 전부 존재)가 성립하지 않아 같은 날 재실행 시 재계산한다 — 같은 leg는 `excludeExisting`이 걸러 중복은 없다
+  - 한계: 접수 직전 재캡(`capIfNeeded`)은 allocator를 거치지 않아 원장 예수금 기준으로만 보정을 덜어낸다 — 한 계좌를 여러 활성 전략이 공유하고 원장 합계가 live 주문가능금액보다 크면 재캡이 live를 넘을 수 있다(미해결, 공유 계좌 운용 전 재캡 직전 live 조회+계좌 단위 직렬화 필요)
 - 재산정 결과가 모두 비어있으면 BUY 주문 전체 제외 (log.warn)
 - INFINITE BUY는 항상 AT_CLOSE라 `capIfNeeded(StrategyType.INFINITE, atOpen=true, ...)`은 실질 no-op — 전략별 분기 대칭성 유지 목적으로만 존재
 

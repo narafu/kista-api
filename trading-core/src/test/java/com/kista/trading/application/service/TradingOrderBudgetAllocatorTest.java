@@ -17,6 +17,7 @@ import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.matching.domain.strategy.InfiniteStrategy;
 import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -305,6 +306,76 @@ class TradingOrderBudgetAllocatorTest {
         assertThat(result.rejectedBuy()).singleElement()
                 .satisfies(rejected -> assertThat(rejected.orders())
                         .containsExactly(firstBuy, secondBuy));
+    }
+
+    @Test
+    void allocate_buyOverBudget_approvesStrategyFittedSubsetAndKeepsSellOrder() {
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("1000.00")));
+        PlannedOrder base = buy("700.00");
+        PlannedOrder sell = sell("25.00", 3);
+        PlannedOrder extra = buy("400.00");
+        when(infiniteCycleOrderStrategy.fitBuysToBudget(any(), any())).thenReturn(List.of(base));
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(StrategyType.INFINITE, base, sell, extra);
+
+        TradingOrderBudgetAllocator.Allocation result = allocator.allocate(List.of(candidate), tradeDate);
+
+        assertThat(result.approved()).singleElement()
+                .satisfies(approved -> assertThat(approved.orders()).containsExactly(base, sell));
+        assertThat(result.rejectedBuy()).isEmpty();
+    }
+
+    @Test
+    void allocate_fittedBuyStillOverBudget_rejects() {
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("500.00")));
+        PlannedOrder base = buy("700.00");
+        when(infiniteCycleOrderStrategy.fitBuysToBudget(any(), any())).thenReturn(List.of(base));
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(StrategyType.INFINITE, base, buy("400.00"));
+
+        TradingOrderBudgetAllocator.Allocation result = allocator.allocate(List.of(candidate), tradeDate);
+
+        assertThat(result.approved()).isEmpty();
+        assertThat(result.rejectedBuy()).containsExactly(candidate);
+    }
+
+    @Test
+    void allocate_defaultHookStrategy_keepsAllOrNothingRejection() {
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("1000.00")));
+        // 기본 훅(PRIVACY 등)은 축소 없이 입력을 그대로 돌려준다
+        when(privacyCycleOrderStrategy.fitBuysToBudget(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(StrategyType.PRIVACY, buy("700.00"), buy("400.00"));
+
+        TradingOrderBudgetAllocator.Allocation result = allocator.allocate(List.of(candidate), tradeDate);
+
+        assertThat(result.approved()).isEmpty();
+        assertThat(result.rejectedBuy()).containsExactly(candidate);
+    }
+
+    @Test
+    void allocate_infiniteCappedLadderOverLiveBudget_dropsTrailingCorrectionsViaRealTrim() {
+        // 교착 재현 시드: 캡 재산정 base 3×73.50 + 보정 3건 = 366.79 > live 300
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(8, new BigDecimal("81.11"), new BigDecimal("300.00")));
+        when(infiniteCycleOrderStrategy.fitBuysToBudget(any(), any())).thenAnswer(inv ->
+                InfiniteStrategy.trimCorrectionsToBudget(inv.getArgument(0), inv.getArgument(1)));
+        PlannedOrder base = locBuy(3, "73.50", "INFINITE_LATE_REF_BUY");
+        PlannedOrder c1 = locBuy(1, "59.31", PlannedOrder.leg("INFINITE_CORRECTION", 1));
+        PlannedOrder c2 = locBuy(1, "47.44", PlannedOrder.leg("INFINITE_CORRECTION", 2));
+        PlannedOrder c3 = locBuy(1, "39.54", PlannedOrder.leg("INFINITE_CORRECTION", 3));
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(StrategyType.INFINITE, base, c1, c2, c3);
+
+        TradingOrderBudgetAllocator.Allocation result = allocator.allocate(List.of(candidate), tradeDate);
+
+        assertThat(result.approved()).singleElement()
+                .satisfies(approved -> assertThat(approved.orders()).containsExactly(base, c1));
+        assertThat(result.rejectedBuy()).isEmpty();
+    }
+
+    private PlannedOrder locBuy(int quantity, String price, String leg) {
+        return PlannedOrder.of(tradeDate, StrategyTicker.SOXL, OrderType.LOC, OrderDirection.BUY,
+                quantity, new BigDecimal(price), leg);
     }
 
     private TradingOrderBudgetAllocator.Candidate candidate(StrategyType type, String buyAmount) {

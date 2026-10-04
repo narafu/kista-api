@@ -2,7 +2,6 @@ package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.application.port.output.OrderPort;
@@ -18,7 +17,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -177,6 +175,18 @@ class TradingOrderBudgetAllocator {
                 log.info("[{}] BUY 예산 배정: strategy={}, required={}, remaining={}",
                         account.nickname(), candidate.ctx().strategy().type(), required,
                         remainingDeposit(live, reservedBuy, allocatedInBatch));
+                continue;
+            }
+            // 전체는 못 담을 때 전략이 허용하는 축소안(예: INFINITE 보정 주문 생략)이 예산 안이면 그것으로 승인
+            BigDecimal budget = live.usdDeposit().subtract(alreadyCommitted);
+            List<PlannedOrder> fitted = cycleOrderStrategies.of(candidate.ctx().strategy().type())
+                    .fitBuysToBudget(candidate.orders(), budget);
+            if (!fitted.isEmpty() && buyTotal(fitted).compareTo(budget) <= 0) {
+                approved.add(candidate.withOrders(fitted));
+                allocatedInBatch = allocatedInBatch.add(buyTotal(fitted));
+                log.info("[{}] BUY 예산 내 축소 승인: strategy={}, required={}, fitted={}, orders {}->{}건",
+                        account.nickname(), candidate.ctx().strategy().type(), required, buyTotal(fitted),
+                        candidate.orders().size(), fitted.size());
             } else {
                 rejected.add(candidate);
                 log.warn("[{}] BUY 예산 부족으로 제외: strategy={}, required={}, remaining={}",
@@ -225,21 +235,19 @@ class TradingOrderBudgetAllocator {
         Map<BatchContext, Candidate> sourceCandidates = new LinkedHashMap<>();
         candidates.forEach(candidate -> sourceCandidates.putIfAbsent(candidate.ctx(), candidate));
 
-        Map<BatchContext, EnumSet<OrderDirection>> approvedDirections = new LinkedHashMap<>();
+        // 승인된 주문 자체(축소된 BUY 포함)를 ctx별로 모은다 — 방향만 보면 축소 전 원본 BUY가 되살아난다
+        Map<BatchContext, List<PlannedOrder>> approvedOrders = new LinkedHashMap<>();
         Stream.concat(sellApproved.stream(), buyApproved.stream())
-                .forEach(candidate -> candidate.orders().forEach(order -> approvedDirections
-                        .computeIfAbsent(candidate.ctx(), ignored -> EnumSet.noneOf(OrderDirection.class))
-                        .add(order.direction())));
+                .forEach(candidate -> approvedOrders
+                        .computeIfAbsent(candidate.ctx(), ignored -> new ArrayList<>())
+                        .addAll(candidate.orders()));
 
-        return Stream.concat(sellApproved.stream(), buyApproved.stream())
-                .map(Candidate::ctx)
-                .distinct()
-                .map(ctx -> {
-                    Candidate source = sourceCandidates.get(ctx);
-                    return source.withOrders(source.orders().stream()
-                            .filter(order -> approvedDirections.get(ctx).contains(order.direction()))
-                            .toList());
-                })
+        // 원본 후보 순서를 기준으로 승인된 주문만 남긴다(축소는 부분집합 제거라 상대 순서 유지)
+        return approvedOrders.entrySet().stream()
+                .map(entry -> sourceCandidates.get(entry.getKey()).withOrders(
+                        sourceCandidates.get(entry.getKey()).orders().stream()
+                                .filter(entry.getValue()::contains)
+                                .toList()))
                 .filter(candidate -> !candidate.orders().isEmpty())
                 .toList();
     }
