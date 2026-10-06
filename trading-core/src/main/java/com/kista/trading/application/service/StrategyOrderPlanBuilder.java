@@ -32,6 +32,7 @@ class StrategyOrderPlanBuilder {
     private final PrivacyTradePort privacyTradePort;         // PRIVACY 기준매매표 조회
     private final CycleOrderComputer orderComputer;          // 전략 계산 + 유효성 검증
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 타입별 capability 조회
+    private final PrivacyBaseGuard privacyBaseGuard;         // PRIVACY 기준표 장전 점검 (무알림 판정)
 
     // 계산 결과 — 정상이면 plan non-null, skip이면 skipReason non-null
     record PlanResult(CycleOrderStrategy.OrderPlan plan, SkipReason skipReason) {
@@ -62,6 +63,11 @@ class StrategyOrderPlanBuilder {
         }
         // PrivacyTradePort에는 이 조합 전용 헬퍼가 없어 동일 로직을 인라인
         PrivacyTradeBase privacyBase = strategy.isPrivacy() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;
+
+        // 장전 점검 이슈 기준표는 쓰지 않는다 — 미리보기는 반복 호출되므로 알림 없이 조용히 차단(알림은 배치 가드 담당)
+        if (privacyBase != null && !privacyBaseGuard.usable(privacyBase)) {
+            return new PlanResult(null, SkipReason.PRIVACY_BASE_BLOCKED);
+        }
 
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
                 balance, strategy, prevClosePrice, today, currentCycle, privacyBase, label, null)

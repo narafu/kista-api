@@ -79,6 +79,10 @@ class ManualTradingService {
             if (result.skipReason() == SkipReason.NO_CYCLE_HISTORY) {
                 throw new ManualTradingException("전략 실행 이력이 없어 수동 실행할 수 없습니다");
             }
+            // 점검 이슈 차단은 사용자가 버튼을 눌렀으므로 사유를 알린다
+            if (result.skipReason() == SkipReason.PRIVACY_BASE_BLOCKED) {
+                throw new ManualTradingException("P 매매표 점검에서 이상이 발견돼 오늘은 PRIVACY 주문을 낼 수 없습니다.");
+            }
             return List.of();
         }
         CycleOrderStrategy.OrderPlan plan = result.plan();

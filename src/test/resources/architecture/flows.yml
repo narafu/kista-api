@@ -625,8 +625,8 @@ flows:
         title: 배치에서 사용
         desc: >-
           개장·마감 배치 모두 주문 계획 전에 기준표를 다시 점검해 이슈가 있으면 기준표를 쓰지 않고(신규 PRIVACY 주문 없음) 관리자에게 알린다.
-          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감)을 계산한다. 사용자 수동 실행("바로 주문")은 이 점검을 거치지 않는다.
-        code: [TradingPriceFetcher#loadPriceContext, PrivacyBaseGuard#screen, PrivacyTradePersistenceAdapter#findTodayTrade]
+          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감)을 계산한다. 사용자 "바로 주문"·주문 미리보기도 같은 점검으로 차단한다(알림 없이 PRIVACY_BASE_BLOCKED — 바로 주문은 409로 거부).
+        code: [TradingPriceFetcher#loadPriceContext, PrivacyBaseGuard#screen, PrivacyBaseGuard#usable, StrategyOrderPlanBuilder#build, PrivacyTradePersistenceAdapter#findTodayTrade]
         cond: ACTIVE PRIVACY 전략이 있을 때
 
       - id: manual

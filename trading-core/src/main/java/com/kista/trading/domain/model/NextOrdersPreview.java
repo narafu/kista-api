@@ -21,6 +21,7 @@ public record NextOrdersPreview(
         NO_CYCLE_HISTORY,          // 사이클 이력 없음 (신규)
         NO_PRIVACY_BASE,           // PRIVACY 기준매매표 미수신
         SCHEDULED_START_NOT_REACHED, // 사이클 시작예정일 미도래
-        CYCLE_ENDED                // 최신 사이클이 종료됨 (청산 후 재등록 미완료) — 재등록/수동 개입 필요
+        CYCLE_ENDED,               // 최신 사이클이 종료됨 (청산 후 재등록 미완료) — 재등록/수동 개입 필요
+        PRIVACY_BASE_BLOCKED       // PRIVACY 기준매매표 점검 이슈로 오늘 신규 주문 차단
     }
 }

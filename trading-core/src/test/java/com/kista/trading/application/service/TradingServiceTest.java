@@ -1579,6 +1579,35 @@ class TradingServiceTest {
         verify(errorReportPort).reportError(any());
     }
 
+    // 개장 배치 장전 가드 — MISSING_SELL 기준표면 신규 PRIVACY 주문을 만들지 않고 "개장 배치" 알림
+    @Test
+    void placeOpenOrders_privacyBaseWithIssues_noExistingOrders_placesNothing() throws InterruptedException {
+        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
+                PRICE, new BigDecimal("20.00"), 10, null, null);
+        PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(missingSellBase));
+        when(privacyValidation.inspect(missingSellBase)).thenReturn(missingSellReport());
+        lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(privacyCycle.id()), any())).thenReturn(List.of());
+
+        service.placeOpenOrders(List.of(new BatchContext(privacy, privacyCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(privacyStrategy, never()).buildOrders(any(), any(), any());
+        verify(orderPort, never()).saveAll(anyList());
+        verify(brokerOrderPort, never()).place(any(), any());
+        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("개장 배치")
+                && e.getMessage().contains("MISSING_SELL")));
+    }
+
     private static com.kista.privacy.domain.model.PrivacyTradeValidationReport missingSellReport() {
         return new com.kista.privacy.domain.model.PrivacyTradeValidationReport(List.of(
                 new com.kista.privacy.domain.model.PrivacyTradeValidationReport.Issue(

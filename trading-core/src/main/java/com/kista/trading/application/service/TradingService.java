@@ -171,6 +171,7 @@ class TradingService {
             }
 
             runState.critical(() -> {
+                // 기준표 미점검(screen 미적용)은 의도 — 정보성 로테이션 최소금액 알림만 일반 마감 경로와 다르고 매매 영향 없음
                 TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(targets, today);
                 Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
                 List<CyclePlacedState> placedStates = new ArrayList<>();
@@ -372,13 +373,13 @@ class TradingService {
         return open;
     }
 
-    // 시작예정일 미도래 사이클 제외 — tradeDate가 startDate 이후일 때만 집행 (tradeDate > startDate)
     // 신규 주문 계획 전 PRIVACY 기준표 장전 점검 — 이슈면 기준표를 비워 PRIVACY 신규 주문만 막고 기존 주문 처리는 유지
     // (리포트 재개 resumeCloseReport는 이미 접수된 주문의 기록이라 적용하지 않는다)
     private TradingPriceFetcher.PriceContext screenPrivacyBase(TradingPriceFetcher.PriceContext priceCtx, LocalDate tradeDate, String batchLabel) {
         return priceCtx.withPrivacyBase(privacyBaseGuard.screen(priceCtx.privacyBase(), tradeDate, batchLabel));
     }
 
+    // 시작예정일 미도래 사이클 제외 — tradeDate가 startDate 이후일 때만 집행 (tradeDate > startDate)
     private List<BatchContext> filterScheduledStart(List<BatchContext> contexts, LocalDate tradeDate) {
         return contexts.stream().filter(ctx -> {
             boolean started = tradeDate.isAfter(ctx.currentCycle().startDate());

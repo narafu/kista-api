@@ -23,11 +23,27 @@ class PrivacyBaseGuard {
     // 이슈가 없으면 base 그대로, 있으면 관리자 알림 후 null. batchLabel은 알림 문구용 배치 이름
     PrivacyTradeBase screen(PrivacyTradeBase base, LocalDate tradeDate, String batchLabel) {
         if (base == null) return null;
-        PrivacyTradeValidationReport report = validationService.inspect(base);
-        if (!report.hasIssues()) return base;
-        errorReportPort.reportError(new IllegalStateException(
-                "[PRIVACY] " + batchLabel + " 장전 가드 발동 — 기준 매매표 이상으로 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + "): "
-                        + report.summary()));
+        try {
+            PrivacyTradeValidationReport report = validationService.inspect(base);
+            if (!report.hasIssues()) return base;
+            errorReportPort.reportError(new IllegalStateException(
+                    "[PRIVACY] " + batchLabel + " 장전 가드 발동 — 기준 매매표 이상으로 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + "): "
+                            + report.summary()));
+        } catch (RuntimeException e) {
+            // 점검 자체가 실패하면 안전하게 차단(fail-closed)
+            errorReportPort.reportError(new IllegalStateException(
+                    "[PRIVACY] " + batchLabel + " 기준 매매표 점검 실패 — 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + ")", e));
+        }
         return null;
+    }
+
+    // 알림 없는 조용한 판정 — 미리보기·수동 실행처럼 반복 호출되는 경로용. base 없음·이슈·점검 실패는 모두 false
+    boolean usable(PrivacyTradeBase base) {
+        if (base == null) return false;
+        try {
+            return !validationService.inspect(base).hasIssues();
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 }

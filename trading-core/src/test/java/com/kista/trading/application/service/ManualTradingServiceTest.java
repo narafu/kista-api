@@ -18,6 +18,7 @@ import com.kista.matching.domain.model.*;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.BrokerBalance;
+import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
@@ -70,6 +71,7 @@ class ManualTradingServiceTest {
     @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
     @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
     @Mock VrStrategy vrStrategy; // VrCycleOrderStrategy 조립용
+    @Mock PrivacyBaseGuard privacyBaseGuard; // PRIVACY 기준표 장전 점검
     @Mock ApplicationEventPublisher eventPublisher; // 4xx 예외라 GlobalExceptionHandler가 저장 안 하는 외부 API 실패를 직접 기록
 
     ManualTradingService service;
@@ -110,7 +112,7 @@ class ManualTradingServiceTest {
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
         StrategyOrderPlanBuilder planBuilder = new StrategyOrderPlanBuilder(
-                balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies);
+                balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
@@ -393,6 +395,30 @@ class ManualTradingServiceTest {
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
                 .hasMessage("전략 실행 이력이 없어 수동 실행할 수 없습니다");
+
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    // 점검 이슈 PRIVACY 기준표는 바로 주문도 시끄럽게 거부 — 주문 저장 없음
+    @Test
+    void execute_privacyBaseBlocked_throwsManualTradingException() {
+        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+        PrivacyTradeBase base = new PrivacyTradeBase(
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+        when(strategyPort.findByIdOrThrow(privacy.id())).thenReturn(privacy);
+        when(strategyCyclePort.requireLatestByStrategyId(privacy.id())).thenReturn(privacyCycle);
+        when(cyclePositionPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(
+                new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"),
+                        new BigDecimal("20.00"), 10, null, null)));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
+        when(privacyBaseGuard.usable(base)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.execute(privacy.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessage("P 매매표 점검에서 이상이 발견돼 오늘은 PRIVACY 주문을 낼 수 없습니다.");
 
         verify(orderPort, never()).saveAll(anyList());
     }
