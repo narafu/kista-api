@@ -143,9 +143,9 @@ flowchart LR
 # 출력: build/spring-modulith-docs/process.html (modules.html과 서로 링크)
 ```
 
-- 탭 4개: 프로세스 랜드스케이프(사용자 여정·자동·관리자 단계, 상세 흐름이 있는 단계만 클릭 가능) / 프로세스 상세 스윔레인(레인 = 사용자·kista-ui·kista-api·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 하루 타임라인(KST 24h, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `scheduler.enabled` 게이트 여부로 `kista-scheduler` 또는 공용) / 상태 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로, 전이 클릭 → 계기·담당 코드·연결된 흐름 단계)
+- 탭 4개: 프로세스 랜드스케이프(사용자 여정·자동·관리자 단계, 상세 흐름이 있는 단계만 클릭 가능) / 프로세스 상세 스윔레인(레인 = 사용자·kista-ui·kista-api·kista-scheduler·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 하루 타임라인(KST 24h, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `scheduler.enabled` 게이트 여부로 `kista-scheduler` 또는 공용) / 상태 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로, 전이 클릭 → 계기·담당 코드·연결된 흐름 단계)
 - `ProcessMapTest`가 flows.yml의 `클래스#메서드` 참조·레인·흐름 연결을 검증하고, `lifecycles:`는 상태 enum 상수 집합이 `states`와 정확히 같은지·전이의 상태·`flow: <flowId>/<stepId>` 링크까지 검증한다 — 메서드 이름이 바뀌거나 enum 상수가 늘면 이 테스트가 깨지니 flows.yml을 같이 고친다. 스키마는 flows.yml 머리 주석이 SSOT
-- 상세 흐름 6개: 마감 배치·개장 배치·가입·승인·전략 등록·회원 탈퇴·FIDA 기준표 수신. 나머지 랜드스케이프 카드(계좌 연결·수동 실행·알림 설정·가계부 등)는 "준비 중" — flows.yml `flows:`에 키를 추가하고 landscape의 `flow:`로 연결하면 된다
+- 상세 흐름 18개 — 랜드스케이프 카드 전부 연결. 사용자 여정(가입·승인·계좌 연결·전략 등록·매일 자동 매매·결과 확인·일시정지·재개·삭제·탈퇴), 사용자 기능(바로 주문·주문 취소·알림 설정·가계부·그룹 공유), 자동(개장·마감 배치·FIDA 기준표 수신), 관리자(런타임 매매 정책·재주문·체결 보정·스케쥴러 수동 실행·오류 로그·사용자 역할 변경). 새 카드는 flows.yml `flows:`에 키를 추가하고 landscape의 `flow:`로 연결한다
 - 생성기는 `ProcessMapExporter`, 템플릿은 `src/test/resources/architecture/process-map.html`(외부 라이브러리 없음)
 
 ## L3 마감 매매 배치 (화~토 04:30 KST)

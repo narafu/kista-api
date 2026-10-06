@@ -21,6 +21,7 @@ lanes:
   - {id: user, label: 사용자}
   - {id: ui, label: kista-ui}
   - {id: api, label: kista-api}
+  - {id: scheduler, label: kista-scheduler}
   - {id: redis, label: Redis}
   - {id: trading, label: kista-trading}
   - {id: db, label: DB}
@@ -32,18 +33,18 @@ landscape:
   - group: 사용자 여정
     steps:
       - {id: signup, title: 가입·승인, flow: signup}
-      - {id: account-link, title: 계좌 연결}
+      - {id: account-link, title: 계좌 연결, flow: account-link}
       - {id: strategy-register, title: 전략 등록, flow: strategy-register}
       - {id: daily-trading, title: 매일 자동 매매, when: "개장 22:30 · 마감 04:30", flow: close-batch}
-      - {id: result, title: 결과 확인}
-      - {id: pause-stop, title: 일시정지·종료}
+      - {id: result, title: 결과 확인, flow: result}
+      - {id: pause-stop, title: 일시정지·재개·삭제, flow: pause-stop}
       - {id: withdraw, title: 탈퇴, flow: withdraw}
   - group: 사용자 기능
     steps:
-      - {id: manual-run, title: 수동 실행·주문 취소}
-      - {id: notify-settings, title: 알림 설정}
-      - {id: finance, title: 가계부}
-      - {id: group-share, title: 그룹 공유}
+      - {id: manual-run, title: 바로 주문·주문 취소, flow: manual-run}
+      - {id: notify-settings, title: 알림 설정, flow: notify-settings}
+      - {id: finance, title: 가계부, flow: finance}
+      - {id: group-share, title: 그룹 공유, flow: group-share}
   - group: 자동 프로세스
     steps:
       - {id: open-batch, title: 개장 배치, when: "월~금 22:30", flow: open-batch}
@@ -53,12 +54,12 @@ landscape:
   - group: 관리자 프로세스
     steps:
       - {id: admin-approve, title: 가입 승인·반려, flow: signup}
-      - {id: admin-runtime, title: 런타임 매매 정책}
-      - {id: admin-orders, title: 주문 정정·재정렬}
-      - {id: admin-scheduler, title: 스케쥴러 수동 실행}
+      - {id: admin-runtime, title: 런타임 매매 정책, flow: admin-runtime}
+      - {id: admin-orders, title: 재주문·체결 보정, flow: admin-orders}
+      - {id: admin-scheduler, title: 스케쥴러 수동 실행, flow: admin-scheduler}
       - {id: admin-privacy, title: PRIVACY 기준표 수동 보정, flow: fida-receive}
-      - {id: admin-error-logs, title: 오류 로그}
-      - {id: admin-role, title: 사용자 역할 변경}
+      - {id: admin-error-logs, title: 오류 로그, flow: admin-error-logs}
+      - {id: admin-role, title: 사용자 역할 변경, flow: admin-role}
 
 flows:
   close-batch:
@@ -640,6 +641,898 @@ flows:
                AdminPrivacyTradeController#addOrder, AdminPrivacyTradeController#deleteOrder]
         cond: 관리자가 직접 실행할 때
 
+  account-link:
+    title: 계좌 연결
+    trigger: 사용자가 대시보드의 "계좌 등록" 버튼이나 계좌 화면에서 증권사 계좌를 연결·수정·삭제한다
+    summary: >-
+      kista-ui가 kista-trading으로 바로 요청해 KIS·Toss·MOCK 계좌를 등록한다. 증권사에 자격증명과 계좌번호를 실제로 확인한 뒤
+      암호화해 저장하고, 별명 수정과 삭제도 같은 경로로 처리한다. 삭제하면 그 계좌의 전략이 뒤따라 정리된다.
+    steps:
+      - id: form
+        lane: user
+        to: [ui]
+        title: 계좌 등록 마법사 입력
+        desc: >-
+          NewAccountButton으로 시작하는 단계별 화면(CreateAccountStepper)에서 증권사를 고르고, KIS·Toss는 API 키와 시크릿을 입력해
+          "연결 테스트"를 통과해야 다음으로 넘어간다. 이어서 계좌번호와 별명을 입력하고 확인 화면에서 등록한다.
+          MOCK(모의계좌)은 키·계좌번호 없이 별명만 입력한다. 운영자가 신규 등록을 막아 둔 증권사를 고르면 화면이 처음 단계로 되돌아간다.
+
+      - id: connection-test
+        lane: ui
+        to: [trading, broker]
+        title: 연결 테스트
+        desc: >-
+          kista-ui 프록시가 kista-api를 거치지 않고 kista-trading으로 POST /api/accounts/connection-tests를 보낸다.
+          신규 등록이 꺼진 증권사면 증권사 호출 없이 먼저 거부해 자격증명이 외부로 나가지 않게 한다.
+          KIS는 OAuth 토큰 발급으로, Toss는 계좌 조회로, MOCK은 아무것도 호출하지 않고 통과시킨다.
+        code: [AccountController#testConnection, AccountService#test, BrokerConnectionTesters#of, KisAuthApi#verifyCredentials, TossAuthApi#verifyCredentials]
+        fail: >-
+          자격증명이 틀리면 422(BROKER_CREDENTIAL_INVALID)로 화면의 연결 테스트가 실패 표시된다. KIS 토큰 발급 1분 1회 제한에 걸리면 429.
+          증권사 신규 등록이 꺼져 있으면 400.
+
+      - id: register
+        lane: ui
+        to: [trading]
+        title: 등록 요청
+        desc: 확인 화면(ConfirmStep)이 POST /api/accounts로 별명·계좌번호·키·시크릿·증권사를 보낸다. 형식은 KIS 8자리-2자리, Toss 3-2-6자리만 허용한다.
+        code: [AccountController#register, AccountService#register]
+        fail: 계좌번호 형식이 틀리면 400.
+
+      - id: guard
+        lane: trading
+        to: [db]
+        title: 등록 정책·중복 확인
+        desc: >-
+          증권사 신규 등록이 허용 상태인지 보고, 사용자당 최대 10개 한도를 확인한다. MOCK은 서버가 합성 계좌번호(KIS 형식)와 가짜 키를 만든다.
+          다른 사용자를 포함해 같은 계좌번호가 이미 등록돼 있으면 거부한다(계좌번호는 해시로 비교한다).
+        code: [AccountService#requireBrokerEnabled, AccountPort#countByUserId, AccountPort#existsByAccountNo]
+        fail: 한도 초과·비활성 증권사·계좌번호 누락은 400, 이미 등록된 계좌는 409(DUPLICATE_ACCOUNT).
+
+      - id: verify
+        lane: trading
+        to: [broker]
+        title: 증권사 계좌 검증
+        desc: >-
+          저장하기 전에 증권사에서 자격증명과 계좌번호가 실제로 맞는지 확인한다. KIS는 토큰을 받아 증거금 조회로 계좌번호 소유를 확인하고,
+          Toss는 계좌 목록에서 계좌 일련번호(accountSeq)를 받아 오며, MOCK은 검증할 것이 없다. 이 호출은 DB 트랜잭션 밖에서 한다.
+        code: [KisAuthApi#verifyAccount, TossAuthApi#verifyAccount, MockAuthApi#verifyAccount]
+        fail: 422(BROKER_CREDENTIAL_INVALID)로 화면에 "App Key, App Secret 또는 계좌번호를 다시 확인하세요"(Toss는 Client ID·Secret 안내)가 보이고 저장되지 않는다.
+
+      - id: save
+        lane: trading
+        to: [db]
+        title: 암호화 저장
+        desc: 계좌번호·앱 키·시크릿을 AES-256으로 암호화해 저장하고, 중복 확인용으로 계좌번호의 HMAC 해시도 함께 저장한다. 저장되면 201과 마스킹된 계좌 정보를 돌려주고 화면은 계좌 상세로 이동한다.
+        code: [AccountPersistenceAdapter#save]
+        state: "accounts +1"
+
+      - id: rename
+        lane: ui
+        to: [trading, db]
+        title: 별명 수정
+        desc: 계좌 수정 화면(EditAccountForm)에서 별명만 바꿀 수 있다. 계좌번호와 자격증명은 수정할 수 없다. PUT /api/accounts/{id}가 소유권을 확인한 뒤 별명만 저장한다.
+        code: [AccountController#update, AccountService#update]
+        fail: 내 계좌가 아니면 403, 없으면 404.
+
+      - id: delete
+        lane: trading
+        to: [db]
+        title: 계좌 삭제와 전략 정리
+        desc: >-
+          EditAccountForm의 "계좌 삭제" 확인 대화상자에서 영구 삭제를 누르면 DELETE /api/accounts/{id}로 계좌를 삭제 처리(소프트 삭제)한다.
+          삭제가 커밋된 뒤 발행되는 이벤트를 받아 별도 트랜잭션에서 그 계좌의 전략을 삭제 처리한다(실패하면 재시도 대상으로 남는다).
+          증권사에 이미 접수된 미체결 주문을 취소하는 단계는 없다.
+        code: [AccountController#delete, AccountService#delete, AccountCascadeListener#onAccountDeleted]
+        state: "accounts → 삭제됨 · 뒤이어 strategy → 삭제됨"
+        fail: 내 계좌가 아니면 403, 없으면 404.
+
+  result:
+    title: 결과 확인
+    trigger: 사용자가 대시보드·성과·계좌 상세·전략 상세 화면을 연다
+    summary: >-
+      화면마다 부르는 API와 처리 프로세스가 다르다. 계좌·전략·주문·통계는 kista-ui 프록시가 kista-trading으로 바로 가고,
+      시장 달력·공포탐욕·주택 벤치마크는 kista-api로 간다. 거래 결과는 모두 DB에 쌓인 주문·포지션 기록에서 읽고,
+      증권사를 직접 부르는 것은 잔고·증거금 조회뿐이다.
+    steps:
+      - id: dashboard
+        lane: ui
+        to: [trading, api, db]
+        title: 대시보드(주간 달력·시장 지표)
+        desc: >-
+          대시보드(DashboardContent)는 계좌 목록(GET /api/accounts)을 불러오고, 주간 시장 달력(WeeklyMarketCalendar)이 이번 주 체결 요약을 한 번에 가져와
+          날짜별 매수·매도 금액과 건수로 보여 준다. 휴장일·공포탐욕지수는 kista-api가 맡는다.
+        code: [DashboardController#getDailyTransactions, AccountStatisticsService#getDailyTransactionsForUser, AccountController#list, MarketHolidayController]
+        fail: 체결 요약 조회가 실패하면 그 주 달력은 체결 표시 없이 나온다(5분 캐시).
+
+      - id: stats-screen
+        lane: ui
+        to: [trading, db]
+        title: 성과 화면(요약·자산 곡선·사이클 목록)
+        desc: >-
+          성과 화면(StatsOverview)은 서버에서 요약(GET /api/stats/summary)과 최근 3개월 누적 자산 곡선(GET /api/stats/equity-curve)을 미리 채우고,
+          사이클 성과 목록(GET /api/stats/cycles)은 커서로 이어 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
+          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다.
+        code: [TradingStatsController#getSummary, TradingStatsController#getEquityCurve, TradingStatsController#getCycles, TradingStatsService#getSummary, TradingStatsService#getEquityCurve, TradingStatsService#getCyclePerformances]
+        fail: 한 쪽 조회가 실패해도 다른 쪽은 보인다(서버 prefetch를 각각 무시). 곡선이 실패하면 필터 토글만 남는다.
+
+      - id: account-detail
+        lane: ui
+        to: [trading, broker, db]
+        title: 계좌 상세(잔고·전략·거래 이력)
+        desc: >-
+          계좌 상세 화면(AccountDetailContent)은 서버에서 계좌·전략 목록·전략별 다음 주문 미리보기와 증권사 실시간 포트폴리오(GET /api/accounts/{id}/portfolio)를 채운다.
+          모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history).
+          증거금(GET .../margin)도 같은 경로로 증권사에서 읽는다.
+        code: [StatisticsController#getPresentBalance, StatisticsController#getMargin, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount]
+        fail: 포트폴리오 조회가 실패하면 예수금·평가금을 0으로 두고 화면은 계속 나온다. 다른 사람의 계좌면 403, 없으면 404, 증권사 호출 실패는 503.
+
+      - id: orders-account
+        lane: ui
+        to: [trading, db]
+        title: 계좌 단위 일별 거래내역
+        desc: >-
+          계좌의 체결 내역은 증권사를 부르지 않고 DB에 저장된 체결 주문(체결수량이 있는 주문)을 기간으로 읽어 일자·방향·종목·수량·단가·금액으로 합산해 돌려준다.
+          사용자 전체를 합친 조회(GET /api/daily-trades)는 대시보드 달력이 쓰고, 계좌별 조회(GET /api/accounts/{id}/daily-trades)는 같은 계산을 계좌 하나로 한정한다.
+        code: [StatisticsController#getDailyTransactions, AccountStatisticsService#getDailyTransactions, AccountStatisticsService#toDailyTransactionResult]
+        fail: 계좌 소유자가 아니면 403.
+
+      - id: strategy-detail
+        lane: ui
+        to: [trading, db]
+        title: 전략 상세(주문 내역·이력)
+        desc: >-
+          전략 상세 화면(StrategyDetailContent)은 전략·계좌와 다음 주문 미리보기를 미리 채우고, 주문 내역(StrategyOrderHistory)은 기간을 정해 GET /api/trading-cycles/{id}/orders로
+          그 전략의 주문을 상태와 함께 보여 준다. 기간을 비우면 최근 30일(KST)이다. 사이클 이력 표는 GET /api/trading-cycles/{id}/history로 일별 포지션 스냅샷을 커서로 읽는다.
+        code: [TradingCycleController#getStrategyOrders, TradingCycleController#getStrategyHistory, StrategyService#getOrdersByStrategy, StrategyService#getByStrategy, StrategyHistoryQueryService#getOrdersByStrategy]
+        fail: 다른 사람의 전략이면 403, 없으면 404.
+
+  pause-stop:
+    title: 일시정지·재개·전략 삭제
+    trigger: 사용자가 전략 화면에서 일시정지·재개·삭제를 누르거나, 관리자가 계좌 화면에서 전략 상태를 바꾼다
+    summary: >-
+      전략의 상태(ACTIVE·PAUSED)만 바꾸면 배치가 그 전략을 다루거나 건너뛴다. 재개할 때 사이클이 이미 끝나 있으면 새 사이클을 열고,
+      삭제하면 전략·사이클·포지션을 삭제 처리한다. 어느 경우에도 증권사에 이미 접수된 주문은 취소하지 않는다.
+    steps:
+      - id: request
+        lane: ui
+        to: [trading]
+        title: 사용자 요청
+        desc: >-
+          전략 카드·상세의 버튼(useManageStrategyMutations)이 kista-trading으로 바로 PATCH /api/trading-cycles/{id}/pause, PATCH .../resume, DELETE /api/trading-cycles/{id}를 보낸다.
+          삭제는 "진행 중인 사이클이 종료됩니다" 확인 대화상자를 거친다. 성공하면 주문·통계·거래 화면 캐시를 새로 고친다.
+        code: [TradingCycleController#pause, TradingCycleController#resume, TradingCycleController#delete]
+        fail: 실패하면 "일시정지에 실패했습니다"·"재개에 실패했습니다"·"삭제에 실패했습니다" 토스트(서버 detail이 있으면 그 문구).
+
+      - id: pause
+        lane: trading
+        to: [db]
+        title: 일시정지
+        desc: >-
+          전략이 내 계좌 소속인지 확인하고 이미 정지된 전략이면 거부한 뒤 상태를 PAUSED로 바꾼다. 배치는 ACTIVE 전략만 대상으로 하므로 다음 배치부터 이 전략은 주문하지 않는다.
+          PLANNED·PLACED 주문은 취소하지 않는다. 그런데 개장·마감 배치 모두 ACTIVE 전략만 모으므로, 정지 전에 접수된 주문(개장 선접수·바로 주문)이
+          체결돼도 마감 배치가 이 전략의 체결 기록·포지션 스냅샷을 남기지 않는다. 남은 PLANNED 장마감 주문도 접수되지 않는다.
+        code: [StrategyService#pause, StrategyService#requireOwnedStrategy, StrategyPort#findAllActive]
+        state: "strategy → PAUSED"
+        fail: 이미 중지된 전략이면 400, 내 전략이 아니면 403, 없으면 404.
+
+      - id: resume
+        lane: trading
+        to: [db]
+        title: 재개와 종료 사이클 재오픈
+        desc: >-
+          이미 ACTIVE면 거부한다. VR이 아닌 전략은 사이클이 청산으로 끝나 일시정지된 경우(연속 정책 NONE 등) 최신 사이클에 종료일이 남아 있는데,
+          상태만 ACTIVE로 되돌리면 배치가 "종료된 사이클"로 판단해 계속 건너뛴다. 그래서 재개할 때 종료된 사이클의 최종 금액을 시드로 하는 새 사이클과 초기 포지션을 열고 상태를 ACTIVE로 바꾼다.
+          VR 전략은 이 재오픈에서 제외한다(VR은 청산으로 사이클이 끝나지 않고 롤오버·재설정이 새 사이클을 항상 만든다).
+        code: [StrategyService#resume, StrategyService#reopenCycleIfEnded, CycleSnapshotCreator#createCycleAndSnapshot]
+        cond: 최신 사이클에 종료일이 있을 때(VR 제외)
+        state: "strategy → ACTIVE · 종료 사이클이면 strategy_cycle +1 · cycle_position +1"
+        fail: 이미 활성이면 400, 활성 전략 버전이 없으면 400(IllegalStateException).
+
+      - id: delete
+        lane: trading
+        to: [db]
+        title: 전략 삭제
+        desc: >-
+          소유권을 확인한 뒤 포지션 기록 → 사이클 → 전략 순으로 삭제 처리(소프트 삭제)한다. 삭제된 전략은 목록·배치·통계에서 빠진다.
+          주문(orders) 행과 증권사에 접수돼 있던 미체결 주문은 그대로 두며 이 단계에서 취소하지 않는다.
+        code: [StrategyService#delete]
+        state: "cycle_position·strategy_cycle·strategy → 삭제됨"
+        fail: 내 전략이 아니면 403, 없으면 404.
+
+      - id: admin-request
+        lane: ui
+        to: [api]
+        title: 관리자 상태 변경 요청
+        desc: 관리자 계좌 화면이 PATCH /api/admin/accounts/{accountId}/strategies/{strategyId}/status에 ACTIVE(재개) 또는 PAUSED(일시정지)를 보낸다. 이 경로는 kista-api가 받는다. 삭제는 관리자 화면에 없다.
+        code: [AdminAccountController#updateStrategyStatus]
+        fail: ACTIVE·PAUSED 외 값이면 400.
+
+      - id: admin-forward
+        lane: api
+        to: [trading, db]
+        title: 관리자 감사 기록과 내부 호출
+        desc: >-
+          kista-api가 내부 API(PATCH /api/internal/trading/accounts/{accountId}/strategies/{strategyId}/status)로 kista-trading에 위임한 뒤,
+          관리자 행위를 감사 로그(STRATEGY_PAUSE·STRATEGY_RESUME)에 남긴다. 감사 로그는 위임이 성공해야 기록한다.
+        code: [AdminStrategyService#pauseStrategy, AdminStrategyService#resumeStrategy, TradingCommandHttpAdapter#updateStrategyStatus]
+        fail: 계좌나 전략이 없으면 404, 전략이 그 계좌 소속이 아니면 400.
+
+      - id: admin-apply
+        lane: trading
+        to: [db]
+        title: 관리자 상태 적용
+        desc: >-
+          trading은 전략이 그 계좌 소속인지 확인하고, 이미 같은 상태면 아무것도 하지 않는다. 다른 상태면 사용자의 일시정지·재개와 같은 서비스(소유자 ID로 호출)를 쓰므로
+          관리자 재개도 종료된 사이클을 다시 열어 준다.
+        code: [StrategyStatusInternalController#updateStatus, StrategyService#pause, StrategyService#resume]
+        state: "strategy → PAUSED / ACTIVE"
+
+  manual-run:
+    title: 수동 실행·주문 취소
+    trigger: 전략 상세 화면의 "바로 주문" / "전체 취소" / 주문별 취소 버튼 (사용자 직접 조작)
+    summary: >-
+      사용자가 자동 매매를 기다리지 않고 오늘 주문을 미리 보고, 바로 내고, 취소한다. 주문 계획·PRIVACY 기준표 점검·예산 배정은
+      배치와 같은 부품을 쓰고, 개장 이후라면 장 시작 주문만 즉시 접수한다. 장마감 주문은 PLANNED로 남겨 마감 배치가 접수한다.
+    steps:
+      - id: preview
+        lane: ui
+        to: [trading, broker]
+        title: 다음 주문 미리보기
+        desc: >-
+          전략 상세 화면의 "다음 주문" 카드(NextOrderCard)가 오늘 낼 주문 계획과 예수금·판매가능수량 충족 여부를 보여 준다.
+          DB에 아무것도 저장하지 않고, 휴장일이나 일시정지 여부와 상관없이 강제로 계산한다. 이 계산이 "바로 주문" 활성화와 안내 문구의 근거다.
+          브라우저 요청은 kista-ui의 /api/trading-cycles·/api/orders 중계 라우트가 Caddy를 거치지 않고 kista-trading으로 바로 보낸다.
+        code: [TradingCycleController#preview, TradingPreviewService#preview]
+        fail: 계산 중 증권사 오류가 나면 증권사 조회 실패 응답(503/422/429)을 그대로 받아 카드에 오류가 표시된다.
+
+      - id: guard
+        lane: trading
+        to: [db]
+        title: 소유권·상태·중복 실행 검사
+        desc: >-
+          "바로 주문"을 누르면 내 계좌의 전략인지, ACTIVE 상태인지, 오늘 거래일(KST 04:00 이후면 다음 날)에 이 사이클의 PLANNED/PLACED 주문이
+          이미 있는지 확인한다. 이미 있으면 중복 주문을 막는다. 같은 검사를 예산 배정 직전에 락 안에서 한 번 더 한다(배치·다른 수동 실행과의 경합 방지).
+        code: [TradingCycleController#executeManually, ManualTradingService#execute]
+        fail: 남의 전략은 403, 일시정지 등 ACTIVE가 아니면 400, 오늘 이미 주문이 있으면 409(ALREADY_ORDERED_TODAY). 화면은 "이미 접수된 주문이 있어 실행할 수 없습니다"로 안내한다.
+
+      - id: plan
+        lane: trading
+        to: [broker, db]
+        title: 주문 계획·PRIVACY 기준표 점검
+        desc: >-
+          잔고·전일종가·(PRIVACY면) 오늘 기준표를 읽어 전략 공식으로 주문을 계산한다. 배치와 같은 계산 부품을 쓰므로, PRIVACY 기준표에
+          경고·차단 이슈가 있으면 배치와 똑같이 오늘 PRIVACY 주문을 내지 않는다. 배치는 조용히 관리자에게만 알리지만 수동 실행은 버튼을 누른 사용자에게 사유를 알린다.
+        code: [StrategyOrderPlanBuilder#build, PrivacyBaseGuard#usable]
+        fail: >-
+          사이클 이력이 없으면 409 "전략 실행 이력이 없어 수동 실행할 수 없습니다", 기준표 점검 차단이면 409 "P 매매표 점검에서 이상이 발견돼 오늘은 PRIVACY 주문을 낼 수 없습니다.".
+          기준표 미수신 등 그 밖의 skip은 빈 목록을 200으로 돌려준다(주문 없음). 증권사 조회 실패는 503/422/429, 그 외 계산 실패는 500 "주문 계산 중 오류가 발생했습니다"와 관리자 알림.
+
+      - id: allocate
+        lane: trading
+        to: [broker, db]
+        title: 가격 보정·예산 배정·PLANNED 저장
+        desc: >-
+          BUY는 현재가×1.05 상한을 미리 적용한 뒤, 계좌 락 안에서 실시간 예수금·판매가능수량으로 승인 여부를 판단하고 승인된 주문을 PLANNED로 저장한다.
+          같은 계좌의 배치 승인과 같은 여유분을 이중으로 쓰지 않도록 배치와 같은 계좌 락을 쓴다. 현재가 조회가 실패하면 상한 없이 진행한다.
+          배치와 달리 일부만 승인하지 않고, BUY나 SELL이 하나라도 거절되면 전체를 거부한다.
+        code: [BuyOrderPriceCapper#prepareForAllocation, TradingOrderBudgetAllocator#allocate, TradingOrderPlanner#savePlannedOrders]
+        state: "orders → PLANNED"
+        fail: 예수금 부족이면 409 "예수금이 부족합니다", 판매가능수량 부족이면 409 "보유 수량이 부족합니다". 아무것도 저장되지 않는다.
+
+      - id: place-open
+        lane: trading
+        to: [broker, db]
+        title: 개장 이후면 장 시작 주문 즉시 접수
+        desc: >-
+          이미 미국장이 열린 뒤라면 PLANNED로 저장된 장 시작 주문(INFINITE 매도 선접수, VR 사다리 등)을 최신 현재가로 BUY 상한을 다시 보정한 뒤 바로 증권사에 접수한다.
+          개장 전이면 접수하지 않고 개장 배치가 맡는다. 장마감 주문은 어느 경우든 PLANNED로 남아 마감 배치가 접수한다(PRIVACY는 장 시작 주문이 없어 이 단계가 비어 있다).
+          접수 뒤 오늘의 PLANNED·PLACED 주문 목록을 응답으로 돌려주고 화면의 "다음 주문" 카드가 접수된 주문 모드로 바뀐다.
+        code: [TradingOrderExecutor#placeAtOpenOrders]
+        cond: 지금이 개장 시각 이후이고 장 시작 주문이 있을 때
+        state: "orders → PLACED / FAILED (장 시작 주문만)"
+
+      - id: cancel-all
+        lane: ui
+        to: [trading, broker, db, telegram]
+        title: 전체 취소(사이클 단위)
+        desc: >-
+          "전체 취소"는 오늘 이 전략의 주문을 한 번에 정리한다. 아직 증권사에 안 간 PLANNED 주문은 상태를 바꾸지 않고 행을 지우고,
+          접수된 PLACED 주문은 하나씩 증권사에 취소를 요청해 성공한 건만 CANCELLED로 기록한다(증권사 취소 성공 뒤에 DB 기록, 건별 짧은 트랜잭션).
+          Toss가 이미 취소됨(409)이라고 답하면 성공으로 간주한다. 일부 취소가 실패해도 나머지는 계속 처리하고, 실패 건수를 응답에 담고 관리자에게 알림 1건을 보낸다.
+        code: [TradingCycleController#cancelExecute, OrderCancelService#cancelByCycle, OrderCancelStateWriter#deletePlanned, OrderCancelStateWriter#markCancelled, OrderCancelFailureNotifier#onOrderCancelFailed]
+        state: "PLANNED 주문 → 삭제 · PLACED 주문 → CANCELLED"
+        fail: 취소가 실패한 PLACED 주문은 PLACED로 남고 응답은 200이며 failedCount로 알린다(전체가 실패해도 마찬가지). 남의 전략은 403.
+
+      - id: cancel-one
+        lane: ui
+        to: [trading, broker, db]
+        title: 주문 1건 취소
+        desc: >-
+          주문 목록의 개별 취소 버튼. PLANNED 주문은 증권사에 간 적이 없으므로 DB에서만 CANCELLED로 바꾸고, PLACED 주문은 증권사 취소가 성공한 뒤 CANCELLED로 기록한다.
+          이미 체결됐거나 취소·실패한 주문은 취소할 수 없다.
+        code: [OrderCancelController#cancelOrder, OrderCancelService#cancelOrder]
+        state: "orders → CANCELLED"
+        fail: 취소 불가 상태면 409(ORDER_NOT_CANCELLABLE), 남의 주문이면 403, 주문이 없으면 404. 증권사 취소가 실패하면 예외가 그대로 전파되고 주문은 PLACED로 남는다.
+
+  admin-orders:
+    title: 관리자 주문 정정·재주문·수동 체결 보정
+    trigger: 관리자 화면(주문 정정 — AdminTradesWorkbench)에서 사용자·계좌·전략을 고르고 재주문하거나 수동 체결 보정 API를 호출
+    summary: >-
+      관리자가 특정 사용자의 오늘 주문을 가격·수량·방향을 바꿔 다시 내거나(원본은 취소), 증권사 밖에서 체결된 거래를 장부에 반영한다.
+      브라우저 → kista-ui → kista-api(관리자 권한·감사 로그) → 내부 HTTP → kista-trading(실제 처리) 순으로 흐른다.
+    steps:
+      - id: select
+        lane: ui
+        to: [api]
+        title: 재주문 대상·시점 선택
+        desc: >-
+          관리자가 사용자 → 증권사 → 계좌 → 전략을 차례로 고르면 그 전략의 오늘 주문 목록이 뜨고, 주문마다 새 가격·수량·방향과 주문 시점(장 시작 AT_OPEN·장마감 AT_CLOSE·즉시 IMMEDIATE)을 입력한다.
+          시점 셀렉터는 지금 시장 단계에서 가능한 것만 활성화하고(휴장일이면 전부 비활성), 전략 상태(일시정지·재개) 토글도 같은 화면에 있다.
+          요청은 kista-ui의 /api/admin 중계 라우트가 Caddy 규칙상 kista-api(/api/admin/**, 스케쥴러 수동 실행만 kista-scheduler)로 보낸다.
+        code: [AdminTradeController#getReorderTiming, AdminAccountController#updateStrategyStatus]
+        fail: ADMIN이 아니면 403. 시점 조회가 실패하면 기존 값을 유지한다.
+
+      - id: forward
+        lane: api
+        to: [trading]
+        title: 내부 호출로 trading에 전달
+        desc: >-
+          kista-api의 관리자 컨트롤러는 로직 없이 요청을 trading의 내부 API(/api/internal/trading/reorder, /trade-corrections)로 넘긴다.
+          브로커 취소·접수를 동기로 감싸는 쓰기 호출이라 응답 타임아웃이 긴 전용 클라이언트를 쓴다. trading이 돌려준 400·404·422·429는 관리자에게 같은 의미의 오류로 되살려 보여 준다.
+        code: [AdminTradeController#reorder, AdminTradeController#correctManualFills, TradingCommandHttpAdapter#reorder, TradingCommandHttpAdapter#correctManualFills, TradingInternalCommandController#reorder, TradingInternalCommandController#correctManualFills]
+        fail: 계좌·전략 없음 404, 소유 불일치·검증 실패 400, 증권사 자격증명 오류 422, 증권사 호출 한도 429. 그 밖의 장애는 500.
+
+      - id: select-chain
+        lane: trading
+        to: [db]
+        title: 대상 선택 체인 검증
+        desc: 계좌가 지정한 사용자 소유인지, 전략이 그 계좌 소속인지, 주문이 그 계좌 소속인지 확인한다. 재주문은 추가로 원본 주문이 현재 전략 사이클의 것이어야 하고 가격·수량이 양수여야 한다.
+        code: [SelectionChain#resolveAndValidate, ReorderService#reorder]
+        fail: 어긋나면 400(내부 호출이 400으로 되살아 관리자 화면에 거절 사유가 표시된다).
+
+      - id: cancel-source
+        lane: trading
+        to: [broker, db]
+        title: 원본 주문 취소
+        desc: >-
+          원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾼다. 이미 체결·취소·실패한 주문은 건드리지 않고 그대로 두며,
+          그래도 재주문은 진행된다.
+        code: [ReorderService#reorder]
+        state: "원본 orders → CANCELLED (PLANNED·PLACED였던 경우)"
+        fail: 증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다.
+
+      - id: timing-check
+        lane: trading
+        to: [db]
+        title: 휴장일·주문 시점 서버 재검증
+        desc: >-
+          화면에서 막았더라도 서버가 다시 확인한다. 오늘이 거래일인지, 선택한 시점이 지금 시장 단계에서 허용되는지 본다.
+          개장 전에는 AT_OPEN·AT_CLOSE, 개장 후에는 AT_CLOSE·IMMEDIATE만 허용하고, 장마감 직후부터 프리마켓 전과 주말은 모두 불가다.
+        code: [DstInfo#reorderTimingAvailabilityAt, MarketCalendarPort#isMarketOpen]
+        fail: 400 "휴장일에는 재주문할 수 없습니다" 또는 "현재 시장 단계에서 ... 접수가 불가합니다".
+
+      - id: reorder-place
+        lane: trading
+        to: [broker, db]
+        title: 재주문 생성(예약 또는 즉시 접수)
+        desc: >-
+          원본의 종목·주문 유형·다리 정보를 이어받아 새 주문을 만든다(방향·거래일을 생략하면 원본 값). AT_OPEN·AT_CLOSE는 PLANNED로 저장만 하고 개장 배치·마감 배치가 접수한다.
+          IMMEDIATE는 곧바로 증권사에 접수해 PLACED로 저장하고, 접수가 실패하면 FAILED 주문으로 남기며 오류를 던지지 않는다. 예산(예수금) 부족은 서버가 막지 않는다 — 화면의 BUY 예산 조회는 경고용이다.
+        code: [Order#reorder, ReorderService#reorder]
+        state: "새 orders → PLANNED(AT_OPEN·AT_CLOSE) / PLACED·FAILED(IMMEDIATE)"
+        fail: 즉시 접수 실패는 응답 자체는 200이고 resultingStatus가 FAILED로 돌아온다(화면에는 재주문 처리 결과로 표시).
+
+      - id: audit
+        lane: api
+        to: [db]
+        title: 감사 로그 기록
+        desc: >-
+          trading 응답이 돌아오면 kista-api가 관리자 ID와 함께 재주문(REORDER) 감사 로그를 남긴다. 시점, 원본 주문의 이전 상태·가격·수량, 새 방향·가격·수량, 결과 상태, 메모가 들어간다.
+          trading도 같은 요청을 자체 로그에 남겨 내부 엔드포인트를 직접 호출한 경우를 놓치지 않는다.
+        code: [AdminReorderService#reorder, AdminTradeCorrectionService#correctManualFills]
+        state: "audit_logs +1행 (REORDER / TRADE_MANUAL_CORRECTION)"
+
+      - id: correction
+        lane: trading
+        to: [db]
+        title: 수동 체결 보정 반영
+        desc: >-
+          증권사 밖에서 체결된 거래를 체결 명세 배열 순서대로 반영한다. 건마다 SELL 수량이 보유 수량을 넘지 않는지 검증하고, FILLED 주문(장마감 시점·수동 체결 표시)을 기록하고,
+          보유 수량·평단·예수금을 다시 계산해 사이클 포지션 스냅샷을 한 행씩 추가한다. 이미 종료된 사이클은 보정할 수 없다. 모두 한 트랜잭션이라 중간에 실패하면 전부 되돌아간다.
+          현재 kista-ui에는 이 API를 호출하는 화면이 없다(확인한 범위).
+        code: [ManualTradeCorrectionService#correctManualFills]
+        state: "orders +N행(FILLED) · cycle_position +N행"
+        fail: 보유 수량 초과 SELL 400, 종료된 사이클 400, 최신 포지션 없음 400. 오류는 관리자 화면에 거절 사유로 보인다.
+
+      - id: close-cycle
+        lane: trading
+        to: [db]
+        title: 청산 시 사이클 종료·전략 일시정지
+        desc: >-
+          보정 결과 보유 수량이 0이 되면 현재 사이클을 그 거래일로 종료하고 전략을 PAUSED로 고정한다(새 사이클은 열지 않는다 — 배치의 자동 순환과 다름). 청산은 마지막 체결 건에서만 허용된다.
+          종료되면 사용자 알림용 사이클 종료 이벤트가 커밋 뒤에 발행된다.
+        code: [CycleCloser#closeIfExhausted]
+        cond: 보정 후 보유 수량이 0일 때
+        state: "strategy_cycle → 종료 · strategy → PAUSED"
+        fail: 청산 이후에 체결이 더 있으면 400 "청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다"이고 전부 롤백된다.
+
+  notify-settings:
+    title: 알림 설정
+    trigger: 사용자가 설정 화면에서 텔레그램 봇을 연결하거나, 알림 채널·알림 종류 스위치를 바꾸거나, 푸시 알림을 켠다
+    summary: 텔레그램 봇 연결, 알림 채널(끄기·푸시·텔레그램·모두), 알림 종류별 on/off, 브라우저 푸시 토큰 등록을 저장한다. 매매 서버가 쓰는 알림 정보(봇·알림 종류)는 Redis Stream으로 복제본에 반영된다.
+    steps:
+      - id: telegram-verify
+        lane: api
+        to: [telegram, db]
+        title: 텔레그램 봇 연결·검증
+        desc: >-
+          설정 화면(TelegramSection)에서 봇 토큰과 chat ID를 입력하면 kista-ui가 /api/settings 프록시로 kista-api에 넘긴다.
+          kista-api는 텔레그램 getMe를 호출해 토큰이 진짜 봇인지 확인하고 봇 이름을 얻은 뒤, 토큰은 암호화해 사용자 정보에 저장한다.
+          해제하면 토큰·chat ID를 비운다.
+        code: [SettingsController#updateTelegram, UserProfileService#updateTelegram, TelegramBotInfoAdapter#getUsername, UserProfileService#removeTelegram]
+        state: "users → 텔레그램 토큰·chatId·봇 이름 저장(해제 시 null)"
+        fail: 토큰이 유효하지 않거나 봇 이름을 못 가져오면 400이고 저장하지 않는다(화면에 오류 안내).
+
+      - id: channel
+        lane: api
+        to: [db]
+        title: 알림 채널 선택
+        desc: >-
+          알림 설정 화면(NotificationSettings)에서 끄기·푸시·텔레그램·모두 중 하나를 고른다. 텔레그램이 포함된 채널은
+          화면이 봇 연결 여부를 먼저 확인해 막는다. 이 값은 kista-api 쪽 알림(가계부 리마인더, 체결 푸시 전달)의 수신 경로를 정한다.
+        code: [SettingsController#updateNotificationChannel, UserProfileService#updateNotificationChannel]
+        state: "users → 알림 채널"
+        fail: 알 수 없는 채널 값이면 400(이 값만 바꾸는 경로는 매매 서버로 전파하지 않는다).
+
+      - id: fcm-token
+        lane: api
+        to: [db]
+        title: 푸시 토큰 등록
+        desc: >-
+          푸시가 포함된 채널을 고르면 브라우저가 알림 권한을 받아 기기 토큰을 만들고, kista-ui의 /api/fcm/tokens 프록시가 kista-api에 등록한다.
+          같은 사용자가 여러 기기 토큰을 가질 수 있고, 푸시를 끄면 이 기기 토큰만 삭제한다.
+        code: [FcmController#registerToken, FcmController#unregisterToken, FcmDeviceTokenPersistenceAdapter#save]
+        cond: 채널이 푸시 또는 모두일 때
+        state: "fcm_device_tokens 등록·삭제"
+        fail: 토큰 발급이 막히면(권한 거부 등) 화면이 안내하고 채널을 바꾸지 않는다. 서버 등록 실패 시 화면이 오류 토스트를 띄운다.
+
+      - id: prefs
+        lane: api
+        to: [db]
+        title: 알림 종류 on/off
+        desc: >-
+          매매 리포트(TRADING_ALERT) 스위치(TradingAlertToggle) 등으로 알림 종류별 수신 여부를 저장한다.
+          종류는 매매 알림, 시장 알림(개장·마감), 가계부 리마인더 3가지이며 저장하지 않은 종류는 켜진 것으로 본다.
+        code: [SettingsController#updateNotificationPref, UserSettingsService#updateNotificationPref]
+        state: "user_notification_prefs → 종류별 enabled"
+        fail: 알 수 없는 종류면 400.
+
+      - id: replicate
+        lane: api
+        to: [redis, trading]
+        title: 매매 서버에 알림 정보 복제
+        desc: >-
+          텔레그램 연결·해제와 알림 종류 변경은 커밋 뒤 사용자 알림 프로필 스냅샷(활성 여부·알림 종류·텔레그램 토큰·chat ID)을
+          Redis Stream으로 보낸다. kista-trading이 받아 자기 DB의 user_notify_profile 복제본을 덮어쓴다(토큰은 다시 암호화).
+          매매 서버는 이 복제본만 보고 텔레그램을 직접 보낸다.
+        code: [UserNotifyProfilePublisher#publishStatusChanged, UserNotifyProfilePublisher#publishSettingsChanged, UserEventStreamPublisher#onProfileChanged, UserNotifyProfileStreamConsumer, UserEventStreamBridge#handleProfileChangedRecord, UserNotifyProfileSyncListener#onProfileChanged]
+        cond: 텔레그램 연결·해제 또는 알림 종류·잔고검증 설정이 바뀐 때(채널·닉네임 변경은 제외)
+        state: "trading.user_notify_profile upsert (알림 종류·텔레그램 토큰·chatId)"
+        fail: 전달이 실패하면 경고 로그만 남기고 넘어간다(옛 변경을 나중에 재적용하면 새 값을 덮어쓰므로). 복제본이 낡았다면 사용자의 다음 설정 변경이 바로잡는다.
+
+      - id: deliver
+        lane: trading
+        to: [telegram, redis]
+        title: 이후 알림 발송
+        desc: >-
+          매매 리포트·시장 알림은 kista-trading이 복제본의 알림 종류 설정을 확인해 보내고, 텔레그램은 복제본 토큰으로 직접 발송한다.
+          푸시는 kista-api에 Redis Stream으로 위임하고, kista-api가 사용자 채널에 푸시가 포함된 경우에만 등록된 기기로 보낸다.
+          가계부 리마인더는 kista-api가 알림 종류 설정·채널을 확인해 텔레그램·푸시로 보낸다.
+        code: [TradingReporter, MarketEventNotifier, TradingUserNotificationAdapter, PushNotificationStreamConsumer#onRecord, UserPushNotificationAdapter#pushIfEnabled, UserChannelNotifier#notify]
+        fail: 텔레그램·푸시 발송 실패는 서로 격리하고 경고 로그만 남긴다.
+
+  finance:
+    title: 가계부
+    trigger: 사용자가 가계부 화면에서 수입·소비·저축 거래나 자산 기록을 입력한다
+    summary: 거래와 자산 스냅샷을 개인 또는 그룹 소유로 기록하고, 월 단위 기록 점검(마감)을 하면 그 달의 쓰기를 막는다. 매월 말일에는 이달 기록이 없는 사용자에게 알린다. 모두 kista-api가 처리하며 매매 서버는 관여하지 않는다.
+    steps:
+      - id: category
+        lane: api
+        to: [db]
+        title: 카테고리 준비
+        desc: >-
+          거래·자산은 카테고리에 묶인다. 관리자가 만든 시스템 카테고리와 사용자 본인 또는 내 그룹 소유 카테고리를 쓸 수 있고,
+          수입·소비·저축·자산 종류와 상위·하위 구조는 만든 뒤 바꿀 수 없다. 시스템 카테고리는 일반 사용자가 수정·삭제·공유할 수 없다.
+        code: [FinanceCategoryController, FinanceCategoryService#create, FinanceCategoryService#update, FinanceCategoryService#delete]
+        state: "finance_categories 생성·수정·소프트 삭제"
+        fail: 시스템 카테고리를 수정·삭제하면 403, 그룹 공유 카테고리를 개인 부모 아래에 만들면 400.
+
+      - id: write
+        lane: ui
+        to: [api]
+        title: 거래·자산 입력
+        desc: >-
+          거래 입력 창(TransactionFormDialog)과 자산 기록 폼, 일괄 등록(BulkRegisterForm)이 kista-ui의 /api/finance 프록시를 거쳐 kista-api로 간다
+          (매매 서버 경로가 아니다). "그룹에 공유" 체크 여부로 개인·그룹 소유가 정해진다. 거래는 자산 카테고리를 쓸 수 없고 자산 기록은 자산 카테고리만 쓸 수 있다.
+        code: [FinanceTransactionController, AssetSnapshotController, FinanceBulkController, FinanceTransactionService#create, AssetSnapshotService#create]
+        cond: 입력·수정할 때
+        state: "finance_transactions / finance_asset_snapshots 행 생성"
+        fail: 접근할 수 없는 카테고리면 403, 종류가 안 맞으면 400, 그룹 공유를 켰는데 소속 그룹이 없으면 400.
+
+      - id: closing-guard
+        lane: api
+        to: [db]
+        title: 마감월 쓰기 차단
+        desc: >-
+          거래·자산을 등록·수정·삭제하거나 그룹 공유로 옮기기 전에 그 날짜의 달이 "기록 점검 완료"인지 확인한다.
+          수정은 원래 날짜의 달과 새 날짜의 달 둘 다 확인해, 마감월에서 빼내거나 마감월로 넣는 것도 막는다.
+          그룹 소속이면 그룹 단위 마감, 아니면 개인 마감을 본다.
+        code: [MonthlyClosingGuard#verifyMonthOpen, FinanceMonthlyClosingPersistenceAdapter#isMonthClosed]
+        cond: 거래·자산 쓰기마다
+        fail: 마감된 달이면 409(code MONTH_CLOSED) — 화면이 마감 해제 안내를 보여준다. 일괄 등록에서는 그 항목만 실패 목록에 담긴다.
+
+      - id: bulk
+        lane: api
+        to: [db]
+        title: 일괄 등록
+        desc: >-
+          자산 기록과 거래를 한 번에 여러 건 등록한다. 항목마다 독립적으로 처리해 한 건이 실패(마감월 등)해도 나머지는 저장하고, 실패한 항목 사유만 모아 돌려준다.
+        code: [BulkFinanceRegisterService#register]
+        cond: 일괄 등록 화면을 쓸 때
+        state: "항목별 거래·자산 행 생성"
+        fail: 그룹 공유를 켰는데 소속 그룹이 없으면 전체를 400으로 거부한다. 항목 단위 실패는 응답의 실패 목록으로 알린다.
+
+      - id: share
+        lane: api
+        to: [db]
+        title: 그룹 공유 전환·해제
+        desc: >-
+          본인이 입력한 거래·자산·카테고리를 내 그룹으로 공유하거나(카테고리는 하위까지 함께) 개인 소유로 되돌린다. 공유 전환은 입력한 본인만 할 수 있고,
+          해제는 그룹 멤버 누구나 할 수 있다. 이미 목표 상태면 아무것도 바꾸지 않는다. 마감월 항목은 전환·해제도 막힌다.
+        code: [GroupShareSupport#shareToGroup, GroupShareSupport#unshare, FinanceTransactionService#shareToGroup, FinanceTransactionService#unshare]
+        cond: 공유·공유 해제를 누를 때
+        state: "항목의 group_id 설정·해제"
+        fail: 남의 항목을 공유하면 403, 소속 그룹이 없거나 이미 다른 그룹에 공유된 항목이면 400.
+
+      - id: month-check
+        lane: api
+        to: [db]
+        title: 기록 점검 완료(월 마감)
+        desc: >-
+          기록 점검 화면(AssetRecordCheck)에서 달을 점검 완료로 표시하면 그 달 쓰기가 막히고, 해제하면 다시 열린다.
+          그룹에 속해 있으면 그룹 전체의 마감, 없으면 개인 마감이다.
+        code: [MonthlyClosingController, MonthlyClosingService#setCompleted]
+        state: "finance_monthly_closings → completed 설정·해제"
+        fail: 달 형식이 yyyy-MM이 아니거나 월 범위가 틀리면 400.
+
+      - id: reminder
+        lane: scheduler
+        to: [telegram]
+        title: 월말 등록 리마인더
+        desc: >-
+          매월 마지막 날 21시(KST)에 이번 달 자산·거래 기록이 하나도 없는 활성 사용자에게 "가계부 등록을 아직 안 하셨어요" 알림을 보낸다.
+          그룹 소속이면 그룹 안에서 누구든 등록했으면 건너뛴다. 알림 종류 설정(가계부 리마인더)과 채널에 따라 텔레그램·푸시로 전달된다.
+          kista-scheduler가 중복 실행 방지 락을 잡고 실행한다.
+        code: [FinanceRegistrationReminderScheduler#run, FinanceRegistrationReminderNotifier#notifyUsersWithoutThisMonthRegistration, FinanceReminderChannelNotifier#onReminderDue]
+        cond: 매월 말일 21:00 KST
+        fail: 사용자 한 명의 조회·요청이 실패하면 그 사용자만 경고 로그로 남기고 계속한다.
+
+  group-share:
+    title: 가계부 그룹 공유
+    trigger: 사용자가 가계부 그룹 관리 화면에서 초대하거나 초대 코드를 입력해 수락한다
+    summary: 가계부 그룹(com.kista.finance 모듈 안)을 만들고 초대 코드로 가입하며, 탈퇴·추방·회원 탈퇴 때 소유자 승계와 그룹 정리를 한다. 한 사용자는 하나의 그룹에만 속하고 모두 kista-api가 처리한다.
+    steps:
+      - id: invite
+        lane: api
+        to: [db]
+        title: 초대 코드 발급
+        desc: >-
+          그룹 관리 화면(GroupManager, InviteDialog)에서 초대를 만들면 16자리 일회용 코드와 만료 시각이 발급된다.
+          아직 그룹이 없는 사용자가 처음 초대하면 그 자리에서 새 그룹을 만들고 본인이 소유자(OWNER)가 된다. 이미 그룹이 있으면 소유자만 초대할 수 있다.
+        code: [FinanceGroupController#invite, FinanceGroupService#invite]
+        state: "finance_groups 생성(처음일 때) · 멤버 OWNER 등록 · 초대 PENDING"
+        fail: 그룹이 있는 일반 멤버가 초대하면 403.
+
+      - id: respond
+        lane: api
+        to: [db]
+        title: 초대 수락·거절
+        desc: >-
+          초대받은 사용자가 코드를 입력(AcceptInvitationForm)해 수락하거나 거절한다. 본인이 발급한 코드는 수락할 수 없고,
+          만료됐거나 이미 처리된 초대는 쓸 수 없다. 한 사람은 한 그룹에만 속하므로 이미 다른 그룹 소속이면 수락이 거부된다.
+        code: [FinanceGroupController#respondToInvitation, FinanceGroupService#respondToInvitation]
+        state: "초대 → ACCEPTED 또는 DECLINED · 수락 시 멤버(MEMBER) 추가"
+        fail: 코드가 없으면 404, 만료·처리 완료는 409, 본인 코드면 403, 이미 다른 그룹 소속이면 400, 수락·거절 외 값이면 400.
+
+      - id: scope
+        lane: api
+        to: [db]
+        title: 합류 후 조회 범위 확장
+        desc: >-
+          합류하면 별도 이관 없이 조회 범위가 넓어진다. 내 기록 + 내 그룹으로 공유된 기록이 함께 보이고, 개인 기록은 사용자가 공유 전환을 해야 그룹에 보인다.
+          그룹 멤버 목록은 그룹 멤버만 볼 수 있다.
+        code: [FinanceGroupController#listMembers, FinanceGroupService#listMembers]
+        fail: 멤버가 아닌 사용자가 목록을 조회하면 403.
+
+      - id: leave
+        lane: api
+        to: [db]
+        title: 탈퇴·추방
+        desc: >-
+          본인이 그룹을 나가거나 소유자가 다른 멤버를 내보낸다. 이전에 공유한 기록은 그룹에 그대로 남고, 나간 사람은 더 이상 멤버가 아니라 그룹 데이터가 보이지 않는다.
+        code: [FinanceGroupController#leaveGroup, FinanceGroupService#leaveGroup]
+        state: "멤버십 소프트 삭제"
+        fail: 본인도 소유자도 아니면 403.
+
+      - id: succession
+        lane: api
+        to: [db]
+        title: 소유자 승계·그룹 정리
+        desc: >-
+          소유자가 나가고 남은 멤버 중 소유자가 없으면 가장 먼저 합류한 멤버가 소유자가 된다. 마지막 멤버가 나가면 그룹 자체를 소프트 삭제해 아무도 초대할 수 없는 고아 그룹을 막는다.
+        code: [GroupMembershipSupport#removeMemberAndHandleSuccession]
+        cond: 소유자가 나갈 때 또는 마지막 멤버가 나갈 때
+        state: "멤버 역할 MEMBER → OWNER · 그룹 소프트 삭제"
+
+      - id: withdraw-cascade
+        lane: api
+        to: [db]
+        title: 회원 탈퇴 때 정리
+        desc: >-
+          사용자가 탈퇴하면 커밋 뒤 가계부 모듈이 그 사용자가 입력한 거래·자산·계좌·카테고리를 정리하고, 속한 그룹에서 같은 승계 규칙으로 빠진다.
+          그룹을 통째로 지우지 않아 다른 멤버의 기록은 남는다.
+        code: [com.kista.finance.adapter.out.UserCascadeListener#onUserDeleted, GroupMembershipSupport#removeMemberAndHandleSuccession]
+        cond: 회원 탈퇴가 커밋된 뒤
+        state: "사용자 입력 기록 소프트 삭제 · 멤버십 제거"
+
+  admin-runtime:
+    title: 런타임 매매 정책
+    trigger: 관리자가 운영 설정 화면에서 가입 승인·증권사·전략 생성 정책을 저장한다
+    summary: 정책의 저장·집행 주체는 kista-trading이다. kista-api는 편집 창구로서 내부 HTTP로 정책을 읽고 쓰며, 가입 승인·벤치마크 설정만 자기 DB에 둔다.
+    steps:
+      - id: open
+        lane: ui
+        to: [api]
+        title: 운영 설정 화면 조회
+        desc: >-
+          관리자가 "운영 설정" 화면을 열면 kista-ui가 /api/admin/settings를 kista-api로 프록시한다. 응답은 캐시하지 않는다.
+          가입 승인 필요 여부와 벤치마크는 kista-api DB에서, 증권사별 신규 등록 허용·전략 유형별 생성 정책은 kista-trading에서 가져와 한 묶음으로 보여준다.
+        code: [AdminSettingsController#getSettings, AdminSettingsService#getSettings, TradingPolicyHttpAdapter#load]
+        fail: kista-trading에 닿지 못하면 503으로 오류를 드러낸다. 관리자가 기본값을 실제 설정으로 오해하지 않게 하려는 것이다.
+
+      - id: save-trading
+        lane: api
+        to: [trading]
+        title: 매매 정책을 kista-trading에 먼저 반영
+        desc: >-
+          저장 요청 전체(승인·증권사·전략)를 한 번에 교체한다. 부분 갱신은 없다. 정책의 주인은 kista-trading이라
+          kista-api는 내부 HTTP(PUT /api/internal/trading/policy-settings)로 증권사 허용과 전략 유형별 생성 정책을 넘긴다.
+          정책이 거절되면 가입 승인 설정은 건드리지 않는다.
+        code: [AdminSettingsService#updateSettings, TradingPolicyHttpAdapter#replace, TradingPolicyInternalController#replacePolicy]
+        fail: 정책 값이 잘못되면(전략·증권사 키 누락 등) 400으로 거절된다. kista-trading이 응답하지 않으면 503, 아직 정책 API가 없는 옛 버전이면 "배포 후 다시 시도" 안내와 함께 거절된다.
+
+      - id: persist-trading
+        lane: trading
+        to: [db]
+        title: 정책 저장
+        desc: kista-trading 자기 스키마의 매매 런타임 설정 행을 새 값으로 교체한다. 이후 모든 매매 기능이 이 행을 읽는다.
+        code: [TradingPolicyService#replacePolicy, TradingPolicySettingsPersistenceAdapter]
+        state: "trading.trading_runtime_settings → 새 정책"
+
+      - id: save-root
+        lane: api
+        to: [db]
+        title: 가입 승인·벤치마크 설정 저장과 감사 기록
+        desc: >-
+          kista-api 자기 DB의 가입 승인 필요 여부·벤치마크 설정을 같은 행 잠금 아래 갱신한다(가입 판정과 직렬화).
+          변경된 항목만 담아 관리자 감사 로그에 남긴다. 가입 승인을 끄면 대기 중 사용자 일괄 승인이 이어진다(가입·승인 흐름 참고).
+        code: [RuntimeSettingsService#update, AuditLogPersistenceAdapter#log]
+        state: "public.admin_runtime_settings → 새 설정 · audit_logs → RUNTIME_SETTINGS_UPDATE"
+        fail: 이 단계가 실패하면 매매 정책만 바뀐 상태로 남는다. 저장은 멱등이라 관리자가 다시 저장하면 맞춰진다.
+
+      - id: enforce-account
+        lane: trading
+        to: [db]
+        title: 계좌 등록 때 증권사 허용 확인
+        desc: >-
+          사용자가 계좌를 등록하면 kista-trading이 정책 행을 읽어 해당 증권사의 신규 등록이 허용인지 확인한다.
+          증권사 자격증명을 외부로 보내기 전에 막는다. 이미 등록된 계좌의 매매에는 영향이 없다.
+        code: [AccountService#register, TradingPolicyService#enabled]
+        fail: 비활성 증권사면 400 "신규 계좌 등록이 비활성화되어 있습니다"가 화면에 나온다.
+
+      - id: enforce-strategy
+        lane: trading
+        to: [db]
+        title: 전략 등록 때 생성 정책 적용
+        desc: >-
+          전략을 등록하면 kista-trading이 유형별 정책을 읽어 생성 허용 여부를 확인하고, 종목·분할 수·VR 주기 같은 값이 허용 목록에 있는지 검증하거나
+          고정값으로 채운다. 잔고 검증 여부는 정책이 아니라 사용자별 설정이며, 가입 때 복제된 사용자 프로필을 따른다.
+        code: [StrategyCreationService#register, TradingPolicyService#find]
+        fail: 비활성 전략 유형이거나 허용되지 않은 값이면 400으로 등록이 거절된다.
+
+      - id: public
+        lane: api
+        to: [trading]
+        title: 로그인 전 화면에 공개 정책 제공
+        desc: >-
+          로그인·가입 화면은 /api/runtime-config로 가입 승인 필요 여부와 증권사·전략 정책을 조회해 안내 문구를 만든다.
+          관리자 조회와 달리 kista-trading이 응답하지 않으면 기본 정책으로 대체해 보여준다. 실제 집행은 kista-trading이 하므로 화면이 잠시 기본값을 보여도 정책을 우회할 수는 없다.
+        code: [RuntimeConfigController#getRuntimeConfig, RuntimeConfigService#getSettings]
+        cond: 사용자가 로그인 전 화면을 열 때
+
+  admin-scheduler:
+    title: 스케쥴러 수동 실행
+    trigger: 관리자가 운영 도구에서 개장·마감 배치나 벤치마크 수집을 지금 바로 실행한다
+    summary: 같은 /api/admin/scheduler 경로라도 하위 경로에 따라 실행 프로세스가 다르다. 개장·마감은 Caddy가 보낸 kista-scheduler가 받아 kista-trading에 내부 호출로 넘기고, 벤치마크 수집은 kista-scheduler가 직접 실행한다.
+    steps:
+      - id: route
+        lane: user
+        to: [scheduler]
+        title: 요청 라우팅
+        desc: >-
+          kista-ui에는 스케쥴러 실행 화면이 없어 운영자가 ADMIN 토큰으로 공개 도메인의 /api/admin/scheduler/** 를 직접 호출한다.
+          Caddy는 이 경로 아래를 모두 kista-scheduler로 보내므로 개장·마감(/open·/close)도 kista-scheduler가 받는다.
+        code: [AdminTradingSchedulerController, AdminSchedulerController]
+
+      - id: open-close-forward
+        lane: scheduler
+        to: [trading]
+        title: 개장·마감 수동 트리거를 kista-trading에 위임
+        desc: >-
+          /open·/close 컨트롤러는 scheduler.enabled 게이팅 없이 모든 root 프로세스에 존재한다. 받은 프로세스는 직접 배치를 돌리지 않고
+          내부 HTTP(POST /api/internal/trading/scheduler/open|close)로 kista-trading에 넘긴 뒤 202를 돌려준다.
+        code: [AdminTradingSchedulerController#triggerOpen, AdminTradingSchedulerController#triggerClose, TradingSchedulerCommandHttpAdapter#triggerOpen, TradingSchedulerCommandHttpAdapter#triggerClose]
+        fail: >-
+          내부 토큰 누락·kista-trading 장애는 500으로 나온다(별도 변환 없음). 배포 compose는 INTERNAL_API_BASE_URL을 kista-api에만 넣고
+          kista-scheduler에는 넣지 않아, .env에 따로 없으면 기본값(localhost:8081)으로 호출해 실패한다(운영 .env는 확인하지 못함).
+
+      - id: trading-run
+        lane: trading
+        to: [db, broker]
+        title: kista-trading이 매매 배치 실행
+        desc: >-
+          kista-trading이 백그라운드 스레드에서 개장·마감 스케쥴러를 즉시 실행하고 바로 202를 돌려준다. 수동 실행은 개장·주문 시각 대기 없이 곧바로 주문을 계산·접수한다.
+          예약 cron과 같은 분산 락 이름(trading-open·trading-close)을 쓴다.
+        code: [TradingSchedulerInternalController#triggerOpen, TradingOpenScheduler#runNow, TradingCloseScheduler#runNow, TradingExecutionFacade#placeOpenOrdersNow, TradingExecutionFacade#executeBatchNow]
+        state: "trading_batch_run → STARTED 이후 진행"
+        fail: 같은 락을 다른 실행이 쥐고 있으면(cron 배치 진행 중 등) 아무 일 없이 건너뛰고, 요청자는 202만 받는다. 실행 중 오류는 로그와 관리자 알림으로만 남는다.
+
+      - id: lock
+        lane: trading
+        to: [db]
+        title: 중복 실행 방지 락
+        desc: >-
+          scheduler_locks 행을 원자적으로 선점해 같은 이름의 작업이 동시에 두 번 돌지 않게 한다. 성공하면 만료까지 락을 유지하고 실패(예외)하면 즉시 풀어 재시도할 수 있게 한다.
+        code: [SchedulerLockService#tryRun]
+
+      - id: bench-run
+        lane: scheduler
+        to: [db]
+        title: 벤치마크 수집 수동 실행
+        desc: >-
+          KB부동산 주택 벤치마크·주간 매매가격지수(월간 전체 갱신 포함)·ETF 지수 종가 수집은 Caddy가 kista-scheduler로 보낸 요청을 그 프로세스가 직접 받아 가상 스레드로 실행하고 202를 돌려준다.
+          cron과 같은 락 이름을 공유해 동시 실행되지 않는다.
+        code: [AdminSchedulerController#triggerKbLandHousingBenchmark, AdminSchedulerController#triggerKbLandPriceIndex, AdminSchedulerController#triggerKbLandPriceIndexFullRefresh, AdminSchedulerController#triggerMarketIndexPriceSync, KbLandHousingBenchmarkScheduler#runNow, KbLandPriceIndexScheduler#runNow, MarketIndexPriceSyncScheduler#runNow]
+        fail: 이 컨트롤러는 scheduler.enabled인 프로세스에만 있다. kista-api로 잘못 라우팅되면 404가 된다.
+
+      - id: notify
+        lane: scheduler
+        to: [telegram]
+        title: 시작·완료·실패 알림
+        desc: 수집 작업은 시작과 완료를 관리자 텔레그램에 알리고, 실패하면 오류 알림과 오류 로그 저장으로 이어진다(오류 로그 흐름 참고).
+        code: [SchedulerJobRunner#run, SchedulerNotifier#onSchedulerLifecycle]
+
+  admin-error-logs:
+    title: 오류 로그
+    trigger: 서버가 미처리 예외·관리자 오류 알림을 만들거나 브라우저 오류 바운더리가 리포트한다
+    summary: 모든 오류는 kista-api의 app_error_logs로 모인다. kista-api 안에서는 이벤트로, kista-trading에서는 Redis Stream으로 전달되고, 관리자는 운영 로그 화면에서 조회하고 조치 완료로 지운다.
+    steps:
+      - id: raise-api
+        lane: api
+        to: [db, telegram]
+        title: kista-api 안에서 오류 발생
+        desc: >-
+          처리되지 않은 예외(500)와 관리자 알림 발송(notifyError)은 오류 보고 이벤트를 발행한다. 이벤트를 받은 리스너가 같은 프로세스에서 곧바로 오류 로그 행을 저장한다.
+          알림은 관리자 텔레그램으로도 나간다. 이미 매핑된 4xx 예외는 오류 로그에 남기지 않는다.
+        code: [GlobalExceptionHandler#handleAll, TelegramAdapter#notifyError, AppErrorRaisedListener#on, AppErrorLogPersistenceAdapter#save]
+        state: "app_error_logs → 행 추가"
+        fail: 저장 실패는 삼키고 경고 로그만 남겨 원래 응답을 막지 않는다. 스택트레이스는 앞 30줄만 저장한다.
+
+      - id: raise-trading
+        lane: trading
+        to: [redis, telegram]
+        title: kista-trading에서 오류 발생
+        desc: >-
+          kista-trading의 미처리 예외와 매매 관리자 알림도 같은 오류 보고 이벤트를 만든다. kista-trading은 kista-api를 호출하지 않으므로
+          이벤트를 Redis Stream(stream:app.error)에 넣는다. 매매 배치 실패 알림은 관리자 텔레그램으로 나간다.
+        code: [TradingExceptionHandler#handleGeneric, TradingNotifyAdapter#notifyError, TradingAlertNotifier#onTradingError, AppErrorStreamPublisher#onAppErrorRaised]
+        fail: Redis에 넣기 실패하면 경고 로그만 남기고 삼킨다(오류 로그 유실 가능).
+
+      - id: consume
+        lane: api
+        to: [redis, db]
+        title: Stream에서 읽어 저장
+        desc: >-
+          kista-api와 kista-scheduler가 같은 소비자 그룹으로 스트림을 나눠 읽어 오류 로그를 저장한다. kista-api가 내려가 있어도 스트림에 쌓였다가 기동 뒤 소비된다.
+          5분마다 끊긴 구독과 처리 안 된 메시지를 복구한다.
+        code: [AppErrorStreamConsumer#onRecord, AppErrorStreamConsumer#scheduledRecovery]
+        state: "app_error_logs → 행 추가"
+        fail: 해석할 수 없는 메시지는 경고만 남기고 확인 처리해 무한 재시도를 막는다. 스트림 보존은 최대 약 1만 건이다.
+
+      - id: client
+        lane: ui
+        to: [api]
+        title: 브라우저 오류 리포트
+        desc: 로그인 전 화면까지 포함한 kista-ui 오류 바운더리가 /api/client-errors로 오류를 보낸다. 인증 없이 받으며 저장이 실패해도 항상 204로 응답한다.
+        code: [ClientErrorLogController#log]
+        cond: 브라우저에서 미처리 오류가 났을 때
+
+      - id: view
+        lane: ui
+        to: [api, db]
+        title: 운영 로그에서 조회
+        desc: 관리자가 "운영 로그" 화면의 오류 영역을 열면 기간·개수(최대 500) 조건으로 삭제되지 않은 오류 로그를 최신순으로 본다.
+        code: [AdminObservabilityController#listErrorLogs, AdminQueryService#listErrorLogs]
+
+      - id: resolve
+        lane: ui
+        to: [api, db]
+        title: 조치 완료 처리
+        desc: 오류 로그 항목에서 삭제를 누르면 행을 지우지 않고 삭제 시각만 기록(소프트 삭제)해 목록에서 사라지게 한다.
+        code: [AdminObservabilityController#softDeleteErrorLog, AdminQueryService#deleteErrorLog, AppErrorLogPersistenceAdapter#softDelete]
+        state: "app_error_logs.deleted_at → 현재 시각"
+        fail: 없는 id면 404.
+
+  admin-role:
+    title: 사용자 역할 변경
+    trigger: 관리자가 사용자 목록에서 역할 변경 버튼을 누른다(또는 ADMIN_KAKAO_IDS 사용자가 로그인한다)
+    summary: USER와 ADMIN 사이를 바꾸고 감사 로그를 남긴다. 이미 발급된 토큰은 변경 시각 이전 발급분이 거절되어 새 역할이 다음 요청 갱신 때 반영된다.
+    steps:
+      - id: request
+        lane: ui
+        to: [api]
+        title: 역할 변경 요청
+        desc: 관리자 사용자 목록의 역할 변경 버튼이 PATCH /api/admin/users/{id}/role을 kista-api로 보낸다. 자기 자신의 버튼은 화면에서 막혀 있다.
+        code: [AdminUserController#changeRole]
+
+      - id: guard
+        lane: api
+        title: 강등 안전 검사
+        desc: 강등(ADMIN을 USER로)일 때만 자기 자신 강등과 마지막 관리자 강등을 막는다. 승격에는 검사가 없다.
+        code: [AdminService#changeRole]
+        cond: 역할을 USER로 바꾸는 경우
+        fail: 자기 자신이면 400, 마지막 관리자면 400.
+
+      - id: save
+        lane: api
+        to: [db]
+        title: 역할 저장과 감사 기록
+        desc: 사용자 행의 역할을 바꾸고, 어느 관리자가 누구를 어떤 역할로 바꿨는지 감사 로그에 남긴다.
+        code: [UserService#changeRole, AuditLogPersistenceAdapter#log]
+        state: "users.role → USER 또는 ADMIN · audit_logs → USER_ROLE_CHANGE"
+        fail: 대상 사용자가 없으면 404.
+
+      - id: stale
+        lane: api
+        to: [redis]
+        title: 기존 토큰 무효화 표시
+        desc: >-
+          Redis에 역할 변경 시각을 기록한다(보관 1일). 이후 요청에서 인증 필터가 이 시각보다 먼저 발급된 액세스 토큰을 401(TOKEN_STALE_ROLE)로 거절한다.
+          kista-trading도 같은 Redis 키를 읽어 같은 판정을 한다.
+        code: [com.kista.user.adapter.out.redis.RedisBlacklistAdapter#markRoleChanged, JwtAuthFilter#doFilterInternal]
+        fail: 대상 사용자의 기존 세션은 다음 요청에서 401이 된 뒤 UI가 리프레시 토큰으로 새 역할의 토큰을 받는다. 그 토큰은 DB의 현재 역할로 발급된다.
+
+      - id: seed
+        lane: api
+        to: [db]
+        title: ADMIN_KAKAO_IDS 자동 승격
+        desc: >-
+          환경변수에 적힌 카카오 ID 사용자는 가입 때 ADMIN·활성으로 만들어지고, 이미 USER로 가입했어도 다음 로그인 때 ADMIN·활성으로 승격된다.
+          승격 사실은 매매 서버 프로필 복제로 전해진다. 강등 경로는 없어 목록에서 지워도 관리자 권한은 유지된다.
+        code: [UserService#login, UserService#register, AdminSeedPromoter#promote]
+        cond: 로그인한 사용자의 카카오 ID가 목록에 있을 때
+        state: "users.role → ADMIN, users.status → ACTIVE"
+
 lifecycles:
   user:
     title: 사용자
@@ -670,8 +1563,8 @@ lifecycles:
       - {id: PAUSED, label: 일시중지, desc: 배치 제외}
     transitions:
       - {to: ACTIVE, title: 전략 등록, code: [StrategyCreationService#register], flow: strategy-register/save}
-      - {from: ACTIVE, to: PAUSED, title: 사용자 일시정지, code: [StrategyService#pause]}
-      - {from: ACTIVE, to: PAUSED, title: 관리자 일시정지, code: [AdminStrategyService#pauseStrategy]}
+      - {from: ACTIVE, to: PAUSED, title: 사용자 일시정지, code: [StrategyService#pause], flow: pause-stop/pause}
+      - {from: ACTIVE, to: PAUSED, title: 관리자 일시정지, code: [AdminStrategyService#pauseStrategy], flow: pause-stop/admin-apply}
       - from: ACTIVE
         to: PAUSED
         title: 사이클 종료 후 다음 사이클을 열지 않음
@@ -681,8 +1574,8 @@ lifecycles:
         code: [CycleRotationService#rotate, StrategyPort#pause]
         tag: 시스템
         flow: close-batch/rotate
-      - {from: ACTIVE, to: PAUSED, title: 수동 체결 보정으로 보유 0, code: [ManualTradeCorrectionService#correctManualFills, CycleCloser#closeIfExhausted], tag: 관리자}
-      - {from: PAUSED, to: ACTIVE, title: 재개, desc: 사이클이 끝나 있으면 새 사이클을 다시 연다., code: [StrategyService#resume, AdminStrategyService#resumeStrategy]}
+      - {from: ACTIVE, to: PAUSED, title: 수동 체결 보정으로 보유 0, code: [ManualTradeCorrectionService#correctManualFills, CycleCloser#closeIfExhausted], tag: 관리자, flow: admin-orders/close-cycle}
+      - {from: PAUSED, to: ACTIVE, title: 재개, desc: 사이클이 끝나 있으면 새 사이클을 다시 연다., code: [StrategyService#resume, AdminStrategyService#resumeStrategy], flow: pause-stop/resume}
       - {from: ACTIVE, title: 전략 삭제·회원 탈퇴, desc: 상태와 무관한 소프트 삭제(사이클 이력 포함)., code: [StrategyService#delete, com.kista.trading.adapter.out.UserCascadeListener#onUserDeleted], flow: withdraw/trading-cleanup}
 
   order:
@@ -698,18 +1591,18 @@ lifecycles:
       - {id: FAILED, label: 접수 실패, terminal: true}
     transitions:
       - {to: PLANNED, title: 배치 예산 배정 후 저장, code: [TradingCandidatePlanner#saveAllocatedOrders], tag: 개장·마감, flow: close-batch/plan}
-      - {to: PLANNED, title: 수동 실행, code: [ManualTradingService#execute], tag: 사용자}
-      - {to: PLANNED, title: 관리자 재주문 (예약), desc: AT_OPEN/AT_CLOSE 재주문은 PLANNED로 저장한다., code: [ReorderService#reorder], tag: 관리자}
-      - {to: FILLED, title: 관리자 수동 체결 보정, desc: 증권사 밖에서 체결된 거래를 바로 FILLED로 기록한다., code: [ManualTradeCorrectionService#correctManualFills, Order#filledManual], tag: 관리자}
+      - {to: PLANNED, title: 수동 실행, code: [ManualTradingService#execute], tag: 사용자, flow: manual-run/allocate}
+      - {to: PLANNED, title: 관리자 재주문 (예약), desc: AT_OPEN/AT_CLOSE 재주문은 PLANNED로 저장한다., code: [ReorderService#reorder], tag: 관리자, flow: admin-orders/reorder-place}
+      - {to: FILLED, title: 관리자 수동 체결 보정, desc: 증권사 밖에서 체결된 거래를 바로 FILLED로 기록한다., code: [ManualTradeCorrectionService#correctManualFills, Order#filledManual], tag: 관리자, flow: admin-orders/correction}
       - {from: PLANNED, to: PLACED, title: 증권사 접수, code: [TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
       - {from: PLANNED, to: FAILED, title: 접수 실패, code: [TradingOrderExecutor#placeOrders], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: BUY cap 재보정, desc: 접수 직전 가격 cap이 바뀐 BUY는 취소하고 보정 주문을 새 PLANNED로 저장한다., code: [BuyOrderPriceCapper#capIfNeeded], flow: close-batch/place}
-      - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder]}
-      - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다., code: [OrderCancelService#cancelByCycle, OrderCancelStateWriter#deletePlanned], tag: 사용자}
+      - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder], flow: manual-run/cancel-one}
+      - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다., code: [OrderCancelService#cancelByCycle, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}
       - {from: PLACED, to: FILLED, title: 전량 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: PARTIALLY_FILLED, title: 부분 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(Toss는 명시 취소, KIS는 장 마감 자동 취소).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
-      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelByCycle, ReorderService#reorder]}
+      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelByCycle, ReorderService#reorder], flow: manual-run/cancel-one}
 
   batch-run:
     title: 매매 배치 체크포인트
