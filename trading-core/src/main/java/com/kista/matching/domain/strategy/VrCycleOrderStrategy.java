@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import com.kista.sharedkernel.StrategyType;
@@ -72,6 +74,27 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
                                             StrategyTicker ticker, LocalDate tradeDate) {
         if (vrPosition == null || isVrBootstrapShaped(buyOrders)) return buyOrders;
         return vrStrategy.buildCappedBuyOrders(vrPosition, ticker, tradeDate, cap);
+    }
+
+    // 예산 축소 — 싼 단(꼬리)부터 덜어낸다. buildBuyLadder가 pool 예산 초과 시 m 증가 방향으로 break하는 것과 같아
+    // "예산이 budget이었다면 사다리가 냈을 결과"를 재현할 뿐 공식은 바뀌지 않는다. 캡 병합 단(1주 rung N개 묶음)은
+    // rung 단위로 수량을 줄인다 — 단 통째 제외면 갭다운 시 결과가 비어 캡 없는 원본 사다리가 접수된다
+    @Override
+    public List<PlannedOrder> fitBuysToBudget(List<PlannedOrder> buyOrders, BigDecimal budget) {
+        if (isVrBootstrapShaped(buyOrders)) return buyOrders;
+        List<PlannedOrder> fitted = new ArrayList<>();
+        BigDecimal remaining = budget;
+        for (PlannedOrder order : buyOrders) {
+            int affordable = remaining.divide(order.price(), 0, RoundingMode.DOWN).intValue();
+            if (affordable >= order.quantity()) {
+                fitted.add(order);
+                remaining = remaining.subtract(order.price().multiply(BigDecimal.valueOf(order.quantity())));
+                continue;
+            }
+            if (affordable > 0) fitted.add(order.withQuantity(affordable));
+            break;
+        }
+        return fitted;
     }
 
     @Override

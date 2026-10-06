@@ -65,7 +65,9 @@ public interface CycleOrderStrategy {
 
     // live 예산(budget) 안에 못 담는 BUY를 전략별로 축소 — 기본은 축소 없음(호출부가 전체 거절)
     // 결과가 비었거나 여전히 budget 초과면 호출부가 거절한다
-    // 계약: 입력 주문의 부분집합(같은 인스턴스·값)만 반환 — allocator.mergeApproved가 원본 목록과 equals로 대조해 순서를 복원한다
+    // 계약: 입력 BUY의 상대 순서를 유지한 축소본(주문 제외·수량 축소 허용, 새 주문 추가 금지) — allocator.mergeApproved가
+    // 원본 후보의 BUY 자리를 이 목록으로 순서대로 교체한다(PriceCapPolicy.replaceBuysPreservingOrder)
+    // INFINITE: 뒤쪽 보정 주문 제외(base 수량은 공식값이라 불변) / VR: 싼 단부터 rung 단위 절단(병합 단 수량 축소 포함)
     default List<PlannedOrder> fitBuysToBudget(List<PlannedOrder> buyOrders, BigDecimal budget) {
         return buyOrders;
     }

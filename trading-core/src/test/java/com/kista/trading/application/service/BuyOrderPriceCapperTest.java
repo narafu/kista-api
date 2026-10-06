@@ -13,6 +13,8 @@ import com.kista.sharedkernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrStrategy;
 import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
@@ -371,5 +373,34 @@ class BuyOrderPriceCapperTest {
 
         verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    @Test
+    void capIfNeeded_vrGapDownWithZeroFreeBudget_persistsTailTrimmedMergedRung() {
+        // 실제 VR 축소 경로 — holdings=10, V=1000·밴드15% → lowerBand=850, poolLimit=230
+        // 원본 사다리 85.00 + 77.27 = 162.27(70.83 추가 시 230 초과). 갭다운 현재가 50 → cap 52.50
+        // 재캡 사다리 52.50×4 = 210 > 원본 → 여유 0(live 실패)이면 예산 = 원본 162.27 → 병합 단을 3주로 줄여 157.50
+        VrPosition position = new VrPosition(
+                new AccountBalance(10, new BigDecimal("100.00"), new BigDecimal("5000.00")),
+                new BigDecimal("1000.00"), new BigDecimal("15.00"), new BigDecimal("230.00"), BigDecimal.ZERO, 0);
+        BuyOrderPriceCapper realVrCapper = new BuyOrderPriceCapper(orderPort, orderPlanner,
+                new CycleOrderStrategies(List.of(new VrCycleOrderStrategy(new VrStrategy()))), strategyCyclePort);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY))
+                .thenReturn(List.of(ladderBuy("85.00"), ladderBuy("77.27")));
+
+        realVrCapper.capIfNeeded(StrategyType.VR, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), null, position, StrategyTicker.TQQQ, BigDecimal.ZERO);
+
+        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
+        assertThat(ordersCaptor.getValue()).singleElement().satisfies(order -> {
+            assertThat(order.quantity()).isEqualTo(3);
+            assertThat(order.price()).isEqualByComparingTo("52.50");
+            assertThat(order.orderLeg()).isEqualTo("VR_BUY_01");
+        });
+    }
+
+    private Order ladderBuy(String price) {
+        return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, OrderType.LIMIT,
+                OrderTiming.AT_OPEN, OrderDirection.BUY, 1, new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 }

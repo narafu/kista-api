@@ -48,4 +48,58 @@ class VrCycleOrderStrategyTest {
         assertThat(result.getFirst().timing()).isEqualTo(OrderTiming.AT_CLOSE);
         assertThat(result.getFirst().price()).isEqualByComparingTo("105.00");
     }
+
+    // 예산 축소는 싼 단(꼬리)부터 덜어낸다 — buildBuyLadder의 pool 예산 break와 같은 방향(앞쪽 비싼 단 prefix 유지)
+    @Test
+    void fitBuysToBudget_trimsCheapestRungsFromTail() {
+        VrCycleOrderStrategy strategy = new VrCycleOrderStrategy(new VrStrategy());
+        PlannedOrder r1 = ladderBuy(1, 1, "100.00");
+        PlannedOrder r2 = ladderBuy(2, 1, "90.00");
+        PlannedOrder r3 = ladderBuy(3, 1, "80.00");
+
+        List<PlannedOrder> result = strategy.fitBuysToBudget(List.of(r1, r2, r3), new BigDecimal("195.00"));
+
+        assertThat(result).containsExactly(r1, r2);
+    }
+
+    // 캡 병합 단(1주 rung N개 묶음)은 rung 단위로 수량을 줄인다 — 단 통째 제외면 갭다운 시 결과가 비어 캡 없는 원본이 접수된다
+    @Test
+    void fitBuysToBudget_mergedRung_reducesQuantityKeepingLeg() {
+        VrCycleOrderStrategy strategy = new VrCycleOrderStrategy(new VrStrategy());
+        PlannedOrder merged = ladderBuy(1, 2, "52.50");
+        PlannedOrder r2 = ladderBuy(2, 1, "50.00");
+
+        List<PlannedOrder> result = strategy.fitBuysToBudget(List.of(merged, r2), new BigDecimal("100.00"));
+
+        assertThat(result).containsExactly(merged.withQuantity(1));
+        assertThat(result.getFirst().orderLeg()).isEqualTo("VR_BUY_01");
+    }
+
+    // 첫 단 1주조차 못 담으면 빈 결과 — 호출부가 거절(allocator)·원본 유지(capper)를 결정한다
+    @Test
+    void fitBuysToBudget_firstRungUnaffordable_returnsEmpty() {
+        VrCycleOrderStrategy strategy = new VrCycleOrderStrategy(new VrStrategy());
+
+        List<PlannedOrder> result = strategy.fitBuysToBudget(
+                List.of(ladderBuy(1, 1, "100.00")), new BigDecimal("99.99"));
+
+        assertThat(result).isEmpty();
+    }
+
+    // bootstrap(LOC+AT_CLOSE) 배치는 사다리가 아니라 축소하지 않는다
+    @Test
+    void fitBuysToBudget_bootstrapBatch_returnedAsIs() {
+        VrCycleOrderStrategy strategy = new VrCycleOrderStrategy(new VrStrategy());
+        PlannedOrder bootstrap = PlannedOrder.of(TODAY, StrategyTicker.TQQQ, OrderType.LOC,
+                com.kista.sharedkernel.OrderDirection.BUY, 10, new BigDecimal("105.00"), OrderTiming.AT_CLOSE,
+                PlannedOrder.leg("VR_BUY", 1));
+        List<PlannedOrder> buys = List.of(bootstrap);
+
+        assertThat(strategy.fitBuysToBudget(buys, new BigDecimal("100.00"))).isSameAs(buys);
+    }
+
+    private static PlannedOrder ladderBuy(int rung, int quantity, String price) {
+        return PlannedOrder.of(TODAY, StrategyTicker.TQQQ, OrderType.LIMIT, com.kista.sharedkernel.OrderDirection.BUY,
+                quantity, new BigDecimal(price), OrderTiming.AT_OPEN, PlannedOrder.leg("VR_BUY", rung));
+    }
 }

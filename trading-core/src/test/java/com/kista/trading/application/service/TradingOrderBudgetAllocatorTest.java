@@ -38,6 +38,8 @@ import static org.mockito.Mockito.when;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.sharedkernel.StrategyStatus;
 import com.kista.sharedkernel.StrategyTicker;
+import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
+import com.kista.matching.domain.strategy.VrStrategy;
 import com.kista.sharedkernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
@@ -371,6 +373,31 @@ class TradingOrderBudgetAllocatorTest {
         assertThat(result.approved()).singleElement()
                 .satisfies(approved -> assertThat(approved.orders()).containsExactly(base, c1));
         assertThat(result.rejectedBuy()).isEmpty();
+    }
+
+    @Test
+    void allocate_vrLadderOverLiveBudget_savesQuantityReducedRungInOriginalSlot() {
+        // 캡 병합 단 52.50×2 + 50.00 = 155 > live 100 — 실제 VR 축소는 병합 단을 1주로 줄인다(새 인스턴스)
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("100.00")));
+        when(vrCycleOrderStrategy.fitBuysToBudget(any(), any())).thenAnswer(inv ->
+                new VrCycleOrderStrategy(new VrStrategy()).fitBuysToBudget(inv.getArgument(0), inv.getArgument(1)));
+        PlannedOrder merged = ladderBuy(1, 2, "52.50");
+        PlannedOrder sell = sell("25.00", 3);
+        PlannedOrder rung2 = ladderBuy(2, 1, "50.00");
+        TradingOrderBudgetAllocator.Candidate candidate = candidate(StrategyType.VR, merged, sell, rung2);
+
+        TradingOrderBudgetAllocator.Allocation result = allocator.allocate(List.of(candidate), tradeDate);
+
+        // equals 대조였다면 수량 축소 주문이 조용히 사라진다 — 원본 BUY 자리에 축소본이 들어가고 SELL 순서도 유지
+        assertThat(result.approved()).singleElement()
+                .satisfies(approved -> assertThat(approved.orders()).containsExactly(merged.withQuantity(1), sell));
+        assertThat(result.rejectedBuy()).isEmpty();
+    }
+
+    private PlannedOrder ladderBuy(int rung, int quantity, String price) {
+        return PlannedOrder.of(tradeDate, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.BUY,
+                quantity, new BigDecimal(price), com.kista.sharedkernel.OrderTiming.AT_OPEN, PlannedOrder.leg("VR_BUY", rung));
     }
 
     private PlannedOrder locBuy(int quantity, String price, String leg) {

@@ -58,7 +58,8 @@ class BuyOrderPriceCapper {
     // 전략별 BUY 가격 캡 진입점 단일화 — capsIndividualOrders()로 DB 행 단위 취소·재저장 방식을 결정한다.
     // capIfNeeded는 @Transactional이라 needsCapCheck() 가드는 TradingOrderExecutor.applyCap에서 미리 걸러
     // 스킵 케이스마다 빈 트랜잭션이 열리지 않도록 한다.
-    // accountFreeBudget: 계좌 live 주문가능금액 − 계좌 PLANNED BUY 합계(호출부가 트랜잭션 밖에서 조회), null이면 아직 미조회
+    // accountFreeBudget: 계좌 live 주문가능금액 − 계좌 PLANNED BUY 합계(호출부가 트랜잭션 밖에서 조회), null이면 아직 미조회,
+    // live 조회 실패면 0(예산 = 자기 스코프 원본 BUY 합계)
     // 반환 true = 재캡이 BUY 총액을 늘려 live 예산이 필요함(아무것도 반영하지 않음) — 호출부가 예산을 구해 다시 호출한다
     // 총액이 늘지 않는 재캡은 allocator 승인 범위 안이라 예산 없이 반영한다
     @Transactional
@@ -92,7 +93,7 @@ class BuyOrderPriceCapper {
     }
 
     // 재캡 결과를 live 예산(자기 스코프 원본 BUY를 되돌린 금액)에 맞춘다 — 접수 시 브로커 주문가능금액 초과 거절 방지
-    // 축소(INFINITE=보정 생략, 그 외 축소 없음)로도 못 담으면 null — allocator가 승인한 원본을 그대로 둔다(base 공식은 불변)
+    // 축소(INFINITE=보정 생략, VR=싼 단부터 rung 절단, PRIVACY=축소 없음)로도 못 담으면 null — allocator가 승인한 원본을 그대로 둔다(base 공식은 불변)
     private List<PlannedOrder> fitToBudget(TradingAccount account, CycleOrderStrategy strategy,
                                            List<PlannedOrder> corrected, BigDecimal budget) {
         if (AccountBalance.buyTotal(corrected).compareTo(budget) <= 0) return corrected;

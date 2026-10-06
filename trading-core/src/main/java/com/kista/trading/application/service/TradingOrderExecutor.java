@@ -92,16 +92,18 @@ class TradingOrderExecutor {
         try {
             // DB 예약 합계를 live보다 먼저 읽는다 — 그 사이 접수된 주문은 이중 차감(보수적)될 뿐 과소 집계되지 않는다
             BigDecimal reservedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), date);
-            BigDecimal liveDeposit;
+            BigDecimal freeBudget;
             try {
-                liveDeposit = liveBalancePort.getLiveBalance(account.brokerRef(), strategy.ticker()).usdDeposit();
+                freeBudget = liveBalancePort.getLiveBalance(account.brokerRef(), strategy.ticker()).usdDeposit()
+                        .subtract(reservedBuy);
             } catch (Exception e) {
-                // 원장 기준 폴백은 live 초과 재캡 그 자체라 택하지 않는다 — allocator가 승인한 기존 PLANNED를 그대로 접수
-                log.warn("[{}] live 잔고 조회 실패 — BUY 재캡 생략, 기존 PLANNED 유지: {}", account.nickname(), e.getMessage());
-                return;
+                // 원장 기준 폴백은 live 초과 재캡 그 자체라 택하지 않는다 — 여유 0으로 두면 예산이 자기 스코프 원본 BUY
+                // (allocator 승인액)로 한정돼 지출은 원본 이하로 유지하면서 축소된 캡 주문을 접수한다(VR 사다리 캡 누락 방지)
+                log.warn("[{}] live 잔고 조회 실패 — 원본 BUY 금액 한도로 재캡: {}", account.nickname(), e.getMessage());
+                freeBudget = BigDecimal.ZERO;
             }
             buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
-                    currentPrice, position, vrPosition, strategy.ticker(), liveDeposit.subtract(reservedBuy));
+                    currentPrice, position, vrPosition, strategy.ticker(), freeBudget);
         } finally {
             lock.unlock();
         }

@@ -9,6 +9,7 @@ import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.matching.domain.strategy.PriceCapPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +23,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.kista.sharedkernel.OrderDirection.BUY;
 import static com.kista.sharedkernel.OrderDirection.SELL;
@@ -235,19 +235,28 @@ class TradingOrderBudgetAllocator {
         Map<BatchContext, Candidate> sourceCandidates = new LinkedHashMap<>();
         candidates.forEach(candidate -> sourceCandidates.putIfAbsent(candidate.ctx(), candidate));
 
-        // 승인된 주문 자체(축소된 BUY 포함)를 ctx별로 모은다 — 방향만 보면 축소 전 원본 BUY가 되살아난다
-        Map<BatchContext, List<PlannedOrder>> approvedOrders = new LinkedHashMap<>();
-        Stream.concat(sellApproved.stream(), buyApproved.stream())
-                .forEach(candidate -> approvedOrders
-                        .computeIfAbsent(candidate.ctx(), ignored -> new ArrayList<>())
-                        .addAll(candidate.orders()));
+        // 승인 SELL은 원본 인스턴스 그대로, 승인 BUY는 축소본(주문 제외·수량 축소)일 수 있어 ctx별로 따로 모은다
+        Map<BatchContext, List<PlannedOrder>> approvedSells = new LinkedHashMap<>();
+        sellApproved.forEach(candidate -> approvedSells
+                .computeIfAbsent(candidate.ctx(), ignored -> new ArrayList<>())
+                .addAll(candidate.orders()));
+        Map<BatchContext, List<PlannedOrder>> approvedBuys = new LinkedHashMap<>();
+        buyApproved.forEach(candidate -> approvedBuys.put(candidate.ctx(), candidate.orders()));
 
-        // 원본 후보 순서를 기준으로 승인된 주문만 남긴다(축소는 부분집합 제거라 상대 순서 유지)
-        return approvedOrders.entrySet().stream()
-                .map(entry -> sourceCandidates.get(entry.getKey()).withOrders(
-                        sourceCandidates.get(entry.getKey()).orders().stream()
-                                .filter(entry.getValue()::contains)
-                                .toList()))
+        // 결과는 승인 순서(SELL 승인 → BUY 승인) 그대로, 후보 내부는 원본 순서 기준 — 승인 SELL만 남기고
+        // BUY 자리는 승인 BUY 목록으로 순서대로 교체한다(equals 대조면 VR 수량 축소 주문 같은 새 인스턴스가 조용히 빠진다)
+        Set<BatchContext> approvedContexts = new LinkedHashSet<>(approvedSells.keySet());
+        approvedContexts.addAll(approvedBuys.keySet());
+        return approvedContexts.stream()
+                .map(ctx -> {
+                    Candidate source = sourceCandidates.get(ctx);
+                    List<PlannedOrder> sells = approvedSells.getOrDefault(ctx, List.of());
+                    List<PlannedOrder> kept = source.orders().stream()
+                            .filter(order -> order.direction() == BUY || sells.contains(order))
+                            .toList();
+                    return source.withOrders(PriceCapPolicy.replaceBuysPreservingOrder(
+                            kept, approvedBuys.getOrDefault(ctx, List.of())));
+                })
                 .filter(candidate -> !candidate.orders().isEmpty())
                 .toList();
     }

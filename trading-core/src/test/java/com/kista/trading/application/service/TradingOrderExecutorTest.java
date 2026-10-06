@@ -364,8 +364,8 @@ class TradingOrderExecutorTest {
     }
 
     @Test
-    @DisplayName("live 조회 실패 시 재캡 생략 — 원래 PLANNED 그대로 접수")
-    void placeOrders_liveBalanceFails_skipsRecapAndPlacesOriginal() {
+    @DisplayName("live 조회 실패 시 여유 0으로 재캡 재시도 — 예산은 자기 스코프 원본 BUY(allocator 승인액)로 한정")
+    void placeOrders_liveBalanceFails_retriesWithZeroFreeBudget() {
         when(buyOrderPriceCapper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null)).thenReturn(true);
         when(orderPort.sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(BigDecimal.ZERO);
@@ -376,7 +376,8 @@ class TradingOrderExecutorTest {
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
-        verify(buyOrderPriceCapper, times(1)).capIfNeeded(any(), anyBoolean(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), BigDecimal.ZERO);
         assertThat(result).hasSize(1);
     }
 
