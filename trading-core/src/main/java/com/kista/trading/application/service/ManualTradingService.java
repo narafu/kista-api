@@ -97,6 +97,9 @@ class ManualTradingService {
         // (접수는 아래에서 락 밖으로 — 다른 계좌는 병렬 유지)
         try {
             budgetLock.call(account.id(), () -> {
+                // 위 이중 실행 검사는 락 밖이라 그 사이 같은 사이클에 배치·다른 수동 실행이 저장했을 수 있다 — 저장 직전 재검사
+                if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())
+                    throw new AlreadyOrderedTodayException();
                 TradingOrderBudgetAllocator.Allocation allocation;
                 try {
                     allocation = budgetAllocator.allocate(

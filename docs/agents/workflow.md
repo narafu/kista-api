@@ -31,7 +31,7 @@
 ### MarketSession (수동 실행 시간대 판단 — `sharedkernel.MarketSession`)
 - `DIRECT`: 프리마켓+정규장 전 구간 — 주문 가능 (DST: 17:00~05:00 / 비DST: 18:00~06:00 KST)
 - `BLOCKED`: 장마감~프리마켓 전 — 주문 불가 (DST: 05:00~17:00 / 비DST: 06:00~18:00 KST)
-- `ManualTradingService.execute()` 수동 실행 진입 시 BLOCKED이면 `IllegalStateException` → 컨트롤러 503; DIRECT(개장 후)이면 AT_OPEN PLANNED 주문(INFINITE는 매도 선접수, VR은 매수·매도 사다리)을 `TradingOrderExecutor.placeAtOpenOrders()`로 즉시 접수한다 — 개장 스케쥴러와 동일하게 BUY cap 보정(`BuyOrderPriceCapper`)을 거친 뒤 접수되며, 반환은 `findPlannedOrPlacedByCycleAndDate`. SELL 가능수량 검증은 같은 계좌·거래일·ticker의 기존 PLANNED/PLACED 예약 수량과 신규 SELL 합계를 사용한다.
+- `ManualTradingService.execute()`는 서버에서 세션을 막지 않는다 — PLANNED 생성은 즉시 접수가 아니라 BLOCKED에도 허용(UI 버튼 활성화만 세션 기준). 그래서 마감·개장 배치와 겹칠 수 있고, 이중 실행 검사(같은 사이클 PLANNED/PLACED 존재 시 `AlreadyOrderedTodayException`)를 `AccountBudgetLock` 안에서 저장 직전 재검사한다(배치도 같은 락 안에서 저장 직전 기존 슬롯을 `TradingOrderSlots.excludeExisting`으로 다시 걸러, 수동 실행이 먼저 저장한 슬롯은 중복 저장하지 않고 접수만 한다). 개장 후(`dst.marketOpen()` 이후)이면 AT_OPEN PLANNED 주문(INFINITE는 매도 선접수, VR은 매수·매도 사다리)을 `TradingOrderExecutor.placeAtOpenOrders()`로 즉시 접수한다 — 개장 스케쥴러와 동일하게 BUY cap 보정(`BuyOrderPriceCapper`)을 거친 뒤 접수되며, 반환은 `findPlannedOrPlacedByCycleAndDate`. SELL 가능수량 검증은 같은 계좌·거래일·ticker의 기존 PLANNED/PLACED 예약 수량과 신규 SELL 합계를 사용한다.
 - `GET /api/market/session`: UI 수동 실행 버튼 활성화 판단용, `{ session: "DIRECT"|"BLOCKED", isDst: boolean }` 반환
 
 ### BuyOrderPriceCapper 보정 주문

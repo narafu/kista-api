@@ -218,6 +218,43 @@ class TradingServiceTest {
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader);
     }
 
+    // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 같은 슬롯을 저장했으면 배치는 다시 저장하지 않고 그 주문을 접수한다
+    @Test
+    void execute_slotSavedByManualAfterCandidateCollection_skipsDuplicateSaveButPlaces() throws InterruptedException {
+        BigDecimal startPrice = new BigDecimal("20.00");
+        Order template = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, startPrice, OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_NORMAL_BUY");
+        UUID manualId = UUID.randomUUID();
+        Order manualSaved = new Order(manualId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, startPrice,
+                OrderStatus.PLANNED, null, null, null).withLeg("TEST_NORMAL_BUY");
+
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00"))));
+        lenient().when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, startPrice));
+        lenient().when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(template.toPlanned()));
+        // 1번째(후보 수집)=빈 목록, 2번째(락 안 저장 직전 재검사)=수동 실행이 그 사이 저장한 같은 슬롯
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any(LocalDate.class)))
+                .thenReturn(List.of(), List.of(manualSaved));
+        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any(LocalDate.class)))
+                .thenReturn(List.of(manualSaved));
+        when(brokerOrderPort.place(any(), eq(ACCOUNT_REF))).thenReturn(brokerResult("ORD-M"));
+        lenient().when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+
+        service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
+
+        verify(orderPort, never()).saveAll(anyList());
+        verify(orderPort).markPlaced(eq(manualId), eq("ORD-M"));
+    }
+
     @Test
     void execute_normalFlow_allPortsCalledInOrder() throws InterruptedException {
         BigDecimal startPrice = new BigDecimal("20.00"); // 시작가 (Phase A, 04:00 KST)

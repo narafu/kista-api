@@ -247,11 +247,31 @@ class TradingCandidatePlanner {
     private Optional<AccountAllocation> allocateAndSave(List<TradingOrderBudgetAllocator.Candidate> accountCandidates,
                                                         BatchContext firstContext, LocalDate tradeDate)
             throws InterruptedException {
-        Optional<TradingOrderBudgetAllocator.Allocation> allocation = batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
-                () -> budgetAllocator.allocate(accountCandidates, tradeDate));
-        if (allocation.isEmpty()) return Optional.empty();
-
+        // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 저장한 슬롯을 배정 전에 제외 — 중복 주문과 예산 이중 계상 방지.
+        // 전부 겹친 사이클은 이미 PLANNED가 있으므로 배정 없이 접수 대상(saved)에 넣는다
         List<BatchContext> saved = new ArrayList<>();
+        Optional<List<TradingOrderBudgetAllocator.Candidate>> fresh = batchGuard.runSafely("기존 주문 재확인", firstContext, () -> {
+            List<TradingOrderBudgetAllocator.Candidate> remaining = new ArrayList<>();
+            for (TradingOrderBudgetAllocator.Candidate candidate : accountCandidates) {
+                List<PlannedOrder> orders = TradingOrderSlots.excludeExisting(candidate.orders(),
+                        orderPort.findPlannedOrPlacedByCycleAndDate(candidate.ctx().currentCycle().id(), tradeDate));
+                if (orders.isEmpty()) {
+                    saved.add(candidate.ctx());
+                } else {
+                    remaining.add(orders.size() == candidate.orders().size() ? candidate : candidate.withOrders(orders));
+                }
+            }
+            return remaining;
+        });
+        if (fresh.isEmpty()) return Optional.empty();
+
+        Optional<TradingOrderBudgetAllocator.Allocation> allocation = batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
+                () -> budgetAllocator.allocate(fresh.get(), tradeDate));
+        if (allocation.isEmpty()) { // 배정 실패여도 수동 실행이 이미 채운 사이클은 접수 대상으로 남긴다
+            return Optional.of(new AccountAllocation(
+                    new TradingOrderBudgetAllocator.Allocation(List.of(), List.of(), List.of()), saved));
+        }
+
         for (TradingOrderBudgetAllocator.Candidate approved : allocation.get().approved()) {
             batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
                 orderPlanner.savePlannedOrders(

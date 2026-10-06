@@ -254,14 +254,36 @@ class ManualTradingServiceTest {
                 .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of()); // AT_OPEN 없음(BUY뿐) — 개장 후에만 호출되므로 lenient
-        // 1번째 호출(이중 실행 방지 가드)=빈 목록, 2번째 호출(최종 반환)=저장된 주문
+        // 1번째(이중 실행 방지 가드)·2번째(락 안 재검사)=빈 목록, 3번째(최종 반환)=저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
-                .thenReturn(List.of(), List.of(savedOrder));
+                .thenReturn(List.of(), List.of(), List.of(savedOrder));
 
         List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
 
         verify(orderPort).saveAll(anyList());
         assertThat(orders).hasSize(1);
+    }
+
+    // 락 밖 이중 실행 검사 이후 같은 사이클에 배치가 먼저 저장했으면 락 안 재검사에서 거부 — 같은 사이클 중복 주문 방지
+    @Test
+    void execute_cycleOrderedWhileWaitingForLock_throwsAlreadyOrderedToday() {
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderStatus.PLANNED, null, null, null);
+        Order batchSaved = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
+                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderStatus.PLANNED, null, null, null);
+        lenient().when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate.toPlanned()));
+        // 1번째(락 밖 가드)=빈 목록, 2번째(락 안 재검사)=배치가 그 사이 저장한 주문
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
+                .thenReturn(List.of(), List.of(batchSaved));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(AlreadyOrderedTodayException.class);
+        verify(orderPort, never()).saveAll(anyList());
     }
 
     // 같은 계좌의 배치 승인·재캡과 live 여유분을 이중 사용하지 않도록 allocator 승인~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다
@@ -324,7 +346,7 @@ class ManualTradingServiceTest {
                 OrderDirection.BUY, 1, new BigDecimal("52.50"), OrderStatus.PLANNED, null, null, null);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
-                .thenReturn(List.of(), List.of(savedOrder));
+                .thenReturn(List.of(), List.of(), List.of(savedOrder));
 
         List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
 
@@ -416,9 +438,9 @@ class ManualTradingServiceTest {
 
         when(strategyPort.findByIdOrThrow(vrStrat.id())).thenReturn(vrStrat);
         when(strategyCyclePort.requireLatestByStrategyId(vrStrat.id())).thenReturn(vrCycle);
-        // 1번째 호출: 이중 실행 방지 가드 → 빈 목록, 2번째 호출: 최종 반환 → 저장된 주문
+        // 1번째(이중 실행 방지 가드)·2번째(락 안 재검사)=빈 목록, 3번째(최종 반환)=저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(vrCycle.id()), any()))
-                .thenReturn(List.of(), List.of(vrBuyPlanned, vrSellPlanned));
+                .thenReturn(List.of(), List.of(), List.of(vrBuyPlanned, vrSellPlanned));
         // 잔고: cycle_position 이력에서 로드
         when(cyclePositionPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
         when(cyclePositionPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
