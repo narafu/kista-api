@@ -8,52 +8,114 @@
         integrity="sha384-IWROdLKRsN1UuJywMlWl7/blXQ8GEooN2n7dzTxfEPd7ybYIKCUJ2Ol/1Gpf3YV4" crossorigin="anonymous"></script>
 <style>
   :root {
-    --bg: #f7f7f5; --panel: #ffffff; --fg: #222; --muted: #777; --line: #ddd;
-    --api: #e8f0fe; --tc: #fdf0e6; --shared: #eef6ee; --node: #ffffff; --node-border: #888;
-    --uses: #3b6fd8; --event: #c2410c; --entity: #7c3aed; --default: #8a8a8a; --hl: #111;
+    --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --fg: #1d2129; --muted: #6b7280; --line: #e3e5e9;
+    --api: #4f63d2; --api-tint: #eef0fc; --tc: #c9821a; --tc-tint: #fdf4e7; --shared: #2f9e5a; --shared-tint: #ebf7f0;
+    --uses: #0e9384; --event: #e0533d; --entity: #8b5cf6; --default: #9ca3af;
+    --focus: #111827; --shadow: 0 1px 2px rgb(0 0 0 / .06), 0 2px 8px rgb(0 0 0 / .04);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #17181a; --panel: #1f2023; --fg: #e6e6e6; --muted: #9a9a9a; --line: #333;
-      --api: #1d2a40; --tc: #3a2a1c; --shared: #1f3322; --node: #2a2b2f; --node-border: #777;
-      --uses: #6f9bff; --event: #ff8a4c; --entity: #b08cff; --default: #8a8a8a; --hl: #fff;
+      --bg: #121417; --surface: #1b1e23; --surface-2: #22262c; --fg: #e7e9ec; --muted: #9aa1ab; --line: #2e333a;
+      --api: #8796f0; --api-tint: #1f2440; --tc: #e6a54a; --tc-tint: #33281a; --shared: #5cc489; --shared-tint: #1a3125;
+      --uses: #2dd4bf; --event: #ff7a63; --entity: #a78bfa; --default: #6b7280;
+      --focus: #f9fafb; --shadow: none;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 13px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); display: grid;
-         grid-template-rows: auto 1fr; grid-template-columns: 1fr 420px; height: 100vh; }
-  header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 8px 16px;
-           border-bottom: 1px solid var(--line); background: var(--panel); }
-  header h1 { font-size: 15px; margin: 0 8px 0 0; }
-  header input[type=search] { padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); }
-  header label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
-  .sw { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
-  #cy { min-height: 0; }
-  aside { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 12px 16px; }
-  aside h2 { font-size: 16px; margin: 0 0 4px; }
-  aside h3 { font-size: 13px; margin: 16px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  aside .tag { display: inline-block; padding: 0 6px; margin: 2px 4px 2px 0; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
-  details { margin: 2px 0; }
-  summary { cursor: pointer; }
-  summary .cnt { color: var(--muted); }
-  ul { margin: 2px 0 6px; padding-left: 18px; }
-  li { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
-  .type { font-size: 11px; font-weight: 600; }
-  .muted { color: var(--muted); }
-  @media (max-width: 800px) {
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.5 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
+         display: grid; grid-template-rows: auto 1fr; grid-template-columns: 1fr 440px; }
+  code, .mono { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 12px; }
+
+  header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 16px;
+           background: var(--surface); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  header h1 small { font-weight: 500; color: var(--muted); margin-left: 6px; font-size: 13px; }
+  .search { padding: 6px 10px; width: 180px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--fg); font: inherit; }
+  .search:focus { outline: 2px solid var(--api); outline-offset: -1px; }
+  .group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .group-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+          cursor: pointer; user-select: none; font-size: 13px; color: var(--muted); background: var(--surface); }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip:has(input:checked) { color: var(--fg); background: var(--surface-2); border-color: color-mix(in srgb, var(--fg) 25%, transparent); }
+  .chip:has(input:focus-visible) { outline: 2px solid var(--api); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .chip:not(:has(input:checked)) .dot { opacity: .3; }
+  .btn { padding: 5px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; }
+  .btn:hover { background: var(--surface-2); }
+  .spacer { flex: 1; }
+
+  #stage { position: relative; min-height: 0; }
+  #cy { position: absolute; inset: 0; }
+  .legend { position: absolute; left: 16px; bottom: 16px; display: flex; gap: 14px; padding: 8px 12px; font-size: 12px; color: var(--muted);
+            background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sq { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 2px solid; }
+
+  aside { background: var(--surface); border-left: 1px solid var(--line); overflow: auto; }
+  .p-head { position: sticky; top: 0; z-index: 1; padding: 16px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .p-head h2 { margin: 0; font-size: 20px; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .p-body { padding: 4px 20px 24px; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .stat { padding: 8px 10px; background: var(--surface-2); border-radius: 8px; }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  h3 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 20px 0 8px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { padding: 2px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
+  .empty { color: var(--muted); font-size: 13px; margin: 0; }
+
+  details.dep { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; background: var(--surface); }
+  details.dep[open] { background: var(--surface-2); }
+  details.dep summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; }
+  details.dep summary::-webkit-details-marker { display: none; }
+  details.dep summary::before { content: "▸"; color: var(--muted); font-size: 11px; transition: transform .15s; }
+  details.dep[open] summary::before { transform: rotate(90deg); }
+  .mod-link { font-weight: 600; color: var(--fg); text-decoration: none; border-bottom: 1px dashed transparent; }
+  .mod-link:hover { border-bottom-color: currentColor; }
+  .bar { flex: 1; display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--line); min-width: 40px; }
+  .count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 28px; text-align: right; }
+  .dep-body { padding: 0 10px 8px 28px; }
+  .type-row { margin-top: 6px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .pairs { margin: 4px 0 0; padding: 0; list-style: none; }
+  .pairs li { padding: 2px 0; word-break: break-all; }
+  .arrow { color: var(--muted); margin: 0 4px; }
+
+  table.rank { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.rank th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  table.rank td { padding: 6px; border-bottom: 1px solid var(--line); }
+  table.rank .num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.rank tbody tr { cursor: pointer; }
+  table.rank tbody tr:hover { background: var(--surface-2); }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+
+  @media (max-width: 900px) {
     body { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; }
     aside { border-left: 0; border-top: 1px solid var(--line); }
+    .legend { display: none; }
   }
 </style>
 </head>
 <body>
 <header>
-  <h1>KISTA 모듈 그래프</h1>
-  <input type="search" id="search" placeholder="모듈 검색">
-  <span id="types"></span>
-  <label><input type="checkbox" id="hideInfra" checked> platform·sharedkernel 숨김</label>
+  <h1>KISTA 모듈 그래프<small id="summary"></small></h1>
+  <input type="search" class="search" id="search" placeholder="모듈 검색…" aria-label="모듈 검색">
+  <div class="group" id="types"><span class="group-label">의존 종류</span></div>
+  <label class="chip"><input type="checkbox" id="hideInfra" checked>platform·sharedkernel 숨김</label>
+  <span class="spacer"></span>
+  <button class="btn" id="fit">전체 보기</button>
 </header>
-<div id="cy"></div>
+<div id="stage">
+  <div id="cy"></div>
+  <div class="legend">
+    <span><i class="sq" style="border-color:var(--api);background:var(--api-tint)"></i>:api</span>
+    <span><i class="sq" style="border-color:var(--tc);background:var(--tc-tint)"></i>:trading-core</span>
+    <span><i class="sq" style="border-color:var(--shared);background:var(--shared-tint)"></i>:shared</span>
+    <span>엣지 굵기 = 클래스 의존 수</span>
+  </div>
+</div>
 <aside id="panel"></aside>
 <script>
 const DATA = /*__DATA__*/null;
@@ -67,136 +129,238 @@ const TYPES = {
 };
 const TYPE_PRIORITY = ['EVENT_LISTENER', 'USES_COMPONENT', 'ENTITY', 'DEFAULT']; // 엣지 색은 가장 의미 있는 종류로
 const INFRA = new Set(['platform', 'sharedkernel']); // 거의 모든 모듈이 참조하는 노이즈 모듈
-const PROJECTS = { ':api': '--api', ':trading-core': '--tc', ':shared': '--shared' };
+// Gradle 서브프로젝트별 색·배치 영역(모델 좌표) — api 좌상, trading-core 우상, shared 하단 중앙
+const PROJECTS = {
+  ':api': { accent: '--api', tint: '--api-tint', box: { x1: 0, y1: 0, x2: 520, y2: 520 } },
+  ':trading-core': { accent: '--tc', tint: '--tc-tint', box: { x1: 640, y1: 0, x2: 1240, y2: 520 } },
+  ':shared': { accent: '--shared', tint: '--shared-tint', box: { x1: 300, y1: 640, x2: 940, y2: 720 } },
+};
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const byName = Object.fromEntries(DATA.modules.map(m => [m.name, m]));
 const enabled = new Set(Object.keys(TYPES));
+const $ = id => document.getElementById(id);
 
-// 종류 필터 체크박스
-document.getElementById('types').innerHTML = Object.entries(TYPES).map(([k, [label, color]]) =>
-  `<label><input type="checkbox" data-type="${k}" checked><span class="sw" style="background:var(${color})"></span>${label}</label>`).join(' ');
+// 의존 종류 필터 칩
+$('types').insertAdjacentHTML('beforeend', Object.entries(TYPES).map(([k, [label, color]]) =>
+  `<label class="chip"><input type="checkbox" data-type="${k}" checked><i class="dot" style="background:var(${color})"></i>${label}</label>`).join(''));
 
-const hidden = name => document.getElementById('hideInfra').checked && INFRA.has(name);
+const hidden = name => $('hideInfra').checked && INFRA.has(name);
+const visible = d => enabled.has(d.type) && !hidden(d.target); // 패널도 그래프 필터와 동일하게
+const outgoing = name => byName[name].deps.filter(visible);
+const incoming = name => DATA.modules.filter(s => !hidden(s.name))
+  .flatMap(s => s.deps.filter(d => d.target === name && visible(d)).map(d => ({ ...d, from: s.name })));
 
 // 현재 필터 기준으로 모듈 쌍별 엣지 집계
 function edges() {
   const out = [];
   for (const m of DATA.modules) {
     if (hidden(m.name)) continue;
-    const groups = {};
-    for (const d of m.deps) {
-      if (!enabled.has(d.type) || hidden(d.target)) continue;
-      (groups[d.target] ??= []).push(d);
-    }
-    for (const [target, deps] of Object.entries(groups)) {
+    for (const [target, deps] of Object.entries(Object.groupBy(outgoing(m.name), d => d.target))) {
       const type = TYPE_PRIORITY.find(t => deps.some(d => d.type === t));
-      out.push({ data: { id: `${m.name}->${target}`, source: m.name, target, count: deps.length, type,
-                         color: css(TYPES[type][1]), width: Math.min(1 + Math.log2(deps.length + 1), 6) } });
+      out.push({ data: { id: `${m.name}->${target}`, source: m.name, target, count: deps.length,
+                         color: css(TYPES[type][1]), width: Math.min(1 + Math.log2(deps.length + 1) * 1.2, 8) } });
     }
   }
   return out;
 }
 
 function elements() {
-  const parents = Object.entries(PROJECTS).map(([p, color]) => ({ data: { id: p, label: p, color: css(color) } }));
-  const nodes = DATA.modules.filter(m => !hidden(m.name))
-    .map(m => ({ data: { id: m.name, label: m.name, parent: m.project } }));
+  const parents = Object.entries(PROJECTS).map(([p, c]) =>
+    ({ data: { id: p, label: p, accent: css(c.accent), tint: css(c.tint) } }));
+  const nodes = DATA.modules.filter(m => !hidden(m.name)).map(m => ({
+    data: { id: m.name, label: m.name, parent: m.project, accent: css(PROJECTS[m.project].accent),
+            weight: outgoing(m.name).length + incoming(m.name).length },
+  }));
   return [...parents, ...nodes, ...edges()];
 }
 
 const cy = cytoscape({
-  container: document.getElementById('cy'),
-  wheelSensitivity: 0.3,
+  container: $('cy'),
+  wheelSensitivity: 0.25,
+  minZoom: 0.3, maxZoom: 2.5,
   style: [
-    { selector: 'node', style: { label: 'data(label)', 'text-valign': 'center', 'font-size': 12, color: css('--fg'),
-        'background-color': css('--node'), 'border-width': 1, 'border-color': css('--node-border'),
-        shape: 'round-rectangle', width: 'label', height: 22, padding: 8 } },
-    { selector: ':parent', style: { 'background-color': 'data(color)', 'background-opacity': 1, 'border-color': css('--line'),
-        'text-valign': 'top', 'font-weight': 600, 'font-size': 13, padding: 16 } },
-    { selector: 'edge', style: { width: 'data(width)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
-        'target-arrow-shape': 'triangle', 'curve-style': 'bezier', opacity: 0.7 } },
-    { selector: '.faded', style: { opacity: 0.1 } },
-    { selector: 'node.focus', style: { 'border-width': 3, 'border-color': css('--hl') } },
-    { selector: 'edge.focus', style: { opacity: 1, label: 'data(count)', 'font-size': 10, color: css('--fg'),
-        'text-background-color': css('--panel'), 'text-background-opacity': 1 } },
+    { selector: 'node', style: {
+        label: 'data(label)', 'text-valign': 'center', 'font-size': 13, 'font-weight': 600, color: css('--fg'),
+        'font-family': getComputedStyle(document.body).fontFamily,
+        'background-color': css('--surface'), 'border-width': 2, 'border-color': 'data(accent)',
+        shape: 'round-rectangle', width: 'label', height: 30, padding: 12,
+        'transition-property': 'opacity, border-width', 'transition-duration': 150 } },
+    { selector: ':parent', style: {
+        'background-color': 'data(tint)', 'background-opacity': 1, 'border-width': 1.5, 'border-style': 'dashed',
+        'border-color': 'data(accent)', color: 'data(accent)', 'text-valign': 'top', 'text-halign': 'center',
+        'text-margin-y': -6, 'font-size': 15, 'font-weight': 700, padding: 28, shape: 'round-rectangle' } },
+    { selector: 'edge', style: {
+        width: 'data(width)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
+        'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, 'curve-style': 'bezier', opacity: 0.45,
+        'transition-property': 'opacity', 'transition-duration': 150 } },
+    { selector: 'edge.hover', style: { opacity: 0.9 } },
+    { selector: 'node.hover', style: { 'border-width': 3 } },
+    { selector: '.faded', style: { opacity: 0.08 } },
+    { selector: ':parent.faded', style: { opacity: 0.35 } },
+    { selector: 'node.focus', style: { 'border-width': 3 } },
+    { selector: 'node.selected', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
+    { selector: 'edge.focus', style: {
+        opacity: 1, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
+        'text-background-color': css('--surface'), 'text-background-opacity': 1, 'text-background-padding': 3,
+        'text-background-shape': 'round-rectangle', 'text-border-width': 1, 'text-border-color': css('--line'), 'text-border-opacity': 1 } },
   ],
 });
+
+// 서브프로젝트 영역마다 의존이 가장 많은 모듈을 가운데, 나머지를 원형으로 배치 — 매번 같은 위치(결정적)
+function layout() {
+  for (const [p, { box }] of Object.entries(PROJECTS)) {
+    const kids = cy.getElementById(p).children();
+    if (!kids.length) continue;
+    const hub = kids.max(n => n.data('weight')).ele;
+    const opts = kids.length <= 3
+      ? { name: 'grid', rows: 1 }
+      : { name: 'concentric', concentric: n => (n === hub ? 2 : 1), levelWidth: () => 1, minNodeSpacing: 40 };
+    kids.layout({ ...opts, boundingBox: box, animate: false, fit: false }).run();
+  }
+  cy.fit(undefined, 40);
+}
 
 function render() {
   cy.elements().remove();
   cy.add(elements());
-  cy.layout({ name: 'cose', animate: false, nodeRepulsion: () => 12000, idealEdgeLength: () => 90,
-              nestingFactor: 0.8, padding: 20 }).run();
-  showOverview();
+  layout();
+  $('summary').textContent = `· 모듈 ${cy.nodes().not(':parent').length} · 의존 쌍 ${cy.edges().length}`;
+  clearFocus();
 }
 
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const typeTag = t => `<span class="type" style="color:var(${TYPES[t][1]})">${TYPES[t][0]}</span>`;
+const typeDot = t => `<i class="dot" style="background:var(${TYPES[t][1]})"></i>`;
+const projectBadge = p => `<span class="badge" style="color:var(${PROJECTS[p].accent});background:var(${PROJECTS[p].tint})">${esc(p)}</span>`;
+const modLink = name => `<a href="#" class="mod-link" data-mod="${esc(name)}">${esc(name)}</a>`;
+const tags = xs => xs.length ? `<div class="tags">${xs.map(x => `<span class="tag mono">${esc(x)}</span>`).join('')}</div>` : '<p class="empty">없음</p>';
 
-// 대상(또는 출처) 모듈 → 종류 → 클래스 쌍 목록
-function depTree(deps, keyOf) {
-  const groups = {};
-  for (const d of deps) ((groups[keyOf(d)] ??= {})[d.type] ??= []).push(d);
-  return Object.entries(groups).sort((a, b) => count(b[1]) - count(a[1])).map(([mod, types]) =>
-    `<details><summary><b>${esc(mod)}</b> <span class="cnt">(${count(types)})</span></summary>` +
-    Object.entries(types).map(([t, ds]) => `<div>${typeTag(t)} <span class="muted">${ds.length}</span><ul>` +
-      ds.map(d => `<li>${esc(d.source)} → ${esc(d.targetType)}</li>`).join('') + '</ul></div>').join('') +
-    '</details>').join('') || '<p class="muted">없음</p>';
+// 종류 비율 막대
+function bar(deps) {
+  return `<span class="bar">${TYPE_PRIORITY.map(t => {
+    const n = deps.filter(d => d.type === t).length;
+    return n ? `<i style="width:${n / deps.length * 100}%;background:var(${TYPES[t][1]})" title="${TYPES[t][0]} ${n}"></i>` : '';
+  }).join('')}</span>`;
 }
-const count = types => Object.values(types).reduce((n, ds) => n + ds.length, 0);
-const visible = d => enabled.has(d.type) && !hidden(d.target); // 패널도 그래프 필터와 동일하게
-const tags = xs => xs.length ? xs.map(x => `<span class="tag">${esc(x)}</span>`).join('') : '<span class="muted">없음</span>';
+
+// 상대 모듈 → 종류 → 클래스 쌍
+function depList(deps, keyOf, open = false) {
+  const groups = Object.entries(Object.groupBy(deps, keyOf)).sort((a, b) => b[1].length - a[1].length);
+  if (!groups.length) return '<p class="empty">없음</p>';
+  return groups.map(([mod, ds]) => `
+    <details class="dep"${open ? ' open' : ''}>
+      <summary>${modLink(mod)}${bar(ds)}<span class="count">${ds.length}</span></summary>
+      <div class="dep-body">${TYPE_PRIORITY.filter(t => ds.some(d => d.type === t)).map(t => {
+        const pairs = ds.filter(d => d.type === t);
+        return `<div class="type-row">${typeDot(t)}${TYPES[t][0]} <span class="count">${pairs.length}</span></div>
+          <ul class="pairs mono">${pairs.map(d => `<li>${esc(d.source)}<span class="arrow">→</span>${esc(d.targetType)}</li>`).join('')}</ul>`;
+      }).join('')}</div>
+    </details>`).join('');
+}
 
 function showModule(name) {
   const m = byName[name];
-  const out = m.deps.filter(visible);
-  const incoming = DATA.modules.filter(s => !hidden(s.name)).flatMap(s => s.deps.filter(d => d.target === name && visible(d)).map(d => ({ ...d, from: s.name })));
-  document.getElementById('panel').innerHTML = `
-    <h2>${esc(name)}</h2><div class="muted">${esc(m.project)}</div>
-    <h3>NamedInterface</h3>${tags(m.namedInterfaces)}
-    <h3>나가는 의존 (${out.length})</h3>${depTree(out, d => d.target)}
-    <h3>들어오는 의존 (${incoming.length})</h3>${depTree(incoming, d => d.from)}
-    <h3>구독 이벤트</h3>${tags(m.listenedEvents)}`;
+  const out = outgoing(name), inc = incoming(name);
+  $('panel').innerHTML = `
+    <div class="p-head">
+      <h2>${esc(name)} ${projectBadge(m.project)}</h2>
+      <div class="stats">
+        <div class="stat"><b>${out.length}</b><span>나가는 의존</span></div>
+        <div class="stat"><b>${inc.length}</b><span>들어오는 의존</span></div>
+        <div class="stat"><b>${m.listenedEvents.length}</b><span>구독 이벤트</span></div>
+      </div>
+    </div>
+    <div class="p-body">
+      <h3>NamedInterface</h3>${tags(m.namedInterfaces)}
+      <h3>이 모듈이 의존하는 곳</h3>${depList(out, d => d.target)}
+      <h3>이 모듈에 의존하는 곳</h3>${depList(inc, d => d.from)}
+      <h3>구독 이벤트</h3>${tags(m.listenedEvents)}
+    </div>`;
+  $('panel').scrollTop = 0;
 }
 
 function showEdge(source, target) {
-  const deps = byName[source].deps.filter(d => d.target === target && visible(d));
-  document.getElementById('panel').innerHTML = `
-    <h2>${esc(source)} → ${esc(target)}</h2><div class="muted">클래스 단위 의존 ${deps.length}건</div>
-    ${depTree(deps, d => d.target).replace('<details>', '<details open>')}`;
+  const deps = outgoing(source).filter(d => d.target === target);
+  $('panel').innerHTML = `
+    <div class="p-head">
+      <h2>${modLink(source)}<span class="arrow">→</span>${modLink(target)}</h2>
+      <p class="hint">클래스 단위 의존 ${deps.length}건</p>
+    </div>
+    <div class="p-body"><h3>상세</h3>${depList(deps, d => d.target, true)}</div>`;
+  $('panel').scrollTop = 0;
 }
 
+// 초기 화면: 의존이 많은 순 모듈 목록 — 어디서부터 볼지 안내
 function showOverview() {
-  document.getElementById('panel').innerHTML = `
-    <h2>모듈 ${DATA.modules.length}개</h2>
-    <p class="muted">노드를 클릭하면 그 모듈의 의존을, 엣지를 클릭하면 두 모듈 사이 클래스 단위 의존을 보여준다.
-    엣지 굵기는 클래스 의존 건수, 색은 가장 의미 있는 의존 종류다. 빈 곳을 클릭하면 초기화.</p>
-    <p class="muted">테스트(<code>ModulithArchitectureTest</code>) 실행 시 자동 생성 — 직접 수정하지 말 것.</p>`;
+  const rows = cy.nodes().not(':parent').map(n => {
+    const name = n.id();
+    return { name, project: byName[name].project, out: outgoing(name).length, inc: incoming(name).length };
+  }).sort((a, b) => (b.out + b.inc) - (a.out + a.inc));
+  $('panel').innerHTML = `
+    <div class="p-head">
+      <h2>모듈 개요</h2>
+      <p class="hint">노드를 클릭하면 모듈 상세, 엣지를 클릭하면 두 모듈 사이 클래스 의존을 본다. 빈 곳을 클릭하면 이 화면으로 돌아온다.</p>
+    </div>
+    <div class="p-body">
+      <h3>의존이 많은 순</h3>
+      <table class="rank"><thead><tr><th>모듈</th><th>프로젝트</th><th class="num">나감</th><th class="num">들어옴</th></tr></thead>
+      <tbody>${rows.map(r => `<tr data-mod="${esc(r.name)}"><td><b>${esc(r.name)}</b></td><td>${projectBadge(r.project)}</td>
+        <td class="num">${r.out}</td><td class="num">${r.inc}</td></tr>`).join('')}</tbody></table>
+      <p class="hint" style="margin-top:16px">테스트(<code>ModulithArchitectureTest</code>) 실행 시 자동 생성 — 직접 수정하지 말 것.</p>
+    </div>`;
 }
 
 // 선택 요소와 이웃만 남기고 흐리게
 function focus(ele) {
-  cy.elements().removeClass('focus faded');
+  cy.elements().removeClass('focus faded selected');
   const keep = ele.isNode() ? ele.closedNeighborhood() : ele.union(ele.connectedNodes());
-  cy.elements().not(keep).not(':parent').addClass('faded');
+  cy.elements().not(keep).addClass('faded');
   keep.addClass('focus');
+  if (ele.isNode()) ele.addClass('selected');
+}
+function clearFocus() {
+  cy.elements().removeClass('focus faded selected');
+  showOverview();
+}
+function selectModule(name) {
+  const n = cy.getElementById(name);
+  if (!n.length) return;
+  focus(n);
+  showModule(name);
+  cy.animate({ center: { eles: n }, duration: 250 });
 }
 
-cy.on('tap', 'node', e => { if (e.target.isParent()) return; focus(e.target); showModule(e.target.id()); });
+cy.on('tap', 'node', e => { if (!e.target.isParent()) { focus(e.target); showModule(e.target.id()); } });
 cy.on('tap', 'edge', e => { focus(e.target); showEdge(e.target.data('source'), e.target.data('target')); });
-cy.on('tap', e => { if (e.target === cy) { cy.elements().removeClass('focus faded'); showOverview(); } });
+cy.on('tap', e => { if (e.target === cy) clearFocus(); });
+cy.on('mouseover', 'node, edge', e => {
+  if (e.target.isNode() && e.target.isParent()) return;
+  e.target.addClass('hover');
+  $('cy').style.cursor = 'pointer';
+});
+cy.on('mouseout', 'node, edge', e => { e.target.removeClass('hover'); $('cy').style.cursor = ''; });
+
+// 패널 안 모듈 이름·개요 행 클릭 → 해당 모듈로 이동
+$('panel').addEventListener('click', e => {
+  const el = e.target.closest('[data-mod]');
+  if (!el) return;
+  e.preventDefault();
+  selectModule(el.dataset.mod);
+});
 
 document.querySelectorAll('[data-type]').forEach(cb => cb.addEventListener('change', () => {
   cb.checked ? enabled.add(cb.dataset.type) : enabled.delete(cb.dataset.type);
   render();
 }));
-document.getElementById('hideInfra').addEventListener('change', render);
-document.getElementById('search').addEventListener('input', e => {
+$('hideInfra').addEventListener('change', render);
+$('fit').addEventListener('click', () => cy.animate({ fit: { padding: 40 }, duration: 250 }));
+$('search').addEventListener('input', e => {
   const q = e.target.value.trim().toLowerCase();
-  const hit = q ? cy.nodes().not(':parent').filter(n => n.id().includes(q)) : cy.collection();
-  cy.elements().removeClass('focus faded');
-  if (hit.length === 1) { focus(hit); showModule(hit.id()); }
-  else if (hit.length) { cy.elements().not(hit).not(':parent').addClass('faded'); hit.addClass('focus'); }
+  if (!q) return clearFocus();
+  const hit = cy.nodes().not(':parent').filter(n => n.id().includes(q));
+  if (hit.length === 1) return selectModule(hit.id());
+  cy.elements().removeClass('focus faded selected');
+  cy.elements().not(hit).not(':parent').addClass('faded');
+  hit.addClass('focus');
 });
 
 render();
