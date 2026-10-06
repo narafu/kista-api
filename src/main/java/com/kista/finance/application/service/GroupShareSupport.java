@@ -1,5 +1,6 @@
 package com.kista.finance.application.service;
 
+import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.GroupShareable;
 
 import java.util.Optional;
@@ -35,7 +36,7 @@ final class GroupShareSupport {
             return Optional.empty(); // 이미 같은 그룹에 공유된 상태
         }
         if (existing.groupId() != null) {
-            throw new IllegalStateException("이미 다른 그룹에 공유된 항목입니다");
+            throw new FinanceGroup.MembershipConflictException("이미 다른 그룹에 공유된 항목입니다.");
         }
         return Optional.of(existing.withGroupId(groupId));
     }

@@ -71,7 +71,7 @@ public class FinanceGroupPersistenceAdapter implements FinanceGroupPort {
         try {
             memberJpaRepository.insertIfAbsent(groupId, userId, role.name());
         } catch (DataIntegrityViolationException e) {
-            throw new IllegalStateException("이미 다른 그룹에 소속되어 있습니다 — 먼저 탈퇴해야 합니다", e);
+            throw new FinanceGroup.MembershipConflictException("이미 다른 그룹에 소속되어 있습니다. 먼저 탈퇴해 주세요.", e);
         }
     }
 

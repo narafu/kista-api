@@ -121,7 +121,7 @@ class FinanceGroupServiceTest {
 
     // 회귀(플랜 항목 7): 1인1그룹 강제 — 이미 다른 그룹에 소속된 사용자가 초대를 수락하려 하면 거부돼야 한다.
     @Test
-    @DisplayName("이미 다른 그룹에 소속된 유저가 ACCEPTED 응답하면 IllegalStateException, addMember 호출 안 됨")
+    @DisplayName("이미 다른 그룹에 소속된 유저가 ACCEPTED 응답하면 MembershipConflictException(409), addMember 호출 안 됨")
     void respond_accepted_alreadyBelongsToAnotherGroup_rejected() {
         FinanceGroupInvitation invitation = pendingInvitation(Instant.now().plus(1, ChronoUnit.HOURS));
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
@@ -129,7 +129,7 @@ class FinanceGroupServiceTest {
 
         assertThatThrownBy(() -> financeGroupService.respondToInvitation(
                 invitation.code(), targetUserId, FinanceGroupInvitation.Status.ACCEPTED))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(FinanceGroup.MembershipConflictException.class);
 
         verify(financeGroupPort, never()).addMember(any(), any(), any());
         verify(financeGroupPort, never()).updateInvitationStatus(any(), any(), any());

@@ -7,6 +7,7 @@ import com.kista.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceCategory;
+import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.platform.web.ErrorCode;
@@ -65,6 +66,7 @@ public class GlobalExceptionHandler {
         Map.entry(FinanceAccount.LinkedAssetSnapshotsException.class,  new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceCategory.DuplicateNameException.class,        new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceGroupInvitation.InvalidInvitationStateException.class, new Mapping(HttpStatus.CONFLICT,  "Conflict")),
+        Map.entry(FinanceGroup.MembershipConflictException.class,       new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(MonthlyClosing.MonthClosedException.class,           new Mapping(HttpStatus.CONFLICT,           "Conflict", ErrorCode.MONTH_CLOSED))
     ));
 

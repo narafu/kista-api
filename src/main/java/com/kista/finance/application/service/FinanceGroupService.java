@@ -80,7 +80,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
         if (status == FinanceGroupInvitation.Status.ACCEPTED) {
             // 1인1그룹 강제 — 이미 다른 그룹에 소속돼 있으면 수락 자체를 거부한다.
             if (financeGroupPort.findCurrentGroupId(userId).isPresent()) {
-                throw new IllegalStateException("이미 다른 그룹에 소속되어 있습니다 — 먼저 탈퇴해야 합니다");
+                throw new FinanceGroup.MembershipConflictException("이미 다른 그룹에 소속되어 있습니다. 먼저 탈퇴해 주세요.");
             }
             financeGroupPort.addMember(invitation.groupId(), userId, FinanceGroup.MemberRole.MEMBER);
         }

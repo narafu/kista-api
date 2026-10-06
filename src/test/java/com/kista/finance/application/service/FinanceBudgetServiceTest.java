@@ -1,5 +1,6 @@
 package com.kista.finance.application.service;
 
+import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceBudget;
 import com.kista.finance.domain.model.FinanceBudgetCommand;
 import com.kista.finance.domain.model.FinanceCategory;
@@ -270,7 +271,7 @@ class FinanceBudgetServiceTest {
     }
 
     @Test
-    @DisplayName("shareToGroup은 이미 다른 그룹에 공유돼 있으면 IllegalStateException")
+    @DisplayName("shareToGroup은 이미 다른 그룹에 공유돼 있으면 MembershipConflictException(409)")
     void shareToGroup_alreadySharedToAnotherGroup_throwsIllegalState() {
         FinanceBudget alreadyShared = new FinanceBudget(budgetId, UUID.randomUUID(), categoryId, userId,
                 LocalDate.of(2026, 1, 1), null, 500_000L, null);
@@ -278,7 +279,7 @@ class FinanceBudgetServiceTest {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
 
         assertThatThrownBy(() -> budgetService.shareToGroup(budgetId, userId))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(FinanceGroup.MembershipConflictException.class);
 
         verify(budgetPort, never()).save(any());
     }

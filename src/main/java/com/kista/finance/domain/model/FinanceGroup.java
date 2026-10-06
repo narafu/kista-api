@@ -13,4 +13,15 @@ public record FinanceGroup(
     public enum MemberRole {
         OWNER, MEMBER
     }
+
+    // 1인1그룹·단일 그룹 공유 규칙과 충돌 — 이미 다른 그룹 소속이거나 다른 그룹에 공유된 항목, GlobalExceptionHandler 409 매핑
+    public static class MembershipConflictException extends RuntimeException {
+        public MembershipConflictException(String message) {
+            super(message);
+        }
+
+        public MembershipConflictException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
 }
