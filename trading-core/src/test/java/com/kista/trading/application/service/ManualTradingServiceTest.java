@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -91,6 +92,8 @@ class ManualTradingServiceTest {
             new BigDecimal("20.00"), 10, null, null
     );
 
+    AccountBudgetLock budgetLock = spy(new AccountBudgetLock()); // 실제 락 + 구간 추적
+
     @BeforeEach
     void setUp() {
         // 실제 헬퍼 컴포넌트 조립 — TradingServiceTest 패턴 동일
@@ -118,7 +121,7 @@ class ManualTradingServiceTest {
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 priceFetcher, planBuilder, priceCapper, budgetAllocator,
-                orderPlanner, orderExecutor, eventPublisher);
+                orderPlanner, orderExecutor, budgetLock, eventPublisher);
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 100));
 
@@ -259,6 +262,36 @@ class ManualTradingServiceTest {
 
         verify(orderPort).saveAll(anyList());
         assertThat(orders).hasSize(1);
+    }
+
+    // 같은 계좌의 배치 승인·재캡과 live 여유분을 이중 사용하지 않도록 allocator 승인~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다
+    @Test
+    void execute_allocationAndSave_runInsideAccountBudgetLock() throws InterruptedException {
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderStatus.PLANNED, null, null, null);
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate.toPlanned()));
+        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
+        AtomicBoolean held = trackLockHeld(budgetLock);
+        AtomicBoolean reservedReadInLock = new AtomicBoolean();
+        AtomicBoolean savedInLock = new AtomicBoolean();
+        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenAnswer(invocation -> {
+            reservedReadInLock.set(held.get());
+            return BigDecimal.ZERO;
+        });
+        doAnswer(invocation -> {
+            savedInLock.set(held.get());
+            return null;
+        }).when(orderPort).saveAll(anyList());
+
+        service.execute(STRATEGY.id(), REQUESTER_ID);
+
+        verify(budgetLock).call(eq(ACCOUNT.id()), any());
+        assertThat(reservedReadInLock).isTrue();
+        assertThat(savedInLock).isTrue();
     }
 
     // 캡 적용 전 금액으로는 예수금 부족이지만 캡 적용 후 금액으로는 충분한 경계 케이스 —
@@ -459,5 +492,18 @@ class ManualTradingServiceTest {
         // 개장 전이므로 AT_OPEN 즉시 접수가 호출되지 않아야 함 — 개장 스케쥴러가 담당
         verify(orderExecutor, never()).placeAtOpenOrders(any(), any(), any(), any(), any(), any(), any());
     }
-}
 
+    // 계좌 예산 락 구간 안에서만 true — 승인분 PLANNED 저장이 락 안에서 커밋되는지 검증용
+    private static AtomicBoolean trackLockHeld(AccountBudgetLock lock) throws InterruptedException {
+        AtomicBoolean held = new AtomicBoolean();
+        doAnswer(invocation -> {
+            held.set(true);
+            try {
+                return invocation.callRealMethod();
+            } finally {
+                held.set(false);
+            }
+        }).when(lock).call(any(), any());
+        return held;
+    }
+}

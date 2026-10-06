@@ -22,6 +22,7 @@ import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,6 +34,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import com.kista.sharedkernel.StrategyType;
@@ -89,6 +91,19 @@ class TradingOrderBudgetAllocatorTest {
 
         assertThat(result.approved()).containsExactly(vr, infinite);
         assertThat(result.rejectedBuy()).containsExactly(privacy);
+    }
+
+    // 락 밖 접수(PLANNED→PLACED)가 두 조회 사이에 끼어도 과소 집계되지 않도록 예약 합계를 live보다 먼저 읽는다
+    @Test
+    void allocate_readsReservedBuyBeforeLiveBalance() {
+        when(liveBalancePort.getLiveBalance(eq(account.brokerRef()), eq(StrategyTicker.SOXL)))
+                .thenReturn(new BrokerBalance(100, new BigDecimal("20.00"), new BigDecimal("3000.00")));
+
+        allocator.allocate(List.of(candidate(StrategyType.INFINITE, "1000.00")), tradeDate);
+
+        InOrder inOrder = inOrder(orderPort, liveBalancePort);
+        inOrder.verify(orderPort).sumPlannedBuyByAccountAndDate(account.id(), tradeDate);
+        inOrder.verify(liveBalancePort).getLiveBalance(account.brokerRef(), StrategyTicker.SOXL);
     }
 
     @Test

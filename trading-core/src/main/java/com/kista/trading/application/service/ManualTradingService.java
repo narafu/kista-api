@@ -37,6 +37,7 @@ class ManualTradingService {
     private final TradingOrderBudgetAllocator budgetAllocator;
     private final TradingOrderPlanner orderPlanner;            // allocator 승인 결과 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
     private final TradingOrderExecutor orderExecutor;
+    private final AccountBudgetLock budgetLock;              // 승인+저장 구간 계좌 직렬화 — 배치 allocator·재캡과 같은 락
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
@@ -92,22 +93,32 @@ class ManualTradingService {
         // 예산 배정기로 예수금/보유수량 검증 — 단건 candidate 하나만 넘긴다(Task 2가 단일계좌 전용으로 축소한 진입점)
         BatchContext ctx = new BatchContext(strategy, currentCycle, account,
                 null /* userProfile: 알림 미사용 경로라 null — allocate()는 approved/rejected 판단에만 ctx.account() 사용 */);
-        TradingOrderBudgetAllocator.Allocation allocation;
+        // 승인~PLANNED 커밋을 계좌 예산 락 안에서 — 같은 계좌의 배치 승인·접수 직전 재캡과 같은 live 여유분을 이중 사용하지 않게 한다
+        // (접수는 아래에서 락 밖으로 — 다른 계좌는 병렬 유지)
         try {
-            allocation = budgetAllocator.allocate(
-                    List.of(new TradingOrderBudgetAllocator.Candidate(ctx, preparedOrders)), today);
-        } catch (Exception e) {
-            log.warn("[{}] 예산 배정 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
-                    account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
+            budgetLock.call(account.id(), () -> {
+                TradingOrderBudgetAllocator.Allocation allocation;
+                try {
+                    allocation = budgetAllocator.allocate(
+                            List.of(new TradingOrderBudgetAllocator.Candidate(ctx, preparedOrders)), today);
+                } catch (Exception e) {
+                    log.warn("[{}] 예산 배정 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
+                            account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
+                    throw queryFailure(e);
+                }
+                if (!allocation.rejectedBuy().isEmpty()) throw new ManualTradingException("예수금이 부족합니다");
+                if (!allocation.rejectedSell().isEmpty()) throw new ManualTradingException("보유 수량이 부족합니다");
+
+                List<PlannedOrder> approvedOrders = allocation.approved().stream()
+                        .flatMap(candidate -> candidate.orders().stream())
+                        .toList();
+                orderPlanner.savePlannedOrders(approvedOrders, account, currentCycle.id());
+                return null;
+            });
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // 종료 인터럽트 — 승인·저장 전이라 주문은 남지 않는다
             throw queryFailure(e);
         }
-        if (!allocation.rejectedBuy().isEmpty()) throw new ManualTradingException("예수금이 부족합니다");
-        if (!allocation.rejectedSell().isEmpty()) throw new ManualTradingException("보유 수량이 부족합니다");
-
-        List<PlannedOrder> approvedOrders = allocation.approved().stream()
-                .flatMap(candidate -> candidate.orders().stream())
-                .toList();
-        orderPlanner.savePlannedOrders(approvedOrders, account, currentCycle.id());
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요

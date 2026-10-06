@@ -59,8 +59,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import com.kista.sharedkernel.StrategyType;
@@ -98,6 +100,7 @@ class TradingServiceTest {
     @Mock TradingBatchRunPort batchRunPort; // 재개 체크포인트 — 단계 기록·리포트 마커
     TradingBatchRunState runState; // 협조적 종료 상태 — 실인스턴스
     TradingService service;
+    AccountBudgetLock budgetLock = spy(new AccountBudgetLock()); // 배치 allocator 경로용 실제 락 + 구간 추적
 
     static final DstInfo PAST_DST = new DstInfo(true,
             Instant.now().minusSeconds(3600),
@@ -160,7 +163,7 @@ class TradingServiceTest {
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies, liveBalancePort);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies, liveBalancePort, new AccountBudgetLock());
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
@@ -205,7 +208,7 @@ class TradingServiceTest {
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
                 orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
-                budgetAllocator, balanceLoader, eventPublisher, batchGuard, new TradingParallelRunner(0));
+                budgetAllocator, balanceLoader, eventPublisher, batchGuard, budgetLock, new TradingParallelRunner(0));
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
                 orderPort, strategyCyclePort,
@@ -249,9 +252,17 @@ class TradingServiceTest {
                 .thenReturn(List.of(planned));
         when(brokerOrderPort.place(any(), eq(ACCOUNT_REF))).thenReturn(brokerResult(placedOrder.externalOrderId()));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+        // 배정~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다 — 수동 실행·재캡과 live 여유분 이중 사용 방지
+        AtomicBoolean held = trackLockHeld(budgetLock);
+        AtomicBoolean savedInLock = new AtomicBoolean();
+        doAnswer(invocation -> {
+            savedInLock.set(held.get());
+            return null;
+        }).when(orderPort).saveAll(anyList());
 
         service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
 
+        assertThat(savedInLock).isTrue();
         verify(marketCalendarPort).isMarketOpen(any());
         verify(cycleHistoryPort).findLatestOneByStrategyId(STRATEGY.id());
         verify(kisPricePort, never()).getPriceSnapshot(any(), any()); // 단건 fallback 없음 — getPriceSnapshots 성공
@@ -2121,5 +2132,19 @@ class TradingServiceTest {
         verify(cycleHistoryPort, never()).findLatestOneByStrategyId(STRATEGY.id());
         verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(idleCycle.id())));
         verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    // 계좌 예산 락 구간 안에서만 true — 승인분 PLANNED 저장이 락 안에서 커밋되는지 검증용
+    private static AtomicBoolean trackLockHeld(AccountBudgetLock lock) throws InterruptedException {
+        AtomicBoolean held = new AtomicBoolean();
+        doAnswer(invocation -> {
+            held.set(true);
+            try {
+                return invocation.callRealMethod();
+            } finally {
+                held.set(false);
+            }
+        }).when(lock).call(any(), any());
+        return held;
     }
 }

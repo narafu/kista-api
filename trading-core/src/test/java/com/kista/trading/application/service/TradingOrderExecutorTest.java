@@ -90,7 +90,7 @@ class TradingOrderExecutorTest {
             new VrCycleOrderStrategy(null)));
 
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, brokerPort, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES, liveBalancePort);
+        return new TradingOrderExecutor(orderPort, brokerPort, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES, liveBalancePort, new AccountBudgetLock());
     }
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {

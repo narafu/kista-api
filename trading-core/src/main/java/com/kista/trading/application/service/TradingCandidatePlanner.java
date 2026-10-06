@@ -43,6 +43,7 @@ class TradingCandidatePlanner {
     private final TradingBalanceLoader balanceLoader;
     private final ApplicationEventPublisher eventPublisher; // 예수금 부족 알림(InsufficientBalanceEvent)
     private final TradingBatchGuard batchGuard;
+    private final AccountBudgetLock budgetLock;                 // 계좌별 배정~저장 직렬화 — 수동 실행·재캡과 같은 락
     private final TradingParallelRunner parallelRunner;         // 계좌별 조회+예산배정 병렬 실행
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
@@ -206,29 +207,21 @@ class TradingCandidatePlanner {
 
         Set<BatchContext> savedContexts = new LinkedHashSet<>();
 
-        // 계좌별 조회(잔고·판매가능수량)+예산 배정을 계좌 간 병렬 태스크로 묶는다.
+        // 계좌별 조회(잔고·판매가능수량)+예산 배정+승인분 PLANNED 저장을 계좌 간 병렬 태스크로 묶는다.
         // 계좌 내 예산 차감(우선순위 순차 배정)은 allocate() 내부에서 순차로 처리된다.
-        List<TradingParallelRunner.Task<TradingOrderBudgetAllocator.Allocation>> tasks = candidatesByAccount.values().stream()
+        // 배정~저장 커밋은 계좌 예산 락 안 — 같은 계좌의 수동 실행 승인·접수 직전 재캡과 live 여유분을 이중 사용하지 않게 한다
+        List<TradingParallelRunner.Task<AccountAllocation>> tasks = candidatesByAccount.values().stream()
                 .map(accountCandidates -> {
                     BatchContext firstContext = accountCandidates.getFirst().ctx();
-                    return new TradingParallelRunner.Task<TradingOrderBudgetAllocator.Allocation>(firstContext.account().id(),
-                            () -> batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
-                                    () -> budgetAllocator.allocate(accountCandidates, tradeDate)));
+                    UUID accountId = firstContext.account().id();
+                    return new TradingParallelRunner.Task<AccountAllocation>(accountId,
+                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountCandidates, firstContext, tradeDate)));
                 })
                 .toList();
-        List<TradingOrderBudgetAllocator.Allocation> allocations = new ArrayList<>(parallelRunner.runAll(tasks));
 
-        for (TradingOrderBudgetAllocator.Allocation allocation : allocations) {
-            for (TradingOrderBudgetAllocator.Candidate approved : allocation.approved()) {
-                Optional<BatchContext> saved = batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
-                    orderPlanner.savePlannedOrders(
-                            approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
-                    return approved.ctx();
-                });
-                if (saved.isPresent()) {
-                    savedContexts.add(saved.get());
-                }
-            }
+        for (AccountAllocation accountAllocation : parallelRunner.runAll(tasks)) {
+            savedContexts.addAll(accountAllocation.savedContexts());
+            TradingOrderBudgetAllocator.Allocation allocation = accountAllocation.allocation();
 
             Set<BatchContext> rejectedContexts = Stream.concat(
                             allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
@@ -245,5 +238,27 @@ class TradingCandidatePlanner {
         }
 
         return new SaveAllocationResult(Set.copyOf(savedContexts));
+    }
+
+    // 계좌 1개의 배정 결과와 저장 성공 사이클
+    private record AccountAllocation(TradingOrderBudgetAllocator.Allocation allocation, List<BatchContext> savedContexts) {}
+
+    // 계좌 예산 락 안에서 실행 — 배정 실패면 empty(runSafely가 알림), 승인분 저장 실패는 사이클 단위로 격리
+    private Optional<AccountAllocation> allocateAndSave(List<TradingOrderBudgetAllocator.Candidate> accountCandidates,
+                                                        BatchContext firstContext, LocalDate tradeDate)
+            throws InterruptedException {
+        Optional<TradingOrderBudgetAllocator.Allocation> allocation = batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
+                () -> budgetAllocator.allocate(accountCandidates, tradeDate));
+        if (allocation.isEmpty()) return Optional.empty();
+
+        List<BatchContext> saved = new ArrayList<>();
+        for (TradingOrderBudgetAllocator.Candidate approved : allocation.get().approved()) {
+            batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
+                orderPlanner.savePlannedOrders(
+                        approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
+                return approved.ctx();
+            }).ifPresent(saved::add);
+        }
+        return Optional.of(new AccountAllocation(allocation.get(), saved));
     }
 }

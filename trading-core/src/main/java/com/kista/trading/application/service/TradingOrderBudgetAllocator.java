@@ -90,10 +90,15 @@ class TradingOrderBudgetAllocator {
     // candidates는 반드시 단일 계좌 스코프 — 조회+배정을 한 번에 수행한다
     Allocation allocate(List<Candidate> candidates, LocalDate tradeDate) {
         if (candidates.isEmpty()) return new Allocation(List.of(), List.of(), List.of());
+        // PLANNED BUY 예약 합계를 live보다 먼저 읽는다 — 락 밖 접수(PLANNED→PLACED)가 두 조회 사이에 끼면
+        // 반대 순서는 그 주문을 live·합계 양쪽에서 빠뜨려 과다 승인하고, 이 순서는 이중 차감(보수적)될 뿐이다
+        BigDecimal reservedBuy = hasBuy(candidates)
+                ? orderPort.sumPlannedBuyByAccountAndDate(candidates.getFirst().ctx().account().id(), tradeDate)
+                : BigDecimal.ZERO;
         AccountQuote quote = fetchQuote(candidates);
 
         SellAllocation sellAllocation = allocateSells(candidates, tradeDate, quote);
-        BuyAllocation buyAllocation = allocateBuys(candidates, tradeDate, quote);
+        BuyAllocation buyAllocation = allocateBuys(candidates, reservedBuy, quote);
         List<Candidate> approved = mergeApproved(candidates, sellAllocation.approved(), buyAllocation.approved());
         return new Allocation(approved, buyAllocation.rejected(), sellAllocation.rejected());
     }
@@ -147,7 +152,7 @@ class TradingOrderBudgetAllocator {
         }
     }
 
-    private BuyAllocation allocateBuys(List<Candidate> candidates, LocalDate tradeDate, AccountQuote quote) {
+    private BuyAllocation allocateBuys(List<Candidate> candidates, BigDecimal reservedBuy, AccountQuote quote) {
         List<Candidate> buyCandidates = candidates.stream()
                 .map(candidate -> candidate.withOrders(
                         candidate.orders().stream().filter(order -> order.direction() == BUY).toList()))
@@ -161,7 +166,6 @@ class TradingOrderBudgetAllocator {
         if (live == null) {
             throw new IllegalStateException("BUY 잔고 선조회 결과 없음: accountId=" + account.id());
         }
-        BigDecimal reservedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), tradeDate);
         BigDecimal allocatedInBatch = BigDecimal.ZERO;
 
         List<Candidate> approved = new ArrayList<>();
@@ -215,6 +219,11 @@ class TradingOrderBudgetAllocator {
 
     private int strategyPriority(StrategyType type) {
         return cycleOrderStrategies.of(type).allocationPriority();
+    }
+
+    private boolean hasBuy(List<Candidate> candidates) {
+        return candidates.stream().flatMap(candidate -> candidate.orders().stream())
+                .anyMatch(order -> order.direction() == BUY);
     }
 
     private BigDecimal buyTotal(List<PlannedOrder> orders) {
