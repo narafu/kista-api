@@ -44,7 +44,7 @@ final class TradingContractMapper {
     }
 
     static ReorderBuyBudgetResponse toResponse(ReorderBuyBudget b) {
-        return new ReorderBuyBudgetResponse(b.plannedBuy(), b.sourceRefund(), b.liveOrderable(), b.remaining());
+        return new ReorderBuyBudgetResponse(b.plannedBuy(), b.liveOrderable(), b.sourceRefunds());
     }
 
     static ReorderResponse toResponse(ReorderResult r) {

@@ -29,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.math.BigDecimal;
@@ -310,17 +311,16 @@ class AdminTradeControllerTest {
     @Test
     void getReorderBuyBudget_adminRole_returnsBudget() throws Exception {
         UUID orderId = UUID.randomUUID();
-        when(tradingCommandPort.reorderBuyBudget(orderId, java.time.LocalDate.of(2026, 10, 6)))
+        when(tradingCommandPort.reorderBuyBudget(List.of(orderId), java.time.LocalDate.of(2026, 10, 6)))
                 .thenReturn(new com.kista.contract.trading.ReorderBuyBudgetResponse(
-                        new BigDecimal("300"), new BigDecimal("200"), new BigDecimal("1000"), new BigDecimal("900")));
+                        new BigDecimal("300"), new BigDecimal("1000"), Map.of(orderId, new BigDecimal("200"))));
 
         mockMvc.perform(get("/api/admin/trades/reorder-buy-budget")
-                        .param("orderId", orderId.toString()).param("tradeDate", "2026-10-06")
+                        .param("orderIds", orderId.toString()).param("tradeDate", "2026-10-06")
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.plannedBuy").value(300))
-                .andExpect(jsonPath("$.sourceRefund").value(200))
                 .andExpect(jsonPath("$.liveOrderable").value(1000))
-                .andExpect(jsonPath("$.remaining").value(900));
+                .andExpect(jsonPath("$.sourceRefunds['" + orderId + "']").value(200));
     }
 }

@@ -143,18 +143,19 @@ class TradingCommandHttpAdapterTest {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("""
-                    {"plannedBuy":300,"sourceRefund":200,"liveOrderable":1000,"remaining":900}
+                    {"plannedBuy":300,"liveOrderable":1000,"sourceRefunds":{"11111111-1111-1111-1111-111111111111":200}}
                     """)
                 .build());
-        UUID orderId = UUID.randomUUID();
+        UUID orderId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID other = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
-        var result = adapter.reorderBuyBudget(orderId, java.time.LocalDate.of(2026, 10, 6));
+        var result = adapter.reorderBuyBudget(List.of(orderId, other), java.time.LocalDate.of(2026, 10, 6));
 
-        assertThat(result.remaining()).isEqualByComparingTo("900");
-        assertThat(result.sourceRefund()).isEqualByComparingTo("200");
+        assertThat(result.liveOrderable()).isEqualByComparingTo("1000");
+        assertThat(result.sourceRefunds().get(orderId)).isEqualByComparingTo("200");
         RecordedRequest recorded = server.takeRequest();
-        assertThat(recorded.getTarget()).isEqualTo(
-                "/api/internal/trading/reorder-buy-budget?orderId=" + orderId + "&tradeDate=2026-10-06");
+        assertThat(recorded.getTarget()).isEqualTo("/api/internal/trading/reorder-buy-budget?orderIds=" + orderId
+                + "&orderIds=" + other + "&tradeDate=2026-10-06");
         assertThat(recorded.getMethod()).isEqualTo("GET");
     }
 
@@ -163,9 +164,9 @@ class TradingCommandHttpAdapterTest {
         server.enqueue(new MockResponse.Builder().code(400).build());
         server.enqueue(new MockResponse.Builder().code(404).build());
 
-        assertThatThrownBy(() -> adapter.reorderBuyBudget(UUID.randomUUID(), null))
+        assertThatThrownBy(() -> adapter.reorderBuyBudget(List.of(UUID.randomUUID()), null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> adapter.reorderBuyBudget(UUID.randomUUID(), null))
+        assertThatThrownBy(() -> adapter.reorderBuyBudget(List.of(UUID.randomUUID()), null))
                 .isInstanceOf(NoSuchElementException.class);
     }
 

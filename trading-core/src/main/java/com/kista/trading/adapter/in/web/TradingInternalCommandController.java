@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 // admin의 TradingCommandHttpAdapter가 소비하는 내부 전용 쓰기 엔드포인트 — X-Internal-Token 인증
@@ -55,10 +56,10 @@ public class TradingInternalCommandController {
         return TradingContractMapper.toResponse(DstInfo.calculate().reorderTimingAvailability());
     }
 
-    @Operation(summary = "BUY 재주문 예산 조회", description = "live 주문가능금액 − PLANNED BUY 합계 + 원본 BUY 환급. 조회만 하며 차단하지 않습니다.")
+    @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문들의 PLANNED BUY 합계·live 주문가능금액(1회 조회)·원본별 환급분. 조회만 하며 차단하지 않습니다.")
     @GetMapping("/reorder-buy-budget")
-    public ReorderBuyBudgetResponse reorderBuyBudget(@RequestParam UUID orderId,
+    public ReorderBuyBudgetResponse reorderBuyBudget(@RequestParam List<UUID> orderIds,
                                                      @RequestParam(required = false) LocalDate tradeDate) {
-        return TradingContractMapper.toResponse(reorderBuyBudgetQuery.query(orderId, tradeDate));
+        return TradingContractMapper.toResponse(reorderBuyBudgetQuery.query(orderIds, tradeDate));
     }
 }

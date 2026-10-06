@@ -128,18 +128,18 @@ class TradingInternalCommandControllerTest {
 
     @Test
     void reorderBuyBudget_도메인_결과를_contract로_매핑해_반환() throws Exception {
-        java.util.UUID orderId = java.util.UUID.randomUUID();
-        when(reorderBuyBudgetQuery.query(orderId, java.time.LocalDate.of(2026, 10, 6)))
+        java.util.UUID a = java.util.UUID.randomUUID();
+        java.util.UUID b = java.util.UUID.randomUUID();
+        when(reorderBuyBudgetQuery.query(java.util.List.of(a, b), java.time.LocalDate.of(2026, 10, 6)))
                 .thenReturn(new com.kista.trading.domain.model.ReorderBuyBudget(
-                        new java.math.BigDecimal("300"), new java.math.BigDecimal("200"), null, null));
+                        new java.math.BigDecimal("300"), null, java.util.Map.of(a, new java.math.BigDecimal("200"))));
 
         mockMvc.perform(get("/api/internal/trading/reorder-buy-budget")
-                        .param("orderId", orderId.toString()).param("tradeDate", "2026-10-06")
+                        .param("orderIds", a.toString(), b.toString()).param("tradeDate", "2026-10-06")
                         .header("X-Internal-Token", VALID_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.plannedBuy").value(300))
-                .andExpect(jsonPath("$.sourceRefund").value(200))
                 .andExpect(jsonPath("$.liveOrderable").doesNotExist())
-                .andExpect(jsonPath("$.remaining").doesNotExist());
+                .andExpect(jsonPath("$.sourceRefunds['" + a + "']").value(200));
     }
 }

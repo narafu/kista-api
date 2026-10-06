@@ -110,12 +110,12 @@ public class AdminTradeController {
     }
 
     // BUY 재주문 예산 조회 — UI 경고용, 서버 차단 없음
-    @Operation(summary = "BUY 재주문 예산 조회", description = "remaining = live 주문가능금액 − PLANNED BUY 합계 + 원본 BUY 환급. live 조회 실패 시 liveOrderable/remaining은 null입니다.")
+    @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문 1~50건. 남은 예산 = liveOrderable − plannedBuy + 재주문할 원본들의 sourceRefunds 합. live 조회 실패 시 liveOrderable은 null입니다.")
     @GetMapping("/trades/reorder-buy-budget")
     public ReorderBuyBudgetResponse getReorderBuyBudget(
-            @RequestParam UUID orderId,
+            @RequestParam List<UUID> orderIds,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        return ReorderBuyBudgetResponse.from(tradingCommandPort.reorderBuyBudget(orderId, tradeDate));
+        return ReorderBuyBudgetResponse.from(tradingCommandPort.reorderBuyBudget(orderIds, tradeDate));
     }
 
     @Operation(summary = "관리자 재주문")
