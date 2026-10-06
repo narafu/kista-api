@@ -53,6 +53,7 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - **DB 작업**: 자체호스팅 postgres(`kista-postgres` 컨테이너) — SSH 접속 후 `docker exec kista-postgres psql -U kista -d kistadb` (상세 명령어 → `docs/agents/docker-infra.md`)
 
 ## 참고 문서 (필요시 Read)
+- **전체 구조 그림**: `docs/architecture-map.md` — 시스템 컨텍스트·빌드/스키마 경계·프로세스 간 통신·매매 배치 시퀀스(Mermaid), 모듈 의존 그래프는 `ModulithArchitectureTest`가 `build/spring-modulith-docs/`에 자동 생성
 - **매매·스케쥴러·주문 로직 작업 시 필수 Read**: `docs/agents/workflow.md` — 스케쥴러 실행 흐름, MarketSession(DIRECT|BLOCKED), BuyOrderPriceCapper 보정 주문, orders/cycle_position 기록 테이블 구분
 - KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
 - 토스증권 API 작업: `docs/agents/toss-api.md`
