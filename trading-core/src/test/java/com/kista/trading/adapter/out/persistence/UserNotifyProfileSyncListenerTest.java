@@ -3,7 +3,6 @@ package com.kista.trading.adapter.out.persistence;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.platform.crypto.AesCryptoService;
 import com.kista.sharedkernel.NotificationType;
-import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,13 +81,5 @@ class UserNotifyProfileSyncListenerTest {
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getTelegramBotToken()).isNull();
-    }
-
-    @Test
-    @DisplayName("사용자 삭제 이벤트를 받으면 복제본 행을 제거한다")
-    void onUserDeleted_deletesRow() {
-        listener().onUserDeleted(new UserDeletedEvent(USER_ID));
-
-        verify(repository).deleteById(USER_ID);
     }
 }

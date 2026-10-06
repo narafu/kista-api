@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 리뷰 지적 회귀 방지 테스트 — UserEventStreamBridge.handleUserDeletedRecord()가 같은 클래스 안의
 // @Transactional 메서드를 this.로 직접 호출(self-invocation)하면 Spring CGLIB 프록시를 완전히
 // 우회해 @Transactional이 무력화된다. 이 경우 AFTER_COMMIT phase 리스너 중 fallbackExecution이
-// 없는 것들(UserCascadeListener/StrategyUserCascadeListener)은 활성 트랜잭션이 없으면 예외·로그
+// 없는 것들은 활성 트랜잭션이 없으면 예외·로그
 // 없이 조용히 스킵되고, publishEvent()/ack() 자체는 정상 리턴하므로 메시지가 그대로 XACK돼
 // 완전히 무증상으로 유실된다.
 //
@@ -80,7 +80,7 @@ class UserEventRepublisherTransactionTest {
         }
     }
 
-    // fallbackExecution 없는 UserCascadeListener/StrategyUserCascadeListener 계열을 대표하는
+    // fallbackExecution 없는 AFTER_COMMIT 리스너 계열을 대표하는
     // 테스트 전용 리스너 — 트랜잭션이 없으면 조용히 스킵되는 동일 조건을 재현한다.
     static class Probe {
         volatile boolean transactionActiveDuringPublish;

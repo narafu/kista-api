@@ -16,7 +16,7 @@ import java.util.UUID;
 // trading(cyclePosition/strategyCycle)·finance(6종+그룹승계)·strategy(strategy)·account(accounts)는
 // UserDeletedEvent 발행 후 각 모듈이 독립 리스너로 자체 soft-delete한다(EPR 재시도 보장) —
 // 모듈 경계를 넘는 직접 포트 호출을 없애 user↔trading·user↔finance·user↔account 순환을 제거했다.
-// account cascade는 AccountUserCascadeListener(trading-core)가 AFTER_COMMIT으로 처리하므로
+// trading-core 쪽 cascade(계좌 포함)는 trading UserCascadeListener가 AFTER_COMMIT으로 처리하므로
 // 탈퇴 응답 시점엔 아직 미완료일 수 있다(동기 → 최종적 일관성 전환).
 @Component
 @RequiredArgsConstructor

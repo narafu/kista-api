@@ -2,7 +2,6 @@ package com.kista.trading.adapter.out.persistence;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.platform.crypto.AesCryptoService;
-import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -13,7 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.Instant;
 
-// trading.user_notify_profile 복제본 동기화 — user 모듈이 발행한 이벤트만 받아 upsert/delete 한다.
+// trading.user_notify_profile 복제본 동기화 — user 모듈이 발행한 프로필 변경 이벤트를 받아 upsert 한다(탈퇴 삭제는 UserCascadeListener).
 // DB 분리(4단계) 전까지는 같은 DB 위 Modulith EPR 경유(실패 시 재기동 때 재시도).
 // fallbackExecution=true는 안전망이다 — 현재 발행 지점은 전부 트랜잭션 안이지만(login()의 ADMIN
 // 승격도 AdminSeedPromoter로 분리됨), 누군가 트랜잭션 밖에서 발행을 추가하면 이 플래그가 없을 때
@@ -39,11 +38,5 @@ class UserNotifyProfileSyncListener {
         repository.save(new UserNotifyProfileEntity(
                 event.userId(), prefsJson, event.balanceCheckEnabled(), event.active(),
                 encryptedToken, event.chatId(), Instant.now()));
-    }
-
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void onUserDeleted(UserDeletedEvent event) {
-        repository.deleteById(event.userId());
     }
 }

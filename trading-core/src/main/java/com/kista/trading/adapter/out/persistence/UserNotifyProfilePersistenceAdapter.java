@@ -66,4 +66,10 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
             return Map.of();
         }
     }
+
+    @Override
+    @Transactional // 클래스 기본 readOnly 해제 — 탈퇴 정리 트랜잭션(UserCascadeListener)에 합류
+    public void deleteByUserId(UUID userId) {
+        repository.deleteById(userId); // 행이 없으면 no-op
+    }
 }
