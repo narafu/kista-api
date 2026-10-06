@@ -336,7 +336,8 @@ class TradingCycleControllerTest {
                 .andExpect(jsonPath("$.vr").exists())
                 .andExpect(jsonPath("$.vr.poolLimit").value(1000.00))
                 .andExpect(jsonPath("$.vr.poolLimitRate").value(0.75))
-                .andExpect(jsonPath("$.vr.intervalWeeks").value(4));
+                .andExpect(jsonPath("$.vr.intervalWeeks").value(4))
+                .andExpect(jsonPath("$.todayOpenBatchMissed").isBoolean()); // 등록 응답에만 실림 (값은 등록 시각 의존)
     }
 
     @Test

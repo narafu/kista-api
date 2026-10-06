@@ -35,20 +35,17 @@ import java.util.UUID;
 class StrategyCreationService {
 
     private final StrategyPort strategyPort;
-    private final StrategyVersionPort strategyVersionPort;
-    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final VrStrategyDetailUseCase vrStrategyLifecycle;
-    private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
-    private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final AccountPort accountPort;
     private final TradingUserProfilePort tradingUserProfilePort;
     private final BrokerPricePort brokerPricePort;
     private final MarginPort marginPort;
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
+    private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
 
-    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증 HTTP 호출 포함 — 트랜잭션 없이 실행 (각 DB 저장은 JPA auto-commit)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
         ResolvedCreation resolved = resolveCreationSettings(cmd);
@@ -88,26 +85,24 @@ class StrategyCreationService {
 
         int divisionCount = resolved.divisionCount();
 
-        // 전략·버전·상세 저장 (strategy → strategy_versions → 전략별 detail)
-        var persisted = saveStrategyWithVersion(accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
-                resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), ramp);
-
-        // 첫 번째 사이클·포지션 저장 (strategy_cycles → cycle_positions → 전략별 cycle_detail)
-        InitialCycleResult initialResult = saveInitialCycleAndPosition(
-                persisted.strategy(), persisted.version().id(), cmd.initialUsdDeposit(),
-                initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue, vrValue,
-                persisted.vrDetail(), scheduledStart);
+        // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
+        // (증권사 호출은 위에서 이미 끝났으므로 트랜잭션이 HTTP 대기를 물지 않는다)
+        StrategyCreationPersister.Persisted persisted = creationPersister.persist(
+                accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
+                resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), ramp,
+                cmd.initialUsdDeposit(), initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue,
+                vrValue, scheduledStart);
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
         // VR 응답은 개장 포지션의 USD pool을 기준으로 조립한다.
         if (persisted.strategy().isVr()) {
             VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
-                    persisted.vrDetail(), initialResult.cycleVr(), initialResult.initialPosition().usdDeposit(),
-                    initialResult.initialPosition().usdDeposit()); // 등록 직후엔 개장 pool=현재 pool 동일
-            return new StrategyDetail(persisted.strategy(), initialResult.initialPosition().usdDeposit(), initialResult.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
+                    persisted.vrDetail(), persisted.cycleVr(), persisted.initialPosition().usdDeposit(),
+                    persisted.initialPosition().usdDeposit()); // 등록 직후엔 개장 pool=현재 pool 동일
+            return new StrategyDetail(persisted.strategy(), persisted.initialPosition().usdDeposit(), persisted.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
         }
-        return new StrategyDetail(persisted.strategy(), initialResult.cycle().startAmount(), initialResult.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
+        return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
     }
 
     // 중간부터 시작 입력 검증 — BootstrapPosition.validate()에 위임 (BacktestService와 공용 규칙)
@@ -210,64 +205,6 @@ class StrategyCreationService {
             }
         }
     }
-
-    // strategy → strategy_versions → 전략 타입별 detail 순 저장
-    // ramp: VR 등록일 때만 non-null (register()에서 정규화 완료 후 전달)
-    private SavedStrategyAndVersion saveStrategyWithVersion(
-            UUID accountId, StrategyType type, StrategyTicker ticker,
-            StrategyCycleSeedType seedType, int divisionCount,
-            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp) {
-        Strategy strategy = new Strategy(null, accountId, type, StrategyStatus.ACTIVE, ticker, seedType);
-        Strategy saved = strategyPort.save(strategy);
-        StrategyVersion version = strategyVersionPort.save(
-                new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
-        );
-        StrategyVrDetail vrDetail = null;
-        if (saved.isInfinite()) {
-            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), divisionCount));
-        } else if (saved.isVr()) {
-            vrDetail = vrStrategyLifecycle.saveVersionDetail(version.id(), intervalWeeks, bandWidth, recurringAmount,
-                    ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
-                    ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
-        }
-        return new SavedStrategyAndVersion(saved, version, vrDetail);
-    }
-
-    // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
-    // startAmount = 현금 + 시장가×보유수량 — VR도 총 시작자산을 동일하게 보존한다(vrValue override와 무관).
-    // vrValue: VR V값 저장용(override 우선순위 반영, resolveVrValue() 참고) — 비VR은 null
-    private InitialCycleResult saveInitialCycleAndPosition(
-            Strategy saved, UUID versionId, BigDecimal initialUsdDeposit,
-            int initialHoldings, BigDecimal initialAvgPrice, BigDecimal marketPrice,
-            BigDecimal initialStockValue, BigDecimal vrValue, StrategyVrDetail vrDetail, LocalDate scheduledStart) {
-        BigDecimal normalizedInitialUsdDeposit = normalizeMoney(initialUsdDeposit);
-        BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), versionId, startAmount, scheduledStart));
-
-        CyclePosition initialPosition = initialHoldings > 0
-                ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(
-                        cycle.id(), normalizedInitialUsdDeposit, initialHoldings, initialAvgPrice, marketPrice))
-                : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
-
-        if (saved.isInfinite()) {
-            cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
-            return new InitialCycleResult(cycle, initialPosition, null);
-        } else if (saved.isVr()) {
-            StrategyCycleVrDetail savedCycleVr = vrStrategyLifecycle.saveInitialCycleDetail(
-                    cycle.id(), vrValue, vrDetail);
-            return new InitialCycleResult(cycle, initialPosition, savedCycleVr);
-        } else {
-            // PRIVACY
-            return new InitialCycleResult(cycle, initialPosition, null);
-        }
-    }
-
-    // 전략 저장 후 버전 ID + VR 상세를 함께 전달하기 위한 내부 전달 객체
-    private record SavedStrategyAndVersion(Strategy strategy, StrategyVersion version, StrategyVrDetail vrDetail) {}
-
-    // 초기 사이클·개장 포지션·VR 전용 cycleVr 저장 결과 — VR 외 cycleVr는 null
-    private record InitialCycleResult(StrategyCycle cycle, CyclePosition initialPosition,
-                                      StrategyCycleVrDetail cycleVr) {}
 
     // 예수금 = 증권사 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
     private BigDecimal calcFreeCash(Account account, UUID accountId) {

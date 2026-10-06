@@ -62,7 +62,7 @@ public class TradingCycleController {
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody TradingCycleRequest request) {
-        return TradingCycleResponse.from(
+        return TradingCycleResponse.forRegistration(
                 tradingCycle.register(userId, accountId, request.toRegisterCommand())
         );
     }

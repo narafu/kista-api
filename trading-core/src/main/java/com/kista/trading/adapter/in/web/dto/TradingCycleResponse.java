@@ -1,5 +1,6 @@
 package com.kista.trading.adapter.in.web.dto;
 
+import com.kista.trading.domain.model.DstInfo;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyDetail;
@@ -23,7 +24,7 @@ public record TradingCycleResponse(
         String ticker,
         @Schema(description = "초기 입금액", example = "2000.00")
         BigDecimal initialUsdDeposit,
-        @Schema(description = "사이클 시작일 (미래면 시작예정일 — 이 날짜 이후 첫 거래일부터 매매 시작)", example = "2026-08-01")
+        @Schema(description = "사이클 시작일 (미래면 시작예정일 — 시작예정일 밤 미국장부터 매매 시작)", example = "2026-08-01")
         LocalDate startDate,
         @Schema(description = "연속 사이클 정책", example = "NONE")
         String cycleSeedType,
@@ -37,7 +38,10 @@ public record TradingCycleResponse(
         Integer currentHoldings,
         @Schema(description = "VR 전략 상세 (VR 전략만 non-null)")
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        VrSummary vr
+        VrSummary vr,
+        @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:30 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        Boolean todayOpenBatchMissed
 ) {
     // VR 전략 응답 요약 DTO
     public record VrSummary(
@@ -95,7 +99,17 @@ public record TradingCycleResponse(
                 detail.isReverseMode(),
                 detail.currentRound(),
                 detail.currentHoldings(),
-                detail.vr() != null ? VrSummary.from(detail.vr()) : null
+                detail.vr() != null ? VrSummary.from(detail.vr()) : null,
+                null
         );
+    }
+
+    // 등록 응답 — 오늘 개장 배치 이후 등록 여부를 함께 싣는다(판정 SSOT는 DstInfo). 동작은 바꾸지 않고 안내만 —
+    // 그날 AT_OPEN 주문은 개장 후 수동 실행(ManualTradingService, UI "바로 주문")으로만 접수할 수 있다
+    public static TradingCycleResponse forRegistration(StrategyDetail detail) {
+        TradingCycleResponse r = from(detail);
+        return new TradingCycleResponse(r.id, r.accountId, r.type, r.status, r.ticker, r.initialUsdDeposit, r.startDate,
+                r.cycleSeedType, r.divisionCount, r.isReverseMode, r.currentRound, r.currentHoldings, r.vr,
+                !detail.strategy().isPrivacy() && DstInfo.openBatchMissedFor(detail.startDate())); // PRIVACY는 AT_OPEN 주문이 없어 해당 없음
     }
 }

@@ -246,4 +246,21 @@ class DstInfoTest {
         assertThat(DstInfo.nextTradeDateAt(LocalDate.of(2026, 7, 18), LocalTime.of(4, 30)))
                 .isEqualTo(LocalDate.of(2026, 7, 19));
     }
+
+    // openBatchMissedAt() — 오늘 시작 전략을 개장 배치 발화(22:30 KST 월~금) 이후 등록했는지
+    @ParameterizedTest
+    @CsvSource({
+            "2026-10-06T22:29, 2026-10-06, false", // 화요일 발화 직전
+            "2026-10-06T22:30, 2026-10-06, true",  // 화요일 발화 시각 — 이미 대상 확정
+            "2026-10-06T23:50, 2026-10-06, true",
+            "2026-10-06T23:50, 2026-10-07, false", // 내일 시작 — 내일 배치가 처리
+            "2026-10-07T01:00, 2026-10-07, false", // 자정 이후 등록 — 그날 밤 배치 전
+            "2026-10-09T23:00, 2026-10-09, true",  // 금요일 밤 — 금요일 배치 이미 발화
+            "2026-10-10T23:00, 2026-10-10, false", // 토요일 — 개장 배치 없음
+            "2026-10-11T23:00, 2026-10-11, false"  // 일요일 — 개장 배치 없음
+    })
+    void openBatchMissedAt(String nowKst, LocalDate scheduledStart, boolean expected) {
+        ZonedDateTime now = java.time.LocalDateTime.parse(nowKst).atZone(ZoneId.of("Asia/Seoul"));
+        assertThat(DstInfo.openBatchMissedAt(scheduledStart, now)).isEqualTo(expected);
+    }
 }

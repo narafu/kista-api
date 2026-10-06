@@ -98,19 +98,17 @@ class StrategyServiceTest {
     void setUp() {
         StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
-                strategyVersionPort,
-                strategyInfiniteDetailPort,
                 vrStrategyLifecycle,
-                strategyCyclePort,
                 cyclePositionPort,
-                cyclePositionInfiniteDetailPort,
                 accountPort,
                 tradingUserProfilePort,
                 brokerPricePort,
                 marginPort,
                 strategyCreationPolicyPort,
                 new StrategyCreationResolvers(List.of(
-                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())));
+                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())),
+                new StrategyCreationPersister(strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
+                        vrStrategyLifecycle, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort));
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort,
                 new com.kista.matching.domain.strategy.CycleOrderStrategies(List.of(
