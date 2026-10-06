@@ -1,5 +1,6 @@
 package com.kista.user.application.service;
 
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
 import com.kista.sharedkernel.UserStatus;
 import com.kista.user.application.port.output.UserPort;
@@ -23,10 +24,10 @@ class UserNotifyProfilePublisher {
     private final UserSettingsPort userSettingsPort;
     private final ApplicationEventPublisher eventPublisher;
 
-    // 상태(가입·승인·거절·재신청·ADMIN 승격)가 바뀐 직후 — 설정은 조회해서 채운다
+    // 상태(가입·승인·거절·재신청·ADMIN 승격)·텔레그램·알림 채널이 바뀐 직후 — 설정은 조회해서 채운다
     void publishStatusChanged(User user) {
         publish(user.id(), userSettingsPort.findOrDefault(user.id()), user.status() == UserStatus.ACTIVE,
-                user.telegramBotToken(), user.telegramChatId());
+                user.telegramBotToken(), user.telegramChatId(), user.notificationChannel());
     }
 
     // 알림·잔고검증 설정이 바뀐 직후 — 상태·텔레그램은 조회해서 채운다(소프트 삭제된 사용자는 비활성 취급)
@@ -35,12 +36,14 @@ class UserNotifyProfilePublisher {
         boolean active = user != null && user.status() == UserStatus.ACTIVE;
         publish(settings.userId(), settings, active,
                 user == null ? null : user.telegramBotToken(),
-                user == null ? null : user.telegramChatId());
+                user == null ? null : user.telegramChatId(),
+                user == null ? null : user.notificationChannel());
     }
 
-    private void publish(UUID userId, UserSettings settings, boolean active, String telegramBotToken, String chatId) {
+    private void publish(UUID userId, UserSettings settings, boolean active, String telegramBotToken, String chatId,
+                         NotificationChannel channel) {
         eventPublisher.publishEvent(new UserNotifyProfileChangedEvent(
                 userId, settings.notificationPrefs(), settings.balanceCheckEnabled(), active,
-                telegramBotToken, chatId));
+                telegramBotToken, chatId, channel));
     }
 }

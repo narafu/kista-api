@@ -1,5 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
+import com.kista.sharedkernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.platform.crypto.AesCryptoService;
 import com.kista.sharedkernel.NotificationType;
@@ -32,7 +33,7 @@ class UserNotifyProfilePersistenceAdapterTest {
     }
 
     private UserNotifyProfileEntity entity(UUID userId, String prefsJson, boolean active) {
-        return new UserNotifyProfileEntity(userId, prefsJson, true, active, null, null, Instant.now());
+        return new UserNotifyProfileEntity(userId, prefsJson, true, active, null, null, Instant.now(), null);
     }
 
     @Test
@@ -89,7 +90,7 @@ class UserNotifyProfilePersistenceAdapterTest {
     @DisplayName("암호문으로 저장된 telegramBotToken을 복호화해 평문으로 투영한다")
     void findByUserId_decryptsTelegramBotToken() {
         UserNotifyProfileEntity withTelegram = new UserNotifyProfileEntity(
-                USER_ID, "{}", true, true, "cipher-text", "chat-1", Instant.now());
+                USER_ID, "{}", true, true, "cipher-text", "chat-1", Instant.now(), NotificationChannel.TELEGRAM);
         when(repository.findById(USER_ID)).thenReturn(Optional.of(withTelegram));
         when(crypto.decrypt("cipher-text")).thenReturn("plain-token");
 

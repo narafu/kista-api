@@ -43,8 +43,10 @@ class UserProfileServiceTest {
 
         userProfileService.updateTelegram(userId, "bot-token", "chat-1");
 
+        // 채널 NONE 사용자가 봇을 연결하면 채널이 TELEGRAM으로 — 고르지 않아도 매매 리포트가 텔레그램으로 온다
         verify(userPort).save(argThat(u -> "bot-token".equals(u.telegramBotToken())
-                && "chat-1".equals(u.telegramChatId())));
+                && "chat-1".equals(u.telegramChatId())
+                && u.notificationChannel() == NotificationChannel.TELEGRAM));
         verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> "bot-token".equals(u.telegramBotToken())));
     }
 
@@ -69,6 +71,20 @@ class UserProfileServiceTest {
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userProfileService.updateNotificationChannel(userId, NotificationChannel.FCM);
+
+        verify(userPort).save(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
+        // 매매 알림도 채널을 따르므로 kista-trading 복제본에 전달
+        verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
+    }
+
+    @Test
+    @DisplayName("텔레그램 해제 시 채널에서 텔레그램을 뺀다 — ALL이면 FCM")
+    void removeTelegram_dropsTelegramFromChannel() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(DomainFixtures.activeUser(userId, NotificationChannel.ALL));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userProfileService.removeTelegram(userId);
 
         verify(userPort).save(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
     }

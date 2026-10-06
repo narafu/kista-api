@@ -100,7 +100,8 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     }
 
     private void sendIfLinked(TradingUserProfile profile, String text) {
-        if (profile.telegramBotToken() == null || profile.chatId() == null) return;
+        // 봇 연결 + 알림 채널에 텔레그램 포함일 때만 — 채널 NONE·FCM 사용자는 앱 푸시만 받는다
+        if (!profile.telegramEnabled()) return;
         telegramHttpClient.sendMessage(profile.chatId(), text, profile.telegramBotToken());
     }
 }

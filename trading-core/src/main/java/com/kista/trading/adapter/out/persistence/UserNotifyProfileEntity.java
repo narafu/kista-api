@@ -1,5 +1,8 @@
 package com.kista.trading.adapter.out.persistence;
 
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import com.kista.sharedkernel.NotificationChannel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -43,4 +46,8 @@ class UserNotifyProfileEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt; // 마지막 동기화 시각
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "notification_channel", length = 20)
+    private NotificationChannel notificationChannel; // 알림 수단, null = 채널 복제 전 행(봇 연결만 판정) — V5 ADD COLUMN이라 맨 뒤
 }

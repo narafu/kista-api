@@ -1,5 +1,6 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.platform.telegram.TelegramHttpClient;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
@@ -49,6 +50,15 @@ class TradingUserNotificationAdapterTest {
         adapter.notifyMarketOpen(LINKED_PROFILE);
 
         verify(restClient.post()).uri(contains("/bot" + "bot-token" + "/sendMessage"));
+        verify(pushNotificationPublisher).publish(new UserPushNotificationRequestedEvent(USER_ID, "장 개시", "🟢 미국 장이 열렸습니다."));
+    }
+
+    @Test
+    void notifyMarketOpen_channelWithoutTelegram_skipsTelegramButStillPublishesEvent() {
+        // 봇이 연결돼 있어도 알림 채널이 FCM이면 텔레그램은 보내지 않는다
+        adapter.notifyMarketOpen(new TradingUserProfile(USER_ID, Map.of(), true, "bot-token", "chat-123", NotificationChannel.FCM));
+
+        verifyNoInteractions(restClient);
         verify(pushNotificationPublisher).publish(new UserPushNotificationRequestedEvent(USER_ID, "장 개시", "🟢 미국 장이 열렸습니다."));
     }
 

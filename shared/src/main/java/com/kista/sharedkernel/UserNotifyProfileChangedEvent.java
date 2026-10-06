@@ -13,6 +13,12 @@ public record UserNotifyProfileChangedEvent(
         boolean balanceCheckEnabled,                      // 잔고검증 활성 여부
         boolean active,                                   // UserStatus.ACTIVE 여부 — findAllActive() 브로드캐스트 대상 판정용
         String telegramBotToken,                          // AES 평문(User.telegramBotToken()은 persistence 경계에서 이미 복호화됨) — trading-core가 자체 DB 저장 시 암호화
-        String chatId                                      // 텔레그램 chat ID — 비밀값 아니라 평문 그대로 저장
+        String chatId,                                     // 텔레그램 chat ID — 비밀값 아니라 평문 그대로 저장
+        NotificationChannel notificationChannel            // 알림 수단 — 매매 알림 텔레그램 발송 여부 판정, null이면 판정 없이 봇 연결 여부만 본다(구버전 발행분)
 ) {
+    public UserNotifyProfileChangedEvent(UUID userId, Map<NotificationType, Boolean> notificationPrefs,
+                                         boolean balanceCheckEnabled, boolean active,
+                                         String telegramBotToken, String chatId) {
+        this(userId, notificationPrefs, balanceCheckEnabled, active, telegramBotToken, chatId, null);
+    }
 }

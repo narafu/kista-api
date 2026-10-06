@@ -70,7 +70,7 @@ com.kista.tradingweb/    :trading-core · CLOSED · (NamedInterface 0개, 앱셸
 
 ### 텔레그램 알림 (사용자 봇)
 - 계좌별 텔레그램 설정은 없다 — 사용자 봇(`telegramBotToken`/`chatId`)만 사용. 봇 토큰은 persistence 경계에서만 AES-256 암호화/복호화(root `UserPersistenceAdapter`, trading-core `UserNotifyProfilePersistenceAdapter`/`UserNotifyProfileSyncListener`)
-- 매매 알림(`notifyTradingReport` 등)은 trading-core `tradingnotify`가 `trading.user_notify_profile` 복제본(`TradingUserProfile`)의 토큰·chatId로 발송하고, 둘 중 하나라도 없으면 조용히 건너뛴다(`TradingUserNotificationAdapter.sendIfLinked`) → `modules/tradingnotify.md`
+- 매매 알림(`notifyTradingReport` 등)은 trading-core `tradingnotify`가 `trading.user_notify_profile` 복제본(`TradingUserProfile`)의 토큰·chatId로 발송하고, 둘 중 하나라도 없거나 알림 채널에 텔레그램이 없으면 조용히 건너뛴다(`TradingUserProfile.telegramEnabled()` — 채널이 아직 복제되지 않은 NULL 행은 봇 연결만 본다) → `modules/tradingnotify.md`
 
 ### 전략 패턴 (모듈별 문서로 이동)
 BrokerCapabilitiesPort/BrokerRouter 패턴·TDA 전략 패턴(InfiniteStrategy)·CycleOrderStrategy Capability 패턴·PRIVACY 전략 패턴·VR 전략 패턴은 각각 `modules/broker.md`·`modules/trading.md`·`modules/matching.md`·`modules/privacy.md`·`modules/trading.md`로 이동했다.

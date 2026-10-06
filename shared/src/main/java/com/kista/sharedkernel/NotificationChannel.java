@@ -22,4 +22,22 @@ public enum NotificationChannel {
 
     public boolean includesTelegram() { return this == TELEGRAM || this == ALL; }
     public boolean includesFcm()      { return this == FCM      || this == ALL; }
+
+    // 텔레그램 봇을 연결하면 텔레그램을 수신 경로에 더한다 — NONE→TELEGRAM, FCM→ALL
+    public NotificationChannel withTelegram() {
+        return switch (this) {
+            case NONE -> TELEGRAM;
+            case FCM -> ALL;
+            default -> this;
+        };
+    }
+
+    // 텔레그램 봇을 해제하면 텔레그램을 수신 경로에서 뺀다 — TELEGRAM→NONE, ALL→FCM
+    public NotificationChannel withoutTelegram() {
+        return switch (this) {
+            case TELEGRAM -> NONE;
+            case ALL -> FCM;
+            default -> this;
+        };
+    }
 }

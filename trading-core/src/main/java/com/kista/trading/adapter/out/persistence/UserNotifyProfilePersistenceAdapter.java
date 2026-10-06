@@ -53,7 +53,7 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
         // persistence 경계에서 telegramBotToken 복호화 — null이면 그대로 null 유지
         String telegramBotToken = entity.getTelegramBotToken() == null ? null : crypto.decrypt(entity.getTelegramBotToken());
         return new TradingUserProfile(entity.getUserId(), readPrefs(entity), entity.isBalanceCheckEnabled(),
-                telegramBotToken, entity.getChatId());
+                telegramBotToken, entity.getChatId(), entity.getNotificationChannel());
     }
 
     // 복제본이 손상돼도 알림 판정만 기본값(전부 활성)으로 떨어지고 매매 자체는 계속되도록 격리한다

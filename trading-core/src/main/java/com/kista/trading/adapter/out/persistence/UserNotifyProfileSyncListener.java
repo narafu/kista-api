@@ -2,6 +2,7 @@ package com.kista.trading.adapter.out.persistence;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.platform.crypto.AesCryptoService;
+import com.kista.sharedkernel.NotificationChannel;
 import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -34,9 +35,13 @@ class UserNotifyProfileSyncListener {
         String prefsJson = objectMapper.writeValueAsString(event.notificationPrefs());
         // persistence 경계에서 telegramBotToken 암호화 — null이면 그대로 null 유지
         String encryptedToken = event.telegramBotToken() == null ? null : crypto.encrypt(event.telegramBotToken());
+        // 채널 없는 이벤트(채널 복제 이전 root가 발행)는 저장된 채널을 지우지 않는다 — NULL이 되면 봇 연결만 보고 텔레그램을 다시 보내게 된다
+        NotificationChannel channel = event.notificationChannel() != null
+                ? event.notificationChannel()
+                : repository.findById(event.userId()).map(UserNotifyProfileEntity::getNotificationChannel).orElse(null);
         // @Id 할당식이라 save()가 곧 upsert
         repository.save(new UserNotifyProfileEntity(
                 event.userId(), prefsJson, event.balanceCheckEnabled(), event.active(),
-                encryptedToken, event.chatId(), Instant.now()));
+                encryptedToken, event.chatId(), Instant.now(), channel));
     }
 }

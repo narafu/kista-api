@@ -27,7 +27,9 @@ class UserProfileService implements UserProfileUseCase {
         // botToken 유효성 검증 + username 취득 (실패 시 IllegalArgumentException)
         String botUsername = telegramBotInfoPort.getUsername(botToken);
         User user = userPort.findByIdOrThrow(userId);
-        User saved = userPort.save(user.withTelegram(botToken, chatId, botUsername));
+        // 봇을 연결하면 알림 채널에 텔레그램을 더한다 — 채널을 따로 고르지 않아도 매매 리포트가 텔레그램으로 온다
+        User saved = userPort.save(user.withTelegram(botToken, chatId, botUsername)
+                .withNotificationChannel(user.notificationChannel().withTelegram()));
         userNotifyProfilePublisher.publishStatusChanged(saved);
         log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
     }
@@ -35,7 +37,9 @@ class UserProfileService implements UserProfileUseCase {
     @Override
     public void removeTelegram(UUID userId) {
         User user = userPort.findByIdOrThrow(userId);
-        User saved = userPort.save(user.withTelegram(null, null, null));
+        // 봇을 해제하면 알림 채널에서 텔레그램을 뺀다 — 연결 없는 텔레그램 채널이 남지 않도록
+        User saved = userPort.save(user.withTelegram(null, null, null)
+                .withNotificationChannel(user.notificationChannel().withoutTelegram()));
         userNotifyProfilePublisher.publishStatusChanged(saved);
         log.info("텔레그램 설정 해제: userId={}", userId);
     }
@@ -43,7 +47,9 @@ class UserProfileService implements UserProfileUseCase {
     @Override
     public void updateNotificationChannel(UUID userId, NotificationChannel channel) {
         User user = userPort.findByIdOrThrow(userId);
-        userPort.save(user.withNotificationChannel(channel));
+        User saved = userPort.save(user.withNotificationChannel(channel));
+        // kista-trading 매매 알림도 채널을 따르므로 복제본에 전달
+        userNotifyProfilePublisher.publishStatusChanged(saved);
         log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
     }
 
