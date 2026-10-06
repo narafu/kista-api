@@ -1,6 +1,7 @@
 package com.kista.account.application.service;
 
 import com.kista.account.application.event.AccountDeletedEvent;
+import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.broker.application.service.BrokerConnectionTesters;
 import com.kista.sharedkernel.Broker;
 import com.kista.account.domain.model.Account;
@@ -32,6 +33,7 @@ class AccountService implements AccountUseCase {
     private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
     private final BrokerEnabledPort brokerEnabledPort; // 증권사 신규 등록 허용 여부 (trading TradingPolicyService가 구현 — 정책 소유자)
     private final ApplicationEventPublisher eventPublisher; // 계좌 삭제 cascade 이벤트 발행
+    private final BrokerTokenCachePort brokerTokenCachePort; // 탈퇴 시 증권사 토큰 삭제
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
@@ -95,6 +97,14 @@ class AccountService implements AccountUseCase {
         // 커밋 후 발행 — strategy-config 리스너가 소유 데이터를 독립적으로 정리(EPR 재시도 보장)
         eventPublisher.publishEvent(new AccountDeletedEvent(accountId));
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
+    }
+
+    @Override
+    public void deleteAllByUserId(UUID userId) {
+        // 소프트 삭제 후엔 @SQLRestriction이 계좌를 숨기므로 토큰 대상 ID를 먼저 확보한다
+        List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
+        brokerTokenCachePort.deleteByAccountIds(accountIds);
+        accountPort.deleteByUserId(userId);
     }
 
     @Override

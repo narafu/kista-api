@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface UserSettingsPort {
     Optional<UserSettings> loadByUserId(UUID userId);
     void save(UserSettings settings);
+    // 탈퇴 정리 — user_settings·user_notification_prefs 하드 삭제
+    void deleteByUserId(UUID userId);
 
     // 설정이 없으면 기본값 반환 — 조회+fallback 반복 패턴 SSOT
     default UserSettings findOrDefault(UUID userId) {

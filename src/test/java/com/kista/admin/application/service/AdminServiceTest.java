@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import com.kista.user.domain.model.User;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,6 +71,45 @@ class AdminServiceTest {
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
         verify(auditLogPort).log(eq(adminId), eq("USER_REJECT"), eq("USER"), eq(targetId), payloadCaptor.capture());
         assertThat(payloadCaptor.getValue()).containsEntry("reason", reason);
+    }
+
+    @Test
+    void approveUserByTelegram_mappedAdmin_logsAdminIdWithTelegramActor() {
+        UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        when(userUseCase.findUserIdByTelegramChatId("777")).thenReturn(Optional.of(adminId));
+        when(userPort.findById(adminId)).thenReturn(Optional.of(new User(adminId, "k", "n", null,
+                UserStatus.ACTIVE, UserRole.ADMIN, null, null, null, null, null, User.DEFAULT_CHANNEL)));
+
+        adminService.approveUserByTelegram("777", targetId);
+
+        verify(userUseCase).approve(targetId);
+        verify(auditLogPort).log(eq(adminId), eq("USER_APPROVE"), eq("USER"), eq(targetId),
+                eq(Map.of("actor", "TELEGRAM_BOT", "chatId", "777")));
+    }
+
+    @Test
+    void rejectUserByTelegram_unmappedChat_logsNullAdminId() {
+        UUID targetId = UUID.randomUUID();
+        when(userUseCase.findUserIdByTelegramChatId("777")).thenReturn(Optional.empty());
+
+        adminService.rejectUserByTelegram("777", targetId);
+
+        verify(userUseCase).reject(targetId, null);
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(auditLogPort).log(eq(null), eq("USER_REJECT"), eq("USER"), eq(targetId), payloadCaptor.capture());
+        assertThat(payloadCaptor.getValue()).containsEntry("actor", "TELEGRAM_BOT").containsEntry("chatId", "777");
+    }
+
+    @Test
+    void approveUserByTelegram_nonAdminChatOwner_logsNullAdminId() {
+        UUID userId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        when(userUseCase.findUserIdByTelegramChatId("777")).thenReturn(Optional.of(userId));
+        when(userPort.findById(userId)).thenReturn(Optional.of(new User(userId, "k", "n", null,
+                UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null, User.DEFAULT_CHANNEL)));
+
+        adminService.approveUserByTelegram("777", targetId);
+
+        verify(auditLogPort).log(eq(null), eq("USER_APPROVE"), eq("USER"), eq(targetId), any());
     }
 
     @Test

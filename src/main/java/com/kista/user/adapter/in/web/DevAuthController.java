@@ -61,8 +61,8 @@ public class DevAuthController {
     public TokenResponse devToken(HttpServletRequest request, HttpServletResponse response) {
         // 테스트 유저 생성 or 기존 유저 반환 (idempotent)
         User user = userUseCase.register(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID, null);
-        // ACTIVE 상태로 설정 (이미 ACTIVE여도 무해)
-        userUseCase.approve(user.id());
+        // ACTIVE 상태로 설정 — 이미 ACTIVE면 approve()가 409라 건너뜀
+        if (user.status() != UserStatus.ACTIVE) userUseCase.approve(user.id());
         // RT 발급 후 HttpOnly 쿠키 설정
         String rawRt = tokenUseCase.issueRefreshToken(user.id(), request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
@@ -76,14 +76,15 @@ public class DevAuthController {
     public TokenResponse devAdminToken(HttpServletRequest request, HttpServletResponse response) {
         // 고정 ADMIN 테스트 유저 자동 생성 또는 조회 후 role promote
         User admin = userPort.findById(DEV_ADMIN_UUID).orElseGet(() ->
-                userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", null, UserStatus.ACTIVE, UserRole.ADMIN,
+                // PENDING으로 저장 후 아래 approve()로 ACTIVE 전환 — 복제본 동기화 이벤트 발행 경로
+                userPort.save(new User(DEV_ADMIN_UUID, "0", "dev-admin", null, UserStatus.PENDING, UserRole.ADMIN,
                         null, null, null, null, null, User.DEFAULT_CHANNEL)));
         // 이미 존재하지만 ADMIN이 아닌 경우 idempotent promote
         if (admin.role() != UserRole.ADMIN) {
-            admin = userPort.save(admin.withStatus(UserStatus.ACTIVE).withRole(UserRole.ADMIN));
+            admin = userPort.save(admin.withRole(UserRole.ADMIN));
         }
-        // user_notify_profile 캐시 동기화 겸용 — approve()가 상태 변경 이벤트를 발행하는 유일한 공개 경로다
-        userUseCase.approve(admin.id());
+        // user_notify_profile 캐시 동기화 겸용 — approve()가 상태 변경 이벤트를 발행하는 유일한 공개 경로다(이미 ACTIVE면 409라 건너뜀)
+        if (admin.status() != UserStatus.ACTIVE) userUseCase.approve(admin.id());
         // RT 발급 후 HttpOnly 쿠키 설정
         String rawRt = tokenUseCase.issueRefreshToken(admin.id(), request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());

@@ -36,6 +36,19 @@ public record User(
         public Instant getRetryAfter() { return retryAfter; }
     }
 
+    // 이미 ACTIVE인 사용자 재승인 시 발생 — GlobalExceptionHandler에서 409 매핑
+    public static class AlreadyActiveException extends IllegalStateException {
+        public AlreadyActiveException() {
+            super("이미 승인된 사용자입니다.");
+        }
+    }
+
+    // 승인 — PENDING·REJECTED만 ACTIVE로 전환, 이미 ACTIVE면 AlreadyActiveException
+    public User approve() {
+        if (status == UserStatus.ACTIVE) throw new AlreadyActiveException();
+        return withStatus(UserStatus.ACTIVE);
+    }
+
     // 텔레그램 봇 토큰 + Chat ID가 모두 설정된 경우에만 true
     public boolean hasTelegramBot() {
         return telegramBotToken != null && !telegramBotToken.isBlank() && telegramChatId != null;

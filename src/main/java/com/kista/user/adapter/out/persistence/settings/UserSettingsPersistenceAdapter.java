@@ -5,6 +5,7 @@ import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,6 +46,13 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
         settings.notificationPrefs().forEach((type, enabled) ->
                 prefRepo.save(new UserNotificationPrefJpaEntity(settings.userId(), type.name(), enabled))
         );
+    }
+
+    @Override
+    @Transactional // derived delete는 트랜잭션 필수 — 호출자(UserService.deleteMe) 트랜잭션에 합류
+    public void deleteByUserId(UUID userId) {
+        prefRepo.deleteByUserId(userId);
+        settingsRepo.deleteById(userId); // 행이 없으면 no-op
     }
 
     @Override

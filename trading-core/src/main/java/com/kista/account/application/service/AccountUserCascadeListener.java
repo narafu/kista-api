@@ -1,6 +1,6 @@
 package com.kista.account.application.service;
 
-import com.kista.account.application.port.output.AccountPort;
+import com.kista.account.application.usecase.AccountUseCase;
 import com.kista.sharedkernel.UserDeletedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,11 +16,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 class AccountUserCascadeListener {
 
-    private final AccountPort accountPort;
+    private final AccountUseCase accountUseCase;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onUserDeleted(UserDeletedEvent event) {
-        accountPort.deleteByUserId(event.userId());
+        accountUseCase.deleteAllByUserId(event.userId()); // 증권사 토큰 하드 삭제 + 계좌 소프트 삭제
     }
 }

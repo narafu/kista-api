@@ -383,9 +383,13 @@ flows:
         lane: api
         to: [db]
         title: 관리자 승인
-        desc: 관리자가 관리자 화면이나 텔레그램 버튼으로 승인한다. 관리자 화면 경로만 감사 로그(USER_APPROVE)를 남긴다.
-        code: [AdminService#approveUser, TelegramBotService#handleCallbackQuery, UserService#approve]
+        desc: >-
+          관리자가 관리자 화면이나 텔레그램 버튼으로 승인한다. PENDING·REJECTED만 승인되고 이미 ACTIVE면 409로 거부한다(텔레그램은 "이미 승인됨" 답장).
+          두 경로 모두 감사 로그(USER_APPROVE)를 남긴다 — 텔레그램은 chatId에 연결된 ADMIN이 없으면 행위자를 TELEGRAM_BOT으로 기록한다.
+        code: [AdminService#approveUser, TelegramBotService#handleCallbackQuery, AdminService#approveUserByTelegram, UserService#approve, User#approve]
+        cond: PENDING 또는 REJECTED
         state: "users → ACTIVE"
+        fail: 이미 ACTIVE면 409.
 
       - id: approve-notify
         lane: api
@@ -401,8 +405,8 @@ flows:
         title: 관리자 반려
         desc: >-
           사유와 함께 반려하면 REJECTED로 바꾸고 24시간 재신청 쿨다운을 시작한다. 액세스 토큰을 15분간 블랙리스트에 올리고 리프레시 토큰을 모두 지워 세션을 끝낸다.
-          사용자에게 사유를 알리고, SSE로 /rejected 화면으로 보낸다.
-        code: [AdminService#rejectUser, UserService#reject, BlacklistPort#add, RefreshTokenPort#deleteAllByUserId, CompositeUserNotificationAdapter#onUserRejected]
+          사용자에게 사유를 알리고, SSE로 /rejected 화면으로 보낸다. 관리자 화면·텔레그램 버튼 모두 감사 로그(USER_REJECT)를 남긴다.
+        code: [AdminService#rejectUser, AdminService#rejectUserByTelegram, UserService#reject, BlacklistPort#add, RefreshTokenPort#deleteAllByUserId, CompositeUserNotificationAdapter#onUserRejected]
         cond: 반려할 때
         state: "users → REJECTED"
 
@@ -512,9 +516,11 @@ flows:
         lane: api
         to: [db, redis]
         title: 사용자 삭제·세션 종료
-        desc: 한 트랜잭션에서 사용자를 소프트 삭제하고, 리프레시 토큰을 모두 지우고, 액세스 토큰을 15분간 블랙리스트에 올린 뒤 UserDeletedEvent를 발행한다.
-        code: [UserCascadeDeleter#deleteCascade]
-        state: "users.deleted_at 설정"
+        desc: >-
+          한 트랜잭션에서 사용자를 소프트 삭제하고, 사용자 설정·알림 선호도를 지우고, 리프레시 토큰을 모두 지우고,
+          액세스 토큰을 15분간 블랙리스트에 올린 뒤 UserDeletedEvent를 발행한다.
+        code: [UserCascadeDeleter#deleteCascade, UserSettingsPort#deleteByUserId]
+        state: "users.deleted_at 설정 · user_settings·user_notification_prefs 삭제"
 
       - id: root-cleanup
         lane: api
@@ -545,11 +551,12 @@ flows:
         to: [db]
         title: 사이클·전략·계좌 정리
         desc: >-
-          구독자들이 각자 소프트 삭제한다 — 사이클 이력(cycle_position → strategy_cycle 순), 전략, 계좌. 알림 프로필 복제본은 행을 지운다.
-          네 구독자 사이의 순서는 정해져 있지 않다.
+          구독자들이 각자 소프트 삭제한다 — 사이클 이력(cycle_position → strategy_cycle 순), 전략, 계좌. 계좌의 증권사 토큰과 알림 프로필 복제본은 행을 지운다.
+          주문(orders)은 보존한다(계좌 소프트 삭제로 조회에서 빠진다). 네 구독자 사이의 순서는 정해져 있지 않다.
         code: [com.kista.trading.adapter.out.UserCascadeListener#onUserDeleted, StrategyUserCascadeListener#onUserDeleted,
-               AccountUserCascadeListener#onUserDeleted, UserNotifyProfileSyncListener#onUserDeleted]
-        state: "cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · user_notify_profile 삭제"
+               AccountUserCascadeListener#onUserDeleted, AccountService#deleteAllByUserId, BrokerTokenCachePort#deleteByAccountIds,
+               UserNotifyProfileSyncListener#onUserDeleted]
+        state: "cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · broker_tokens·user_notify_profile 삭제"
 
   fida-receive:
     title: FIDA 기준표 수신
@@ -627,7 +634,8 @@ lifecycles:
     transitions:
       - {to: PENDING, title: 가입 (승인 필요), code: [UserService#register], flow: signup/register}
       - {to: ACTIVE, title: 가입 (승인 불필요 · ADMIN seed), code: [UserService#register], flow: signup/register}
-      - {from: PENDING, to: ACTIVE, title: 관리자 승인, code: [AdminService#approveUser, TelegramBotService#handleCallbackQuery, UserService#approve], flow: signup/approve}
+      - {from: PENDING, to: ACTIVE, title: 관리자 승인, code: [AdminService#approveUser, AdminService#approveUserByTelegram, UserService#approve, User#approve], flow: signup/approve}
+      - {from: REJECTED, to: ACTIVE, title: 관리자 승인, desc: 반려된 사용자도 재신청 없이 바로 승인할 수 있다., code: [AdminService#approveUser, AdminService#approveUserByTelegram, UserService#approve, User#approve], flow: signup/approve}
       - {from: PENDING, to: ACTIVE, title: 승인 설정 OFF 일괄 승인, code: [ApprovalRequirementDisabledListener#onApprovalRequirementDisabled], flow: signup/approval-off}
       - {from: PENDING, to: REJECTED, title: 관리자 반려, desc: "사유 저장, 24시간 쿨다운 시작, 세션 종료.", code: [UserService#reject, User#withRejection], flow: signup/reject}
       - {from: PENDING, to: PENDING, title: 대기 중 재신청, desc: 1시간 쿨다운. 관리자에게 승인 버튼 알림을 다시 보낸다., code: [UserService#reapply], flow: signup/reapply}

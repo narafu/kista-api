@@ -20,6 +20,8 @@ public interface AccountUseCase {
 
     // --- 삭제 ---
     void delete(UUID accountId, UUID requesterId);
+    // 사용자 탈퇴 정리 — 증권사 토큰 하드 삭제 + 계좌 일괄 소프트 삭제 (호출자 트랜잭션 합류)
+    void deleteAllByUserId(UUID userId);
 
     // --- 증권사 연결 테스트 ---
     // accountId null 허용 — null이면 캐시 저장 생략 (등록 전 사전 검증). 실패 시 BrokerCredentialException throw

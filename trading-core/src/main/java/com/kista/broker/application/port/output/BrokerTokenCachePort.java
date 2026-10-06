@@ -1,6 +1,7 @@
 package com.kista.broker.application.port.output;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,4 +13,6 @@ public interface BrokerTokenCachePort {
     Optional<String> findValidToken(UUID accountId, OffsetDateTime threshold);
     void saveToken(UUID accountId, String accessToken, OffsetDateTime expiresAt);
     void invalidateToken(UUID accountId, String rejectedAccessToken, OffsetDateTime invalidatedAt);
+    // 탈퇴 정리 — 계좌들의 캐시 토큰 하드 삭제. 호출자 트랜잭션에 합류한다(REQUIRES_NEW 아님)
+    void deleteByAccountIds(Collection<UUID> accountIds);
 }

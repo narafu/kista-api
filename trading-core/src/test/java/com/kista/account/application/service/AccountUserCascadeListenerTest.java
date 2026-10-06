@@ -1,6 +1,6 @@
 package com.kista.account.application.service;
 
-import com.kista.account.application.port.output.AccountPort;
+import com.kista.account.application.usecase.AccountUseCase;
 import com.kista.sharedkernel.UserDeletedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ import static org.mockito.Mockito.verify;
 @DisplayName("AccountUserCascadeListener 단위 테스트")
 class AccountUserCascadeListenerTest {
 
-    @Mock AccountPort accountPort;
+    @Mock AccountUseCase accountUseCase;
 
     @InjectMocks AccountUserCascadeListener listener;
 
@@ -28,6 +28,6 @@ class AccountUserCascadeListenerTest {
 
         listener.onUserDeleted(new UserDeletedEvent(userId));
 
-        verify(accountPort).deleteByUserId(userId);
+        verify(accountUseCase).deleteAllByUserId(userId);
     }
 }

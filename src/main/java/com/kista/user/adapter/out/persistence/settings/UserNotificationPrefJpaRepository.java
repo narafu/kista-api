@@ -12,4 +12,7 @@ interface UserNotificationPrefJpaRepository extends JpaRepository<UserNotificati
 
     // 여러 사용자의 알림 선호도 배치 조회 (N+1 방지)
     List<UserNotificationPrefJpaEntity> findByUserIdIn(Collection<UUID> userIds);
+
+    // 탈퇴 정리 — 해당 사용자의 알림 선호도 전부 삭제
+    void deleteByUserId(UUID userId);
 }

@@ -7,7 +7,9 @@ import com.kista.sharedkernel.StrategyTicker;
 import com.kista.admin.application.port.output.PortfolioQueryPort;
 import com.kista.platform.telegram.TelegramHttpClient;
 import com.kista.platform.telegram.TelegramProperties;
+import com.kista.admin.application.usecase.AdminUserUseCase;
 import com.kista.user.application.usecase.UserUseCase;
+import com.kista.user.domain.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -27,7 +29,8 @@ class TelegramBotService {
     private final TelegramHttpClient telegramHttpClient;
     private final TelegramProperties props;            // 관리자 봇 토큰
     private final PortfolioQueryPort portfolioQueryPort;
-    private final UserUseCase userUseCase; // /status, /history 조회 + 관리자 승인/거절 명령 실행 전용
+    private final UserUseCase userUseCase; // /status, /history 조회 전용
+    private final AdminUserUseCase adminUserUseCase; // 인라인 버튼 승인/거절 + 감사 로그
 
     void handle(TelegramUpdate update) {
         // 인라인 버튼 클릭(callback_query) 처리 — message가 null이므로 별도 분기 필수
@@ -76,22 +79,26 @@ class TelegramBotService {
             return;
         }
 
-        String reply = switch (action) {
-            case "approve" -> {
-                userUseCase.approve(targetUserId);
-                log.info("텔레그램 관리자 승인: targetUserId={}", targetUserId);
-                yield "✅ 승인 완료: " + targetUserId;
-            }
-            case "reject" -> {
-                userUseCase.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
-                log.info("텔레그램 관리자 거절: targetUserId={}", targetUserId);
-                yield "❌ 거절 완료: " + targetUserId;
-            }
-            default -> {
-                log.warn("알 수 없는 callback action: {}", action);
-                yield null;
-            }
-        };
+        String reply;
+        try {
+            reply = switch (action) {
+                case "approve" -> {
+                    adminUserUseCase.approveUserByTelegram(String.valueOf(chatId), targetUserId);
+                    yield "✅ 승인 완료: " + targetUserId;
+                }
+                case "reject" -> {
+                    adminUserUseCase.rejectUserByTelegram(String.valueOf(chatId), targetUserId);
+                    yield "❌ 거절 완료: " + targetUserId;
+                }
+                default -> {
+                    log.warn("알 수 없는 callback action: {}", action);
+                    yield null;
+                }
+            };
+        } catch (User.AlreadyActiveException e) {
+            // 버튼 중복 클릭·웹에서 먼저 승인 — webhook은 200으로 끝내고(재전송 방지) 안내만 보낸다
+            reply = "ℹ️ 이미 승인된 사용자입니다: " + targetUserId;
+        }
 
         if (reply != null) {
             telegramHttpClient.sendMessage(String.valueOf(chatId), reply, props.botToken());

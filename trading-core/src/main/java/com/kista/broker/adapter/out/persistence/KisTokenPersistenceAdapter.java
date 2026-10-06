@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,4 +37,10 @@ public class KisTokenPersistenceAdapter implements BrokerTokenCachePort {
         repository.invalidateToken(accountId, rejectedAccessToken, INVALIDATED_TOKEN, invalidatedAt);
     }
 
+    @Override
+    @Transactional // bulk delete는 트랜잭션 필수 — 기본 REQUIRED라 탈퇴 정리 트랜잭션에 합류(REQUIRES_NEW 금지)
+    public void deleteByAccountIds(Collection<UUID> accountIds) {
+        if (accountIds.isEmpty()) return;
+        repository.deleteAllByIdInBatch(accountIds);
+    }
 }

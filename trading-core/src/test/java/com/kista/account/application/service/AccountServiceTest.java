@@ -8,15 +8,19 @@ import com.kista.account.domain.model.UpdateAccountCommand;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.application.port.output.BrokerEnabledPort;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
+import com.kista.broker.application.port.output.BrokerTokenCachePort;
+import com.kista.support.TradingFixtures;
 import com.kista.sharedkernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -34,6 +38,7 @@ class AccountServiceTest {
     @Mock BrokerConnectionTestPort connectionTester;  // 라우터가 반환하는 실제 포트 mock
     @Mock BrokerEnabledPort brokerEnabledPort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock BrokerTokenCachePort brokerTokenCachePort;
     @InjectMocks AccountService accountService;
 
     private final UUID userId = UUID.randomUUID();
@@ -325,4 +330,18 @@ class AccountServiceTest {
         verifyNoInteractions(brokerEnabledPort);
     }
 
+    @Test
+    void deleteAllByUserId_deletesTokensBeforeSoftDeletingAccounts() {
+        UUID userId = UUID.randomUUID();
+        Account a1 = TradingFixtures.kisAccount(UUID.randomUUID(), userId);
+        Account a2 = TradingFixtures.kisAccount(UUID.randomUUID(), userId);
+        when(accountPort.findByUserId(userId)).thenReturn(List.of(a1, a2));
+
+        accountService.deleteAllByUserId(userId);
+
+        InOrder inOrder = inOrder(accountPort, brokerTokenCachePort);
+        inOrder.verify(accountPort).findByUserId(userId);
+        inOrder.verify(brokerTokenCachePort).deleteByAccountIds(List.of(a1.id(), a2.id()));
+        inOrder.verify(accountPort).deleteByUserId(userId);
+    }
 }

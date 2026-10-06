@@ -4,6 +4,7 @@ import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.RefreshTokenPort;
 import com.kista.user.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class UserCascadeDeleter {
 
     private final UserPort userPort;
+    private final UserSettingsPort userSettingsPort; // 탈퇴 시 설정·알림 선호도 하드 삭제 (user 소유라 이벤트 없이 같은 트랜잭션)
     private final RefreshTokenPort refreshTokenPort;
     private final BlacklistPort blacklistPort;
     private final ApplicationEventPublisher eventPublisher;
@@ -30,6 +32,7 @@ public class UserCascadeDeleter {
 
     public void deleteCascade(UUID userId) {
         userPort.delete(userId);
+        userSettingsPort.deleteByUserId(userId);
         refreshTokenPort.deleteAllByUserId(userId);
         blacklistPort.add(userId, AT_TTL);
         // 커밋 후 발행 — trading/finance/notify/strategy-config 리스너가 각자 소유 데이터를 독립적으로 정리

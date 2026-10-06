@@ -4,6 +4,7 @@ import com.kista.sharedkernel.UserDeletedEvent;
 import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.RefreshTokenPort;
 import com.kista.user.application.port.output.UserPort;
+import com.kista.user.application.port.output.UserSettingsPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.verify;
 class UserCascadeDeleterTest {
 
     @Mock UserPort userPort;
+    @Mock UserSettingsPort userSettingsPort;
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock BlacklistPort blacklistPort;
     @Mock ApplicationEventPublisher eventPublisher;
@@ -38,6 +40,7 @@ class UserCascadeDeleterTest {
         deleter.deleteCascade(userId);
 
         verify(userPort).delete(userId);
+        verify(userSettingsPort).deleteByUserId(userId);
         verify(refreshTokenPort).deleteAllByUserId(userId);
         verify(blacklistPort).add(eq(userId), any(Duration.class));
         verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));

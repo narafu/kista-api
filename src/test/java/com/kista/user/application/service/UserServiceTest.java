@@ -310,6 +310,31 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("REJECTED 사용자 승인 시 ACTIVE 전환 (공식 전이)")
+    void approve_rejectedUser_setsActive() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(rejectedUser(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.approve(userId);
+
+        verify(userPort).save(argThat(u -> u.status() == UserStatus.ACTIVE));
+        verify(eventPublisher).publishEvent(any(UserApprovedEvent.class));
+    }
+
+    @Test
+    @DisplayName("이미 ACTIVE인 사용자 승인 시 AlreadyActiveException — 저장·이벤트 없음")
+    void approve_activeUser_throws() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(pendingUser(userId).withStatus(UserStatus.ACTIVE));
+
+        assertThatThrownBy(() -> userService.approve(userId)).isInstanceOf(User.AlreadyActiveException.class);
+
+        verify(userPort, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     @DisplayName("거절 시 REJECTED 전환 + 이벤트 발행 (직접 알림 호출 없음)")
     void reject_sets_rejected_and_notifies() {
         UUID userId = UUID.randomUUID();

@@ -1,6 +1,7 @@
 package com.kista.admin.application.service;
 
 import com.kista.sharedkernel.TimeZones;
+import com.kista.user.domain.model.User;
 import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import com.kista.user.application.usecase.UserUseCase;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +32,8 @@ class AdminService implements AdminUserUseCase {
     private final UserSummaryPort userSummaryPort;   // 관리자 화면 전용 read-model
     private final UserUseCase userUseCase; // 승인/거절/탈퇴 위임 (텔레그램 알림 + SSE 포함)
     private final AuditLogPort auditLogPort;             // 감사 로그 기록
+
+    private static final String TELEGRAM_ACTOR = "TELEGRAM_BOT"; // 텔레그램 인라인 버튼 경로 행위자 표기
 
     @Override
     @Transactional(readOnly = true)
@@ -69,6 +73,36 @@ class AdminService implements AdminUserUseCase {
         userUseCase.reject(targetUserId, reason);
         log.info("관리자 사용자 거절: adminId={}, targetUserId={}", adminId, targetUserId);
         auditLogPort.log(adminId, "USER_REJECT", "USER", targetUserId, Map.of("reason", reason == null ? "" : reason));
+    }
+
+    @Override
+    public void approveUserByTelegram(String chatId, UUID targetUserId) {
+        userUseCase.approve(targetUserId);
+        log.info("텔레그램 관리자 승인: chatId={}, targetUserId={}", chatId, targetUserId);
+        auditLogPort.log(resolveTelegramAdmin(chatId), "USER_APPROVE", "USER", targetUserId, telegramPayload(chatId));
+    }
+
+    @Override
+    public void rejectUserByTelegram(String chatId, UUID targetUserId) {
+        userUseCase.reject(targetUserId, null); // 텔레그램 인라인 버튼은 사유 입력 UI 없음
+        log.info("텔레그램 관리자 거절: chatId={}, targetUserId={}", chatId, targetUserId);
+        Map<String, Object> payload = new HashMap<>(telegramPayload(chatId));
+        payload.put("reason", "");
+        auditLogPort.log(resolveTelegramAdmin(chatId), "USER_REJECT", "USER", targetUserId, payload);
+    }
+
+    // chatId에 연결된 ADMIN 사용자 — 없거나 ADMIN이 아니면 null(admin_id nullable, 행위자는 payload.actor로 식별)
+    private UUID resolveTelegramAdmin(String chatId) {
+        return userUseCase.findUserIdByTelegramChatId(chatId)
+                .flatMap(userPort::findById)
+                .filter(u -> u.role() == UserRole.ADMIN)
+                .map(User::id)
+                .orElse(null);
+    }
+
+    // 텔레그램 경로 감사 payload — 채널·chatId 고정 기록
+    private Map<String, Object> telegramPayload(String chatId) {
+        return Map.of("actor", TELEGRAM_ACTOR, "chatId", chatId);
     }
 
     @Override

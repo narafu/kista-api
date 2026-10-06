@@ -123,8 +123,8 @@ class UserService implements UserUseCase {
 
     @Override
     public void approve(UUID userId) {
-        User user = userPort.findByIdOrThrow(userId);
-        User updated = user.withStatus(UserStatus.ACTIVE);
+        // PENDING·REJECTED → ACTIVE, 이미 ACTIVE면 409 (중복 승인 차단)
+        User updated = userPort.findByIdOrThrow(userId).approve();
         userPort.save(updated);
         log.info("사용자 승인: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송

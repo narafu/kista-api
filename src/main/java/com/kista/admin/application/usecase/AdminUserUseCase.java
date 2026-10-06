@@ -15,6 +15,9 @@ public interface AdminUserUseCase {
     List<UserSummary> listByStatus(UserStatus status, LocalDate from, LocalDate to);
     void approveUser(UUID adminId, UUID targetUserId);
     void rejectUser(UUID adminId, UUID targetUserId, String reason);
+    // 텔레그램 인라인 버튼 승인·거절 — chatId로 관리자를 찾고, 없으면 시스템 행위자(TELEGRAM_BOT)로 감사 기록
+    void approveUserByTelegram(String chatId, UUID targetUserId);
+    void rejectUserByTelegram(String chatId, UUID targetUserId);
     void changeRole(UUID adminId, UUID targetUserId, UserRole role);
     void deleteUser(UUID adminId, UUID targetUserId);
 

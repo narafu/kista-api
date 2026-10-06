@@ -77,4 +77,20 @@ class UserSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
         assertThat(result).isPresent();
         assertThat(result.get().strategySuggestions()).isEqualTo(UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
     }
+
+    @Test
+    @DisplayName("deleteByUserId() — user_settings·user_notification_prefs 행을 모두 하드 삭제, 행이 없어도 예외 없음")
+    void deleteByUserId_removesSettingsAndPrefs() {
+        UUID userId = UUID.randomUUID();
+        insertUser(userId);
+        adapter.save(new UserSettings(userId, true, Map.of(NotificationType.TRADING_ALERT, false), List.of("VR")));
+        entityManager.flush();
+
+        adapter.deleteByUserId(userId);
+        adapter.deleteByUserId(UUID.randomUUID()); // 설정 없는 사용자 — no-op
+        entityManager.flush();
+
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM user_settings WHERE user_id = ?", Integer.class, userId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM user_notification_prefs WHERE user_id = ?", Integer.class, userId)).isZero();
+    }
 }
