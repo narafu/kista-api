@@ -87,7 +87,11 @@ class AccountService implements AccountUseCase {
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return accountPort.save(account.withNickname(cmd.nickname()));
+        // 수정 요청은 등록 전용 제약(@Pattern 계좌번호 등) 때문에 @Valid 없이 받는다 — 별명 필수만 여기서 확인
+        if (cmd.nickname() == null || cmd.nickname().isBlank()) {
+            throw new IllegalArgumentException("계좌 별명을 입력해 주세요.");
+        }
+        return accountPort.save(account.withNickname(cmd.nickname().strip()));
     }
 
     @Override

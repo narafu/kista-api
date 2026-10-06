@@ -148,6 +148,17 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("빈 별명으로 수정하면 IllegalArgumentException (→ 400)")
+    void update_blank_nickname_throws() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
+
+        assertThatThrownBy(() -> accountService.update(accountId, userId, new UpdateAccountCommand("  ")))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("본인 계좌 삭제 성공")
     void delete_by_owner_success() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
