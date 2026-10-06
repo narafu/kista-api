@@ -1,0 +1,214 @@
+# 업무 흐름 맵(process.html) 원본 — 사람이 작성한다.
+# ProcessMapTest가 code: 의 `클래스#메서드` 참조가 실제로 존재하는지 검증한다(이름이 바뀌면 빌드 실패).
+# 클래스는 단순 이름(com.kista 안에서 유일해야 함) 또는 FQCN으로 쓴다.
+#
+# 스키마
+#   lanes[]:     {id, label}                        — 스윔레인 순서
+#   landscape[]: {group, steps[]: {id, title, when?, flow?}}  — flow 없는 단계는 "준비 중"으로 표시
+#   flows.<id>:  {title, trigger, summary, steps[]}
+#     step:      {id, lane, to?[], title, desc, code?[], cond?, state?, fail?}
+#       to    — 이 단계가 호출·기록하는 상대 레인(화살표)
+#       cond  — 이 단계가 실행되는 조건(조건부 단계만)
+#       state — 이 단계에서 바뀌는 상태
+#       fail  — 실패 시 어떻게 되는지(실패 경로)
+
+lanes:
+  - {id: user, label: 사용자}
+  - {id: ui, label: kista-ui}
+  - {id: api, label: kista-api}
+  - {id: redis, label: Redis}
+  - {id: trading, label: kista-trading}
+  - {id: db, label: DB}
+  - {id: broker, label: 증권사}
+  - {id: telegram, label: Telegram}
+
+landscape:
+  - group: 사용자 여정
+    steps:
+      - {id: signup, title: 가입·승인}
+      - {id: account-link, title: 계좌 연결}
+      - {id: strategy-register, title: 전략 등록}
+      - {id: daily-trading, title: 매일 자동 매매, when: "개장 22:30 · 마감 04:30", flow: close-batch}
+      - {id: result, title: 결과 확인}
+      - {id: pause-stop, title: 일시정지·종료}
+      - {id: withdraw, title: 탈퇴}
+  - group: 자동 프로세스
+    steps:
+      - {id: open-batch, title: 개장 배치, when: "월~금 22:30"}
+      - {id: close-batch, title: 마감 배치, when: "화~토 04:30", flow: close-batch}
+      - {id: report-notify, title: 리포트·알림, when: "마감 배치 끝", flow: close-batch}
+      - {id: fida-receive, title: FIDA 기준표 수신, when: "매일 07:00 (fida 프로젝트)"}
+  - group: 관리자 프로세스
+    steps:
+      - {id: admin-approve, title: 가입 승인·반려}
+      - {id: admin-runtime, title: 런타임 매매 정책}
+      - {id: admin-orders, title: 주문 정정·재정렬}
+      - {id: admin-scheduler, title: 스케쥴러 수동 실행}
+
+flows:
+  close-batch:
+    title: 마감 매매 배치
+    trigger: 화~토 04:30 KST cron (kista-trading)
+    summary: ACTIVE 전략마다 오늘 장마감 주문(AT_CLOSE)을 계산·예산 배정해 증권사에 접수하고, 장 마감 뒤 체결 결과로 포지션을 기록해 사용자에게 리포트한다.
+    steps:
+      - id: lock
+        lane: trading
+        to: [db]
+        title: 배치 시작·중복 실행 방지
+        desc: cron이 발화하면 DB 분산 락(trading-close, TTL 3h)을 잡아 같은 배치가 두 번 돌지 않게 한다.
+        code: [TradingCloseScheduler#run, SchedulerLockService#tryRun]
+        fail: 다른 프로세스가 락을 쥐고 있으면 조용히 건너뛴다.
+
+      - id: contexts
+        lane: trading
+        to: [db]
+        title: 대상 전략 수집
+        desc: ACTIVE 전략마다 현재 사이클·계좌·사용자 알림 프로필(복제본)을 묶어 배치 컨텍스트를 만든다.
+        code: [BatchContextFactory#buildAll]
+        state: "수집 직후 trading_batch_run → STARTED"
+        fail: 전략 하나의 구성이 실패하면 그 전략만 빼고 관리자에게 알린다. 대상이 0건이면 DONE으로 끝낸다.
+
+      - id: holiday
+        lane: trading
+        to: [db, telegram]
+        title: 휴장일 확인
+        desc: 미국 휴장일 캘린더로 오늘이 거래일인지 확인한다. 이 확인은 배치 전체에서 한 번만 한다.
+        code: [TradingService#isMarketOpen, MarketCalendarPort#isMarketOpen, TradingAlertNotifier#onMarketClosed]
+        cond: 휴장일이면
+        fail: 관리자 봇에만 휴장 알림을 보내고 DONE으로 끝낸다(정상 종료, 사용자 알림 없음).
+
+      - id: start-filter
+        lane: trading
+        title: 아직 시작 전인 전략 제외
+        desc: >-
+          전략 등록 때 정한 시작예정일(기본값 등록한 날)의 밤 미국장부터 매매한다. 그래서 배치 거래일(KST 아침 날짜)이
+          시작예정일보다 뒤일 때만 대상에 넣는다. 예) 월요일 등록 → 화요일 04:30 배치(월요일 밤 미국장)부터 매매.
+          월요일 새벽에 등록해도 월요일 04:30 배치(일요일 밤 미국장)에는 끼지 않는다.
+        code: [TradingService#filterScheduledStart]
+
+      - id: prices
+        lane: trading
+        to: [broker, db]
+        title: 시세·기준표 일괄 조회
+        desc: 종목별 현재가와 전일종가, PRIVACY 기준 매매표(전날 07:00 fida가 보낸 것)를 한 번에 조회한다. 0회차의 진입 방향을 판단하는 데 쓴다.
+        code: [TradingPriceFetcher#loadPriceContext]
+
+      - id: plan
+        lane: trading
+        to: [broker, db]
+        title: 주문 계획·예산 배정
+        desc: >-
+          전략 공식으로 주문을 계산하고, 오늘 아직 없는 AT_CLOSE 슬롯만 후보로 남긴다. BUY는 현재가×1.05 cap을 미리 적용한다.
+          계좌별 실시간 잔고·판매가능수량 안에서 VR → INFINITE → PRIVACY 순서로 예산을 배정하고, 승인된 주문을 PLANNED로 저장한다.
+        code: [TradingCandidatePlanner#planAll, TradingOrderBudgetAllocator#allocate]
+        state: "orders → PLANNED · trading_batch_run → PLANNED"
+        fail: 예산이 부족해 거절된 전략은 사용자에게 잔고 부족을 알린다. 계좌나 사이클 하나가 실패해도 그 단위만 격리하고 나머지는 계속 진행한다.
+
+      - id: wait-order
+        lane: trading
+        title: 주문 시각까지 대기
+        desc: 장 마감 30분 전 접수 시각까지 기다린다. DST는 04:30, 비DST는 05:30에 접수한다(cron 04:30 기준 0분 또는 60분 대기).
+        code: [DstInfo#waitUntilOrderTime, TradingService#waitFor]
+        fail: 재기동 종료면 기동 후 재개된다. 그 밖의 인터럽트는 사용자에게 "미접수" 알림을 보낸다.
+
+      - id: place
+        lane: trading
+        to: [broker, db]
+        title: 증권사 접수
+        desc: >-
+          접수 직전에 현재가를 다시 조회해 BUY cap을 재보정한 뒤 PLANNED 주문을 증권사에 접수한다.
+          계좌별 동시 2건까지 병렬로 처리하고, 이 구간은 재기동 종료 요청이 와도 끝까지 마친다.
+        code: [TradingPriceFetcher#reloadPlacementPrices, TradingOrderExecutor#placeOrders, BuyOrderPriceCapper#capIfNeeded]
+        state: "trading_batch_run → PLACING → PLACED · orders → PLACED / FAILED"
+        fail: 주문 하나의 접수가 실패하면 그 주문은 FAILED로 기록하고 다음 주문을 계속 접수한다.
+
+      - id: wait-close
+        lane: trading
+        to: [telegram]
+        title: 장 마감까지 대기·마감 알림
+        desc: 장 마감 10분 뒤(DST 05:10, 비DST 06:10)까지 기다린 뒤, 장 알림(MARKET_ALERT)을 켠 활성 사용자에게 장 마감 알림을 보낸다(텔레그램 + 앱 푸시).
+        code: [DstInfo#waitUntilPostClose, MarketEventNotifier#notifyMarketClose]
+
+      - id: closing-prices
+        lane: trading
+        to: [broker]
+        title: 확정 종가 조회
+        desc: 장 마감 뒤 종목별 확정 종가를 한 번에 조회한다(라이브 현재가가 아니다 — KIS는 일별 시세, Toss·MOCK은 일봉 캔들).
+        code: [TradingPriceFetcher#fetchClosingPrices]
+
+      - id: cancel-unfilled
+        lane: trading
+        to: [broker]
+        title: 미체결 주문 취소
+        desc: 여기부터는 전략별로 계좌당 동시 2건까지 병렬 처리한다. Toss 지정가는 애프터마켓까지 이어지므로 남은 PLACED 주문을 명시적으로 취소한다. KIS는 장 마감 때 자동 취소된다.
+        code: [TradingReporter#recordAndNotify, TradingReporter#cancelUnresolvedOrders]
+        cond: Toss 계좌만
+        fail: 취소가 실패해도 흐름은 계속되고 관리자에게만 알린다.
+
+      - id: executions
+        lane: trading
+        to: [broker]
+        title: 체결 내역 조회
+        desc: 오늘 체결 내역을 조회해 매매 전 잔고에 반영한 매매 후 잔고를 계산한다.
+        code: [ExecutionPort#getExecutions]
+
+      - id: position
+        lane: trading
+        to: [db]
+        title: 포지션 스냅샷 기록
+        desc: 사이클 포지션(예수금·평단·보유수량·종가)을 한 행 추가하고 리포트 완료 마커를 남긴다. INFINITE는 리버스모드도 함께 판정한다.
+        code: [CyclePositionPersistor#saveCyclePosition]
+        state: "cycle_position +1행 · 리포트 완료 마커"
+
+      - id: rotate
+        lane: trading
+        to: [db, telegram]
+        title: 사이클 종료·다음 사이클
+        desc: 보유 수량이 있다가 0이 되면(청산) 현재 사이클을 종료하고 연속 정책에 따라 새 사이클을 연다. VR은 청산으로 끝나지 않고, 대신 매일 N주 롤오버 주기 도래를 판정한다.
+        code: [StrategyCyclePort#markEnded, CycleRotationService#rotate, VrCycleRolloverService#rollIfDue]
+        cond: 이전 보유 > 0 → 이번 보유 0 (VR 제외) · VR은 롤오버 주기 도래 시
+        state: "strategy_cycle → 종료 · 새 사이클 생성"
+
+      - id: order-status
+        lane: trading
+        to: [db]
+        title: 주문 체결 상태 기록
+        desc: 접수했던 주문을 체결 내역과 외부 주문번호로 맞춰 체결·부분체결로 기록하고, 체결이 없는 주문은 취소로 기록한다.
+        code: [TradingReporter#markFilledOrders]
+        state: "orders → FILLED / PARTIALLY_FILLED / CANCELLED"
+
+      - id: report-telegram
+        lane: trading
+        to: [telegram]
+        title: 매매 리포트 발송
+        desc: >-
+          매매 결산(매수·매도 금액)을 사용자 봇으로 직접 보내고, 같은 내용의 앱 푸시 요청을 Redis Stream에 넣는다.
+          매매 알림(TRADING_ALERT)을 끈 사용자는 둘 다 받지 않는다. 텔레그램은 봇 토큰·chatId가 없으면 건너뛴다.
+          체결 건별 실시간 이벤트(SSE)는 알림 설정과 무관하게 항상 발행한다.
+        code: [TradingReportNotifier#onTradingReportReady, TradingUserNotificationAdapter#notifyTradingReport]
+
+      - id: report-realtime
+        lane: redis
+        to: [api]
+        title: 실시간·푸시 전달
+        desc: >-
+          체결 이벤트는 Redis Pub/Sub(trade.event)으로, 앱 푸시 요청은 Redis Stream으로 kista-api에 넘긴다(FCM 디바이스 토큰은 root 소유).
+          kista-api는 체결 이벤트를 접속 중인 사용자의 SSE 연결로 보내고, 푸시는 사용자 알림 채널에 FCM이 포함될 때만 발송한다.
+        code: [RedisTradeEventPublisher#notifyTrade, RedisTradeEventSubscriber#onMessage, PushNotificationStreamConsumer, PushNotificationPort#pushIfEnabled]
+        fail: SSE는 유실을 허용한다(fire-and-forget). Stream은 5분마다 pending을 복구한다.
+
+      - id: report-ui
+        lane: ui
+        to: [user]
+        title: 화면 실시간 반영
+        desc: >-
+          화면을 열어 둔 사용자는 kista-ui가 /api/trades/stream을 kista-api로 중계한 SSE를 받아 체결 토스트를 띄우고 화면 데이터를 새로 고친다(TradeNotificationProvider).
+          앱 푸시는 포그라운드면 FcmForegroundListener가, 백그라운드면 firebase-messaging-sw.js가 알림으로 보여 준다.
+
+      - id: done
+        lane: trading
+        to: [db]
+        title: 배치 완료
+        desc: 체크포인트를 DONE으로 기록하고, 외부 감시 서비스 URL로 heartbeat를 보낸다(dead-man's switch). heartbeat가 오지 않으면 배치가 끝까지 돌지 않았다는 뜻이다.
+        code: [HeartbeatPort#pingClose]
+        state: "trading_batch_run → DONE"

@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KISTA 업무 흐름 맵</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --fg: #1d2129; --muted: #6b7280; --line: #e3e5e9;
+    --api: #4f63d2; --api-tint: #eef0fc; --tc: #c9821a; --tc-tint: #fdf4e7; --shared: #2f9e5a; --shared-tint: #ebf7f0;
+    --uses: #0e9384; --event: #e0533d; --entity: #8b5cf6; --default: #9ca3af;
+    --focus: #111827; --shadow: 0 1px 2px rgb(0 0 0 / .06), 0 2px 8px rgb(0 0 0 / .04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121417; --surface: #1b1e23; --surface-2: #22262c; --fg: #e7e9ec; --muted: #9aa1ab; --line: #2e333a;
+      --api: #8796f0; --api-tint: #1f2440; --tc: #e6a54a; --tc-tint: #33281a; --shared: #5cc489; --shared-tint: #1a3125;
+      --uses: #2dd4bf; --event: #ff7a63; --entity: #a78bfa; --default: #6b7280;
+      --focus: #f9fafb; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.5 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
+         display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr) 440px; }
+  code, .mono { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: 12px; }
+
+  header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 16px;
+           background: var(--surface); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  .tabs { display: flex; gap: 4px; padding: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; }
+  .tab { padding: 4px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: var(--shadow); }
+  .tab:focus-visible, .btn:focus-visible, .card:focus-visible, .step:focus-visible, .job:focus-visible { outline: 2px solid var(--api); outline-offset: 1px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+          cursor: pointer; font: inherit; font-size: 13px; color: var(--muted); background: var(--surface); }
+  .chip[aria-pressed="true"] { color: var(--fg); background: var(--surface-2); border-color: color-mix(in srgb, var(--fg) 25%, transparent); }
+  .btn { padding: 5px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); font: inherit; font-size: 13px;
+         cursor: pointer; text-decoration: none; }
+  .btn:hover { background: var(--surface-2); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .spacer { flex: 1; }
+
+  main { min-height: 0; overflow: auto; padding: 20px; }
+  .view[hidden] { display: none; }
+  .view-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 14px; }
+  .view-head h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0; }
+
+  /* 랜드스케이프 */
+  .group { margin-bottom: 22px; }
+  .group h3 { margin: 0 0 8px; }
+  .row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .row.journey .card:not(:last-child)::after { content: "→"; position: absolute; right: -15px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+  .row.journey { gap: 22px; }
+  .card { position: relative; min-width: 128px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+          text-align: left; font: inherit; color: var(--fg); box-shadow: var(--shadow); }
+  .card b { display: block; font-size: 14px; }
+  .card small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .card.linked { cursor: pointer; border-color: color-mix(in srgb, var(--tc) 55%, var(--line)); }
+  .card.linked:hover { background: var(--tc-tint); }
+  .card.pending { box-shadow: none; background: var(--surface-2); color: var(--muted); border-style: dashed; cursor: default; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.soon { background: var(--line); color: var(--muted); }
+  .badge.go { background: var(--tc-tint); color: var(--tc); }
+
+  /* 스윔레인 */
+  .lanes { position: relative; display: grid; width: max-content; min-width: 100%;
+           border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .lane-label { position: sticky; left: 0; z-index: 2; display: flex; align-items: center; padding: 0 12px; font-size: 12px; font-weight: 600;
+                color: var(--muted); background: var(--surface-2); border-right: 1px solid var(--line); }
+  .lane-cell { border-top: 1px solid var(--line); min-height: 64px; }
+  .lane-label.first, .lane-cell.first { border-top: 0; }
+  .lane-label:not(.first) { border-top: 1px solid var(--line); }
+  .lane-cell.alt, .lane-label.alt { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+  .lane-label.alt { background: var(--surface-2); }
+  .step { position: relative; z-index: 1; align-self: center; justify-self: center; width: 148px; margin: 8px 6px; padding: 7px 9px;
+          border: 1.5px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--fg); font: inherit; font-size: 12.5px;
+          text-align: left; cursor: pointer; box-shadow: var(--shadow); transition: transform .15s, border-color .15s; }
+  .step .n { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .step b { display: block; font-size: 13px; line-height: 1.35; }
+  .step .marks { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .mark { font-size: 10.5px; padding: 0 5px; border-radius: 4px; font-weight: 600; }
+  .mark.state { background: var(--entity); color: #fff; }
+  .mark.fail { background: color-mix(in srgb, var(--event) 15%, transparent); color: var(--event); }
+  .mark.cond { background: var(--line); color: var(--muted); }
+  .step.trading { border-color: color-mix(in srgb, var(--tc) 55%, var(--line)); }
+  .step.selected { border-color: var(--focus); border-width: 2px; transform: translateY(-1px); }
+  .step.playing { border-color: var(--tc); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tc) 30%, transparent); }
+  .lanes.dim .step:not(.selected):not(.playing) { opacity: .45; }
+  .touch { position: relative; z-index: 1; align-self: center; justify-self: center; width: 12px; height: 12px; border-radius: 50%;
+           background: var(--uses); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uses) 25%, transparent); }
+  svg.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+  svg.links .seq { stroke: var(--muted); stroke-width: 1.5; fill: none; opacity: .55; }
+  svg.links .call { stroke: var(--uses); stroke-width: 1.5; stroke-dasharray: 4 3; fill: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* 타임라인 */
+  .tl { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .tl-row { display: grid; grid-template-columns: 340px 1fr; align-items: center; min-height: 34px; border-top: 1px solid var(--line); }
+  .tl-row:first-child { border-top: 0; }
+  .tl-proc { padding: 8px 12px; font-size: 12px; font-weight: 700; background: var(--surface-2); grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+  .tl-name { padding: 4px 12px; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-name small { color: var(--muted); margin-left: 6px; }
+  .tl-track { position: relative; height: 34px; border-left: 1px solid var(--line); }
+  .tl-axis .tl-track span { position: absolute; top: 8px; transform: translateX(-50%); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .grid-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+  .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--event); opacity: .8; }
+  .job { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border: 0; padding: 0; border-radius: 50%;
+         cursor: pointer; }
+  .job.selected { box-shadow: 0 0 0 3px var(--focus); }
+  .job-time { position: absolute; top: 50%; transform: translateY(-50%); margin-left: 9px; font-size: 11px; color: var(--muted); white-space: nowrap; pointer-events: none; }
+  .periodic { position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed var(--default); }
+  .tl-row.clickable { cursor: pointer; }
+  .tl-row.clickable:hover { background: var(--surface-2); }
+  .tl-row.sel { background: var(--surface-2); }
+
+  /* 상세 패널 */
+  aside { background: var(--surface); border-left: 1px solid var(--line); overflow: auto; }
+  .p-head { position: sticky; top: 0; z-index: 1; padding: 16px 20px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .p-head h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+  .p-body { padding: 4px 20px 24px; }
+  h3 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 20px 0 8px; }
+  .desc { margin: 12px 0 0; font-size: 14.5px; line-height: 1.65; }
+  .box { padding: 10px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+  .box.fail { border-color: color-mix(in srgb, var(--event) 40%, var(--line)); background: color-mix(in srgb, var(--event) 7%, var(--surface)); }
+  .box.state { border-color: color-mix(in srgb, var(--entity) 40%, var(--line)); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { padding: 2px 8px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
+  .lane-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--tc-tint); color: var(--tc); }
+  .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .navs { display: flex; gap: 6px; margin-top: 12px; }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+    main { overflow: visible; padding: 16px; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+    .tl-row { grid-template-columns: 130px 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>KISTA 업무 흐름 맵</h1>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="landscape">프로세스 랜드스케이프</button>
+    <button class="tab" role="tab" data-view="flow">프로세스 상세</button>
+    <button class="tab" role="tab" data-view="timeline">하루 타임라인</button>
+  </nav>
+  <span class="spacer"></span>
+  <a class="btn" href="modules.html">모듈 그래프 →</a>
+</header>
+<main>
+  <section class="view" id="view-landscape">
+    <div class="view-head"><h2>프로세스 랜드스케이프</h2><p class="sub">상세 흐름이 있는 단계를 누르면 스윔레인으로 이동합니다.</p></div>
+    <div id="landscape"></div>
+  </section>
+  <section class="view" id="view-flow" hidden>
+    <div class="view-head">
+      <h2 id="flow-title"></h2>
+      <div id="flow-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <span class="spacer"></span>
+      <button class="btn" id="prev" aria-label="이전 단계">◀</button>
+      <button class="btn" id="play">▶ 재생</button>
+      <button class="btn" id="next" aria-label="다음 단계">▶|</button>
+    </div>
+    <p class="sub" id="flow-sub" style="margin:-6px 0 14px"></p>
+    <div id="swim"></div>
+    <div class="legend">
+      <span><i class="mark state">상태</i> 상태 변화</span>
+      <span><i class="mark fail">실패</i> 실패 경로 있음</span>
+      <span><i class="mark cond">조건</i> 조건부 단계</span>
+      <span><i class="touch" style="display:inline-block"></i> 호출·기록 대상 레인</span>
+    </div>
+  </section>
+  <section class="view" id="view-timeline" hidden>
+    <div class="view-head"><h2>하루 타임라인 (KST)</h2><p class="sub">@Scheduled를 테스트가 자동 수집합니다. 빨간 세로선은 현재 시각입니다.</p></div>
+    <div class="tl" id="tl"></div>
+  </section>
+</main>
+<aside id="panel"></aside>
+<script>
+const DATA = /*__DATA__*/null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const MAP = DATA.map;
+const laneIndex = Object.fromEntries(MAP.lanes.map((l, i) => [l.id, i]));
+const laneLabel = Object.fromEntries(MAP.lanes.map(l => [l.id, l.label]));
+// 실행 프로세스별 점 색 — 모듈 그래프의 서브프로젝트 색과 맞춘다 (trading-core=주황, root=파랑)
+const PROC_COLOR = { 'kista-trading': '--tc', 'kista-scheduler': '--api' };
+const procColor = p => `var(${PROC_COLOR[p] ?? '--default'})`;
+
+let currentFlow = null, selected = -1, timer = null;
+
+/* ---------- 탭·라우팅 (#landscape / #flow/<id>/<step> / #timeline) ---------- */
+function route() {
+  const [view, flowId, stepId] = (location.hash.slice(1) || 'landscape').split('/');
+  const v = ['landscape', 'flow', 'timeline'].includes(view) ? view : 'landscape';
+  document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.view === v));
+  document.querySelectorAll('.view').forEach(s => s.hidden = s.id !== 'view-' + v);
+  stop();
+  if (v === 'flow') {
+    const id = Object.hasOwn(MAP.flows, flowId ?? '') ? flowId : Object.keys(MAP.flows)[0];
+    if (id !== currentFlow) renderFlow(id); else requestAnimationFrame(drawLinks); // 숨김 중 리사이즈 반영
+    const idx = MAP.flows[id].steps.findIndex(s => s.id === stepId);
+    select(idx);
+  } else if (v === 'landscape') {
+    panelLandscape();
+  } else {
+    panelTimeline();
+  }
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  location.hash = t.dataset.view === 'flow' ? 'flow/' + (currentFlow ?? Object.keys(MAP.flows)[0]) : t.dataset.view;
+});
+window.addEventListener('hashchange', route);
+
+/* ---------- 1. 랜드스케이프 ---------- */
+$('landscape').innerHTML = MAP.landscape.map((g, gi) => `
+  <div class="group"><h3>${esc(g.group)}</h3>
+    <div class="row${gi === 0 ? ' journey' : ''}">${g.steps.map(s => s.flow
+      ? `<button class="card linked" data-flow="${esc(s.flow)}"><b>${esc(s.title)}</b>${s.when ? `<small>${esc(s.when)}</small>` : ''}<small><span class="badge go">흐름 보기 →</span></small></button>`
+      : `<div class="card pending"><b>${esc(s.title)}</b>${s.when ? `<small>${esc(s.when)}</small>` : ''}<small><span class="badge soon">준비 중</span></small></div>`).join('')}
+    </div></div>`).join('');
+document.querySelectorAll('.card.linked').forEach(c => c.onclick = () => location.hash = 'flow/' + c.dataset.flow);
+
+function panelLandscape() {
+  const all = MAP.landscape.flatMap(g => g.steps);
+  const linked = all.filter(s => s.flow).length;
+  $('panel').innerHTML = `<div class="p-head"><h2>업무 흐름 맵</h2>
+    <p class="hint">모듈 그래프가 정적 구조를 보여 준다면, 이 맵은 무엇이 계기가 되어 어떤 순서로 어디까지 가는지를 보여 줍니다.</p></div>
+    <div class="p-body">
+      <h3>현황</h3><p class="desc">단계 ${all.length}개 중 상세 흐름 ${linked}개가 연결돼 있습니다.</p>
+      <h3>흐름 목록</h3><div class="tags">${Object.entries(MAP.flows).map(([id, f]) =>
+        `<a class="btn" href="#flow/${esc(id)}">${esc(f.title)}</a>`).join('')}</div>
+      <h3>원본</h3><p class="hint"><code>src/test/resources/architecture/flows.yml</code>을 수정하면 <code>ProcessMapTest</code>가 참조한 클래스·메서드를 검증한 뒤 이 페이지를 다시 생성합니다.</p>
+    </div>`;
+}
+
+/* ---------- 2. 스윔레인 ---------- */
+$('flow-chips').innerHTML = Object.entries(MAP.flows).map(([id, f]) =>
+  `<button class="chip" data-flow="${esc(id)}">${esc(f.title)}</button>`).join('');
+document.querySelectorAll('#flow-chips .chip').forEach(c => c.onclick = () => location.hash = 'flow/' + c.dataset.flow);
+
+function renderFlow(id) {
+  currentFlow = id; selected = -1;
+  const flow = MAP.flows[id];
+  document.querySelectorAll('#flow-chips .chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.flow === id));
+  $('flow-title').textContent = flow.title;
+  $('flow-sub').innerHTML = `<b>계기</b> ${esc(flow.trigger)} · ${esc(flow.summary)}`;
+
+  const cols = flow.steps.length;
+  let html = `<div class="lanes" id="lanes" style="grid-template-columns: 110px repeat(${cols}, 160px); grid-template-rows: repeat(${MAP.lanes.length}, minmax(64px, auto))">`;
+  // 레인 배경 줄
+  MAP.lanes.forEach((l, r) => {
+    const cls = (r === 0 ? ' first' : '') + (r % 2 ? ' alt' : '');
+    html += `<div class="lane-label${cls}" style="grid-row:${r + 1};grid-column:1">${esc(l.label)}</div>`;
+    html += `<div class="lane-cell${cls}" style="grid-row:${r + 1};grid-column:2 / span ${cols}"></div>`;
+  });
+  // 단계 카드 + 상대 레인 접점
+  flow.steps.forEach((s, i) => {
+    const marks = [s.state && '<i class="mark state">상태</i>', s.fail && '<i class="mark fail">실패</i>', s.cond && '<i class="mark cond">조건</i>'].filter(Boolean).join('');
+    html += `<button class="step ${esc(s.lane)}" id="step-${i}" data-i="${i}" style="grid-row:${laneIndex[s.lane] + 1};grid-column:${i + 2}">
+      <span class="n">${i + 1}</span><b>${esc(s.title)}</b>${marks ? `<span class="marks">${marks}</span>` : ''}</button>`;
+    s.to.forEach(t => html += `<i class="touch" data-from="${i}" data-to="${esc(t)}" style="grid-row:${laneIndex[t] + 1};grid-column:${i + 2}" title="${esc(laneLabel[t])}"></i>`);
+  });
+  html += `<svg class="links" id="links"></svg></div>`;
+  $('swim').innerHTML = html;
+  document.querySelectorAll('.step').forEach(b => b.onclick = () => location.hash = `flow/${id}/${flow.steps[b.dataset.i].id}`);
+  requestAnimationFrame(drawLinks);
+}
+
+// 순서 연결선(단계→다음 단계)과 호출선(단계→상대 레인 접점)을 그린다
+function drawLinks() {
+  const lanes = $('lanes'), svg = $('links');
+  if (!lanes || lanes.offsetParent === null) return;
+  const base = lanes.getBoundingClientRect();
+  const box = el => { const r = el.getBoundingClientRect(); return { l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, cx: (r.left + r.right) / 2 - base.left, cy: (r.top + r.bottom) / 2 - base.top }; };
+  const steps = [...lanes.querySelectorAll('.step')].map(box);
+  let d = '';
+  for (let i = 0; i + 1 < steps.length; i++) {
+    const a = steps[i], b = steps[i + 1], mx = (a.r + b.l) / 2;
+    d += `<path class="seq" d="M${a.r},${a.cy} C${mx},${a.cy} ${mx},${b.cy} ${b.l},${b.cy}"/>`;
+  }
+  lanes.querySelectorAll('.touch').forEach(t => {
+    const s = steps[t.dataset.from], p = box(t);
+    const y1 = p.cy > s.cy ? s.b : s.t;
+    d += `<path class="call" d="M${s.cx},${y1} L${p.cx},${p.cy}"/>`;
+  });
+  svg.innerHTML = d;
+}
+window.addEventListener('resize', drawLinks);
+
+function select(i, scroll = true) {
+  const flow = MAP.flows[currentFlow];
+  selected = i;
+  document.querySelectorAll('.step').forEach(b => b.classList.toggle('selected', +b.dataset.i === i));
+  $('lanes')?.classList.toggle('dim', i >= 0);
+  $('prev').disabled = i <= 0;
+  $('next').disabled = i >= flow.steps.length - 1;
+  if (i < 0) return panelFlow(flow);
+  const el = $('step-' + i);
+  if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  panelStep(flow, flow.steps[i], i);
+}
+
+function panelFlow(flow) {
+  const states = flow.steps.filter(s => s.state).length, fails = flow.steps.filter(s => s.fail).length;
+  $('panel').innerHTML = `<div class="p-head"><h2>${esc(flow.title)}</h2><p class="hint">${esc(flow.trigger)}</p></div>
+    <div class="p-body"><p class="desc">${esc(flow.summary)}</p>
+      <h3>구성</h3><p class="desc">단계 ${flow.steps.length}개 · 상태 변화 ${states}곳 · 실패 경로 ${fails}곳</p>
+      <h3>보는 법</h3><p class="hint">단계를 누르면 업무 설명과 담당 코드가 보입니다. ▶ 재생은 단계를 순서대로 하이라이트합니다.</p></div>`;
+}
+
+function panelStep(flow, s, i) {
+  const href = k => `#flow/${currentFlow}/${flow.steps[k].id}`;
+  $('panel').innerHTML = `<div class="p-head"><span class="hint">${i + 1} / ${flow.steps.length} · <span class="lane-pill">${esc(laneLabel[s.lane])}</span></span>
+      <h2>${esc(s.title)}</h2></div>
+    <div class="p-body">
+      ${s.cond ? `<h3>실행 조건</h3><div class="box">${esc(s.cond)}</div>` : ''}
+      <p class="desc">${esc(s.desc)}</p>
+      ${s.state ? `<h3>상태 변화</h3><div class="box state">${esc(s.state)}</div>` : ''}
+      ${s.fail ? `<h3>실패 경로</h3><div class="box fail">${esc(s.fail)}</div>` : ''}
+      ${s.to.length ? `<h3>호출·기록 대상</h3><div class="tags">${s.to.map(t => `<span class="tag">${esc(laneLabel[t])}</span>`).join('')}</div>` : ''}
+      ${s.code.length ? `<h3>담당 코드</h3><div class="tags">${s.code.map(c => `<code class="tag">${esc(c)}</code>`).join('')}</div>` : ''}
+      <div class="navs">${i > 0 ? `<a class="btn" href="${esc(href(i - 1))}">◀ ${esc(flow.steps[i - 1].title)}</a>` : ''}
+        ${i < flow.steps.length - 1 ? `<a class="btn" href="${esc(href(i + 1))}">${esc(flow.steps[i + 1].title)} ▶</a>` : ''}</div>
+    </div>`;
+}
+
+const go = i => location.hash = `flow/${currentFlow}/${MAP.flows[currentFlow].steps[i].id}`;
+$('prev').onclick = () => selected > 0 && go(selected - 1);
+$('next').onclick = () => go(Math.min(selected + 1, MAP.flows[currentFlow].steps.length - 1));
+
+// ▶ 재생 — 1.4초 간격으로 다음 단계 하이라이트, 끝나면 정지
+function stop() {
+  clearInterval(timer); timer = null;
+  $('play').textContent = '▶ 재생';
+  document.querySelectorAll('.step.playing').forEach(b => b.classList.remove('playing'));
+}
+$('play').onclick = () => {
+  if (timer) return stop();
+  const n = MAP.flows[currentFlow].steps.length;
+  let i = selected >= 0 && selected < n - 1 ? selected : -1;
+  const tick = () => {
+    i++;
+    if (i >= n) return stop();
+    document.querySelectorAll('.step').forEach(b => b.classList.toggle('playing', +b.dataset.i === i));
+    select(i);
+    history.replaceState(null, '', `#flow/${currentFlow}/${MAP.flows[currentFlow].steps[i].id}`);
+  };
+  tick();
+  timer = setInterval(tick, 1400);
+  $('play').textContent = '■ 정지';
+};
+
+/* ---------- 3. 하루 타임라인 ---------- */
+const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const pct = m => (m / 1440 * 100).toFixed(3) + '%';
+function renderTimeline() {
+  const grid = [...Array(25).keys()].map(h => `<i class="grid-line" style="left:${pct(h * 60)}"></i>`).join('');
+  const kstNow = new Date(Date.now() + 9 * 3600e3);
+  const now = `<i class="now" style="left:${pct(kstNow.getUTCHours() * 60 + kstNow.getUTCMinutes())}" title="현재 KST"></i>`;
+  let html = `<div class="tl-row tl-axis"><div class="tl-name"></div><div class="tl-track">${[0, 3, 6, 9, 12, 15, 18, 21].map(h =>
+    `<span style="left:${pct(h * 60)}">${String(h).padStart(2, '0')}</span>`).join('')}</div></div>`;
+  const byProc = Object.groupBy(DATA.jobs.map((j, i) => ({ ...j, i })), j => j.process);
+  // 매매 → 배치 → 공용(주기 복구) 순
+  const rank = p => ['kista-trading', 'kista-scheduler'].indexOf(p) >>> 0;
+  const order = Object.keys(byProc).sort((a, b) => rank(a) - rank(b));
+  for (const proc of order) {
+    const jobs = byProc[proc];
+    const color = procColor(proc);
+    html += `<div class="tl-row"><div class="tl-proc"><i class="job" style="position:static;transform:none;background:${color}"></i>${esc(proc)} <span class="hint" style="margin:0">${jobs.length}개</span></div></div>`;
+    for (const j of jobs) {
+      const dots = j.times.length
+        ? j.times.map(t => `<button class="job" data-i="${j.i}" style="left:${pct(toMin(t))};background:${color}" aria-label="${esc(j.name)} ${t}"></button><span class="job-time" style="left:${pct(toMin(t))}">${t}</span>`).join('')
+        : `<i class="periodic"></i>`;
+      html += `<div class="tl-row clickable" data-i="${j.i}"><div class="tl-name" title="${esc(j.name)}">${esc(j.name.replace(/#.*/, ''))}<small>#${esc(j.name.replace(/.*#/, ''))} · ${esc(j.days)}${j.times.length ? '' : ' ' + esc(j.schedule)}</small></div>
+        <div class="tl-track">${grid}${now}${dots}</div></div>`;
+    }
+  }
+  $('tl').innerHTML = html;
+  $('tl').querySelectorAll('.tl-row.clickable').forEach(r => r.onclick = () => panelJob(+r.dataset.i));
+}
+
+function panelTimeline() {
+  const procs = Object.groupBy(DATA.jobs, j => j.process);
+  $('panel').innerHTML = `<div class="p-head"><h2>하루 타임라인</h2><p class="hint">모든 시각은 KST입니다. 행을 누르면 cron 원문과 담당 메서드가 보입니다.</p></div>
+    <div class="p-body"><h3>실행 프로세스</h3>${Object.entries(procs).map(([p, js]) =>
+      `<p class="desc"><i class="job" style="position:static;display:inline-block;transform:none;background:${procColor(p)}"></i> <b>${esc(p)}</b> — ${js.length}개</p>`).join('')}
+      <h3>참고</h3><p class="hint">매매 배치는 cron 발화 뒤에 내부 대기(주문 시각·장 마감)가 이어집니다. 실제 접수 시각은 마감 배치 흐름의 "주문 시각까지 대기" 단계를 보세요.</p>
+      <a class="btn" href="#flow/close-batch">마감 배치 흐름 →</a></div>`;
+}
+
+function panelJob(i) {
+  const j = DATA.jobs[i];
+  document.querySelectorAll('.tl-row.clickable').forEach(r => r.classList.toggle('sel', +r.dataset.i === i));
+  $('panel').innerHTML = `<div class="p-head"><span class="hint">${esc(j.process)} · ${esc(j.module)} 모듈</span><h2>${esc(j.name.replace(/#.*/, ''))}</h2></div>
+    <div class="p-body">
+      <h3>실행</h3><p class="desc">${esc(j.days)}${j.times.length ? ' ' + j.times.join(', ') + ' KST' : ' · ' + esc(j.schedule)}</p>
+      <h3>스케줄 원문</h3><code class="tag">${esc(j.schedule)}</code>
+      <h3>담당 메서드</h3><code class="tag">${esc(j.name)}</code></div>`;
+}
+
+renderTimeline();
+route();
+</script>
+</body>
+</html>

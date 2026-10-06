@@ -9,6 +9,7 @@
 | L1.5 프로세스 간 통신 | root ↔ trading-core는 무엇으로 대화하나 | 아래 L1.5 |
 | L2 모듈 의존 그래프 | 모듈끼리 누가 누구를 참조하나 | **자동 생성** — 아래 L2 |
 | L3 핵심 흐름 | 매매 배치는 어떤 순서로 도나 | 아래 L3, 상세는 `docs/agents/workflow.md` |
+| 업무 흐름 맵 | 무엇이 계기가 되어 어떤 순서로 어디까지 가나·하루에 언제 무엇이 도나 | **반자동 생성** — 아래 "업무 흐름 맵" |
 
 ## L0 시스템 컨텍스트
 
@@ -132,6 +133,20 @@ flowchart LR
 - `modules.html`: 브라우저로 연다(Cytoscape.js를 CDN에서 받으므로 인터넷 필요). 노드 클릭 → 그 모듈의 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존 전체. 의존 종류 필터·platform/sharedkernel 숨김·검색 지원. 생성기는 `ModuleGraphExporter`, 템플릿은 `src/test/resources/architecture/module-graph.html`
 - `.puml`: IntelliJ PlantUML Integration 플러그인으로 열면 렌더링된다
 - `build/`는 IntelliJ에서 Excluded라 `Ctrl+Shift+N` 두 번(non-project 포함)으로 찾는다
+
+## 업무 흐름 맵 (process.html, 반자동 생성)
+
+모듈 그래프가 정적 구조라면 이쪽은 업무 흐름이다. 흐름 내용은 사람이 `src/test/resources/architecture/flows.yml`에 쓰고, 하루 타임라인은 테스트가 `@Scheduled`를 자동 수집한다.
+
+```bash
+./gradlew :test --tests 'com.kista.architecture.ProcessMapTest'
+# 출력: build/spring-modulith-docs/process.html (modules.html과 서로 링크)
+```
+
+- 탭 3개: 프로세스 랜드스케이프(사용자 여정·자동·관리자 단계, 상세 흐름이 있는 단계만 클릭 가능) / 프로세스 상세 스윔레인(레인 = 사용자·kista-ui·kista-api·Redis·kista-trading·DB·증권사·Telegram, 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 하루 타임라인(KST 24h, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `scheduler.enabled` 게이트 여부로 `kista-scheduler` 또는 공용)
+- `ProcessMapTest`가 flows.yml의 `클래스#메서드` 참조·레인·흐름 연결을 검증한다 — 메서드 이름이 바뀌면 이 테스트가 깨지니 flows.yml을 같이 고친다. 스키마는 flows.yml 머리 주석이 SSOT
+- 현재 상세 흐름은 마감 배치 1개. 가입·승인/전략 등록/개장 배치/회원 탈퇴는 flows.yml `flows:`에 키를 추가하고 landscape의 `flow:`로 연결하면 된다
+- 생성기는 `ProcessMapExporter`, 템플릿은 `src/test/resources/architecture/process-map.html`(외부 라이브러리 없음)
 
 ## L3 마감 매매 배치 (화~토 04:30 KST)
 
