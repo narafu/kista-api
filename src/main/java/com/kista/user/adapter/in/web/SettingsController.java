@@ -19,7 +19,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Tag(name = "설정", description = "텔레그램 봇 알림 설정 관리")
 @RestController
@@ -87,7 +89,7 @@ public class SettingsController {
         try {
             notificationType = NotificationType.valueOf(type.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("알 수 없는 알림 타입: " + type + ". 허용값: TRADING_ALERT");
+            throw new IllegalArgumentException("알 수 없는 알림 타입: " + type + ". 허용값: " + Arrays.stream(NotificationType.values()).map(Enum::name).collect(Collectors.joining(", ")));
         }
         userSettingsUseCase.updateNotificationPref(userId, notificationType, body.enabled());
     }

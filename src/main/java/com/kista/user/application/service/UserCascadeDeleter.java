@@ -5,6 +5,7 @@ import com.kista.user.application.port.output.BlacklistPort;
 import com.kista.user.application.port.output.RefreshTokenPort;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSettingsPort;
+import com.kista.user.domain.auth.TokenConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -28,7 +29,7 @@ public class UserCascadeDeleter {
     private final BlacklistPort blacklistPort;
     private final ApplicationEventPublisher eventPublisher;
 
-    private static final Duration AT_TTL = Duration.ofMinutes(15);
+    private static final Duration AT_TTL = TokenConstants.AT_TTL; // AT 수명 전체 — 탈퇴 전 발급된 AT가 만료될 때까지 차단
 
     public void deleteCascade(UUID userId) {
         userPort.delete(userId);

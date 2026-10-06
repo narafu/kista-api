@@ -136,6 +136,7 @@ class AdminServiceTest {
     @Test
     void changeRole_throwsWhenLastAdmin() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(DomainFixtures.userWithStatus(targetId, UserStatus.ACTIVE, UserRole.ADMIN));
         when(userPort.countByRole(UserRole.ADMIN)).thenReturn(1L);
 
         assertThatThrownBy(() -> adminService.changeRole(adminId, targetId, UserRole.USER))
@@ -147,10 +148,23 @@ class AdminServiceTest {
     @Test
     void changeRole_allowsDemotionWhenMultipleAdmins() {
         UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(DomainFixtures.userWithStatus(targetId, UserStatus.ACTIVE, UserRole.ADMIN));
         when(userPort.countByRole(UserRole.ADMIN)).thenReturn(2L);
 
         adminService.changeRole(adminId, targetId, UserRole.USER);
 
+        verify(userUseCase).changeRole(targetId, UserRole.USER);
+    }
+
+    @Test
+    void changeRole_toUserForNonAdminTarget_skipsLastAdminCheck() {
+        // 대상이 이미 USER면 관리자 수가 줄지 않으므로 마지막 관리자 검사로 막지 않는다
+        UUID adminId = UUID.randomUUID(), targetId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(targetId)).thenReturn(DomainFixtures.userWithStatus(targetId, UserStatus.ACTIVE, UserRole.USER));
+
+        adminService.changeRole(adminId, targetId, UserRole.USER);
+
+        verify(userPort, never()).countByRole(any());
         verify(userUseCase).changeRole(targetId, UserRole.USER);
     }
 

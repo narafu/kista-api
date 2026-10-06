@@ -2,9 +2,11 @@ package com.kista.user.application.service;
 
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
+import com.kista.user.application.event.UserSeedPromotedEvent;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.domain.model.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,11 +22,13 @@ class AdminSeedPromoter {
 
     private final UserPort userPort;
     private final UserNotifyProfilePublisher userNotifyProfilePublisher;
+    private final ApplicationEventPublisher eventPublisher; // 승격 감사 로그 이벤트 — admin이 커밋 후 기록
 
     @Transactional
     User promote(User user) {
         User promoted = userPort.save(user.withStatus(UserStatus.ACTIVE).withRole(UserRole.ADMIN));
         userNotifyProfilePublisher.publishStatusChanged(promoted);
+        eventPublisher.publishEvent(new UserSeedPromotedEvent(promoted.id()));
         return promoted;
     }
 }

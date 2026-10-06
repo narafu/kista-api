@@ -1,5 +1,7 @@
 package com.kista.user.application.service;
 
+import com.kista.user.application.event.UserSeedPromotedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.kista.sharedkernel.UserRole;
 import com.kista.sharedkernel.UserStatus;
 import com.kista.support.DomainFixtures;
@@ -27,6 +29,7 @@ class AdminSeedPromoterTest {
 
     @Mock UserPort userPort;
     @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks AdminSeedPromoter promoter;
 
@@ -46,5 +49,7 @@ class AdminSeedPromoterTest {
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userNotifyProfilePublisher).publishStatusChanged(captor.capture());
         assertThat(captor.getValue().status()).isEqualTo(UserStatus.ACTIVE);
+        // 감사 로그용 승격 이벤트 발행
+        verify(eventPublisher).publishEvent(new UserSeedPromotedEvent(userId));
     }
 }
