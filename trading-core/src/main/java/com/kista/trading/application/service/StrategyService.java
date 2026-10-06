@@ -60,10 +60,11 @@ class StrategyService implements StrategyUseCase {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 먼저 PAUSED로 기록해 이후 배치가 이 전략으로 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다
-        // 하나라도 증권사 취소에 실패하면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
+        // 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
+        // 자격증명 오류(키 만료·철회)는 재시도로 풀리지 않아 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
-        if (cancelled.failedCount() > 0) {
+        if (cancelled.retryableFailedCount() > 0) {
             throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 전략을 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.");
         }
         stateWriter.delete(strategyId);

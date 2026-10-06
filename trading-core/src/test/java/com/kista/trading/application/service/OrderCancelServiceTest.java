@@ -1,5 +1,6 @@
 package com.kista.trading.application.service;
 
+import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.support.StubBrokerApiException;
 import com.kista.sharedkernel.OrderStatus;
@@ -176,6 +177,25 @@ class OrderCancelServiceTest {
         assertThat(eventCaptor.getValue().strategyId()).isEqualTo(cycleId);
         assertThat(eventCaptor.getValue().failedCount()).isEqualTo(1);
         assertThat(eventCaptor.getValue().summary()).contains(order2.id().toString());
+    }
+
+    @Test
+    @DisplayName("cancelByCycle: 자격증명 오류 실패는 credentialFailedCount로 따로 세어 재시도 대상에서 뺀다")
+    void cancelByCycle_credentialFailure_countedSeparately() {
+        Order order = placedOrder(UUID.randomUUID(), "ORD_1");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+                .thenReturn(List.of(order));
+        doThrow(new BrokerCredentialException()).when(brokerPort).cancel(eq(cancelOf(order)), any());
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result).isEqualTo(new CancelResult(0, 1, 1));
+        assertThat(result.retryableFailedCount()).isZero();
+        verify(eventPublisher).publishEvent(any(OrderCancelFailedEvent.class)); // 관리자 알림은 그대로
     }
 
     @Test

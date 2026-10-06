@@ -9,6 +9,7 @@ import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.OrderCancelException;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.broker.domain.model.BrokerApiException;
+import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
@@ -75,6 +76,7 @@ class OrderCancelService {
 
         // PLACED 주문: 증권사 취소 + DB 상태 변경 (best-effort)
         int failedCount = 0;
+        int credentialFailedCount = 0; // 자격증명 오류 실패 — 재시도로 풀리지 않아 삭제를 막지 않는다
         List<String> failures = new ArrayList<>(); // 취소 실패 건 요약 — 커밋 후 알림 1건으로 통지
 
         for (Order order : placedOrders) {
@@ -96,6 +98,9 @@ class OrderCancelService {
                 failures.add("orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId()
                         + ": " + e.getMessage());
                 failedCount++;
+                if (e instanceof BrokerCredentialException) {
+                    credentialFailedCount++;
+                }
             }
         }
 
@@ -104,7 +109,7 @@ class OrderCancelService {
             eventPublisher.publishEvent(new OrderCancelFailedEvent(strategyId, failedCount, String.join("; ", failures)));
         }
 
-        return new CancelResult(cancelledCount, failedCount);
+        return new CancelResult(cancelledCount, failedCount, credentialFailedCount);
     }
 
     void cancelOrder(UUID orderId, UUID requesterId) {

@@ -315,6 +315,19 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("delete() 호출 시 실패가 자격증명 오류뿐이면 삭제를 진행한다(재시도해도 풀리지 않음)")
+    void delete_proceeds_when_only_credential_failures() {
+        Account account = ownerAccount();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(orderCancelService.cancelOpenOrders(STRATEGY_ID, account)).thenReturn(new CancelResult(0, 1, 1));
+
+        strategyService.delete(STRATEGY_ID, USER_ID);
+
+        verify(strategyPort).delete(STRATEGY_ID);
+    }
+
+    @Test
     @DisplayName("delete() 호출 시 증권사 취소에 실패한 주문이 있으면 삭제하지 않고 PAUSED로 남긴다")
     void delete_aborts_when_order_cancel_fails() {
         Account account = ownerAccount();
