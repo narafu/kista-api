@@ -3,16 +3,12 @@ package com.kista.trading.adapter.in.schedule;
 import com.kista.platform.scheduling.SchedulerJobRunner;
 import com.kista.platform.scheduling.SchedulerLockService;
 import com.kista.trading.domain.model.TradingAccount;
-import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.port.output.*;
-import com.kista.privacy.application.port.output.PrivacyTradePort;
-import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.trading.application.port.output.HeartbeatPort;
 import com.kista.platform.scheduling.SchedulerLifecycleEvent;
 import com.kista.support.TradingFixtures;
@@ -49,11 +45,8 @@ class TradingOpenSchedulerTest {
     @Mock TradingExecutionUseCase useCase;
     @Mock StrategyPort strategyPort;
     @Mock SchedulerLockService schedulerLockService;
-    @Mock PrivacyTradePort privacyTradePort;
-    @Mock PrivacyTradeValidationUseCase validationService;
     @Mock BatchContextFactory contextFactory;
     @Mock ApplicationEventPublisher events;
-    @Mock TradingErrorReportPort errorReportPort;
     @Mock HeartbeatPort heartbeatPort;
 
     TradingOpenScheduler scheduler;
@@ -83,8 +76,8 @@ class TradingOpenSchedulerTest {
     void setUp() throws InterruptedException {
         // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
         SchedulerJobRunner jobRunner = new SchedulerJobRunner(events);
-        scheduler = new TradingOpenScheduler(useCase, strategyPort, errorReportPort, schedulerLockService,
-                privacyTradePort, validationService, contextFactory, jobRunner, heartbeatPort);
+        scheduler = new TradingOpenScheduler(useCase, strategyPort, schedulerLockService,
+                contextFactory, jobRunner, heartbeatPort);
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
@@ -115,8 +108,6 @@ class TradingOpenSchedulerTest {
         BatchContext privacyCtx  = new BatchContext(privacy,  mockCycle(privacy.id()),  account, user);
 
         when(strategyPort.findAllActive()).thenReturn(List.of(infinite, privacy));
-        // PRIVACY 가드: 기준 매매표 없음 → 필터 없이 통과
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
         when(contextFactory.buildAll(List.of(infinite, privacy))).thenReturn(List.of(infiniteCtx, privacyCtx));
 
         scheduler.run();
@@ -142,7 +133,6 @@ class TradingOpenSchedulerTest {
         BatchContext context = new BatchContext(strategy, mockCycle(strategy.id()), mockAccount(ACCOUNT_ID), mockUser());
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
-        // INFINITE만 있으면 guardPrivacyStrategies 조기 반환 — privacyTradePort 호출 없음
         when(contextFactory.buildAll(any())).thenReturn(List.of(context));
         doAnswer(invocation -> {
             Thread.currentThread().interrupt();
@@ -167,7 +157,6 @@ class TradingOpenSchedulerTest {
         RuntimeException ex = new RuntimeException("KIS API 오류");
 
         when(strategyPort.findAllActive()).thenReturn(List.of(strategy));
-        // INFINITE만 있으면 guardPrivacyStrategies 조기 반환 — privacyTradePort 호출 없음
         when(contextFactory.buildAll(any())).thenReturn(List.of(context));
         doThrow(ex).when(useCase).placeOpenOrders(any());
 
@@ -187,33 +176,7 @@ class TradingOpenSchedulerTest {
 
         scheduler.run();
 
-        verifyNoInteractions(strategyPort, contextFactory, useCase, events, errorReportPort, heartbeatPort);
-    }
-
-    @Test
-    void run_invalidPrivacyBase_pausesPrivacyStrategiesAndSkipsThem() throws InterruptedException {
-        Strategy infinite = mockStrategy(ACCOUNT_ID, StrategyType.INFINITE);
-        UUID privacyAccountId = UUID.randomUUID();
-        Strategy privacy = mockStrategy(privacyAccountId, StrategyType.PRIVACY);
-        TradingAccount infiniteAccount = mockAccount(ACCOUNT_ID);
-        TradingUserProfile user = mockUser();
-        BatchContext infiniteCtx = new BatchContext(infinite, mockCycle(infinite.id()), infiniteAccount, user);
-        PrivacyTradeBase invalidBase = new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("225.75"),
-                4, new BigDecimal("13977.43"), List.of());
-
-        when(strategyPort.findAllActive()).thenReturn(List.of(infinite, privacy));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(invalidBase));
-        when(validationService.inspect(invalidBase))
-                .thenReturn(new PrivacyTradeValidationReport(java.util.List.of(new PrivacyTradeValidationReport.Issue(PrivacyTradeValidationReport.Severity.WARNING, "MISSING_SELL", "SELL 주문이 없습니다"))));
-        // 가드 후 INFINITE만 남아 contextFactory에 전달됨
-        when(contextFactory.buildAll(List.of(infinite))).thenReturn(List.of(infiniteCtx));
-
-        scheduler.run();
-
-        // strategyPort는 StrategyPort(읽기 전용)로 전환됨 — save() 자체가 없어 미호출 검증이 구조적으로 보장됨
-        verify(useCase).placeOpenOrders(List.of(infiniteCtx));
-        verify(errorReportPort).reportError(argThat(e -> e instanceof IllegalStateException));
-        verify(heartbeatPort).pingOpen();
+        verifyNoInteractions(strategyPort, contextFactory, useCase, events, heartbeatPort);
     }
 
     @Test

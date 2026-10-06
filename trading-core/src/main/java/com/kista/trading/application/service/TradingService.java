@@ -58,6 +58,7 @@ class TradingService {
     private final TradingBatchRunPort batchRunPort;            // 재개 체크포인트 (단계 기록·리포트 마커 조회)
     private final TradingBatchRunState runState;               // 협조적 종료 — 배치 스레드·임계구역 등록
     private final TradingBalanceLoader balanceLoader;          // 리포트 재개 시 사전 잔고(최신 cycle_position) 재구성
+    private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
@@ -100,7 +101,7 @@ class TradingService {
         }
 
         // 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 (0회차 진입 방향 판단에 모두 필요)
-        TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(started, today);
+        TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, today), today, "마감 배치");
 
         // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<TradingCandidatePlanner.CycleState> states = candidatePlanner.planAll(started, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
@@ -277,7 +278,7 @@ class TradingService {
         }
 
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
-        TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(started, tradeDate);
+        TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
 
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
@@ -372,6 +373,12 @@ class TradingService {
     }
 
     // 시작예정일 미도래 사이클 제외 — tradeDate가 startDate 이후일 때만 집행 (tradeDate > startDate)
+    // 신규 주문 계획 전 PRIVACY 기준표 장전 점검 — 이슈면 기준표를 비워 PRIVACY 신규 주문만 막고 기존 주문 처리는 유지
+    // (리포트 재개 resumeCloseReport는 이미 접수된 주문의 기록이라 적용하지 않는다)
+    private TradingPriceFetcher.PriceContext screenPrivacyBase(TradingPriceFetcher.PriceContext priceCtx, LocalDate tradeDate, String batchLabel) {
+        return priceCtx.withPrivacyBase(privacyBaseGuard.screen(priceCtx.privacyBase(), tradeDate, batchLabel));
+    }
+
     private List<BatchContext> filterScheduledStart(List<BatchContext> contexts, LocalDate tradeDate) {
         return contexts.stream().filter(ctx -> {
             boolean started = tradeDate.isAfter(ctx.currentCycle().startDate());

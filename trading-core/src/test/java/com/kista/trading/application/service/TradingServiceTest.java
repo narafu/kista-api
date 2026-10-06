@@ -88,6 +88,8 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
+    @Mock com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
+    @Mock com.kista.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
     @Mock com.kista.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
     @Mock LiveBalancePort liveBalancePort;
     @Mock SellableQuantityPort sellableQuantityPort;
@@ -215,7 +217,11 @@ class TradingServiceTest {
                 priceFetcher, orderExecutor, reporter,
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
-                batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader);
+                batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader,
+                new PrivacyBaseGuard(privacyValidation, errorReportPort));
+        // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
+        lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
+                .thenReturn(new com.kista.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
     }
 
     // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 같은 슬롯을 저장했으면 배치는 다시 저장하지 않고 그 주문을 접수한다
@@ -1505,6 +1511,78 @@ class TradingServiceTest {
         verify(orderPort, never()).saveAll(anyList());
         verify(brokerOrderPort).place(eq(instructionOf(existingSell)), eq(ACCOUNT_REF));
         verify(privacyStrategy, never()).buildOrders(any(), any(), any());
+    }
+
+    // 마감 배치 장전 가드 — MISSING_SELL 기준표면 신규 PRIVACY 주문은 만들지 않되, 이미 있는 주문은 접수·체결 조회까지 이어간다
+    @Test
+    void executeBatch_privacyBaseWithIssues_skipsNewPrivacyOrdersButKeepsExistingOrders() throws InterruptedException {
+        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
+                PRICE, new BigDecimal("20.00"), 10, null, null);
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(),
+                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
+                1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
+        PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(missingSellBase));
+        when(privacyValidation.inspect(missingSellBase)).thenReturn(missingSellReport());
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(privacyCycle.id()), any()))
+                .thenReturn(List.of(existingSell));
+        when(orderPort.findPlannedByCycleAndDate(eq(privacyCycle.id()), any())).thenReturn(List.of(existingSell));
+        when(brokerOrderPort.place(eq(instructionOf(existingSell)), eq(ACCOUNT_REF)))
+                .thenReturn(brokerResult("ORD-PRIVACY-SELL"));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(privacy, privacyCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(privacyStrategy, never()).buildOrders(any(), any(), any()); // 신규 계획 없음
+        verify(orderPort, never()).saveAll(anyList());
+        verify(brokerOrderPort).place(eq(instructionOf(existingSell)), eq(ACCOUNT_REF)); // 기존 주문은 접수
+        verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT_REF));    // 체결 조회·리포트까지 진행
+        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("마감 배치")
+                && e.getMessage().contains("MISSING_SELL")));
+    }
+
+    @Test
+    void executeBatch_privacyBaseWithIssues_noExistingOrders_placesNothing() throws InterruptedException {
+        Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
+                PRICE, new BigDecimal("20.00"), 10, null, null);
+        PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
+                UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
+
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
+        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(missingSellBase));
+        when(privacyValidation.inspect(missingSellBase)).thenReturn(missingSellReport());
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(privacyCycle.id()), any())).thenReturn(List.of());
+
+        service.executeBatch(List.of(new BatchContext(privacy, privacyCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(privacyStrategy, never()).buildOrders(any(), any(), any());
+        verify(orderPort, never()).saveAll(anyList());
+        verify(brokerOrderPort, never()).place(any(), any());
+        verify(errorReportPort).reportError(any());
+    }
+
+    private static com.kista.privacy.domain.model.PrivacyTradeValidationReport missingSellReport() {
+        return new com.kista.privacy.domain.model.PrivacyTradeValidationReport(List.of(
+                new com.kista.privacy.domain.model.PrivacyTradeValidationReport.Issue(
+                        com.kista.privacy.domain.model.PrivacyTradeValidationReport.Severity.WARNING, "MISSING_SELL", "SELL 주문이 없습니다")));
     }
 
     @Test

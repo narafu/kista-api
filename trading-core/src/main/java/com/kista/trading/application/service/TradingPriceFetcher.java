@@ -39,7 +39,12 @@ class TradingPriceFetcher {
             BrokerAccountRef priceAccount,
             Map<StrategyTicker, PriceSnapshot> startPriceSnapshots,
             PrivacyTradeBase privacyBase
-    ) {}
+    ) {
+        // 장전 점검(PrivacyBaseGuard) 결과로 기준표만 교체
+        PriceContext withPrivacyBase(PrivacyTradeBase base) {
+            return new PriceContext(cycleTickers, priceAccount, startPriceSnapshots, base);
+        }
+    }
 
     // 배치 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 — executeBatch/placeOpenOrders 공통
     // date: executeBatch는 today(당일), placeOpenOrders는 tradeDate(익일 US 거래일)

@@ -108,6 +108,19 @@ flows:
         desc: 종목별 현재가와 전일종가, PRIVACY 기준 매매표(전날 07:00 fida가 보낸 것)를 한 번에 조회한다. 0회차의 진입 방향을 판단하는 데 쓴다.
         code: [TradingPriceFetcher#loadPriceContext]
 
+      - id: privacy-guard
+        lane: trading
+        to: [db, telegram]
+        title: PRIVACY 기준표 장전 점검
+        desc: >-
+          가격·기준표를 읽은 직후, 주문을 계획하기 전에 오늘(KST) 거래일 기준표를 다시 점검한다. 경고·차단 이슈가 하나라도 있으면
+          기준표를 쓰지 않고(기준표 미수신과 같은 경로) 관리자에게 알린다 — 저장 때 경고로 통과한 "보유 중인데 매도 없음"도 여기서 막혀
+          신규 PRIVACY 주문이 생기지 않는다. 그날 이미 있는 PRIVACY 주문(바로 주문·재개 등)은 그대로 접수·체결 기록·리포트까지 간다.
+          접수 뒤 리포트만 재개하는 경로(재기동)에는 적용하지 않는다.
+        code: [TradingService#screenPrivacyBase, PrivacyBaseGuard#screen, PrivacyTradeValidationService#inspect]
+        cond: PRIVACY 전략이 있고 기준표가 있을 때
+        fail: 기준표가 아예 없으면 점검할 것이 없다(주문 계산 단계가 PRIVACY 신규 주문을 skip한다).
+
       - id: plan
         lane: trading
         to: [broker, db]
@@ -243,17 +256,6 @@ flows:
         code: [TradingOpenScheduler#run, SchedulerLockService#tryRun]
         fail: 다른 프로세스가 락을 쥐고 있으면 조용히 건너뛴다.
 
-      - id: privacy-guard
-        lane: trading
-        to: [db, telegram]
-        title: PRIVACY 기준표 장전 점검
-        desc: >-
-          PRIVACY 전략이 있으면 이번 거래일 기준표를 다시 점검한다. 경고·차단 이슈가 하나라도 있으면 이번 실행에서 PRIVACY 전략만 빼고
-          관리자에게 알린다(저장 때는 경고였던 "보유 중인데 매도 없음"도 여기서는 제외 사유다). 마감 배치에는 이 점검이 없다.
-        code: [TradingOpenScheduler#guardPrivacyStrategies]
-        cond: PRIVACY 전략이 있고 기준표가 있을 때
-        fail: 기준표가 아예 없으면 점검을 건너뛴다.
-
       - id: contexts
         lane: trading
         to: [db]
@@ -287,6 +289,18 @@ flows:
         title: 시세·기준표 일괄 조회
         desc: 종목별 현재가·전일종가와 PRIVACY 기준표를 거래일 기준으로 한 번에 조회한다.
         code: [TradingPriceFetcher#loadPriceContext]
+
+      - id: privacy-guard
+        lane: trading
+        to: [db, telegram]
+        title: PRIVACY 기준표 장전 점검
+        desc: >-
+          PRIVACY 전략이 있으면 주문 계획 전에 다음 거래일 기준표를 다시 점검한다. 경고·차단 이슈가 하나라도 있으면 기준표를 쓰지 않고
+          관리자에게 알린다(저장 때는 경고였던 "보유 중인데 매도 없음"도 여기서는 차단 사유다). PRIVACY 주문은 모두 장마감(AT_CLOSE)이라
+          개장 배치에서는 조기 경보이고, 실제 차단은 같은 가드를 쓰는 마감 배치가 한다.
+        code: [TradingService#screenPrivacyBase, PrivacyBaseGuard#screen]
+        cond: PRIVACY 전략이 있고 기준표가 있을 때
+        fail: 기준표가 아예 없으면 점검을 건너뛴다.
 
       - id: wait-open
         lane: trading
@@ -589,7 +603,7 @@ flows:
         title: 위험 패턴 점검·관리자 알림
         desc: >-
           보유수량과 매도 계획이 맞는지 점검한다. 차단 사유(보유 0인데 매도, 매도 합 > 보유, 수량 없는 매도 2건 이상)면 저장하지 않고,
-          경고 사유(보유 중인데 매도 없음)면 저장은 진행한다. 둘 다 관리자 텔레그램으로 알린다.
+          경고 사유(보유 중인데 매도 없음)면 저장은 진행하되, 그날 개장·마감 배치의 장전 점검이 PRIVACY 주문을 막는다. 둘 다 관리자 텔레그램으로 알린다.
         code: [com.kista.privacy.application.service.PrivacyService#executeFidaOrder, PrivacyTradeValidationService#inspect, PrivacyAlertNotifier#onPrivacyAlert]
         cond: 경고·차단 이슈가 있을 때 알림
         fail: 차단이면 400, 저장 안 됨.
@@ -609,8 +623,10 @@ flows:
         lane: trading
         to: [db]
         title: 배치에서 사용
-        desc: 개장 배치는 접수 전에 기준표를 다시 점검해 이슈가 있으면 PRIVACY 주문을 건너뛰고, 개장·마감 배치 모두 거래일의 기준표로 PRIVACY 주문을 계산한다.
-        code: [TradingOpenScheduler#guardPrivacyStrategies, TradingPriceFetcher#loadPriceContext, PrivacyTradePersistenceAdapter#findTodayTrade]
+        desc: >-
+          개장·마감 배치 모두 주문 계획 전에 기준표를 다시 점검해 이슈가 있으면 기준표를 쓰지 않고(신규 PRIVACY 주문 없음) 관리자에게 알린다.
+          이슈가 없으면 거래일의 기준표로 PRIVACY 주문(모두 장마감)을 계산한다. 사용자 수동 실행("바로 주문")은 이 점검을 거치지 않는다.
+        code: [TradingPriceFetcher#loadPriceContext, PrivacyBaseGuard#screen, PrivacyTradePersistenceAdapter#findTodayTrade]
         cond: ACTIVE PRIVACY 전략이 있을 때
 
       - id: manual
@@ -619,7 +635,7 @@ flows:
         title: 관리자 수동 보정
         desc: >-
           수신이 실패했거나 틀렸으면 관리자가 기준표를 수동 등록하거나 마스터·주문 명세를 고친다. 수동 등록은 같은 fida-orders 내부 API를 다시 쓰므로
-          점검·멱등 규칙이 같다. 수정·추가·삭제는 저장 때 점검을 거치지 않고, 개장 배치 점검이 다시 잡는다.
+          점검·멱등 규칙이 같다. 수정·추가·삭제는 저장 때 점검을 거치지 않고, 개장·마감 배치의 장전 점검이 다시 잡는다.
         code: [AdminPrivacyTradeController#createBase, AdminPrivacyTradeController#updateBase, AdminPrivacyTradeController#updateOrder,
                AdminPrivacyTradeController#addOrder, AdminPrivacyTradeController#deleteOrder]
         cond: 관리자가 직접 실행할 때
