@@ -61,6 +61,10 @@ class AdminTradeCorrectionServiceTest {
 
         assertThat(response).isEqualTo(result);
 
-        verify(auditLogPort).log(eq(ADMIN_ID), eq("TRADE_MANUAL_CORRECTION"), eq("STRATEGY"), eq(STRATEGY_ID), any(Map.class));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> payload = ArgumentCaptor.forClass(Map.class);
+        verify(auditLogPort).log(eq(ADMIN_ID), eq("TRADE_MANUAL_CORRECTION"), eq("STRATEGY"), eq(STRATEGY_ID), payload.capture());
+        // 체결 명세의 메모·외부 주문번호까지 감사 로그에 남는다
+        assertThat(payload.getValue().get("fillDetails").toString()).contains("manual correction", "MANUAL-1");
     }
 }

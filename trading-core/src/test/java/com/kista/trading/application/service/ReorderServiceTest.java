@@ -112,23 +112,26 @@ class ReorderServiceTest {
     }
 
     @Test
-    void reorder_fromFilled_noCancel_savesPlanned() {
-        stubCommon(filledOrder());
+    void reorder_fromFilled_rejected() {
+        // 체결된 원본 위에 새 주문을 얹으면 같은 주문이 중복으로 나간다 — 체결분 보정은 수동 체결 보정 API
+        stubSelection(filledOrder());
 
-        reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("미체결");
 
-        verify(orderPort, never()).markCancelled(any()); // 체결 주문 취소 없음
-        verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLANNED, OrderTiming.AT_OPEN));
+        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).saveAll(any());
     }
 
     @Test
-    void reorder_fromFailed_noCancel_savesPlanned() {
-        stubCommon(failedOrder());
+    void reorder_fromFailed_rejected() {
+        stubSelection(failedOrder());
 
-        reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN);
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class);
 
-        verify(orderPort, never()).markCancelled(any());
-        verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLANNED, OrderTiming.AT_OPEN));
+        verify(orderPort, never()).saveAll(any());
     }
 
     // --- IMMEDIATE 접수 ---
@@ -225,11 +228,16 @@ class ReorderServiceTest {
     }
 
     private void stubCommon(Order order) {
+        stubSelection(order);
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+    }
+
+    // 계좌·전략·사이클·원본 주문 선택까지만 — 원본 상태 검증에서 거절되는 경로용
+    private void stubSelection(Order order) {
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle());
         when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(order));
-        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
     }
 
     @SuppressWarnings("unchecked")

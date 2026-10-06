@@ -8,6 +8,7 @@ import com.kista.contract.trading.TradeCorrectionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,9 +31,22 @@ class AdminTradeCorrectionService implements AdminTradeCorrectionUseCase {
                         "userId", result.userId().toString(),
                         "accountId", result.accountId().toString(),
                         "fills", result.processedCount(),
+                        "fillDetails", command.fills().stream().map(AdminTradeCorrectionService::auditFill).toList(),
                         "cycleEnded", result.cycleEnded()
                 ));
 
         return result;
+    }
+
+    // 체결 명세 1건의 감사 기록 — 메모·외부 주문번호는 선택값이라 있을 때만 담는다(Map.of는 null 불가)
+    private static Map<String, Object> auditFill(TradeCorrectionRequest.Fill fill) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("tradeDate", fill.tradeDate().toString());
+        entry.put("direction", fill.direction().name());
+        entry.put("quantity", fill.quantity());
+        entry.put("price", fill.price());
+        if (fill.externalOrderId() != null) entry.put("externalOrderId", fill.externalOrderId());
+        if (fill.memo() != null) entry.put("memo", fill.memo());
+        return entry;
     }
 }

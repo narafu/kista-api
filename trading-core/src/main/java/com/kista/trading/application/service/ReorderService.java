@@ -63,6 +63,10 @@ class ReorderService implements ReorderUseCase {
         if (!sourceOrder.strategyCycleId().equals(currentCycle.id())) {
             throw new IllegalArgumentException("현재 전략 사이클 주문만 재주문할 수 있습니다");
         }
+        // 미체결(PLANNED·PLACED) 원본만 — 체결·취소·실패한 주문 위에 새 주문을 얹으면 같은 주문이 중복으로 나간다(체결분 보정은 수동 체결 보정)
+        if (sourceOrder.status() != OrderStatus.PLANNED && sourceOrder.status() != OrderStatus.PLACED) {
+            throw new IllegalArgumentException("미체결(PLANNED·PLACED) 주문만 재주문할 수 있습니다");
+        }
 
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
@@ -84,7 +88,7 @@ class ReorderService implements ReorderUseCase {
         }
 
         // 2. 원본 상태별 취소 처리
-        cancelIfNeeded(sourceOrder, account);
+        cancelSource(sourceOrder, account);
 
         // 3. 재주문 생성 — timing에 따라 PLANNED 저장 또는 즉시 증권사 접수
         Order newOrder = Order.reorder(sourceOrder, tradeDate, direction, quantity, price, command.timing());
@@ -101,17 +105,13 @@ class ReorderService implements ReorderUseCase {
                 sourceOrder.price(), sourceOrder.quantity(), direction);
     }
 
-    // 원본 상태에 따라 취소 처리 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED
-    private void cancelIfNeeded(Order order, Account account) {
-        switch (order.status()) {
-            case PLANNED -> stateWriter.markCancelled(order.id());
-            case PLACED -> {
-                brokerOrderCorrectionPort
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
-                stateWriter.markCancelled(order.id());
-            }
-            default -> {} // FILLED/PARTIALLY_FILLED/FAILED/CANCELLED: 이미 종료 상태, no-op
+    // 원본 취소 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED (그 밖의 상태는 앞에서 거부됨)
+    private void cancelSource(Order order, Account account) {
+        if (order.status() == OrderStatus.PLACED) {
+            brokerOrderCorrectionPort
+                    .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
         }
+        stateWriter.markCancelled(order.id());
     }
 
     // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
