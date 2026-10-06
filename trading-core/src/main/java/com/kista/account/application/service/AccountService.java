@@ -1,6 +1,5 @@
 package com.kista.account.application.service;
 
-import com.kista.account.application.event.AccountDeletedEvent;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.broker.application.service.BrokerConnectionTesters;
 import com.kista.sharedkernel.Broker;
@@ -9,10 +8,10 @@ import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
 import com.kista.account.application.usecase.AccountUseCase;
 import com.kista.account.application.port.output.AccountPort;
+import com.kista.account.application.port.output.AccountOpenOrderCancelPort;
 import com.kista.account.application.port.output.BrokerEnabledPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +31,9 @@ class AccountService implements AccountUseCase {
     private final AccountPort accountPort;
     private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
     private final BrokerEnabledPort brokerEnabledPort; // 증권사 신규 등록 허용 여부 (trading TradingPolicyService가 구현 — 정책 소유자)
-    private final ApplicationEventPublisher eventPublisher; // 계좌 삭제 cascade 이벤트 발행
     private final BrokerTokenCachePort brokerTokenCachePort; // 탈퇴 시 증권사 토큰 삭제
+    private final AccountOpenOrderCancelPort openOrderCancelPort; // 계좌 삭제 전 미체결 주문 취소 (trading이 구현)
+    private final AccountDeletionWriter deletionWriter; // 계좌 삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
@@ -91,11 +91,14 @@ class AccountService implements AccountUseCase {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 AccountDeletionWriter 짧은 트랜잭션
     public void delete(UUID accountId, UUID requesterId) {
-        accountPort.requireOwnedAccount(accountId, requesterId);
-        accountPort.delete(accountId);
-        // 커밋 후 발행 — strategy-config 리스너가 소유 데이터를 독립적으로 정리(EPR 재시도 보장)
-        eventPublisher.publishEvent(new AccountDeletedEvent(accountId));
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        // 미체결 주문을 먼저 정리 — 하나라도 증권사 취소에 실패하면 삭제하지 않는다(삭제된 계좌의 주문이 증권사에 남지 않도록)
+        if (openOrderCancelPort.cancelOpenOrders(account) > 0) {
+            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 계좌를 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        deletionWriter.delete(accountId);
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
     }
 

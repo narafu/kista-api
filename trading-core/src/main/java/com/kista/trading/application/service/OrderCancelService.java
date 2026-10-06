@@ -1,6 +1,7 @@
 package com.kista.trading.application.service;
 
 import com.kista.sharedkernel.OrderStatus;
+import com.kista.sharedkernel.TimeZones;
 import com.kista.trading.application.event.OrderCancelFailedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.CancelResult;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 // 비-트랜잭션 서비스 — 브로커 취소 HTTP는 트랜잭션 밖에서 실행, DB 상태변경만 OrderCancelStateWriter의 짧은 트랜잭션으로 위임
 @Slf4j
@@ -43,24 +45,35 @@ class OrderCancelService {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
         var strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        return cancelOpenOrders(strategy.id(), account);
+    }
 
-        // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리
-        var currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
+    // 전략의 현재 사이클 미체결 주문 정리 — 호출자가 소유권을 이미 검증한 경우(일시정지·삭제·계좌 삭제) 직접 사용
+    CancelResult cancelOpenOrders(UUID strategyId, Account account) {
+        // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리, 사이클이 없으면 정리할 주문도 없다
+        var latestCycle = strategyCyclePort.findLatestByStrategyId(strategyId);
+        if (latestCycle.isEmpty()) {
+            return new CancelResult(0, 0);
+        }
+        var currentCycle = latestCycle.get();
 
-        // ManualTradingService와 동일 날짜 기준 사용 (KST 04:00 이후면 +1일 = 수동 실행 tradeDate)
-        LocalDate tradeDate = DstInfo.nextTradeDate();
+        // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
+        List<LocalDate> tradeDates = Stream.of(LocalDate.now(TimeZones.KST), DstInfo.nextTradeDate()).distinct().toList();
 
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
-        List<Order> plannedOrders = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate);
-        int plannedDeleted = plannedOrders.size();
-        if (!plannedOrders.isEmpty()) {
-            stateWriter.deletePlanned(currentCycle.id(), tradeDate);
-            log.info("PLANNED 주문 {}건 삭제 — cycleId={}", plannedDeleted, currentCycle.id());
+        int cancelledCount = 0;
+        List<Order> placedOrders = new ArrayList<>();
+        for (LocalDate tradeDate : tradeDates) {
+            int plannedCount = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate).size();
+            if (plannedCount > 0) {
+                stateWriter.deletePlanned(currentCycle.id(), tradeDate);
+                log.info("PLANNED 주문 {}건 삭제 — cycleId={}, tradeDate={}", plannedCount, currentCycle.id(), tradeDate);
+                cancelledCount += plannedCount;
+            }
+            placedOrders.addAll(orderPort.findPlacedByCycleAndDate(currentCycle.id(), tradeDate));
         }
 
         // PLACED 주문: 증권사 취소 + DB 상태 변경 (best-effort)
-        List<Order> placedOrders = orderPort.findPlacedByCycleAndDate(currentCycle.id(), tradeDate);
-        int cancelledCount = plannedDeleted;
         int failedCount = 0;
         List<String> failures = new ArrayList<>(); // 취소 실패 건 요약 — 커밋 후 알림 1건으로 통지
 

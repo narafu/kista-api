@@ -67,6 +67,7 @@ class StrategyServiceTest {
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort; // 신규 전략 생성 설정 조회
     @Mock OrderPort orderPort;                                   // 전략별 주문 내역 조회
     @Mock com.kista.privacy.application.port.output.PrivacyTradePort privacyTradePort; // 시드 미리보기 PRIVACY 기준표
+    @Mock OrderCancelService orderCancelService;                 // 일시정지·삭제 전 미체결 주문 정리
 
     private StrategyService strategyService;
 
@@ -127,7 +128,10 @@ class StrategyServiceTest {
                 creationService,
                 historyQueryService,
                 new CycleSnapshotCreator(
-                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle));
+                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle),
+                orderCancelService,
+                new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
+        lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));
         }
@@ -263,6 +267,68 @@ class StrategyServiceTest {
         strategyService.pause(STRATEGY_ID, USER_ID);
 
         verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+    }
+
+    @Test
+    @DisplayName("pause() 호출 시 PAUSED 기록 후 미체결 주문을 정리하고, 취소 실패가 있어도 중지는 유지된다")
+    void pause_cancels_open_orders_and_pauses_even_when_cancel_fails() {
+        Account account = ownerAccount();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(orderCancelService.cancelOpenOrders(STRATEGY_ID, account)).thenReturn(new CancelResult(1, 1));
+
+        strategyService.pause(STRATEGY_ID, USER_ID);
+
+        // PAUSED를 먼저 기록해 이후 배치가 새 주문을 만들지 않게 한 뒤 취소한다
+        var inOrder = inOrder(strategyPort, orderCancelService);
+        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        inOrder.verify(orderCancelService).cancelOpenOrders(STRATEGY_ID, account);
+    }
+
+    @Test
+    @DisplayName("pause() 호출 시 이미 중지된 전략이면 주문을 건드리지 않고 IllegalStateException")
+    void pause_already_paused_does_not_cancel_orders() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(orderCancelService, never()).cancelOpenOrders(any(), any());
+    }
+
+    @Test
+    @DisplayName("delete() 호출 시 PAUSED 기록·미체결 주문 정리 후 포지션 → 사이클 → 전략 순으로 소프트 삭제한다")
+    void delete_cancels_open_orders_then_soft_deletes() {
+        Account account = ownerAccount();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+
+        strategyService.delete(STRATEGY_ID, USER_ID);
+
+        var inOrder = inOrder(orderCancelService, cyclePositionPort, strategyCyclePort, strategyPort);
+        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        inOrder.verify(orderCancelService).cancelOpenOrders(STRATEGY_ID, account);
+        inOrder.verify(cyclePositionPort).deleteByStrategyId(STRATEGY_ID);
+        inOrder.verify(strategyCyclePort).deleteByStrategyId(STRATEGY_ID);
+        inOrder.verify(strategyPort).delete(STRATEGY_ID);
+    }
+
+    @Test
+    @DisplayName("delete() 호출 시 증권사 취소에 실패한 주문이 있으면 삭제하지 않고 PAUSED로 남긴다")
+    void delete_aborts_when_order_cancel_fails() {
+        Account account = ownerAccount();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(orderCancelService.cancelOpenOrders(STRATEGY_ID, account)).thenReturn(new CancelResult(0, 1));
+
+        assertThatThrownBy(() -> strategyService.delete(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        verify(strategyPort, never()).delete(any());
+        verify(strategyCyclePort, never()).deleteByStrategyId(any());
+        verify(cyclePositionPort, never()).deleteByStrategyId(any());
     }
 
     @Test

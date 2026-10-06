@@ -91,7 +91,7 @@ public class TradingCycleController {
     }
 
     // 거래 사이클 삭제
-    @Operation(summary = "거래 사이클 삭제")
+    @Operation(summary = "거래 사이클 삭제", description = "미체결 주문을 증권사에 취소한 뒤 전략·사이클·포지션을 삭제 처리(소프트 삭제). 취소에 실패한 주문이 있으면 400으로 중단.")
     @DeleteMapping("/api/trading-cycles/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
@@ -101,7 +101,7 @@ public class TradingCycleController {
     }
 
     // 거래 사이클 중지 (ACTIVE → PAUSED)
-    @Operation(summary = "거래 사이클 중지")
+    @Operation(summary = "거래 사이클 중지", description = "오늘 미체결 주문을 정리(PLANNED 삭제·PLACED 증권사 취소)한 뒤 PAUSED로 바꾼다. 취소 실패분은 관리자에게 알리고 중지는 진행.")
     @PatchMapping("/api/trading-cycles/{id}/pause")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void pause(

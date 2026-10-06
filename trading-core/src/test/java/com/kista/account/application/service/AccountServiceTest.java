@@ -1,5 +1,7 @@
 package com.kista.account.application.service;
 
+import org.junit.jupiter.api.BeforeEach;
+import com.kista.account.application.port.output.AccountOpenOrderCancelPort;
 import com.kista.account.application.event.AccountDeletedEvent;
 import com.kista.broker.application.service.BrokerConnectionTesters;
 import com.kista.account.domain.model.Account;
@@ -15,7 +17,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -39,7 +40,15 @@ class AccountServiceTest {
     @Mock BrokerEnabledPort brokerEnabledPort;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock BrokerTokenCachePort brokerTokenCachePort;
-    @InjectMocks AccountService accountService;
+    @Mock AccountOpenOrderCancelPort openOrderCancelPort; // 삭제 전 미체결 주문 취소 (trading 구현)
+    AccountService accountService;
+
+    @BeforeEach
+    void setUpService() {
+        // deletionWriter는 실제 인스턴스에 mock 포트를 위임 — 삭제 DB 쓰기·이벤트 발행을 그대로 검증
+        accountService = new AccountService(accountPort, connectionTesters, brokerEnabledPort, brokerTokenCachePort,
+                openOrderCancelPort, new AccountDeletionWriter(accountPort, brokerTokenCachePort, eventPublisher));
+    }
 
     private final UUID userId = UUID.randomUUID();
     private final UUID accountId = UUID.randomUUID();
@@ -146,7 +155,22 @@ class AccountServiceTest {
         accountService.delete(accountId, userId);
 
         verify(accountPort).delete(accountId);
+        verify(brokerTokenCachePort).deleteByAccountIds(List.of(accountId));
         verify(eventPublisher).publishEvent(new AccountDeletedEvent(accountId));
+    }
+
+    @Test
+    @DisplayName("증권사 주문 취소에 실패한 주문이 있으면 계좌를 삭제하지 않는다")
+    void delete_aborts_when_open_order_cancel_fails() {
+        Account account = activeAccount(userId);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
+        when(openOrderCancelPort.cancelOpenOrders(account)).thenReturn(1);
+
+        assertThatThrownBy(() -> accountService.delete(accountId, userId))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(accountPort, never()).delete(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

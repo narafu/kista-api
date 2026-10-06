@@ -1,8 +1,10 @@
 package com.kista.trading.application.service;
 
+import com.kista.sharedkernel.TimeZones;
 import com.kista.support.StubBrokerApiException;
 import com.kista.sharedkernel.OrderStatus;
 import com.kista.account.domain.model.Account;
+import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.CancelResult;
 import com.kista.trading.domain.model.Order;
 import com.kista.sharedkernel.OrderType;
@@ -81,6 +83,10 @@ class OrderCancelServiceTest {
         // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
         service = new OrderCancelService(orderPort, brokerPort, accountPort, cyclePort, strategyCyclePort,
                 eventPublisher, new OrderCancelStateWriter(orderPort));
+        // 취소 범위는 오늘(KST)·다음 거래일 둘 다 — 기본은 오늘 주문 없음, 각 테스트가 다음 거래일(또는 오늘)을 따로 stub
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        lenient().when(orderPort.findPlannedByCycleAndDate(any(), eq(today))).thenReturn(List.of());
+        lenient().when(orderPort.findPlacedByCycleAndDate(any(), eq(today))).thenReturn(List.of());
     }
 
     private static CancelInstruction cancelOf(Order order) {
@@ -98,10 +104,10 @@ class OrderCancelServiceTest {
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
-        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(plannedOrder));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order1, order2));
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
@@ -115,6 +121,35 @@ class OrderCancelServiceTest {
     }
 
     @Test
+    @DisplayName("cancelByCycle: 오늘(KST) 마감 배치가 접수한 PLACED 주문도 취소한다(04:00~리포트 사이 다음 거래일과 날짜가 갈리는 구간)")
+    void cancelByCycle_includesTodayPlacedOrders() {
+        Order todayOrder = placedOrder(UUID.randomUUID(), "ORD_TODAY");
+
+        when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(LocalDate.now(TimeZones.KST))))
+                .thenReturn(List.of(todayOrder));
+
+        CancelResult result = service.cancelByCycle(cycleId, requesterId);
+
+        assertThat(result.cancelledCount()).isEqualTo(1);
+        verify(brokerPort).cancel(eq(cancelOf(todayOrder)), eq(ownedAccount.toBrokerRef()));
+        verify(orderPort).markCancelled(todayOrder.id());
+    }
+
+    @Test
+    @DisplayName("cancelOpenOrders: 사이클이 없는 전략은 정리할 주문이 없어 CancelResult(0, 0)")
+    void cancelOpenOrders_noCycle_returnsEmpty() {
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.empty());
+
+        CancelResult result = service.cancelOpenOrders(cycleId, ownedAccount);
+
+        assertThat(result).isEqualTo(new CancelResult(0, 0));
+        verifyNoInteractions(brokerPort);
+    }
+
+    @Test
     @DisplayName("cancelByCycle: KIS 취소 일부 실패 시 best-effort → CancelResult(1, 1)")
     void cancelByCycle_partialFailure() {
         Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
@@ -122,8 +157,8 @@ class OrderCancelServiceTest {
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
         doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
@@ -151,8 +186,8 @@ class OrderCancelServiceTest {
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order1, order2));
         // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
         doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
@@ -173,10 +208,10 @@ class OrderCancelServiceTest {
     void cancelByCycle_noPlacedOrders() {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(strategyCyclePort.requireLatestByStrategyId(cycleId)).thenReturn(currentCycle);
-        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of());
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class)))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);

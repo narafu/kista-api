@@ -45,6 +45,8 @@ class StrategyService implements StrategyUseCase {
     private final StrategyCreationService creationService;         // 신규 전략 등록 전용
     private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
+    private final OrderCancelService orderCancelService;           // 일시정지·삭제 전 미체결 주문 정리
+    private final StrategyStateWriter stateWriter;                 // 일시정지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -53,24 +55,36 @@ class StrategyService implements StrategyUseCase {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void delete(UUID strategyId, UUID requesterId) {
-        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
-        // StrategyCycle + CyclePosition 소프트 삭제 → Strategy 삭제 순
-        cyclePositionPort.deleteByStrategyId(strategyId);
-        strategyCyclePort.deleteByStrategyId(strategyId);
-        strategyPort.delete(strategyId);
-        log.info("전략 삭제: strategyId={}, requesterId={}", strategyId, requesterId);
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        // 먼저 PAUSED로 기록해 이후 배치가 이 전략으로 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다
+        // 하나라도 증권사 취소에 실패하면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
+        stateWriter.pause(strategyId);
+        CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
+        if (cancelled.failedCount() > 0) {
+            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 전략을 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        stateWriter.delete(strategyId);
+        log.info("전략 삭제: strategyId={}, requesterId={}, cancelledOrders={}", strategyId, requesterId, cancelled.cancelledCount());
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
     public void pause(UUID strategyId, UUID requesterId) {
-        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 중복 상태 guard — 이미 중지된 전략은 재중지 불가 (소유권 검증 이후 수행)
         if (strategy.isPaused()) {
             throw new IllegalStateException("이미 중지된 전략입니다: " + strategyId);
         }
-        strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
-        log.info("전략 중지: strategyId={}", strategyId);
+        // 먼저 PAUSED로 기록해 이후 배치가 새 주문을 만들지 않게 하고, 배치가 정지 뒤 체결을 기록하지 않으므로 오늘 미체결 주문을 정리한다
+        // 취소 실패분은 관리자 알림 후 PLACED로 남는다
+        stateWriter.pause(strategyId);
+        CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
+        log.info("전략 중지: strategyId={}, cancelledOrders={}, failedOrders={}",
+                strategyId, cancelled.cancelledCount(), cancelled.failedCount());
     }
 
     @Override

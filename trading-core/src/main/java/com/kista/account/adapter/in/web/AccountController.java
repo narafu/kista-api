@@ -71,9 +71,10 @@ public class AccountController {
     }
 
     // 계좌 삭제 (소유권 검증)
-    @Operation(summary = "계좌 삭제", description = "계좌 및 관련 데이터를 영구 삭제.")
+    @Operation(summary = "계좌 삭제", description = "미체결 주문을 증권사에 취소한 뒤 계좌와 전략·사이클·포지션을 삭제 처리(소프트 삭제). 주문 이력은 보존.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 성공"),
+            @ApiResponse(responseCode = "400", description = "증권사 주문 취소에 실패한 주문이 있어 삭제 중단"),
             @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
             @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음")
     })

@@ -194,7 +194,8 @@ class HexagonalArchitectureTest {
                 "com.kista.trading.application.service.StrategyCreationService",     // 계좌 소유권·브로커 검증
                 "com.kista.trading.application.service.StrategyService",             // 계좌 소유권 검증
                 "com.kista.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
-                "com.kista.trading.application.service.ManualTradeCorrectionService" // 소유권 검증
+                "com.kista.trading.application.service.ManualTradeCorrectionService", // 소유권 검증
+                "com.kista.trading.application.service.AccountOpenOrderCanceller"    // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
         );
         // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다
         Set<String> existing = new java.util.HashSet<>();
