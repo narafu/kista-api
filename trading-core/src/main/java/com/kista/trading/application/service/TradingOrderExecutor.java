@@ -10,6 +10,7 @@ import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
+import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 // 증권사 접수: BUY 가격 보정 → PLANNED 개별 접수 → PLACED 마킹 (접수 실패 주문은 로그 후 skip)
 @Component
@@ -34,6 +38,8 @@ class TradingOrderExecutor {
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final ApplicationEventPublisher eventPublisher;
     private final CycleOrderStrategies cycleOrderStrategies;
+    private final LiveBalancePort liveBalancePort;              // 재캡이 BUY 총액을 늘릴 때만 live 주문가능금액 조회
+    private final Map<UUID, ReentrantLock> accountLocks = new ConcurrentHashMap<>(); // 계좌별 재캡 예산 산정 직렬화
 
     // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수 + 개장 후 수동실행 공용
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
@@ -70,7 +76,35 @@ class TradingOrderExecutor {
         if (currentPrice == null) return;
         CycleOrderStrategy orderStrategy = cycleOrderStrategies.of(strategy.type());
         if (!orderStrategy.needsCapCheck(position, vrPosition)) return;
-        buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId, currentPrice, position, vrPosition, strategy.ticker());
+        if (!buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
+                currentPrice, position, vrPosition, strategy.ticker(), null)) return;
+
+        // 재캡이 BUY 총액을 늘림 — live 주문가능금액 기준 예산으로 재시도. 브로커 호출이라 트랜잭션(capIfNeeded) 밖에서 조회하고,
+        // 같은 계좌의 "예약 합계 → live → 재캡 커밋"을 직렬화해 동시 재캡끼리 같은 여유분을 이중 사용하지 않게 한다(접수는 락 밖 — 병렬 유지)
+        // ponytail: JVM 내 락 — kista-trading 단일 인스턴스 전제, 다중 인스턴스가 되면 DB 락(계좌 row FOR UPDATE)으로 승격
+        ReentrantLock lock = accountLocks.computeIfAbsent(account.id(), ignored -> new ReentrantLock());
+        try {
+            lock.lockInterruptibly(); // 종료 인터럽트 시 락 대기로 stop_grace_period를 잠식하지 않는다
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // placeEach 상단 체크가 남은 접수를 중단
+            return;
+        }
+        try {
+            // DB 예약 합계를 live보다 먼저 읽는다 — 그 사이 접수된 주문은 이중 차감(보수적)될 뿐 과소 집계되지 않는다
+            BigDecimal reservedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), date);
+            BigDecimal liveDeposit;
+            try {
+                liveDeposit = liveBalancePort.getLiveBalance(account.brokerRef(), strategy.ticker()).usdDeposit();
+            } catch (Exception e) {
+                // 원장 기준 폴백은 live 초과 재캡 그 자체라 택하지 않는다 — allocator가 승인한 기존 PLANNED를 그대로 접수
+                log.warn("[{}] live 잔고 조회 실패 — BUY 재캡 생략, 기존 PLANNED 유지: {}", account.nickname(), e.getMessage());
+                return;
+            }
+            buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
+                    currentPrice, position, vrPosition, strategy.ticker(), liveDeposit.subtract(reservedBuy));
+        } finally {
+            lock.unlock();
+        }
     }
 
     // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)

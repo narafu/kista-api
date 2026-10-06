@@ -17,6 +17,8 @@ import com.kista.matching.domain.model.VrPosition;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
+import com.kista.broker.application.port.output.LiveBalancePort;
+import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.matching.domain.strategy.CycleOrderStrategies;
@@ -51,6 +53,7 @@ class TradingOrderExecutorTest {
     @Mock BrokerOrderCorrectionPort brokerPort;
     @Mock BuyOrderPriceCapper buyOrderPriceCapper;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock LiveBalancePort liveBalancePort;
 
     static final LocalDate TODAY = LocalDate.now();
 
@@ -87,7 +90,7 @@ class TradingOrderExecutorTest {
             new VrCycleOrderStrategy(null)));
 
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, brokerPort, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES);
+        return new TradingOrderExecutor(orderPort, brokerPort, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES, liveBalancePort);
     }
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {
@@ -115,7 +118,7 @@ class TradingOrderExecutorTest {
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker());
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null);
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo(orderId); // DB PK 보존
         assertThat(result.getFirst().status()).isEqualTo(OrderStatus.PLACED);
@@ -149,7 +152,7 @@ class TradingOrderExecutorTest {
 
         // PRIVACY 타입으로 위임 — 개별/전체 취소 판단·position/vrPosition 무시는 capIfNeeded 내부(BuyOrderPriceCapperTest)에서 검증
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.PRIVACY, false, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker());
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker(), null);
         verifyNoMoreInteractions(buyOrderPriceCapper);
     }
 
@@ -192,7 +195,7 @@ class TradingOrderExecutorTest {
 
         // VR 타입 + vrPosition non-null → 접수 전 VR 전용 보정 호출
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.VR, false, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker());
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker(), null);
         verifyNoMoreInteractions(buyOrderPriceCapper);
     }
 
@@ -223,7 +226,7 @@ class TradingOrderExecutorTest {
         // AT_OPEN 스코프 전용 보정 — capIfNeeded(atOpen=true)로 위임돼 findAtOpenPlannedByCycleAndDate만 조회한다
         // (atOpen=false 호출은 절대 발생하지 않아야 한다 — 동일 사이클의 AT_CLOSE PLANNED 오염 방지가 이 태스크의 핵심)
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.VR, true, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker());
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, VR_POSITION, VR_STRATEGY.ticker(), null);
         verifyNoMoreInteractions(buyOrderPriceCapper);
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
         assertThat(result).hasSize(1);
@@ -254,7 +257,7 @@ class TradingOrderExecutorTest {
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, true, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker());
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null);
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
     }
 
@@ -269,7 +272,7 @@ class TradingOrderExecutorTest {
         executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.PRIVACY, true, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker());
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY.ticker(), null);
         verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
     }
 
@@ -339,5 +342,52 @@ class TradingOrderExecutorTest {
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.message() != null && tee.message().contains("DB 불일치")));
     }
-}
 
+    @Test
+    @DisplayName("재캡이 BUY 총액을 늘리면 live 주문가능금액 − 계좌 PLANNED BUY를 예산으로 재캡을 다시 시도")
+    void placeOrders_capIncreasesTotal_retriesWithLiveBudget() {
+        when(buyOrderPriceCapper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null)).thenReturn(true);
+        when(orderPort.sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(new BigDecimal("600.00"));
+        when(liveBalancePort.getLiveBalance(ACCOUNT_REF, INFINITE_STRATEGY.ticker()))
+                .thenReturn(new BrokerBalance(0, null, new BigDecimal("1000.00")));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        // DB 예약 합계를 live보다 먼저 읽는다 — 동시 접수분이 과소 집계되지 않고 이중 차감(보수적)만 가능
+        var inOrder = inOrder(orderPort, liveBalancePort);
+        inOrder.verify(orderPort).sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
+        inOrder.verify(liveBalancePort).getLiveBalance(ACCOUNT_REF, INFINITE_STRATEGY.ticker());
+        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), new BigDecimal("400.00"));
+    }
+
+    @Test
+    @DisplayName("live 조회 실패 시 재캡 생략 — 원래 PLANNED 그대로 접수")
+    void placeOrders_liveBalanceFails_skipsRecapAndPlacesOriginal() {
+        when(buyOrderPriceCapper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null)).thenReturn(true);
+        when(orderPort.sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(BigDecimal.ZERO);
+        when(liveBalancePort.getLiveBalance(any(), any())).thenThrow(new RuntimeException("rate limit"));
+        Order plannedOrder = planned(UUID.randomUUID(), OrderDirection.BUY, "60.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-009"));
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        verify(buyOrderPriceCapper, times(1)).capIfNeeded(any(), anyBoolean(), any(), any(), any(), any(), any(), any(), any(), any());
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("재캡이 총액을 늘리지 않으면 live 조회 없음")
+    void placeOrders_capWithoutIncrease_noLiveQuery() {
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
+
+        verifyNoInteractions(liveBalancePort);
+        verify(orderPort, never()).sumPlannedBuyByAccountAndDate(any(), any());
+    }
+}

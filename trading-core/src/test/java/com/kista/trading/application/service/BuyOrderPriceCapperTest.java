@@ -181,7 +181,7 @@ class BuyOrderPriceCapperTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
         capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteType, never()).capBuyOrders(any(), any(), any(), any(), any(), any());
@@ -196,7 +196,7 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(List.of(buy("50.00", 18)));
 
         capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteType, never()).capBuyOrders(any(), any(), any(), any(), any(), any());
@@ -214,7 +214,7 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(plannedBuyOrders); // 변경 없음 — bootstrap 스킵을 흉내
 
         capper.capIfNeeded(StrategyType.VR, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("90.00"), null, VR_POSITION, StrategyTicker.TQQQ);
+                new BigDecimal("90.00"), null, VR_POSITION, StrategyTicker.TQQQ, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort, never()).markCancelled(any());
@@ -231,9 +231,11 @@ class BuyOrderPriceCapperTest {
         when(infiniteType.capBuyOrders(eq(plannedBuyOrders), any(), eq(POSITION), isNull(), eq(StrategyTicker.SOXL), eq(TODAY)))
                 .thenReturn(capped);
 
-        capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
+        // 재캡 총액(1044.50)이 원본(112.00)보다 커지므로 live 예산이 필요 — 충분한 예산이면 재캡 결과 그대로 반영
+        boolean budgetRequired = capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, new BigDecimal("10000.00"));
 
+        assertThat(budgetRequired).isFalse();
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
         inOrder.verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         inOrder.verify(orderPort).findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
@@ -253,7 +255,7 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(List.of());
 
         capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL);
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort).markCancelled(isNull());
@@ -273,7 +275,7 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(List.of(cappedFirst, plannedBuyOrders.get(1))); // 두 번째는 변경 없음(동일 값)
 
         capper.capIfNeeded(StrategyType.PRIVACY, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("30.00"), null, null, StrategyTicker.SOXL);
+                new BigDecimal("30.00"), null, null, StrategyTicker.SOXL, null);
 
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
         inOrder.verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
@@ -294,10 +296,79 @@ class BuyOrderPriceCapperTest {
                 .thenReturn(List.of(buy("50.00", 5)));
 
         capper.capIfNeeded(StrategyType.PRIVACY, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
-                new BigDecimal("50.00"), null, null, StrategyTicker.SOXL);
+                new BigDecimal("50.00"), null, null, StrategyTicker.SOXL, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(privacyType, never()).capBuyOrders(any(), any(), any(), any(), any(), any());
+        verify(orderPort, never()).markCancelled(any());
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    // ─── capIfNeeded — live 예산 가드(재캡 총액 증가 시) ─────────────────────
+
+    @Test
+    void capIfNeeded_totalIncreasesWithoutBudget_requestsBudgetWithoutPersisting() {
+        // 원본 60×1=60 → 재캡 52.5×2=105 — 총액 증가인데 예산이 없으면 반영하지 않고 호출부에 live 예산을 요청한다
+        List<Order> buyOrders = List.of(buy("60.00", 1));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
+        when(infiniteType.capBuyOrders(any(), any(), eq(POSITION), isNull(), eq(StrategyTicker.SOXL), eq(TODAY)))
+                .thenReturn(List.of(buy("52.50", 2).toPlanned()));
+
+        boolean budgetRequired = capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
+
+        assertThat(budgetRequired).isTrue();
+        verify(orderPort, never()).markCancelled(any());
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    @Test
+    void capIfNeeded_totalNotIncreased_appliesWithoutBudget() {
+        // 원본 60×2=120 → 재캡 52.5×2=105 — 총액이 늘지 않으면 allocator 승인 범위 안이라 예산 없이 반영
+        List<Order> buyOrders = List.of(buy("60.00", 2));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
+        List<PlannedOrder> capped = List.of(buy("52.50", 2).toPlanned());
+        when(infiniteType.capBuyOrders(any(), any(), eq(POSITION), isNull(), eq(StrategyTicker.SOXL), eq(TODAY)))
+                .thenReturn(capped);
+
+        boolean budgetRequired = capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
+
+        assertThat(budgetRequired).isFalse();
+        verify(orderPlanner).savePlannedOrders(capped, ACCOUNT, STRATEGY_CYCLE_ID);
+    }
+
+    @Test
+    void capIfNeeded_overBudget_persistsFittedOrders() {
+        // 원본 60×1=60, 계좌 여유 40 → 예산 100. 재캡 base 52.5 + 보정 50 = 102.5 > 100 → 보정 생략안(52.5)만 반영
+        List<Order> buyOrders = List.of(buy("60.00", 1));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
+        PlannedOrder base = buy("52.50", 1).toPlanned();
+        List<PlannedOrder> capped = List.of(base, buy("50.00", 1).toPlanned());
+        when(infiniteType.capBuyOrders(any(), any(), eq(POSITION), isNull(), eq(StrategyTicker.SOXL), eq(TODAY)))
+                .thenReturn(capped);
+        when(infiniteType.fitBuysToBudget(capped, new BigDecimal("100.00"))).thenReturn(List.of(base));
+
+        capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, new BigDecimal("40.00"));
+
+        verify(orderPort).markCancelled(isNull());
+        verify(orderPlanner).savePlannedOrders(List.of(base), ACCOUNT, STRATEGY_CYCLE_ID);
+    }
+
+    @Test
+    void capIfNeeded_fittedStillOverBudget_keepsOriginalOrders() {
+        // 예산 = 여유 0 + 원본 60 = 60. 축소안도 105 > 60 — 재캡을 생략하고 allocator가 승인한 원본을 그대로 둔다
+        List<Order> buyOrders = List.of(buy("60.00", 1));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
+        List<PlannedOrder> capped = List.of(buy("52.50", 2).toPlanned());
+        when(infiniteType.capBuyOrders(any(), any(), eq(POSITION), isNull(), eq(StrategyTicker.SOXL), eq(TODAY)))
+                .thenReturn(capped);
+        when(infiniteType.fitBuysToBudget(any(), any())).thenReturn(capped);
+
+        capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, BigDecimal.ZERO);
+
         verify(orderPort, never()).markCancelled(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }

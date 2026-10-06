@@ -160,7 +160,7 @@ class TradingServiceTest {
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies, liveBalancePort);
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
@@ -731,8 +731,10 @@ class TradingServiceTest {
         Order cappedPlanned = new Order(cappedOrderId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.TQQQ,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, 2, new BigDecimal("84.00"),
                 OrderStatus.PLANNED, null, null, null);
-        // 1번째 조회(capVrIfNeededAtOpen 내부, 캡 초과 확인) → stale 90.00 주문 / 2번째 조회(보정 이후 접수 대상) → capped 84.00 주문
+        // 재캡 총액(84×2=168)이 원본(90)보다 커서 capIfNeeded가 2회 조회한다 — 1차(live 예산 요청)·2차(live 예산 10000으로 반영)는
+        // stale 90.00 주문, 3번째 조회(보정 이후 접수 대상)는 capped 84.00 주문
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(vrCycle.id()), any()))
+                .thenReturn(List.of(stalePlanned))
                 .thenReturn(List.of(stalePlanned))
                 .thenReturn(List.of(cappedPlanned));
         when(brokerOrderPort.place(eq(instructionOf(cappedPlanned)), eq(ACCOUNT_REF))).thenReturn(brokerResult("ORD-VR-OPEN-CAP"));
@@ -740,7 +742,8 @@ class TradingServiceTest {
         service.placeOpenOrders(List.of(new BatchContext(vr, vrCycle, ACCOUNT, USER)), PAST_DST);
 
         // 접수 전 AT_OPEN 스코프 캡 재산정이 새 cap(84.00)으로 호출됐는지 확인 — stale 90.00 주문을 잡아낸 증거
-        verify(vrStrategy).buildCappedBuyOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00")));
+        // 총액 증가라 live 예산 요청(1차)·반영(2차)으로 2회 재산정
+        verify(vrStrategy, times(2)).buildCappedBuyOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00")));
         // stale 주문은 CANCELLED
         verify(orderPort).markCancelled(staleBuyId);
         // 최초 계획 저장(saveAll #1) + 보정 재저장(saveAll #2) — 총 2회
