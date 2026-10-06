@@ -85,6 +85,17 @@ class FinanceGroupServiceTest {
         verify(financeGroupPort, never()).createInvitation(any(), any(), any(), any());
     }
 
+    @Test
+    @DisplayName("이미 그룹이 있는데 경로의 그룹이 내 그룹이 아니면 SecurityException")
+    void invite_hasGroup_otherGroupId_throwsSecurityException() {
+        when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
+
+        assertThatThrownBy(() -> financeGroupService.invite(UUID.randomUUID(), userId, 72))
+                .isInstanceOf(SecurityException.class);
+
+        verify(financeGroupPort, never()).createInvitation(any(), any(), any(), any());
+    }
+
     // ----- respondToInvitation -----
 
     private FinanceGroupInvitation pendingInvitation(Instant expiresAt) {

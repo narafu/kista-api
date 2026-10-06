@@ -47,6 +47,10 @@ class FinanceGroupService implements FinanceGroupUseCase {
             targetGroupId = financeGroupPort.createGroup(userId);
             financeGroupPort.addMember(targetGroupId, userId, FinanceGroup.MemberRole.OWNER);
         } else {
+            // 이미 그룹이 있으면 경로의 그룹이 내 그룹이어야 한다 — 그룹이 없을 때는 새로 만들 그룹이라 경로 값을 쓰지 않는다(UI는 자리표시로 내 ID를 보낸다)
+            if (!targetGroupId.equals(groupId)) {
+                throw new SecurityException("내 그룹에만 초대할 수 있습니다");
+            }
             boolean isOwner = financeGroupPort.findRole(targetGroupId, userId)
                     .filter(role -> role == FinanceGroup.MemberRole.OWNER)
                     .isPresent();

@@ -33,7 +33,7 @@ public class FinanceGroupController {
     private final FinanceGroupUseCase groupUseCase;
     private final FinanceMemberPort financeMemberPort; // 멤버 닉네임 조회(user 모듈 의존은 포트 어댑터가 격리)
 
-    @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 전체 — 개인 그룹 포함.")
+    @Operation(summary = "내 그룹 목록 조회", description = "내가 속한 그룹 목록(한 사용자는 최대 1개 그룹).")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/groups")
     public List<FinanceGroupResponse> listMyGroups(@AuthenticationPrincipal UUID userId) {
@@ -91,11 +91,10 @@ public class FinanceGroupController {
                 .orElseGet(() -> new FinanceGroupResponse(invitation.groupId(), null));
     }
 
-    @Operation(summary = "그룹 탈퇴 / 멤버 추방", description = "본인이 나가거나(userId=본인) OWNER가 다른 멤버를 추방할 수 있습니다. 개인 그룹은 탈퇴할 수 없습니다.")
+    @Operation(summary = "그룹 탈퇴 / 멤버 추방", description = "본인이 나가거나(userId=본인) OWNER가 다른 멤버를 추방할 수 있습니다. 마지막 멤버가 나가면 그룹이 삭제되고, OWNER가 나가면 가장 먼저 합류한 멤버가 OWNER를 승계합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "탈퇴 성공"),
-            @ApiResponse(responseCode = "403", description = "본인이거나 OWNER가 아님"),
-            @ApiResponse(responseCode = "409", description = "개인 그룹은 탈퇴할 수 없음")
+            @ApiResponse(responseCode = "403", description = "본인이거나 OWNER가 아님")
     })
     @DeleteMapping("/groups/{id}/members/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
