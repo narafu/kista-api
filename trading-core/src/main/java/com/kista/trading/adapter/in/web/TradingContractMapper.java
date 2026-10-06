@@ -1,6 +1,7 @@
 package com.kista.trading.adapter.in.web;
 
 import com.kista.contract.trading.OrderResponse;
+import com.kista.contract.trading.ReorderBuyBudgetResponse;
 import com.kista.contract.trading.ReorderRequest;
 import com.kista.contract.trading.ReorderResponse;
 import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
@@ -12,6 +13,7 @@ import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.trading.domain.model.ManualTradeCorrectionResult;
 import com.kista.trading.domain.model.Order;
+import com.kista.trading.domain.model.ReorderBuyBudget;
 import com.kista.trading.domain.model.ReorderCommand;
 import com.kista.trading.domain.model.ReorderResult;
 import com.kista.trading.domain.model.Strategy;
@@ -39,6 +41,10 @@ final class TradingContractMapper {
 
     static ReorderTimingAvailabilityResponse toResponse(DstInfo.ReorderTimingAvailability a) {
         return new ReorderTimingAvailabilityResponse(a.atOpen(), a.atClose(), a.immediate());
+    }
+
+    static ReorderBuyBudgetResponse toResponse(ReorderBuyBudget b) {
+        return new ReorderBuyBudgetResponse(b.plannedBuy(), b.sourceRefund(), b.liveOrderable(), b.remaining());
     }
 
     static ReorderResponse toResponse(ReorderResult r) {

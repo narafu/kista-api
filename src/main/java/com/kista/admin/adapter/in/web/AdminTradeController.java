@@ -5,6 +5,7 @@ import com.kista.admin.adapter.in.web.dto.AdminReorderRequest;
 import com.kista.admin.adapter.in.web.dto.AdminReorderResponse;
 import com.kista.admin.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.admin.adapter.in.web.dto.AdminTradeResponse;
+import com.kista.admin.adapter.in.web.dto.ReorderBuyBudgetResponse;
 import com.kista.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
 import com.kista.contract.account.AccountSummaryResponse;
 import com.kista.contract.trading.OrderResponse;
@@ -106,6 +107,15 @@ public class AdminTradeController {
     public ReorderTimingAvailabilityResponse getReorderTiming() {
         // 개장 여부 판정은 trading-core 쪽 내부 API 구현부(MarketCalendarPort.isMarketOpen)로 이관됨
         return ReorderTimingAvailabilityResponse.from(tradingCommandPort.reorderTimingAvailability());
+    }
+
+    // BUY 재주문 예산 조회 — UI 경고용, 서버 차단 없음
+    @Operation(summary = "BUY 재주문 예산 조회", description = "remaining = live 주문가능금액 − PLANNED BUY 합계 + 원본 BUY 환급. live 조회 실패 시 liveOrderable/remaining은 null입니다.")
+    @GetMapping("/trades/reorder-buy-budget")
+    public ReorderBuyBudgetResponse getReorderBuyBudget(
+            @RequestParam UUID orderId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
+        return ReorderBuyBudgetResponse.from(tradingCommandPort.reorderBuyBudget(orderId, tradeDate));
     }
 
     @Operation(summary = "관리자 재주문")

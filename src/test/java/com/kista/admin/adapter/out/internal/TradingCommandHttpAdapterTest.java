@@ -138,6 +138,37 @@ class TradingCommandHttpAdapterTest {
         assertThat(recorded.getMethod()).isEqualTo("GET");
     }
 
+    @Test
+    void reorderBuyBudget_쿼리파라미터를_실어_응답을_역직렬화한다() throws InterruptedException {
+        server.enqueue(new MockResponse.Builder()
+                .code(200).addHeader("Content-Type", "application/json")
+                .body("""
+                    {"plannedBuy":300,"sourceRefund":200,"liveOrderable":1000,"remaining":900}
+                    """)
+                .build());
+        UUID orderId = UUID.randomUUID();
+
+        var result = adapter.reorderBuyBudget(orderId, java.time.LocalDate.of(2026, 10, 6));
+
+        assertThat(result.remaining()).isEqualByComparingTo("900");
+        assertThat(result.sourceRefund()).isEqualByComparingTo("200");
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(recorded.getTarget()).isEqualTo(
+                "/api/internal/trading/reorder-buy-budget?orderId=" + orderId + "&tradeDate=2026-10-06");
+        assertThat(recorded.getMethod()).isEqualTo("GET");
+    }
+
+    @Test
+    void reorderBuyBudget_400은_IllegalArgument_404는_NoSuchElement로_변환한다() {
+        server.enqueue(new MockResponse.Builder().code(400).build());
+        server.enqueue(new MockResponse.Builder().code(404).build());
+
+        assertThatThrownBy(() -> adapter.reorderBuyBudget(UUID.randomUUID(), null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> adapter.reorderBuyBudget(UUID.randomUUID(), null))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
     // --- 실패 모드 변환 ---
     // trading-core 쪽 GlobalExceptionHandler(전역 공유)가 매핑한 상태코드를 admin의
     // GlobalExceptionHandler가 다시 매핑할 수 있는 원래 예외 타입으로 되돌려야 한다.

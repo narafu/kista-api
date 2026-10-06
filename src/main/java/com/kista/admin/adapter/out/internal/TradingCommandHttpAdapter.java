@@ -2,6 +2,7 @@ package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.contract.trading.TradeCorrectionRequest;
+import com.kista.contract.trading.ReorderBuyBudgetResponse;
 import com.kista.contract.trading.ReorderRequest;
 import com.kista.contract.trading.ReorderResponse;
 import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Component
@@ -75,6 +77,23 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
                 .uri("/api/internal/trading/reorder-timing-availability")
                 .retrieve()
                 .body(ReorderTimingAvailabilityResponse.class);
+    }
+
+    // 증권사 live 잔고 조회(KIS 10s·Toss 13s 상한)를 거치므로 10s 조회 빈이 먼저 끊겨 500이 나지 않도록
+    // internalApiWriteRestClient(20s) 사용 — live 실패는 trading-core가 null 필드로 흡수한다
+    @Override
+    public ReorderBuyBudgetResponse reorderBuyBudget(UUID orderId, LocalDate tradeDate) {
+        RestClient.ResponseSpec spec = internalApiWriteRestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/internal/trading/reorder-buy-budget")
+                        .queryParam("orderId", orderId)
+                        .queryParamIfPresent("tradeDate", java.util.Optional.ofNullable(tradeDate))
+                        .build())
+                .retrieve();
+        // 계좌 미존재(404)·주문 미존재(400)를 도메인 예외로 되살려 500 catch-all 대신 4xx로 응답
+        spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "계좌를 찾을 수 없습니다");
+        return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "주문을 찾을 수 없습니다")
+                .body(ReorderBuyBudgetResponse.class);
     }
 
     // 계좌·전략 소유권 검증 + 저장은 trading-core 쪽에서 처리 — DB 쓰기 경로라 internalApiWriteRestClient 사용

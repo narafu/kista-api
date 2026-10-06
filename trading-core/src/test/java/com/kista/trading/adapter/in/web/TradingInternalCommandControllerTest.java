@@ -53,6 +53,7 @@ class TradingInternalCommandControllerTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean ReorderUseCase reorderUseCase;
+    @MockitoBean com.kista.trading.application.usecase.ReorderBuyBudgetQuery reorderBuyBudgetQuery;
     @MockitoBean ManualTradeCorrectionUseCase manualTradeCorrectionUseCase;
     @MockitoBean MarketCalendarPort marketCalendarPort;
 
@@ -123,5 +124,22 @@ class TradingInternalCommandControllerTest {
                 .andExpect(jsonPath("$.atOpen").isBoolean())
                 .andExpect(jsonPath("$.atClose").isBoolean())
                 .andExpect(jsonPath("$.immediate").isBoolean());
+    }
+
+    @Test
+    void reorderBuyBudget_도메인_결과를_contract로_매핑해_반환() throws Exception {
+        java.util.UUID orderId = java.util.UUID.randomUUID();
+        when(reorderBuyBudgetQuery.query(orderId, java.time.LocalDate.of(2026, 10, 6)))
+                .thenReturn(new com.kista.trading.domain.model.ReorderBuyBudget(
+                        new java.math.BigDecimal("300"), new java.math.BigDecimal("200"), null, null));
+
+        mockMvc.perform(get("/api/internal/trading/reorder-buy-budget")
+                        .param("orderId", orderId.toString()).param("tradeDate", "2026-10-06")
+                        .header("X-Internal-Token", VALID_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plannedBuy").value(300))
+                .andExpect(jsonPath("$.sourceRefund").value(200))
+                .andExpect(jsonPath("$.liveOrderable").doesNotExist())
+                .andExpect(jsonPath("$.remaining").doesNotExist());
     }
 }
