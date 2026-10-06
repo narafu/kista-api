@@ -710,9 +710,9 @@ flows:
         lane: ui
         to: [trading, db]
         title: 별명 수정
-        desc: 계좌 수정 화면(EditAccountForm)에서 별명만 바꿀 수 있다. 계좌번호와 자격증명은 수정할 수 없다. PUT /api/accounts/{id}가 소유권을 확인한 뒤 별명만 저장한다.
+        desc: 계좌 수정 화면(EditAccountForm)에서 별명만 바꿀 수 있다. 계좌번호와 자격증명은 수정할 수 없다. PUT /api/accounts/{id}가 소유권을 확인한 뒤 별명만 저장한다(앞뒤 공백 제거).
         code: [AccountController#update, AccountService#update]
-        fail: 내 계좌가 아니면 403, 없으면 404.
+        fail: 별명이 비어 있으면 400, 내 계좌가 아니면 403, 없으면 404.
 
       - id: delete
         lane: trading
@@ -720,7 +720,7 @@ flows:
         title: 계좌 삭제와 전략 정리
         desc: >-
           EditAccountForm의 "계좌 삭제" 확인 대화상자에서 영구 삭제를 누르면 DELETE /api/accounts/{id}가 먼저 이 계좌 전략들을 PAUSED로 바꾸고 미체결 주문을 정리한다
-          (PLANNED는 삭제, PLACED는 증권사 취소 — 전략 삭제와 같은 규칙). 하나라도 증권사 취소에 실패하면 삭제하지 않는다.
+          (PLANNED는 삭제, PLACED는 증권사 취소 — 전략 삭제와 같은 규칙). 일시 장애로 취소에 실패한 주문이 있으면 삭제하지 않는다(자격증명 오류 실패는 막지 않음).
           이어서 증권사 토큰을 지우고 계좌를 삭제 처리(소프트 삭제)한 뒤, 커밋 후 이벤트를 받아 별도 트랜잭션에서 포지션 → 사이클 → 전략 순으로 삭제 처리한다
           (실패하면 재시도 대상으로 남는다). 주문 이력(orders)은 보존한다.
         code: [AccountController#delete, AccountService#delete, AccountOpenOrderCanceller#cancelOpenOrders, AccountDeletionWriter#delete, AccountCascadeListener#onAccountDeleted]
@@ -834,7 +834,8 @@ flows:
         to: [broker, db]
         title: 전략 삭제
         desc: >-
-          소유권을 확인한 뒤 일시정지와 같은 규칙으로 PAUSED 기록·미체결 주문 정리를 먼저 하고, 하나라도 증권사 취소에 실패하면 삭제하지 않는다(전략은 PAUSED로 남는다).
+          소유권을 확인한 뒤 일시정지와 같은 규칙으로 PAUSED 기록·미체결 주문 정리를 먼저 하고, 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(전략은 PAUSED로 남는다).
+          자격증명 오류(키 만료·철회)로 실패한 주문은 재시도해도 풀리지 않으므로 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다.
           정리가 끝나면 포지션 기록 → 사이클 → 전략 순으로 한 트랜잭션에서 삭제 처리(소프트 삭제)한다. 삭제된 전략은 목록·배치·통계에서 빠지고 주문 이력(orders)은 보존한다.
         code: [StrategyService#delete, OrderCancelService#cancelOpenOrders, StrategyStateWriter#delete]
         state: "orders PLANNED 삭제·PLACED → CANCELLED · cycle_position·strategy_cycle·strategy → 삭제됨"
@@ -967,7 +968,8 @@ flows:
         to: [api]
         title: 재주문 대상·시점 선택
         desc: >-
-          관리자가 사용자 → 증권사 → 계좌 → 전략을 차례로 고르면 그 전략의 오늘 주문 목록이 뜨고, 주문마다 새 가격·수량·방향과 주문 시점(장 시작 AT_OPEN·장마감 AT_CLOSE·즉시 IMMEDIATE)을 입력한다.
+          관리자가 사용자 → 증권사 → 계좌 → 전략을 차례로 고르면 그 전략의 거래일(KST 04:30 이후면 다음 날 — 배치·바로 주문과 같은 기준) 주문 목록이 뜨고,
+          미체결(PLANNED·PLACED) 주문마다 새 가격·수량·방향과 주문 시점(장 시작 AT_OPEN·장마감 AT_CLOSE·즉시 IMMEDIATE)을 입력한다. 체결·취소·실패한 주문은 입력이 잠긴다.
           시점 셀렉터는 지금 시장 단계에서 가능한 것만 활성화하고(휴장일이면 전부 비활성), 전략 상태(일시정지·재개) 토글도 같은 화면에 있다.
           요청은 kista-ui의 /api/admin 중계 라우트가 Caddy 규칙상 kista-api(/api/admin/**, 스케쥴러 수동 실행만 kista-scheduler)로 보낸다.
         code: [AdminTradeController#getReorderTiming, AdminAccountController#updateStrategyStatus]
@@ -987,7 +989,9 @@ flows:
         lane: trading
         to: [db]
         title: 대상 선택 체인 검증
-        desc: 계좌가 지정한 사용자 소유인지, 전략이 그 계좌 소속인지, 주문이 그 계좌 소속인지 확인한다. 재주문은 추가로 원본 주문이 현재 전략 사이클의 것이어야 하고 가격·수량이 양수여야 한다.
+        desc: >-
+          계좌가 지정한 사용자 소유인지, 전략이 그 계좌 소속인지, 주문이 그 계좌 소속인지 확인한다. 재주문은 추가로 원본 주문이 현재 전략 사이클의
+          미체결(PLANNED·PLACED) 주문이어야 하고 가격·수량이 양수여야 한다 — 체결된 주문 위에 같은 주문이 중복으로 나가지 않도록(체결분은 수동 체결 보정).
         code: [SelectionChain#resolveAndValidate, ReorderService#reorder]
         fail: 어긋나면 400(내부 호출이 400으로 되살아 관리자 화면에 거절 사유가 표시된다).
 
@@ -1006,10 +1010,9 @@ flows:
         to: [broker, db]
         title: 원본 주문 취소
         desc: >-
-          시점 검증을 통과한 뒤에만 원본을 취소한다. 원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾼다. 이미 체결·취소·실패한 주문은 건드리지 않고 그대로 두며,
-          그래도 재주문은 진행된다.
+          시점 검증을 통과한 뒤에만 원본을 취소한다. 원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾼다.
         code: [ReorderService#reorder]
-        state: "원본 orders → CANCELLED (PLANNED·PLACED였던 경우)"
+        state: "원본 orders → CANCELLED"
         fail: 증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다(원본은 PLACED로 남는다).
 
       - id: reorder-place
@@ -1029,6 +1032,7 @@ flows:
         title: 감사 로그 기록
         desc: >-
           trading 응답이 돌아오면 kista-api가 관리자 ID와 함께 재주문(REORDER) 감사 로그를 남긴다. 시점, 원본 주문의 이전 상태·가격·수량, 새 방향·가격·수량, 결과 상태, 메모가 들어간다.
+          수동 체결 보정은 처리 건수·사이클 종료 여부와 체결 명세(거래일·방향·수량·가격·외부 주문번호·메모)를 남긴다.
           trading도 같은 요청을 자체 로그에 남겨 내부 엔드포인트를 직접 호출한 경우를 놓치지 않는다.
         code: [AdminReorderService#reorder, AdminTradeCorrectionService#correctManualFills]
         state: "audit_logs +1행 (REORDER / TRADE_MANUAL_CORRECTION)"
@@ -1060,7 +1064,7 @@ flows:
   notify-settings:
     title: 알림 설정
     trigger: 사용자가 설정 화면에서 텔레그램 봇을 연결하거나, 알림 채널·알림 종류 스위치를 바꾸거나, 푸시 알림을 켠다
-    summary: 텔레그램 봇 연결, 알림 채널(끄기·푸시·텔레그램·모두), 알림 종류별 on/off, 브라우저 푸시 토큰 등록을 저장한다. 매매 서버가 쓰는 알림 정보(봇·알림 종류)는 Redis Stream으로 복제본에 반영된다.
+    summary: 텔레그램 봇 연결, 알림 채널(끄기·푸시·텔레그램·모두), 알림 종류별 on/off, 브라우저 푸시 토큰 등록을 저장한다. 매매 서버가 쓰는 알림 정보(봇·채널·알림 종류)는 Redis Stream으로 복제본에 반영된다.
     steps:
       - id: telegram-verify
         lane: api
@@ -1069,9 +1073,9 @@ flows:
         desc: >-
           설정 화면(TelegramSection)에서 봇 토큰과 chat ID를 입력하면 kista-ui가 /api/settings 프록시로 kista-api에 넘긴다.
           kista-api는 텔레그램 getMe를 호출해 토큰이 진짜 봇인지 확인하고 봇 이름을 얻은 뒤, 토큰은 암호화해 사용자 정보에 저장한다.
-          해제하면 토큰·chat ID를 비운다.
-        code: [SettingsController#updateTelegram, UserProfileService#updateTelegram, TelegramBotInfoAdapter#getUsername, UserProfileService#removeTelegram]
-        state: "users → 텔레그램 토큰·chatId·봇 이름 저장(해제 시 null)"
+          봇을 연결하면 알림 채널에 텔레그램을 더하고(끄기→텔레그램, 푸시→모두), 해제하면 토큰·chat ID를 비우고 채널에서 텔레그램을 뺀다.
+        code: [NotificationChannel#withTelegram, NotificationChannel#withoutTelegram, SettingsController#updateTelegram, UserProfileService#updateTelegram, TelegramBotInfoAdapter#getUsername, UserProfileService#removeTelegram]
+        state: "users → 텔레그램 토큰·chatId·봇 이름 저장(해제 시 null) · 알림 채널에 텔레그램 추가/제거"
         fail: 토큰이 유효하지 않거나 봇 이름을 못 가져오면 400이고 저장하지 않는다(화면에 오류 안내).
 
       - id: channel
@@ -1080,10 +1084,10 @@ flows:
         title: 알림 채널 선택
         desc: >-
           알림 설정 화면(NotificationSettings)에서 끄기·푸시·텔레그램·모두 중 하나를 고른다. 텔레그램이 포함된 채널은
-          화면이 봇 연결 여부를 먼저 확인해 막는다. 이 값은 kista-api 쪽 알림(가계부 리마인더, 체결 푸시 전달)의 수신 경로를 정한다.
+          화면이 봇 연결 여부를 먼저 확인해 막는다. 이 값이 모든 알림의 수신 경로를 정한다 — kista-api 쪽(가계부 리마인더, 체결 푸시 전달)과 kista-trading 매매·시장 알림의 텔레그램 발송 모두.
         code: [SettingsController#updateNotificationChannel, UserProfileService#updateNotificationChannel]
         state: "users → 알림 채널"
-        fail: 알 수 없는 채널 값이면 400(이 값만 바꾸는 경로는 매매 서버로 전파하지 않는다).
+        fail: 알 수 없는 채널 값이면 400.
 
       - id: fcm-token
         lane: api
@@ -1113,12 +1117,12 @@ flows:
         to: [redis, trading]
         title: 매매 서버에 알림 정보 복제
         desc: >-
-          텔레그램 연결·해제와 알림 종류 변경은 커밋 뒤 사용자 알림 프로필 스냅샷(활성 여부·알림 종류·텔레그램 토큰·chat ID)을
+          텔레그램 연결·해제, 알림 채널·알림 종류 변경은 커밋 뒤 사용자 알림 프로필 스냅샷(활성 여부·알림 종류·알림 채널·텔레그램 토큰·chat ID)을
           Redis Stream으로 보낸다. kista-trading이 받아 자기 DB의 user_notify_profile 복제본을 덮어쓴다(토큰은 다시 암호화).
           매매 서버는 이 복제본만 보고 텔레그램을 직접 보낸다.
         code: [UserNotifyProfilePublisher#publishStatusChanged, UserNotifyProfilePublisher#publishSettingsChanged, UserEventStreamPublisher#onProfileChanged, UserNotifyProfileStreamConsumer, UserEventStreamBridge#handleProfileChangedRecord, UserNotifyProfileSyncListener#onProfileChanged]
-        cond: 텔레그램 연결·해제 또는 알림 종류·잔고검증 설정이 바뀐 때(채널·닉네임 변경은 제외)
-        state: "trading.user_notify_profile upsert (알림 종류·텔레그램 토큰·chatId)"
+        cond: 텔레그램 연결·해제, 알림 채널, 알림 종류·잔고검증 설정이 바뀐 때(닉네임 변경은 제외)
+        state: "trading.user_notify_profile upsert (알림 종류·알림 채널·텔레그램 토큰·chatId)"
         fail: 전달이 실패하면 경고 로그만 남기고 넘어간다(옛 변경을 나중에 재적용하면 새 값을 덮어쓰므로). 복제본이 낡았다면 사용자의 다음 설정 변경이 바로잡는다.
 
       - id: deliver
@@ -1126,10 +1130,11 @@ flows:
         to: [telegram, redis]
         title: 이후 알림 발송
         desc: >-
-          매매 리포트·시장 알림은 kista-trading이 복제본의 알림 종류 설정을 확인해 보내고, 텔레그램은 복제본 토큰으로 직접 발송한다.
+          매매 리포트·시장 알림은 kista-trading이 복제본의 알림 종류 설정을 확인해 보내고, 텔레그램은 봇이 연결돼 있고 알림 채널에 텔레그램이 포함될 때만 복제본 토큰으로 직접 발송한다
+          (채널이 아직 복제되지 않은 행은 봇 연결만 본다 — root V4가 봇 연결 사용자의 채널을 텔레그램 포함으로 보정해 결과가 같다).
           푸시는 kista-api에 Redis Stream으로 위임하고, kista-api가 사용자 채널에 푸시가 포함된 경우에만 등록된 기기로 보낸다.
           가계부 리마인더는 kista-api가 알림 종류 설정·채널을 확인해 텔레그램·푸시로 보낸다.
-        code: [TradingReporter, MarketEventNotifier, TradingUserNotificationAdapter, PushNotificationStreamConsumer#onRecord, UserPushNotificationAdapter#pushIfEnabled, UserChannelNotifier#notify]
+        code: [TradingReporter, MarketEventNotifier, TradingUserNotificationAdapter, TradingUserProfile#telegramEnabled, PushNotificationStreamConsumer#onRecord, UserPushNotificationAdapter#pushIfEnabled, UserChannelNotifier#notify]
         fail: 텔레그램·푸시 발송 실패는 서로 격리하고 경고 로그만 남긴다.
 
   finance:
@@ -1193,7 +1198,7 @@ flows:
         code: [GroupShareSupport#shareToGroup, GroupShareSupport#unshare, FinanceTransactionService#shareToGroup, FinanceTransactionService#unshare]
         cond: 공유·공유 해제를 누를 때
         state: "항목의 group_id 설정·해제"
-        fail: 남의 항목을 공유하면 403, 소속 그룹이 없거나 이미 다른 그룹에 공유된 항목이면 400.
+        fail: 남의 항목을 공유하면 403, 소속 그룹이 없으면 400, 이미 다른 그룹에 공유된 항목이면 409.
 
       - id: month-check
         lane: api
@@ -1244,7 +1249,7 @@ flows:
           만료됐거나 이미 처리된 초대는 쓸 수 없다. 한 사람은 한 그룹에만 속하므로 이미 다른 그룹 소속이면 수락이 거부된다.
         code: [FinanceGroupController#respondToInvitation, FinanceGroupService#respondToInvitation]
         state: "초대 → ACCEPTED 또는 DECLINED · 수락 시 멤버(MEMBER) 추가"
-        fail: 코드가 없으면 404, 만료·처리 완료는 409, 본인 코드면 403, 이미 다른 그룹 소속이면 400, 수락·거절 외 값이면 400.
+        fail: 코드가 없으면 404, 만료·처리 완료는 409, 본인 코드면 403, 이미 다른 그룹 소속이면 409, 수락·거절 외 값이면 400.
 
       - id: scope
         lane: api
