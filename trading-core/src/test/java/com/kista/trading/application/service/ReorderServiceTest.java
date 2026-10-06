@@ -20,9 +20,9 @@ import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -53,7 +53,14 @@ class ReorderServiceTest {
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     @Mock MarketCalendarPort marketCalendarPort;
 
-    @InjectMocks ReorderService service;
+    ReorderService service;
+
+    @BeforeEach
+    void setUp() {
+        // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
+        service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort));
+    }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
@@ -193,6 +200,22 @@ class ReorderServiceTest {
         assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("휴장일");
+    }
+
+    @Test
+    void reorder_onMarketHoliday_doesNotCancelPlacedSourceAtBroker() {
+        // 검증이 증권사 취소보다 먼저 — 휴장일 거절 시 원본 PLACED 주문이 증권사에서 취소된 채 남지 않아야 한다
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy());
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle());
+        when(orderPort.findById(ORDER_ID)).thenReturn(Optional.of(placedOrder()));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
+        verify(orderPort, never()).markCancelled(any());
     }
 
     // --- 헬퍼 ---

@@ -24,7 +24,6 @@ import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,7 +33,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
+// 비-트랜잭션 — 증권사 취소·접수 HTTP를 트랜잭션 밖에서 실행하고 DB 쓰기는 건별 짧은 트랜잭션(OrderCancelStateWriter·saveAll)으로 처리
 class ReorderService implements ReorderUseCase {
 
     private final AccountPort accountPort;
@@ -43,6 +42,7 @@ class ReorderService implements ReorderUseCase {
     private final OrderPort orderPort;
     private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final MarketCalendarPort marketCalendarPort;
+    private final OrderCancelStateWriter stateWriter; // 원본 취소 DB 기록 — 짧은 트랜잭션
 
     @Override
     public ReorderResult reorder(ReorderCommand command) {
@@ -69,10 +69,7 @@ class ReorderService implements ReorderUseCase {
         OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();
         LocalDate tradeDate = command.tradeDate() != null ? command.tradeDate() : sourceOrder.tradeDate();
 
-        // 1. 원본 상태별 취소 처리
-        cancelIfNeeded(sourceOrder, account);
-
-        // 2. 주문시점 가용성 서버 측 재검증 (UI disable 우회 방지)
+        // 1. 주문시점 가용성 서버 측 재검증 (UI disable 우회 방지) — 증권사 취소보다 먼저: 검증 실패 시 원본이 취소된 채 남지 않도록
         if (!marketCalendarPort.isMarketOpen(LocalDate.now(TimeZones.KST))) {
             throw new IllegalArgumentException("휴장일에는 재주문할 수 없습니다");
         }
@@ -85,6 +82,9 @@ class ReorderService implements ReorderUseCase {
         if (!timingOk) {
             throw new IllegalArgumentException("현재 시장 단계에서 " + command.timing() + " 접수가 불가합니다");
         }
+
+        // 2. 원본 상태별 취소 처리
+        cancelIfNeeded(sourceOrder, account);
 
         // 3. 재주문 생성 — timing에 따라 PLANNED 저장 또는 즉시 증권사 접수
         Order newOrder = Order.reorder(sourceOrder, tradeDate, direction, quantity, price, command.timing());
@@ -104,11 +104,11 @@ class ReorderService implements ReorderUseCase {
     // 원본 상태에 따라 취소 처리 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED
     private void cancelIfNeeded(Order order, Account account) {
         switch (order.status()) {
-            case PLANNED -> orderPort.markCancelled(order.id());
+            case PLANNED -> stateWriter.markCancelled(order.id());
             case PLACED -> {
                 brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
-                orderPort.markCancelled(order.id());
+                stateWriter.markCancelled(order.id());
             }
             default -> {} // FILLED/PARTIALLY_FILLED/FAILED/CANCELLED: 이미 종료 상태, no-op
         }
