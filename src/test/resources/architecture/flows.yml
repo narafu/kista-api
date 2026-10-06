@@ -11,6 +11,11 @@
 #       cond  — 이 단계가 실행되는 조건(조건부 단계만)
 #       state — 이 단계에서 바뀌는 상태
 #       fail  — 실패 시 어떻게 되는지(실패 경로)
+#   lifecycles.<id>: {title, enum, summary, states[], transitions[]}  — "상태 생명주기" 탭
+#     enum       — 상태 enum 클래스. 상수 집합이 states id 집합과 정확히 같아야 한다(상수가 늘거나 줄면 빌드 실패)
+#     state:     {id, label, desc?, terminal?}       — states 순서대로 한 줄에 놓인다
+#     transition:{from?, to?, title, desc?, code?[], tag?, flow?}
+#       from 없음 = 생성, to 없음 = 삭제(소멸), tag = 경로 구분(예: 개장·마감), flow = "flowId/stepId" 연결
 
 lanes:
   - {id: user, label: 사용자}
@@ -21,29 +26,39 @@ lanes:
   - {id: db, label: DB}
   - {id: broker, label: 증권사}
   - {id: telegram, label: Telegram}
+  - {id: fida, label: 외부(fida)}
 
 landscape:
   - group: 사용자 여정
     steps:
-      - {id: signup, title: 가입·승인}
+      - {id: signup, title: 가입·승인, flow: signup}
       - {id: account-link, title: 계좌 연결}
-      - {id: strategy-register, title: 전략 등록}
+      - {id: strategy-register, title: 전략 등록, flow: strategy-register}
       - {id: daily-trading, title: 매일 자동 매매, when: "개장 22:30 · 마감 04:30", flow: close-batch}
       - {id: result, title: 결과 확인}
       - {id: pause-stop, title: 일시정지·종료}
-      - {id: withdraw, title: 탈퇴}
+      - {id: withdraw, title: 탈퇴, flow: withdraw}
+  - group: 사용자 기능
+    steps:
+      - {id: manual-run, title: 수동 실행·주문 취소}
+      - {id: notify-settings, title: 알림 설정}
+      - {id: finance, title: 가계부}
+      - {id: group-share, title: 그룹 공유}
   - group: 자동 프로세스
     steps:
-      - {id: open-batch, title: 개장 배치, when: "월~금 22:30"}
+      - {id: open-batch, title: 개장 배치, when: "월~금 22:30", flow: open-batch}
       - {id: close-batch, title: 마감 배치, when: "화~토 04:30", flow: close-batch}
       - {id: report-notify, title: 리포트·알림, when: "마감 배치 끝", flow: close-batch}
-      - {id: fida-receive, title: FIDA 기준표 수신, when: "매일 07:00 (fida 프로젝트)"}
+      - {id: fida-receive, title: FIDA 기준표 수신, when: "매일 07:00 (fida 프로젝트)", flow: fida-receive}
   - group: 관리자 프로세스
     steps:
-      - {id: admin-approve, title: 가입 승인·반려}
+      - {id: admin-approve, title: 가입 승인·반려, flow: signup}
       - {id: admin-runtime, title: 런타임 매매 정책}
       - {id: admin-orders, title: 주문 정정·재정렬}
       - {id: admin-scheduler, title: 스케쥴러 수동 실행}
+      - {id: admin-privacy, title: PRIVACY 기준표 수동 보정, flow: fida-receive}
+      - {id: admin-error-logs, title: 오류 로그}
+      - {id: admin-role, title: 사용자 역할 변경}
 
 flows:
   close-batch:
@@ -212,3 +227,491 @@ flows:
         desc: 체크포인트를 DONE으로 기록하고, 외부 감시 서비스 URL로 heartbeat를 보낸다(dead-man's switch). heartbeat가 오지 않으면 배치가 끝까지 돌지 않았다는 뜻이다.
         code: [HeartbeatPort#pingClose]
         state: "trading_batch_run → DONE"
+
+  open-batch:
+    title: 개장 매매 배치
+    trigger: 월~금 22:30 KST cron (kista-trading)
+    summary: >-
+      ACTIVE 전략마다 다음 거래일의 장 시작 주문(AT_OPEN)만 계산·예산 배정해 개장 직후 증권사에 미리 접수한다.
+      장마감 주문(AT_CLOSE)·체결 기록·리포트는 마감 배치가 맡는다.
+    steps:
+      - id: lock
+        lane: trading
+        to: [db]
+        title: 배치 시작·중복 실행 방지
+        desc: cron이 발화하면 DB 분산 락(trading-open, TTL 2h)을 잡는다.
+        code: [TradingOpenScheduler#run, SchedulerLockService#tryRun]
+        fail: 다른 프로세스가 락을 쥐고 있으면 조용히 건너뛴다.
+
+      - id: privacy-guard
+        lane: trading
+        to: [db, telegram]
+        title: PRIVACY 기준표 장전 점검
+        desc: >-
+          PRIVACY 전략이 있으면 이번 거래일 기준표를 다시 점검한다. 경고·차단 이슈가 하나라도 있으면 이번 실행에서 PRIVACY 전략만 빼고
+          관리자에게 알린다(저장 때는 경고였던 "보유 중인데 매도 없음"도 여기서는 제외 사유다). 마감 배치에는 이 점검이 없다.
+        code: [TradingOpenScheduler#guardPrivacyStrategies]
+        cond: PRIVACY 전략이 있고 기준표가 있을 때
+        fail: 기준표가 아예 없으면 점검을 건너뛴다.
+
+      - id: contexts
+        lane: trading
+        to: [db]
+        title: 대상 전략 수집
+        desc: >-
+          ACTIVE 전략마다 배치 컨텍스트를 만든다. 거래일은 다음 거래일(22:30이면 내일 KST 날짜)이고, 이 날짜로 체크포인트를 남긴다.
+          AT_OPEN 주문이 있는 전략만 고르지 않는다 — 걸러지는 건 뒤의 주문 계획 단계다.
+        code: [BatchContextFactory#buildAll, TradingService#runOpenBatch]
+        state: "trading_batch_run(OPEN) → STARTED"
+        fail: 대상 0건이면 DONE으로 끝낸다.
+
+      - id: holiday
+        lane: trading
+        to: [db, telegram]
+        title: 휴장일 확인
+        desc: 거래일이 미국 휴장일이면 관리자 봇에만 알리고 끝낸다.
+        code: [TradingService#isMarketOpen, TradingAlertNotifier#onMarketClosed]
+        cond: 휴장일이면
+        fail: DONE으로 정상 종료.
+
+      - id: start-filter
+        lane: trading
+        title: 아직 시작 전인 전략 제외
+        desc: 마감 배치와 같은 규칙이다. 거래일이 시작예정일보다 뒤인 전략만 남는다 — 시작예정일 당일 22:30 개장 배치부터 대상이다.
+        code: [TradingService#filterScheduledStart]
+        fail: 모두 제외되면 DONE으로 끝낸다.
+
+      - id: prices
+        lane: trading
+        to: [broker, db]
+        title: 시세·기준표 일괄 조회
+        desc: 종목별 현재가·전일종가와 PRIVACY 기준표를 거래일 기준으로 한 번에 조회한다.
+        code: [TradingPriceFetcher#loadPriceContext]
+
+      - id: wait-open
+        lane: trading
+        title: 개장 시각까지 대기
+        desc: DST면 22:30이 곧 개장이라 바로 진행하고, 비DST면 23:30까지 약 60분 기다린다.
+        code: [DstInfo#waitUntilMarketOpen, TradingService#waitFor]
+        fail: 재기동 종료면 기동 후 재개된다. 그 밖의 인터럽트는 사용자에게 "미접수" 알림을 보낸다.
+
+      - id: open-alert
+        lane: trading
+        to: [telegram]
+        title: 개장 알림
+        desc: 장 알림(MARKET_ALERT)을 켠 활성 사용자에게 장 시작 알림을 보낸다(텔레그램 + 앱 푸시). 이 시점부터 접수 구간이라 재기동 종료 요청이 와도 끝까지 마친다.
+        code: [MarketEventNotifier#notifyMarketOpen]
+        state: "trading_batch_run → PLACING"
+
+      - id: plan
+        lane: trading
+        to: [broker, db]
+        title: AT_OPEN 주문 계획·예산 배정
+        desc: >-
+          전략 공식으로 주문을 계산하되 오늘 아직 없는 AT_OPEN 슬롯만 후보로 남긴다(INFINITE 매도, VR 사다리 — PRIVACY는 AT_OPEN 주문이 없다).
+          계좌별 잔고 안에서 예산을 배정해 PLANNED로 저장한다. AT_CLOSE는 개장 가격으로 cap이 굳지 않도록 여기서 만들지 않는다.
+        code: [TradingCandidatePlanner#collectOpenCandidates, TradingCandidatePlanner#saveAllocatedOrders, TradingOrderBudgetAllocator#allocate]
+        state: "orders → PLANNED (AT_OPEN)"
+        fail: 예산 부족으로 거절된 전략은 사용자에게 잔고 부족을 알린다. 전략 하나가 실패해도 그 전략만 격리한다.
+
+      - id: place
+        lane: trading
+        to: [broker, db]
+        title: 증권사 선접수
+        desc: 현재가를 다시 조회해 BUY cap을 재보정한 뒤 AT_OPEN PLANNED 주문을 접수한다. 마감 배치와 달리 전략 단위로 순차 처리한다.
+        code: [TradingPriceFetcher#reloadPlacementPrices, TradingOrderExecutor#placeAtOpenOrders, BuyOrderPriceCapper#capIfNeeded]
+        state: "orders → PLACED / FAILED"
+        fail: 주문 하나의 접수가 실패하면 FAILED로 기록하고 계속한다.
+
+      - id: done
+        lane: trading
+        to: [db]
+        title: 배치 완료
+        desc: 체크포인트를 DONE으로 기록하고 개장 heartbeat를 보낸다. 체결 결과·리포트는 다음 날 04:30 마감 배치가 함께 처리한다.
+        code: [HeartbeatPort#pingOpen]
+        state: "trading_batch_run → DONE"
+
+  signup:
+    title: 가입·승인
+    trigger: 사용자가 로그인 화면에서 "카카오로 시작하기"를 누른다
+    summary: 카카오 로그인으로 가입하고, 승인 설정이 켜져 있으면 관리자 승인을 기다린다. 반려되면 쿨다운 뒤 재신청할 수 있다.
+    steps:
+      - id: kakao
+        lane: ui
+        to: [api]
+        title: 카카오 로그인
+        desc: 카카오 인가 페이지에서 받은 code를 kista-ui의 /auth/callback이 kista-api로 넘긴다. kista-api는 카카오 토큰을 교환하고 카카오 ID·닉네임·이메일을 가져온다.
+        code: [AuthController#kakaoCallback, UserService#login, KakaoOAuthPort#exchangeCodeForToken, KakaoOAuthPort#getUserInfo]
+        fail: code가 없거나 API가 실패하면 로그인 화면으로 돌아간다.
+
+      - id: register
+        lane: api
+        to: [db]
+        title: 신규 사용자 가입
+        desc: >-
+          이미 가입한 사용자면 그대로 로그인한다. 신규면 승인 설정에 따라 PENDING(승인 필요) 또는 ACTIVE(승인 불필요)로 저장한다.
+          ADMIN_KAKAO_IDS에 있는 사용자는 항상 ACTIVE·ADMIN이다.
+        code: [UserService#register, ApprovalPolicyPort#approvalRequiredForUpdate]
+        cond: 처음 로그인하는 사용자
+        state: "users → PENDING 또는 ACTIVE"
+
+      - id: replicate
+        lane: api
+        to: [redis, trading]
+        title: 매매 서버에 프로필 복제
+        desc: 상태(활성 여부)와 알림 설정 스냅샷을 Redis Stream으로 kista-trading에 보내 user_notify_profile 복제본을 갱신한다. 승인·반려·재신청 때도 같은 경로로 다시 보낸다.
+        code: [UserNotifyProfilePublisher#publishStatusChanged, UserEventStreamPublisher#onProfileChanged, UserNotifyProfileSyncListener#onProfileChanged]
+        state: "user_notify_profile upsert (is_active)"
+
+      - id: admin-alert
+        lane: api
+        to: [telegram]
+        title: 관리자에게 가입 알림
+        desc: PENDING이면 승인·거절 버튼이 달린 텔레그램 알림을, 승인 불필요라 바로 ACTIVE가 됐으면 정보 알림만 관리자 봇으로 보낸다.
+        code: [CompositeUserNotificationAdapter#onNewUserRegistered, TelegramUserNotificationAdapter#notifyNewUser]
+        cond: 신규이고 ADMIN이 아닐 때
+
+      - id: pending
+        lane: ui
+        to: [user, api]
+        title: 승인 대기 화면
+        desc: JWT를 발급받은 뒤 상태가 PENDING이면 /pending으로 보낸다. 화면은 /api/auth/status-stream SSE로 상태 변경을 기다린다(폴링 없음).
+        code: [StatusStreamController#statusStream, SseEmitterRegistry#connect]
+        cond: PENDING일 때
+
+      - id: approve
+        lane: api
+        to: [db]
+        title: 관리자 승인
+        desc: 관리자가 관리자 화면이나 텔레그램 버튼으로 승인한다. 관리자 화면 경로만 감사 로그(USER_APPROVE)를 남긴다.
+        code: [AdminService#approveUser, TelegramBotService#handleCallbackQuery, UserService#approve]
+        state: "users → ACTIVE"
+
+      - id: approve-notify
+        lane: api
+        to: [telegram, ui]
+        title: 승인 알림·화면 전환
+        desc: 사용자에게 텔레그램·앱 푸시로 승인을 알리고, 열려 있는 대기 화면에는 SSE로 ACTIVE를 보내 대시보드로 이동시킨다.
+        code: [CompositeUserNotificationAdapter#onUserApproved, SseEmitterRegistry#onUserApproved]
+        fail: 대기 화면이 닫혀 있으면 SSE는 버린다(다음 로그인 때 상태로 이동).
+
+      - id: reject
+        lane: api
+        to: [db, redis, telegram, ui]
+        title: 관리자 반려
+        desc: >-
+          사유와 함께 반려하면 REJECTED로 바꾸고 24시간 재신청 쿨다운을 시작한다. 액세스 토큰을 15분간 블랙리스트에 올리고 리프레시 토큰을 모두 지워 세션을 끝낸다.
+          사용자에게 사유를 알리고, SSE로 /rejected 화면으로 보낸다.
+        code: [AdminService#rejectUser, UserService#reject, BlacklistPort#add, RefreshTokenPort#deleteAllByUserId, CompositeUserNotificationAdapter#onUserRejected]
+        cond: 반려할 때
+        state: "users → REJECTED"
+
+      - id: reapply
+        lane: ui
+        to: [api]
+        title: 재신청
+        desc: >-
+          반려(24시간) 또는 대기(1시간) 쿨다운이 지나면 재신청할 수 있다. 승인 설정이 켜져 있으면 PENDING으로 돌아가 관리자에게 다시 승인 버튼 알림이 가고,
+          꺼져 있으면 바로 ACTIVE가 된다.
+        code: [AuthController#requestApproval, UserService#reapply]
+        cond: PENDING 또는 REJECTED
+        state: "users → PENDING 또는 ACTIVE"
+        fail: 쿨다운 중이면 429(retryAfter), 다른 상태면 400.
+
+      - id: approval-off
+        lane: api
+        to: [db]
+        title: 승인 설정 OFF 시 일괄 승인
+        desc: 관리자가 "가입 승인 필요"를 끄면 커밋 뒤 대기 중인 PENDING 사용자를 모두 승인한다. 사용자마다 승인 알림·화면 전환이 그대로 일어난다.
+        code: [RuntimeSettingsService#update, ApprovalRequirementDisabledListener#onApprovalRequirementDisabled]
+        cond: 승인 필요 true → false로 바꿀 때
+        state: "users PENDING → ACTIVE (일괄)"
+
+  strategy-register:
+    title: 전략 등록
+    trigger: 사용자가 계좌 화면에서 전략을 등록한다
+    summary: >-
+      kista-ui가 kista-trading으로 바로 등록을 요청하면, 정책·중복·잔고를 검증하고 전략·버전·첫 사이클·초기 포지션을 저장한다.
+      주문은 바로 나가지 않고 시작예정일 밤 미국장부터 배치가 매매한다.
+    steps:
+      - id: form
+        lane: user
+        to: [ui]
+        title: 등록 폼 입력
+        desc: 유형·종목·분할수·시드, 중간부터 시작(보유수량·평단), 시작예정일(비우면 오늘), VR 설정을 입력한다. 시드 미리보기로 최소 시드와 기준가를 볼 수 있다.
+        code: [StrategyHistoryQueryService#strategySeedPreview]
+
+      - id: request
+        lane: ui
+        to: [trading]
+        title: 등록 요청
+        desc: kista-ui 프록시가 kista-api를 거치지 않고 kista-trading으로 바로 POST /api/accounts/{accountId}/trading-cycles를 보낸다.
+        code: [TradingCycleController#register, StrategyService#register]
+
+      - id: validate
+        lane: trading
+        to: [db]
+        title: 정책·입력 검증
+        desc: >-
+          계좌 소유권을 확인하고, 유형별 생성 정책이 켜져 있는지 보고 종목·분할수 기본값을 정한다. 중간부터 시작이면 평단이 필수다.
+          시작예정일은 오늘 이후만 허용한다. 같은 계좌에 같은 종목 전략이 이미 있으면 거부한다.
+        code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
+               StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker]
+        fail: 위반이면 400(중복은 409 성격의 상태 오류).
+
+      - id: balance
+        lane: trading
+        to: [broker]
+        title: 잔고 검증
+        desc: 잔고 검증 토글이 켜져 있으면 "증권사 USD 매수가능금액 − 기존 전략들의 예수금 합"보다 시드가 크지 않은지 확인한다.
+        code: [StrategyCreationService#validateBalanceIfRequired, MarginPort#getUsdBuyableAmount]
+        cond: 잔고 검증 ON이고 시드가 있을 때
+        fail: 한도 초과면 거부한다.
+
+      - id: bootstrap-price
+        lane: trading
+        to: [broker]
+        title: 초기 평가금 계산
+        desc: 중간부터 시작(보유수량 > 0)이면 전일종가를 한 번 조회해 보유분 평가금을 만든다. VR은 V값 직접 입력이 없으면 이 평가금을 V로 쓴다.
+        code: [StrategyCreationService#fetchMarketPrice, BrokerPricePort#getPrevClose, StrategyCreationService#resolveVrValue, StrategyCreationService#validateVrCommand]
+        cond: 보유수량 > 0 (VR 파라미터 검증은 VR일 때)
+        fail: 시세 조회가 실패하면 등록 전체가 실패한다.
+
+      - id: save
+        lane: trading
+        to: [db]
+        title: 전략·첫 사이클 저장
+        desc: >-
+          전략(ACTIVE)·전략 버전·유형별 상세를 저장하고, 시작일 = 시작예정일인 첫 사이클과 초기 포지션 스냅샷(예수금 + 보유분)을 저장한다.
+          각 저장은 별도 커밋이다(증권사 호출 때문에 트랜잭션 밖에서 실행).
+        code: [StrategyCreationService#saveStrategyWithVersion, StrategyCreationService#saveInitialCycleAndPosition, StrategyCycle#start, CyclePosition#bootstrapSnapshot, CyclePosition#initialSnapshot]
+        state: "strategy → ACTIVE · strategy_cycle +1 · cycle_position +1"
+
+      - id: first-trade
+        lane: trading
+        title: 첫 매매 시점
+        desc: >-
+          등록만으로 주문은 나가지 않는다. 배치가 "거래일 > 시작예정일"인 전략만 매매하므로, 시작예정일 D 밤 미국장(D 22:30 개장 배치 · D+1 04:30 마감 배치)부터 매매한다.
+        code: [TradingService#filterScheduledStart]
+
+  withdraw:
+    title: 회원 탈퇴
+    trigger: 사용자가 설정에서 "회원 탈퇴"를 누른다 (관리자 강제 탈퇴도 같은 경로)
+    summary: >-
+      kista-api가 사용자를 소프트 삭제하고 세션을 끊은 뒤 UserDeletedEvent를 낸다. 이후 정리는 이벤트 구독자들이 맡고,
+      매매 데이터는 Redis Stream으로 kista-trading에 전달돼 그쪽에서 지운다. 구독자 사이의 실행 순서는 보장되지 않는다.
+    steps:
+      - id: request
+        lane: ui
+        to: [api]
+        title: 탈퇴 요청
+        desc: kista-ui가 DELETE /api/auth/me를 호출하고, 성공하면 인증 쿠키를 지운다. 관리자 강제 탈퇴는 감사 로그(USER_DELETE)를 남기고 같은 서비스로 들어온다.
+        code: [AuthController#deleteMe, AdminService#deleteUser, UserService#deleteMe]
+
+      - id: soft-delete
+        lane: api
+        to: [db, redis]
+        title: 사용자 삭제·세션 종료
+        desc: 한 트랜잭션에서 사용자를 소프트 삭제하고, 리프레시 토큰을 모두 지우고, 액세스 토큰을 15분간 블랙리스트에 올린 뒤 UserDeletedEvent를 발행한다.
+        code: [UserCascadeDeleter#deleteCascade]
+        state: "users.deleted_at 설정"
+
+      - id: root-cleanup
+        lane: api
+        to: [db, telegram]
+        title: kista-api 쪽 정리
+        desc: >-
+          커밋 뒤 구독자들이 각자 정리한다 — 가계부(거래·자산 스냅샷·계정·카테고리 소프트 삭제, 그룹 탈퇴와 OWNER 승계), FCM 기기 토큰 삭제,
+          관리자에게 삭제 완료 알림.
+        code: [com.kista.finance.adapter.out.UserCascadeListener#onUserDeleted, UserFcmCleanupListener#onUserDeleted, UserDeletedNotifier#onUserDeleted]
+
+      - id: stream
+        lane: api
+        to: [redis]
+        title: 매매 서버로 전달
+        desc: 같은 이벤트를 Redis Stream(stream:user.deleted)에 넣는다. 매매 데이터는 kista-trading 소유라 kista-api가 직접 지울 수 없다.
+        code: [UserEventStreamPublisher#onUserDeleted]
+
+      - id: consume
+        lane: trading
+        to: [redis]
+        title: 스트림 수신
+        desc: UserDeletedStreamConsumer가 받아 kista-trading 안에서 UserDeletedEvent로 다시 발행한다.
+        code: [UserDeletedStreamConsumer#onRecord, UserEventStreamBridge#handleUserDeletedRecord, UserEventRepublisher#republishUserDeleted]
+        fail: 형식 오류는 버린다(ack). DB 일시 오류는 pending으로 남겨 5분마다 재시도하고 약 2시간 뒤 포기한다.
+
+      - id: trading-cleanup
+        lane: trading
+        to: [db]
+        title: 사이클·전략·계좌 정리
+        desc: >-
+          구독자들이 각자 소프트 삭제한다 — 사이클 이력(cycle_position → strategy_cycle 순), 전략, 계좌. 알림 프로필 복제본은 행을 지운다.
+          네 구독자 사이의 순서는 정해져 있지 않다.
+        code: [com.kista.trading.adapter.out.UserCascadeListener#onUserDeleted, StrategyUserCascadeListener#onUserDeleted,
+               AccountUserCascadeListener#onUserDeleted, UserNotifyProfileSyncListener#onUserDeleted]
+        state: "cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · user_notify_profile 삭제"
+
+  fida-receive:
+    title: FIDA 기준표 수신
+    trigger: 매일 07:00 KST — fida 프로젝트(별도 OCI 인스턴스)가 호출 (이 레포 밖)
+    summary: >-
+      fida가 다음 거래일에 쓸 PRIVACY 기준 매매표를 보내면 kista-trading이 점검·멱등 저장하고, 이상이 있으면 관리자에게 알린다.
+      저장된 기준표는 이후 개장·마감 배치가 읽는다.
+    steps:
+      - id: send
+        lane: fida
+        to: [trading]
+        title: 기준표 전송
+        desc: >-
+          fida가 공인 도메인의 POST /api/internal/fida-orders로 종목별 기준표(발행일·기준가·평단·보유수량·계획 주문)를 보낸다.
+          Caddy가 이 경로만 kista-trading으로 넘긴다(deploy/server/caddy/kista-api.caddy, CaddyRoutingTest가 대조).
+        code: [FidaOrderRequest]
+
+      - id: auth
+        lane: trading
+        title: 내부 토큰 인증·형식 검증
+        desc: X-Internal-Token이 설정값과 같아야 통과한다. 이어서 필수값과 BUY 수량 누락을 검증한다.
+        code: [InternalTokenAuthFilter#doFilterInternal, FidaOrderController#placeFidaOrder]
+        fail: 토큰 불일치 401, 형식 위반 400.
+
+      - id: inspect
+        lane: trading
+        to: [telegram]
+        title: 위험 패턴 점검·관리자 알림
+        desc: >-
+          보유수량과 매도 계획이 맞는지 점검한다. 차단 사유(보유 0인데 매도, 매도 합 > 보유, 수량 없는 매도 2건 이상)면 저장하지 않고,
+          경고 사유(보유 중인데 매도 없음)면 저장은 진행한다. 둘 다 관리자 텔레그램으로 알린다.
+        code: [com.kista.privacy.application.service.PrivacyService#executeFidaOrder, PrivacyTradeValidationService#inspect, PrivacyAlertNotifier#onPrivacyAlert]
+        cond: 경고·차단 이슈가 있을 때 알림
+        fail: 차단이면 400, 저장 안 됨.
+
+      - id: save
+        lane: trading
+        to: [db]
+        title: 멱등 저장
+        desc: >-
+          (발행일, 종목)이 처음이면 기준표와 주문 명세를 저장하고 201. 이미 있고 내용이 같으면 그대로 두고 200(재전송 안전).
+          내용이 다르면 409로 거절하고 기존 기준표를 유지한다. 발행일(release_date)은 거래일 전날이다.
+        code: [PrivacyTradePersistenceAdapter#saveBaseWithOrders, PrivacyDates#tradeDateOf]
+        state: "privacy_trade_bases / privacy_trade_base_orders +1"
+        fail: 내용이 다른 재전송은 409.
+
+      - id: consume
+        lane: trading
+        to: [db]
+        title: 배치에서 사용
+        desc: 개장 배치는 접수 전에 기준표를 다시 점검해 이슈가 있으면 PRIVACY 주문을 건너뛰고, 개장·마감 배치 모두 거래일의 기준표로 PRIVACY 주문을 계산한다.
+        code: [TradingOpenScheduler#guardPrivacyStrategies, TradingPriceFetcher#loadPriceContext, PrivacyTradePersistenceAdapter#findTodayTrade]
+        cond: ACTIVE PRIVACY 전략이 있을 때
+
+      - id: manual
+        lane: api
+        to: [trading]
+        title: 관리자 수동 보정
+        desc: >-
+          수신이 실패했거나 틀렸으면 관리자가 기준표를 수동 등록하거나 마스터·주문 명세를 고친다. 수동 등록은 같은 fida-orders 내부 API를 다시 쓰므로
+          점검·멱등 규칙이 같다. 수정·추가·삭제는 저장 때 점검을 거치지 않고, 개장 배치 점검이 다시 잡는다.
+        code: [AdminPrivacyTradeController#createBase, AdminPrivacyTradeController#updateBase, AdminPrivacyTradeController#updateOrder,
+               AdminPrivacyTradeController#addOrder, AdminPrivacyTradeController#deleteOrder]
+        cond: 관리자가 직접 실행할 때
+
+lifecycles:
+  user:
+    title: 사용자
+    enum: UserStatus
+    summary: 가입 때 승인 설정에 따라 PENDING 또는 ACTIVE로 시작하고, 반려되면 쿨다운 뒤 재신청한다. 탈퇴는 상태와 무관한 소프트 삭제다.
+    states:
+      - {id: PENDING, label: 승인 대기}
+      - {id: ACTIVE, label: 이용 가능}
+      - {id: REJECTED, label: 반려, desc: 24시간 뒤 재신청 가능}
+    transitions:
+      - {to: PENDING, title: 가입 (승인 필요), code: [UserService#register], flow: signup/register}
+      - {to: ACTIVE, title: 가입 (승인 불필요 · ADMIN seed), code: [UserService#register], flow: signup/register}
+      - {from: PENDING, to: ACTIVE, title: 관리자 승인, code: [AdminService#approveUser, TelegramBotService#handleCallbackQuery, UserService#approve], flow: signup/approve}
+      - {from: PENDING, to: ACTIVE, title: 승인 설정 OFF 일괄 승인, code: [ApprovalRequirementDisabledListener#onApprovalRequirementDisabled], flow: signup/approval-off}
+      - {from: PENDING, to: REJECTED, title: 관리자 반려, desc: "사유 저장, 24시간 쿨다운 시작, 세션 종료.", code: [UserService#reject, User#withRejection], flow: signup/reject}
+      - {from: PENDING, to: PENDING, title: 대기 중 재신청, desc: 1시간 쿨다운. 관리자에게 승인 버튼 알림을 다시 보낸다., code: [UserService#reapply], flow: signup/reapply}
+      - {from: REJECTED, to: PENDING, title: 재신청 (승인 필요), code: [UserService#reapply], flow: signup/reapply}
+      - {from: REJECTED, to: ACTIVE, title: 재신청 (승인 불필요), code: [UserService#reapply], flow: signup/reapply}
+      - {from: ACTIVE, title: 탈퇴 (소프트 삭제), desc: 상태 검사 없이 어떤 상태에서든 탈퇴할 수 있다., code: [UserService#deleteMe, UserCascadeDeleter#deleteCascade], flow: withdraw/soft-delete}
+
+  strategy:
+    title: 전략
+    enum: StrategyStatus
+    summary: 등록하면 ACTIVE로 매일 배치 대상이 된다. 사용자·관리자가 멈추거나, 사이클이 끝났는데 다음 사이클을 열 수 없으면 시스템이 PAUSED로 바꾼다.
+    states:
+      - {id: ACTIVE, label: 운영중, desc: 매일 배치 대상}
+      - {id: PAUSED, label: 일시중지, desc: 배치 제외}
+    transitions:
+      - {to: ACTIVE, title: 전략 등록, code: [StrategyCreationService#register], flow: strategy-register/save}
+      - {from: ACTIVE, to: PAUSED, title: 사용자 일시정지, code: [StrategyService#pause]}
+      - {from: ACTIVE, to: PAUSED, title: 관리자 일시정지, code: [AdminStrategyService#pauseStrategy]}
+      - from: ACTIVE
+        to: PAUSED
+        title: 사이클 종료 후 다음 사이클을 열지 않음
+        desc: >-
+          청산으로 사이클이 끝났을 때 연속 정책이 NONE이거나, 잔고가 유지 시드에 못 미치거나, 증권사 잔고 조회·사이클 재등록이 실패하면
+          좀비 사이클을 막으려고 전략을 멈춘다.
+        code: [CycleRotationService#rotate, StrategyPort#pause]
+        tag: 시스템
+        flow: close-batch/rotate
+      - {from: ACTIVE, to: PAUSED, title: 수동 체결 보정으로 보유 0, code: [ManualTradeCorrectionService#correctManualFills, CycleCloser#closeIfExhausted], tag: 관리자}
+      - {from: PAUSED, to: ACTIVE, title: 재개, desc: 사이클이 끝나 있으면 새 사이클을 다시 연다., code: [StrategyService#resume, AdminStrategyService#resumeStrategy]}
+      - {from: ACTIVE, title: 전략 삭제·회원 탈퇴, desc: 상태와 무관한 소프트 삭제(사이클 이력 포함)., code: [StrategyService#delete, StrategyUserCascadeListener#onUserDeleted], flow: withdraw/trading-cleanup}
+
+  order:
+    title: 주문
+    enum: OrderStatus
+    summary: 배치·수동 실행이 PLANNED로 저장하고 접수하면 PLACED, 장 마감 뒤 체결 내역으로 체결·부분체결·취소가 정해진다.
+    states:
+      - {id: PLANNED, label: 접수 대기, desc: DB에만 있음}
+      - {id: PLACED, label: 접수 완료}
+      - {id: FILLED, label: 전량 체결, terminal: true}
+      - {id: PARTIALLY_FILLED, label: 부분 체결, terminal: true}
+      - {id: CANCELLED, label: 취소, terminal: true}
+      - {id: FAILED, label: 접수 실패, terminal: true}
+    transitions:
+      - {to: PLANNED, title: 배치 예산 배정 후 저장, code: [TradingCandidatePlanner#saveAllocatedOrders], tag: 개장·마감, flow: close-batch/plan}
+      - {to: PLANNED, title: 수동 실행, code: [ManualTradingService#execute], tag: 사용자}
+      - {to: PLANNED, title: 관리자 재주문 (예약), desc: AT_OPEN/AT_CLOSE 재주문은 PLANNED로 저장한다., code: [ReorderService#reorder], tag: 관리자}
+      - {to: FILLED, title: 관리자 수동 체결 보정, desc: 증권사 밖에서 체결된 거래를 바로 FILLED로 기록한다., code: [ManualTradeCorrectionService#correctManualFills, Order#filledManual], tag: 관리자}
+      - {from: PLANNED, to: PLACED, title: 증권사 접수, code: [TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
+      - {from: PLANNED, to: FAILED, title: 접수 실패, code: [TradingOrderExecutor#placeOrders], flow: close-batch/place}
+      - {from: PLANNED, to: CANCELLED, title: BUY cap 재보정, desc: 접수 직전 가격 cap이 바뀐 BUY는 취소하고 보정 주문을 새 PLANNED로 저장한다., code: [BuyOrderPriceCapper#capIfNeeded], flow: close-batch/place}
+      - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder]}
+      - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다., code: [OrderCancelService#cancelByCycle, OrderCancelStateWriter#deletePlanned], tag: 사용자}
+      - {from: PLACED, to: FILLED, title: 전량 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
+      - {from: PLACED, to: PARTIALLY_FILLED, title: 부분 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
+      - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(Toss는 명시 취소, KIS는 장 마감 자동 취소).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
+      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelByCycle, ReorderService#reorder]}
+
+  batch-run:
+    title: 매매 배치 체크포인트
+    enum: TradingBatchPhase
+    summary: >-
+      trading_batch_run에 (배치, 거래일)별 진행 단계를 남겨, kista-trading이 재기동되면 TradingBatchResumer가 이어서 실행한다.
+      마감은 STARTED → PLANNED → PLACING → PLACED → DONE, 개장은 PLANNED·PLACED 없이 STARTED → PLACING → DONE이다.
+    states:
+      - {id: STARTED, label: 시작}
+      - {id: PLANNED, label: 주문 저장 완료}
+      - {id: PLACING, label: 접수 중, desc: 여기서 끊기면 이중 접수 확인 필요}
+      - {id: PLACED, label: 접수 완료, desc: 리포트 대기}
+      - {id: DONE, label: 종료, terminal: true}
+    transitions:
+      - {to: STARTED, title: 배치 시작, desc: 이전 수동 실행의 DONE도 덮어써 중단 시 재개가 가려지지 않게 한다., code: [TradingService#runCloseBatch, TradingService#runOpenBatch], tag: 개장·마감, flow: close-batch/contexts}
+      - {from: STARTED, to: PLANNED, title: PLANNED 주문 저장, code: [TradingService#runCloseBatch], tag: 마감, flow: close-batch/plan}
+      - {from: PLANNED, to: PLACING, title: 접수 진입, code: [TradingService#runCloseBatch], tag: 마감, flow: close-batch/place}
+      - {from: STARTED, to: PLACING, title: 개장 접수 진입, code: [TradingService#runOpenBatch], tag: 개장, flow: open-batch/open-alert}
+      - {from: PLACING, to: PLACED, title: 접수 완료, code: [TradingService#runCloseBatch], tag: 마감, flow: close-batch/place}
+      - {from: PLACED, to: DONE, title: 리포트 완료, code: [TradingService#runCloseBatch], tag: 마감, flow: close-batch/done}
+      - {from: PLACING, to: DONE, title: 개장 접수 완료, code: [TradingService#runOpenBatch], tag: 개장, flow: open-batch/done}
+      - {from: STARTED, to: DONE, title: 조기 종료, desc: 대상 0건·휴장일·모두 시작 전이면 바로 끝낸다., code: [TradingService#runCloseBatch, TradingService#runOpenBatch], tag: 개장·마감, flow: close-batch/holiday}
+      - from: PLACING
+        to: STARTED
+        title: 재기동 후 재실행
+        desc: >-
+          DONE이 아니면 배치를 처음부터 다시 돌린다(STARTED·PLANNED에서도 같다). PLACING에서 끊겼으면 이중 접수 확인 경고를 관리자에게 보낸다.
+          마감은 접수 마감 시각이 지났으면 재개하지 않고 수동 확인을 요청한다.
+        code: [TradingBatchResumer#resumeClose, TradingBatchResumer#resumeOpen]
+        tag: 재개
+      - {from: PLACED, to: DONE, title: 재기동 후 리포트만 재개, code: [TradingBatchResumer#resumeClose, TradingService#resumeCloseReport], tag: 재개·마감}

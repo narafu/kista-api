@@ -1,7 +1,9 @@
 package com.kista.architecture;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaEnumConstant;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,11 +50,13 @@ final class ProcessMapExporter {
     private ProcessMapExporter() {
     }
 
-    record FlowMap(List<Lane> lanes, List<LandscapeGroup> landscape, Map<String, Flow> flows) {
+    record FlowMap(List<Lane> lanes, List<LandscapeGroup> landscape, Map<String, Flow> flows,
+                   Map<String, Lifecycle> lifecycles) {
         FlowMap {
             lanes = lanes == null ? List.of() : lanes;
             landscape = landscape == null ? List.of() : landscape;
             flows = flows == null ? Map.of() : flows;
+            lifecycles = lifecycles == null ? Map.of() : lifecycles;
         }
     }
 
@@ -80,6 +84,26 @@ final class ProcessMapExporter {
                 String cond, String state, String fail) {
         Step {
             to = to == null ? List.of() : to;
+            code = code == null ? List.of() : code;
+        }
+    }
+
+    // enumType: 상태 enum 클래스 — 상수 집합이 states와 같아야 한다
+    record Lifecycle(String title, @JsonProperty("enum") String enumType, String summary, List<State> states,
+                     List<Transition> transitions) {
+        Lifecycle {
+            states = states == null ? List.of() : states;
+            transitions = transitions == null ? List.of() : transitions;
+        }
+    }
+
+    // terminal: 더 나가는 전이가 없는 최종 상태
+    record State(String id, String label, String desc, Boolean terminal) {
+    }
+
+    // from 없음 = 생성, to 없음 = 소멸(삭제), tag: 같은 상태 기계를 쓰는 경로 구분(예: 개장·마감), flow: "flowId/stepId"
+    record Transition(String from, String to, String title, String desc, List<String> code, String tag, String flow) {
+        Transition {
             code = code == null ? List.of() : code;
         }
     }
@@ -127,7 +151,66 @@ final class ProcessMapExporter {
                 step.code().forEach(ref -> codeError(ref, classes).ifPresent(e -> errors.add(where + ": " + e)));
             }
         });
+        map.lifecycles().forEach((id, lc) -> lifecycleErrors(map, lc, classes).forEach(e -> errors.add("lifecycle " + id + ": " + e)));
         return errors;
+    }
+
+    private static List<String> lifecycleErrors(FlowMap map, Lifecycle lc, JavaClasses classes) {
+        var errors = new ArrayList<String>();
+        if (lc.states().stream().anyMatch(s -> s.id() == null)) {
+            return List.of("id 없는 state");
+        }
+        var stateIds = lc.states().stream().map(State::id).collect(Collectors.toCollection(TreeSet::new));
+        if (stateIds.size() != lc.states().size()) {
+            errors.add("state id 중복");
+        }
+        // 최종 상태에서 나가는 전이는 없어야 한다(자기 전이 포함)
+        lc.states().stream().filter(s -> Boolean.TRUE.equals(s.terminal()))
+                .filter(s -> lc.transitions().stream().anyMatch(t -> s.id().equals(t.from())))
+                .forEach(s -> errors.add("terminal 상태 '" + s.id() + "'에서 나가는 전이가 있음"));
+        // enum 상수와 states가 정확히 일치해야 한다 — 상수가 늘거나 줄면 맵도 고치게 한다
+        resolve(lc.enumType(), classes).ifPresentOrElse(enumClass -> {
+            var constants = enumClass.getEnumConstants().stream().map(JavaEnumConstant::name)
+                    .collect(Collectors.toCollection(TreeSet::new));
+            if (!constants.equals(stateIds)) {
+                errors.add("states " + stateIds + " ≠ " + lc.enumType() + " 상수 " + constants);
+            }
+        }, () -> errors.add("enum '" + lc.enumType() + "' 클래스 없음 또는 이름 중복"));
+        for (int i = 0; i < lc.transitions().size(); i++) {
+            var t = lc.transitions().get(i);
+            var where = "transition[" + i + "]";
+            if (t.from() == null && t.to() == null) {
+                errors.add(where + ": from·to 둘 다 없음");
+            }
+            for (var s : new String[]{t.from(), t.to()}) {
+                if (s != null && !stateIds.contains(s)) {
+                    errors.add(where + ": 없는 상태 '" + s + "'");
+                }
+            }
+            if (t.flow() != null && !flowStepExists(map, t.flow())) {
+                errors.add(where + ": 없는 flow 단계 '" + t.flow() + "'");
+            }
+            t.code().forEach(ref -> codeError(ref, classes).ifPresent(e -> errors.add(where + ": " + e)));
+        }
+        return errors;
+    }
+
+    // "flowId/stepId" 또는 "flowId"
+    private static boolean flowStepExists(FlowMap map, String ref) {
+        var parts = ref.split("/", 2);
+        var flow = map.flows().get(parts[0]);
+        return flow != null && (parts.length == 1 || flow.steps().stream().anyMatch(s -> s.id().equals(parts[1])));
+    }
+
+    // 단순 이름(유일) 또는 FQCN → 클래스
+    private static Optional<JavaClass> resolve(String name, JavaClasses classes) {
+        if (name == null) {
+            return Optional.empty();
+        }
+        var matches = classes.stream()
+                .filter(c -> name.contains(".") ? c.getName().equals(name) : c.getSimpleName().equals(name))
+                .toList();
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
     }
 
     // "Class#method" 또는 "Class" — 클래스는 단순 이름(유일) 또는 FQCN
