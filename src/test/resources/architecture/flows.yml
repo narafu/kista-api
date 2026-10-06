@@ -535,7 +535,7 @@ flows:
         title: 사용자 삭제·세션 종료
         desc: >-
           한 트랜잭션에서 사용자를 소프트 삭제하고, 사용자 설정·알림 선호도를 지우고, 리프레시 토큰을 모두 지우고,
-          액세스 토큰을 15분간 블랙리스트에 올린 뒤 UserDeletedEvent를 발행한다.
+          액세스 토큰 수명(1일) 동안 블랙리스트에 올린 뒤 UserDeletedEvent를 발행한다.
         code: [UserCascadeDeleter#deleteCascade, UserSettingsPort#deleteByUserId]
         state: "users.deleted_at 설정 · user_settings·user_notification_prefs 삭제"
 
@@ -646,7 +646,7 @@ flows:
     trigger: 사용자가 대시보드의 "계좌 등록" 버튼이나 계좌 화면에서 증권사 계좌를 연결·수정·삭제한다
     summary: >-
       kista-ui가 kista-trading으로 바로 요청해 KIS·Toss·MOCK 계좌를 등록한다. 증권사에 자격증명과 계좌번호를 실제로 확인한 뒤
-      암호화해 저장하고, 별명 수정과 삭제도 같은 경로로 처리한다. 삭제하면 그 계좌의 전략이 뒤따라 정리된다.
+      암호화해 저장하고, 별명 수정과 삭제도 같은 경로로 처리한다. 삭제하면 미체결 주문을 증권사에 먼저 취소하고, 그 계좌의 전략·사이클·포지션이 뒤따라 정리된다.
     steps:
       - id: form
         lane: user
@@ -716,15 +716,16 @@ flows:
 
       - id: delete
         lane: trading
-        to: [db]
+        to: [broker, db]
         title: 계좌 삭제와 전략 정리
         desc: >-
-          EditAccountForm의 "계좌 삭제" 확인 대화상자에서 영구 삭제를 누르면 DELETE /api/accounts/{id}로 계좌를 삭제 처리(소프트 삭제)한다.
-          삭제가 커밋된 뒤 발행되는 이벤트를 받아 별도 트랜잭션에서 그 계좌의 전략을 삭제 처리한다(실패하면 재시도 대상으로 남는다).
-          증권사에 이미 접수된 미체결 주문을 취소하는 단계는 없다.
-        code: [AccountController#delete, AccountService#delete, AccountCascadeListener#onAccountDeleted]
-        state: "accounts → 삭제됨 · 뒤이어 strategy → 삭제됨"
-        fail: 내 계좌가 아니면 403, 없으면 404.
+          EditAccountForm의 "계좌 삭제" 확인 대화상자에서 영구 삭제를 누르면 DELETE /api/accounts/{id}가 먼저 이 계좌 전략들을 PAUSED로 바꾸고 미체결 주문을 정리한다
+          (PLANNED는 삭제, PLACED는 증권사 취소 — 전략 삭제와 같은 규칙). 하나라도 증권사 취소에 실패하면 삭제하지 않는다.
+          이어서 증권사 토큰을 지우고 계좌를 삭제 처리(소프트 삭제)한 뒤, 커밋 후 이벤트를 받아 별도 트랜잭션에서 포지션 → 사이클 → 전략 순으로 삭제 처리한다
+          (실패하면 재시도 대상으로 남는다). 주문 이력(orders)은 보존한다.
+        code: [AccountController#delete, AccountService#delete, AccountOpenOrderCanceller#cancelOpenOrders, AccountDeletionWriter#delete, AccountCascadeListener#onAccountDeleted]
+        state: "orders PLANNED 삭제·PLACED → CANCELLED · broker_tokens 삭제 · accounts → 삭제됨 · 뒤이어 cycle_position·strategy_cycle·strategy → 삭제됨"
+        fail: 증권사 취소에 실패한 주문이 있으면 400(삭제 안 됨·전략은 PAUSED 유지, 관리자 알림). 내 계좌가 아니면 403, 없으면 404.
 
   result:
     title: 결과 확인
@@ -791,7 +792,7 @@ flows:
     trigger: 사용자가 전략 화면에서 일시정지·재개·삭제를 누르거나, 관리자가 계좌 화면에서 전략 상태를 바꾼다
     summary: >-
       전략의 상태(ACTIVE·PAUSED)만 바꾸면 배치가 그 전략을 다루거나 건너뛴다. 재개할 때 사이클이 이미 끝나 있으면 새 사이클을 열고,
-      삭제하면 전략·사이클·포지션을 삭제 처리한다. 어느 경우에도 증권사에 이미 접수된 주문은 취소하지 않는다.
+      삭제하면 전략·사이클·포지션을 삭제 처리한다. 일시정지·삭제 모두 오늘 미체결 주문을 먼저 정리한다(PLANNED 삭제, PLACED 증권사 취소).
     steps:
       - id: request
         lane: ui
@@ -805,14 +806,14 @@ flows:
 
       - id: pause
         lane: trading
-        to: [db]
+        to: [broker, db]
         title: 일시정지
         desc: >-
-          전략이 내 계좌 소속인지 확인하고 이미 정지된 전략이면 거부한 뒤 상태를 PAUSED로 바꾼다. 배치는 ACTIVE 전략만 대상으로 하므로 다음 배치부터 이 전략은 주문하지 않는다.
-          PLANNED·PLACED 주문은 취소하지 않는다. 그런데 개장·마감 배치 모두 ACTIVE 전략만 모으므로, 정지 전에 접수된 주문(개장 선접수·바로 주문)이
-          체결돼도 마감 배치가 이 전략의 체결 기록·포지션 스냅샷을 남기지 않는다. 남은 PLANNED 장마감 주문도 접수되지 않는다.
-        code: [StrategyService#pause, StrategyService#requireOwnedStrategy, StrategyPort#findAllActive]
-        state: "strategy → PAUSED"
+          전략이 내 계좌 소속인지 확인하고 이미 정지된 전략이면 거부한다. 개장·마감 배치는 ACTIVE 전략만 모아 정지 뒤 체결을 기록하지 않으므로,
+          먼저 PAUSED로 바꿔 이후 배치가 새 주문을 만들지 않게 한 뒤, 오늘(KST)·다음 거래일의 미체결 주문을 정리한다 — PLANNED는 지우고 PLACED는 증권사에 취소한 뒤 CANCELLED로 기록한다.
+          증권사 취소에 실패한 주문이 있어도 정지는 유지하고 관리자에게 알린다(그 주문은 PLACED로 남는다).
+        code: [StrategyService#pause, OrderCancelService#cancelOpenOrders, StrategyStateWriter#pause, StrategyPort#findAllActive]
+        state: "orders PLANNED 삭제·PLACED → CANCELLED · strategy → PAUSED"
         fail: 이미 중지된 전략이면 400, 내 전략이 아니면 403, 없으면 404.
 
       - id: resume
@@ -830,14 +831,14 @@ flows:
 
       - id: delete
         lane: trading
-        to: [db]
+        to: [broker, db]
         title: 전략 삭제
         desc: >-
-          소유권을 확인한 뒤 포지션 기록 → 사이클 → 전략 순으로 삭제 처리(소프트 삭제)한다. 삭제된 전략은 목록·배치·통계에서 빠진다.
-          주문(orders) 행과 증권사에 접수돼 있던 미체결 주문은 그대로 두며 이 단계에서 취소하지 않는다.
-        code: [StrategyService#delete]
-        state: "cycle_position·strategy_cycle·strategy → 삭제됨"
-        fail: 내 전략이 아니면 403, 없으면 404.
+          소유권을 확인한 뒤 일시정지와 같은 규칙으로 PAUSED 기록·미체결 주문 정리를 먼저 하고, 하나라도 증권사 취소에 실패하면 삭제하지 않는다(전략은 PAUSED로 남는다).
+          정리가 끝나면 포지션 기록 → 사이클 → 전략 순으로 한 트랜잭션에서 삭제 처리(소프트 삭제)한다. 삭제된 전략은 목록·배치·통계에서 빠지고 주문 이력(orders)은 보존한다.
+        code: [StrategyService#delete, OrderCancelService#cancelOpenOrders, StrategyStateWriter#delete]
+        state: "orders PLANNED 삭제·PLACED → CANCELLED · cycle_position·strategy_cycle·strategy → 삭제됨"
+        fail: 증권사 취소에 실패한 주문이 있으면 400(삭제 안 됨·PAUSED 유지, 관리자 알림). 내 전략이 아니면 403, 없으면 404.
 
       - id: admin-request
         lane: ui
@@ -936,7 +937,7 @@ flows:
         to: [trading, broker, db, telegram]
         title: 전체 취소(사이클 단위)
         desc: >-
-          "전체 취소"는 오늘 이 전략의 주문을 한 번에 정리한다. 아직 증권사에 안 간 PLANNED 주문은 상태를 바꾸지 않고 행을 지우고,
+          "전체 취소"는 오늘(KST)과 다음 거래일의 이 전략 주문을 한 번에 정리한다(일시정지·전략 삭제·계좌 삭제도 같은 정리를 먼저 한다). 아직 증권사에 안 간 PLANNED 주문은 상태를 바꾸지 않고 행을 지우고,
           접수된 PLACED 주문은 하나씩 증권사에 취소를 요청해 성공한 건만 CANCELLED로 기록한다(증권사 취소 성공 뒤에 DB 기록, 건별 짧은 트랜잭션).
           Toss가 이미 취소됨(409)이라고 답하면 성공으로 간주한다. 일부 취소가 실패해도 나머지는 계속 처리하고, 실패 건수를 응답에 담고 관리자에게 알림 1건을 보낸다.
         code: [TradingCycleController#cancelExecute, OrderCancelService#cancelByCycle, OrderCancelStateWriter#deletePlanned, OrderCancelStateWriter#markCancelled, OrderCancelFailureNotifier#onOrderCancelFailed]
@@ -990,26 +991,26 @@ flows:
         code: [SelectionChain#resolveAndValidate, ReorderService#reorder]
         fail: 어긋나면 400(내부 호출이 400으로 되살아 관리자 화면에 거절 사유가 표시된다).
 
-      - id: cancel-source
-        lane: trading
-        to: [broker, db]
-        title: 원본 주문 취소
-        desc: >-
-          원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾼다. 이미 체결·취소·실패한 주문은 건드리지 않고 그대로 두며,
-          그래도 재주문은 진행된다.
-        code: [ReorderService#reorder]
-        state: "원본 orders → CANCELLED (PLANNED·PLACED였던 경우)"
-        fail: 증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다.
-
       - id: timing-check
         lane: trading
         to: [db]
         title: 휴장일·주문 시점 서버 재검증
         desc: >-
-          화면에서 막았더라도 서버가 다시 확인한다. 오늘이 거래일인지, 선택한 시점이 지금 시장 단계에서 허용되는지 본다.
+          화면에서 막았더라도 서버가 원본을 건드리기 전에 다시 확인한다. 오늘이 거래일인지, 선택한 시점이 지금 시장 단계에서 허용되는지 본다.
           개장 전에는 AT_OPEN·AT_CLOSE, 개장 후에는 AT_CLOSE·IMMEDIATE만 허용하고, 장마감 직후부터 프리마켓 전과 주말은 모두 불가다.
         code: [DstInfo#reorderTimingAvailabilityAt, MarketCalendarPort#isMarketOpen]
         fail: 400 "휴장일에는 재주문할 수 없습니다" 또는 "현재 시장 단계에서 ... 접수가 불가합니다".
+
+      - id: cancel-source
+        lane: trading
+        to: [broker, db]
+        title: 원본 주문 취소
+        desc: >-
+          시점 검증을 통과한 뒤에만 원본을 취소한다. 원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾼다. 이미 체결·취소·실패한 주문은 건드리지 않고 그대로 두며,
+          그래도 재주문은 진행된다.
+        code: [ReorderService#reorder]
+        state: "원본 orders → CANCELLED (PLANNED·PLACED였던 경우)"
+        fail: 증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다(원본은 PLACED로 남는다).
 
       - id: reorder-place
         lane: trading
@@ -1228,10 +1229,11 @@ flows:
         title: 초대 코드 발급
         desc: >-
           그룹 관리 화면(GroupManager, InviteDialog)에서 초대를 만들면 16자리 일회용 코드와 만료 시각이 발급된다.
-          아직 그룹이 없는 사용자가 처음 초대하면 그 자리에서 새 그룹을 만들고 본인이 소유자(OWNER)가 된다. 이미 그룹이 있으면 소유자만 초대할 수 있다.
+          아직 그룹이 없는 사용자가 처음 초대하면 그 자리에서 새 그룹을 만들고 본인이 소유자(OWNER)가 된다(경로의 그룹 ID는 자리표시라 쓰지 않는다).
+          이미 그룹이 있으면 경로의 그룹이 내 그룹이어야 하고, 소유자만 초대할 수 있다.
         code: [FinanceGroupController#invite, FinanceGroupService#invite]
         state: "finance_groups 생성(처음일 때) · 멤버 OWNER 등록 · 초대 PENDING"
-        fail: 그룹이 있는 일반 멤버가 초대하면 403.
+        fail: 그룹이 있는 일반 멤버가 초대하거나 다른 그룹 ID로 초대하면 403.
 
       - id: respond
         lane: api
@@ -1383,8 +1385,8 @@ flows:
           내부 HTTP(POST /api/internal/trading/scheduler/open|close)로 kista-trading에 넘긴 뒤 202를 돌려준다.
         code: [AdminTradingSchedulerController#triggerOpen, AdminTradingSchedulerController#triggerClose, TradingSchedulerCommandHttpAdapter#triggerOpen, TradingSchedulerCommandHttpAdapter#triggerClose]
         fail: >-
-          내부 토큰 누락·kista-trading 장애는 500으로 나온다(별도 변환 없음). 배포 compose는 INTERNAL_API_BASE_URL을 kista-api에만 넣고
-          kista-scheduler에는 넣지 않아, .env에 따로 없으면 기본값(localhost:8081)으로 호출해 실패한다(운영 .env는 확인하지 못함).
+          내부 토큰 누락·kista-trading 장애는 500으로 나온다(별도 변환 없음). kista-trading 주소는 배포 compose가
+          kista-scheduler에도 INTERNAL_API_BASE_URL로 넣는다.
 
       - id: trading-run
         lane: trading
@@ -1498,7 +1500,7 @@ flows:
       - id: guard
         lane: api
         title: 강등 안전 검사
-        desc: 강등(ADMIN을 USER로)일 때만 자기 자신 강등과 마지막 관리자 강등을 막는다. 승격에는 검사가 없다.
+        desc: USER로 바꿀 때만 자기 자신 강등과, 대상이 지금 ADMIN이면 마지막 관리자 강등을 막는다. 승격에는 검사가 없다.
         code: [AdminService#changeRole]
         cond: 역할을 USER로 바꾸는 경우
         fail: 자기 자신이면 400, 마지막 관리자면 400.
@@ -1528,8 +1530,9 @@ flows:
         title: ADMIN_KAKAO_IDS 자동 승격
         desc: >-
           환경변수에 적힌 카카오 ID 사용자는 가입 때 ADMIN·활성으로 만들어지고, 이미 USER로 가입했어도 다음 로그인 때 ADMIN·활성으로 승격된다.
-          승격 사실은 매매 서버 프로필 복제로 전해진다. 강등 경로는 없어 목록에서 지워도 관리자 권한은 유지된다.
-        code: [UserService#login, UserService#register, AdminSeedPromoter#promote]
+          승격 사실은 매매 서버 프로필 복제로 전해지고, 커밋 뒤 감사 로그(USER_ROLE_CHANGE, 행위자 ADMIN_SEED)로 남는다.
+          강등 경로는 없어 목록에서 지워도 관리자 권한은 유지된다.
+        code: [UserService#login, UserService#register, AdminSeedPromoter#promote, UserSeedPromotedAuditListener]
         cond: 로그인한 사용자의 카카오 ID가 목록에 있을 때
         state: "users.role → ADMIN, users.status → ACTIVE"
 
@@ -1598,11 +1601,11 @@ lifecycles:
       - {from: PLANNED, to: FAILED, title: 접수 실패, code: [TradingOrderExecutor#placeOrders], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: BUY cap 재보정, desc: 접수 직전 가격 cap이 바뀐 BUY는 취소하고 보정 주문을 새 PLANNED로 저장한다., code: [BuyOrderPriceCapper#capIfNeeded], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder], flow: manual-run/cancel-one}
-      - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다., code: [OrderCancelService#cancelByCycle, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}
+      - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: "전체 취소·일시정지·전략/계좌 삭제가 같은 규칙을 쓴다. 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다.", code: [OrderCancelService#cancelByCycle, OrderCancelService#cancelOpenOrders, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}
       - {from: PLACED, to: FILLED, title: 전량 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: PARTIALLY_FILLED, title: 부분 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(Toss는 명시 취소, KIS는 장 마감 자동 취소).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
-      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelByCycle, ReorderService#reorder], flow: manual-run/cancel-one}
+      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelOpenOrders, ReorderService#reorder], flow: manual-run/cancel-one}
 
   batch-run:
     title: 매매 배치 체크포인트
