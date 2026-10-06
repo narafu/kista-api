@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KISTA 모듈 그래프</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"
+        integrity="sha384-IWROdLKRsN1UuJywMlWl7/blXQ8GEooN2n7dzTxfEPd7ybYIKCUJ2Ol/1Gpf3YV4" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --fg: #222; --muted: #777; --line: #ddd;
+    --api: #e8f0fe; --tc: #fdf0e6; --shared: #eef6ee; --node: #ffffff; --node-border: #888;
+    --uses: #3b6fd8; --event: #c2410c; --entity: #7c3aed; --default: #8a8a8a; --hl: #111;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a; --panel: #1f2023; --fg: #e6e6e6; --muted: #9a9a9a; --line: #333;
+      --api: #1d2a40; --tc: #3a2a1c; --shared: #1f3322; --node: #2a2b2f; --node-border: #777;
+      --uses: #6f9bff; --event: #ff8a4c; --entity: #b08cff; --default: #8a8a8a; --hl: #fff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); display: grid;
+         grid-template-rows: auto 1fr; grid-template-columns: 1fr 420px; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 8px 16px;
+           border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; }
+  header input[type=search] { padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); }
+  header label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  .sw { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
+  #cy { min-height: 0; }
+  aside { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 12px 16px; }
+  aside h2 { font-size: 16px; margin: 0 0 4px; }
+  aside h3 { font-size: 13px; margin: 16px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  aside .tag { display: inline-block; padding: 0 6px; margin: 2px 4px 2px 0; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
+  details { margin: 2px 0; }
+  summary { cursor: pointer; }
+  summary .cnt { color: var(--muted); }
+  ul { margin: 2px 0 6px; padding-left: 18px; }
+  li { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
+  .type { font-size: 11px; font-weight: 600; }
+  .muted { color: var(--muted); }
+  @media (max-width: 800px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; }
+    aside { border-left: 0; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>KISTA 모듈 그래프</h1>
+  <input type="search" id="search" placeholder="모듈 검색">
+  <span id="types"></span>
+  <label><input type="checkbox" id="hideInfra" checked> platform·sharedkernel 숨김</label>
+</header>
+<div id="cy"></div>
+<aside id="panel"></aside>
+<script>
+const DATA = /*__DATA__*/null;
+
+// 의존 종류별 표시 이름·색 변수
+const TYPES = {
+  USES_COMPONENT: ['컴포넌트 사용', '--uses'],
+  EVENT_LISTENER: ['이벤트 구독', '--event'],
+  ENTITY: ['엔티티 참조', '--entity'],
+  DEFAULT: ['타입 참조', '--default'],
+};
+const TYPE_PRIORITY = ['EVENT_LISTENER', 'USES_COMPONENT', 'ENTITY', 'DEFAULT']; // 엣지 색은 가장 의미 있는 종류로
+const INFRA = new Set(['platform', 'sharedkernel']); // 거의 모든 모듈이 참조하는 노이즈 모듈
+const PROJECTS = { ':api': '--api', ':trading-core': '--tc', ':shared': '--shared' };
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const byName = Object.fromEntries(DATA.modules.map(m => [m.name, m]));
+const enabled = new Set(Object.keys(TYPES));
+
+// 종류 필터 체크박스
+document.getElementById('types').innerHTML = Object.entries(TYPES).map(([k, [label, color]]) =>
+  `<label><input type="checkbox" data-type="${k}" checked><span class="sw" style="background:var(${color})"></span>${label}</label>`).join(' ');
+
+const hidden = name => document.getElementById('hideInfra').checked && INFRA.has(name);
+
+// 현재 필터 기준으로 모듈 쌍별 엣지 집계
+function edges() {
+  const out = [];
+  for (const m of DATA.modules) {
+    if (hidden(m.name)) continue;
+    const groups = {};
+    for (const d of m.deps) {
+      if (!enabled.has(d.type) || hidden(d.target)) continue;
+      (groups[d.target] ??= []).push(d);
+    }
+    for (const [target, deps] of Object.entries(groups)) {
+      const type = TYPE_PRIORITY.find(t => deps.some(d => d.type === t));
+      out.push({ data: { id: `${m.name}->${target}`, source: m.name, target, count: deps.length, type,
+                         color: css(TYPES[type][1]), width: Math.min(1 + Math.log2(deps.length + 1), 6) } });
+    }
+  }
+  return out;
+}
+
+function elements() {
+  const parents = Object.entries(PROJECTS).map(([p, color]) => ({ data: { id: p, label: p, color: css(color) } }));
+  const nodes = DATA.modules.filter(m => !hidden(m.name))
+    .map(m => ({ data: { id: m.name, label: m.name, parent: m.project } }));
+  return [...parents, ...nodes, ...edges()];
+}
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  wheelSensitivity: 0.3,
+  style: [
+    { selector: 'node', style: { label: 'data(label)', 'text-valign': 'center', 'font-size': 12, color: css('--fg'),
+        'background-color': css('--node'), 'border-width': 1, 'border-color': css('--node-border'),
+        shape: 'round-rectangle', width: 'label', height: 22, padding: 8 } },
+    { selector: ':parent', style: { 'background-color': 'data(color)', 'background-opacity': 1, 'border-color': css('--line'),
+        'text-valign': 'top', 'font-weight': 600, 'font-size': 13, padding: 16 } },
+    { selector: 'edge', style: { width: 'data(width)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
+        'target-arrow-shape': 'triangle', 'curve-style': 'bezier', opacity: 0.7 } },
+    { selector: '.faded', style: { opacity: 0.1 } },
+    { selector: 'node.focus', style: { 'border-width': 3, 'border-color': css('--hl') } },
+    { selector: 'edge.focus', style: { opacity: 1, label: 'data(count)', 'font-size': 10, color: css('--fg'),
+        'text-background-color': css('--panel'), 'text-background-opacity': 1 } },
+  ],
+});
+
+function render() {
+  cy.elements().remove();
+  cy.add(elements());
+  cy.layout({ name: 'cose', animate: false, nodeRepulsion: () => 12000, idealEdgeLength: () => 90,
+              nestingFactor: 0.8, padding: 20 }).run();
+  showOverview();
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const typeTag = t => `<span class="type" style="color:var(${TYPES[t][1]})">${TYPES[t][0]}</span>`;
+
+// 대상(또는 출처) 모듈 → 종류 → 클래스 쌍 목록
+function depTree(deps, keyOf) {
+  const groups = {};
+  for (const d of deps) ((groups[keyOf(d)] ??= {})[d.type] ??= []).push(d);
+  return Object.entries(groups).sort((a, b) => count(b[1]) - count(a[1])).map(([mod, types]) =>
+    `<details><summary><b>${esc(mod)}</b> <span class="cnt">(${count(types)})</span></summary>` +
+    Object.entries(types).map(([t, ds]) => `<div>${typeTag(t)} <span class="muted">${ds.length}</span><ul>` +
+      ds.map(d => `<li>${esc(d.source)} → ${esc(d.targetType)}</li>`).join('') + '</ul></div>').join('') +
+    '</details>').join('') || '<p class="muted">없음</p>';
+}
+const count = types => Object.values(types).reduce((n, ds) => n + ds.length, 0);
+const visible = d => enabled.has(d.type) && !hidden(d.target); // 패널도 그래프 필터와 동일하게
+const tags = xs => xs.length ? xs.map(x => `<span class="tag">${esc(x)}</span>`).join('') : '<span class="muted">없음</span>';
+
+function showModule(name) {
+  const m = byName[name];
+  const out = m.deps.filter(visible);
+  const incoming = DATA.modules.filter(s => !hidden(s.name)).flatMap(s => s.deps.filter(d => d.target === name && visible(d)).map(d => ({ ...d, from: s.name })));
+  document.getElementById('panel').innerHTML = `
+    <h2>${esc(name)}</h2><div class="muted">${esc(m.project)}</div>
+    <h3>NamedInterface</h3>${tags(m.namedInterfaces)}
+    <h3>나가는 의존 (${out.length})</h3>${depTree(out, d => d.target)}
+    <h3>들어오는 의존 (${incoming.length})</h3>${depTree(incoming, d => d.from)}
+    <h3>구독 이벤트</h3>${tags(m.listenedEvents)}`;
+}
+
+function showEdge(source, target) {
+  const deps = byName[source].deps.filter(d => d.target === target && visible(d));
+  document.getElementById('panel').innerHTML = `
+    <h2>${esc(source)} → ${esc(target)}</h2><div class="muted">클래스 단위 의존 ${deps.length}건</div>
+    ${depTree(deps, d => d.target).replace('<details>', '<details open>')}`;
+}
+
+function showOverview() {
+  document.getElementById('panel').innerHTML = `
+    <h2>모듈 ${DATA.modules.length}개</h2>
+    <p class="muted">노드를 클릭하면 그 모듈의 의존을, 엣지를 클릭하면 두 모듈 사이 클래스 단위 의존을 보여준다.
+    엣지 굵기는 클래스 의존 건수, 색은 가장 의미 있는 의존 종류다. 빈 곳을 클릭하면 초기화.</p>
+    <p class="muted">테스트(<code>ModulithArchitectureTest</code>) 실행 시 자동 생성 — 직접 수정하지 말 것.</p>`;
+}
+
+// 선택 요소와 이웃만 남기고 흐리게
+function focus(ele) {
+  cy.elements().removeClass('focus faded');
+  const keep = ele.isNode() ? ele.closedNeighborhood() : ele.union(ele.connectedNodes());
+  cy.elements().not(keep).not(':parent').addClass('faded');
+  keep.addClass('focus');
+}
+
+cy.on('tap', 'node', e => { if (e.target.isParent()) return; focus(e.target); showModule(e.target.id()); });
+cy.on('tap', 'edge', e => { focus(e.target); showEdge(e.target.data('source'), e.target.data('target')); });
+cy.on('tap', e => { if (e.target === cy) { cy.elements().removeClass('focus faded'); showOverview(); } });
+
+document.querySelectorAll('[data-type]').forEach(cb => cb.addEventListener('change', () => {
+  cb.checked ? enabled.add(cb.dataset.type) : enabled.delete(cb.dataset.type);
+  render();
+}));
+document.getElementById('hideInfra').addEventListener('change', render);
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const hit = q ? cy.nodes().not(':parent').filter(n => n.id().includes(q)) : cy.collection();
+  cy.elements().removeClass('focus faded');
+  if (hit.length === 1) { focus(hit); showModule(hit.id()); }
+  else if (hit.length) { cy.elements().not(hit).not(':parent').addClass('faded'); hit.addClass('focus'); }
+});
+
+render();
+</script>
+</body>
+</html>

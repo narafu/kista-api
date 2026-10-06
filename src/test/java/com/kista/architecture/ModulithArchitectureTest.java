@@ -17,5 +17,6 @@ class ModulithArchitectureTest {
         new Documenter(modules)
                 .writeModulesAsPlantUml()
                 .writeIndividualModulesAsPlantUml();
+        ModuleGraphExporter.write(modules); // 클릭 탐색용 modules.html
     }
 }

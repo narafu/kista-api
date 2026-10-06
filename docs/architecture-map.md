@@ -126,10 +126,12 @@ flowchart LR
 
 ```bash
 ./gradlew :test --tests 'com.kista.architecture.ModulithArchitectureTest'
-# 출력: build/spring-modulith-docs/components.puml (전체), module-<name>.puml (모듈별)
+# 출력: build/spring-modulith-docs/modules.html (클릭 탐색), components.puml (전체), module-<name>.puml (모듈별)
 ```
 
-IntelliJ PlantUML Integration 플러그인으로 `.puml`을 열면 렌더링된다.
+- `modules.html`: 브라우저로 연다(Cytoscape.js를 CDN에서 받으므로 인터넷 필요). 노드 클릭 → 그 모듈의 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존 전체. 의존 종류 필터·platform/sharedkernel 숨김·검색 지원. 생성기는 `ModuleGraphExporter`, 템플릿은 `src/test/resources/architecture/module-graph.html`
+- `.puml`: IntelliJ PlantUML Integration 플러그인으로 열면 렌더링된다
+- `build/`는 IntelliJ에서 Excluded라 `Ctrl+Shift+N` 두 번(non-project 포함)으로 찾는다
 
 ## L3 마감 매매 배치 (화~토 04:30 KST)
 
