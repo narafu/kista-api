@@ -159,8 +159,15 @@ h3 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: upp
 
 /* 구조 탭 — 모듈 그래프 */
 #view-structure:not([hidden]) { position: absolute; inset: 0; display: flex; flex-direction: column; }
-#view-structure .view-head { padding: 10px 16px; margin: 0; background: var(--surface); border-bottom: 1px solid var(--line); }
+#view-structure .view-head { flex-wrap: nowrap; gap: 8px; padding: 10px 16px; margin: 0; background: var(--surface); border-bottom: 1px solid var(--line); }
+#view-structure .view-head h2 { white-space: nowrap; }
 #view-structure .view-head h2 small { font-weight: 500; color: var(--muted); margin-left: 6px; font-size: 13px; }
+#view-structure .view-head .chip { padding: 3px 9px; font-size: 12.5px; white-space: nowrap; }
+#view-structure .view-head select.search { width: 170px; }
+/* 캔버스 위 플로팅 도구 — 펼치기·전체 보기 */
+.graph-tools { position: absolute; top: 14px; right: 14px; z-index: 2; display: flex; gap: 2px; padding: 3px;
+               background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.graph-tools .btn { border: 0; padding: 4px 10px; font-size: 12.5px; }
 .search { padding: 6px 10px; width: 180px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--fg); font: inherit; }
 .search:focus { outline: 2px solid var(--api); outline-offset: -1px; }
 .filter-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
@@ -251,6 +258,7 @@ svg.links .live { stroke: var(--tc); stroke-width: 4; stroke-dasharray: 0 10; st
   aside { border-left: 0; border-top: 1px solid var(--line); }
   .tl-row { grid-template-columns: 130px 1fr; }
   #view-structure:not([hidden]) { position: relative; height: 70vh; }
+  #view-structure .view-head { flex-wrap: wrap; }
   .graph-legend { display: none; }
   .qbox .search { width: 160px; }
   .results { width: calc(100vw - 32px); }

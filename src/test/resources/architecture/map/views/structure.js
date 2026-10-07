@@ -9,11 +9,11 @@
   };
   const TYPE_PRIORITY = ['EVENT_LISTENER', 'USES_COMPONENT', 'ENTITY', 'DEFAULT']; // 엣지 색은 가장 의미 있는 종류로
   const INFRA = new Set(['platform', 'sharedkernel']); // 거의 모든 모듈이 참조하는 노이즈 모듈
-  // Gradle 서브프로젝트별 색·배치 영역(모델 좌표) — api 좌상, trading-core 우상, shared 하단 중앙
+  // Gradle 서브프로젝트별 색·카드 열(모델 좌표) — api | shared | trading-core, shared를 가운데 두어 양쪽 엣지가 짧게 모인다
   const PROJECTS = {
-    ':api': { accent: '--api', tint: '--api-tint', box: { x1: 0, y1: 0, x2: 520, y2: 520 } },
-    ':trading-core': { accent: '--tc', tint: '--tc-tint', box: { x1: 640, y1: 0, x2: 1240, y2: 520 } },
-    ':shared': { accent: '--shared', tint: '--shared-tint', box: { x1: 300, y1: 640, x2: 940, y2: 720 } },
+    ':api': { accent: '--api', tint: '--api-tint', box: { x1: 0, y1: 0, x2: 400, y2: 640 }, cols: 2 },
+    ':shared': { accent: '--shared', tint: '--shared-tint', box: { x1: 500, y1: 0, x2: 660, y2: 640 }, cols: 1 },
+    ':trading-core': { accent: '--tc', tint: '--tc-tint', box: { x1: 760, y1: 0, x2: 1160, y2: 640 }, cols: 2 },
   };
   const byName = Object.fromEntries(DATA.modules.map(m => [m.name, m]));
   const enabled = new Set(Object.keys(TYPES));
@@ -51,12 +51,14 @@
   function elements() {
     const mods = visibleModules();
     const projects = Object.entries(PROJECTS).map(([p, c]) => {
-      const n = mods.filter(m => m.project === p).length;
-      return { data: { id: p, label: expanded.has(p) ? p : `${p} · ${n}`, accent: css(c.accent), tint: css(c.tint) },
+      const names = mods.filter(m => m.project === p).map(m => m.name);
+      // 접힌 박스엔 소속 모듈 목록
+      return { data: { id: p, label: expanded.has(p) ? p : `${p} · ${names.length}\n\n${names.join('\n')}`, accent: css(c.accent), tint: css(c.tint) },
                classes: expanded.has(p) ? '' : 'proj' };
     });
     const nodes = mods.filter(m => expanded.has(m.project)).map(m => ({
-      data: { id: m.name, label: m.name, parent: m.project, accent: css(PROJECTS[m.project].accent), tint: css(PROJECTS[m.project].tint),
+      data: { id: m.name, label: `${m.name}\n나감 ${outgoing(m.name).length} · 들어옴 ${incoming(m.name).length}`, parent: m.project,
+              accent: css(PROJECTS[m.project].accent), tint: css(PROJECTS[m.project].tint),
               weight: outgoing(m.name).length + incoming(m.name).length },
     }));
     return [...projects, ...nodes, ...edges()];
@@ -69,50 +71,63 @@
   function styles() {
     const shadow = isDark() ? 0 : 0.06; // 랜드스케이프·흐름 카드의 옅은 그림자 — 다크에선 없음
     return [
-      // 모듈 = 카드: 흰 바탕·옅은 프로젝트색 테두리·둥근 모서리
+      // 모듈 = 랜드스케이프 카드: 이름 + 나감·들어옴 2줄, 흰 바탕·프로젝트색 옅은 테두리
       { selector: 'node', style: {
-          label: 'data(label)', 'text-valign': 'center', 'font-size': 13, 'font-weight': 600, color: css('--fg'),
-          'font-family': getComputedStyle(document.body).fontFamily,
-          'background-color': css('--surface'), 'border-width': 1.5, 'border-color': 'data(accent)', 'border-opacity': 0.45,
-          shape: 'round-rectangle', 'corner-radius': 10, width: 'label', height: 36, padding: 14,
+          label: 'data(label)', 'text-valign': 'center', 'text-halign': 'center', 'font-size': 14, 'font-weight': 600, color: css('--fg'),
+          'font-family': getComputedStyle(document.body).fontFamily, 'text-wrap': 'wrap', 'line-height': 1.45,
+          'background-color': css('--surface'), 'border-width': 1, 'border-color': css('--line'), 'border-opacity': 1,
+          shape: 'round-rectangle', 'corner-radius': 10, width: 'label', height: 54, padding: 18,
           'underlay-color': '#000', 'underlay-opacity': shadow, 'underlay-padding': 2, 'underlay-shape': 'round-rectangle',
-          'transition-property': 'opacity, border-opacity, background-color', 'transition-duration': 150 } },
-      // 프로젝트 영역 = 그룹: 옅은 틴트 바탕·실선 테두리·작은 회색 제목(랜드스케이프 그룹 제목 톤)
+          'transition-property': 'opacity, border-color, background-color', 'transition-duration': 150 } },
+      { selector: 'node[accent]', style: { 'border-color': ele => mix(ele.data('accent'), 0.4) } },
+      // 프로젝트 영역 = 옅은 틴트 판·작은 회색 제목(랜드스케이프 그룹 제목 톤)
       { selector: ':parent', style: {
-          'background-color': 'data(tint)', 'background-opacity': 0.55, 'border-width': 1, 'border-style': 'solid',
-          'border-color': css('--line'), 'border-opacity': 1, color: css('--muted'), 'text-valign': 'top', 'text-halign': 'left',
-          'text-margin-x': 14, 'text-margin-y': 22, 'font-size': 12, 'font-weight': 600, padding: 30,
-          shape: 'round-rectangle', 'corner-radius': 14, 'underlay-opacity': 0 } },
+          'background-color': 'data(tint)', 'background-opacity': 0.5, 'border-width': 0,
+          color: css('--muted'), 'text-valign': 'top', 'text-halign': 'left', 'text-margin-x': 18, 'text-margin-y': 24,
+          'font-size': 12, 'font-weight': 700, padding: 32, shape: 'round-rectangle', 'corner-radius': 16, 'underlay-opacity': 0 } },
+      // 엣지는 기본 아주 옅게 — hover·선택·오버레이 때만 진하게
       { selector: 'edge', style: {
-          width: 'mapData(count, 1, 60, 1, 4)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
-          'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, 'curve-style': 'bezier', opacity: 0.3,
+          width: 'mapData(count, 1, 60, 1.2, 4)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
+          'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, 'curve-style': 'bezier', opacity: 0.07,
           'transition-property': 'opacity', 'transition-duration': 150 } },
-      { selector: 'edge.hover', style: { opacity: 0.85 } },
-      { selector: 'edge.flowing', style: { opacity: 0.85, 'line-style': 'dashed', 'line-dash-pattern': [6, 4] } },
-      { selector: 'node.hover', style: { 'border-opacity': 1, 'underlay-opacity': shadow * 2 } },
-      { selector: '.faded', style: { opacity: 0.15 } },
-      { selector: ':parent.faded', style: { opacity: 0.5 } },
-      { selector: 'node.focus', style: { 'border-opacity': 1 } },
-      // 선택 = 카드 hover 톤(틴트 바탕·진한 테두리), 글자는 그대로
-      { selector: 'node.selected', style: { 'background-color': 'data(tint)', 'border-width': 2, 'border-opacity': 1 } },
+      { selector: 'edge.arc', style: { 'curve-style': 'unbundled-bezier', 'control-point-distances': 'data(cpd)', 'control-point-weights': 0.5 } },
+      // 그리기 순서 고정: 프로젝트 영역 < 엣지 < 모듈 카드 — 엣지가 카드 위를 지나지 않게
+      { selector: '*', style: { 'z-index-compare': 'manual' } },
+      { selector: ':parent', style: { 'z-index': 0 } },
+      { selector: 'edge', style: { 'z-index': 1 } },
+      { selector: 'node:childless', style: { 'z-index': 2 } },
+      { selector: 'edge.hover, edge.ov-on', style: { 'z-index': 3 } },
+      { selector: 'edge.hover', style: { opacity: 0.9 } },
+      { selector: 'edge.flowing', style: { opacity: 0.9, 'line-style': 'dashed', 'line-dash-pattern': [6, 4] } },
+      { selector: 'node.hover', style: { 'border-color': 'data(accent)', 'underlay-opacity': shadow * 2 } },
+      { selector: 'node.faded', style: { opacity: 0.12 } },
+      { selector: 'edge.faded', style: { opacity: 0.03 } }, // 기본(0.07)보다 더 옅게
+      { selector: 'node.focus', style: { 'border-color': 'data(accent)' } },
+      { selector: 'node.selected', style: { 'background-color': 'data(tint)', 'border-width': 2, 'border-color': 'data(accent)' } },
       { selector: 'edge.focus', style: {
           opacity: 0.9, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
           'text-background-color': css('--surface'), 'text-background-opacity': 1, 'text-background-padding': 3,
           'text-background-shape': 'round-rectangle', 'text-border-width': 1, 'text-border-color': css('--line'), 'text-border-opacity': 1 } },
-      // 접힌 프로젝트 = 큰 카드
+      // 접힌 프로젝트 = 모듈 목록 카드
       { selector: 'node.proj', style: {
-          'background-color': css('--surface'), 'border-color': 'data(accent)', 'border-opacity': 0.55, color: css('--fg'),
-          'font-size': 15, 'font-weight': 700, width: 180, height: 64, 'corner-radius': 12 } },
-      { selector: 'node.proj.hover', style: { 'background-color': 'data(tint)', 'border-opacity': 1 } },
-      { selector: 'node.ov-trail', style: { 'border-opacity': 1 } },
-      { selector: 'node.ov-on', style: { 'background-color': css('--tc-tint'), 'border-color': css('--tc'), 'border-width': 2, 'border-opacity': 1 } },
-      { selector: 'edge.ov-trail', style: { opacity: 0.35, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
+          'background-color': 'data(tint)', 'border-width': 0, color: css('--fg'), 'font-size': 14, 'font-weight': 600, 'line-height': 1.7,
+          width: 210, height: 'label', padding: 22, 'corner-radius': 16, 'text-max-width': 180 } },
+      { selector: 'node.proj.hover', style: { 'underlay-opacity': shadow * 2 } },
+      { selector: 'node.ov-trail', style: { 'border-color': 'data(accent)' } },
+      { selector: 'node.ov-on', style: { 'background-color': css('--tc-tint'), 'border-color': css('--tc'), 'border-width': 2 } },
+      { selector: 'edge.ov-trail', style: { opacity: 0.4, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
       { selector: 'edge.ov-on', style: { opacity: 1, width: 3, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
       { selector: 'edge.ov-virtual', style: { 'line-style': 'dashed', width: 1.5 } },
-      { selector: 'node.ov-dot', style: { width: 12, height: 12, padding: 0, label: '', shape: 'ellipse',
+      { selector: 'node.ov-dot', style: { 'z-index': 4, width: 12, height: 12, padding: 0, label: '', shape: 'ellipse',
           'background-color': css('--tc'), 'border-width': 0, 'underlay-opacity': 0, events: 'no' } },
     ];
   }
+  // 프로젝트색을 바탕(--surface)과 섞은 옅은 테두리색
+  const mix = (hex, a) => {
+    const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const [c, s] = [p(hex), p(css('--surface'))];
+    return `rgb(${c.map((v, i) => Math.round(v * a + s[i] * (1 - a))).join(',')})`;
+  };
 
   let cy; // 첫 show()에서 생성 — 숨긴 컨테이너에서 만들면 0×0으로 잡혀 fit이 깨진다
   function init() {
@@ -166,19 +181,43 @@
     render();
   }
 
-  // 서브프로젝트 영역마다 의존이 가장 많은 모듈을 가운데, 나머지를 원형으로 배치 — 매번 같은 위치(결정적)
+  // 프로젝트 열마다 의존 많은 순으로 카드 그리드 — 매번 같은 위치(결정적)
   function layout() {
-    for (const [p, { box }] of Object.entries(PROJECTS)) {
+    const byWeight = (a, b) => b.data('weight') - a.data('weight') || a.id().localeCompare(b.id());
+    for (const [p, { box, cols }] of Object.entries(PROJECTS)) {
       if (!expanded.has(p)) { cy.getElementById(p).position({ x: (box.x1 + box.x2) / 2, y: (box.y1 + box.y2) / 2 }); continue; }
       const kids = cy.getElementById(p).children();
       if (!kids.length) continue;
-      const hub = kids.max(n => n.data('weight')).ele;
-      const opts = kids.length <= 3
-        ? { name: 'grid', rows: 1 }
-        : { name: 'concentric', concentric: n => (n === hub ? 2 : 1), levelWidth: () => 1, minNodeSpacing: 40 };
-      kids.layout({ ...opts, boundingBox: box, animate: false, fit: false }).run();
+      kids.layout({ name: 'grid', cols, sort: byWeight, boundingBox: box, animate: false, fit: false }).run();
     }
-    cy.fit(undefined, 40);
+    bendBlocked();
+    frame(cy.elements(), 40);
+  }
+  // 직선 경로에 다른 카드가 걸리는 엣지는 호로 휘게 — 거리는 진행 방향 기준이라 같은 부호면 양방향 쌍이 서로 반대쪽으로 휜다
+  function bendBlocked() {
+    const cards = cy.nodes(':childless');
+    cy.edges().forEach(e => {
+      const a = e.source().position(), b = e.target().position();
+      const hit = cards.some(n => {
+        if (n === e.source() || n === e.target()) return false;
+        const bb = n.boundingBox();
+        for (let t = 0.1; t < 0.95; t += 0.05) {
+          const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+          if (x > bb.x1 && x < bb.x2 && y > bb.y1 && y < bb.y2) return true;
+        }
+        return false;
+      });
+      if (!hit) return;
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      e.data('cpd', Math.min(90, len * 0.22)).addClass('arc');
+    });
+  }
+  // 화면에 맞추되 확대는 1.15배까지 — 노드가 적을 때 카드가 과하게 커지지 않게
+  function frame(eles, padding, animate = false) {
+    const bb = eles.boundingBox();
+    const zoom = Math.max(cy.minZoom(), Math.min(1.15, (cy.width() - padding * 2) / bb.w, (cy.height() - padding * 2) / bb.h));
+    const pan = { x: cy.width() / 2 - zoom * (bb.x1 + bb.w / 2), y: cy.height() / 2 - zoom * (bb.y1 + bb.h / 2) };
+    if (animate) cy.animate({ zoom, pan, duration: 250 }); else cy.viewport({ zoom, pan });
   }
 
   function render() {
@@ -279,7 +318,7 @@
   function focus(ele) {
     cy.elements().removeClass('focus faded selected');
     const keep = ele.isNode() ? ele.closedNeighborhood() : ele.union(ele.connectedNodes());
-    cy.elements().not(keep).addClass('faded');
+    cy.elements().not(keep).not(':parent').addClass('faded'); // 부모 opacity는 자식 카드에 곱해진다 — 영역은 흐리지 않는다
     keep.addClass('focus');
     if (ele.isNode()) ele.addClass('selected');
   }
@@ -295,7 +334,7 @@
     SHARED.module = name; SHARED.step = null;
     focus(n);
     showModule(name);
-    cy.animate({ center: { eles: n }, duration: 250 });
+    frame(n.closedNeighborhood(), 60, true);
   }
 
   // 패널 안 모듈 이름·개요 행 클릭 → 해당 모듈로 이동
@@ -312,7 +351,7 @@
     resetHash();
   }));
   $('hideInfra').addEventListener('change', () => { if (cy) { render(); resetHash(); } });
-  $('fit').addEventListener('click', () => cy && cy.animate({ fit: { padding: 40 }, duration: 250 }));
+  $('fit').addEventListener('click', () => cy && frame(cy.elements(), 40, true));
   // 필터 변경으로 포커스가 풀렸으면 모듈 해시도 지운다(라우팅 없이) — 오버레이 중엔 해시가 오버레이 위치라 유지
   const resetHash = () => { if (!ov && parseHash().rest.length) history.replaceState(null, '', '#structure'); };
 
