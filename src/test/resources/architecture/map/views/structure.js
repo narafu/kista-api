@@ -28,28 +28,38 @@
   const incoming = name => DATA.modules.filter(s => !hidden(s.name))
     .flatMap(s => s.deps.filter(d => d.target === name && visible(d)).map(d => ({ ...d, from: s.name })));
 
-  // 현재 필터 기준으로 모듈 쌍별 엣지 집계
+  const expanded = new Set(); // 펼친 서브프로젝트 — 처음엔 모두 접힘
+  const shown = name => expanded.has(byName[name].project) ? name : byName[name].project; // 모듈이 그려지는 노드 id
+  const visibleModules = () => DATA.modules.filter(m => !hidden(m.name));
+
+  // 현재 필터 기준으로 표시 노드 쌍별 엣지 집계 — 접힌 프로젝트는 박스 하나로 합산
   function edges() {
-    const out = [];
-    for (const m of DATA.modules) {
-      if (hidden(m.name)) continue;
-      for (const [target, deps] of Object.entries(Object.groupBy(outgoing(m.name), d => d.target))) {
-        const type = TYPE_PRIORITY.find(t => deps.some(d => d.type === t));
-        out.push({ data: { id: `${m.name}->${target}`, source: m.name, target, count: deps.length,
-                           color: css(TYPES[type][1]), width: Math.min(1 + Math.log2(deps.length + 1) * 1.2, 8) } });
+    const groups = {};
+    for (const m of visibleModules()) {
+      for (const d of outgoing(m.name)) {
+        const s = shown(m.name), t = shown(d.target);
+        if (s !== t) (groups[`${s}->${t}`] ??= { source: s, target: t, deps: [] }).deps.push(d);
       }
     }
-    return out;
+    return Object.entries(groups).map(([id, { source, target, deps }]) => {
+      const type = TYPE_PRIORITY.find(t => deps.some(d => d.type === t));
+      return { data: { id, source, target, count: deps.length, color: css(TYPES[type][1]),
+                       width: Math.min(1 + Math.log2(deps.length + 1) * 1.2, 8) } };
+    });
   }
 
   function elements() {
-    const parents = Object.entries(PROJECTS).map(([p, c]) =>
-      ({ data: { id: p, label: p, accent: css(c.accent), tint: css(c.tint) } }));
-    const nodes = DATA.modules.filter(m => !hidden(m.name)).map(m => ({
+    const mods = visibleModules();
+    const projects = Object.entries(PROJECTS).map(([p, c]) => {
+      const n = mods.filter(m => m.project === p).length;
+      return { data: { id: p, label: expanded.has(p) ? p : `${p} · ${n}`, accent: css(c.accent), tint: css(c.tint) },
+               classes: expanded.has(p) ? '' : 'proj' };
+    });
+    const nodes = mods.filter(m => expanded.has(m.project)).map(m => ({
       data: { id: m.name, label: m.name, parent: m.project, accent: css(PROJECTS[m.project].accent),
               weight: outgoing(m.name).length + incoming(m.name).length },
     }));
-    return [...parents, ...nodes, ...edges()];
+    return [...projects, ...nodes, ...edges()];
   }
 
 
@@ -86,11 +96,29 @@
             opacity: 1, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
             'text-background-color': css('--surface'), 'text-background-opacity': 1, 'text-background-padding': 3,
             'text-background-shape': 'round-rectangle', 'text-border-width': 1, 'text-border-color': css('--line'), 'text-border-opacity': 1 } },
+        { selector: 'node.proj', style: {
+            'background-color': 'data(tint)', 'border-color': 'data(accent)', 'border-style': 'dashed', color: 'data(accent)',
+            'font-size': 15, 'font-weight': 700, width: 160, height: 64 } },
+        { selector: 'node.ov-trail', style: { 'border-width': 3 } },
+        { selector: 'node.ov-on', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
+        { selector: 'edge.ov-trail', style: { opacity: 0.35, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
+        { selector: 'edge.ov-on', style: { opacity: 1, width: 4, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
+        { selector: 'edge.ov-virtual', style: { 'line-style': 'dashed', width: 2 } },
+        { selector: 'node.ov-dot', style: { width: 14, height: 14, padding: 0, label: '', shape: 'ellipse',
+            'background-color': css('--tc'), 'border-width': 0, events: 'no' } },
       ],
     });
 
-    cy.on('tap', 'node', e => { if (!e.target.isParent()) go(hash('structure', e.target.id())); });
+    cy.on('tap', 'node', e => {
+      if (e.target.hasClass('proj')) { expanded.add(e.target.id()); return render(); } // 접힌 박스 → 펼침
+      if (!e.target.isParent()) go(hash('structure', e.target.id()));
+    });
     cy.on('tap', 'edge', e => {
+      // 박스 합계 엣지는 클래스 쌍 대상이 아니다 — 양끝 박스를 펼친다
+      const ends = e.target.connectedNodes();
+      if (ends.some(n => n.hasClass('proj'))) { ends.forEach(n => { if (n.hasClass('proj')) expanded.add(n.id()); }); return render(); }
+      if (e.target.hasClass('ov-virtual')) return; // 오버레이 가상 엣지엔 클래스 의존이 없다
+      if (ov) clearOverlay();
       // 엣지 선택은 해시로 표현하지 않는다 — 모듈 해시를 비워 같은 모듈 재탭이 다시 라우팅되게
       SHARED.module = null;
       history.replaceState(null, '', '#structure');
@@ -109,6 +137,7 @@
   // 서브프로젝트 영역마다 의존이 가장 많은 모듈을 가운데, 나머지를 원형으로 배치 — 매번 같은 위치(결정적)
   function layout() {
     for (const [p, { box }] of Object.entries(PROJECTS)) {
+      if (!expanded.has(p)) { cy.getElementById(p).position({ x: (box.x1 + box.x2) / 2, y: (box.y1 + box.y2) / 2 }); continue; }
       const kids = cy.getElementById(p).children();
       if (!kids.length) continue;
       const hub = kids.max(n => n.data('weight')).ele;
@@ -124,8 +153,10 @@
     cy.elements().remove();
     cy.add(elements());
     layout();
-    $('summary').textContent = `· 모듈 ${cy.nodes().not(':parent').length} · 의존 쌍 ${cy.edges().length}`;
+    $('summary').textContent = `· 모듈 ${visibleModules().length} · 의존 쌍 ${cy.edges().length}`;
+    $('expand').textContent = expanded.size === Object.keys(PROJECTS).length ? '모두 접기' : '모두 펼치기';
     clearFocus();
+    if (ov) showOverlay(ov.fid, ov.i); // 요소를 갈아엎었으니 오버레이 재적용
   }
 
   const typeDot = t => `<i class="dot" style="background:var(${TYPES[t][1]})"></i>`;
@@ -195,8 +226,7 @@
 
   // 초기 화면: 의존이 많은 순 모듈 목록 — 어디서부터 볼지 안내
   function showOverview() {
-    const rows = cy.nodes().not(':parent').map(n => {
-      const name = n.id();
+    const rows = visibleModules().map(({ name }) => {
       return { name, project: byName[name].project, out: outgoing(name).length, inc: incoming(name).length };
     }).sort((a, b) => (b.out + b.inc) - (a.out + a.inc));
     $('panel').innerHTML = `
@@ -227,6 +257,7 @@
     showOverview();
   }
   function selectModule(name) {
+    if (!expanded.has(byName[name].project)) { expanded.add(byName[name].project); render(); } // 딥링크 진입 시 자동 펼침
     const n = cy.getElementById(name);
     if (!n.length) return;
     SHARED.module = name; SHARED.step = null;
@@ -250,14 +281,120 @@
   }));
   $('hideInfra').addEventListener('change', () => { if (cy) { render(); resetHash(); } });
   $('fit').addEventListener('click', () => cy && cy.animate({ fit: { padding: 40 }, duration: 250 }));
-  // 필터 변경으로 포커스가 풀렸으면 모듈 해시도 지운다(라우팅 없이)
-  const resetHash = () => { if (parseHash().rest.length) history.replaceState(null, '', '#structure'); };
+  // 필터 변경으로 포커스가 풀렸으면 모듈 해시도 지운다(라우팅 없이) — 오버레이 중엔 해시가 오버레이 위치라 유지
+  const resetHash = () => { if (!ov && parseHash().rest.length) history.replaceState(null, '', '#structure'); };
 
-  // 흐름에서 고른 단계가 있으면 그 단계의 (보이는) 첫 모듈, 아니면 마지막으로 고른 모듈
-  const homeModule = () => SHARED.step ? findStep(SHARED.step)?.modules.find(m => !hidden(m)) : SHARED.module;
+  function expandAll(on = true) {
+    const before = expanded.size;
+    Object.keys(PROJECTS).forEach(p => on ? expanded.add(p) : expanded.delete(p));
+    if (expanded.size !== before) render();
+  }
+  $('expand').onclick = () => cy && expandAll(expanded.size < Object.keys(PROJECTS).length);
+
+  /* ---------- 흐름 오버레이 ---------- */
+  const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches; // 흐르는 점 대신 정적 하이라이트
+  let ov = null, ovTimer = null; // ov: { fid, i }
+  $('ov-flow').insertAdjacentHTML('beforeend', Object.entries(MAP.flows).map(([id, f]) =>
+    `<option value="${esc(id)}">${esc(f.title)}</option>`).join(''));
+  const ovHash = (fid, i) => `${hash('structure')}?flow=${encodeURIComponent(fid)}&step=${encodeURIComponent(MAP.flows[fid].steps[i].id)}`;
+  // 단계 i가 그래프에 올리는 모듈 — 숨김·필터 밖은 건너뛴다(스트립·패널에는 남는다)
+  const stepNodes = (fid, i) => MAP.flows[fid].steps[i].modules.filter(m => byName[m] && !hidden(m));
+
+  function ovStop() {
+    clearInterval(ovTimer); ovTimer = null;
+    $('ov-play').textContent = '▶ 재생';
+  }
+
+  function clearOverlay() {
+    ov = null;
+    SHARED.step = null;
+    $('expand').disabled = false;
+    $('ov-bar').hidden = true;
+    $('ov-flow').value = '';
+    cy.remove('.ov-virtual, .ov-dot');
+    cy.elements().removeClass('ov-on ov-trail');
+  }
+
+  function showOverlay(fid, i) {
+    const prevOv = ov;
+    ov = { fid, i };
+    SHARED.step = { flow: fid, step: MAP.flows[fid].steps[i].id };
+    expandAll(); // 펼칠 게 있으면 render()가 이 함수를 다시 부른다 — ov를 먼저 세워 둔 이유
+    const steps = MAP.flows[fid].steps;
+    $('ov-flow').value = fid;
+    $('ov-bar').hidden = false;
+    $('expand').disabled = true; // 오버레이는 모두 펼친 상태가 전제 — 접기 불가
+    $('ov-slider').max = steps.length - 1;
+    $('ov-slider').value = i;
+    $('ov-prev').disabled = i <= 0;
+    $('ov-next').disabled = i >= steps.length - 1;
+    $('ov-strip').innerHTML = steps.map((s, k) =>
+      `<button data-k="${k}" class="${k === i ? 'on' : k < i ? 'done' : ''}${s.modules.length ? '' : ' nomod'}" title="${esc(s.modules.join(', ') || '모듈 없음')}">${k + 1}. ${esc(s.title)}</button>`).join('');
+    $('ov-strip').querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+
+    // 0..i 단계를 훑으며 연속(모듈 있는) 단계 사이 경로를 만든다 — 의존 엣지가 있으면 그것, 없으면 점선 가상 엣지
+    cy.remove('.ov-virtual, .ov-dot');
+    cy.elements().removeClass('focus faded selected ov-on ov-trail');
+    let prev = [], last = [], from = null;
+    const trail = cy.collection();
+    for (let k = 0; k <= i; k++) {
+      const cur = stepNodes(fid, k);
+      if (!cur.length) continue;
+      for (const a of prev) for (const b of cur) {
+        if (a === b) continue;
+        let e = cy.getElementById(`${a}->${b}`).union(cy.getElementById(`${b}->${a}`));
+        if (!e.length) e = cy.add({ data: { id: `ov:${k}:${a}->${b}`, source: a, target: b }, classes: 'ov-virtual' });
+        trail.merge(e);
+        if (k === i) e.addClass('ov-on');
+      }
+      cur.forEach(m => trail.merge(cy.getElementById(m)));
+      if (k === i) { from = prev[0] ?? null; last = cur; }
+      prev = cur;
+    }
+    cy.elements().not(trail).not(':parent').addClass('faded');
+    trail.addClass('ov-trail');
+    last.forEach(m => cy.getElementById(m).addClass('ov-on'));
+
+    // 이전 단계 모듈 → 현재 단계 모듈로 점 하나 이동 (바로 다음 단계로 넘어갈 때만)
+    const to = last[0];
+    if (!REDUCE_MOTION && from && to && prevOv?.fid === fid && prevOv.i === i - 1) {
+      const dot = cy.add({ data: { id: 'ov-dot', accent: css('--tc') }, classes: 'ov-dot', position: { ...cy.getElementById(from).position() } });
+      dot.animate({ position: { ...cy.getElementById(to).position() } }, { duration: 600, easing: 'ease-in-out-cubic',
+        complete: () => dot.remove() });
+    }
+    stepPanel(fid, i, k => ovHash(fid, k));
+  }
+
+  $('ov-flow').onchange = e => location.hash = e.target.value ? ovHash(e.target.value, 0) : '#structure';
+  $('ov-slider').oninput = e => { if (ov) location.hash = ovHash(ov.fid, +e.target.value); };
+  $('ov-prev').onclick = () => { if (ov && ov.i > 0) location.hash = ovHash(ov.fid, ov.i - 1); };
+  $('ov-next').onclick = () => { if (ov) location.hash = ovHash(ov.fid, Math.min(ov.i + 1, MAP.flows[ov.fid].steps.length - 1)); };
+  $('ov-strip').onclick = e => { const b = e.target.closest('[data-k]'); if (b) location.hash = ovHash(ov.fid, +b.dataset.k); };
+  // ▶ 재생 — 흐름 탭과 같은 1.4초 간격, 해시는 replaceState(라우팅이 재생을 멈추지 않도록)
+  $('ov-play').onclick = () => {
+    if (ovTimer) return ovStop();
+    const n = MAP.flows[ov.fid].steps.length;
+    let i = ov.i < n - 1 ? ov.i : -1;
+    const tick = () => {
+      i++;
+      if (i >= n) return ovStop();
+      showOverlay(ov.fid, i);
+      history.replaceState(null, '', ovHash(ov.fid, i));
+    };
+    tick();
+    ovTimer = setInterval(tick, 1400);
+    $('ov-play').textContent = '■ 정지';
+  };
+
   VIEWS.structure = {
-    show([mod]) {
+    show([mod], params) {
       if (!cy) init(); else cy.resize(); // 숨김 중 창 크기 변경 반영
+      const fid = params.get('flow');
+      if (fid && Object.hasOwn(MAP.flows, fid)) {
+        const i = Math.max(0, MAP.flows[fid].steps.findIndex(s => s.id === params.get('step')));
+        return showOverlay(fid, i);
+      }
+      if (ov) clearOverlay();
       if (mod && byName[mod]) {
         if (hidden(mod)) { $('hideInfra').checked = false; render(); } // 숨긴 infra 모듈 딥링크
         selectModule(mod);
@@ -265,6 +402,10 @@
         clearFocus();
       }
     },
-    home: () => hash('structure', homeModule() ?? undefined),
+    leave: ovStop,
+    // 흐름에서 고른 단계가 있으면 오버레이를 그 단계에 멈춘 채로, 아니면 마지막 모듈
+    home: () => SHARED.step
+      ? `${hash('structure', findStep(SHARED.step)?.modules.find(m => !hidden(m)))}?flow=${encodeURIComponent(SHARED.step.flow)}&step=${encodeURIComponent(SHARED.step.step)}`
+      : hash('structure', SHARED.module ?? undefined),
   };
 })();

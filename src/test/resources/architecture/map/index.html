@@ -29,6 +29,8 @@
       <div class="filter-group" id="types"><span class="group-label">의존 종류</span></div>
       <label class="chip check"><input type="checkbox" id="hideInfra" checked>platform·sharedkernel 숨김</label>
       <span class="spacer"></span>
+      <select class="search" id="ov-flow" aria-label="흐름 오버레이"><option value="">흐름 오버레이 없음</option></select>
+      <button class="btn" id="expand">모두 펼치기</button>
       <button class="btn" id="fit">전체 보기</button>
     </div>
     <div id="stage">
@@ -38,6 +40,13 @@
         <span><i class="sq" style="border-color:var(--tc);background:var(--tc-tint)"></i>:trading-core</span>
         <span><i class="sq" style="border-color:var(--shared);background:var(--shared-tint)"></i>:shared</span>
         <span>엣지 굵기 = 클래스 의존 수</span>
+      </div>
+      <div class="ov-bar" id="ov-bar" hidden>
+        <button class="btn" id="ov-prev" aria-label="이전 단계">◀</button>
+        <button class="btn" id="ov-play">▶ 재생</button>
+        <button class="btn" id="ov-next" aria-label="다음 단계">▶|</button>
+        <input type="range" id="ov-slider" min="0" value="0" aria-label="단계">
+        <div class="ov-strip" id="ov-strip"></div>
       </div>
     </div>
   </section>

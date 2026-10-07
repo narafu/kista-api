@@ -13,6 +13,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* display를 지정한 요소도 hidden 속성을 따른다 */
 html, body { height: 100%; }
 body { margin: 0; font: 14px/1.5 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
        display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr) 440px; }
@@ -193,6 +194,16 @@ table.rank .num { text-align: right; font-variant-numeric: tabular-nums; }
 table.rank tbody tr { cursor: pointer; }
 table.rank tbody tr:hover { background: var(--surface-2); }
 
+.ov-bar { position: absolute; left: 16px; right: 16px; bottom: 16px; z-index: 2; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center;
+          padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.ov-bar input[type=range] { flex: 1; min-width: 120px; }
+.ov-strip { flex-basis: 100%; display: flex; gap: 4px; overflow-x: auto; }
+.ov-strip button { flex: none; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted);
+                   font: inherit; font-size: 12px; cursor: pointer; }
+.ov-strip button.done { color: var(--fg); }
+.ov-strip button.on { border-color: var(--tc); color: var(--fg); font-weight: 600; background: var(--tc-tint); }
+.ov-strip button.nomod { border-style: dashed; }
+#stage:has(.ov-bar:not([hidden])) .graph-legend { display: none; }
 .qbox { position: relative; }
 .qbox .search { width: 240px; }
 .results { position: absolute; top: calc(100% + 4px); left: 0; z-index: 10; width: 420px; max-height: 60vh; overflow: auto;
