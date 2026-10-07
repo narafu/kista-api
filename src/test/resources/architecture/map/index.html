@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KISTA 아키텍처 맵</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"
+        integrity="sha384-IWROdLKRsN1UuJywMlWl7/blXQ8GEooN2n7dzTxfEPd7ybYIKCUJ2Ol/1Gpf3YV4" crossorigin="anonymous"></script>
+</head>
+<body>
+<header>
+  <h1>KISTA 아키텍처 맵</h1>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="structure">구조</button>
+    <button class="tab" role="tab" data-view="landscape">랜드스케이프</button>
+    <button class="tab" role="tab" data-view="flow">흐름</button>
+    <button class="tab" role="tab" data-view="timeline">타임라인</button>
+    <button class="tab" role="tab" data-view="lifecycle">생명주기</button>
+  </nav>
+  <span class="spacer"></span>
+</header>
+<main>
+  <section class="view" id="view-structure" hidden>
+    <div class="view-head">
+      <h2>모듈 구조<small id="summary"></small></h2>
+      <input type="search" class="search" id="mod-search" placeholder="모듈 검색…" aria-label="모듈 검색">
+      <div class="filter-group" id="types"><span class="group-label">의존 종류</span></div>
+      <label class="chip check"><input type="checkbox" id="hideInfra" checked>platform·sharedkernel 숨김</label>
+      <span class="spacer"></span>
+      <button class="btn" id="fit">전체 보기</button>
+    </div>
+    <div id="stage">
+      <div id="cy"></div>
+      <div class="graph-legend">
+        <span><i class="sq" style="border-color:var(--api);background:var(--api-tint)"></i>:api</span>
+        <span><i class="sq" style="border-color:var(--tc);background:var(--tc-tint)"></i>:trading-core</span>
+        <span><i class="sq" style="border-color:var(--shared);background:var(--shared-tint)"></i>:shared</span>
+        <span>엣지 굵기 = 클래스 의존 수</span>
+      </div>
+    </div>
+  </section>
+  <section class="view" id="view-landscape">
+    <div class="view-head"><h2>프로세스 랜드스케이프</h2><p class="sub">상세 흐름이 있는 단계를 누르면 스윔레인으로 이동합니다.</p></div>
+    <div id="landscape"></div>
+  </section>
+  <section class="view" id="view-flow" hidden>
+    <div class="view-head">
+      <h2 id="flow-title"></h2>
+      <div id="flow-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <span class="spacer"></span>
+      <button class="btn" id="prev" aria-label="이전 단계">◀</button>
+      <button class="btn" id="play">▶ 재생</button>
+      <button class="btn" id="next" aria-label="다음 단계">▶|</button>
+    </div>
+    <p class="sub" id="flow-sub" style="margin:-6px 0 14px"></p>
+    <div id="swim"></div>
+    <div class="legend">
+      <span><i class="mark state">상태</i> 상태 변화</span>
+      <span><i class="mark fail">실패</i> 실패 경로 있음</span>
+      <span><i class="mark cond">조건</i> 조건부 단계</span>
+      <span><i class="touch" style="display:inline-block"></i> 호출·기록 대상 레인</span>
+    </div>
+  </section>
+  <section class="view" id="view-timeline" hidden>
+    <div class="view-head"><h2>하루 타임라인 (KST)</h2><p class="sub">@Scheduled를 테스트가 자동 수집합니다. 빨간 세로선은 현재 시각입니다.</p></div>
+    <div class="tl" id="tl"></div>
+  </section>
+  <section class="view" id="view-lifecycle" hidden>
+    <div class="view-head">
+      <h2 id="lc-title"></h2>
+      <div id="lc-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <p class="sub" id="lc-sub" style="margin:-6px 0 14px"></p>
+    <div style="overflow:auto"><div id="lc"></div></div>
+    <div class="legend">
+      <span>위쪽 호 = 앞으로 가는 전이 · 아래쪽 호 = 되돌아가는 전이 · 번호 = 아래 표의 전이</span>
+      <span><i class="st terminal" style="display:inline-block;min-width:0;padding:0 8px;font-style:normal">최종</i> 최종 상태</span>
+    </div>
+    <table class="tr" id="lc-table"></table>
+  </section>
+</main>
+<aside id="panel"></aside>
+<script src="data.js"></script>
+<script src="core.js"></script>
+<script src="views/structure.js"></script>
+<script src="views/landscape.js"></script>
+<script src="views/flow.js"></script>
+<script src="views/timeline.js"></script>
+<script src="views/lifecycle.js"></script>
+</body>
+</html>

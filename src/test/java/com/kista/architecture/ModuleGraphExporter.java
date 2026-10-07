@@ -4,32 +4,19 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import org.springframework.modulith.core.ApplicationModule;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.core.NamedInterface;
-import tools.jackson.databind.json.JsonMapper;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-// Modulith 모듈 그래프를 클릭 탐색용 단일 HTML(build/spring-modulith-docs/modules.html)로 내보낸다
+// Modulith 모듈 그래프를 아키텍처 맵 데이터(DATA.modules)로 조립한다
 final class ModuleGraphExporter {
 
-    private static final Path OUTPUT = Path.of("build/spring-modulith-docs/modules.html"); // Documenter 출력 옆에 둔다
-    private static final String TEMPLATE = "/architecture/module-graph.html"; // 데이터 자리표시자를 가진 템플릿
-    private static final String PLACEHOLDER = "/*__DATA__*/null"; // 템플릿 안 JSON 삽입 지점
     private static final Set<String> EXCLUDED = Set.of("support"); // 테스트 픽스처(com.kista.support) — 운영 모듈 아님
 
     private ModuleGraphExporter() {
-    }
-
-    record Graph(List<Module> modules) {
     }
 
     // project: :api / :trading-core / :shared, deps: 이 모듈이 다른 모듈을 참조하는 클래스 단위 목록
@@ -48,22 +35,12 @@ final class ModuleGraphExporter {
         }
     }
 
-    static void write(ApplicationModules modules) {
-        var graph = new Graph(modules.stream()
+    static List<Module> graph(ApplicationModules modules) {
+        return modules.stream()
                 .filter(m -> !EXCLUDED.contains(name(m)))
                 .sorted(Comparator.comparing(ModuleGraphExporter::name))
                 .map(m -> toModule(m, modules))
-                .toList());
-
-        // </script> 조기 종료 방지 — JSON 안의 "</"를 이스케이프
-        var json = JsonMapper.builder().build().writeValueAsString(graph).replace("</", "<\\/");
-        try (InputStream in = ModuleGraphExporter.class.getResourceAsStream(TEMPLATE)) {
-            var template = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            Files.createDirectories(OUTPUT.getParent());
-            Files.writeString(OUTPUT, template.replace(PLACEHOLDER, json));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+                .toList();
     }
 
     private static Module toModule(ApplicationModule module, ApplicationModules modules) {

@@ -14,10 +14,8 @@ class ModulithArchitectureTest {
     void verifyModularStructure() {
         var modules = ApplicationModules.of(KistaApplication.class).verify();
 
-        // withoutClean — 같은 폴더의 process.html(ProcessMapTest 생성)을 실행 순서에 따라 지우지 않도록
-        new Documenter(modules, Documenter.Options.defaults().withoutClean())
+        new Documenter(modules)
                 .writeModulesAsPlantUml()
                 .writeIndividualModulesAsPlantUml();
-        ModuleGraphExporter.write(modules); // 클릭 탐색용 modules.html
     }
 }

@@ -16,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneId;
@@ -31,13 +31,12 @@ import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-// 업무 흐름 맵(flows.yml) + @Scheduled 시간표를 단일 HTML(build/spring-modulith-docs/process.html)로 내보낸다
-final class ProcessMapExporter {
+// 모듈 그래프 + 업무 흐름 맵(flows.yml) + @Scheduled 시간표를 단일 페이지(build/architecture-map/)로 내보낸다
+final class ArchitectureMapExporter {
 
-    private static final Path OUTPUT = Path.of("build/spring-modulith-docs/process.html"); // modules.html 옆에 둔다(상호 링크)
-    private static final String TEMPLATE = "/architecture/process-map.html"; // 데이터 자리표시자를 가진 템플릿
+    static final Path OUTPUT = Path.of("build/architecture-map"); // 생성물 — 매번 비우고 새로 쓴다
+    private static final String STATIC = "/architecture/map"; // 정적 원본(셸·CSS·JS) — 그대로 복사
     private static final String FLOWS = "/architecture/flows.yml"; // 사람이 작성하는 흐름 원본
-    private static final String PLACEHOLDER = "/*__DATA__*/null"; // 템플릿 안 JSON 삽입 지점
     private static final ZoneId KST = ZoneId.of("Asia/Seoul"); // 타임라인 축 기준
     private static final ZonedDateTime CRON_FROM = ZonedDateTime.of(2026, 1, 1, 0, 0, 0, 0, KST); // 결정적 출력을 위한 고정 시작점
     private static final int CRON_SCAN_DAYS = 400; // 연 1회 cron까지 잡히도록 1년 넘게 훑는다
@@ -47,7 +46,7 @@ final class ProcessMapExporter {
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES) // flows.yml 키 오타를 조용히 버리지 않는다
             .build();
 
-    private ProcessMapExporter() {
+    private ArchitectureMapExporter() {
     }
 
     record FlowMap(List<Lane> lanes, List<LandscapeGroup> landscape, Map<String, Flow> flows,
@@ -112,11 +111,11 @@ final class ProcessMapExporter {
     record Job(String process, String name, String module, String schedule, String days, List<String> times) {
     }
 
-    record Data(FlowMap map, List<Job> jobs) {
+    record Data(List<ModuleGraphExporter.Module> modules, FlowMap map, List<Job> jobs) {
     }
 
     static FlowMap load() {
-        try (InputStream in = ProcessMapExporter.class.getResourceAsStream(FLOWS)) {
+        try (InputStream in = ArchitectureMapExporter.class.getResourceAsStream(FLOWS)) {
             var options = new LoaderOptions();
             options.setAllowDuplicateKeys(false); // 중복 flow·step 키가 앞의 것을 조용히 덮어쓰지 않도록
             Object yaml = new Yaml(options).load(in);
@@ -234,7 +233,7 @@ final class ProcessMapExporter {
         return classes.stream()
                 .flatMap(c -> c.getMethods().stream())
                 .filter(m -> m.isAnnotatedWith(Scheduled.class))
-                .map(ProcessMapExporter::toJob)
+                .map(ArchitectureMapExporter::toJob)
                 .sorted(Comparator.comparing(Job::process).thenComparing(j -> j.times().isEmpty() ? "99" : j.times().getFirst())
                         .thenComparing(Job::name))
                 .toList();
@@ -313,15 +312,38 @@ final class ProcessMapExporter {
         return gated ? "kista-scheduler" : "kista-api · kista-scheduler";
     }
 
-    static void write(FlowMap map, List<Job> jobs) {
-        // </script> 조기 종료 방지 — JSON 안의 "</"를 이스케이프
-        var json = JSON.writeValueAsString(new Data(map, jobs)).replace("</", "<\\/");
-        try (InputStream in = ProcessMapExporter.class.getResourceAsStream(TEMPLATE)) {
-            var template = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            Files.createDirectories(OUTPUT.getParent());
-            Files.writeString(OUTPUT, template.replace(PLACEHOLDER, json));
+    static void write(List<ModuleGraphExporter.Module> modules, FlowMap map, List<Job> jobs) {
+        try {
+            deleteRecursively(OUTPUT); // 삭제된 뷰 파일이 남지 않도록
+            // test 리소스는 jar가 아니라 디렉토리 — 순회 복사라 뷰 파일을 추가해도 Java 수정 불필요
+            var source = Path.of(ArchitectureMapExporter.class.getResource(STATIC).toURI());
+            try (var paths = Files.walk(source)) {
+                for (var path : paths.toList()) {
+                    var target = OUTPUT.resolve(source.relativize(path).toString());
+                    if (Files.isDirectory(path)) {
+                        Files.createDirectories(target);
+                    } else {
+                        Files.copy(path, target);
+                    }
+                }
+            }
+            Files.writeString(OUTPUT.resolve("data.js"),
+                    "window.DATA = " + JSON.writeValueAsString(new Data(modules, map, jobs)) + ";\n");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void deleteRecursively(Path dir) throws IOException {
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (var paths = Files.walk(dir)) {
+            for (var path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(path);
+            }
         }
     }
 }
