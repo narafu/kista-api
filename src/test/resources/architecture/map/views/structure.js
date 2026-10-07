@@ -56,7 +56,7 @@
                classes: expanded.has(p) ? '' : 'proj' };
     });
     const nodes = mods.filter(m => expanded.has(m.project)).map(m => ({
-      data: { id: m.name, label: m.name, parent: m.project, accent: css(PROJECTS[m.project].accent),
+      data: { id: m.name, label: m.name, parent: m.project, accent: css(PROJECTS[m.project].accent), tint: css(PROJECTS[m.project].tint),
               weight: outgoing(m.name).length + incoming(m.name).length },
     }));
     return [...projects, ...nodes, ...edges()];
@@ -67,42 +67,50 @@
   const go = h => location.hash === h ? route() : location.hash = h;
   // 스타일 — css() 값을 박아 두므로 테마 전환 시 다시 만든다
   function styles() {
+    const shadow = isDark() ? 0 : 0.06; // 랜드스케이프·흐름 카드의 옅은 그림자 — 다크에선 없음
     return [
+      // 모듈 = 카드: 흰 바탕·옅은 프로젝트색 테두리·둥근 모서리
       { selector: 'node', style: {
-          label: 'data(label)', 'text-valign': 'center', 'font-size': 'mapData(weight, 0, 120, 12, 16)', 'font-weight': 600, color: css('--fg'), // 의존 수 약하게 반영
+          label: 'data(label)', 'text-valign': 'center', 'font-size': 13, 'font-weight': 600, color: css('--fg'),
           'font-family': getComputedStyle(document.body).fontFamily,
-          'background-color': css('--surface'), 'border-width': 2, 'border-color': 'data(accent)',
-          shape: 'round-rectangle', width: 'label', height: 30, padding: 12,
-          'transition-property': 'opacity, border-width', 'transition-duration': 150 } },
+          'background-color': css('--surface'), 'border-width': 1.5, 'border-color': 'data(accent)', 'border-opacity': 0.45,
+          shape: 'round-rectangle', 'corner-radius': 10, width: 'label', height: 36, padding: 14,
+          'underlay-color': '#000', 'underlay-opacity': shadow, 'underlay-padding': 2, 'underlay-shape': 'round-rectangle',
+          'transition-property': 'opacity, border-opacity, background-color', 'transition-duration': 150 } },
+      // 프로젝트 영역 = 그룹: 옅은 틴트 바탕·실선 테두리·작은 회색 제목(랜드스케이프 그룹 제목 톤)
       { selector: ':parent', style: {
-          'background-color': 'data(tint)', 'background-opacity': 1, 'border-width': 1.5, 'border-style': 'dashed',
-          'border-color': 'data(accent)', color: 'data(accent)', 'text-valign': 'top', 'text-halign': 'center',
-          'text-margin-y': -6, 'font-size': 15, 'font-weight': 700, padding: 28, shape: 'round-rectangle' } },
+          'background-color': 'data(tint)', 'background-opacity': 0.55, 'border-width': 1, 'border-style': 'solid',
+          'border-color': css('--line'), 'border-opacity': 1, color: css('--muted'), 'text-valign': 'top', 'text-halign': 'left',
+          'text-margin-x': 14, 'text-margin-y': 22, 'font-size': 12, 'font-weight': 600, padding: 30,
+          shape: 'round-rectangle', 'corner-radius': 14, 'underlay-opacity': 0 } },
       { selector: 'edge', style: {
-          width: 'data(width)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
-          'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, 'curve-style': 'bezier', opacity: 0.45,
+          width: 'mapData(count, 1, 60, 1, 4)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
+          'target-arrow-shape': 'triangle', 'arrow-scale': 0.7, 'curve-style': 'bezier', opacity: 0.3,
           'transition-property': 'opacity', 'transition-duration': 150 } },
-      { selector: 'edge.hover', style: { opacity: 0.9 } },
-      { selector: 'edge.flowing', style: { opacity: 0.9, 'line-style': 'dashed', 'line-dash-pattern': [6, 4] } },
-      { selector: 'node.hover', style: { 'border-width': 3 } },
-      { selector: '.faded', style: { opacity: 0.08 } },
-      { selector: ':parent.faded', style: { opacity: 0.35 } },
-      { selector: 'node.focus', style: { 'border-width': 3 } },
-      { selector: 'node.selected', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
+      { selector: 'edge.hover', style: { opacity: 0.85 } },
+      { selector: 'edge.flowing', style: { opacity: 0.85, 'line-style': 'dashed', 'line-dash-pattern': [6, 4] } },
+      { selector: 'node.hover', style: { 'border-opacity': 1, 'underlay-opacity': shadow * 2 } },
+      { selector: '.faded', style: { opacity: 0.15 } },
+      { selector: ':parent.faded', style: { opacity: 0.5 } },
+      { selector: 'node.focus', style: { 'border-opacity': 1 } },
+      // 선택 = 카드 hover 톤(틴트 바탕·진한 테두리), 글자는 그대로
+      { selector: 'node.selected', style: { 'background-color': 'data(tint)', 'border-width': 2, 'border-opacity': 1 } },
       { selector: 'edge.focus', style: {
-          opacity: 1, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
+          opacity: 0.9, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
           'text-background-color': css('--surface'), 'text-background-opacity': 1, 'text-background-padding': 3,
           'text-background-shape': 'round-rectangle', 'text-border-width': 1, 'text-border-color': css('--line'), 'text-border-opacity': 1 } },
+      // 접힌 프로젝트 = 큰 카드
       { selector: 'node.proj', style: {
-          'background-color': 'data(tint)', 'border-color': 'data(accent)', 'border-style': 'dashed', color: 'data(accent)',
-          'font-size': 15, 'font-weight': 700, width: 160, height: 64 } },
-      { selector: 'node.ov-trail', style: { 'border-width': 3 } },
-      { selector: 'node.ov-on', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
+          'background-color': css('--surface'), 'border-color': 'data(accent)', 'border-opacity': 0.55, color: css('--fg'),
+          'font-size': 15, 'font-weight': 700, width: 180, height: 64, 'corner-radius': 12 } },
+      { selector: 'node.proj.hover', style: { 'background-color': 'data(tint)', 'border-opacity': 1 } },
+      { selector: 'node.ov-trail', style: { 'border-opacity': 1 } },
+      { selector: 'node.ov-on', style: { 'background-color': css('--tc-tint'), 'border-color': css('--tc'), 'border-width': 2, 'border-opacity': 1 } },
       { selector: 'edge.ov-trail', style: { opacity: 0.35, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
-      { selector: 'edge.ov-on', style: { opacity: 1, width: 4, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
-      { selector: 'edge.ov-virtual', style: { 'line-style': 'dashed', width: 2 } },
-      { selector: 'node.ov-dot', style: { width: 14, height: 14, padding: 0, label: '', shape: 'ellipse',
-          'background-color': css('--tc'), 'border-width': 0, events: 'no' } },
+      { selector: 'edge.ov-on', style: { opacity: 1, width: 3, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
+      { selector: 'edge.ov-virtual', style: { 'line-style': 'dashed', width: 1.5 } },
+      { selector: 'node.ov-dot', style: { width: 12, height: 12, padding: 0, label: '', shape: 'ellipse',
+          'background-color': css('--tc'), 'border-width': 0, 'underlay-opacity': 0, events: 'no' } },
     ];
   }
 
