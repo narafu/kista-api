@@ -5,6 +5,7 @@
 | 레벨 | 질문 | 위치 |
 |---|---|---|
 | L0 시스템 컨텍스트 | 어떤 프로세스와 외부 시스템이 있나 | 아래 L0 |
+| L0-1 배포 구성 | 어떤 컨테이너·네트워크·볼륨에 어떻게 배포되나 | 아래 L0-1 |
 | L1 빌드·스키마 경계 | 어느 모듈이 어느 jar·DB 스키마 소속인가 | 아래 L1 |
 | L1.5 프로세스 간 통신 | root ↔ trading-core는 무엇으로 대화하나 | 아래 L1.5 |
 | L2 모듈 의존 그래프 | 모듈끼리 누가 누구를 참조하나 | **자동 생성** — 아래 L2 |
@@ -57,6 +58,133 @@ flowchart LR
 
 - 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy` (`CaddyRoutingTest`가 컨트롤러 경로와 대조)
 - 배포·role 상세: `docs/agents/docker-infra.md` "서버 배포 방식"
+
+## L0-1 배포 구성
+
+L0을 컨테이너·네트워크·볼륨·배포 경로 수준으로 펼친 그림이다. 소유 레포가 셋으로 갈린다 — `kista-infra`(caddy·postgres·redis·네트워크·시크릿·reconcile), `kista-api`(앱 3 role compose + API 도메인 라우팅 스니펫), `kista-ui`(UI compose).
+
+### 호스트·컨테이너·네트워크
+
+```mermaid
+flowchart TB
+    USER["브라우저 / 앱"]
+    FIDA["fida-server<br/>별도 OCI 인스턴스"]
+
+    subgraph HOST["OCI kista-api-server (arm64 · 단일 인스턴스)"]
+        direction TB
+        subgraph SN["shared_net 만"]
+            CADDY["caddy · :80/:443 공개<br/>UI_DOMAIN → kista-ui:3000<br/>API_DOMAIN → 스니펫 import"]
+            UI["kista-ui · blue/green<br/>Next.js standalone :3000"]
+        end
+        subgraph BOTH["shared_net + data_net"]
+            API["kista-api · blue/green<br/>app.jar · SCHEDULER_ENABLED=false"]
+            SCH["kista-scheduler<br/>app.jar · SCHEDULER_ENABLED=true<br/>public.event_publication 재발행"]
+            TRD["kista-trading · 단일·stop-first<br/>trading-core.jar · 매매 배치<br/>trading.event_publication 재발행"]
+        end
+        subgraph DN["data_net 만"]
+            PG[("kista-postgres<br/>postgres:17 · alias postgres<br/>127.0.0.1:5432 (SSH 터널용)")]
+            RD[("redis:7 · AOF<br/>alias redis")]
+        end
+        subgraph VOL["볼륨 · 호스트 경로"]
+            V1[/"named: caddy_data · caddy_config<br/>postgres_data · redis_data"/]
+            V2[/"/opt/kista-api/caddy → caddy ro 마운트<br/>/opt/#lt;app#gt;/releases · current · previous<br/>/opt/#lt;app#gt;/.env · /opt/kista-infra/.env"/]
+        end
+    end
+
+    USER -->|HTTPS| CADDY
+    FIDA -->|"HTTPS /api/internal/fida-orders"| CADDY
+    CADDY -->|"@scheduler ^/api/admin/scheduler/.+"| SCH
+    CADDY -->|"@trading accounts · orders · trading-cycles · backtest<br/>daily-trades · stats/summary·equity-curve·cycles · internal/fida-orders"| TRD
+    CADDY -->|"그 외 API_DOMAIN"| API
+    CADDY --> UI
+
+    API & SCH -->|"INTERNAL_API_BASE_URL<br/>http://kista-trading:8080"| TRD
+    API & SCH & TRD --> PG
+    API & SCH & TRD <--> RD
+```
+
+- 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy`(API 도메인, 이 레포 소유) · `kista-infra/Caddyfile`(UI 도메인 + 스니펫 import)
+- 네트워크·볼륨 SSOT: `kista-infra/docker-compose.yml`(두 네트워크는 external — infra 배포가 `docker network create`로 멱등 생성) · 앱 compose는 `deploy/server/docker-compose.yml`, `kista-ui/deploy/server/docker-compose.yml`
+- blue/green 대상은 bundle `bluegreen` 파일이 정한다 — kista-api·kista-ui만. kista-trading은 재기동 시 매매 배치 재개가 잔여 락을 인수하므로 겹침 기동 금지(`.github/tests/compose-invariants.bats`)
+
+### 외부 연동
+
+```mermaid
+flowchart LR
+    subgraph APP["kista-api-server"]
+        API["kista-api"]
+        SCH["kista-scheduler"]
+        TRD["kista-trading"]
+        PG[("postgres")]
+    end
+
+    subgraph BROKER["증권·시세"]
+        KIS["KIS"]
+        TOSS["Toss증권"]
+        ALPACA["Alpaca<br/>캔들·휴장일"]
+    end
+    subgraph DATA["참조 데이터"]
+        KB["KB부동산"]
+        FG["공포탐욕지수<br/>CNN · Crypto"]
+    end
+    subgraph USERIO["인증·알림"]
+        KAKAO["Kakao OAuth"]
+        TG["Telegram<br/>관리자 봇 · 사용자 봇"]
+        FCM["FCM"]
+    end
+    subgraph OPS["운영 관측·백업"]
+        GRAF["Grafana Cloud<br/>OTLP 메트릭 push"]
+        HC["healthchecks.io<br/>개장·마감 heartbeat"]
+        OBJ["OCI Object Storage<br/>kista-infra-backups"]
+    end
+
+    TRD --> KIS & TOSS & ALPACA
+    SCH --> KB & FG & ALPACA
+    API --> KAKAO & FCM
+    API & SCH & TRD --> TG
+    API & SCH & TRD --> GRAF
+    TRD --> HC
+    PG -.->|"cron 02:00 KST backup.sh<br/>pg_dump → GPG"| OBJ
+```
+
+- 외부 호출 방향은 L0과 같다 — 여기서는 운영 관측(`GRAFANA_CLOUD_OTLP_*`, `heartbeat.*`는 trading-core만)과 백업 경로를 더했다
+
+### 배포 파이프라인·시크릿
+
+```mermaid
+flowchart LR
+    subgraph APPREPO["앱 레포 (kista-api · kista-ui)"]
+        PUSH["main push"]
+        WF["server-deploy.yml<br/>plan → checks → verify → build"]
+        GHCR[("GHCR<br/>ghcr.io/narafu/#lt;app#gt;:#lt;sha#gt;<br/>linux/arm64")]
+    end
+
+    subgraph INFRA["kista-infra 레포"]
+        REC["reconcile.yml<br/>SHA·이미지 검증 · 신선도 병합<br/>config SHA로 bundle 구성"]
+        STATE[("state/#lt;app#gt;.yml<br/>config · roles SHA")]
+        SD["server-deploy.yml<br/>infra compose · .env 적용<br/>매매 시간대 창 차단"]
+        SEC[("secrets/*.env.gpg<br/>kista-api · kista-ui · infra")]
+    end
+
+    subgraph SRV["kista-api-server"]
+        RSH["/opt/kista-infra/bin/reconcile.sh<br/>required-env 검사 → role 교체<br/>헬스 게이트 → 스니펫 설치·caddy reload<br/>실패 시 롤백"]
+        AINF["/opt/kista-infra/bin/apply-infra.sh"]
+        ENV["/opt/#lt;app#gt;/.env<br/>/opt/kista-infra/.env"]
+    end
+
+    PUSH --> WF -->|build-push| GHCR
+    WF -->|"repository_dispatch deploy-#lt;app#gt;<br/>GitHub App kista-infra-dispatch"| REC
+    REC -->|SSH| RSH
+    GHCR -->|"compose pull (public)"| RSH
+    RSH -->|성공| STATE
+    SEC -->|"ENV_PASSPHRASE 복호화"| SD
+    SD -->|SSH| AINF --> ENV
+    AINF -->|".env 변경 시 current 재적용"| RSH
+```
+
+- 앱 배포 설계: `kista-infra/docs/superpowers/specs/2026-10-02-deploy-reconcile-design.md` · 앱 쪽 판정: `.github/scripts/detect-deploy-scope.sh`(변경 경로별 role 선택)
+- 시크릿: 운영 `.env` 3종은 `kista-infra/secrets/`에 GPG 대칭 암호화로만 존재(`scripts/env.sh edit`→커밋, 서버 `.env` 직접 수정 금지) — 배포 키 목록 `kista-infra/.env.example`. OCI 백업 PEM은 서버 `/opt/kista-infra/oci_backup_key.pem`에만. GitHub Secrets: kista-infra(`ENV_PASSPHRASE`·`SERVER_*`·`TELEGRAM_*`), 앱 레포(`INFRA_APP_CLIENT_ID` 변수 + `INFRA_APP_PRIVATE_KEY`)
+- 호스트 단위 reconcile 락으로 앱끼리·infra 재적용과 교체가 겹치지 않는다. 수동 복구(exit 2)·서버 재구축 순서 → `kista-infra/README.md`
 
 ## L1 빌드·스키마 경계
 
