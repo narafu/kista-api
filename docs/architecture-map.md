@@ -255,26 +255,29 @@ flowchart LR
 
 ```bash
 ./gradlew :test --tests 'com.kista.architecture.ModulithArchitectureTest'
-# 출력: build/spring-modulith-docs/modules.html (클릭 탐색), components.puml (전체), module-<name>.puml (모듈별)
+# 출력: build/spring-modulith-docs/components.puml (전체), module-<name>.puml (모듈별)
 ```
 
-- `modules.html`: 브라우저로 연다(Cytoscape.js를 CDN에서 받으므로 인터넷 필요). 노드 클릭 → 그 모듈의 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존 전체. 의존 종류 필터·platform/sharedkernel 숨김·검색 지원. 생성기는 `ModuleGraphExporter`, 템플릿은 `src/test/resources/architecture/module-graph.html`
+- 클릭 탐색 그래프는 아키텍처 맵 구조 탭(아래 절)으로 옮겼다
 - `.puml`: IntelliJ PlantUML Integration 플러그인으로 열면 렌더링된다
 - `build/`는 IntelliJ에서 Excluded라 `Ctrl+Shift+N` 두 번(non-project 포함)으로 찾는다
 
-## 업무 흐름 맵 (process.html, 반자동 생성)
+## 아키텍처 맵 (build/architecture-map/, 반자동 생성)
 
-모듈 그래프가 정적 구조라면 이쪽은 업무 흐름이다. 흐름 내용은 사람이 `src/test/resources/architecture/flows.yml`에 쓰고, 하루 타임라인은 테스트가 `@Scheduled`를 자동 수집한다.
+모듈 구조와 업무 흐름을 한 페이지에서 오간다. 모듈 그래프는 Modulith가, 하루 타임라인은 `@Scheduled`가 자동 공급하고, 흐름 내용만 사람이 `src/test/resources/architecture/flows.yml`에 쓴다.
 
 ```bash
-./gradlew :test --tests 'com.kista.architecture.ProcessMapTest'
-# 출력: build/spring-modulith-docs/process.html (modules.html과 서로 링크)
+./gradlew :test --tests 'com.kista.architecture.ArchitectureMapTest'
+# 출력: build/architecture-map/index.html (file://로 연다 — cytoscape만 CDN이라 인터넷 필요)
 ```
 
-- 탭 4개: 프로세스 랜드스케이프(사용자 여정·자동·관리자 단계, 상세 흐름이 있는 단계만 클릭 가능) / 프로세스 상세 스윔레인(레인 = 사용자·kista-ui·kista-api·kista-scheduler·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 하루 타임라인(KST 24h, 실행 프로세스별 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `scheduler.enabled` 게이트 여부로 `kista-scheduler` 또는 공용) / 상태 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로, 전이 클릭 → 계기·담당 코드·연결된 흐름 단계)
-- `ProcessMapTest`가 flows.yml의 `클래스#메서드` 참조·레인·흐름 연결을 검증하고, `lifecycles:`는 상태 enum 상수 집합이 `states`와 정확히 같은지·전이의 상태·`flow: <flowId>/<stepId>` 링크까지 검증한다 — 메서드 이름이 바뀌거나 enum 상수가 늘면 이 테스트가 깨지니 flows.yml을 같이 고친다. 스키마는 flows.yml 머리 주석이 SSOT
+- 탭 5개: 구조(모듈 의존 그래프 — 처음엔 `:api`·`:trading-core`·`:shared` 박스로 접혀 있고 박스 클릭·"모두 펼치기"로 모듈을 편다. 노드 클릭 → 나가는·들어오는 의존을 대상 모듈 → 의존 종류 → `소스클래스 → 타깃클래스`로, 엣지 클릭 → 두 모듈 사이 클래스 단위 의존. 의존 종류 필터·platform/sharedkernel 숨김. "흐름 오버레이"를 고르면 단계별 모듈을 강조하고 연속 단계 사이를 의존 엣지 또는 점선 가상 엣지로 이어 재생한다) / 랜드스케이프(사용자 여정은 노선도, 나머지는 카드 — 카드마다 터치 레인 스파크라인·모듈 수) / 흐름(스윔레인 — 레인 = 사용자·kista-ui·kista-api·kista-scheduler·Redis·kista-trading·DB·증권사·Telegram·외부(fida), 단계 클릭 → 업무 설명·상태 변화·실패 경로·담당 코드, ▶ 재생) / 타임라인(원형 24h 시계 기본·선형 토글, 실행 프로세스별 동심원 — cron 시각은 `CronExpression`으로 계산, 프로세스는 trading-core 소속 → `kista-trading`, root는 `scheduler.enabled` 게이트 여부로 `kista-scheduler` 또는 공용, 매매 구간 띠는 개장·마감 잡 cron에서 도출) / 생명주기(user·strategy·order·매매 배치 체크포인트 — 상태를 한 줄에 놓고 전이를 호로)
+- URL 해시가 전체 상태다 — `#structure/trading?flow=close-batch&step=lock`, `#flow/close-batch/lock`, `#timeline/TradingCloseScheduler%23run`, `#lifecycle/order/3`. 리뷰 메모에 링크로 남길 수 있다. 헤더 통합 검색(`/`)은 모듈·흐름·단계(제목·code)·잡·상태 enum을 한 목록에서 찾는다
+- 상세 패널 하단 "연결"이 뷰를 잇는다 — 모듈 ↔ 거치는 흐름 단계·소속 잡, 단계 ↔ 모듈·생명주기 전이·시작 잡. 단계 → 모듈은 `code:` 클래스 패키지(`com.kista.<module>`)에서 자동 도출(`ArchitectureMapExporter.stepModules`)하므로 flows.yml에 쓰지 않는다. 잡 ↔ 단계는 잡 이름(`Class#method`)이 단계 `code:` 항목과 같으면 연결된다
+- `ArchitectureMapTest`가 flows.yml의 `클래스#메서드` 참조·레인·흐름 연결을 검증하고, `lifecycles:`는 상태 enum 상수 집합이 `states`와 정확히 같은지·전이의 상태·`flow: <flowId>/<stepId>` 링크까지 검증한다 — 메서드 이름이 바뀌거나 enum 상수가 늘면 이 테스트가 깨지니 flows.yml을 같이 고친다. 스키마는 flows.yml 머리 주석이 SSOT
 - 상세 흐름 18개 — 랜드스케이프 카드 전부 연결. 사용자 여정(가입·승인·계좌 연결·전략 등록·매일 자동 매매·결과 확인·일시정지·재개·삭제·탈퇴), 사용자 기능(바로 주문·주문 취소·알림 설정·가계부·그룹 공유), 자동(개장·마감 배치·FIDA 기준표 수신), 관리자(런타임 매매 정책·재주문·체결 보정·스케쥴러 수동 실행·오류 로그·사용자 역할 변경). 새 카드는 flows.yml `flows:`에 키를 추가하고 landscape의 `flow:`로 연결한다
-- 생성기는 `ProcessMapExporter`, 템플릿은 `src/test/resources/architecture/process-map.html`(외부 라이브러리 없음)
+- `code:` 클래스가 어느 모듈에도 속하지 않으면(예: `com.kista` 루트) 같은 테스트가 깨진다 — 오버레이에서 조용히 빠지지 않게
+- 생성기는 `ModuleGraphExporter`(모듈 그래프 데이터)·`ArchitectureMapExporter`(flows 검증·잡 수집·`data.js`·정적 파일 복사), 정적 원본은 `src/test/resources/architecture/map/`(셸·`style.css`·`core.js`·`views/*.js` — 디렉토리를 순회 복사하므로 뷰 파일을 추가해도 Java 수정 불필요)
 
 ## L3 마감 매매 배치 (화~토 04:30 KST)
 

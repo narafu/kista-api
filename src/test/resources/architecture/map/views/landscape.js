@@ -1,10 +1,19 @@
 'use strict';
 (() => {
   /* ---------- 1. 랜드스케이프 ---------- */
+  // 흐름이 건드리는 레인(단계 lane·to)과 모듈 수 — 카드·역 공통
+  function footprint(fid) {
+    const steps = MAP.flows[fid]?.steps ?? [];
+    const lanes = new Set(steps.flatMap(s => [s.lane, ...s.to]));
+    const mods = new Set(steps.flatMap(s => s.modules));
+    return `<span class="spark" aria-label="터치 레인">${MAP.lanes.map(l =>
+      `<i class="${lanes.has(l.id) ? 'on' : ''}" title="${esc(l.label)}"></i>`).join('')}</span><span class="badge mods">모듈 ${mods.size}</span>`;
+  }
+
   $('landscape').innerHTML = MAP.landscape.map((g, gi) => `
     <div class="group"><h3>${esc(g.group)}</h3>
       <div class="row${gi === 0 ? ' journey' : ''}">${g.steps.map(s => s.flow
-        ? `<button class="card linked" data-flow="${esc(s.flow)}"><b>${esc(s.title)}</b>${s.when ? `<small>${esc(s.when)}</small>` : ''}<small><span class="badge go">흐름 보기 →</span></small></button>`
+        ? `<button class="card linked" data-flow="${esc(s.flow)}"><b>${esc(s.title)}</b>${s.when ? `<small>${esc(s.when)}</small>` : ''}<small>${footprint(s.flow)}</small></button>`
         : `<div class="card pending"><b>${esc(s.title)}</b>${s.when ? `<small>${esc(s.when)}</small>` : ''}<small><span class="badge soon">준비 중</span></small></div>`).join('')}
       </div></div>`).join('');
   document.querySelectorAll('.card.linked').forEach(c => c.onclick = () => location.hash = 'flow/' + c.dataset.flow);

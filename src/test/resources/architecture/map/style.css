@@ -4,15 +4,27 @@
   --uses: #0e9384; --event: #e0533d; --entity: #8b5cf6; --default: #9ca3af;
   --focus: #111827; --shadow: 0 1px 2px rgb(0 0 0 / .06), 0 2px 8px rgb(0 0 0 / .04);
 }
+/* 다크: 시스템 설정 기본, data-theme 수동 토글이 덮어쓴다 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #121417; --surface: #1b1e23; --surface-2: #22262c; --fg: #e7e9ec; --muted: #9aa1ab; --line: #2e333a;
     --api: #8796f0; --api-tint: #1f2440; --tc: #e6a54a; --tc-tint: #33281a; --shared: #5cc489; --shared-tint: #1a3125;
     --uses: #2dd4bf; --event: #ff7a63; --entity: #a78bfa; --default: #6b7280;
     --focus: #f9fafb; --shadow: none;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #121417; --surface: #1b1e23; --surface-2: #22262c; --fg: #e7e9ec; --muted: #9aa1ab; --line: #2e333a;
+  --api: #8796f0; --api-tint: #1f2440; --tc: #e6a54a; --tc-tint: #33281a; --shared: #5cc489; --shared-tint: #1a3125;
+  --uses: #2dd4bf; --event: #ff7a63; --entity: #a78bfa; --default: #6b7280;
+  --focus: #f9fafb; --shadow: none;
+}
 * { box-sizing: border-box; }
+.view:not([hidden]) { animation: fade .15s ease-out; }
+@keyframes fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 [hidden] { display: none !important; } /* display를 지정한 요소도 hidden 속성을 따른다 */
 html, body { height: 100%; }
 body { margin: 0; font: 14px/1.5 "Pretendard", system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg);
@@ -45,8 +57,6 @@ main { position: relative; min-height: 0; overflow: auto; padding: 20px; }
 .group { margin-bottom: 22px; }
 .group h3 { margin: 0 0 8px; }
 .row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
-.row.journey .card:not(:last-child)::after { content: "→"; position: absolute; right: -15px; top: 50%; transform: translateY(-50%); color: var(--muted); }
-.row.journey { gap: 22px; }
 .card { position: relative; min-width: 128px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
         text-align: left; font: inherit; color: var(--fg); box-shadow: var(--shadow); }
 .card b { display: block; font-size: 14px; }
@@ -217,6 +227,34 @@ table.rank tbody tr:hover { background: var(--surface-2); }
 a.tag.link { color: var(--fg); text-decoration: none; }
 a.tag.link:hover { border-color: color-mix(in srgb, var(--fg) 35%, transparent); }
 .lanes.modfilter .step:not(.mod-hit) { opacity: .3; }
+
+/* 랜드스케이프 — 사용자 여정은 노선도, 카드·역마다 터치 레인 스파크라인 */
+.row.journey { position: relative; flex-wrap: nowrap; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+.row.journey::before { content: ""; position: absolute; left: 60px; right: 60px; top: 15px; height: 4px; border-radius: 2px; background: var(--tc); }
+.row.journey .card { flex: 1 0 128px; padding-top: 34px; text-align: center; background: none; border: 0; box-shadow: none; }
+.row.journey .card::before { content: ""; position: absolute; top: 7px; left: 50%; translate: -50% 0; width: 20px; height: 20px; border-radius: 50%;
+                             background: var(--surface); border: 4px solid var(--tc); box-sizing: border-box; }
+.row.journey .card.pending::before { border-color: var(--line); }
+.row.journey .card.linked:hover { background: var(--tc-tint); border-radius: 10px; }
+.spark { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: 6px; }
+.spark i { width: 6px; height: 12px; border-radius: 1px; background: var(--line); }
+.spark i.on { background: var(--uses); }
+.badge.mods { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+
+/* 흐름 — 재생 중 현재 단계 경로 위로 점이 흐른다 */
+svg.links .live { stroke: var(--tc); stroke-width: 4; stroke-dasharray: 0 10; stroke-linecap: round; opacity: 1; animation: flowdot .6s linear infinite; }
+@keyframes flowdot { to { stroke-dashoffset: -10; } }
+
+/* 타임라인 — 원형 24h 시계 */
+.dial { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+.dial svg { width: min(520px, 100%); height: auto; }
+.dial .ring { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.dial .ring.periodic { stroke: var(--default); stroke-dasharray: 4 4; }
+.dial .band { fill: none; stroke: var(--tc-tint); stroke-width: 30; stroke-linecap: round; }
+.dial .hour { font-size: 12px; fill: var(--muted); text-anchor: middle; dominant-baseline: middle; }
+.dial .dot-job { stroke: var(--surface); stroke-width: 2; cursor: pointer; }
+.dial .hand { stroke: var(--event); stroke-width: 2; opacity: .8; }
+.dial .legend { flex-direction: column; }
 
 @media (max-width: 900px) {
   body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }

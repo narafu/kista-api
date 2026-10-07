@@ -54,6 +54,55 @@
   }
 
   renderTimeline();
+  // 원형 24h 시계 — 매매 구간 띠는 개장·마감 잡의 실제 cron 시각에서 도출(없으면 띠 없음)
+  const BAND = ['TradingOpenScheduler#run', 'TradingCloseScheduler#run'];
+  const RING = { 'kista-trading': 120, 'kista-scheduler': 170 }; // 그 외 프로세스 = 220
+  const R = 250, C = 260; // 바깥 반지름·중심(viewBox 520)
+  const ang = min => min / 1440 * 2 * Math.PI - Math.PI / 2; // 0시 = 12시 방향, 시계방향
+  const pt = (r, min) => [C + r * Math.cos(ang(min)), C + r * Math.sin(ang(min))];
+  function arc(r, a, b) { // a→b 시계방향(자정 넘김 허용)
+    const sweep = (b - a + 1440) % 1440, [x0, y0] = pt(r, a), [x1, y1] = pt(r, b);
+    return `M${x0},${y0} A${r},${r} 0 ${sweep > 720 ? 1 : 0} 1 ${x1},${y1}`;
+  }
+
+  function renderDial() {
+    const ringOf = p => RING[p] ?? 220;
+    const procs = [...new Set(DATA.jobs.map(j => j.process))];
+    const [open, close] = BAND.map(n => DATA.jobs.find(j => j.name === n));
+    let svg = '';
+    if (open?.times.length && close?.times.length) {
+      const a = Math.min(...open.times.map(toMin)), b = Math.max(...close.times.map(toMin));
+      svg += `<path class="band" d="${arc(RING['kista-trading'], a, b)}"><title>매매 구간 ${open.times[0]} → ${close.times.at(-1)}</title></path>`;
+    }
+    for (const p of procs) {
+      const periodic = DATA.jobs.some(j => j.process === p && !j.times.length);
+      svg += `<circle class="ring${periodic ? ' periodic' : ''}" cx="${C}" cy="${C}" r="${ringOf(p)}"><title>${esc(p)}${periodic ? ' · 주기 실행 잡 있음' : ''}</title></circle>`;
+    }
+    for (let h = 0; h < 24; h += 3) {
+      const [x, y] = pt(R, h * 60);
+      svg += `<text class="hour" x="${x}" y="${y}">${String(h).padStart(2, '0')}</text>`;
+    }
+    DATA.jobs.forEach(j => j.times.forEach(t => {
+      const [x, y] = pt(ringOf(j.process), toMin(t));
+      svg += `<a href="${esc(hash('timeline', j.name))}"><circle class="dot-job" cx="${x}" cy="${y}" r="7" style="fill:${procColor(j.process)}"><title>${esc(j.name)} ${t}</title></circle></a>`;
+    }));
+    const kst = new Date(Date.now() + 9 * 3600e3), [hx, hy] = pt(R - 24, kst.getUTCHours() * 60 + kst.getUTCMinutes());
+    svg += `<line class="hand" x1="${C}" y1="${C}" x2="${hx}" y2="${hy}"><title>현재 KST</title></line>`;
+    $('tl-dial').innerHTML = `<svg viewBox="0 0 520 520" role="img" aria-label="24시간 잡 시계">${svg}</svg>
+      <div class="legend">${procs.map(p => `<span><i class="job" style="position:static;transform:none;background:${procColor(p)}"></i>${esc(p)} · 반지름 ${ringOf(p)}</span>`).join('')}
+      <span>점선 링 = 주기 실행 잡 · 띠 = 매매 구간</span></div>`;
+  }
+
+  let linear = false;
+  $('tl-mode').onclick = () => {
+    linear = !linear;
+    $('tl').hidden = !linear;
+    $('tl-dial').hidden = linear;
+    $('tl-mode').textContent = linear ? '원형 보기' : '선형 보기';
+  };
+  renderDial();
+  $('tl').hidden = true;
+
   VIEWS.timeline = {
     show([name]) {
       const i = DATA.jobs.findIndex(j => j.name === name);

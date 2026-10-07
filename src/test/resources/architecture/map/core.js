@@ -7,6 +7,17 @@ const MAP = DATA.map;
 const VIEWS = {};
 const VIEW_ORDER = ['structure', 'landscape', 'flow', 'timeline', 'lifecycle']; // 첫 항목이 기본 탭
 
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches; // 흐르는 점·dash 끔
+const THEME_KEY = 'kista-architecture-map-theme';
+const isDark = () => document.documentElement.dataset.theme === 'dark'
+  || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+function applyTheme(t) {
+  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  window.dispatchEvent(new Event('themechange')); // cytoscape처럼 색을 값으로 박는 뷰가 다시 그린다
+}
+try { const t = localStorage.getItem(THEME_KEY); applyTheme(t === 'light' || t === 'dark' ? t : null); } catch { /* 저장소 차단 — 시스템 설정 */ }
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => applyTheme(document.documentElement.dataset.theme));
+
 const setPanel = html => { $('panel').innerHTML = html; $('panel').scrollTop = 0; };
 // 해시 생성 — segment별 인코드(잡 이름의 #·흐름 id 등), null/undefined segment는 버린다
 const hash = (view, ...parts) => '#' + [view, ...parts.filter(p => p != null).map(p => encodeURIComponent(p))].join('/');
@@ -126,6 +137,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     location.hash = VIEWS[t.dataset.view].home?.() ?? '#' + t.dataset.view;
   });
+  $('theme').onclick = () => {
+    const t = isDark() ? 'light' : 'dark';
+    applyTheme(t);
+    try { localStorage.setItem(THEME_KEY, t); } catch { /* 기억만 못 함 */ }
+  };
   const q = $('q');
   q.addEventListener('input', () => search(q.value));
   q.addEventListener('keydown', e => {

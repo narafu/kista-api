@@ -65,48 +65,54 @@
 
   // 같은 해시면 hashchange가 안 나므로 직접 라우팅
   const go = h => location.hash === h ? route() : location.hash = h;
+  // 스타일 — css() 값을 박아 두므로 테마 전환 시 다시 만든다
+  function styles() {
+    return [
+      { selector: 'node', style: {
+          label: 'data(label)', 'text-valign': 'center', 'font-size': 'mapData(weight, 0, 120, 12, 16)', 'font-weight': 600, color: css('--fg'), // 의존 수 약하게 반영
+          'font-family': getComputedStyle(document.body).fontFamily,
+          'background-color': css('--surface'), 'border-width': 2, 'border-color': 'data(accent)',
+          shape: 'round-rectangle', width: 'label', height: 30, padding: 12,
+          'transition-property': 'opacity, border-width', 'transition-duration': 150 } },
+      { selector: ':parent', style: {
+          'background-color': 'data(tint)', 'background-opacity': 1, 'border-width': 1.5, 'border-style': 'dashed',
+          'border-color': 'data(accent)', color: 'data(accent)', 'text-valign': 'top', 'text-halign': 'center',
+          'text-margin-y': -6, 'font-size': 15, 'font-weight': 700, padding: 28, shape: 'round-rectangle' } },
+      { selector: 'edge', style: {
+          width: 'data(width)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
+          'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, 'curve-style': 'bezier', opacity: 0.45,
+          'transition-property': 'opacity', 'transition-duration': 150 } },
+      { selector: 'edge.hover', style: { opacity: 0.9 } },
+      { selector: 'edge.flowing', style: { opacity: 0.9, 'line-style': 'dashed', 'line-dash-pattern': [6, 4] } },
+      { selector: 'node.hover', style: { 'border-width': 3 } },
+      { selector: '.faded', style: { opacity: 0.08 } },
+      { selector: ':parent.faded', style: { opacity: 0.35 } },
+      { selector: 'node.focus', style: { 'border-width': 3 } },
+      { selector: 'node.selected', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
+      { selector: 'edge.focus', style: {
+          opacity: 1, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
+          'text-background-color': css('--surface'), 'text-background-opacity': 1, 'text-background-padding': 3,
+          'text-background-shape': 'round-rectangle', 'text-border-width': 1, 'text-border-color': css('--line'), 'text-border-opacity': 1 } },
+      { selector: 'node.proj', style: {
+          'background-color': 'data(tint)', 'border-color': 'data(accent)', 'border-style': 'dashed', color: 'data(accent)',
+          'font-size': 15, 'font-weight': 700, width: 160, height: 64 } },
+      { selector: 'node.ov-trail', style: { 'border-width': 3 } },
+      { selector: 'node.ov-on', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
+      { selector: 'edge.ov-trail', style: { opacity: 0.35, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
+      { selector: 'edge.ov-on', style: { opacity: 1, width: 4, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
+      { selector: 'edge.ov-virtual', style: { 'line-style': 'dashed', width: 2 } },
+      { selector: 'node.ov-dot', style: { width: 14, height: 14, padding: 0, label: '', shape: 'ellipse',
+          'background-color': css('--tc'), 'border-width': 0, events: 'no' } },
+    ];
+  }
+
   let cy; // 첫 show()에서 생성 — 숨긴 컨테이너에서 만들면 0×0으로 잡혀 fit이 깨진다
   function init() {
     cy = cytoscape({
       container: $('cy'),
       wheelSensitivity: 0.25,
       minZoom: 0.3, maxZoom: 2.5,
-      style: [
-        { selector: 'node', style: {
-            label: 'data(label)', 'text-valign': 'center', 'font-size': 13, 'font-weight': 600, color: css('--fg'),
-            'font-family': getComputedStyle(document.body).fontFamily,
-            'background-color': css('--surface'), 'border-width': 2, 'border-color': 'data(accent)',
-            shape: 'round-rectangle', width: 'label', height: 30, padding: 12,
-            'transition-property': 'opacity, border-width', 'transition-duration': 150 } },
-        { selector: ':parent', style: {
-            'background-color': 'data(tint)', 'background-opacity': 1, 'border-width': 1.5, 'border-style': 'dashed',
-            'border-color': 'data(accent)', color: 'data(accent)', 'text-valign': 'top', 'text-halign': 'center',
-            'text-margin-y': -6, 'font-size': 15, 'font-weight': 700, padding: 28, shape: 'round-rectangle' } },
-        { selector: 'edge', style: {
-            width: 'data(width)', 'line-color': 'data(color)', 'target-arrow-color': 'data(color)',
-            'target-arrow-shape': 'triangle', 'arrow-scale': 0.9, 'curve-style': 'bezier', opacity: 0.45,
-            'transition-property': 'opacity', 'transition-duration': 150 } },
-        { selector: 'edge.hover', style: { opacity: 0.9 } },
-        { selector: 'node.hover', style: { 'border-width': 3 } },
-        { selector: '.faded', style: { opacity: 0.08 } },
-        { selector: ':parent.faded', style: { opacity: 0.35 } },
-        { selector: 'node.focus', style: { 'border-width': 3 } },
-        { selector: 'node.selected', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
-        { selector: 'edge.focus', style: {
-            opacity: 1, label: 'data(count)', 'font-size': 11, 'font-weight': 700, color: css('--fg'),
-            'text-background-color': css('--surface'), 'text-background-opacity': 1, 'text-background-padding': 3,
-            'text-background-shape': 'round-rectangle', 'text-border-width': 1, 'text-border-color': css('--line'), 'text-border-opacity': 1 } },
-        { selector: 'node.proj', style: {
-            'background-color': 'data(tint)', 'border-color': 'data(accent)', 'border-style': 'dashed', color: 'data(accent)',
-            'font-size': 15, 'font-weight': 700, width: 160, height: 64 } },
-        { selector: 'node.ov-trail', style: { 'border-width': 3 } },
-        { selector: 'node.ov-on', style: { 'background-color': 'data(accent)', color: '#fff', 'border-color': css('--focus') } },
-        { selector: 'edge.ov-trail', style: { opacity: 0.35, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
-        { selector: 'edge.ov-on', style: { opacity: 1, width: 4, 'line-color': css('--tc'), 'target-arrow-color': css('--tc') } },
-        { selector: 'edge.ov-virtual', style: { 'line-style': 'dashed', width: 2 } },
-        { selector: 'node.ov-dot', style: { width: 14, height: 14, padding: 0, label: '', shape: 'ellipse',
-            'background-color': css('--tc'), 'border-width': 0, events: 'no' } },
-      ],
+      style: styles(),
     });
 
     cy.on('tap', 'node', e => {
@@ -125,12 +131,30 @@
       focus(e.target); showEdge(e.target.data('source'), e.target.data('target'));
     });
     cy.on('tap', e => { if (e.target === cy) go('#structure'); });
+    // 노드 hover → 연결 엣지에 흐르는 dash(방향 표시), 모션 감소 설정이면 정적 dash
+    let dashOffset = 0, dashRaf = 0;
+    const dashLoop = () => {
+      const flowing = cy.edges('.flowing');
+      if (!flowing.length) { dashRaf = 0; return; } // 재렌더로 hover 노드가 사라져 mouseout이 안 온 경우
+      dashOffset = (dashOffset + 0.6) % 1000;
+      flowing.style('line-dash-offset', -dashOffset);
+      dashRaf = requestAnimationFrame(dashLoop);
+    };
     cy.on('mouseover', 'node, edge', e => {
       if (e.target.isNode() && e.target.isParent()) return;
       e.target.addClass('hover');
       $('cy').style.cursor = 'pointer';
+      if (e.target.isNode()) {
+        e.target.connectedEdges().addClass('flowing');
+        if (!REDUCED && !dashRaf) dashRaf = requestAnimationFrame(dashLoop);
+      }
     });
-    cy.on('mouseout', 'node, edge', e => { e.target.removeClass('hover'); $('cy').style.cursor = ''; });
+    cy.on('mouseout', 'node, edge', e => {
+      e.target.removeClass('hover');
+      $('cy').style.cursor = '';
+      cy.edges('.flowing').removeClass('flowing');
+      cancelAnimationFrame(dashRaf); dashRaf = 0;
+    });
     render();
   }
 
@@ -292,7 +316,6 @@
   $('expand').onclick = () => cy && expandAll(expanded.size < Object.keys(PROJECTS).length);
 
   /* ---------- 흐름 오버레이 ---------- */
-  const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches; // 흐르는 점 대신 정적 하이라이트
   let ov = null, ovTimer = null; // ov: { fid, i }
   $('ov-flow').insertAdjacentHTML('beforeend', Object.entries(MAP.flows).map(([id, f]) =>
     `<option value="${esc(id)}">${esc(f.title)}</option>`).join(''));
@@ -357,7 +380,7 @@
 
     // 이전 단계 모듈 → 현재 단계 모듈로 점 하나 이동 (바로 다음 단계로 넘어갈 때만)
     const to = last[0];
-    if (!REDUCE_MOTION && from && to && prevOv?.fid === fid && prevOv.i === i - 1) {
+    if (!REDUCED && from && to && prevOv?.fid === fid && prevOv.i === i - 1) {
       const dot = cy.add({ data: { id: 'ov-dot', accent: css('--tc') }, classes: 'ov-dot', position: { ...cy.getElementById(from).position() } });
       dot.animate({ position: { ...cy.getElementById(to).position() } }, { duration: 600, easing: 'ease-in-out-cubic',
         complete: () => dot.remove() });
@@ -385,6 +408,14 @@
     ovTimer = setInterval(tick, 1400);
     $('ov-play').textContent = '■ 정지';
   };
+
+  // 테마 전환 — 스타일·엣지 색이 생성 시점 값으로 박혀 있어 다시 계산하고 해시 상태를 복원
+  window.addEventListener('themechange', () => {
+    if (!cy) return;
+    cy.style(styles());
+    render();
+    if (!$('view-structure').hidden) route();
+  });
 
   VIEWS.structure = {
     show([mod], params) {

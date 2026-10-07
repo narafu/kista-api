@@ -50,17 +50,18 @@
     const base = lanes.getBoundingClientRect();
     const box = el => { const r = el.getBoundingClientRect(); return { l: r.left - base.left, r: r.right - base.left, t: r.top - base.top, b: r.bottom - base.top, cx: (r.left + r.right) / 2 - base.left, cy: (r.top + r.bottom) / 2 - base.top }; };
     const steps = [...lanes.querySelectorAll('.step')].map(box);
+    const live = timer && selected >= 0; // 재생 중 현재 단계로 들어오는 순서선·나가는 호출선
     let d = '';
     for (let i = 0; i + 1 < steps.length; i++) {
       const a = steps[i], b = steps[i + 1], mx = (a.r + b.l) / 2;
-      d += `<path class="seq" d="M${a.r},${a.cy} C${mx},${a.cy} ${mx},${b.cy} ${b.l},${b.cy}"/>`;
+      d += `<path class="seq${live && i === selected - 1 ? ' live' : ''}" d="M${a.r},${a.cy} C${mx},${a.cy} ${mx},${b.cy} ${b.l},${b.cy}"/>`;
     }
     lanes.querySelectorAll('.touch').forEach(t => {
       const s = steps[t.dataset.from], p = box(t);
       const y1 = p.cy > s.cy ? s.b : s.t;
-      d += `<path class="call" d="M${s.cx},${y1} L${p.cx},${p.cy}"/>`;
+      d += `<path class="call${live && +t.dataset.from === selected ? ' live' : ''}" marker-end="url(#call-ah)" d="M${s.cx},${y1} L${p.cx},${p.cy}"/>`;
     });
-    svg.innerHTML = d;
+    svg.innerHTML = `<defs><marker id="call-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--uses)"/></marker></defs>` + d;
   }
   window.addEventListener('resize', drawLinks);
 
@@ -75,6 +76,7 @@
     const el = $('step-' + i);
     if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
     SHARED.step = { flow: currentFlow, step: flow.steps[i].id };
+    requestAnimationFrame(drawLinks); // 재생 중 live 경로 갱신
     stepPanel(currentFlow, i, k => hash('flow', currentFlow, flow.steps[k].id));
   }
 
@@ -97,6 +99,7 @@
     clearInterval(timer); timer = null;
     $('play').textContent = '▶ 재생';
     document.querySelectorAll('.step.playing').forEach(b => b.classList.remove('playing'));
+    requestAnimationFrame(drawLinks); // live 경로 해제
   }
   $('play').onclick = () => {
     if (timer) return stop();

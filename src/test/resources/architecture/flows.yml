@@ -1,5 +1,5 @@
-# 업무 흐름 맵(process.html) 원본 — 사람이 작성한다.
-# ProcessMapTest가 code: 의 `클래스#메서드` 참조가 실제로 존재하는지 검증한다(이름이 바뀌면 빌드 실패).
+# 업무 흐름 맵 원본 — 사람이 작성한다. 아키텍처 맵(build/architecture-map/index.html)의 랜드스케이프·흐름·생명주기 탭이 된다.
+# ArchitectureMapTest가 code: 의 `클래스#메서드` 참조가 실제로 존재하는지 검증한다(이름이 바뀌면 빌드 실패).
 # 클래스는 단순 이름(com.kista 안에서 유일해야 함) 또는 FQCN으로 쓴다.
 #
 # 스키마

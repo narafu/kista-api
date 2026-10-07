@@ -21,6 +21,7 @@
   <div class="qbox"><input type="search" class="search" id="q" placeholder="검색 ( / )" aria-label="통합 검색" autocomplete="off">
     <div class="results" id="q-results" hidden></div></div>
   <span class="spacer"></span>
+  <button class="btn" id="theme" aria-label="테마 전환">◐</button>
 </header>
 <main>
   <section class="view" id="view-structure" hidden>
@@ -74,7 +75,9 @@
     </div>
   </section>
   <section class="view" id="view-timeline" hidden>
-    <div class="view-head"><h2>하루 타임라인 (KST)</h2><p class="sub">@Scheduled를 테스트가 자동 수집합니다. 빨간 세로선은 현재 시각입니다.</p></div>
+    <div class="view-head"><h2>하루 타임라인 (KST)</h2><p class="sub">@Scheduled를 테스트가 자동 수집합니다. 빨간 바늘·세로선은 현재 시각입니다.</p>
+      <span class="spacer"></span><button class="btn" id="tl-mode">선형 보기</button></div>
+    <div id="tl-dial" class="dial"></div>
     <div class="tl" id="tl"></div>
   </section>
   <section class="view" id="view-lifecycle" hidden>
