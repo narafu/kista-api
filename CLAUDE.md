@@ -34,12 +34,7 @@ Java 21 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - **시간 기준 정책**: 거래일은 전 구간 KST 단일 기준(변환 없음), `release_date`는 FIDA 발행일 원본, US 기준 외부 데이터만 어댑터 내부 `UsTradeDates` 변환 (`docs/agents/constraints.md` 참고)
 - **kista-ui 연계 작업 감지 시**: API 응답 형식 변경·인증/토큰 흐름 등이면 즉시 `../kista-ui/CLAUDE.md`를 Read로 확인 (자동 로드 안 됨)
 - **README.md 드리프트 감지**: 코드 변경으로 `README.md`(기술 스택 배지 버전, 아키텍처 다이어그램 속 클래스/패키지명, 스케쥴러 실행 시각, 배포 파이프라인 방식 등)의 내용이 실제와 달라지면 같은 작업에서 `README.md`도 함께 수정. kista-ui 쪽 README도 영향받으면 `../kista-ui/README.md`까지 확인
-- **flows.yml 드리프트 감지**: 아키텍처 맵의 랜드스케이프·흐름·생명주기 탭은 `src/test/resources/architecture/flows.yml` 수기 원본이다. `ArchitectureMapTest`는 `code:` 참조 존재와 enum 상수 집합만 검증하고 의미는 검증하지 않는다. 다음을 바꾸면 같은 작업에서 `flows.yml`도 함께 갱신한다.
-  - 매매·스케쥴러·주문 흐름의 동작 → 해당 단계의 `desc`·`cond`·`state`·`fail`
-  - 프로세스 간 통신 경로(HTTP·Redis·이벤트) → `lane`·`to`
-  - 상태 전이 규칙 → `lifecycles`의 전이
-  - 사용자·관리자 기능 추가·삭제 → `flows`와 `landscape`
-  - 주기 점검 요청("아키텍처 맵 최신화") 시에는 `flows.yml` 마지막 수정 커밋 이후 `git log`에서 `code:` 참조 클래스·흐름 관련 변경을 추려 대조한다
+- **flows.yml 드리프트 감지**: 흐름·상태 전이·통신 경로·기능 목록을 바꾸면 같은 작업에서 아키텍처 맵 원본 `flows.yml`도 갱신 — 규칙 상세는 `docs/agents/constraints.md` "아키텍처 맵 flows.yml 동기화"
 - Git 규칙(push·author·커밋 메시지)은 `docs/agents/constraints.md` 참고
 
 @docs/agents/commands.md
