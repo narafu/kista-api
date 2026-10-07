@@ -63,49 +63,18 @@ flowchart LR
 
 L0을 컨테이너·네트워크·볼륨·배포 경로 수준으로 펼친 그림이다. 소유 레포가 셋으로 갈린다 — `kista-infra`(caddy·postgres·redis·네트워크·시크릿·reconcile), `kista-api`(앱 3 role compose + API 도메인 라우팅 스니펫), `kista-ui`(UI compose).
 
-### 호스트·컨테이너·네트워크
+### 호스트·컨테이너·네트워크 (자동 생성)
 
-```mermaid
-flowchart TB
-    USER["브라우저 / 앱"]
-    FIDA["fida-server<br/>별도 OCI 인스턴스"]
+컨테이너·네트워크·볼륨·Caddy 라우팅 그림은 kista-infra가 서버에 적용된 구성(`state/<app>.yml` config 커밋 기준)에서 자동 생성한다 — [kista-infra `docs/deployment-map.md`](https://github.com/narafu/kista-infra/blob/main/docs/deployment-map.md)(private, 앱·infra 배포 성공 시 `deployment-map.yml`이 갱신). 직접 그리지 말고 그쪽을 본다.
 
-    subgraph HOST["OCI kista-api-server (arm64 · 단일 인스턴스)"]
-        direction TB
-        subgraph SN["shared_net 만"]
-            CADDY["caddy · :80/:443 공개<br/>UI_DOMAIN → kista-ui:3000<br/>API_DOMAIN → 스니펫 import"]
-            UI["kista-ui · blue/green<br/>Next.js standalone :3000"]
-        end
-        subgraph BOTH["shared_net + data_net"]
-            API["kista-api · blue/green<br/>app.jar · SCHEDULER_ENABLED=false"]
-            SCH["kista-scheduler<br/>app.jar · SCHEDULER_ENABLED=true<br/>public.event_publication 재발행"]
-            TRD["kista-trading · 단일·stop-first<br/>trading-core.jar · 매매 배치<br/>trading.event_publication 재발행"]
-        end
-        subgraph DN["data_net 만"]
-            PG[("kista-postgres<br/>postgres:17 · alias postgres<br/>127.0.0.1:5432 (SSH 터널용)")]
-            RD[("redis:7 · AOF<br/>alias redis")]
-        end
-        subgraph VOL["볼륨 · 호스트 경로"]
-            V1[/"named: caddy_data · caddy_config<br/>postgres_data · redis_data"/]
-            V2[/"/opt/kista-api/caddy → caddy ro 마운트<br/>/opt/#lt;app#gt;/releases · current · previous<br/>/opt/#lt;app#gt;/.env · /opt/kista-infra/.env"/]
-        end
-    end
-
-    USER -->|HTTPS| CADDY
-    FIDA -->|"HTTPS /api/internal/fida-orders"| CADDY
-    CADDY -->|"@scheduler ^/api/admin/scheduler/.+"| SCH
-    CADDY -->|"@trading accounts · orders · trading-cycles · backtest<br/>daily-trades · stats/summary·equity-curve·cycles · internal/fida-orders"| TRD
-    CADDY -->|"그 외 API_DOMAIN"| API
-    CADDY --> UI
-
-    API & SCH -->|"INTERNAL_API_BASE_URL<br/>http://kista-trading:8080"| TRD
-    API & SCH & TRD --> PG
-    API & SCH & TRD <--> RD
-```
-
-- 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy`(API 도메인, 이 레포 소유) · `kista-infra/Caddyfile`(UI 도메인 + 스니펫 import)
-- 네트워크·볼륨 SSOT: `kista-infra/docker-compose.yml`(두 네트워크는 external — infra 배포가 `docker network create`로 멱등 생성) · 앱 compose는 `deploy/server/docker-compose.yml`, `kista-ui/deploy/server/docker-compose.yml`
-- blue/green 대상은 bundle `bluegreen` 파일이 정한다 — kista-api·kista-ui만. kista-trading은 재기동 시 매매 배치 재개가 잔여 락을 인수하므로 겹침 기동 금지(`.github/tests/compose-invariants.bats`)
+생성본에 없는 의미 정보:
+- **role 구분**: 같은 `app.jar`라도 `SCHEDULER_ENABLED`로 갈린다 — kista-api는 `false`(HTTP 전용), kista-scheduler는 `true`(비매매 스케쥴러). kista-trading은 `trading-core.jar`(`APP_JAR`)로 매매 배치 + HTTP
+- **EPR 재발행 소유**: kista-scheduler = `public.event_publication`, kista-trading = `trading.event_publication`, kista-api는 재발행 안 함(둘 다 true면 이중 claim)
+- **교체 방식**: blue/green은 bundle `bluegreen` 파일의 kista-api·kista-ui만. kista-trading은 단일 인스턴스·stop-first 고정 — 재기동 시 매매 배치 재개가 잔여 락을 인수하므로 겹침 기동 금지(`.github/tests/compose-invariants.bats`)
+- **외부 호출자**: 별도 OCI 인스턴스의 fida-server가 공인 API 도메인으로 `/api/internal/fida-orders`를 호출 → Caddy `@trading` → kista-trading
+- **DB 연결**: 앱 3 role 모두 postgres에 붙는다 — `DB_URL`이 시크릿 `.env`에만 있어 생성본엔 엣지가 없다(data_net 소속으로 판단)
+- **호스트 경로**: `/opt/<app>/releases/<id>`(bundle) · `current`/`previous`(심볼릭 링크) · `/opt/<app>/.env`, `/opt/kista-infra/.env`(시크릿 렌더링 결과)
+- 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy`(API 도메인, 이 레포 소유, `CaddyRoutingTest`) · `kista-infra/Caddyfile`(UI 도메인 + 스니펫 import)
 
 ### 외부 연동
 
