@@ -245,17 +245,6 @@ a.tag.link:hover { border-color: color-mix(in srgb, var(--fg) 35%, transparent);
 svg.links .live { stroke: var(--tc); stroke-width: 4; stroke-dasharray: 0 10; stroke-linecap: round; opacity: 1; animation: flowdot .6s linear infinite; }
 @keyframes flowdot { to { stroke-dashoffset: -10; } }
 
-/* 타임라인 — 원형 24h 시계 */
-.dial { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-.dial svg { width: min(520px, 100%); height: auto; }
-.dial .ring { fill: none; stroke: var(--line); stroke-width: 1.5; }
-.dial .ring.periodic { stroke: var(--default); stroke-dasharray: 4 4; }
-.dial .band { fill: none; stroke: var(--tc-tint); stroke-width: 30; stroke-linecap: round; }
-.dial .hour { font-size: 12px; fill: var(--muted); text-anchor: middle; dominant-baseline: middle; }
-.dial .dot-job { stroke: var(--surface); stroke-width: 2; cursor: pointer; }
-.dial .hand { stroke: var(--event); stroke-width: 2; opacity: .8; }
-.dial .legend { flex-direction: column; }
-
 @media (max-width: 900px) {
   body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
   main { overflow: visible; padding: 16px; }
