@@ -18,13 +18,14 @@
     <button class="tab" role="tab" data-view="timeline">타임라인</button>
     <button class="tab" role="tab" data-view="lifecycle">생명주기</button>
   </nav>
+  <div class="qbox"><input type="search" class="search" id="q" placeholder="검색 ( / )" aria-label="통합 검색" autocomplete="off">
+    <div class="results" id="q-results" hidden></div></div>
   <span class="spacer"></span>
 </header>
 <main>
   <section class="view" id="view-structure" hidden>
     <div class="view-head">
       <h2>모듈 구조<small id="summary"></small></h2>
-      <input type="search" class="search" id="mod-search" placeholder="모듈 검색…" aria-label="모듈 검색">
       <div class="filter-group" id="types"><span class="group-label">의존 종류</span></div>
       <label class="chip check"><input type="checkbox" id="hideInfra" checked>platform·sharedkernel 숨김</label>
       <span class="spacer"></span>
@@ -48,6 +49,7 @@
     <div class="view-head">
       <h2 id="flow-title"></h2>
       <div id="flow-chips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <button class="chip" id="mod-filter" hidden aria-pressed="true"></button>
       <span class="spacer"></span>
       <button class="btn" id="prev" aria-label="이전 단계">◀</button>
       <button class="btn" id="play">▶ 재생</button>

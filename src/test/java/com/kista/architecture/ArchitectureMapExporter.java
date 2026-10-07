@@ -25,9 +25,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -111,7 +114,8 @@ final class ArchitectureMapExporter {
     record Job(String process, String name, String module, String schedule, String days, List<String> times) {
     }
 
-    record Data(List<ModuleGraphExporter.Module> modules, FlowMap map, List<Job> jobs) {
+    record Data(List<ModuleGraphExporter.Module> modules, FlowMap map,
+                Map<String, Map<String, List<String>>> stepModules, List<Job> jobs) {
     }
 
     static FlowMap load() {
@@ -201,24 +205,26 @@ final class ArchitectureMapExporter {
         return flow != null && (parts.length == 1 || flow.steps().stream().anyMatch(s -> s.id().equals(parts[1])));
     }
 
+    // 단순 이름(유일해야 함) 또는 FQCN으로 찾은 후보 전부
+    private static List<JavaClass> matches(String name, JavaClasses classes) {
+        return classes.stream()
+                .filter(c -> name.contains(".") ? c.getName().equals(name) : c.getSimpleName().equals(name))
+                .toList();
+    }
+
     // 단순 이름(유일) 또는 FQCN → 클래스
     private static Optional<JavaClass> resolve(String name, JavaClasses classes) {
         if (name == null) {
             return Optional.empty();
         }
-        var matches = classes.stream()
-                .filter(c -> name.contains(".") ? c.getName().equals(name) : c.getSimpleName().equals(name))
-                .toList();
-        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+        var found = matches(name, classes);
+        return found.size() == 1 ? Optional.of(found.getFirst()) : Optional.empty();
     }
 
     // "Class#method" 또는 "Class" — 클래스는 단순 이름(유일) 또는 FQCN
     private static Optional<String> codeError(String ref, JavaClasses classes) {
         var parts = ref.split("#", 2);
-        var name = parts[0];
-        var matches = classes.stream()
-                .filter(c -> name.contains(".") ? c.getName().equals(name) : c.getSimpleName().equals(name))
-                .toList();
+        var matches = matches(parts[0], classes);
         if (matches.size() != 1) {
             return Optional.of("'" + ref + "' 클래스 " + (matches.isEmpty() ? "없음" : "이름 중복 — FQCN으로 쓸 것: " + matches));
         }
@@ -243,7 +249,7 @@ final class ArchitectureMapExporter {
         var scheduled = method.getAnnotationOfType(Scheduled.class);
         var owner = method.getOwner();
         var name = owner.getSimpleName() + "#" + method.getName();
-        var module = owner.getPackageName().replaceFirst("^com\\.kista\\.", "").split("\\.")[0];
+        var module = moduleOf(owner);
         if (scheduled.cron().isEmpty()) {
             return new Job(process(owner), name, module, period(scheduled), "주기 실행", List.of());
         }
@@ -252,6 +258,35 @@ final class ArchitectureMapExporter {
             throw new IllegalStateException(name + ": @Scheduled zone은 Asia/Seoul이어야 한다 (현재 '" + scheduled.zone() + "')");
         }
         return new Job(process(owner), name, module, scheduled.cron(), days(scheduled.cron()), times(scheduled.cron(), KST));
+    }
+
+    // com.kista.<module>.… 의 첫 세그먼트 — 잡·단계 모두 이 규칙
+    static String moduleOf(JavaClass owner) {
+        return owner.getPackageName().replaceFirst("^com\\.kista\\.", "").split("\\.")[0];
+    }
+
+    // 단계 code: 클래스의 소속 모듈 (flowId → stepId → 모듈명) — flows.yml 키가 아니라 출력 전용
+    static Map<String, Map<String, List<String>>> stepModules(FlowMap map, JavaClasses classes) {
+        var result = new TreeMap<String, Map<String, List<String>>>();
+        map.flows().forEach((flowId, flow) -> {
+            var steps = new LinkedHashMap<String, List<String>>();
+            flow.steps().forEach(s -> steps.put(s.id(), s.code().stream()
+                    .flatMap(ref -> resolve(ref.split("#", 2)[0], classes).stream())
+                    .map(ArchitectureMapExporter::moduleOf)
+                    .distinct().sorted().toList()));
+            result.put(flowId, steps);
+        });
+        return result;
+    }
+
+    // 모듈 밖 클래스(예: com.kista 루트)를 가리키는 단계 code: — 오버레이가 조용히 빠지지 않도록
+    static List<String> moduleViolations(FlowMap map, JavaClasses classes, Set<String> moduleNames) {
+        var errors = new ArrayList<String>();
+        map.flows().forEach((flowId, flow) -> flow.steps().forEach(s -> s.code().forEach(ref ->
+                resolve(ref.split("#", 2)[0], classes)
+                        .filter(c -> !moduleNames.contains(moduleOf(c)))
+                        .ifPresent(c -> errors.add(flowId + "." + s.id() + ": " + c.getName() + "은 어느 모듈에도 속하지 않음")))));
+        return errors;
     }
 
     // fixedDelay/fixedRate(숫자 또는 *String) → "5분마다" / "30초마다", 해석 불가 문자열은 원문
@@ -312,7 +347,8 @@ final class ArchitectureMapExporter {
         return gated ? "kista-scheduler" : "kista-api · kista-scheduler";
     }
 
-    static void write(List<ModuleGraphExporter.Module> modules, FlowMap map, List<Job> jobs) {
+    static void write(List<ModuleGraphExporter.Module> modules, FlowMap map,
+                      Map<String, Map<String, List<String>>> stepModules, List<Job> jobs) {
         try {
             deleteRecursively(OUTPUT); // 삭제된 뷰 파일이 남지 않도록
             // test 리소스는 jar가 아니라 디렉토리 — 순회 복사라 뷰 파일을 추가해도 Java 수정 불필요
@@ -328,7 +364,7 @@ final class ArchitectureMapExporter {
                 }
             }
             Files.writeString(OUTPUT.resolve("data.js"),
-                    "window.DATA = " + JSON.writeValueAsString(new Data(modules, map, jobs)) + ";\n");
+                    "window.DATA = " + JSON.writeValueAsString(new Data(modules, map, stepModules, jobs)) + ";\n");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (URISyntaxException e) {

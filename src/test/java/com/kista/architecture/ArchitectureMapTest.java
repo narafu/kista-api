@@ -7,6 +7,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
 
+import java.util.stream.Collectors;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("아키텍처 맵(build/architecture-map)")
@@ -34,7 +36,13 @@ class ArchitectureMapTest {
                 });
 
         var modules = ModuleGraphExporter.graph(ApplicationModules.of(KistaApplication.class));
-        ArchitectureMapExporter.write(modules, map, jobs);
+        // 단계 code: 클래스는 전부 모듈 소속이어야 하고, 오버레이 회귀 가드 — 마감 배치 락 단계는 trading을 거친다
+        var moduleNames = modules.stream().map(ModuleGraphExporter.Module::name).collect(Collectors.toSet());
+        assertThat(ArchitectureMapExporter.moduleViolations(map, classes, moduleNames)).isEmpty();
+        var stepModules = ArchitectureMapExporter.stepModules(map, classes);
+        assertThat(stepModules.get("close-batch").get("lock")).contains("trading");
+
+        ArchitectureMapExporter.write(modules, map, stepModules, jobs);
 
         // 셸·생성 데이터·복사된 뷰가 모두 출력에 있어야 한다
         assertThat(ArchitectureMapExporter.OUTPUT.resolve("index.html")).exists();

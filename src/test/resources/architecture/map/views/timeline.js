@@ -30,7 +30,7 @@
       }
     }
     $('tl').innerHTML = html;
-    $('tl').querySelectorAll('.tl-row.clickable').forEach(r => r.onclick = () => panelJob(+r.dataset.i));
+    $('tl').querySelectorAll('.tl-row.clickable').forEach(r => r.onclick = () => location.hash = hash('timeline', DATA.jobs[+r.dataset.i].name));
   }
 
   function panelTimeline() {
@@ -49,9 +49,17 @@
       <div class="p-body">
         <h3>실행</h3><p class="desc">${esc(j.days)}${j.times.length ? ' ' + j.times.join(', ') + ' KST' : ' · ' + esc(j.schedule)}</p>
         <h3>스케줄 원문</h3><code class="tag">${esc(j.schedule)}</code>
-        <h3>담당 메서드</h3><code class="tag">${esc(j.name)}</code></div>`;
+        <h3>담당 메서드</h3><code class="tag">${esc(j.name)}</code>
+        ${connections([['시작하는 흐름 단계', (IDX.jobSteps[j.name] ?? []).map(r => chipLink(hash('flow', r.flow, r.step), stepLabel(r)))]])}</div>`;
   }
 
   renderTimeline();
-  VIEWS.timeline = { show: () => panelTimeline() };
+  VIEWS.timeline = {
+    show([name]) {
+      const i = DATA.jobs.findIndex(j => j.name === name);
+      if (i >= 0) return panelJob(i);
+      document.querySelectorAll('.tl-row.sel').forEach(r => r.classList.remove('sel'));
+      panelTimeline();
+    },
+  };
 })();

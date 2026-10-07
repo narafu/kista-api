@@ -193,6 +193,20 @@ table.rank .num { text-align: right; font-variant-numeric: tabular-nums; }
 table.rank tbody tr { cursor: pointer; }
 table.rank tbody tr:hover { background: var(--surface-2); }
 
+.qbox { position: relative; }
+.qbox .search { width: 240px; }
+.results { position: absolute; top: calc(100% + 4px); left: 0; z-index: 10; width: 420px; max-height: 60vh; overflow: auto;
+           background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.results a { display: grid; grid-template-columns: 44px 1fr; gap: 0 8px; padding: 6px 10px; color: var(--fg); text-decoration: none; border-top: 1px solid var(--line); }
+.results a:first-child { border-top: 0; }
+.results a:hover, .results a:focus { background: var(--surface-2); }
+.results .kind { grid-row: span 2; font-size: 11px; color: var(--muted); padding-top: 2px; }
+.results small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-body h4 { font-size: 12px; font-weight: 600; margin: 10px 0 6px; }
+a.tag.link { color: var(--fg); text-decoration: none; }
+a.tag.link:hover { border-color: color-mix(in srgb, var(--fg) 35%, transparent); }
+.lanes.modfilter .step:not(.mod-hit) { opacity: .3; }
+
 @media (max-width: 900px) {
   body { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
   main { overflow: visible; padding: 16px; }
@@ -200,4 +214,6 @@ table.rank tbody tr:hover { background: var(--surface-2); }
   .tl-row { grid-template-columns: 130px 1fr; }
   #view-structure:not([hidden]) { position: relative; height: 70vh; }
   .graph-legend { display: none; }
+  .qbox .search { width: 160px; }
+  .results { width: calc(100vw - 32px); }
 }

@@ -2,7 +2,7 @@
 (() => {
   const laneIndex = Object.fromEntries(MAP.lanes.map((l, i) => [l.id, i]));
   const laneLabel = Object.fromEntries(MAP.lanes.map(l => [l.id, l.label]));
-  let currentFlow = null, selected = -1, timer = null;
+  let currentFlow = null, selected = -1, timer = null, renderedModule = null; // renderedModule: 그릴 때 반영한 모듈 필터
 
   /* ---------- 2. 스윔레인 ---------- */
   $('flow-chips').innerHTML = Object.entries(MAP.flows).map(([id, f]) =>
@@ -33,6 +33,12 @@
     });
     html += `<svg class="links" id="links"></svg></div>`;
     $('swim').innerHTML = html;
+    // 구조 탭에서 고른 모듈을 거치는 단계만 강조
+    const m = renderedModule = SHARED.module;
+    $('lanes').classList.toggle('modfilter', !!m);
+    flow.steps.forEach((s, i) => $('step-' + i).classList.toggle('mod-hit', !!m && s.modules.includes(m)));
+    $('mod-filter').hidden = !m;
+    $('mod-filter').textContent = m ? `모듈: ${m} ✕` : '';
     document.querySelectorAll('.step').forEach(b => b.onclick = () => location.hash = `flow/${id}/${flow.steps[b.dataset.i].id}`);
     requestAnimationFrame(drawLinks);
   }
@@ -65,10 +71,11 @@
     $('lanes')?.classList.toggle('dim', i >= 0);
     $('prev').disabled = i <= 0;
     $('next').disabled = i >= flow.steps.length - 1;
-    if (i < 0) return panelFlow(flow);
+    if (i < 0) { SHARED.step = null; return panelFlow(flow); }
     const el = $('step-' + i);
     if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
-    panelStep(flow, flow.steps[i], i);
+    SHARED.step = { flow: currentFlow, step: flow.steps[i].id };
+    stepPanel(currentFlow, i, k => hash('flow', currentFlow, flow.steps[k].id));
   }
 
   function panelFlow(flow) {
@@ -79,21 +86,7 @@
         <h3>보는 법</h3><p class="hint">단계를 누르면 업무 설명과 담당 코드가 보입니다. ▶ 재생은 단계를 순서대로 하이라이트합니다.</p></div>`;
   }
 
-  function panelStep(flow, s, i) {
-    const href = k => `#flow/${currentFlow}/${flow.steps[k].id}`;
-    $('panel').innerHTML = `<div class="p-head"><span class="hint">${i + 1} / ${flow.steps.length} · <span class="lane-pill">${esc(laneLabel[s.lane])}</span></span>
-        <h2>${esc(s.title)}</h2></div>
-      <div class="p-body">
-        ${s.cond ? `<h3>실행 조건</h3><div class="box">${esc(s.cond)}</div>` : ''}
-        <p class="desc">${esc(s.desc)}</p>
-        ${s.state ? `<h3>상태 변화</h3><div class="box state">${esc(s.state)}</div>` : ''}
-        ${s.fail ? `<h3>실패 경로</h3><div class="box fail">${esc(s.fail)}</div>` : ''}
-        ${s.to.length ? `<h3>호출·기록 대상</h3><div class="tags">${s.to.map(t => `<span class="tag">${esc(laneLabel[t])}</span>`).join('')}</div>` : ''}
-        ${s.code.length ? `<h3>담당 코드</h3><div class="tags">${s.code.map(c => `<code class="tag">${esc(c)}</code>`).join('')}</div>` : ''}
-        <div class="navs">${i > 0 ? `<a class="btn" href="${esc(href(i - 1))}">◀ ${esc(flow.steps[i - 1].title)}</a>` : ''}
-          ${i < flow.steps.length - 1 ? `<a class="btn" href="${esc(href(i + 1))}">${esc(flow.steps[i + 1].title)} ▶</a>` : ''}</div>
-      </div>`;
-  }
+  $('mod-filter').onclick = () => { SHARED.module = null; renderFlow(currentFlow); select(selected, false); };
 
   const go = i => location.hash = `flow/${currentFlow}/${MAP.flows[currentFlow].steps[i].id}`;
   $('prev').onclick = () => selected > 0 && go(selected - 1);
@@ -124,10 +117,13 @@
   VIEWS.flow = {
     show([flowId, stepId]) {
       const id = Object.hasOwn(MAP.flows, flowId ?? '') ? flowId : Object.keys(MAP.flows)[0];
-      if (id !== currentFlow) renderFlow(id); else requestAnimationFrame(drawLinks); // 숨김 중 리사이즈 반영
+      // 흐름이나 구조 탭에서 고른 모듈 필터가 바뀔 때만 다시 그린다
+      if (id !== currentFlow || SHARED.module !== renderedModule) renderFlow(id); else requestAnimationFrame(drawLinks);
       select(MAP.flows[id].steps.findIndex(s => s.id === stepId));
     },
     leave: stop,
-    home: () => '#flow/' + (currentFlow ?? Object.keys(MAP.flows)[0]),
+    // 공유 단계 → 그 단계, 고른 모듈 → 그 모듈을 처음 거치는 흐름, 아니면 현재 흐름
+    home: () => SHARED.step ? hash('flow', SHARED.step.flow, SHARED.step.step)
+      : hash('flow', (SHARED.module && IDX.modSteps[SHARED.module]?.[0]?.flow) ?? currentFlow ?? Object.keys(MAP.flows)[0]),
   };
 })();

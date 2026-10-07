@@ -53,6 +53,8 @@
   }
 
 
+  // 같은 해시면 hashchange가 안 나므로 직접 라우팅
+  const go = h => location.hash === h ? route() : location.hash = h;
   let cy; // 첫 show()에서 생성 — 숨긴 컨테이너에서 만들면 0×0으로 잡혀 fit이 깨진다
   function init() {
     cy = cytoscape({
@@ -87,9 +89,14 @@
       ],
     });
 
-    cy.on('tap', 'node', e => { if (!e.target.isParent()) { focus(e.target); showModule(e.target.id()); } });
-    cy.on('tap', 'edge', e => { focus(e.target); showEdge(e.target.data('source'), e.target.data('target')); });
-    cy.on('tap', e => { if (e.target === cy) clearFocus(); });
+    cy.on('tap', 'node', e => { if (!e.target.isParent()) go(hash('structure', e.target.id())); });
+    cy.on('tap', 'edge', e => {
+      // 엣지 선택은 해시로 표현하지 않는다 — 모듈 해시를 비워 같은 모듈 재탭이 다시 라우팅되게
+      SHARED.module = null;
+      history.replaceState(null, '', '#structure');
+      focus(e.target); showEdge(e.target.data('source'), e.target.data('target'));
+    });
+    cy.on('tap', e => { if (e.target === cy) go('#structure'); });
     cy.on('mouseover', 'node, edge', e => {
       if (e.target.isNode() && e.target.isParent()) return;
       e.target.addClass('hover');
@@ -123,7 +130,7 @@
 
   const typeDot = t => `<i class="dot" style="background:var(${TYPES[t][1]})"></i>`;
   const projectBadge = p => `<span class="badge" style="color:var(${PROJECTS[p].accent});background:var(${PROJECTS[p].tint})">${esc(p)}</span>`;
-  const modLink = name => `<a href="#" class="mod-link" data-mod="${esc(name)}">${esc(name)}</a>`;
+  const modLink = name => `<a class="mod-link" href="${esc(hash('structure', name))}">${esc(name)}</a>`;
   const tags = xs => xs.length ? `<div class="tags">${xs.map(x => `<span class="tag mono">${esc(x)}</span>`).join('')}</div>` : '<p class="empty">없음</p>';
 
   // 종류 비율 막대
@@ -166,6 +173,11 @@
         <h3>이 모듈이 의존하는 곳</h3>${depList(out, d => d.target)}
         <h3>이 모듈에 의존하는 곳</h3>${depList(inc, d => d.from)}
         <h3>구독 이벤트</h3>${tags(m.listenedEvents)}
+        ${connections([
+          ...Object.entries(Object.groupBy(IDX.modSteps[name] ?? [], r => r.flow)).map(([fid, refs]) =>
+            [MAP.flows[fid].title, refs.map(r => chipLink(hash('flow', fid, r.step), findStep(r).title))]),
+          ['소속 잡', DATA.jobs.filter(j => j.module === name).map(j => chipLink(hash('timeline', j.name), j.name))],
+        ])}
       </div>`;
     $('panel').scrollTop = 0;
   }
@@ -210,12 +222,14 @@
     if (ele.isNode()) ele.addClass('selected');
   }
   function clearFocus() {
+    SHARED.module = null;
     cy.elements().removeClass('focus faded selected');
     showOverview();
   }
   function selectModule(name) {
     const n = cy.getElementById(name);
     if (!n.length) return;
+    SHARED.module = name; SHARED.step = null;
     focus(n);
     showModule(name);
     cy.animate({ center: { eles: n }, duration: 250 });
@@ -225,34 +239,32 @@
   $('panel').addEventListener('click', e => {
     const el = e.target.closest('[data-mod]');
     if (!el) return;
-    e.preventDefault();
-    selectModule(el.dataset.mod);
+    location.hash = hash('structure', el.dataset.mod);
   });
 
   document.querySelectorAll('[data-type]').forEach(cb => cb.addEventListener('change', () => {
     cb.checked ? enabled.add(cb.dataset.type) : enabled.delete(cb.dataset.type);
     if (!cy) return;
     render();
+    resetHash();
   }));
-  $('hideInfra').addEventListener('change', () => cy && render());
+  $('hideInfra').addEventListener('change', () => { if (cy) { render(); resetHash(); } });
   $('fit').addEventListener('click', () => cy && cy.animate({ fit: { padding: 40 }, duration: 250 }));
-  $('mod-search').addEventListener('input', e => {
-    if (!cy) return;
-    const q = e.target.value.trim().toLowerCase();
-    if (!q) return clearFocus();
-    const hit = cy.nodes().not(':parent').filter(n => n.id().includes(q));
-    if (hit.length === 1) return selectModule(hit.id());
-    cy.elements().removeClass('focus faded selected');
-    cy.elements().not(hit).not(':parent').addClass('faded');
-    hit.addClass('focus');
-  });
+  // 필터 변경으로 포커스가 풀렸으면 모듈 해시도 지운다(라우팅 없이)
+  const resetHash = () => { if (parseHash().rest.length) history.replaceState(null, '', '#structure'); };
 
+  // 흐름에서 고른 단계가 있으면 그 단계의 (보이는) 첫 모듈, 아니면 마지막으로 고른 모듈
+  const homeModule = () => SHARED.step ? findStep(SHARED.step)?.modules.find(m => !hidden(m)) : SHARED.module;
   VIEWS.structure = {
-    show() {
-      if (!cy) return init();
-      cy.resize(); // 숨김 중 창 크기 변경 반영
-      const sel = cy.$('node.selected');
-      sel.length ? showModule(sel.id()) : showOverview();
+    show([mod]) {
+      if (!cy) init(); else cy.resize(); // 숨김 중 창 크기 변경 반영
+      if (mod && byName[mod]) {
+        if (hidden(mod)) { $('hideInfra').checked = false; render(); } // 숨긴 infra 모듈 딥링크
+        selectModule(mod);
+      } else {
+        clearFocus();
+      }
     },
+    home: () => hash('structure', homeModule() ?? undefined),
   };
 })();
