@@ -25,19 +25,17 @@
 - **(a) 순환 불가피**: 통합하면 모듈 순환이 생기고, 소유권 이동으로도 끊을 수 없다.
 - **(b) 외부 계약 분리**: 두 값 집합이 각기 다른 외부 계약(증권사 wire 포맷, DB 컬럼, 업스트림 피드, HTTP 응답 스키마)에 묶여 독립적으로 버전이 오를 수 있다.
 
-**(b) 주장 시 증거 의무**: "외부 계약에 묶여있다"는 서술만으로는 통과 못 한다 — 그 값이 실제로 wire 포맷 변환 코드(어댑터의 switch/if 매핑, 예: `KisOrderApi.resolveOrderDvsn` 류)에서 소비되는지 grep으로 확인하고 그 파일:라인을 근거로 남길 것. `OrderDirection`/`OrderType` 3중복제 사례 — "KIS/Toss wire 포맷이 실려있다"고 서술만 하고 실측을 안 해서, 실제로는 enum 값 자체엔 계약이 없고 매핑은 어댑터 코드가 담당한다는 사실이 나중에야 드러나 뒤늦게 sharedkernel로 승격·복제본 삭제됐다. 새 own-type 복제·게이트 판정을 문서에 적을 때는 이 확인을 거치지 않은 "~로 보인다/추정된다" 식 단정을 넣지 말 것.
+**(b) 주장 시 증거 의무**: "외부 계약에 묶여있다"는 서술만으로는 통과 못 한다 — 그 값이 실제로 wire 포맷 변환 코드(어댑터의 switch/if 매핑, 예: `KisOrderApi.resolveOrderDvsn` 류)에서 소비되는지 grep으로 확인하고 그 파일:라인을 근거로 남길 것(enum 값 자체엔 계약이 없고 매핑은 어댑터가 담당하는 경우가 많다). 새 own-type 복제·게이트 판정을 문서에 적을 때는 이 확인을 거치지 않은 "~로 보인다/추정된다" 식 단정을 넣지 말 것.
 
-**포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`AccountOpenOrderCancelPort`(account 정의·trading `AccountOpenOrderCanceller` 구현 — 주문 소유자)/`StrategyCreationPolicyPort`(trading 정의·trading 자체 구현이라 포트 역전 아님, 나열은 이력 참고용)/`ActiveStrategyCountPort`(user 정의·`com.kista.user.adapter.out.internal.ActiveStrategyCountAdapter` 구현 — trading-core 내부 HTTP 호출)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingstats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingstats.application.port.output` 소유 일반 출력 포트다(한때 sharedkernel로 승격됐다가 환원). `TradingUserProfilePort`는 한때 이 계열이었으나 지금은 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다(아래 "폐기된 전례" 참고).
+**포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`AccountOpenOrderCancelPort`(account 정의·trading `AccountOpenOrderCanceller` 구현 — 주문 소유자)/`ActiveStrategyCountPort`(user 정의·`com.kista.user.adapter.out.internal.ActiveStrategyCountAdapter` 구현 — trading-core 내부 HTTP 호출)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingstats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingstats.application.port.output` 소유 일반 출력 포트다. `TradingUserProfilePort`도 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다.
 
-**폐기된 전례 — 제3자(web) 구현은 컴파일 경계와 양립 불가**: `TradingUserProfilePort`를 정의자(trading)도 데이터 소유자(user)도 아닌 `com.kista.web`이 구현하던 방식은, root(`:api`)의 `:trading-core` 컴파일 의존이 0이 되는 순간 trading-core 정의 인터페이스를 root가 구현할 수 없어 불가능해졌다(스타일 문제가 아니라 컴파일 불가). 지금은 trading-core가 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·잔고검증·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다.
-
-**따라서 "제3자 구현"을 새 설계의 선례로 삼지 말 것** — 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `user.adapter.out.internal.ActiveStrategyCountAdapter` — trading-core 내부 HTTP 호출).
+**제3자(정의자도 데이터 소유자도 아닌 모듈, 예: web) 구현을 새 설계의 선례로 삼지 말 것** — root(`:api`)는 `:trading-core`를 컴파일 의존하지 않으므로 trading-core 정의 인터페이스를 root가 구현할 수 없다(스타일 문제가 아니라 컴파일 불가). trading-core는 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·잔고검증·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `user.adapter.out.internal.ActiveStrategyCountAdapter` — trading-core 내부 HTTP 호출).
 
 **복제본을 쓸 때의 필수 조건 2가지**(user_notify_profile 사례에서 실측):
 - **(a) 신규 복제 테이블은 마이그레이션에서 기존 데이터를 반드시 백필한다.** 복제본이 비면 소비처가 빈 결과를 정상 응답으로 받아 기능이 멈춘다. `TradingUserProfilePort` 3개 메서드의 실제 실패 양상이 서로 다르다는 점에 주의: `findAllByUserIds()` 빈 맵 → `BatchContextFactory`가 전략마다 `NoSuchElementException`을 던지고 잡아 `errorReportPort.reportError()`로 관리자 알림을 내보낸다(**시끄럽게** 전면 중단 — 전략 수만큼 알림이 쏟아진다). `findByUserId()` 빈 Optional → 전략 등록이 "사용자를 찾을 수 없습니다"로 거부된다. `findAllActive()` 빈 리스트 → `MarketEventNotifier`가 **조용히** 아무에게도 안 보낸다(예외·로그 없음). 셋 중 마지막이 발견이 가장 늦다.
 - **(b) 원본의 모든 쓰기 지점을 전수 확인하고 발행을 건다.** 상태값은 `withStatus`/`withRejection` 같은 도메인 메서드명으로, 설정값은 필드명으로 grep한다. 포트 메서드명만 보고 판단하지 말 것 — `findAllActive()`가 실제로 `UserStatus.ACTIVE` 필터라는 사실은 소비처(`MarketEventNotifier`)와 구 어댑터를 읽어야만 드러났고, 이걸 놓쳤다면 복제본에 `is_active` 컬럼이 빠져 개장·마감 알림이 비활성 사용자에게까지 나갔을 것이다.
 
-**신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read** — (b) DTO 이중복제 사례·단일 소유 포트 시그니처 타입·narrowing projection 원장(과거 (a) 순환 불가피 목록은 `com.kista.contract` 도입으로 소멸). 자동 로드되지 않는다.
+**신규 own-type 복제·게이트 판정 시 `docs/agents/own-type-ledger.md` 필수 Read** — (b) DTO 이중복제 사례·단일 소유 포트 시그니처 타입·narrowing projection 원장. 자동 로드되지 않는다.
 
 신규 broker/notify/privacy 포트 추가 시 이 게이트를 먼저 통과할 것 — (a)(b) 어느 쪽도 아니면 복제하지 말고 sharedkernel 승격 또는 소유권 이동을 먼저 검토한다.
 
@@ -52,7 +50,7 @@
 - Controller에서 별도 catch/rethrow 불필요 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT (예외별 코드는 코드가 SSOT)
 - async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 - **ProblemDetail 응답 계약**: `detail`은 사용자에게 그대로 보여줄 수 있는 한국어 문구다(완전한 문장은 "~습니다."+마침표). 내부 정보(URL·응답 바디·계좌번호·enum 원문·영어 프레임워크 메시지)는 detail에 싣지 말고 로그로 — 원문이 영어 내부 정보인 프레임워크 예외는 `Mapping.fixedDetail`로 고정 문구를 쓴다. 예외: 검증 실패(`MethodArgumentNotValidException`)는 "[field: message]" 형식 유지
-- **기계 판독 코드 `code`**: UI가 분기하거나 문구를 달리 보여줘야 하는 예외만 `ErrorCode`(`com.kista.platform.web`)를 `Mapping`에 지정한다 — 응답 확장 프로퍼티 `code`, 없으면 키 자체가 없다. 상수 이름 변경·삭제 금지(kista-ui 계약). 추가 절차: ① `ErrorCode` 상수 ② 핸들러 매핑 테이블 `Mapping(status, title, code)` ③ 같은 예외 클래스가 여러 의미면 서브클래스 분리(`resolve()`가 계층 하위부터 탐색 — 예: `AlreadyOrderedTodayException`) ④ openapi는 `ErrorCodeOpenApiCustomizer`가 자동 반영 → kista-ui `gen:types` + 문구 매핑
+- **기계 판독 코드 `code`**: UI가 분기하거나 문구를 달리 보여줘야 하는 예외만 `ErrorCode`(`com.kista.platform.web`)를 `Mapping`에 지정한다 — 응답 확장 프로퍼티 `code`, 없으면 키 자체가 없다. 상수 이름 변경·삭제 금지(kista-ui 계약). 추가 절차: ① `ErrorCode` 상수 ② 핸들러 매핑 테이블 `Mapping(status, title, code, fixedDetail)` ③ 같은 예외 클래스가 여러 의미면 서브클래스 분리(`resolve()`가 계층 하위부터 탐색 — 예: `AlreadyOrderedTodayException`) ④ openapi는 `ErrorCodeOpenApiCustomizer`가 자동 반영 → kista-ui `gen:types` + 문구 매핑
 - **내부 API 경유 한계**: root 내부 API 어댑터는 trading-core 응답의 status만 보고 `Admin*` 예외를 되살린다 — root 테이블이 같은 코드를 다시 붙인다. 같은 status에 서로 다른 코드가 실려 오는 경로가 생기면 `InternalApiErrorDetails`가 `code`도 읽어 전달하도록 확장한다
 
 ### 모듈 문서가 SSOT인 규칙 (해당 모듈 작업 시 자동 로드, 그 외엔 직접 Read)
@@ -82,7 +80,7 @@
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User/Account/Strategy 공유 enum — sharedkernel 이관 완료
-`User.UserRole`/`UserStatus`/`NotificationType`, `Strategy.Type`/`Status`/`Ticker`/`CycleSeedType`, `Account.Broker`는 여러 모듈이 공유하는 값이라 `com.kista.sharedkernel` 독립 타입이다 — 이 모듈들에 nested enum으로 재도입 금지. `NotificationChannel`도 user(설정 저장)와 notify(채널 라우팅)가 공유해 `com.kista.sharedkernel`로 승격됐다(2026-09-30). DB `@Enumerated(STRING)` 컬럼 상수명은 모두 byte-identical 유지 — 이동해도 상수명은 절대 바꾸지 않는다.
+`User.UserRole`/`UserStatus`/`NotificationType`, `Strategy.Type`/`Status`/`Ticker`/`CycleSeedType`, `Account.Broker`는 여러 모듈이 공유하는 값이라 `com.kista.sharedkernel` 독립 타입이다 — 이 모듈들에 nested enum으로 재도입 금지. `NotificationChannel`도 user(설정 저장)와 notify(채널 라우팅)가 공유하는 `com.kista.sharedkernel` 타입이다. DB `@Enumerated(STRING)` 컬럼 상수명은 모두 byte-identical 유지 — 이동해도 상수명은 절대 바꾸지 않는다.
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수, `User`에 유지) — 서비스/컨트롤러에서 직접 하드코딩 금지
 
 ### 도메인 Command 명명 규칙
@@ -107,7 +105,7 @@
 
 ### 계좌번호 마스킹 (AccountNumberMasker)
 - `com.kista.sharedkernel.AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)
-- KIS(하이픈 1개)·TOSS(하이픈 2개) 포맷 모두 대응 — 하이픈 위치별 개별 마스킹을 DTO 3곳에 중복 구현하던 방식은 부분 노출 결함으로 폐기됨
+- KIS(하이픈 1개)·TOSS(하이픈 2개) 포맷 모두 대응
 - 신규 DTO에서 계좌번호 마스킹이 필요하면 반드시 이 유틸을 재사용 — 개별 `substring`/`replace` 마스킹 로직 신규 작성 금지
 
 ### 상태 종속 민감 필드 마스킹 패턴 (rejectReason 사례)
@@ -150,7 +148,7 @@
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
 
 ### adapter.in.telegram package-private 제약
-- 텔레그램 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아닌 **인바운드 관리자 명령**이라 `com.kista.admin.adapter.in.telegram`이 소유한다(2026-09-30 notify에서 이전). `TelegramBotService`는 package-private → 컨트롤러 외 다른 패키지에서 직접 참조 불가. `/telegram/webhook`은 `platform.security.SecurityConfig`에서 permitAll(경로 불변)
+- 텔레그램 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아닌 **인바운드 관리자 명령**이라 `com.kista.admin.adapter.in.telegram`이 소유한다. `TelegramBotService`는 package-private → 컨트롤러 외 다른 패키지에서 직접 참조 불가. `/telegram/webhook`은 `platform.security.SecurityConfig`에서 permitAll(경로 불변)
 - 텔레그램 HTTP 전송은 `com.kista.platform.telegram.TelegramHttpClient`(public — `sendMessage`/`sendWithInlineKeyboard`/`answerCallbackQuery`/`getBotUsername`) 하나로 통합돼 root(notify·admin)와 trading-core(`tradingnotify`)가 공용한다. 새 텔레그램 API 호출은 이 클래스에 메서드를 추가하고, notify·admin에 `RestClient`를 직접 쓰지 않는다(`HexagonalArchitectureTest.notify_must_stay_pure_outbound_gateway`가 notify의 `org.springframework.web.client..`·`..application.usecase..` 의존을 잠근다)
 - 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `TelegramHttpClient`에 메서드 추가 + 소유 모듈 포트(예: user `TelegramBotInfoPort`)를 `com.kista.notify.adapter.out.gateway` 어댑터(`TelegramBotInfoAdapter`)가 구현·위임하는 패턴
 - `RestClient` 빈이 여러 개이므로 텔레그램 빈은 이름 `telegramRestClient`/`telegramHttpClient` — 주입 지점은 필드명 `telegramRestClient` 또는 `TelegramHttpClient` 타입으로만 받는다(불일치 시 `NoUniqueBeanDefinitionException`)
@@ -217,7 +215,7 @@
 - **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (과거 US 거래일 기준에서 KST 기준으로 전환 완료됨)
 - **`privacy_trade_bases.release_date` = FIDA 발행일 원본(KST)** — 거래일 아님. 발행일↔거래일(+1일)은 `PrivacyDates.releaseDateFor()/tradeDateOf()` 업무 규칙 헬퍼만 사용
 - **외부 원본 참조 데이터는 원본 기준 유지**: `us_market_holidays`(US 달력일) — KST↔US 변환은 해당 어댑터 내부에서만 (`UsTradeDates.toUsTradeDate()/toKstTradeDate()`)
-- `UsTradeDates`(`com.kista.platform.time` — 어댑터 전용이라 sharedkernel "공용 어휘"에서 분리) 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter`, `KisPriceApi`(dailyprice BYMD 파라미터), `TossPriceApi.getClosingPrice`(Toss 일봉 캔들 `date()`는 US 세션일 기준) — 도메인·서비스·orders persistence에서 사용 금지. `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`가 이 4클래스 allowlist를 실제로 강제한다(모듈 경계 재구성 #3)
+- `UsTradeDates`(`com.kista.platform.time` — 어댑터 전용이라 sharedkernel "공용 어휘"에서 분리) 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter`, `KisPriceApi`(dailyprice BYMD 파라미터), `TossPriceApi.getClosingPrice`(Toss 일봉 캔들 `date()`는 US 세션일 기준) — 도메인·서비스·orders persistence에서 사용 금지. `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`가 이 4클래스 allowlist를 실제로 강제한다
 - **Toss API**: 주문 접수일(KST) 기준 — 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후 `filledAt`(KST) 재필터. 예외: 일봉 캔들(`TossCandleApi`)의 `date()`는 US 세션일이라 `TossPriceApi.getClosingPrice`는 KST 거래일 D를 US 세션 D-1로 변환해 조회 (KIS `fetchConfirmedClose`와 동일 규칙)
 - Instant ↔ KST 일자 경계는 `atStartOfDay(TimeZones.KST)` 단일 관용구 — `ZoneOffset.UTC` 자정 경계 금지
 - 거래일 경계 시각: `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` (마감 배치 cron 발화와 동일) — preview·수동실행·주문취소가 `DstInfo.nextTradeDate()` SSOT 사용

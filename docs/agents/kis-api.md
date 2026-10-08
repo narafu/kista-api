@@ -22,11 +22,11 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 ### 주요 오류 코드
 
 - `EGW00202` "GW라우팅 중 오류가 발생했습니다" — 세 가지 원인:
-  1. **미국 공휴일에 주문 접수**: 휴장일 미감지로 주문 시도 → KIS 거부 (과거 KIS 휴장조회 404 폴백 사례 — 현재는 Alpaca 캘린더 DB 기반)
-  2. **LOC 주문에 가격 "0" 전송**: LOC(장마감지정가)는 실제 limit price 필수. `"0"` 전송 시 "$0 이하 체결" 불가 조건으로 판단해 거부 (과거 `formatPrice(LOC,price)="0"` 버그, 수정 완료)
+  1. **미국 공휴일에 주문 접수**: 휴장일 미감지로 주문 시도 → KIS 거부 (휴장일은 Alpaca 캘린더 DB 기반)
+  2. **LOC 주문에 가격 "0" 전송**: LOC(장마감지정가)는 실제 limit price 필수. `"0"` 전송 시 "$0 이하 체결" 불가 조건으로 판단해 거부
   3. **주문 body를 Map(compact JSON)으로 전송**: KIS GW는 raw JSON String 포맷만 허용 — `KisOrderApi.place()`는 `String.format()` 방식 사용 (LinkedHashMap → Jackson 직렬화 금지)
   - 재시도 로직 없음 — 원인 제거로만 해결
-- `EGW00201` "초당 거래건수를 초과하였습니다" — **appKey(계좌 아님) 단위** 초당 20건 제한(공식 문서 기준) 초과. 2026-08-06 장개시 스케쥴러에서 한 계좌의 INFINITE 매도 선접수(LOC_SELL 성공 직후 지연 없는 LIMIT_SELL)가 이 오류로 실패한 사례로 확인됨
+- `EGW00201` "초당 거래건수를 초과하였습니다" — **appKey(계좌 아님) 단위** 초당 20건 제한(공식 문서 기준) 초과 (지연 없는 연속 매도 선접수 등에서 발생)
   - `KisHttpClient.executeWithRetry`가 조회·주문접수·취소 등 스케쥴러·서비스 경유 KIS 호출의 공통 경로라 이 한 지점에서 방어(예외: `KisAuthApi.verifyAccount`는 계좌 등록 전 검증용으로 `kisRestClient`를 직접 호출해 이 게이트를 타지 않음 — 등록 전 1회성 호출이라 리스크 낮음):
     - **사전 게이트(appKey 단위, GET+POST 공통, 401 인라인 재시도 포함)**: 같은 appKey로의 연속 호출 사이 최소 간격(`MIN_CALL_INTERVAL_MILLIS`=350ms)을 CAS 루프로 강제(`System.nanoTime()` 기준, 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않음 — 안 그러면 반복 거부가 대기열을 무한정 미래로 밀어버림). 대량 배치(VR 사다리 등)가 슬롯을 선점 중이어도 `MAX_QUEUE_WAIT_MILLIS`(20초)를 넘으면 무한 대기 대신 즉시 `KisApiException` — 같은 appKey의 실시간 조회(`StatisticsController` 등)가 배치 뒤에 무한정 밀리는 것을 방지
     - **반응 재시도(조회 GET 전용)**: `retryOnRateLimit=true`일 때 msg_cd 매칭 시 추가로 지수 백오프(1초 기준) 재시도. 주문 접수/취소(POST)는 재시도 안 함(중복 주문 위험 배제 — 사전 게이트만으로 방어)
@@ -57,11 +57,11 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 ### 주문 API (KisOrderApi)
 - 미국 매수 TR ID: `TTTT1002U`, 미국 매도: `TTTT1006U` (일본은 TTTS0308U/0307U — 혼동 주의)
-- `ORD_DVSN` 코드: LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, LOO(장개시지정가)=`32`, 지정가=`00`
+- `ORD_DVSN` 코드(`KisOrderApi.resolveOrderDvsn`): LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, 지정가=`00`
 - MOC(장마감시장가) 주문 시 `OVRS_ORD_UNPR="0"`, **LOC(장마감지정가)는 실제 limit price 필수**
 - **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류)
 - **주문 body는 반드시 raw JSON String**: `String.format("""...""", ...)` 방식으로 직접 구성 — `Map<String, String>` + RestClient Jackson 직렬화 방식으로 보내면 KIS GW가 EGW00202 반환 (필드 순서·포맷 민감성)
-- **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 프리마켓·정규장·애프터마켓 전 구간에서 LOC/MOC 모두 지원하므로 예약주문 API 불필요 — kista에서 완전 제거됨
+- **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 전 구간에서 LOC/MOC 모두 지원하므로 불필요 (코드에 없음)
 
 ### KIS 어댑터 공통 파싱 헬퍼 (KisResponseParser)
 - `com.kista.broker.adapter.out.kis.KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
@@ -85,8 +85,8 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 ### 전일종가(prevClose) 조회 — KisPriceApi.getPriceSnapshot()/getPriceSnapshots()
 
 - 단건(`HHDFS00000300`)·복수종목(`HHDFS76220000`) 응답 모두 `base`(전일종가) 필드를 `last`(현재가)와 함께 반환 — **별도 API 호출 없이 `base` 필드를 그대로 prevClose로 사용** (빈값이면 current로 fallback)
-- 과거엔 "`base`는 장 시작 전엔 하루 더 과거 종가일 수 있다"는 결함 회피를 위해 종목별로 `dailyprice`(`HHDFS76240000`)를 별도 호출해 확정 종가를 재조회했으나, 정확도보다 단순성(종목당 API 호출 1회)을 택해 제거함 — 운영 중 이상 종가(개장 전 시간대)가 관측되면 이 트레이드오프부터 의심할 것
-- 2026-07-24 마감 리포트 종가 정확도 문제(라이브 current가 종가로 오인됨)로 `getClosingPrice(s)`를 신규 추가하며 dailyprice를 재도입했다 — 단, 위에서 제거된 `getPrevClose(s)`(전일종가, 미리보기·통계 등 핫패스 공용)와는 별개 메서드로 격리해 호출량 증가가 마감 리포트 1일 1회로만 한정되도록 했다. 응답 봉 날짜가 기대 거래일과 다르면 라이브 현재가로 자동 fallback한다(`KisPriceApi.fetchConfirmedClose`).
+- `base`는 장 시작 전엔 하루 더 과거 종가일 수 있다 — 개장 전 시간대에 이상 종가가 관측되면 이 트레이드오프부터 의심할 것
+- 마감 리포트 확정 종가는 별도 `getClosingPrice(s)`(dailyprice `HHDFS76240000`, `fetchConfirmedClose`)로 조회한다 — 호출량 증가를 마감 리포트 1일 1회로 한정하려고 `getPrevClose(s)`(미리보기·통계 핫패스 공용)와 분리했다. 응답 봉 날짜가 기대 거래일과 다르면 라이브 현재가로 fallback
 - **전략 생성 화면과 실제 매매의 기준가 통일**: `AccountStatisticsService.getPrices()`(tradingstats, `GET /prices` 티커 목록)와 `StrategyHistoryQueryService.strategySeedPreview()`(trading, 최소 시드 미리보기 — `StrategyService`가 위임) 모두 `BrokerPricePort.getPrevClose(s)`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
 - **`BrokerPricePort`에 `getPrevClose`/`getPrevCloses` 전용 메서드 존재**: `getPriceSnapshot(s)`(현재가+전일종가 조합)와 별개로, 전일종가만 필요하면 이걸 사용 — KIS는 응답이 한 API에 묶여 있어 내부적으로 `getPriceSnapshot(s)`를 재사용(호출 절감 없음)하지만, Toss는 현재가 API(`/api/v1/prices`) 호출을 완전히 생략하고 캔들 API만 호출하므로 실질적 절감이 있음 (`toss-api.md` "가격 조회 API 3분리" 참고)
 
@@ -97,5 +97,4 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 ### kis-trade-mcp (localhost:3001)
 - `open-trading-api/MCP/Kis Trading MCP` 소스, SSE 모드 Docker 컨테이너
-- docker run 시 KIS 자격증명 환경변수 필수: `KIS_APP_KEY`, `KIS_APP_SECRET`, `KIS_HTS_ID`, `KIS_ACCT_STOCK` (kista `.env`의 `KIS_ACCOUNT_NO` 값 — 변수명 다름 주의)
-- 재시작/문제 발생 시: `docker-infra.md`의 `kis-trade-mcp 재시작` 섹션 참고
+- 환경변수·재시작 절차: `docker-infra.md`의 `kis-trade-mcp 재시작` 섹션

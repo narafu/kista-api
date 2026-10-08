@@ -10,7 +10,7 @@
 | L1.5 프로세스 간 통신 | root ↔ trading-core는 무엇으로 대화하나 | 아래 L1.5 |
 | L2 모듈 의존 그래프 | 모듈끼리 누가 누구를 참조하나 | **자동 생성** — 아래 L2 |
 | L3 핵심 흐름 | 매매 배치는 어떤 순서로 도나 | 아래 L3, 상세는 `docs/agents/workflow.md` |
-| 업무 흐름 맵 | 무엇이 계기가 되어 어떤 순서로 어디까지 가나·하루에 언제 무엇이 도나 | **반자동 생성** — 아래 "업무 흐름 맵" |
+| 업무 흐름 맵 | 무엇이 계기가 되어 어떤 순서로 어디까지 가나·하루에 언제 무엇이 도나 | **반자동 생성** — 아래 "아키텍처 맵" |
 
 ## L0 시스템 컨텍스트
 
@@ -116,7 +116,7 @@ flowchart LR
     PG -.->|"cron 02:00 KST backup.sh<br/>pg_dump → GPG"| OBJ
 ```
 
-- 외부 호출 방향은 L0과 같다 — 여기서는 운영 관측(`GRAFANA_CLOUD_OTLP_*`, `heartbeat.*`는 trading-core만)과 백업 경로를 더했다
+- 외부 호출 방향은 L0과 같고, 운영 관측(`GRAFANA_CLOUD_OTLP_*`, `heartbeat.*`는 trading-core만)과 백업 경로를 더했다
 
 ### 배포 파이프라인·시크릿
 
@@ -227,7 +227,6 @@ flowchart LR
 # 출력: build/spring-modulith-docs/components.puml (전체), module-<name>.puml (모듈별)
 ```
 
-- 클릭 탐색 그래프는 아키텍처 맵 구조 탭(아래 절)으로 옮겼다
 - `.puml`: IntelliJ PlantUML Integration 플러그인으로 열면 렌더링된다
 - `build/`는 IntelliJ에서 Excluded라 `Ctrl+Shift+N` 두 번(non-project 포함)으로 찾는다
 
