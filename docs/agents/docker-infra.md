@@ -177,8 +177,8 @@ DB는 자체호스팅 postgres(`kista-postgres` 컨테이너, A 서버)이며 `k
 - Supabase는 영구 삭제됨 — 롤백 경로 없음, 백업/복구는 전적으로 위 `kista-infra` Object Storage 경로에 의존
 
 ### 복구
-1. Object Storage에서 다운로드 → `gpg --batch --yes --passphrase "$BACKUP_ENCRYPTION_KEY" -d backup-YYYYMMDD.sql.gpg -o backup.dump`
-2. `docker exec -i kista-postgres pg_restore --no-owner --no-privileges -U kista -d kistadb < backup.dump` (재해 복구로 DB 자체가 없으면 먼저 `createdb -U kista kistadb`)
+1. 서버에서 다운로드+복호화: `/opt/kista-infra/scripts/backup.sh --restore kistadb-YYYYMMDD-HHMMSS.dump.gpg` (오브젝트명은 `oci os object list --bucket-name "$OCI_BUCKET_NAME" --namespace "$OCI_NAMESPACE" --all`로 확인)
+2. 스크립트가 출력하는 `/tmp/kista-infra-restore/<오브젝트명>.dump`를 `docker cp`로 `kista-postgres:/tmp/backup.dump`에 넣고 `docker exec kista-postgres pg_restore -U kista -d kistadb --clean --if-exists /tmp/backup.dump` (재해 복구로 DB 자체가 없으면 먼저 `createdb -U kista kistadb`). 복구 후 평문 덤프 삭제
 3. 복원 후 두 이력 테이블 `flyway_schema_history_api`(root)·`flyway_schema_history_trading`(trading)의 최신 버전이 각각 배포 코드의 `db/migration`·`db/migration-trading` 버전과 일치하는지 확인 — 불일치 시 앱 기동 실패. 옛 공용 `public.flyway_schema_history`는 스키마 재편 롤백 증거로 보존된 테이블이라 검증 대상이 아니다
 4. 앱 재기동 후 `/actuator/health` 200 확인 + 텔레그램 시작 알림 수신 확인
 
