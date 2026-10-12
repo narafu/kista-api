@@ -170,7 +170,7 @@ class TradingStatsService implements TradingStatsUseCase {
         for (CycleView v : open) {
             CyclePosition pos = latestPositions.get(v.cycle().id());
             if (pos != null) {
-                result.put(v.cycle().id(), assetWithAvgPriceFallback(pos).subtract(v.startAmount()));
+                result.put(v.cycle().id(), pos.totalAssetWithAvgPriceFallback().subtract(v.startAmount()));
             }
         }
         return result;
@@ -241,7 +241,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 if (view == null) continue;
                 LocalDate endDate = view.cycle().endDate();
                 if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
-                asset = asset.add(assetWithAvgPriceFallback(posEntry.getValue()));
+                asset = asset.add(posEntry.getValue().totalAssetWithAvgPriceFallback());
                 principal = principal.add(view.startAmount());
             }
             points.add(new EquityPoint(date,
@@ -251,18 +251,10 @@ class TradingStatsService implements TradingStatsUseCase {
         return points;
     }
 
-    // 종가 없으면 매입평단가로 대체(최후 0) → InvestmentIndexCalculator와 달리 null을 반환하지 않고 항상 값 산출, scale=2 반올림
-    private static BigDecimal assetWithAvgPriceFallback(CyclePosition pos) {
-        BigDecimal unitPrice = pos.closingPrice() != null ? pos.closingPrice()
-                : pos.avgPrice() != null ? pos.avgPrice() : BigDecimal.ZERO;
-        return pos.usdDeposit().add(unitPrice.multiply(BigDecimal.valueOf(pos.holdings())))
-                .setScale(2, RoundingMode.HALF_UP);
-    }
-
     private CyclePerformance toPerformance(CycleView v, Map<UUID, CyclePosition> latestPositions) {
         StrategyCycle c = v.cycle();
         BigDecimal endAmount = v.closed() ? c.endAmount()
-                : Optional.ofNullable(latestPositions.get(c.id())).map(TradingStatsService::assetWithAvgPriceFallback).orElse(null);
+                : Optional.ofNullable(latestPositions.get(c.id())).map(CyclePosition::totalAssetWithAvgPriceFallback).orElse(null);
         BigDecimal pnl = endAmount != null ? endAmount.subtract(v.startAmount()) : null;
         // 개장금액이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
         BigDecimal returnRate = (pnl != null && v.startAmount().signum() != 0)

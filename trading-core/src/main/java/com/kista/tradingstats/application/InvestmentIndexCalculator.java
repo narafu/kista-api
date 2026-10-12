@@ -86,7 +86,7 @@ public final class InvestmentIndexCalculator {
             boolean complete = !activeByStrategy.isEmpty();
             for (StrategyCycle cycle : activeByStrategy.values()) {
                 CyclePosition position = latestByCycle.get(cycle.id());
-                BigDecimal cycleValue = position == null ? null : assetOrNullIfIncomplete(position);
+                BigDecimal cycleValue = position == null ? null : position.totalAssetAtCloseOrNull();
                 if (cycleValue == null) {
                     complete = false;
                     break;
@@ -183,7 +183,7 @@ public final class InvestmentIndexCalculator {
         Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle = new HashMap<>();
         for (var entry : dailyPositionsByCycle.entrySet()) {
             for (var dailyPosition : entry.getValue().entrySet()) {
-                BigDecimal value = assetOrNullIfIncomplete(dailyPosition.getValue());
+                BigDecimal value = dailyPosition.getValue().totalAssetAtCloseOrNull();
                 if (value != null) {
                     valuesByCycle.computeIfAbsent(entry.getKey(), ignored -> new TreeMap<>())
                             .put(dailyPosition.getKey(), value);
@@ -298,15 +298,6 @@ public final class InvestmentIndexCalculator {
 
     private static CyclePosition laterPosition(CyclePosition first, CyclePosition second) {
         return first.createdAt().isAfter(second.createdAt()) ? first : second;
-    }
-
-    // 보유수량이 있는데 종가가 없으면 시장가 평가 불가 → null(호출부가 "그 날짜 평가 불완전"으로 처리, avgPrice로 대체하지 않음)
-    private static BigDecimal assetOrNullIfIncomplete(CyclePosition position) {
-        if (position.holdings() > 0 && position.closingPrice() == null) {
-            return null;
-        }
-        BigDecimal unitPrice = position.closingPrice() != null ? position.closingPrice() : BigDecimal.ZERO;
-        return position.usdDeposit().add(unitPrice.multiply(BigDecimal.valueOf(position.holdings())));
     }
 
     private record DailyValuation(LocalDate date, BigDecimal value) {}

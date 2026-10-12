@@ -3,6 +3,7 @@ package com.kista.trading.domain.model;
 import com.kista.matching.domain.model.AccountBalance;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -44,5 +45,22 @@ public record CyclePosition(
     // DB 저장 포지션 → 매매 계산용 잔고 변환 (tradeSnapshot의 역방향)
     public AccountBalance toBalance() {
         return new AccountBalance(holdings, avgPrice, usdDeposit);
+    }
+
+    // 총자산(예수금 + 보유분 종가 평가) — 보유분이 있는데 종가가 없으면 평가 불완전이라 null(수익률 계산용, 평단가로 대체하지 않음), 반올림 없음
+    public BigDecimal totalAssetAtCloseOrNull() {
+        if (holdings > 0 && closingPrice == null) {
+            return null;
+        }
+        BigDecimal unitPrice = closingPrice != null ? closingPrice : BigDecimal.ZERO;
+        return usdDeposit.add(unitPrice.multiply(BigDecimal.valueOf(holdings)));
+    }
+
+    // 총자산 — 종가 없으면 평단가, 그것도 없으면 0으로 대체해 항상 값 산출(화면 표시용), scale=2 HALF_UP
+    public BigDecimal totalAssetWithAvgPriceFallback() {
+        BigDecimal unitPrice = closingPrice != null ? closingPrice
+                : avgPrice != null ? avgPrice : BigDecimal.ZERO;
+        return usdDeposit.add(unitPrice.multiply(BigDecimal.valueOf(holdings)))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 }
