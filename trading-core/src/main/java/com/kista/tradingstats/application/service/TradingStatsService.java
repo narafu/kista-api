@@ -1,5 +1,6 @@
 package com.kista.tradingstats.application.service;
 
+import com.kista.platform.cache.TtlResultCache;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.sharedkernel.Broker;
@@ -40,7 +41,7 @@ class TradingStatsService implements TradingStatsUseCase {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
-    private final TradingStatsResultCache statsResultCache;
+    private final TtlResultCache statsResultCache = new TtlResultCache(); // summary/equity-curve 결과 캐시
 
     // getSummary 캐시 키
     private record SummaryKey(UUID userId) {}

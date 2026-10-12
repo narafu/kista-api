@@ -1,5 +1,6 @@
 package com.kista.benchmark.application.service;
 
+import com.kista.platform.cache.TtlResultCache;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.benchmark.domain.model.*;
 import com.kista.benchmark.application.usecase.BenchmarkUseCase;
@@ -31,7 +32,7 @@ class BenchmarkService implements BenchmarkUseCase {
     private final HousingPriceIndexPort housingPriceIndexPort;
     private final CurrentExchangeRatePort currentExchangeRatePort;
     private final IndexPricePort indexPricePort;
-    private final BenchmarkResultCache statsResultCache;
+    private final TtlResultCache statsResultCache = new TtlResultCache(); // 비교 본체 결과 캐시
     private final HousingBenchmarkComparisonBuilder comparisonBuilder =
             new HousingBenchmarkComparisonBuilder();
 

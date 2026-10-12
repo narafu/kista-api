@@ -8,7 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -36,8 +35,6 @@ class BenchmarkServiceTest {
     @Mock HousingPriceIndexPort housingPriceIndexPort;
     @Mock CurrentExchangeRatePort currentExchangeRatePort;
     @Mock IndexPricePort indexPricePort;
-    // getOrCompute가 null을 반환하지 않도록 mock이 아닌 실제 캐시 인스턴스 사용 (@InjectMocks가 생성자로 주입)
-    @Spy BenchmarkResultCache statsResultCache = new BenchmarkResultCache();
     @InjectMocks BenchmarkService statsService;
 
     private static final UUID USER_ID = UUID.randomUUID();

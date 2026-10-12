@@ -1,4 +1,4 @@
-package com.kista.tradingstats.application.service;
+package com.kista.platform.cache;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Execution(ExecutionMode.SAME_THREAD)
-class TradingStatsResultCacheTest {
+class TtlResultCacheTest {
 
     // 테스트에서 임의 시각으로 이동시킬 수 있는 가변 Clock — TossRedisTokenStore 테스트 패턴 재사용
     private static final class MutableClock extends Clock {
@@ -51,12 +51,12 @@ class TradingStatsResultCacheTest {
     private static final Instant BASE = Instant.parse("2026-08-01T00:00:00Z");
 
     private MutableClock clock;
-    private TradingStatsResultCache cache;
+    private TtlResultCache cache;
 
     @BeforeEach
     void setUp() {
         clock = new MutableClock(BASE);
-        cache = new TradingStatsResultCache(clock);
+        cache = new TtlResultCache(clock);
     }
 
     @Test

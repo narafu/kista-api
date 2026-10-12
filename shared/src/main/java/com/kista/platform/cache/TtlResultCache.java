@@ -1,7 +1,4 @@
-package com.kista.tradingstats.application.service;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
+package com.kista.platform.cache;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -11,12 +8,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
-// TradingStatsService(summary/equity-curve/cycles) 전용 인메모리 TTL 캐시 — com.kista.benchmark.application.service.BenchmarkResultCache
-// (housing/ETF 벤치마크 비교 전용으로 축소됨)의 별개 인스턴스. 구현은 완전히 동일(제네릭 TTL get-or-compute/peek) —
-// summary/equity-curve 캐시(TTL 5분)를 벤치마크 캐시(TTL 10분)와 분리해 서로 다른 만료 정책이 한 캐시에 섞이지 않게 한다.
+// 통계 결과 인메모리 TTL 캐시 — 소비처가 각자 인스턴스를 소유한다(root BenchmarkService 10분, trading-core TradingStatsService 5분).
+// 빈이 아닌 평범한 객체라 프로세스 배선 없이 new로 쓴다.
 // 단일 인스턴스 배포 전제 — 다중 인스턴스로 확장 시 인스턴스별 캐시가 최대 TTL만큼 서로 다를 수 있음
-@Component
-class TradingStatsResultCache {
+public class TtlResultCache {
 
     private static final int CLEANUP_THRESHOLD = 1000; // 만료 엔트리 기회적 청소 트리거 크기
     private static final int LOCK_STRIPES = 64;         // 동시 miss 직렬화용 고정 스트라이프 락 수 (키에 날짜 포함돼 카디널리티 무한 → 맵 대신 스트라이프로 메모리 유계)
@@ -25,12 +20,11 @@ class TradingStatsResultCache {
     private final ConcurrentMap<Object, Entry> cache = new ConcurrentHashMap<>();
     private final ReentrantLock[] stripes = createStripes(); // 키 해시로 매핑하는 고정 크기 락 배열 — 무한 증가·제거 레이스 없음
 
-    @Autowired
-    TradingStatsResultCache() {
+    public TtlResultCache() {
         this(Clock.systemUTC());
     }
 
-    TradingStatsResultCache(Clock clock) {
+    public TtlResultCache(Clock clock) {
         this.clock = clock;
     }
 
@@ -55,12 +49,12 @@ class TradingStatsResultCache {
 
     // 유효 캐시가 있으면 즉시 반환, 없으면 null — 호출부가 hit/miss에 따라 병렬화 여부를 결정할 수 있게 분리
     @SuppressWarnings("unchecked")
-    <V> V peek(Object key) {
+    public <V> V peek(Object key) {
         Entry cached = cache.get(key);
         return cached != null && cached.isValid(clock.instant()) ? (V) cached.value() : null;
     }
 
-    <V> V getOrCompute(Object key, Duration ttl, Supplier<V> loader) {
+    public <V> V getOrCompute(Object key, Duration ttl, Supplier<V> loader) {
         V peeked = peek(key);
         if (peeked != null) {
             return peeked;
