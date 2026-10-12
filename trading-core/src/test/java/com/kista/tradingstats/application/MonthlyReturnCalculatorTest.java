@@ -416,6 +416,30 @@ class MonthlyReturnCalculatorTest {
                                 FEBRUARY_2, new BigDecimal("121.0000000000"), new BigDecimal("0.1000000000")));
     }
 
+    @Test
+    void 시작예정일_전략은_등록_스냅샷_평가액으로_진입해_가짜_손익을_만들지_않는다() {
+        StrategyCycle existing = activeCycle(UUID.randomUUID(), "1000", JANUARY_1);
+        // 1/30 등록·2/1 시작 예정 — 시작일 당일 스냅샷 없이 다음 날 첫 배치 스냅샷이 생긴다
+        StrategyCycle scheduled = activeCycle(UUID.randomUUID(), "1000", FEBRUARY_1);
+
+        List<InvestmentPoint> result = calculator.calculate(
+                List.of(existing, scheduled),
+                List.of(position(existing, JANUARY_31, "1000"),
+                        position(existing, FEBRUARY_1, "1000"),
+                        position(existing, FEBRUARY_2, "1000"),
+                        position(scheduled, LocalDate.of(2026, 1, 30), "1000"),
+                        position(scheduled, FEBRUARY_2, "1100")),
+                JANUARY_31, FEBRUARY_2, BenchmarkGranularity.DAILY);
+
+        // 2/1은 신규 진입만 있어 0%, 2/2는 합산 2,000 -> 2,100의 +5%
+        assertThat(result)
+                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(JANUARY_31, new BigDecimal("100.0000000000")),
+                        org.assertj.core.groups.Tuple.tuple(FEBRUARY_1, new BigDecimal("100.0000000000")),
+                        org.assertj.core.groups.Tuple.tuple(FEBRUARY_2, new BigDecimal("105.0000000000")));
+    }
+
     private static StrategyCycle activeCycle(UUID strategyId, String startAmount, LocalDate startDate) {
         return cycle(strategyId, startAmount, null, startDate, null);
     }
