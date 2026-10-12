@@ -133,97 +133,42 @@ class TradingStatsServiceTest {
     }
 
     @Test
-    void 레거시_VR_진행_사이클은_개장_포지션_총자산으로_원금과_미실현손익을_복원한다() {
+    void VR_사이클도_저장된_startAmount를_원금으로_쓰고_개장_포지션을_조회하지_않는다() {
         UUID vrStrategyId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
                 vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(
                 UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1000.00"), null,
-                LocalDate.of(2026, 6, 1), null, Instant.parse("2026-06-01T00:00:00Z"), null);
-        CyclePosition opening = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
-                new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
-        CyclePosition latest = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("800.00"),
-                new BigDecimal("180.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), opening));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), latest));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("1600.00");
-        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
-        assertThat(summary.byType()).singleElement().satisfies(stats -> {
-            assertThat(stats.type()).isEqualTo(StrategyType.VR);
-            assertThat(stats.unrealizedPnl()).isEqualByComparingTo("100.00");
-        });
-    }
-
-    @Test
-    void 레거시_VR_개장_보유분에_종가가_없으면_저장된_startAmount를_유지한다() {
-        UUID vrStrategyId = UUID.randomUUID();
-        Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
-                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(
-                UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1500.00"), null,
-                LocalDate.of(2026, 6, 1), null, Instant.parse("2026-06-01T00:00:00Z"), null);
-        CyclePosition openingWithoutClosingPrice = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
-                null, new BigDecimal("80.00"), 5, Instant.now(), null);
-        CyclePosition latest = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("900.00"),
-                new BigDecimal("140.00"), new BigDecimal("80.00"), 5, Instant.now(), null);
-        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
-        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id())))
-                .thenReturn(Map.of(cycle.id(), openingWithoutClosingPrice));
-        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), latest));
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("1500.00");
-        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("100.00");
-    }
-
-    @Test
-    void 레거시_VR_종료_사이클은_개장_포지션_총자산으로_실현손익과_성과를_복원한다() {
-        UUID vrStrategyId = UUID.randomUUID();
-        Strategy vrStrategy = new Strategy(
-                vrStrategyId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
-                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle = new StrategyCycle(
-                UUID.randomUUID(), vrStrategyId, null,
-                new BigDecimal("1000.00"), new BigDecimal("1800.00"),
+                new BigDecimal("1600.00"), new BigDecimal("1800.00"),
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31),
                 Instant.parse("2026-01-01T00:00:00Z"), null);
-        CyclePosition opening = new CyclePosition(
-                UUID.randomUUID(), cycle.id(), new BigDecimal("1000.00"),
-                new BigDecimal("120.00"), new BigDecimal("100.00"), 5, Instant.now(), null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(cyclePositionPort.findFirstByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(), opening));
 
-        StatsSummary summary = statsService.getSummary(USER_ID);
         CyclePerformance performance = statsService
                 .getCyclePerformances(USER_ID, StrategyType.VR, null, null, null, 0, 10)
                 .items().getFirst();
 
-        assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("200.00");
-        assertThat(summary.byType()).singleElement().satisfies(stats ->
-                assertThat(stats.avgReturnRate()).isEqualByComparingTo("0.1250"));
         assertThat(performance.startAmount()).isEqualByComparingTo("1600.00");
-        assertThat(performance.endAmount()).isEqualByComparingTo("1800.00");
         assertThat(performance.pnl()).isEqualByComparingTo("200.00");
         assertThat(performance.returnRate()).isEqualByComparingTo("0.1250");
+        verify(cyclePositionPort, never()).findFirstByCycleIds(any());
+    }
+
+    @Test
+    void 시작예정일이_미래인_사이클의_경과일은_0이다() {
+        stubUserWithStrategy();
+        StrategyCycle scheduled = activeCycle(STRATEGY_ID, "1000.00",
+                LocalDate.now(TimeZones.KST).plusDays(3).toString());
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(scheduled));
+
+        CyclePerformance performance = statsService
+                .getCyclePerformances(USER_ID, null, null, null, null, 0, 10)
+                .items().getFirst();
+
+        assertThat(performance.durationDays()).isZero();
     }
 
     @Test

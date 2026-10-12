@@ -15,7 +15,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -109,14 +108,13 @@ class TradingStatsControllerTest {
 
     @Test
     void cycles를_페이지_정보와_함께_반환한다() throws Exception {
-        var createdAt = Instant.parse("2026-02-01T00:00:00Z");
         when(tradingStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), eq(0), eq(50)))
                 .thenReturn(new CyclePerformancePage(
                         List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
                                 StrategyTicker.SOXL, LocalDate.parse("2026-01-01"),
                                 LocalDate.parse("2026-01-31"), new BigDecimal("1000.00"),
                                 new BigDecimal("1100.00"), new BigDecimal("100.00"),
-                                new BigDecimal("0.1000"), 30, true, createdAt)),
+                                new BigDecimal("0.1000"), 30, true)),
                         0, 51, 2));
 
         mockMvc.perform(get("/api/stats/cycles").with(authentication(userToken(USER_ID))))

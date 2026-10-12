@@ -49,13 +49,17 @@ class TradingStatsService implements TradingStatsUseCase {
     private record EquityCurveKey(UUID userId, StrategyType type, LocalDate from, LocalDate to) {}
 
     // 사이클 + 소속 전략 조인 뷰
-    private record CycleView(StrategyCycle cycle, Strategy strategy, BigDecimal effectiveStartAmount) {
+    private record CycleView(StrategyCycle cycle, Strategy strategy) {
         boolean closed() {
             return cycle.endAmount() != null && cycle.endDate() != null;
         }
 
+        BigDecimal startAmount() {
+            return cycle.startAmount();
+        }
+
         BigDecimal realizedPnl() {
-            return cycle.endAmount().subtract(effectiveStartAmount);
+            return cycle.endAmount().subtract(startAmount());
         }
     }
 
@@ -80,7 +84,7 @@ class TradingStatsService implements TradingStatsUseCase {
         BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl));
         BigDecimal totalUnrealized = sum(typeStats.stream().map(StrategyTypeStats::unrealizedPnl));
         BigDecimal activePrincipal = sum(cycles.stream()
-                .filter(v -> !v.closed()).map(CycleView::effectiveStartAmount));
+                .filter(v -> !v.closed()).map(CycleView::startAmount));
 
         return new StatsSummary(totalRealized, totalUnrealized, activePrincipal, typeStats);
     }
@@ -113,12 +117,14 @@ class TradingStatsService implements TradingStatsUseCase {
     public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId,
                                                      StrategyTicker ticker, CycleStatusFilter status, int page, int size) {
         // loadCycles가 본인 계좌로 한정하므로 타 사용자 accountId는 자연히 빈 결과
-        List<CycleView> filtered = loadCycles(userId).stream()
+        List<CycleView> filtered = loadCycles(userId, false).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
                 .filter(v -> accountId == null || v.strategy().accountId().equals(accountId))
                 .filter(v -> ticker == null || v.strategy().ticker() == ticker)
                 .filter(v -> status == null || status.matches(v.closed()))
-                .sorted(Comparator.comparing((CycleView v) -> v.cycle().createdAt()).reversed())
+                // createdAt 동률이면 id로 순서 고정 — 페이지 경계에서 항목이 흔들리지 않게
+                .sorted(Comparator.comparing((CycleView v) -> v.cycle().createdAt())
+                        .thenComparing(v -> v.cycle().id()).reversed())
                 .toList();
 
         int totalPages = (int) Math.ceil(filtered.size() / (double) size);
@@ -136,10 +142,6 @@ class TradingStatsService implements TradingStatsUseCase {
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────
 
-    private List<CycleView> loadCycles(UUID userId) {
-        return loadCycles(userId, false);
-    }
-
     // excludeMock=true: 누적자산추이·전략유형비교처럼 실제 투자 성과 집계 목적인 조회에서 모의계좌(MOCK) 제외.
     // 사이클 성과 목록은 계좌별 이력 확인이 목적이라 모의계좌도 포함(excludeMock=false)한다.
     private List<CycleView> loadCycles(UUID userId, boolean excludeMock) {
@@ -152,42 +154,12 @@ class TradingStatsService implements TradingStatsUseCase {
                 .flatMap(List::stream)
                 .collect(Collectors.toMap(Strategy::id, Function.identity()));
         if (strategies.isEmpty()) return List.of();
-        List<StrategyCycle> cycles = strategyCyclePort.findByStrategyIds(strategies.keySet());
-        // VR 전략 사이클의 개장 포지션을 일괄 조회 (N+1 방지)
-        Set<UUID> vrCycleIds = cycles.stream()
-                .filter(c -> strategies.get(c.strategyId()).isVr())
-                .map(StrategyCycle::id)
-                .collect(Collectors.toSet());
-        Map<UUID, CyclePosition> openingPositions = vrCycleIds.isEmpty()
-                ? Map.of() : cyclePositionPort.findFirstByCycleIds(vrCycleIds);
-        return cycles.stream()
-                .map(c -> toCycleView(c, strategies.get(c.strategyId()), openingPositions))
+        return strategyCyclePort.findByStrategyIds(strategies.keySet()).stream()
+                .map(c -> new CycleView(c, strategies.get(c.strategyId())))
                 .toList();
     }
 
-    private CycleView toCycleView(StrategyCycle cycle, Strategy strategy, Map<UUID, CyclePosition> openingPositions) {
-        BigDecimal effectiveStartAmount = cycle.startAmount();
-        if (strategy.isVr()) {
-            CyclePosition opening = openingPositions.get(cycle.id());
-            effectiveStartAmount = opening != null
-                    ? compatibleVrStartAmount(cycle, opening)
-                    : cycle.startAmount();
-        }
-        return new CycleView(cycle, strategy, effectiveStartAmount);
-    }
-
-    // 종가 없는 양수 보유분은 개장 시장가를 복원할 수 없으므로 저장된 startAmount를 유지한다.
-    private static BigDecimal compatibleVrStartAmount(StrategyCycle cycle, CyclePosition opening) {
-        if (opening.holdings() > 0 && opening.closingPrice() == null) {
-            return cycle.startAmount();
-        }
-        BigDecimal holdingsValue = opening.holdings() == 0
-                ? BigDecimal.ZERO
-                : opening.closingPrice().multiply(BigDecimal.valueOf(opening.holdings()));
-        return opening.usdDeposit().add(holdingsValue).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 - 호환 개장금액 (스냅샷 없으면 제외)
+    // 진행 중 사이클의 미실현 = 최신 스냅샷 자산 - 개장금액 (스냅샷 없으면 제외)
     private Map<UUID, BigDecimal> unrealizedByCycle(List<CycleView> cycles) {
         List<CycleView> open = cycles.stream().filter(v -> !v.closed()).toList();
         Set<UUID> openCycleIds = open.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
@@ -197,7 +169,7 @@ class TradingStatsService implements TradingStatsUseCase {
         for (CycleView v : open) {
             CyclePosition pos = latestPositions.get(v.cycle().id());
             if (pos != null) {
-                result.put(v.cycle().id(), assetWithAvgPriceFallback(pos).subtract(v.effectiveStartAmount()));
+                result.put(v.cycle().id(), assetWithAvgPriceFallback(pos).subtract(v.startAmount()));
             }
         }
         return result;
@@ -219,13 +191,13 @@ class TradingStatsService implements TradingStatsUseCase {
             long wins = closed.stream().filter(v -> v.realizedPnl().signum() > 0).count();
             winRate = BigDecimal.valueOf(wins)
                     .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
-            // 호환 개장금액이 0인 사이클(VR 적립식 등)은 수익률 계산에서 제외한다.
+            // 개장금액이 0인 사이클(VR 적립식 등)은 수익률 계산에서 제외한다.
             List<CycleView> returnable = closed.stream()
-                    .filter(v -> v.effectiveStartAmount().signum() != 0)
+                    .filter(v -> v.startAmount().signum() != 0)
                     .toList();
             if (!returnable.isEmpty()) {
                 avgReturnRate = returnable.stream()
-                        .map(v -> v.realizedPnl().divide(v.effectiveStartAmount(), 6, RoundingMode.HALF_UP))
+                        .map(v -> v.realizedPnl().divide(v.startAmount(), 6, RoundingMode.HALF_UP))
                         .reduce(BigDecimal.ZERO, BigDecimal::add)
                         .divide(BigDecimal.valueOf(returnable.size()), 4, RoundingMode.HALF_UP);
             }
@@ -269,7 +241,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 LocalDate endDate = view.cycle().endDate();
                 if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
                 asset = asset.add(assetWithAvgPriceFallback(posEntry.getValue()));
-                principal = principal.add(view.effectiveStartAmount());
+                principal = principal.add(view.startAmount());
             }
             points.add(new EquityPoint(date,
                     asset.setScale(2, RoundingMode.HALF_UP),
@@ -290,14 +262,16 @@ class TradingStatsService implements TradingStatsUseCase {
         StrategyCycle c = v.cycle();
         BigDecimal endAmount = v.closed() ? c.endAmount()
                 : Optional.ofNullable(latestPositions.get(c.id())).map(TradingStatsService::assetWithAvgPriceFallback).orElse(null);
-        BigDecimal pnl = endAmount != null ? endAmount.subtract(v.effectiveStartAmount()) : null;
-        // 호환 개장금액이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
-        BigDecimal returnRate = (pnl != null && v.effectiveStartAmount().signum() != 0)
-                ? pnl.divide(v.effectiveStartAmount(), 4, RoundingMode.HALF_UP) : null;
+        BigDecimal pnl = endAmount != null ? endAmount.subtract(v.startAmount()) : null;
+        // 개장금액이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
+        BigDecimal returnRate = (pnl != null && v.startAmount().signum() != 0)
+                ? pnl.divide(v.startAmount(), 4, RoundingMode.HALF_UP) : null;
         LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(TimeZones.KST);
+        // 시작예정일이 미래인 사이클은 아직 경과일이 없다 — 음수 대신 0
+        int durationDays = (int) Math.max(0, ChronoUnit.DAYS.between(c.startDate(), durationEnd));
         return new CyclePerformance(c.id(), v.strategy().accountId(), v.strategy().type(), v.strategy().ticker(),
-                c.startDate(), c.endDate(), v.effectiveStartAmount(), endAmount, pnl, returnRate,
-                (int) ChronoUnit.DAYS.between(c.startDate(), durationEnd), v.closed(), c.createdAt());
+                c.startDate(), c.endDate(), v.startAmount(), endAmount, pnl, returnRate,
+                durationDays, v.closed());
     }
 
     private static BigDecimal sum(java.util.stream.Stream<BigDecimal> stream) {
