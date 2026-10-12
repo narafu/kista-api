@@ -112,7 +112,7 @@ class BenchmarkServiceTest {
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
@@ -155,7 +155,7 @@ class BenchmarkServiceTest {
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2027, 1, 5));
 
@@ -178,11 +178,11 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 1, 5), "100"),
                 weeklyIndex(LocalDate.of(2026, 2, 16), "121")));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 16));
 
-        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+        assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 16));
         // 결측 주와 무관하게 인접 공통 포인트끼리 항상 수익률을 계산한다
         assertThat(result.points().getLast().investmentPeriodReturn()).isEqualByComparingTo("0.1");
@@ -207,11 +207,11 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 1, 12), "105"),
                 weeklyIndex(LocalDate.of(2026, 1, 13), "110")));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 13));
 
-        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+        assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 12), LocalDate.of(2026, 1, 13));
         // 01-12는 아직 01-13 스냅샷(110)이 오지 않았으므로 직전 01-09 값(100)을 그대로 이어받는다
         assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("100.0");
@@ -235,12 +235,12 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 1, 20), "130"),
                 weeklyIndex(LocalDate.of(2026, 1, 27), "150")));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 27));
 
         // 투자 종료(01-13) 이후 조사일(01-20, 01-27)은 지수 고정 없이 스킵된다
-        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+        assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 9), LocalDate.of(2026, 1, 13));
         assertThat(result.period().toDate()).isEqualTo(LocalDate.of(2026, 1, 13));
     }
@@ -262,7 +262,7 @@ class BenchmarkServiceTest {
                                 "2600000000", "부산", LocalDate.of(2026, 2, 23), new BigDecimal("110"),
                                 null, java.time.Instant.parse("2026-02-16T00:00:00Z"))));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "2600000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
@@ -286,11 +286,11 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 2, 2), "100"),
                 weeklyIndex(LocalDate.of(2026, 2, 23), "121")));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
-        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+        assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 2, 2), LocalDate.of(2026, 2, 23));
     }
 
@@ -306,7 +306,7 @@ class BenchmarkServiceTest {
                 weeklyIndex(LocalDate.of(2026, 1, 19), "90"),
                 weeklyIndex(LocalDate.of(2026, 2, 2), "135")));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 2));
 
@@ -322,7 +322,7 @@ class BenchmarkServiceTest {
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
@@ -363,7 +363,7 @@ class BenchmarkServiceTest {
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(weeklyIndices());
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", FROM, TO);
 
         assertThat(result.points()).isEmpty();
@@ -379,7 +379,7 @@ class BenchmarkServiceTest {
                 anyString(), anyString(), any(), any()))
                 .thenReturn(List.of(weeklyIndex(LocalDate.of(2026, 1, 5), "100")));
 
-        HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
@@ -580,7 +580,7 @@ class BenchmarkServiceTest {
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
-        HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
+        BenchmarkComparison result = statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
 
         assertThat(result.benchmark().assetType()).isEqualTo(BenchmarkAssetType.ETF);
@@ -591,7 +591,7 @@ class BenchmarkServiceTest {
         // US 거래일 원본 2/27 + 1일 보정 = KST 2/28
         assertThat(result.benchmark().sourceUpdatedDate()).isEqualTo(LocalDate.of(2026, 2, 28));
         // 다운샘플링 없이 IndexPrice가 존재하는 3개 거래일이 +1일 보정된 KST 날짜로 그대로 포인트가 생긴다.
-        assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
+        assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 7), LocalDate.of(2026, 2, 28));
         assertThat(result.points().get(0).investmentIndexUsd()).isEqualByComparingTo("100.0");
         assertThat(result.points().get(0).benchmarkIndex()).isEqualByComparingTo("100.0");
@@ -640,7 +640,7 @@ class BenchmarkServiceTest {
                         point("2026-02-28", "184.20")), FROM, TO, null));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
 
-        HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
+        BenchmarkComparison result = statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, FROM, TO);
 
         assertThat(result.points()).isEmpty();
@@ -657,7 +657,7 @@ class BenchmarkServiceTest {
                         point("2026-02-28", "110.00")), FROM, TO, STRATEGY));
         when(indexPricePort.findBySymbolAndRange(eq("QQQ"), any(), any())).thenReturn(spyPrices());
 
-        HousingBenchmarkComparison result = statsService.getEtfBenchmarkComparison(
+        BenchmarkComparison result = statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, EtfBenchmarkSymbol.QQQ, FROM, TO);
 
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
@@ -696,7 +696,7 @@ class BenchmarkServiceTest {
                 new BigDecimal("-1"));
 
         for (int invocation = 0; invocation < 3; invocation++) {
-            HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
+            BenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                     USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                     LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
             assertThat(result.currentExchangeRate()).isNull();
@@ -714,10 +714,10 @@ class BenchmarkServiceTest {
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
-        HousingBenchmarkComparison first = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison first = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-        HousingBenchmarkComparison second = statsService.getHousingBenchmarkComparison(
+        BenchmarkComparison second = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 

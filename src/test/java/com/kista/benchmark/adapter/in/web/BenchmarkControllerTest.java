@@ -168,24 +168,24 @@ class BenchmarkControllerTest {
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000", null, null);
     }
 
-    private static HousingBenchmarkComparison etfComparison() {
-        return new HousingBenchmarkComparison(
+    private static BenchmarkComparison etfComparison() {
+        return new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
                 null,
-                new HousingBenchmarkComparison.Benchmark(
+                new BenchmarkComparison.Benchmark(
                         BenchmarkAssetType.ETF, null, null, "QLD",
                         "QLD (ProShares Ultra QQQ (2x 레버리지))", LocalDate.of(2026, 7, 18)),
-                new HousingBenchmarkComparison.Period(
+                new BenchmarkComparison.Period(
                         LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
                 new PerformanceComparisonSummary(
                         new BigDecimal("0.1000000000"), new BigDecimal("0.1000000000"),
                         BigDecimal.ZERO, new BigDecimal("2.1384283767"),
                         new BigDecimal("2.1384283767"), BigDecimal.ZERO, BigDecimal.ZERO),
                 List.of(
-                        new HousingBenchmarkPoint(
+                        new BenchmarkPoint(
                                 LocalDate.of(2026, 1, 1), new BigDecimal("100.0000000000"),
                                 new BigDecimal("100.0000000000"), null, null),
-                        new HousingBenchmarkPoint(
+                        new BenchmarkPoint(
                                 LocalDate.of(2026, 2, 1), new BigDecimal("110.0000000000"),
                                 new BigDecimal("110.0000000000"), new BigDecimal("0.1000000000"),
                                 new BigDecimal("0.1000000000"))),
@@ -320,24 +320,24 @@ class BenchmarkControllerTest {
         verifyNoInteractions(userStats);
     }
 
-    private static HousingBenchmarkComparison comparison(CurrentExchangeRate currentExchangeRate) {
-        return new HousingBenchmarkComparison(
+    private static BenchmarkComparison comparison(CurrentExchangeRate currentExchangeRate) {
+        return new BenchmarkComparison(
                 BenchmarkScope.PORTFOLIO,
                 null,
-                new HousingBenchmarkComparison.Benchmark(
+                new BenchmarkComparison.Benchmark(
                         BenchmarkAssetType.HOUSING, "1100000000", "서울", null,
                         "서울 아파트 매매가격지수", LocalDate.of(2026, 6, 15)),
-                new HousingBenchmarkComparison.Period(
+                new BenchmarkComparison.Period(
                         LocalDate.of(2026, 1, 1), LocalDate.of(2026, 2, 1), 2),
                 new PerformanceComparisonSummary(
                         new BigDecimal("0.1000000000"), new BigDecimal("0.1000000000"),
                         BigDecimal.ZERO, new BigDecimal("2.1384283767"),
                         new BigDecimal("2.1384283767"), BigDecimal.ZERO, BigDecimal.ZERO),
                 List.of(
-                        new HousingBenchmarkPoint(
+                        new BenchmarkPoint(
                                 LocalDate.of(2026, 1, 1), new BigDecimal("100.0000000000"),
                                 new BigDecimal("100.0000000000"), null, null),
-                        new HousingBenchmarkPoint(
+                        new BenchmarkPoint(
                                 LocalDate.of(2026, 2, 1), new BigDecimal("110.0000000000"),
                                 new BigDecimal("110.0000000000"), new BigDecimal("0.1000000000"),
                                 new BigDecimal("0.1000000000"))),

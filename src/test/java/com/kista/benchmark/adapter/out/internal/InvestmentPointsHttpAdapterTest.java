@@ -81,7 +81,7 @@ class InvestmentPointsHttpAdapterTest {
         assertThat(result.selectedStrategy()).isEqualTo(expected);
         assertThat(result.points()).hasSize(1);
         // InvestmentIndexCalculator.SCALE=10 정밀도가 HTTP 왕복(직렬화→역직렬화)에서 보존되는지 확인
-        // — 벤치마크 비교 화면(HousingBenchmarkComparisonResponse)이 이 값을 그대로 노출한다
+        // — 벤치마크 비교 화면(BenchmarkComparisonResponse)이 이 값을 그대로 노출한다
         var point = result.points().getFirst();
         assertThat(point.investmentIndexUsd()).isEqualByComparingTo(new java.math.BigDecimal("100.1234567890"));
         assertThat(point.investmentIndexUsd().scale()).isEqualTo(10);

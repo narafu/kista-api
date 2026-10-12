@@ -374,7 +374,7 @@ class InvestmentIndexCalculatorTest {
         List<InvestmentPoint> points = calculator.calculate(
                 List.of(cycle), positions, JANUARY_1, MARCH_31);
 
-        // MDD 자체는 HousingBenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 시리즈에 포함되는지 확인한다
+        // MDD 자체는 BenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 시리즈에 포함되는지 확인한다
         assertThat(pointOn(points, LocalDate.of(2026, 1, 15)).investmentIndexUsd())
                 .isEqualTo(new BigDecimal("50.0000000000"));
         assertThat(pointOn(points, FEBRUARY_28).investmentIndexUsd()).isEqualTo(new BigDecimal("80.0000000000"));

@@ -11,12 +11,12 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class HousingBenchmarkComparisonResponseSchemaTest {
+class BenchmarkComparisonResponseSchemaTest {
 
     @Test
     void openApi31_스키마는_실제_null_응답_필드를_nullable_union으로_생성한다() {
         Map<String, Schema> schemas = ModelConverters.getInstance(true)
-                .readAll(HousingBenchmarkComparisonResponse.class);
+                .readAll(BenchmarkComparisonResponse.class);
         OpenAPI openApi = new OpenAPI().components(new Components().schemas(schemas));
 
         new HousingBenchmarkOpenApiCustomizer().customise(openApi);

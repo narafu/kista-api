@@ -1,8 +1,8 @@
 package com.kista.benchmark.application.service;
 
 import com.kista.benchmark.domain.model.BenchmarkScope;
-import com.kista.benchmark.domain.model.HousingBenchmarkComparison;
-import com.kista.benchmark.domain.model.HousingBenchmarkPoint;
+import com.kista.benchmark.domain.model.BenchmarkComparison;
+import com.kista.benchmark.domain.model.BenchmarkPoint;
 import com.kista.benchmark.domain.model.InvestmentPoint;
 import com.kista.benchmark.domain.model.PerformanceComparisonSummary;
 import com.kista.benchmark.domain.model.StrategyRef;
@@ -23,17 +23,17 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-final class HousingBenchmarkComparisonBuilder {
+final class BenchmarkComparisonBuilder {
 
     private static final int SCALE = 10;
     private static final RoundingMode HALF_UP = RoundingMode.HALF_UP;
     private static final double DAYS_PER_YEAR = 365.0;
     private static final int MIN_ANNUALIZED_DAYS = 365; // 이보다 짧은 구간은 연환산이 과대·과소 표시되므로 null (백테스트 CAGR과 동일 기준)
 
-    HousingBenchmarkComparison build(
+    BenchmarkComparison build(
             BenchmarkScope scope,
             StrategyRef strategy,
-            HousingBenchmarkComparison.Benchmark benchmark,
+            BenchmarkComparison.Benchmark benchmark,
             List<InvestmentPoint> investmentPoints,
             Map<LocalDate, BigDecimal> benchmarkPrices) {
         if (investmentPoints.isEmpty()) {
@@ -60,7 +60,7 @@ final class HousingBenchmarkComparisonBuilder {
             return empty(scope, strategy, benchmark, "INSUFFICIENT_COMMON_MONTHS");
         }
 
-        List<HousingBenchmarkPoint> points = new ArrayList<>();
+        List<BenchmarkPoint> points = new ArrayList<>();
         LocalDate previousDate = null;
         BigDecimal previousInvestmentIndex = null;
         BigDecimal previousBenchmarkIndex = null;
@@ -70,7 +70,7 @@ final class HousingBenchmarkComparisonBuilder {
             BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(date), firstBenchmarkPrice);
             // commonDates 자체가 실제 관측 포인트 교집합이라 인접 검사 없이 직전 포인트 대비로 계산한다
             boolean computeReturn = previousDate != null;
-            points.add(new HousingBenchmarkPoint(
+            points.add(new BenchmarkPoint(
                     date,
                     investmentIndex,
                     benchmarkIndex,
@@ -95,14 +95,14 @@ final class HousingBenchmarkComparisonBuilder {
                 investmentCumulativeReturn.subtract(benchmarkCumulativeReturn).setScale(SCALE, HALF_UP),
                 suppressAnnualized ? null : annualizedReturn(lastInvestmentIndex, periodsPerYear),
                 suppressAnnualized ? null : annualizedReturn(lastBenchmarkIndex, periodsPerYear),
-                maxDrawdown(points.stream().map(HousingBenchmarkPoint::investmentIndexUsd).toList()),
-                maxDrawdown(points.stream().map(HousingBenchmarkPoint::benchmarkIndex).toList()));
+                maxDrawdown(points.stream().map(BenchmarkPoint::investmentIndexUsd).toList()),
+                maxDrawdown(points.stream().map(BenchmarkPoint::benchmarkIndex).toList()));
 
-        return new HousingBenchmarkComparison(
+        return new BenchmarkComparison(
                 scope,
                 strategy,
                 benchmark,
-                new HousingBenchmarkComparison.Period(
+                new BenchmarkComparison.Period(
                         firstDate, points.getLast().baseDate(), points.size()),
                 summary,
                 List.copyOf(points),
@@ -110,14 +110,14 @@ final class HousingBenchmarkComparisonBuilder {
                 null);
     }
 
-    private static HousingBenchmarkComparison empty(
+    private static BenchmarkComparison empty(
             BenchmarkScope scope,
             StrategyRef strategy,
-            HousingBenchmarkComparison.Benchmark benchmark,
+            BenchmarkComparison.Benchmark benchmark,
             String reason) {
-        return new HousingBenchmarkComparison(
+        return new BenchmarkComparison(
                 scope, strategy, benchmark,
-                new HousingBenchmarkComparison.Period(null, null, 0),
+                new BenchmarkComparison.Period(null, null, 0),
                 null, List.of(), null, reason);
     }
 

@@ -1,6 +1,6 @@
 package com.kista.benchmark.adapter.in.web;
 
-import com.kista.benchmark.adapter.in.web.dto.HousingBenchmarkComparisonResponse;
+import com.kista.benchmark.adapter.in.web.dto.BenchmarkComparisonResponse;
 import com.kista.benchmark.adapter.in.web.dto.HousingBenchmarkRegionsResponse;
 import com.kista.benchmark.adapter.in.web.dto.HousingBenchmarkSeriesResponse;
 import com.kista.benchmark.adapter.in.web.dto.HousingPriceIndexSeriesResponse;
@@ -36,7 +36,7 @@ public class BenchmarkController {
             description = "USD 투자 성과와 벤치마크(아파트 지역 매매가격지수 또는 SPY/QQQ/QLD/IBIT/ETHA ETF)를 비교합니다. "
                     + "benchmarkType=ETF면 symbol이 필수이며 regionCode는 무시됩니다.")
     @GetMapping("/housing-benchmark")
-    public HousingBenchmarkComparisonResponse getHousingBenchmarkComparison(
+    public BenchmarkComparisonResponse getHousingBenchmarkComparison(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(defaultValue = "PORTFOLIO") BenchmarkScope scope,
             @RequestParam(required = false) UUID strategyId,
@@ -58,13 +58,13 @@ public class BenchmarkController {
             if (symbol == null) {
                 throw new IllegalArgumentException("benchmarkType=ETF에는 symbol이 필요합니다");
             }
-            return HousingBenchmarkComparisonResponse.from(
+            return BenchmarkComparisonResponse.from(
                     userStats.getEtfBenchmarkComparison(userId, scope, strategyId, symbol, from, to));
         }
         if (regionCode == null || regionCode.isBlank()) {
             throw new IllegalArgumentException("regionCode는 비어있을 수 없습니다");
         }
-        return HousingBenchmarkComparisonResponse.from(
+        return BenchmarkComparisonResponse.from(
                 userStats.getHousingBenchmarkComparison(
                         userId, scope, strategyId, regionCode, from, to));
     }

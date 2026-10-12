@@ -2,7 +2,7 @@ package com.kista.benchmark.application.service;
 
 import com.kista.benchmark.domain.model.BenchmarkAssetType;
 import com.kista.benchmark.domain.model.BenchmarkScope;
-import com.kista.benchmark.domain.model.HousingBenchmarkComparison;
+import com.kista.benchmark.domain.model.BenchmarkComparison;
 import com.kista.benchmark.domain.model.InvestmentPoint;
 import org.junit.jupiter.api.Test;
 
@@ -14,11 +14,11 @@ import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class HousingBenchmarkComparisonBuilderTest {
+class BenchmarkComparisonBuilderTest {
 
-    private final HousingBenchmarkComparisonBuilder builder = new HousingBenchmarkComparisonBuilder();
+    private final BenchmarkComparisonBuilder builder = new BenchmarkComparisonBuilder();
 
-    private static final HousingBenchmarkComparison.Benchmark BENCHMARK = new HousingBenchmarkComparison.Benchmark(
+    private static final BenchmarkComparison.Benchmark BENCHMARK = new BenchmarkComparison.Benchmark(
             BenchmarkAssetType.HOUSING, "1100000000", "서울", null, "서울 아파트 매매가격지수", null);
 
     private static InvestmentPoint point(LocalDate date, String indexUsd) {
@@ -40,7 +40,7 @@ class HousingBenchmarkComparisonBuilderTest {
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "110"));
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "121");
 
-        HousingBenchmarkComparison result = builder.build(
+        BenchmarkComparison result = builder.build(
                 BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.points().getLast().investmentPeriodReturn()).isEqualByComparingTo("0.1");
@@ -55,7 +55,7 @@ class HousingBenchmarkComparisonBuilderTest {
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "101"));
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
 
-        HousingBenchmarkComparison result = builder.build(
+        BenchmarkComparison result = builder.build(
                 BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.emptyReason()).isNull();
@@ -70,7 +70,7 @@ class HousingBenchmarkComparisonBuilderTest {
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "101"));
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
 
-        HousingBenchmarkComparison result = builder.build(
+        BenchmarkComparison result = builder.build(
                 BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.summary().investmentAnnualizedReturn()).isNull();
@@ -85,7 +85,7 @@ class HousingBenchmarkComparisonBuilderTest {
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "184.2"));
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
 
-        HousingBenchmarkComparison result = builder.build(
+        BenchmarkComparison result = builder.build(
                 BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
@@ -98,7 +98,7 @@ class HousingBenchmarkComparisonBuilderTest {
         // 119일 구간 — 백테스트 CAGR과 같은 365일 하한
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         LocalDate d2 = LocalDate.of(2026, 5, 4);
-        HousingBenchmarkComparison result = builder.build(
+        BenchmarkComparison result = builder.build(
                 BenchmarkScope.PORTFOLIO, null, BENCHMARK,
                 List.of(point(d1, "100"), point(d2, "184.2")), prices(d1, "100", d2, "400"));
 

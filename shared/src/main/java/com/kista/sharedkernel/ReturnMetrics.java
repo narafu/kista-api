@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
-// 자산 곡선 성과 지표 순수 계산 유틸 — HousingBenchmarkComparisonBuilder에서 추출, 백테스트(Task 7)와 공용
+// 자산 곡선 성과 지표 순수 계산 유틸 — BenchmarkComparisonBuilder에서 추출, 백테스트(Task 7)와 공용
 public final class ReturnMetrics {
 
     private static final int SCALE = 10;

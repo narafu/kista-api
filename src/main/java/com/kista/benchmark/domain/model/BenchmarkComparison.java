@@ -3,13 +3,13 @@ package com.kista.benchmark.domain.model;
 import java.time.LocalDate;
 import java.util.List;
 
-public record HousingBenchmarkComparison(
+public record BenchmarkComparison(
         BenchmarkScope scope,
         StrategyRef strategy,
         Benchmark benchmark,
         Period period,
         PerformanceComparisonSummary summary,
-        List<HousingBenchmarkPoint> points,
+        List<BenchmarkPoint> points,
         CurrentExchangeRate currentExchangeRate,
         String emptyReason
 ) {
@@ -24,8 +24,8 @@ public record HousingBenchmarkComparison(
 
     public record Period(LocalDate fromDate, LocalDate toDate, int pointCount) {}
 
-    public HousingBenchmarkComparison withCurrentExchangeRate(CurrentExchangeRate rate) {
-        return new HousingBenchmarkComparison(
+    public BenchmarkComparison withCurrentExchangeRate(CurrentExchangeRate rate) {
+        return new BenchmarkComparison(
                 scope, strategy, benchmark, period, summary, points, rate, emptyReason);
     }
 }

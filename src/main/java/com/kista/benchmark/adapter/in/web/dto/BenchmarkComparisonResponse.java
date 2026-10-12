@@ -2,8 +2,8 @@ package com.kista.benchmark.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.benchmark.domain.model.BenchmarkAssetType;
-import com.kista.benchmark.domain.model.HousingBenchmarkComparison;
-import com.kista.benchmark.domain.model.HousingBenchmarkPoint;
+import com.kista.benchmark.domain.model.BenchmarkComparison;
+import com.kista.benchmark.domain.model.BenchmarkPoint;
 import com.kista.benchmark.domain.model.PerformanceComparisonSummary;
 import com.kista.benchmark.domain.model.StrategyRef;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,7 +14,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-public record HousingBenchmarkComparisonResponse(
+// 주택·ETF 비교 공용 응답 — openapi 스키마명은 kista-ui 생성 타입 계약이라 HousingBenchmark* 접두사를 유지한다
+@Schema(name = "HousingBenchmarkComparisonResponse")
+public record BenchmarkComparisonResponse(
         String scope,
         @JsonInclude(JsonInclude.Include.ALWAYS)
         StrategyInfo strategy,
@@ -89,13 +91,13 @@ public record HousingBenchmarkComparisonResponse(
             String method, String investmentCurrency, String benchmarkCurrency, String notice
     ) {}
 
-    public static HousingBenchmarkComparisonResponse from(HousingBenchmarkComparison comparison) {
+    public static BenchmarkComparisonResponse from(BenchmarkComparison comparison) {
         StrategyRef strategy = comparison.strategy();
-        HousingBenchmarkComparison.Benchmark benchmark = comparison.benchmark();
-        HousingBenchmarkComparison.Period period = comparison.period();
+        BenchmarkComparison.Benchmark benchmark = comparison.benchmark();
+        BenchmarkComparison.Period period = comparison.period();
         var rate = comparison.currentExchangeRate();
         boolean isEtf = benchmark.assetType() == BenchmarkAssetType.ETF;
-        return new HousingBenchmarkComparisonResponse(
+        return new BenchmarkComparisonResponse(
                 comparison.scope().name(),
                 strategy == null ? null : new StrategyInfo(
                         strategy.id(), strategy.type().name(), strategy.ticker().name()),
@@ -104,7 +106,7 @@ public record HousingBenchmarkComparisonResponse(
                         benchmark.symbol(), benchmark.label(), benchmark.sourceUpdatedDate()),
                 new Period(period.fromDate(), period.toDate(), period.pointCount()),
                 toSummary(comparison.summary()),
-                comparison.points().stream().map(HousingBenchmarkComparisonResponse::toPoint).toList(),
+                comparison.points().stream().map(BenchmarkComparisonResponse::toPoint).toList(),
                 rate == null ? null : new CurrentExchangeRate(
                         rate.midRate(), rate.fetchedAt(), rate.source()),
                 isEtf
@@ -121,7 +123,7 @@ public record HousingBenchmarkComparisonResponse(
                 summary.benchmarkMaxDrawdown());
     }
 
-    private static Point toPoint(HousingBenchmarkPoint point) {
+    private static Point toPoint(BenchmarkPoint point) {
         return new Point(
                 point.baseDate(), point.investmentIndexUsd(), point.benchmarkIndex(),
                 point.investmentPeriodReturn(), point.benchmarkPeriodReturn());

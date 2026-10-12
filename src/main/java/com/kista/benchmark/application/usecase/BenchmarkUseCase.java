@@ -2,7 +2,7 @@ package com.kista.benchmark.application.usecase;
 
 import com.kista.benchmark.domain.model.BenchmarkScope;
 import com.kista.benchmark.domain.model.EtfBenchmarkSymbol;
-import com.kista.benchmark.domain.model.HousingBenchmarkComparison;
+import com.kista.benchmark.domain.model.BenchmarkComparison;
 import com.kista.benchmark.domain.model.HousingBenchmarkPrice;
 import com.kista.benchmark.domain.model.HousingBenchmarkRegion;
 import com.kista.benchmark.domain.model.HousingPriceIndex;
@@ -13,12 +13,12 @@ import java.util.List;
 import java.util.UUID;
 
 public interface BenchmarkUseCase {
-    HousingBenchmarkComparison getHousingBenchmarkComparison(
+    BenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             String regionCode, LocalDate from, LocalDate to);
 
     // ETF(SPY/QQQ/QLD/IBIT/ETHA) 벤치마크 비교 — 계산 로직은 getHousingBenchmarkComparison과 공유
-    HousingBenchmarkComparison getEtfBenchmarkComparison(
+    BenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to);
 

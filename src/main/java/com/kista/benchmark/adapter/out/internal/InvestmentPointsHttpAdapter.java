@@ -48,7 +48,7 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
         return toResult(response);
     }
 
-    // contract → stats 도메인 매핑 — 벤치마크 계산(HousingBenchmarkComparisonBuilder 등)은 root stats 도메인 타입을 쓴다
+    // contract → stats 도메인 매핑 — 벤치마크 계산(BenchmarkComparisonBuilder 등)은 root stats 도메인 타입을 쓴다
     private static Result toResult(InvestmentPointsResponse r) {
         List<InvestmentPoint> points = r.points().stream()
                 .map(p -> new InvestmentPoint(p.baseDate(), p.investmentIndexUsd(), p.periodReturn()))

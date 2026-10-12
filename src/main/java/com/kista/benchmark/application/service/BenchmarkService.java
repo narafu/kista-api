@@ -33,8 +33,8 @@ class BenchmarkService implements BenchmarkUseCase {
     private final CurrentExchangeRatePort currentExchangeRatePort;
     private final IndexPricePort indexPricePort;
     private final TtlResultCache statsResultCache = new TtlResultCache(); // 비교 본체 결과 캐시
-    private final HousingBenchmarkComparisonBuilder comparisonBuilder =
-            new HousingBenchmarkComparisonBuilder();
+    private final BenchmarkComparisonBuilder comparisonBuilder =
+            new BenchmarkComparisonBuilder();
 
     // 벤치마크 비교 캐시 키 — HOUSING(regionCode 사용, symbol=null) / ETF(symbol 사용, regionCode=null) 공용
     private record BenchmarkComparisonKey(
@@ -42,7 +42,7 @@ class BenchmarkService implements BenchmarkUseCase {
             String regionCode, String symbol, LocalDate from, LocalDate to) {}
 
     @Override
-    public HousingBenchmarkComparison getHousingBenchmarkComparison(
+    public BenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             String regionCode, LocalDate from, LocalDate to) {
         validateComparisonRequest(scope, strategyId, regionCode, from, to);
@@ -52,7 +52,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 () -> computeHousingComparisonBody(userId, scope, strategyId, regionCode, from, to));
     }
 
-    private HousingBenchmarkComparison computeHousingComparisonBody(
+    private BenchmarkComparison computeHousingComparisonBody(
             UUID userId, BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
                 userId, scope, strategyId, from, effectiveTo(to));
@@ -87,7 +87,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 .max(LocalDate::compareTo)
                 .orElse(null);
 
-        HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
+        BenchmarkComparison.Benchmark benchmark = new BenchmarkComparison.Benchmark(
                 BenchmarkAssetType.HOUSING, regionCode, regionName, null,
                 (regionName != null ? regionName : regionCode) + " 아파트 매매가격지수", sourceUpdatedDate);
 
@@ -96,7 +96,7 @@ class BenchmarkService implements BenchmarkUseCase {
     }
 
     @Override
-    public HousingBenchmarkComparison getEtfBenchmarkComparison(
+    public BenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
         // 데이터 조회 전 fast-fail — 검증 로직·예외 타입은 HOUSING과 동일하게 재사용
@@ -107,7 +107,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 () -> computeEtfComparisonBody(userId, scope, strategyId, symbol, from, to));
     }
 
-    private HousingBenchmarkComparison computeEtfComparisonBody(
+    private BenchmarkComparison computeEtfComparisonBody(
             UUID userId, BenchmarkScope scope, UUID strategyId, EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
                 userId, scope, strategyId, from, effectiveTo(to));
@@ -125,7 +125,7 @@ class BenchmarkService implements BenchmarkUseCase {
         LocalDate sourceUpdatedDate = dailyPrices.stream().map(IndexPrice::tradeDate)
                 .max(LocalDate::compareTo).map(date -> date.plusDays(1)).orElse(null);
 
-        HousingBenchmarkComparison.Benchmark benchmark = new HousingBenchmarkComparison.Benchmark(
+        BenchmarkComparison.Benchmark benchmark = new BenchmarkComparison.Benchmark(
                 BenchmarkAssetType.ETF, null, null, symbol.name(),
                 symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
 
@@ -133,9 +133,9 @@ class BenchmarkService implements BenchmarkUseCase {
     }
 
     // 본체(캐시 대상)를 먼저 구한 뒤 환율을 후결합 — 본체 실패(소유권 등) 시 환율 조회를 하지 않는다
-    private HousingBenchmarkComparison comparisonWithExchangeRate(
-            BenchmarkComparisonKey key, Supplier<HousingBenchmarkComparison> bodyLoader) {
-        HousingBenchmarkComparison body = statsResultCache.getOrCompute(key, BENCHMARK_CACHE_TTL, bodyLoader);
+    private BenchmarkComparison comparisonWithExchangeRate(
+            BenchmarkComparisonKey key, Supplier<BenchmarkComparison> bodyLoader) {
+        BenchmarkComparison body = statsResultCache.getOrCompute(key, BENCHMARK_CACHE_TTL, bodyLoader);
         return body.withCurrentExchangeRate(fetchCurrentExchangeRate());
     }
 

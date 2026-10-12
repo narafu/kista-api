@@ -130,7 +130,7 @@ class HousingBenchmarkApiDocsTest {
     @RestController
     static class SchemaController {
         @GetMapping("/housing-benchmark-schema")
-        HousingBenchmarkComparisonResponse schema() {
+        BenchmarkComparisonResponse schema() {
             return null;
         }
 
