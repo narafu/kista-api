@@ -3,6 +3,7 @@ package com.kista.finance.adapter.out.persistence;
 import com.kista.platform.persistence.BaseAuditEntity;
 import com.kista.finance.domain.model.FinanceCategory;
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,7 +24,7 @@ import java.util.UUID;
 class FinanceCategoryEntity extends BaseAuditEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     @Column(columnDefinition = "UUID")
     private UUID id;
 
@@ -51,7 +52,7 @@ class FinanceCategoryEntity extends BaseAuditEntity {
 
     static FinanceCategoryEntity fromModel(FinanceCategory c) {
         FinanceCategoryEntity e = new FinanceCategoryEntity();
-        e.id = c.id(); // null이면 @GeneratedValue가 UUID 생성
+        e.id = c.id(); // null이면 @UuidGenerator가 UUID v7 생성
         e.groupId = c.groupId();
         e.parentId = c.parentId();
         e.userId = c.userId();

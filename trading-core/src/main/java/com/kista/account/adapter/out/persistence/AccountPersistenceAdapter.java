@@ -77,7 +77,7 @@ public class AccountPersistenceAdapter implements AccountPort {
     // Account 도메인 모델 → 암호화 후 Entity 변환
     private AccountEntity toEntity(Account a) {
         AccountEntity e = new AccountEntity();
-        e.setId(a.id()); // null이면 @GeneratedValue가 UUID 생성
+        e.setId(a.id()); // null이면 @UuidGenerator가 UUID v7 생성
         e.setUserId(a.userId());
         e.setNickname(a.nickname());
         e.setAccountNo(crypto.encrypt(a.accountNo()));

@@ -9,6 +9,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.persistence.GeneratedValue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPac
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("Hexagonal Architecture 규칙")
@@ -30,6 +32,16 @@ class HexagonalArchitectureTest {
     @BeforeAll
     static void setUp() {
         classes = new ClassFileImporter().importPackages("com.kista");
+    }
+
+    @Test
+    @DisplayName("JPA PK는 @GeneratedValue 대신 @UuidGenerator(VERSION_7)로 생성한다")
+    void entity_ids_must_use_uuid_v7_generator() {
+        // GenerationType.UUID는 Hibernate 기본이 랜덤 v4라 인덱스 끝에 붙지 않는다 — 시간순 v7로 통일
+        ArchRule rule = noFields()
+                .should().beAnnotatedWith(GeneratedValue.class)
+                .because("UUID PK는 @UuidGenerator(style = UuidGenerator.Style.VERSION_7)로 생성한다");
+        rule.check(classes);
     }
 
     @Test

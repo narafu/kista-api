@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -24,7 +25,7 @@ import java.util.UUID;
 class FinanceAssetSnapshotEntity extends BaseAuditEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     @Column(columnDefinition = "UUID")
     private UUID id;
 
@@ -65,7 +66,7 @@ class FinanceAssetSnapshotEntity extends BaseAuditEntity {
 
     static FinanceAssetSnapshotEntity fromModel(AssetSnapshot s) {
         FinanceAssetSnapshotEntity e = new FinanceAssetSnapshotEntity();
-        e.id = s.id(); // null이면 @GeneratedValue가 UUID 생성
+        e.id = s.id(); // null이면 @UuidGenerator가 UUID v7 생성
         e.groupId = s.groupId();
         e.categoryId = s.categoryId();
         e.accountId = s.accountId();

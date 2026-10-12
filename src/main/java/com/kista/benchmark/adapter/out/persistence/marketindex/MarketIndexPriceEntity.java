@@ -3,6 +3,7 @@ package com.kista.benchmark.adapter.out.persistence.marketindex;
 import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.benchmark.domain.model.IndexPrice;
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -24,7 +25,7 @@ import java.util.UUID;
 class MarketIndexPriceEntity extends BaseCreatedAtEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     private UUID id;
 
     @Column(name = "symbol", nullable = false, length = 10)

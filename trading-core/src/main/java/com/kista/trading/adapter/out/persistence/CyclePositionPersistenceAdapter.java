@@ -206,7 +206,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     private CyclePositionEntity toEntity(CyclePosition p) {
         CyclePositionEntity e = new CyclePositionEntity();
-        e.setId(p.id()); // null이면 @GeneratedValue가 UUID 생성
+        e.setId(p.id()); // null이면 @UuidGenerator가 UUID v7 생성
         e.setStrategyCycleId(p.strategyCycleId());
         e.setUsdDeposit(p.usdDeposit());
         e.setClosingPrice(p.closingPrice());

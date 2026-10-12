@@ -10,7 +10,7 @@ import java.util.UUID;
 // 한 StrategyCycle 내의 포지션 스냅샷 — 체결마다 1건 append
 // 최신 행 = 현재 보유 포지션
 public record CyclePosition(
-        UUID id,                  // PK (null이면 @GeneratedValue)
+        UUID id,                  // PK (null이면 @UuidGenerator)
         UUID strategyCycleId,     // FK → strategy_cycle.id
         BigDecimal usdDeposit,    // 통합주문가능금액 (매매 공식 B 계산 기준)
         BigDecimal closingPrice,  // 종가

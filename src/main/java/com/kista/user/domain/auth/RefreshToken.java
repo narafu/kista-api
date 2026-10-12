@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record RefreshToken(
-        UUID id,           // 생성 시 null (@GeneratedValue)
+        UUID id,           // 생성 시 null (@UuidGenerator)
         UUID userId,
         String tokenHash,  // SHA-256 hex(rawToken) — 64자
         String userAgent,  // nullable, 디바이스 식별용

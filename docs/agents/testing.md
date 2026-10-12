@@ -72,7 +72,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 - `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음
 
 ### JPA 엔티티 저장 패턴
-- `@GeneratedValue(strategy = GenerationType.UUID)` 엔티티 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
+- UUID PK 엔티티(`@UuidGenerator(style = UuidGenerator.Style.VERSION_7)` — 시간순 v7, `@GeneratedValue`는 `HexagonalArchitectureTest`가 금지) 저장 시 도메인 모델의 `id`는 반드시 `null` — non-null UUID 전달 시 Spring Data JPA가 `merge()` 호출 → `StaleObjectStateException` 발생
 - `@Transactional` 테스트 내에서 `insertable=false, updatable=false` 필드(예: `createdAt`)는 DB DEFAULT 값이 JPA 1차 캐시에 반영되지 않음 → 해당 필드 `isNotNull()` 단언 금지
 
 ### record 필드 수정 시 주의

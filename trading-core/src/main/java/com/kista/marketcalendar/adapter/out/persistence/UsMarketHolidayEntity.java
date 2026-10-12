@@ -2,6 +2,7 @@ package com.kista.marketcalendar.adapter.out.persistence;
 
 import com.kista.platform.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -15,7 +16,7 @@ import java.util.UUID;
 public class UsMarketHolidayEntity extends BaseCreatedAtEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     private UUID id;
 
     @Column(name = "trade_date", nullable = false, unique = true)

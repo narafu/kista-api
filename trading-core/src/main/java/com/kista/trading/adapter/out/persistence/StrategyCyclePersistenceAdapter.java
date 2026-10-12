@@ -106,7 +106,7 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
 
     private StrategyCycleEntity toEntity(StrategyCycle c) {
         StrategyCycleEntity e = new StrategyCycleEntity();
-        e.setId(c.id()); // null이면 @GeneratedValue가 UUID 생성
+        e.setId(c.id()); // null이면 @UuidGenerator가 UUID v7 생성
         e.setStrategyId(c.strategyId());
         e.setStrategyVersionId(c.strategyVersionId());
         e.setStartAmount(c.startAmount());

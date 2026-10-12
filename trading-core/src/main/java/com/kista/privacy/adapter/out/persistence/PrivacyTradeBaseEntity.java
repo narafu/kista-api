@@ -3,6 +3,7 @@ package com.kista.privacy.adapter.out.persistence;
 import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.sharedkernel.StrategyTicker;
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,7 +27,7 @@ import java.util.UUID;
 class PrivacyTradeBaseEntity extends BaseCreatedAtEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     @Column(columnDefinition = "UUID")
     private UUID id;
 

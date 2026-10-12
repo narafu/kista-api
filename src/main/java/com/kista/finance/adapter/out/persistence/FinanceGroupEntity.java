@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -21,7 +22,7 @@ import java.util.UUID;
 class FinanceGroupEntity extends BaseAuditEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     @Column(columnDefinition = "UUID")
     private UUID id;
 
@@ -33,7 +34,7 @@ class FinanceGroupEntity extends BaseAuditEntity {
 
     static FinanceGroupEntity fromModel(FinanceGroup g) {
         FinanceGroupEntity e = new FinanceGroupEntity();
-        e.id = g.id(); // null이면 @GeneratedValue가 UUID 생성
+        e.id = g.id(); // null이면 @UuidGenerator가 UUID v7 생성
         e.ownerUserId = g.ownerUserId();
         return e;
     }

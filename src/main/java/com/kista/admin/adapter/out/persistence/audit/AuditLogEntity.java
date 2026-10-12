@@ -4,6 +4,7 @@ import com.kista.platform.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 import java.util.Map;
 import java.util.UUID;
@@ -17,7 +18,7 @@ import java.util.UUID;
 public class AuditLogEntity extends BaseCreatedAtEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     @Column(updatable = false)
     private UUID id;
 

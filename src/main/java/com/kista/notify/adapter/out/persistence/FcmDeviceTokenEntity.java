@@ -1,6 +1,7 @@
 package com.kista.notify.adapter.out.persistence;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +18,7 @@ import java.util.UUID;
 class FcmDeviceTokenEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     @Column(columnDefinition = "UUID")
     private UUID id;
 

@@ -75,7 +75,11 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         List<Order> result = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now());
 
         assertThat(result).singleElement()
-                .satisfies(saved -> assertThat(saved.orderLeg()).isEqualTo("INFINITE_EARLY_AVG_BUY"));
+                .satisfies(saved -> {
+                    assertThat(saved.orderLeg()).isEqualTo("INFINITE_EARLY_AVG_BUY");
+                    // PK는 JPA가 시간순 UUID v7로 생성한다
+                    assertThat(saved.id().version()).isEqualTo(7);
+                });
     }
 
     // 주문 1건 직접 삽입 헬퍼

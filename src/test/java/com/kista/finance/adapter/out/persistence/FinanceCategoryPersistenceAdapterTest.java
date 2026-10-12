@@ -59,6 +59,8 @@ class FinanceCategoryPersistenceAdapterTest extends RootDataJpaTestBase {
     @Test
     void findSelectable_returnsSystemUnionMyPersonalUnionMyGroup_excludingSoftDeleted() {
         FinanceCategory personal = adapter.save(personalCategory(userId, FinanceCategory.Type.EXPENSE, "개인카테고리"));
+        // PK는 JPA가 시간순 UUID v7로 생성한다
+        assertThat(personal.id().version()).isEqualTo(7);
         FinanceCategory group = adapter.save(groupCategory(null, FinanceCategory.Type.EXPENSE, "그룹카테고리"));
         FinanceCategory toDelete = adapter.save(personalCategory(userId, FinanceCategory.Type.EXPENSE, "삭제될카테고리"));
         adapter.softDeleteWithChildren(toDelete.id());

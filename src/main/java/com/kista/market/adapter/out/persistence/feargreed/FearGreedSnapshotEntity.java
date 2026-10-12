@@ -4,6 +4,7 @@ import com.kista.platform.persistence.BaseCreatedAtEntity;
 import com.kista.market.domain.model.FearGreedRating;
 import com.kista.market.domain.model.FearGreedSnapshot;
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -24,7 +25,7 @@ import java.util.UUID;
 class FearGreedSnapshotEntity extends BaseCreatedAtEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     private UUID id;
 
     @Column(name = "source", nullable = false, length = 20)

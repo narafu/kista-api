@@ -2,6 +2,7 @@ package com.kista.user.adapter.out.persistence.auth;
 
 import com.kista.user.domain.auth.RefreshToken;
 import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,7 +17,7 @@ import java.util.UUID;
 class RefreshTokenEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
     private UUID id;
 
     @Column(name = "user_id", nullable = false)

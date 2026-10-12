@@ -11,7 +11,7 @@ import java.util.UUID;
 // 여러 StrategyCycle이 동일 Strategy에 누적됨 (사이클 이력 추적 가능)
 // 리버스모드 여부는 공통 strategy_cycle이 아닌 INFINITE 상세 모델이 SSOT
 public record StrategyCycle(
-        UUID id,                          // PK (null이면 @GeneratedValue)
+        UUID id,                          // PK (null이면 @UuidGenerator)
         UUID strategyId,                  // FK → strategy.id
         UUID strategyVersionId,           // FK → strategy_version.id
         BigDecimal startAmount,           // 사이클 개장 총자산 (USD)
