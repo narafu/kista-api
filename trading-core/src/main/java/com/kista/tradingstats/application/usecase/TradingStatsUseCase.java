@@ -3,10 +3,10 @@ package com.kista.tradingstats.application.usecase;
 import com.kista.sharedkernel.StrategyTicker;
 import com.kista.sharedkernel.StrategyType;
 import com.kista.tradingstats.domain.model.CyclePerformancePage;
+import com.kista.tradingstats.domain.model.CycleStatusFilter;
 import com.kista.tradingstats.domain.model.EquityCurve;
 import com.kista.tradingstats.domain.model.StatsSummary;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -18,7 +18,7 @@ public interface TradingStatsUseCase {
     // from/to null 허용 (null이면 전체/오늘)
     EquityCurve getEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to);
 
-    // type/accountId/ticker 각각 null이면 해당 조건 미적용 (AND 조합). 타 사용자 accountId는 빈 결과
+    // type/accountId/ticker/status 각각 null이면 해당 조건 미적용 (AND 조합). 타 사용자 accountId는 빈 결과. page는 0-based
     CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId, StrategyTicker ticker,
-                                              Instant cursor, int size);
+                                              CycleStatusFilter status, int page, int size);
 }

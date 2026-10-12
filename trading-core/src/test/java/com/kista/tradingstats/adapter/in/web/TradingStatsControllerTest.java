@@ -94,34 +94,36 @@ class TradingStatsControllerTest {
     @Test
     void cycles는_계좌와_티커_필터를_전달한다() throws Exception {
         var accountId = UUID.randomUUID();
-        when(tradingStats.getCyclePerformances(any(), any(), any(), any(), any(), anyInt()))
-                .thenReturn(new CyclePerformancePage(List.of(), null, false));
+        when(tradingStats.getCyclePerformances(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new CyclePerformancePage(List.of(), 0, 0, 0));
 
         mockMvc.perform(get("/api/stats/cycles")
                         .param("type", "INFINITE").param("accountId", accountId.toString()).param("ticker", "SOXL")
+                        .param("status", "ACTIVE").param("page", "2")
                         .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk());
 
         verify(tradingStats).getCyclePerformances(
-                USER_ID, StrategyType.INFINITE, accountId, StrategyTicker.SOXL, null, 50);
+                USER_ID, StrategyType.INFINITE, accountId, StrategyTicker.SOXL, CycleStatusFilter.ACTIVE, 2, 50);
     }
 
     @Test
-    void cycles를_커서와_함께_반환한다() throws Exception {
+    void cycles를_페이지_정보와_함께_반환한다() throws Exception {
         var createdAt = Instant.parse("2026-02-01T00:00:00Z");
-        when(tradingStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), eq(50)))
+        when(tradingStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), eq(0), eq(50)))
                 .thenReturn(new CyclePerformancePage(
                         List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
                                 StrategyTicker.SOXL, LocalDate.parse("2026-01-01"),
                                 LocalDate.parse("2026-01-31"), new BigDecimal("1000.00"),
                                 new BigDecimal("1100.00"), new BigDecimal("100.00"),
                                 new BigDecimal("0.1000"), 30, true, createdAt)),
-                        createdAt, true));
+                        0, 51, 2));
 
         mockMvc.perform(get("/api/stats/cycles").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].closed").value(true))
-                .andExpect(jsonPath("$.nextCursor").value("2026-02-01T00:00:00Z"))
-                .andExpect(jsonPath("$.hasMore").value(true));
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.totalElements").value(51))
+                .andExpect(jsonPath("$.totalPages").value(2));
     }
 }

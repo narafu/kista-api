@@ -1,6 +1,6 @@
 package com.kista.tradingstats.domain.model;
 
-import java.time.Instant;
 import java.util.List;
 
-public record CyclePerformancePage(List<CyclePerformance> items, Instant nextCursor, boolean hasMore) {}
+// 번호 페이징 결과 — page는 0-based
+public record CyclePerformancePage(List<CyclePerformance> items, int page, long totalElements, int totalPages) {}

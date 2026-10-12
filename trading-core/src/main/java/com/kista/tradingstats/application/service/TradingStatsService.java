@@ -111,26 +111,27 @@ class TradingStatsService implements TradingStatsUseCase {
 
     @Override
     public CyclePerformancePage getCyclePerformances(UUID userId, StrategyType type, UUID accountId,
-                                                     StrategyTicker ticker, Instant cursor, int size) {
+                                                     StrategyTicker ticker, CycleStatusFilter status, int page, int size) {
         // loadCycles가 본인 계좌로 한정하므로 타 사용자 accountId는 자연히 빈 결과
         List<CycleView> filtered = loadCycles(userId).stream()
                 .filter(v -> type == null || v.strategy().type() == type)
                 .filter(v -> accountId == null || v.strategy().accountId().equals(accountId))
                 .filter(v -> ticker == null || v.strategy().ticker() == ticker)
+                .filter(v -> status == null || status.matches(v.closed()))
                 .sorted(Comparator.comparing((CycleView v) -> v.cycle().createdAt()).reversed())
-                .filter(v -> cursor == null || v.cycle().createdAt().isBefore(cursor))
                 .toList();
 
-        boolean hasMore = filtered.size() > size;
-        List<CycleView> pageItems = hasMore ? filtered.subList(0, size) : filtered;
+        int totalPages = (int) Math.ceil(filtered.size() / (double) size);
+        // 범위를 벗어난 page는 빈 목록
+        int from = (int) Math.min((long) page * size, filtered.size());
+        List<CycleView> pageItems = filtered.subList(from, Math.min(from + size, filtered.size()));
         // 미종료 사이클의 최신 포지션을 일괄 조회 (N+1 방지)
         Set<UUID> openCycleIds = pageItems.stream().filter(v -> !v.closed())
                 .map(v -> v.cycle().id()).collect(Collectors.toSet());
         Map<UUID, CyclePosition> latestPositions = openCycleIds.isEmpty()
                 ? Map.of() : cyclePositionPort.findLatestByCycleIds(openCycleIds);
         List<CyclePerformance> items = pageItems.stream().map(v -> toPerformance(v, latestPositions)).toList();
-        Instant nextCursor = hasMore ? pageItems.get(pageItems.size() - 1).cycle().createdAt() : null;
-        return new CyclePerformancePage(items, nextCursor, hasMore);
+        return new CyclePerformancePage(items, page, filtered.size(), totalPages);
     }
 
     // ── private 헬퍼 ─────────────────────────────────────────────────────────

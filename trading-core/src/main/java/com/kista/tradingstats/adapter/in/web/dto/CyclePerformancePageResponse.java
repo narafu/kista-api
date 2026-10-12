@@ -1,6 +1,5 @@
 package com.kista.tradingstats.adapter.in.web.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.tradingstats.domain.model.CyclePerformance;
 import com.kista.tradingstats.domain.model.CyclePerformancePage;
 
@@ -11,8 +10,9 @@ import java.util.UUID;
 
 public record CyclePerformancePageResponse(
         List<Item> items,
-        @JsonInclude(JsonInclude.Include.NON_NULL) String nextCursor,
-        boolean hasMore
+        int page, // 0-based
+        long totalElements,
+        int totalPages
 ) {
     public record Item(
             UUID cycleId, UUID accountId, String strategyType, String ticker,
@@ -31,7 +31,6 @@ public record CyclePerformancePageResponse(
     public static CyclePerformancePageResponse from(CyclePerformancePage page) {
         return new CyclePerformancePageResponse(
                 page.items().stream().map(Item::from).toList(),
-                page.nextCursor() != null ? page.nextCursor().toString() : null,
-                page.hasMore());
+                page.page(), page.totalElements(), page.totalPages());
     }
 }

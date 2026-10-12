@@ -4,6 +4,7 @@ import com.kista.tradingstats.application.usecase.TradingStatsUseCase;
 import com.kista.tradingstats.adapter.in.web.dto.CyclePerformancePageResponse;
 import com.kista.tradingstats.adapter.in.web.dto.EquityCurveResponse;
 import com.kista.tradingstats.adapter.in.web.dto.StatsSummaryResponse;
+import com.kista.tradingstats.domain.model.CycleStatusFilter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import com.kista.sharedkernel.StrategyTicker;
@@ -45,17 +45,18 @@ class TradingStatsController {
     }
 
     @Operation(summary = "사이클 성과 목록",
-            description = "종료·진행 중 사이클의 손익/수익률/소요일 (커서 페이지네이션). type/accountId/ticker는 AND 조합, 타 사용자 accountId는 빈 결과.")
+            description = "종료·진행 중 사이클의 손익/수익률/소요일 (번호 페이지네이션, page 0-based). type/accountId/ticker/status는 AND 조합(status 생략 시 전체), 타 사용자 accountId는 빈 결과.")
     @GetMapping("/cycles")
     public CyclePerformancePageResponse getCycles(
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) StrategyType type,
             @RequestParam(required = false) UUID accountId,
             @RequestParam(required = false) StrategyTicker ticker,
-            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) CycleStatusFilter status,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CyclePerformancePageResponse.from(
-                tradingStats.getCyclePerformances(userId, type, accountId, ticker, cursorInstant, Math.clamp(size, 1, 200)));
+                tradingStats.getCyclePerformances(userId, type, accountId, ticker, status,
+                        Math.max(page, 0), Math.clamp(size, 1, 200)));
     }
 }

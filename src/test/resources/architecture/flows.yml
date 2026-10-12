@@ -751,7 +751,7 @@ flows:
         title: 성과 화면(요약·자산 곡선·사이클 목록)
         desc: >-
           성과 화면(StatsOverview)은 서버에서 요약(GET /api/stats/summary)과 최근 3개월 누적 자산 곡선(GET /api/stats/equity-curve)을 미리 채우고,
-          사이클 성과 목록(GET /api/stats/cycles)은 커서로 이어 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
+          사이클 성과 목록(GET /api/stats/cycles)은 진행 상태(진행중/종료) 필터와 번호 페이지로 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
           전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다.
         code: [TradingStatsController#getSummary, TradingStatsController#getEquityCurve, TradingStatsController#getCycles, TradingStatsService#getSummary, TradingStatsService#getEquityCurve, TradingStatsService#getCyclePerformances]
         fail: 한 쪽 조회가 실패해도 다른 쪽은 보인다(서버 prefetch를 각각 무시). 곡선이 실패하면 필터 토글만 남는다.
