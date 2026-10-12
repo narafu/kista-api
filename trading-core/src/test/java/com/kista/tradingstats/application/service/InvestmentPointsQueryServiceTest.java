@@ -15,7 +15,6 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.tradingstats.application.usecase.InvestmentPointsQuery;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -41,7 +40,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 // Task 5로 api BenchmarkService.buildInvestmentContext에서 이전된 소유권 검증·MOCK 계좌 필터링·
-// MonthlyReturnCalculator 배선 책임을 검증한다 — 스냅/벤치마크 비교 로직 자체는 api의
+// InvestmentIndexCalculator 배선 책임을 검증한다 — 스냅/벤치마크 비교 로직 자체는 api의
 // BenchmarkServiceTest가 계속 커버한다(이 서비스는 순수 InvestmentPoint 시리즈만 반환).
 @ExtendWith(MockitoExtension.class)
 class InvestmentPointsQueryServiceTest {
@@ -88,7 +87,7 @@ class InvestmentPointsQueryServiceTest {
                         depositSnapshot(cycle.id(), "110.00", "2026-02-23T01:00:00Z")));
 
         InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
-                STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23), BenchmarkGranularity.WEEKLY);
+                STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isEqualTo(STRATEGY);
         assertThat(result.points()).isNotEmpty();
@@ -106,7 +105,7 @@ class InvestmentPointsQueryServiceTest {
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(otherUserId));
 
         assertThatThrownBy(() -> service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
-                STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23), BenchmarkGranularity.WEEKLY))
+                STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23)))
                 .isInstanceOf(SecurityException.class);
 
         verify(strategyCyclePort, never()).findByStrategyIds(any());
@@ -129,7 +128,7 @@ class InvestmentPointsQueryServiceTest {
                 depositSnapshot(cycle.id(), "184.20", "2026-02-23T01:00:00Z")));
 
         InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.PORTFOLIO,
-                null, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23), BenchmarkGranularity.WEEKLY);
+                null, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         assertThat(result.selectedStrategy()).isNull();
         assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
@@ -138,7 +137,7 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
-    void from이_없으면_사이클_시작일_중_최소값의_월초를_effectiveFrom으로_쓴다() {
+    void from이_없으면_사이클_시작일_중_최소값을_effectiveFrom으로_쓴다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(USER_ID));
         StrategyCycle cycle = activeCycle("100.00", "2026-01-15");
@@ -147,8 +146,9 @@ class InvestmentPointsQueryServiceTest {
                 .thenReturn(List.of(depositSnapshot(cycle.id(), "100.00", "2026-01-15T01:00:00Z")));
 
         InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
-                STRATEGY_ID, null, LocalDate.of(2026, 2, 23), BenchmarkGranularity.WEEKLY);
+                STRATEGY_ID, null, LocalDate.of(2026, 2, 23));
 
-        assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 1));
+        assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 15));
+        assertThat(result.points().getFirst().baseDate()).isEqualTo(LocalDate.of(2026, 1, 15));
     }
 }

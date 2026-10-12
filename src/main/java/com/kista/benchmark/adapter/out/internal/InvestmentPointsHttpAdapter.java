@@ -4,7 +4,6 @@ import com.kista.contract.stats.InvestmentPointsResponse;
 import com.kista.platform.internalapi.InternalApiErrorDetails;
 import com.kista.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.benchmark.application.port.output.InvestmentPointsPort;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.benchmark.domain.model.BenchmarkScope;
 import com.kista.benchmark.domain.model.InvestmentPoint;
 import com.kista.benchmark.domain.model.StrategyRef;
@@ -24,7 +23,7 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
     private final RestClient internalApiRestClient;
 
     @Override
-    public Result fetch(UUID userId, BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to, BenchmarkGranularity granularity) {
+    public Result fetch(UUID userId, BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
         RestClient.ResponseSpec spec = internalApiRestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/internal/trading/stats/investment-points")
                         .queryParam("userId", userId)
@@ -32,7 +31,6 @@ class InvestmentPointsHttpAdapter implements InvestmentPointsPort {
                         .queryParamIfPresent("strategyId", Optional.ofNullable(strategyId))
                         .queryParamIfPresent("from", Optional.ofNullable(from))
                         .queryParamIfPresent("to", Optional.ofNullable(to))
-                        .queryParam("granularity", granularity)
                         .build())
                 .retrieve()
                 // trading 쪽 GlobalExceptionHandler가 매핑한 상태코드를 원래 예외 타입으로 되돌린다 —

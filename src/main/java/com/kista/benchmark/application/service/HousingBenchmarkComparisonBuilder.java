@@ -1,6 +1,5 @@
 package com.kista.benchmark.application.service;
 
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.benchmark.domain.model.BenchmarkScope;
 import com.kista.benchmark.domain.model.HousingBenchmarkComparison;
 import com.kista.benchmark.domain.model.HousingBenchmarkPoint;
@@ -36,8 +35,7 @@ final class HousingBenchmarkComparisonBuilder {
             StrategyRef strategy,
             HousingBenchmarkComparison.Benchmark benchmark,
             List<InvestmentPoint> investmentPoints,
-            Map<LocalDate, BigDecimal> benchmarkPrices,
-            BenchmarkGranularity granularity) {
+            Map<LocalDate, BigDecimal> benchmarkPrices) {
         if (investmentPoints.isEmpty()) {
             return empty(scope, strategy, benchmark, "NO_INVESTMENT_DATA");
         }
@@ -70,11 +68,8 @@ final class HousingBenchmarkComparisonBuilder {
             BigDecimal investmentIndex = normalize(
                     investmentByDate.get(date).investmentIndexUsd(), firstInvestmentIndex);
             BigDecimal benchmarkIndex = normalize(benchmarkPrices.get(date), firstBenchmarkPrice);
-            // MONTHLY는 인접 데이터 간 공백(결측월)이 있으면 수익률을 비워 오해를 막는다.
-            // 그 외(WEEKLY·DAILY)는 commonDates 자체가 이미 실제 관측 포인트 교집합이라
-            // 인접 검사 없이 항상 계산한다.
-            boolean computeReturn = previousDate != null
-                    && (granularity != BenchmarkGranularity.MONTHLY || date.equals(previousDate.plusMonths(1)));
+            // commonDates 자체가 실제 관측 포인트 교집합이라 인접 검사 없이 직전 포인트 대비로 계산한다
+            boolean computeReturn = previousDate != null;
             points.add(new HousingBenchmarkPoint(
                     date,
                     investmentIndex,
@@ -90,12 +85,10 @@ final class HousingBenchmarkComparisonBuilder {
         BigDecimal lastBenchmarkIndex = points.getLast().benchmarkIndex();
         BigDecimal investmentCumulativeReturn = cumulativeReturn(lastInvestmentIndex);
         BigDecimal benchmarkCumulativeReturn = cumulativeReturn(lastBenchmarkIndex);
-        // MONTHLY 이외 granularity는 1년 미만 구간에서 연환산을 null로 억제한다
-        boolean suppressAnnualized = granularity != BenchmarkGranularity.MONTHLY
-                && ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate()) < MIN_ANNUALIZED_DAYS;
-        double periodsPerYear = granularity == BenchmarkGranularity.MONTHLY
-                ? 12.0 / ChronoUnit.MONTHS.between(firstDate, points.getLast().baseDate())
-                : DAYS_PER_YEAR / ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate());
+        // 1년 미만 구간은 연환산을 null로 억제한다
+        long periodDays = ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate());
+        boolean suppressAnnualized = periodDays < MIN_ANNUALIZED_DAYS;
+        double periodsPerYear = DAYS_PER_YEAR / periodDays;
         PerformanceComparisonSummary summary = new PerformanceComparisonSummary(
                 investmentCumulativeReturn,
                 benchmarkCumulativeReturn,

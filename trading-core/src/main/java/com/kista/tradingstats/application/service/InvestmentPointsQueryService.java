@@ -10,9 +10,8 @@ import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
-import com.kista.tradingstats.application.MonthlyReturnCalculator;
+import com.kista.tradingstats.application.InvestmentIndexCalculator;
 import com.kista.tradingstats.application.usecase.InvestmentPointsQuery;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.tradingstats.domain.model.InvestmentPoint;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;
 import lombok.RequiredArgsConstructor;
@@ -33,13 +32,13 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
-    private final MonthlyReturnCalculator monthlyReturnCalculator = new MonthlyReturnCalculator();
+    private final InvestmentIndexCalculator investmentIndexCalculator = new InvestmentIndexCalculator();
 
     // 원본 BenchmarkService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
     // 이 메서드가 담당하므로(authorizeIfStrategyScope 대체) api 쪽은 사전검증을 하지 않는다.
     @Override
     public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId,
-                                        LocalDate from, LocalDate to, BenchmarkGranularity granularity) {
+                                        LocalDate from, LocalDate to) {
         LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
         Strategy selectedStrategy = null;
         List<Strategy> strategies;
@@ -61,16 +60,15 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
         List<StrategyCycle> cycles = strategyIds.isEmpty()
                 ? List.of() : strategyCyclePort.findByStrategyIds(strategyIds);
         LocalDate effectiveFrom = from != null
-                ? (granularity != BenchmarkGranularity.MONTHLY ? from : from.withDayOfMonth(1))
-                : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo)
-                        .orElse(effectiveTo).withDayOfMonth(1);
+                ? from
+                : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo).orElse(effectiveTo);
         Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
         List<CyclePosition> positions = scope == Scope.STRATEGY
                 ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
                 : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
 
-        List<InvestmentPoint> investmentPoints = monthlyReturnCalculator.calculate(
-                cycles, positions, effectiveFrom, effectiveTo, granularity);
+        List<InvestmentPoint> investmentPoints = investmentIndexCalculator.calculate(
+                cycles, positions, effectiveFrom, effectiveTo);
 
         return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy);
     }

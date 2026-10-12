@@ -1,7 +1,6 @@
 package com.kista.tradingstats.application;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.tradingstats.domain.model.InvestmentPoint;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -9,11 +8,9 @@ import com.kista.trading.domain.model.StrategyCycle;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
@@ -22,14 +19,14 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public final class MonthlyReturnCalculator {
+public final class InvestmentIndexCalculator {
 
     private static final int SCALE = 10; // 수익률과 투자지수 계산 정밀도
     private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_UP; // 통계 반올림 기준
     private static final BigDecimal INITIAL_INDEX = new BigDecimal("100.0000000000"); // 최초 투자지수
 
     public List<InvestmentPoint> calculate(List<StrategyCycle> cycles, List<CyclePosition> positions,
-                                    LocalDate from, LocalDate to, BenchmarkGranularity granularity) {
+                                    LocalDate from, LocalDate to) {
         if (cycles.isEmpty() || from.isAfter(to)) {
             return List.of();
         }
@@ -37,7 +34,7 @@ public final class MonthlyReturnCalculator {
         Map<LocalDate, BigDecimal> flows = buildExternalFlows(cycles, positions);
         // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
         List<DailyValuation> valuations = buildDailyValuations(cycles, positions, from, to, flows);
-        return compoundDailyReturns(valuations, flows, granularity);
+        return compoundDailyReturns(valuations, flows);
     }
 
     private List<DailyValuation> buildDailyValuations(
@@ -57,7 +54,7 @@ public final class MonthlyReturnCalculator {
                 continue;
             }
             positionsByDate.computeIfAbsent(date, ignored -> new HashMap<>())
-                    .merge(position.strategyCycleId(), position, MonthlyReturnCalculator::laterPosition);
+                    .merge(position.strategyCycleId(), position, InvestmentIndexCalculator::laterPosition);
         }
 
         Map<UUID, CyclePosition> latestByCycle = new HashMap<>();
@@ -65,7 +62,7 @@ public final class MonthlyReturnCalculator {
         Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
                 .collect(Collectors.groupingBy(StrategyCycle::strategyId));
         cyclesByStrategy.replaceAll((strategyId, strategyCycles) -> strategyCycles.stream()
-                .sorted(MonthlyReturnCalculator::compareCycles)
+                .sorted(InvestmentIndexCalculator::compareCycles)
                 .toList());
 
         List<DailyValuation> valuations = new ArrayList<>();
@@ -120,7 +117,7 @@ public final class MonthlyReturnCalculator {
         // 전략 최초 진입, 내부 사이클 교체, 최종 종료를 하나의 연속된 외부흐름으로 기록한다.
         for (List<StrategyCycle> strategyCycles : cyclesByStrategy.values()) {
             List<StrategyCycle> ordered = strategyCycles.stream()
-                    .sorted(MonthlyReturnCalculator::compareCycles)
+                    .sorted(InvestmentIndexCalculator::compareCycles)
                     .toList();
             addEntryFlow(flows, ordered.getFirst(), valuesByCycle.get(ordered.getFirst().id()));
 
@@ -180,7 +177,7 @@ public final class MonthlyReturnCalculator {
             }
             LocalDate date = position.createdAt().atZone(TimeZones.KST).toLocalDate();
             dailyPositionsByCycle.computeIfAbsent(cycle.id(), ignored -> new TreeMap<>())
-                    .merge(date, position, MonthlyReturnCalculator::laterPosition);
+                    .merge(date, position, InvestmentIndexCalculator::laterPosition);
         }
 
         Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle = new HashMap<>();
@@ -196,30 +193,17 @@ public final class MonthlyReturnCalculator {
         return valuesByCycle;
     }
 
-    // MONTHLY는 월말 시점 1포인트로 수집(월내 일별 factor 복리), DAILY는 매 유효 평가일마다 1포인트를 방출한다.
+    // 유효 평가일마다 1포인트를 방출한다(투자지수 = 일별 factor 누적 복리).
     private List<InvestmentPoint> compoundDailyReturns(
-            List<DailyValuation> valuations, Map<LocalDate, BigDecimal> flows, BenchmarkGranularity granularity) {
-        if (valuations.isEmpty()) {
-            return List.of();
-        }
-
+            List<DailyValuation> valuations, Map<LocalDate, BigDecimal> flows) {
         NavigableMap<LocalDate, BigDecimal> orderedFlows = new TreeMap<>(flows);
-        Map<YearMonth, InvestmentPoint> monthlyPoints = new LinkedHashMap<>();
         List<InvestmentPoint> dailyPoints = new ArrayList<>();
         BigDecimal investmentIndex = INITIAL_INDEX;
-        BigDecimal monthlyFactor = BigDecimal.ONE.setScale(SCALE, ROUNDING_MODE);
-        BigDecimal dailyFactor = BigDecimal.ONE.setScale(SCALE, ROUNDING_MODE);
         BigDecimal previousValue = null;
         LocalDate previousDate = null;
-        YearMonth currentMonth = null;
 
         for (DailyValuation valuation : valuations) {
-            YearMonth valuationMonth = YearMonth.from(valuation.date());
-            if (!valuationMonth.equals(currentMonth)) {
-                currentMonth = valuationMonth;
-                monthlyFactor = BigDecimal.ONE.setScale(SCALE, ROUNDING_MODE);
-            }
-            dailyFactor = BigDecimal.ONE.setScale(SCALE, ROUNDING_MODE);
+            BigDecimal dailyFactor = BigDecimal.ONE.setScale(SCALE, ROUNDING_MODE);
 
             boolean validIndex = previousValue == null;
             if (previousValue != null) {
@@ -228,7 +212,6 @@ public final class MonthlyReturnCalculator {
                     BigDecimal valueBeforeEndOfDayFlow = valuation.value().subtract(flow);
                     dailyFactor = valueBeforeEndOfDayFlow.divide(previousValue, SCALE, ROUNDING_MODE);
                     investmentIndex = investmentIndex.multiply(dailyFactor).setScale(SCALE, ROUNDING_MODE);
-                    monthlyFactor = monthlyFactor.multiply(dailyFactor).setScale(SCALE, ROUNDING_MODE);
                     validIndex = true;
                 }
             }
@@ -237,21 +220,13 @@ public final class MonthlyReturnCalculator {
             previousValue = valuation.value();
             previousDate = valuation.date();
             if (validIndex) {
-                if (granularity != BenchmarkGranularity.MONTHLY) {
-                    dailyPoints.add(new InvestmentPoint(
-                            valuation.date(),
-                            investmentIndex.setScale(SCALE, ROUNDING_MODE),
-                            dailyFactor.subtract(BigDecimal.ONE).setScale(SCALE, ROUNDING_MODE)));
-                } else {
-                    monthlyPoints.put(currentMonth, new InvestmentPoint(
-                            currentMonth.atDay(1),
-                            investmentIndex.setScale(SCALE, ROUNDING_MODE),
-                            monthlyFactor.subtract(BigDecimal.ONE).setScale(SCALE, ROUNDING_MODE)));
-                }
+                dailyPoints.add(new InvestmentPoint(
+                        valuation.date(),
+                        investmentIndex.setScale(SCALE, ROUNDING_MODE),
+                        dailyFactor.subtract(BigDecimal.ONE).setScale(SCALE, ROUNDING_MODE)));
             }
         }
-        return granularity != BenchmarkGranularity.MONTHLY
-                ? List.copyOf(dailyPoints) : List.copyOf(monthlyPoints.values());
+        return List.copyOf(dailyPoints);
     }
 
     private static BigDecimal sumFlows(NavigableMap<LocalDate, BigDecimal> flows,

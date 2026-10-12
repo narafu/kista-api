@@ -49,8 +49,7 @@ class InvestmentPointsHttpAdapterTest {
 
         InvestmentPointsPort.Result result = adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null,
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
 
         assertThat(result.effectiveFrom()).isEqualTo(LocalDate.of(2026, 1, 1));
         assertThat(result.effectiveTo()).isEqualTo(LocalDate.of(2026, 9, 1));
@@ -75,14 +74,13 @@ class InvestmentPointsHttpAdapterTest {
 
         InvestmentPointsPort.Result result = adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.STRATEGY, strategyId,
-                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23),
-                com.kista.sharedkernel.BenchmarkGranularity.WEEKLY);
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         StrategyRef expected = new StrategyRef(strategyId,
                 com.kista.sharedkernel.StrategyType.INFINITE, com.kista.sharedkernel.StrategyTicker.SOXL);
         assertThat(result.selectedStrategy()).isEqualTo(expected);
         assertThat(result.points()).hasSize(1);
-        // MonthlyReturnCalculator.SCALE=10 정밀도가 HTTP 왕복(직렬화→역직렬화)에서 보존되는지 확인
+        // InvestmentIndexCalculator.SCALE=10 정밀도가 HTTP 왕복(직렬화→역직렬화)에서 보존되는지 확인
         // — 벤치마크 비교 화면(HousingBenchmarkComparisonResponse)이 이 값을 그대로 노출한다
         var point = result.points().getFirst();
         assertThat(point.investmentIndexUsd()).isEqualByComparingTo(new java.math.BigDecimal("100.1234567890"));
@@ -104,15 +102,14 @@ class InvestmentPointsHttpAdapterTest {
         UUID strategyId = UUID.randomUUID();
 
         adapter.fetch(userId, BenchmarkScope.STRATEGY, strategyId,
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.sharedkernel.BenchmarkGranularity.WEEKLY);
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1));
 
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/investment-points");
         assertThat(recorded.getTarget()).contains("userId=" + userId);
         assertThat(recorded.getTarget()).contains("scope=STRATEGY");
         assertThat(recorded.getTarget()).contains("strategyId=" + strategyId);
-        assertThat(recorded.getTarget()).contains("granularity=WEEKLY");
+        assertThat(recorded.getTarget()).doesNotContain("granularity");
     }
 
     // trading 쪽 GlobalExceptionHandler가 SecurityException/NoSuchElementException/
@@ -125,8 +122,7 @@ class InvestmentPointsHttpAdapterTest {
 
         assertThatThrownBy(() -> adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY))
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(SecurityException.class);
     }
 
@@ -136,8 +132,7 @@ class InvestmentPointsHttpAdapterTest {
 
         assertThatThrownBy(() -> adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.STRATEGY, UUID.randomUUID(),
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY))
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(NoSuchElementException.class);
     }
 
@@ -147,8 +142,7 @@ class InvestmentPointsHttpAdapterTest {
 
         assertThatThrownBy(() -> adapter.fetch(
                 UUID.randomUUID(), BenchmarkScope.PORTFOLIO, null,
-                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1),
-                com.kista.sharedkernel.BenchmarkGranularity.MONTHLY))
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 9, 1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

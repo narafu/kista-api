@@ -3,7 +3,6 @@ package com.kista.tradingstats.adapter.in.web;
 import com.kista.contract.stats.InvestmentPointsResponse;
 import com.kista.tradingstats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingstats.application.usecase.InvestmentPointsQuery;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,9 +30,8 @@ public class TradingStatsInternalController {
             @RequestParam InvestmentPointsQuery.Scope scope,
             @RequestParam(required = false) UUID strategyId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam BenchmarkGranularity granularity) {
-        InvestmentPointsResult result = investmentPointsQuery.fetch(userId, scope, strategyId, from, to, granularity);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        InvestmentPointsResult result = investmentPointsQuery.fetch(userId, scope, strategyId, from, to);
         return StatsContractMapper.toResponse(result);
     }
 

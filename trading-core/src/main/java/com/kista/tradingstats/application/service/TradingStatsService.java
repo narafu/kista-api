@@ -250,7 +250,7 @@ class TradingStatsService implements TradingStatsUseCase {
         return points;
     }
 
-    // 종가 없으면 매입평단가로 대체(최후 0) → MonthlyReturnCalculator와 달리 null을 반환하지 않고 항상 값 산출, scale=2 반올림
+    // 종가 없으면 매입평단가로 대체(최후 0) → InvestmentIndexCalculator와 달리 null을 반환하지 않고 항상 값 산출, scale=2 반올림
     private static BigDecimal assetWithAvgPriceFallback(CyclePosition pos) {
         BigDecimal unitPrice = pos.closingPrice() != null ? pos.closingPrice()
                 : pos.avgPrice() != null ? pos.avgPrice() : BigDecimal.ZERO;

@@ -1,7 +1,6 @@
 package com.kista.benchmark.application.service;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.benchmark.domain.model.*;
 import com.kista.benchmark.application.port.output.*;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +25,7 @@ import com.kista.sharedkernel.StrategyTicker;
 
 // Task 5 이후: BenchmarkService는 accountPort/strategyPort/strategyCyclePort/cyclePositionPort를 직접
 // 호출하지 않고 investmentPointsPort(HTTP 경유)로부터 InvestmentPoint 시리즈를 받는다. 소유권 검증·
-// MOCK 계좌 필터링·MonthlyReturnCalculator 배선 등은 trading-core의 InvestmentPointsQueryService로
+// MOCK 계좌 필터링·InvestmentIndexCalculator 배선 등은 trading-core의 InvestmentPointsQueryService로
 // 이전됐고 그쪽 테스트(InvestmentPointsQueryServiceTest)가 커버한다 — 여기서는 BenchmarkService 자신의
 // 책임(KB 조사일 as-of 스냅, ETF 거래일 보정, 캐시+환율 후결합, 검증 fast-fail)만 검증한다.
 @ExtendWith(MockitoExtension.class)
@@ -56,13 +54,13 @@ class BenchmarkServiceTest {
 
     private void stubPortfolioWeekly(List<InvestmentPoint> points, LocalDate from, LocalDate to) {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any(), eq(BenchmarkGranularity.WEEKLY)))
+                any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(points, from, to, null));
     }
 
     private void stubStrategyWeekly(List<InvestmentPoint> points, LocalDate from, LocalDate to) {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any(), eq(BenchmarkGranularity.WEEKLY)))
+                any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(points, from, to, STRATEGY));
     }
 
@@ -189,8 +187,7 @@ class BenchmarkServiceTest {
 
         assertThat(result.points()).extracting(HousingBenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 16));
-        // 옛 MONTHLY 로직이었다면 정확히 1개월 뒤가 아니라는 이유로 null이 됐을 구간이지만,
-        // WEEKLY는 결측 주와 무관하게 인접 공통 포인트끼리 항상 수익률을 계산한다
+        // 결측 주와 무관하게 인접 공통 포인트끼리 항상 수익률을 계산한다
         assertThat(result.points().getLast().investmentPeriodReturn()).isEqualByComparingTo("0.1");
         assertThat(result.points().getLast().benchmarkPeriodReturn()).isEqualByComparingTo("0.21");
         assertThat(result.summary().investmentCumulativeReturn()).isEqualByComparingTo("0.1");
@@ -200,7 +197,7 @@ class BenchmarkServiceTest {
     @Test
     void 조사일과_정확히_일치하지_않는_투자_스냅샷은_직전_값으로_carry_back된다() {
         // 투자 시리즈는 01-09(100)와 01-13(110) 두 시점만 있다 — 01-12는 트레이딩 측
-        // MonthlyReturnCalculator가 평가 불가능(closingPrice 없음)으로 판단해 시리즈에서 빠진
+        // InvestmentIndexCalculator가 평가 불가능(closingPrice 없음)으로 판단해 시리즈에서 빠진
         // 상태를 그대로 반영한다. KB 조사일 01-12는 investmentByDate에 정확히 일치하는 키가
         // 없어 floorEntry의 진짜 carry-back 경로(직전 01-09의 값)를 타게 된다.
         stubPortfolioWeekly(List.of(
@@ -336,7 +333,7 @@ class BenchmarkServiceTest {
         assertThat(result.strategy().type()).isEqualTo(StrategyType.INFINITE);
         assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.SOXL);
         verify(investmentPointsPort).fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any(), eq(BenchmarkGranularity.WEEKLY));
+                any(), any());
     }
 
     // 소유권 검증은 investmentPointsPort.fetch() 내부(trading 쪽 HTTP 호출)에서 일어난다 —
@@ -344,7 +341,7 @@ class BenchmarkServiceTest {
     @Test
     void 소유하지_않은_전략은_예외를_전파하고_환율을_조회하지_않는다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any(), eq(BenchmarkGranularity.WEEKLY)))
+                any(), any()))
                 .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
 
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
@@ -573,7 +570,7 @@ class BenchmarkServiceTest {
         // IndexPrice.tradeDate는 US 거래일 원본이라 BenchmarkService가 KST로 +1일 보정한다.
         // 투자 시리즈는 그 보정된 KST 날짜(1/6, 1/7, 2/28)에 맞춰 배치한다.
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(List.of(
                         point("2026-01-06", "100.00"),
                         point("2026-01-07", "102.00"),
@@ -614,15 +611,16 @@ class BenchmarkServiceTest {
         assertThat(result.emptyReason()).isNull();
         assertThat(result.currentExchangeRate().midRate()).isEqualByComparingTo("1365.20");
 
+        // US 거래일 +1일 보정 때문에 조회 하한은 effectiveFrom 하루 전
         verify(indexPricePort).findBySymbolAndRange(
-                "SPY", LocalDate.of(2025, 12, 1), LocalDate.of(2026, 2, 28));
+                "SPY", LocalDate.of(2025, 12, 31), LocalDate.of(2026, 2, 28));
     }
 
     @Test
-    void ETF_비교는_이번_달이_아직_끝나지_않아도_아파트처럼_지난달로_clamp하지_않는다() {
+    void ETF_비교는_to가_없으면_오늘까지_조회한다() {
         LocalDate today = LocalDate.now(TimeZones.KST);
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(
                         List.of(point(today.toString(), "100.00")), today, today, null));
         when(indexPricePort.findBySymbolAndRange(eq("SPY"), any(), any())).thenReturn(List.of());
@@ -632,16 +630,14 @@ class BenchmarkServiceTest {
         statsService.getEtfBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, EtfBenchmarkSymbol.SPY, null, null);
 
-        // 아파트(MONTHLY)는 이번 달이 미완료면 지난달 말까지만 조회하지만, ETF(DAILY)는 이번 달 말일까지
-        // 그대로 조회 범위에 포함한다 — 매일 갱신되는 데이터라 발행 지연을 기다릴 필요가 없다.
-        LocalDate endOfCurrentMonth = YearMonth.from(today).atEndOfMonth();
-        verify(indexPricePort).findBySymbolAndRange(eq("SPY"), any(), eq(endOfCurrentMonth));
+        // 매일 갱신되는 데이터라 월 단위 clamp 없이 [effectiveFrom-1일, effectiveTo]를 그대로 조회한다
+        verify(indexPricePort).findBySymbolAndRange("SPY", today.minusDays(1), today);
     }
 
     @Test
     void ETF_가격_데이터가_없으면_INSUFFICIENT_COMMON_MONTHS를_반환한다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
-                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(List.of(
                         point("2026-01-31", "100.00"),
                         point("2026-02-28", "184.20")), FROM, TO, null));
@@ -658,7 +654,7 @@ class BenchmarkServiceTest {
     @Test
     void ETF_비교도_소유한_개별_전략만_조회하고_전략_메타데이터를_반환한다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(List.of(
                         point("2026-01-31", "100.00"),
                         point("2026-02-28", "110.00")), FROM, TO, STRATEGY));
@@ -669,13 +665,13 @@ class BenchmarkServiceTest {
 
         assertThat(result.strategy().id()).isEqualTo(STRATEGY_ID);
         verify(investmentPointsPort).fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any(), eq(BenchmarkGranularity.DAILY));
+                any(), any());
     }
 
     @Test
     void ETF_비교도_소유하지_않은_전략은_예외를_그대로_전파한다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
-                any(), any(), eq(BenchmarkGranularity.DAILY)))
+                any(), any()))
                 .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
 
         assertThatThrownBy(() -> statsService.getEtfBenchmarkComparison(
@@ -730,7 +726,7 @@ class BenchmarkServiceTest {
 
         assertThat(second.points()).isEqualTo(first.points());
         // 본체(HTTP+DB) 조회는 캐시 hit이라 1회만 — investmentPointsPort/housingPriceIndexPort 둘 다 검증
-        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), any(), any(), any());
+        verify(investmentPointsPort, times(1)).fetch(any(), any(), any(), any(), any());
         verify(housingPriceIndexPort, times(1)).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any());
         // 환율은 캐시 대상이 아니라 응답마다 후결합 재조회
@@ -749,7 +745,7 @@ class BenchmarkServiceTest {
                 "2600000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         // regionCode가 캐시 키에 포함되므로 본체(HTTP+DB)가 각각 다시 조회된다
-        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any(), any());
+        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any());
         verify(housingPriceIndexPort, times(2)).findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any());
     }

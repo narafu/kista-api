@@ -1,6 +1,5 @@
 package com.kista.benchmark.application.service;
 
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.sharedkernel.TimeZones;
 import com.kista.benchmark.domain.model.*;
 import com.kista.benchmark.application.usecase.BenchmarkUseCase;
@@ -54,10 +53,8 @@ class BenchmarkService implements BenchmarkUseCase {
 
     private HousingBenchmarkComparison computeHousingComparisonBody(
             UUID userId, BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
-        LocalDate effectiveTo = completedMonthEnd(to);
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
-                userId, scope, strategyId, from, effectiveTo,
-                BenchmarkGranularity.WEEKLY);
+                userId, scope, strategyId, from, effectiveTo(to));
 
         List<HousingPriceIndex> indexRows = housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX, regionCode,
@@ -94,8 +91,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 (regionName != null ? regionName : regionCode) + " 아파트 매매가격지수", sourceUpdatedDate);
 
         return comparisonBuilder.build(
-                scope, ctx.selectedStrategy(), benchmark, snappedPoints, indexByDate,
-                BenchmarkGranularity.WEEKLY);
+                scope, ctx.selectedStrategy(), benchmark, snappedPoints, indexByDate);
     }
 
     @Override
@@ -112,20 +108,16 @@ class BenchmarkService implements BenchmarkUseCase {
 
     private HousingBenchmarkComparison computeEtfComparisonBody(
             UUID userId, BenchmarkScope scope, UUID strategyId, EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
-        LocalDate effectiveTo = completedMonthEnd(to);
         InvestmentPointsPort.Result ctx = investmentPointsPort.fetch(
-                userId, scope, strategyId, from, effectiveTo,
-                BenchmarkGranularity.DAILY);
-        LocalDate benchmarkFrom = ctx.effectiveFrom().minusMonths(1).withDayOfMonth(1);
-        LocalDate benchmarkTo = ctx.effectiveTo().withDayOfMonth(1);
-        LocalDate dailyTo = benchmarkTo.plusMonths(1).minusDays(1);
+                userId, scope, strategyId, from, effectiveTo(to));
 
         // ETF는 다운샘플링 없이 거래일별 종가를 그대로 벤치마크 가격으로 사용한다.
         // IndexPrice.tradeDate는 US 거래일 원본(KST 변환은 소비처 책임 — IndexPrice 문서 참고) —
         // KST 투자지수 날짜와 매칭하려면 +1일 보정이 필요하다. KST 거래일(정산 아침)은 항상 US 거래일
         // 다음날이라는 규칙은 UsTradeDates.toKstTradeDate와 동일하나, 그 클래스는 어댑터 전용이라
-        // 여기서는 같은 규칙을 직접 적용한다.
-        List<IndexPrice> dailyPrices = indexPricePort.findBySymbolAndRange(symbol.name(), benchmarkFrom, dailyTo);
+        // 여기서는 같은 규칙을 직접 적용한다. 그래서 조회 하한도 하루 앞당겨야 첫 KST 일자가 매칭된다.
+        List<IndexPrice> dailyPrices = indexPricePort.findBySymbolAndRange(
+                symbol.name(), ctx.effectiveFrom().minusDays(1), ctx.effectiveTo());
         Map<LocalDate, BigDecimal> prices = dailyPrices.stream()
                 .collect(Collectors.toMap(
                         price -> price.tradeDate().plusDays(1), IndexPrice::close, (left, right) -> right, TreeMap::new));
@@ -136,8 +128,7 @@ class BenchmarkService implements BenchmarkUseCase {
                 BenchmarkAssetType.ETF, null, null, symbol.name(),
                 symbol.name() + " (" + symbol.description() + ")", sourceUpdatedDate);
 
-        return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.points(), prices,
-                BenchmarkGranularity.DAILY);
+        return comparisonBuilder.build(scope, ctx.selectedStrategy(), benchmark, ctx.points(), prices);
     }
 
     // 본체(캐시 대상)를 먼저 구한 뒤 환율을 후결합 — 본체 실패(소유권 등) 시 환율 조회를 하지 않는다
@@ -217,9 +208,8 @@ class BenchmarkService implements BenchmarkUseCase {
         }
     }
 
-    // WEEKLY·DAILY는 포인트 단위로 자주 갱신되어 clamp가 필요 없다 — 요청값 그대로 사용
-    // (root가 실제로 넘기는 granularity는 WEEKLY/DAILY뿐 — MONTHLY clamp 분기는 사용되지 않아 제거됨)
-    private static LocalDate completedMonthEnd(LocalDate requestedTo) {
+    // 투자 시리즈는 일별이라 clamp 없이 요청값 그대로, 미지정이면 오늘(KST)
+    private static LocalDate effectiveTo(LocalDate requestedTo) {
         return requestedTo != null ? requestedTo : LocalDate.now(TimeZones.KST);
     }
 

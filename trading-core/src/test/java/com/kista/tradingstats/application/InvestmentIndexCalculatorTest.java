@@ -1,7 +1,6 @@
 package com.kista.tradingstats.application;
 
 import com.kista.sharedkernel.TimeZones;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.tradingstats.domain.model.InvestmentPoint;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -17,29 +16,32 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MonthlyReturnCalculatorTest {
+class InvestmentIndexCalculatorTest {
 
     private static final LocalDate JANUARY_1 = LocalDate.of(2026, 1, 1);
     private static final LocalDate JANUARY_31 = LocalDate.of(2026, 1, 31);
     private static final LocalDate FEBRUARY_1 = LocalDate.of(2026, 2, 1);
     private static final LocalDate FEBRUARY_2 = LocalDate.of(2026, 2, 2);
-    private static final LocalDate FEBRUARY_28 = LocalDate.of(2026, 2, 28);
+    private static final LocalDate FEBRUARY_27 = LocalDate.of(2026, 2, 27);
+    private static final LocalDate FEBRUARY_28 =LocalDate.of(2026, 2, 28);
     private static final LocalDate MARCH_31 = LocalDate.of(2026, 3, 31);
 
-    private final MonthlyReturnCalculator calculator = new MonthlyReturnCalculator();
+    private final InvestmentIndexCalculator calculator = new InvestmentIndexCalculator();
 
     @Test
-    void 단일_사이클의_월말_USD_평가액으로_누적지수를_계산한다() {
+    void 단일_사이클의_일별_USD_평가액으로_누적지수를_계산한다() {
         StrategyCycle cycle = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
 
         List<InvestmentPoint> result = calculator.calculate(
                 List.of(cycle),
                 List.of(position(cycle, JANUARY_31, "100"), position(cycle, FEBRUARY_28, "110")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
-        assertThat(result)
-                .extracting(InvestmentPoint::investmentIndexUsd)
-                .containsExactly(new BigDecimal("100.0000000000"), new BigDecimal("110.0000000000"));
+        // 첫 완전평가일(1/31)부터 스냅샷 없는 날은 직전 평가액을 이어 매일 1포인트
+        assertThat(result.getFirst().baseDate()).isEqualTo(JANUARY_31);
+        assertThat(result).hasSize(29);
+        assertThat(pointOn(result, FEBRUARY_27).investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -54,13 +56,14 @@ class MonthlyReturnCalculatorTest {
                         position(previous, FEBRUARY_1, LocalTime.of(10, 0), "110"),
                         position(next, FEBRUARY_1, "150"),
                         position(next, FEBRUARY_28, "150")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         // 장중 100 -> 110 수익 후 일말에 40을 추가 투입해 150으로 교체한다.
-        assertThat(result).last().satisfies(point -> {
+        assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -75,12 +78,13 @@ class MonthlyReturnCalculatorTest {
                         position(previous, FEBRUARY_1, LocalTime.of(10, 0), "110"),
                         position(next, FEBRUARY_1, "110"),
                         position(next, FEBRUARY_28, "110")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
-        assertThat(result).last().satisfies(point -> {
+        assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -95,13 +99,14 @@ class MonthlyReturnCalculatorTest {
                         position(previous, FEBRUARY_1, "50", "10", null, 10),
                         position(next, FEBRUARY_1, "50", "10", null, 10),
                         position(next, FEBRUARY_28, "50", "10", null, 10)),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         // 현금 50만 비교하지 않고 이전·신규 사이클의 전체 평가액 150을 비교한다.
-        assertThat(result).last().satisfies(point -> {
+        assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.0000000000"));
         });
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
     }
 
     @Test
@@ -116,7 +121,7 @@ class MonthlyReturnCalculatorTest {
                         position(previous, FEBRUARY_1, LocalTime.of(10, 0), "110"),
                         position(next, FEBRUARY_1, "90"),
                         position(next, FEBRUARY_28, "90")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
                 .isEqualTo(new BigDecimal("110.0000000000"));
@@ -132,13 +137,14 @@ class MonthlyReturnCalculatorTest {
                 List.of(position(existing, JANUARY_31, "100"),
                         position(added, FEBRUARY_1, "50", "10", null, 10),
                         position(added, FEBRUARY_28, "50", "10", null, 10)),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         // 신규 사이클의 실제 초기 자본은 startAmount 100이 아니라 50 + 10*10 = 150이다.
-        assertThat(result).last().satisfies(point -> {
+        assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.0000000000"));
         });
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
     }
 
     @Test
@@ -152,7 +158,7 @@ class MonthlyReturnCalculatorTest {
                         position(large, JANUARY_31, "900"),
                         position(small, FEBRUARY_28, "200"),
                         position(large, FEBRUARY_28, "900")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         // 전략별 수익률 평균 50%가 아니라 합산 자산 1,000 -> 1,100의 10%다.
         assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
@@ -168,7 +174,7 @@ class MonthlyReturnCalculatorTest {
         List<InvestmentPoint> result = calculator.calculate(
                 List.of(cycle),
                 List.of(position(cycle, JANUARY_31, "100"), later, earlier),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
                 .isEqualTo(new BigDecimal("110.0000000000"));
@@ -184,13 +190,14 @@ class MonthlyReturnCalculatorTest {
                 List.of(position(first, JANUARY_31, "100"),
                         position(second, JANUARY_31, "900"),
                         position(second, FEBRUARY_28, "990")),
-                JANUARY_1, MARCH_31, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, MARCH_31);
 
-        assertThat(result)
-                .extracting(InvestmentPoint::investmentIndexUsd)
-                .containsExactly(new BigDecimal("100.0000000000"),
-                        new BigDecimal("109.0000000000"),
-                        new BigDecimal("109.0000000000"));
+        assertThat(pointOn(result, JANUARY_31).investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(pointOn(result, FEBRUARY_28).investmentIndexUsd()).isEqualTo(new BigDecimal("109.0000000000"));
+        assertThat(result.getLast()).satisfies(point -> {
+            assertThat(point.baseDate()).isEqualTo(MARCH_31);
+            assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("109.0000000000"));
+        });
     }
 
     @Test
@@ -202,10 +209,10 @@ class MonthlyReturnCalculatorTest {
                 List.of(first, delayed),
                 List.of(position(first, JANUARY_31, "100"),
                         position(delayed, FEBRUARY_28, "900")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         assertThat(result).singleElement().satisfies(point -> {
-            assertThat(point.baseDate()).isEqualTo(FEBRUARY_1);
+            assertThat(point.baseDate()).isEqualTo(FEBRUARY_28);
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
         });
     }
@@ -218,10 +225,10 @@ class MonthlyReturnCalculatorTest {
                 List.of(cycle),
                 List.of(position(cycle, JANUARY_31, "0", null, "10", 10),
                         position(cycle, FEBRUARY_28, "0", "10", "10", 10)),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         assertThat(result).singleElement().satisfies(point -> {
-            assertThat(point.baseDate()).isEqualTo(FEBRUARY_1);
+            assertThat(point.baseDate()).isEqualTo(FEBRUARY_28);
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
         });
     }
@@ -234,12 +241,12 @@ class MonthlyReturnCalculatorTest {
                 List.of(cycle),
                 List.of(position(cycle, Instant.parse("2026-01-31T14:59:59Z"), "100"),
                         position(cycle, Instant.parse("2026-01-31T15:00:00Z"), "110")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_1);
 
         assertThat(result)
                 .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(JANUARY_1, new BigDecimal("100.0000000000")),
+                        org.assertj.core.groups.Tuple.tuple(JANUARY_31, new BigDecimal("100.0000000000")),
                         org.assertj.core.groups.Tuple.tuple(FEBRUARY_1, new BigDecimal("110.0000000000")));
     }
 
@@ -255,13 +262,14 @@ class MonthlyReturnCalculatorTest {
                         position(active, JANUARY_31, "100"),
                         position(active, FEBRUARY_1, "110"),
                         position(active, FEBRUARY_28, "110")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         // 종료 전략의 현금 endAmount 100이 아닌 마지막 전체 평가액 110을 종료일에 회수한다.
-        assertThat(result).last().satisfies(point -> {
+        assertThat(pointOn(result, FEBRUARY_1)).satisfies(point -> {
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
             assertThat(point.periodReturn()).isEqualTo(new BigDecimal("0.1000000000"));
         });
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test
@@ -272,7 +280,7 @@ class MonthlyReturnCalculatorTest {
                 List.of(ended),
                 List.of(position(ended, JANUARY_31, "100"),
                         position(ended, FEBRUARY_1, "110")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         assertThat(result).last().satisfies(point -> {
             assertThat(point.baseDate()).isEqualTo(FEBRUARY_1);
@@ -296,26 +304,27 @@ class MonthlyReturnCalculatorTest {
                         position(survivor, FEBRUARY_28, "100"),
                         position(restarted, LocalDate.of(2026, 3, 10), "150"),
                         position(restarted, MARCH_31, "150")),
-                JANUARY_1, MARCH_31, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, MARCH_31);
 
+        // 종료일(2/1) 회수와 재진입일(3/10) 투입이 각각 외부흐름이라 지수는 전 구간 100 유지
         assertThat(result)
                 .extracting(InvestmentPoint::investmentIndexUsd)
-                .containsExactly(new BigDecimal("100.0000000000"),
-                        new BigDecimal("100.0000000000"),
-                        new BigDecimal("100.0000000000"));
+                .containsOnly(new BigDecimal("100.0000000000"));
+        assertThat(result.getFirst().baseDate()).isEqualTo(JANUARY_31);
+        assertThat(result.getLast().baseDate()).isEqualTo(MARCH_31);
     }
 
     @Test
-    void 개별_전략_시계열은_마지막_사이클의_종료월에서_끝난다() {
+    void 개별_전략_시계열은_마지막_사이클의_종료일에서_끝난다() {
         StrategyCycle ended = closedCycle(UUID.randomUUID(), "100", "100", JANUARY_1, JANUARY_31);
 
         List<InvestmentPoint> result = calculator.calculate(
                 List.of(ended), List.of(position(ended, JANUARY_31.minusDays(1), "100")),
-                JANUARY_1, MARCH_31, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, MARCH_31);
 
         assertThat(result)
                 .extracting(InvestmentPoint::baseDate)
-                .containsExactly(JANUARY_1);
+                .containsExactly(JANUARY_31.minusDays(1), JANUARY_31);
     }
 
     @Test
@@ -327,7 +336,7 @@ class MonthlyReturnCalculatorTest {
                 List.of(position(cycle, JANUARY_31, "0"),
                         position(cycle, FEBRUARY_1, "50"),
                         position(cycle, FEBRUARY_28, "55")),
-                JANUARY_1, FEBRUARY_28, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, FEBRUARY_28);
 
         // 2월 1일은 직전 평가액이 0이므로 생략하고, 현재 평가액 50은 다음 비교 기준으로 갱신한다.
         assertThat(result).last().extracting(InvestmentPoint::investmentIndexUsd)
@@ -335,23 +344,25 @@ class MonthlyReturnCalculatorTest {
     }
 
     @Test
-    void 월별_포인트는_그달의_마지막_유효_누적지수를_사용한다() {
+    void 스냅샷_사이_날짜는_직전_누적지수를_유지한다() {
         StrategyCycle cycle = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
 
         List<InvestmentPoint> result = calculator.calculate(
                 List.of(cycle),
                 List.of(position(cycle, LocalDate.of(2026, 1, 10), "100"),
                         position(cycle, LocalDate.of(2026, 1, 20), "120")),
-                JANUARY_1, JANUARY_31, BenchmarkGranularity.MONTHLY);
+                JANUARY_1, JANUARY_31);
 
-        assertThat(result).singleElement().satisfies(point -> {
-            assertThat(point.baseDate()).isEqualTo(JANUARY_1);
+        assertThat(pointOn(result, LocalDate.of(2026, 1, 19)).investmentIndexUsd())
+                .isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(result.getLast()).satisfies(point -> {
+            assertThat(point.baseDate()).isEqualTo(JANUARY_31);
             assertThat(point.investmentIndexUsd()).isEqualTo(new BigDecimal("120.0000000000"));
         });
     }
 
     @Test
-    void MDD는_월중_저점이_아닌_월말_USD_지수만_사용한다() {
+    void 월중_저점도_일별_포인트로_방출한다() {
         StrategyCycle cycle = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
         List<CyclePosition> positions = new ArrayList<>(List.of(
                 position(cycle, JANUARY_1, "100"),
@@ -361,19 +372,17 @@ class MonthlyReturnCalculatorTest {
                 position(cycle, MARCH_31, "120")));
 
         List<InvestmentPoint> points = calculator.calculate(
-                List.of(cycle), positions, JANUARY_1, MARCH_31, BenchmarkGranularity.MONTHLY);
+                List.of(cycle), positions, JANUARY_1, MARCH_31);
 
-        // MDD 자체는 HousingBenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 반영되지 않고
-        // 월말 지수만 산출되는지 확인한다 (BenchmarkServiceTest.월말_지수의_고점_대비_최대낙폭을_계산한다 참고)
-        assertThat(points)
-                .extracting(InvestmentPoint::investmentIndexUsd)
-                .containsExactly(new BigDecimal("100.0000000000"),
-                        new BigDecimal("80.0000000000"),
-                        new BigDecimal("120.0000000000"));
+        // MDD 자체는 HousingBenchmarkComparisonBuilder가 계산 — 여기서는 월중 저점이 시리즈에 포함되는지 확인한다
+        assertThat(pointOn(points, LocalDate.of(2026, 1, 15)).investmentIndexUsd())
+                .isEqualTo(new BigDecimal("50.0000000000"));
+        assertThat(pointOn(points, FEBRUARY_28).investmentIndexUsd()).isEqualTo(new BigDecimal("80.0000000000"));
+        assertThat(points.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("120.0000000000"));
     }
 
     @Test
-    void DAILY_granularity는_매_유효_평가일마다_포인트를_방출한다() {
+    void 매_유효_평가일마다_포인트를_방출한다() {
         StrategyCycle cycle = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
 
         List<InvestmentPoint> result = calculator.calculate(
@@ -381,29 +390,7 @@ class MonthlyReturnCalculatorTest {
                 List.of(position(cycle, JANUARY_31, "100"),
                         position(cycle, FEBRUARY_1, "110"),
                         position(cycle, FEBRUARY_2, "121")),
-                JANUARY_31, FEBRUARY_2, BenchmarkGranularity.DAILY);
-
-        assertThat(result)
-                .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd, InvestmentPoint::periodReturn)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(
-                                JANUARY_31, new BigDecimal("100.0000000000"), new BigDecimal("0.0000000000")),
-                        org.assertj.core.groups.Tuple.tuple(
-                                FEBRUARY_1, new BigDecimal("110.0000000000"), new BigDecimal("0.1000000000")),
-                        org.assertj.core.groups.Tuple.tuple(
-                                FEBRUARY_2, new BigDecimal("121.0000000000"), new BigDecimal("0.1000000000")));
-    }
-
-    @Test
-    void WEEKLY_granularity는_DAILY와_동일하게_매_유효_평가일마다_포인트를_방출한다() {
-        StrategyCycle cycle = activeCycle(UUID.randomUUID(), "100", JANUARY_1);
-
-        List<InvestmentPoint> result = calculator.calculate(
-                List.of(cycle),
-                List.of(position(cycle, JANUARY_31, "100"),
-                        position(cycle, FEBRUARY_1, "110"),
-                        position(cycle, FEBRUARY_2, "121")),
-                JANUARY_31, FEBRUARY_2, BenchmarkGranularity.WEEKLY);
+                JANUARY_31, FEBRUARY_2);
 
         assertThat(result)
                 .extracting(InvestmentPoint::baseDate, InvestmentPoint::investmentIndexUsd, InvestmentPoint::periodReturn)
@@ -429,7 +416,7 @@ class MonthlyReturnCalculatorTest {
                         position(existing, FEBRUARY_2, "1000"),
                         position(scheduled, LocalDate.of(2026, 1, 30), "1000"),
                         position(scheduled, FEBRUARY_2, "1100")),
-                JANUARY_31, FEBRUARY_2, BenchmarkGranularity.DAILY);
+                JANUARY_31, FEBRUARY_2);
 
         // 2/1은 신규 진입만 있어 0%, 2/2는 합산 2,000 -> 2,100의 +5%
         assertThat(result)
@@ -438,6 +425,10 @@ class MonthlyReturnCalculatorTest {
                         org.assertj.core.groups.Tuple.tuple(JANUARY_31, new BigDecimal("100.0000000000")),
                         org.assertj.core.groups.Tuple.tuple(FEBRUARY_1, new BigDecimal("100.0000000000")),
                         org.assertj.core.groups.Tuple.tuple(FEBRUARY_2, new BigDecimal("105.0000000000")));
+    }
+
+    private static InvestmentPoint pointOn(List<InvestmentPoint> points, LocalDate date) {
+        return points.stream().filter(point -> point.baseDate().equals(date)).findFirst().orElseThrow();
     }
 
     private static StrategyCycle activeCycle(UUID strategyId, String startAmount, LocalDate startDate) {

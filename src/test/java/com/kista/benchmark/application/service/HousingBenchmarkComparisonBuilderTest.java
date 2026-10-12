@@ -1,7 +1,6 @@
 package com.kista.benchmark.application.service;
 
 import com.kista.benchmark.domain.model.BenchmarkAssetType;
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.benchmark.domain.model.BenchmarkScope;
 import com.kista.benchmark.domain.model.HousingBenchmarkComparison;
 import com.kista.benchmark.domain.model.InvestmentPoint;
@@ -34,7 +33,7 @@ class HousingBenchmarkComparisonBuilderTest {
     }
 
     @Test
-    void WEEKLY_구간은_KB_결측_주가_있어도_인접_공통_포인트마다_수익률을_계산한다() {
+    void 결측_주가_있어도_인접_공통_포인트마다_수익률을_계산한다() {
         // 1/5 -> 2/16 (결측 주 존재, 정확히 1개월 뒤가 아님)까지도 항상 수익률이 나와야 한다
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         LocalDate d2 = LocalDate.of(2026, 2, 16);
@@ -42,15 +41,14 @@ class HousingBenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "121");
 
         HousingBenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
-                BenchmarkGranularity.WEEKLY);
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.points().getLast().investmentPeriodReturn()).isEqualByComparingTo("0.1");
         assertThat(result.points().getLast().benchmarkPeriodReturn()).isEqualByComparingTo("0.21");
     }
 
     @Test
-    void WEEKLY_3주_구간에서는_예외_없이_결과를_반환한다() {
+    void 삼주_구간에서는_예외_없이_결과를_반환한다() {
         // 과거 MONTHS.between==0으로 Infinity 예외가 나던 케이스의 회귀 방지
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         LocalDate d2 = LocalDate.of(2026, 1, 26);
@@ -58,8 +56,7 @@ class HousingBenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
 
         HousingBenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
-                BenchmarkGranularity.WEEKLY);
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.emptyReason()).isNull();
         assertThat(result.summary()).isNotNull();
@@ -67,23 +64,17 @@ class HousingBenchmarkComparisonBuilderTest {
 
     @Test
     void 짧은_구간에서는_연환산_수익률을_null로_억제한다() {
-        // 21일(< 365일) 구간 — WEEKLY(아파트)와 DAILY(ETF) 둘 다 동일 규칙 적용
+        // 21일(< 365일) 구간
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         LocalDate d2 = LocalDate.of(2026, 1, 26);
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "101"));
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "102");
 
-        HousingBenchmarkComparison weekly = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
-                BenchmarkGranularity.WEEKLY);
-        HousingBenchmarkComparison daily = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
-                BenchmarkGranularity.DAILY);
+        HousingBenchmarkComparison result = builder.build(
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
-        assertThat(weekly.summary().investmentAnnualizedReturn()).isNull();
-        assertThat(weekly.summary().benchmarkAnnualizedReturn()).isNull();
-        assertThat(daily.summary().investmentAnnualizedReturn()).isNull();
-        assertThat(daily.summary().benchmarkAnnualizedReturn()).isNull();
+        assertThat(result.summary().investmentAnnualizedReturn()).isNull();
+        assertThat(result.summary().benchmarkAnnualizedReturn()).isNull();
     }
 
     @Test
@@ -95,8 +86,7 @@ class HousingBenchmarkComparisonBuilderTest {
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
 
         HousingBenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
-                BenchmarkGranularity.WEEKLY);
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices);
 
         assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
                 BigDecimal.valueOf(Math.pow(1.842, 365.0 / 365.0) - 1.0),
@@ -110,27 +100,9 @@ class HousingBenchmarkComparisonBuilderTest {
         LocalDate d2 = LocalDate.of(2026, 5, 4);
         HousingBenchmarkComparison result = builder.build(
                 BenchmarkScope.PORTFOLIO, null, BENCHMARK,
-                List.of(point(d1, "100"), point(d2, "184.2")), prices(d1, "100", d2, "400"),
-                BenchmarkGranularity.WEEKLY);
+                List.of(point(d1, "100"), point(d2, "184.2")), prices(d1, "100", d2, "400"));
 
         assertThat(result.summary().investmentAnnualizedReturn()).isNull();
         assertThat(result.summary().benchmarkAnnualizedReturn()).isNull();
-    }
-
-    @Test
-    void MONTHLY_구간에서는_짧은_구간이어도_연환산_수익률을_그대로_계산한다() {
-        // MONTHLY는 이번 변경의 영향을 받지 않아야 한다 (회귀 방지)
-        LocalDate d1 = LocalDate.of(2026, 1, 1);
-        LocalDate d2 = LocalDate.of(2026, 2, 1);
-        List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "184.2"));
-        Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
-
-        HousingBenchmarkComparison result = builder.build(
-                BenchmarkScope.PORTFOLIO, null, BENCHMARK, investmentPoints, benchmarkPrices,
-                BenchmarkGranularity.MONTHLY);
-
-        assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
-                BigDecimal.valueOf(Math.pow(1.842, 12.0) - 1.0),
-                org.assertj.core.data.Offset.offset(new BigDecimal("0.000000001")));
     }
 }

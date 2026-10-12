@@ -1,6 +1,5 @@
 package com.kista.tradingstats.application.usecase;
 
-import com.kista.sharedkernel.BenchmarkGranularity;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;
 
 import java.time.LocalDate;
@@ -14,5 +13,5 @@ public interface InvestmentPointsQuery {
     enum Scope { STRATEGY, PORTFOLIO }
 
     InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId,
-                                 LocalDate from, LocalDate to, BenchmarkGranularity granularity);
+                                 LocalDate from, LocalDate to);
 }
