@@ -29,7 +29,7 @@ import com.kista.sharedkernel.StrategyTicker;
 // 호출하지 않고 investmentPointsPort(HTTP 경유)로부터 InvestmentPoint 시리즈를 받는다. 소유권 검증·
 // MOCK 계좌 필터링·MonthlyReturnCalculator 배선 등은 trading-core의 InvestmentPointsQueryService로
 // 이전됐고 그쪽 테스트(InvestmentPointsQueryServiceTest)가 커버한다 — 여기서는 BenchmarkService 자신의
-// 책임(KB 조사일 as-of 스냅, ETF 거래일 보정, 캐시∥환율 병렬 조회, 검증 fast-fail)만 검증한다.
+// 책임(KB 조사일 as-of 스냅, ETF 거래일 보정, 캐시+환율 후결합, 검증 fast-fail)만 검증한다.
 @ExtendWith(MockitoExtension.class)
 class BenchmarkServiceTest {
 
@@ -149,26 +149,26 @@ class BenchmarkServiceTest {
     }
 
     @Test
-    void 구간이_90일_이상이면_연환산_수익률을_계산한다() {
+    void 구간이_365일_이상이면_연환산_수익률을_계산한다() {
         stubPortfolioWeekly(List.of(
                 point("2026-01-05", "100.00"),
-                point("2026-05-04", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 5, 4));
+                point("2027-01-05", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2027, 1, 5));
         when(housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
                 anyString(), anyString(), any(), any())).thenReturn(List.of(
                 weeklyIndex(LocalDate.of(2026, 1, 5), "100"),
-                weeklyIndex(LocalDate.of(2026, 5, 4), "400")));
+                weeklyIndex(LocalDate.of(2027, 1, 5), "400")));
         when(currentExchangeRatePort.getMidRate()).thenReturn(
                 new BigDecimal("1365.20"));
 
         HousingBenchmarkComparison result = statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
-                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 5, 4));
+                LocalDate.of(2026, 1, 5), LocalDate.of(2027, 1, 5));
 
         assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
-                BigDecimal.valueOf(Math.pow(1.842, 365.0 / 119.0) - 1.0),
+                BigDecimal.valueOf(Math.pow(1.842, 365.0 / 365.0) - 1.0),
                 org.assertj.core.data.Offset.offset(new BigDecimal("0.000000001")));
         assertThat(result.summary().benchmarkAnnualizedReturn()).isCloseTo(
-                BigDecimal.valueOf(Math.pow(4.0, 365.0 / 119.0) - 1.0),
+                BigDecimal.valueOf(Math.pow(4.0, 365.0 / 365.0) - 1.0),
                 org.assertj.core.data.Offset.offset(new BigDecimal("0.000000001")));
     }
 
@@ -339,24 +339,19 @@ class BenchmarkServiceTest {
                 any(), any(), eq(BenchmarkGranularity.WEEKLY));
     }
 
-    // Task 5 boundary 이전에는 authorizeIfStrategyScope가 병렬 실행(본체∥환율) 전에 소유권을
-    // 동기적으로 검증해 인가 실패 시 환율 API 호출 자체를 막았다. 이제 소유권 검증은
-    // investmentPointsPort.fetch() 내부(trading 쪽 HTTP 호출)로 이동해, 병렬 실행이 이미 시작된
-    // 뒤에야 실패가 드러난다 — invokeAll()이 두 잡을 모두 실행 완료할 때까지 기다리므로 인가 실패여도
-    // 환율 조회가 이미 낭비 호출된다. fast-fail 회귀 확인용 테스트.
+    // 소유권 검증은 investmentPointsPort.fetch() 내부(trading 쪽 HTTP 호출)에서 일어난다 —
+    // 본체를 먼저 구하므로 인가 실패 시 환율 조회는 일어나지 않는다
     @Test
-    void 소유하지_않은_전략은_예외를_전파하되_환율_병렬_호출은_낭비된다() {
+    void 소유하지_않은_전략은_예외를_전파하고_환율을_조회하지_않는다() {
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.STRATEGY), eq(STRATEGY_ID),
                 any(), any(), eq(BenchmarkGranularity.WEEKLY)))
                 .thenThrow(new SecurityException("소유하지 않은 계좌입니다"));
-        when(currentExchangeRatePort.getMidRate()).thenReturn(
-                new BigDecimal("1365.20"));
 
         assertThatThrownBy(() -> statsService.getHousingBenchmarkComparison(
                 USER_ID, BenchmarkScope.STRATEGY, STRATEGY_ID, "1100000000", FROM, TO))
                 .isInstanceOf(SecurityException.class);
 
-        verify(currentExchangeRatePort, times(1)).getMidRate();
+        verify(currentExchangeRatePort, never()).getMidRate();
     }
 
     @Test
@@ -397,29 +392,6 @@ class BenchmarkServiceTest {
         assertThat(result.points()).isEmpty();
         assertThat(result.summary()).isNull();
         assertThat(result.emptyReason()).isEqualTo("INSUFFICIENT_COMMON_MONTHS");
-    }
-
-    @Test
-    void 환율_예외는_완성된_비교_결과에서_환율만_null로_격리한다() {
-        stubWeeklyPortfolioComparison("100.00", "184.20");
-        when(currentExchangeRatePort.getMidRate())
-                .thenReturn(new BigDecimal("1365.20"))
-                .thenThrow(new IllegalStateException("환율 조회 실패"));
-
-        HousingBenchmarkComparison success = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
-                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-        HousingBenchmarkComparison isolated = statsService.getHousingBenchmarkComparison(
-                USER_ID, BenchmarkScope.PORTFOLIO, null, "1100000000",
-                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
-
-        assertThat(isolated.currentExchangeRate()).isNull();
-        assertThat(isolated.points()).isEqualTo(success.points());
-        assertThat(isolated.period()).isEqualTo(success.period());
-        assertThat(isolated.summary()).isEqualTo(success.summary());
-        assertThat(isolated.benchmark()).isEqualTo(success.benchmark());
-        assertThat(isolated.emptyReason()).isEqualTo(success.emptyReason());
-        verify(currentExchangeRatePort, times(2)).getMidRate();
     }
 
     @Test
@@ -741,7 +713,7 @@ class BenchmarkServiceTest {
         verify(currentExchangeRatePort, times(3)).getMidRate();
     }
 
-    // ── 벤치마크 비교 캐시(TTL 10분) + 환율 병렬 조회 ───────────────────────────
+    // ── 벤치마크 비교 캐시(TTL 10분) + 환율 후결합 ───────────────────────────
 
     @Test
     void 벤치마크_비교는_같은_파라미터_재조회시_본체는_캐시하고_환율은_매번_재조회한다() {
@@ -783,7 +755,7 @@ class BenchmarkServiceTest {
     }
 
     @Test
-    void 벤치마크_본체_계산_실패는_병렬_래핑_없이_원본_예외를_그대로_전파한다() {
+    void 벤치마크_본체_계산_실패는_원본_예외를_그대로_전파한다() {
         stubPortfolioWeekly(List.of(
                 point("2026-01-05", "100.00"),
                 point("2026-02-23", "184.20")), LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));

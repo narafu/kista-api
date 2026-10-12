@@ -29,6 +29,7 @@ final class HousingBenchmarkComparisonBuilder {
     private static final int SCALE = 10;
     private static final RoundingMode HALF_UP = RoundingMode.HALF_UP;
     private static final double DAYS_PER_YEAR = 365.0;
+    private static final int MIN_ANNUALIZED_DAYS = 365; // 이보다 짧은 구간은 연환산이 과대·과소 표시되므로 null (백테스트 CAGR과 동일 기준)
 
     HousingBenchmarkComparison build(
             BenchmarkScope scope,
@@ -89,9 +90,9 @@ final class HousingBenchmarkComparisonBuilder {
         BigDecimal lastBenchmarkIndex = points.getLast().benchmarkIndex();
         BigDecimal investmentCumulativeReturn = cumulativeReturn(lastInvestmentIndex);
         BigDecimal benchmarkCumulativeReturn = cumulativeReturn(lastBenchmarkIndex);
-        // MONTHLY 이외 granularity는 짧은 구간(90일 미만)에서 연환산 시 극단값이 나오므로 null로 억제한다
+        // MONTHLY 이외 granularity는 1년 미만 구간에서 연환산을 null로 억제한다
         boolean suppressAnnualized = granularity != BenchmarkGranularity.MONTHLY
-                && ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate()) < 90;
+                && ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate()) < MIN_ANNUALIZED_DAYS;
         double periodsPerYear = granularity == BenchmarkGranularity.MONTHLY
                 ? 12.0 / ChronoUnit.MONTHS.between(firstDate, points.getLast().baseDate())
                 : DAYS_PER_YEAR / ChronoUnit.DAYS.between(firstDate, points.getLast().baseDate());

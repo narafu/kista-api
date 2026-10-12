@@ -67,7 +67,7 @@ class HousingBenchmarkComparisonBuilderTest {
 
     @Test
     void 짧은_구간에서는_연환산_수익률을_null로_억제한다() {
-        // 21일(< 90일) 구간 — WEEKLY(아파트)와 DAILY(ETF) 둘 다 동일 규칙 적용
+        // 21일(< 365일) 구간 — WEEKLY(아파트)와 DAILY(ETF) 둘 다 동일 규칙 적용
         LocalDate d1 = LocalDate.of(2026, 1, 5);
         LocalDate d2 = LocalDate.of(2026, 1, 26);
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "101"));
@@ -88,9 +88,9 @@ class HousingBenchmarkComparisonBuilderTest {
 
     @Test
     void 긴_구간에서는_연환산_수익률을_계산한다() {
-        // 119일(>= 90일) 구간
+        // 365일(>= 365일) 구간
         LocalDate d1 = LocalDate.of(2026, 1, 5);
-        LocalDate d2 = LocalDate.of(2026, 5, 4);
+        LocalDate d2 = LocalDate.of(2027, 1, 5);
         List<InvestmentPoint> investmentPoints = List.of(point(d1, "100"), point(d2, "184.2"));
         Map<LocalDate, BigDecimal> benchmarkPrices = prices(d1, "100", d2, "400");
 
@@ -99,8 +99,22 @@ class HousingBenchmarkComparisonBuilderTest {
                 BenchmarkGranularity.WEEKLY);
 
         assertThat(result.summary().investmentAnnualizedReturn()).isCloseTo(
-                BigDecimal.valueOf(Math.pow(1.842, 365.0 / 119.0) - 1.0),
+                BigDecimal.valueOf(Math.pow(1.842, 365.0 / 365.0) - 1.0),
                 org.assertj.core.data.Offset.offset(new BigDecimal("0.000000001")));
+    }
+
+    @Test
+    void 일년_미만_구간은_90일을_넘어도_연환산_수익률을_null로_억제한다() {
+        // 119일 구간 — 백테스트 CAGR과 같은 365일 하한
+        LocalDate d1 = LocalDate.of(2026, 1, 5);
+        LocalDate d2 = LocalDate.of(2026, 5, 4);
+        HousingBenchmarkComparison result = builder.build(
+                BenchmarkScope.PORTFOLIO, null, BENCHMARK,
+                List.of(point(d1, "100"), point(d2, "184.2")), prices(d1, "100", d2, "400"),
+                BenchmarkGranularity.WEEKLY);
+
+        assertThat(result.summary().investmentAnnualizedReturn()).isNull();
+        assertThat(result.summary().benchmarkAnnualizedReturn()).isNull();
     }
 
     @Test

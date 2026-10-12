@@ -6,7 +6,6 @@ import com.kista.benchmark.domain.model.*;
 import com.kista.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.benchmark.application.port.output.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -14,18 +13,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 class BenchmarkService implements BenchmarkUseCase {
 
     private static final String SEOUL_REGION_CODE = "1100000000";
@@ -109,8 +102,7 @@ class BenchmarkService implements BenchmarkUseCase {
     public HousingBenchmarkComparison getEtfBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             EtfBenchmarkSymbol symbol, LocalDate from, LocalDate to) {
-        // ETF는 별도 최상위 검증이 없어 investmentPointsPort.fetch() 내부에서만 검증되던 것을
-        // 병렬 실행 전 fast-fail 위해 여기로 앞당긴다 (검증 로직·예외 타입은 100% 동일하게 재사용)
+        // 데이터 조회 전 fast-fail — 검증 로직·예외 타입은 HOUSING과 동일하게 재사용
         validateScopeAndRange(scope, strategyId, from, to);
         BenchmarkComparisonKey key = new BenchmarkComparisonKey(
                 userId, BenchmarkAssetType.ETF, scope, strategyId, null, symbol.name(), from, to);
@@ -148,38 +140,11 @@ class BenchmarkService implements BenchmarkUseCase {
                 BenchmarkGranularity.DAILY);
     }
 
-    // 캐시 hit면 병렬화 없이 환율만 후결합, miss면 본체(DB)와 환율(외부 HTTP)을 virtual thread로 병렬 조회.
-    // 본체∥환율 2갈래 — 벤치마크 시세 범위가 사이클 DB 조회 결과에 의존해 3갈래 불가, 환율 스레드는 DB 미사용이라 커넥션 증가 없음.
+    // 본체(캐시 대상)를 먼저 구한 뒤 환율을 후결합 — 본체 실패(소유권 등) 시 환율 조회를 하지 않는다
     private HousingBenchmarkComparison comparisonWithExchangeRate(
             BenchmarkComparisonKey key, Supplier<HousingBenchmarkComparison> bodyLoader) {
-        HousingBenchmarkComparison cached = statsResultCache.peek(key);
-        if (cached != null) {
-            return cached.withCurrentExchangeRate(fetchCurrentExchangeRate());
-        }
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            List<Callable<Object>> jobs = List.of(
-                    () -> statsResultCache.getOrCompute(key, BENCHMARK_CACHE_TTL, bodyLoader),
-                    () -> fetchCurrentExchangeRate());
-            List<Future<Object>> futures = executor.invokeAll(jobs);
-            HousingBenchmarkComparison body = (HousingBenchmarkComparison) join(futures.get(0));
-            CurrentExchangeRate rate = (CurrentExchangeRate) join(futures.get(1));
-            return body.withCurrentExchangeRate(rate);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("벤치마크 비교 병렬 조회가 중단됐습니다", e);
-        }
-    }
-
-    // Future 결과를 언랩 — 원인이 RuntimeException이면 그대로(래핑 없이) 재전파
-    private static Object join(Future<Object> future) throws InterruptedException {
-        try {
-            return future.get();
-        } catch (ExecutionException e) {
-            if (e.getCause() instanceof RuntimeException runtime) {
-                throw runtime;
-            }
-            throw new IllegalStateException("벤치마크 비교 병렬 조회 실패", e.getCause());
-        }
+        HousingBenchmarkComparison body = statsResultCache.getOrCompute(key, BENCHMARK_CACHE_TTL, bodyLoader);
+        return body.withCurrentExchangeRate(fetchCurrentExchangeRate());
     }
 
     @Override
@@ -258,19 +223,13 @@ class BenchmarkService implements BenchmarkUseCase {
         return requestedTo != null ? requestedTo : LocalDate.now(TimeZones.KST);
     }
 
+    // 조회 실패는 CurrentExchangeRateHttpAdapter가 null로 흡수한다
     private CurrentExchangeRate fetchCurrentExchangeRate() {
-        try {
-            BigDecimal midRate = currentExchangeRatePort.getMidRate();
-            if (midRate == null || midRate.signum() <= 0) {
-                return null;
-            }
-            return new CurrentExchangeRate(midRate, Instant.now(), "TOSS_INVEST");
-        } catch (RuntimeException e) {
-            // CurrentExchangeRateHttpAdapter가 실패를 이미 흡수해 null을 반환하므로 실전에서는
-            // 이 catch에 도달하지 않는다 — 방어적으로만 남긴다(실제 진단 로그는 어댑터 쪽에 있음).
-            log.warn("현재 USD/KRW 환율 조회 실패", e);
+        BigDecimal midRate = currentExchangeRatePort.getMidRate();
+        if (midRate == null || midRate.signum() <= 0) {
             return null;
         }
+        return new CurrentExchangeRate(midRate, Instant.now(), "TOSS_INVEST");
     }
 
 }
