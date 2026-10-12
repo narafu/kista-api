@@ -43,7 +43,9 @@ curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  
 ```bash
 scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태에서 실행, 재실행 가능
 ```
-- dev 유저(`...0001`)에만 적용: `[시드] 모의계좌`(MOCK) + ACTIVE INFINITE SOXL·VR TQQQ(API 등록), 가계부, KIS `[시드]` 전략(PAUSED) 일별 포지션(equity-curve — MOCK은 집계 제외)·종결 주문(관리자 주문 관리)
+- dev 유저(`...0001`)에만 적용: `[시드] 모의계좌`(MOCK) + ACTIVE INFINITE SOXL·VR TQQQ(API 등록), 가계부, KIS `[시드]` 전략(PAUSED) 일별 포지션(equity-curve — MOCK은 집계 제외)·종결 주문(관리자 주문 관리), MOCK 계좌 INFINITE MAGX·USD(PAUSED, SQL) 사이클 25건(진행 중 2·종료 23 — 사이클 성과 목록 필터·페이징)
+- `jq` 필요(Windows: `winget install jqlang.jq`). 시작 시 dev 유저 잔고검증 값을 재저장해 trading-core 사용자 복제본을 동기화한다 — dev-token은 사용자를 직접 저장해 복제본이 비고, 그 상태면 전략 등록이 404
+- Toss가 로컬 IP를 허용하지 않으면(로그 `IP address not allowed`) MOCK 전략 API 등록이 422로 실패한다 — SQL 시드(MAGX·USD 사이클 포함)는 그대로 적용된다
 - MOCK 시세는 Toss 공용 피드라 trading-core `application-local.yml`에 `toss.admin-client-id`/`admin-client-secret` 필요 — 없으면 MOCK 전략 등록·preview가 422/503
 - trading-core local은 스케쥴러가 켜져 있어 ACTIVE MOCK 전략이 실제로 돈다(DB 주문만 생성, 실패 시 관리자 텔레그램 알림)
 - 벤치마크(`kista_ref`)는 가짜 행 없이 수집기 트리거(kbland 2종 + ETF 지수 종가 `/api/admin/scheduler/market-index-prices`) — root를 `SCHEDULER_ENABLED=true`로 잠시 띄워야 엔드포인트가 열린다

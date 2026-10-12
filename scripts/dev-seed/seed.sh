@@ -3,9 +3,12 @@
 # 전제: root(8080)·trading-core(8081) local 프로파일 기동, docker compose postgres 기동,
 #       trading-core application-local.yml에 toss.admin-client-id/secret 설정(MOCK 시세 피드용)
 # 1) MOCK 계좌·ACTIVE 전략은 API로 등록(계좌 컬럼 AES 암호화 때문에 SQL 직접 삽입 불가)
-# 2) 가계부·equity-curve 스냅샷·관리자 주문 이력은 dev-seed.sql
+# 2) 가계부·equity-curve 스냅샷·관리자 주문 이력·사이클 성과 목록용 사이클은 dev-seed.sql
 # 3) 벤치마크(kista_ref) 전역 데이터는 실제 수집기 트리거(가짜 행 미삽입 — kbland 2종 + ETF 지수 종가)
 set -euo pipefail
+
+# Windows jq.exe는 CRLF로 출력해 id 끝에 \r이 붙는다 — 모든 호출에서 제거
+jq() { command jq "$@" | tr -d '\r'; }
 
 API=${API:-http://localhost:8080}
 TRADING=${TRADING:-http://localhost:8081}
@@ -19,12 +22,28 @@ TOKEN=$(curl -fsS -X POST "$API/api/auth/dev-token" | jq -r .accessToken)
 ADMIN_TOKEN=$(curl -fsS -X POST "$API/api/auth/dev-admin-token" | jq -r .accessToken)
 AUTH=(-H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json')
 
+# trading-core 사용자 복제본(trading.user_notify_profile) 동기화 — dev-token은 사용자를 직접 저장해 동기화 이벤트를 내지 않으므로,
+# 복제본이 없으면 전략 등록이 404("사용자를 찾을 수 없습니다")로 실패한다. 현재 잔고검증 값을 그대로 재저장해 이벤트를 발행
+DEV_USER=00000000-0000-0000-0000-000000000001
+psql_val() { docker exec "$PG_CONTAINER" psql -Atq -U kista -d kistadb -c "$1"; }
+BALANCE_CHECK=$(psql_val "SELECT COALESCE((SELECT balance_check_enabled FROM public.user_settings WHERE user_id = '$DEV_USER'), true)")
+[[ $BALANCE_CHECK == t ]] && BALANCE_CHECK=true || BALANCE_CHECK=false
+curl -fsS -o /dev/null -X PATCH "${AUTH[@]}" "$API/api/settings/balance-check" -d "{\"enabled\":$BALANCE_CHECK}"
+# Redis Stream 경유 비동기 반영 — 최대 10초 대기
+for _ in {1..20}; do
+  [[ $(psql_val "SELECT count(*) FROM trading.user_notify_profile WHERE user_id = '$DEV_USER'") == 1 ]] && break
+  sleep 0.5
+done
+[[ $(psql_val "SELECT count(*) FROM trading.user_notify_profile WHERE user_id = '$DEV_USER'") == 1 ]] \
+  || echo "trading-core 사용자 복제본 미반영 — 전략 등록이 404로 실패할 수 있음(trading-core 기동·Redis 확인)" >&2
+
 # MOCK 계좌 — 닉네임으로 기존 계좌 재사용
 ACCOUNT=$(curl -fsS "${AUTH[@]}" "$TRADING/api/accounts" \
   | jq -r --arg n "$MOCK_NICKNAME" '[.[] | select(.broker == "MOCK" and .nickname == $n)][0].id // empty')
 if [[ -z "$ACCOUNT" ]]; then
-  ACCOUNT=$(curl -fsS -X POST "${AUTH[@]}" "$TRADING/api/accounts" \
-    -d "$(jq -n --arg n "$MOCK_NICKNAME" '{nickname: $n, broker: "MOCK"}')" | jq -r .id)
+  # 한글 닉네임은 stdin으로 보낸다 — Windows curl은 인자 문자열을 ANSI 코드페이지로 바꿔 UTF-8이 깨진다(400)
+  ACCOUNT=$(jq -n --arg n "$MOCK_NICKNAME" '{nickname: $n, broker: "MOCK"}' \
+    | curl -fsS -X POST "${AUTH[@]}" "$TRADING/api/accounts" --data-binary @- | jq -r .id)
 fi
 echo "MOCK 계좌: $ACCOUNT"
 

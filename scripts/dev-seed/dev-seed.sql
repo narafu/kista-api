@@ -118,4 +118,64 @@ WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'KIS'
   AND extract(isodow FROM d) < 6
 ON CONFLICT (id) DO NOTHING;
 
+-- ── 사이클 성과 목록(status 필터·번호 페이징)용: MOCK [시드] 계좌에 INFINITE MAGX·USD 전략(PAUSED) ──
+-- API 등록(SOXL·TQQQ)과 겹치지 않는 종목으로 종료 사이클 15·8건 + 진행 중 1건씩(합계 25건, size=20 기준 2페이지)
+-- API 등록이 실패해도(예: Toss 허용 IP 밖이라 MOCK 시세 403) 이 데이터는 생성된다. PAUSED라 스케쥴러가 건드리지 않는다
+CREATE TEMP TABLE seed_cycle_tickers (ticker, closed_n, price) ON COMMIT DROP AS
+VALUES ('MAGX', 15, 45.30::numeric), ('USD', 8, 52.80::numeric);
+
+INSERT INTO trading.strategy (id, account_id, type, ticker, status, cycle_seed_type)
+SELECT md5('dev-seed:cycles:strategy:' || t.ticker)::uuid, a.id, 'INFINITE', t.ticker, 'PAUSED', 'NONE'
+FROM trading.accounts a
+CROSS JOIN seed_cycle_tickers t
+WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'MOCK'
+  AND a.nickname LIKE '[시드]%' AND a.deleted_at IS NULL
+  AND NOT EXISTS (SELECT 1 FROM trading.strategy s -- 같은 종목 전략이 이미 있으면(직접 등록 포함) 생략
+                  WHERE s.account_id = a.id AND s.ticker = t.ticker AND s.deleted_at IS NULL)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.strategy_version (id, strategy_id, version_no)
+SELECT md5('dev-seed:cycles:version:' || t.ticker)::uuid, s.id, 1
+FROM seed_cycle_tickers t
+JOIN trading.strategy s ON s.id = md5('dev-seed:cycles:strategy:' || t.ticker)::uuid
+ON CONFLICT DO NOTHING;
+
+INSERT INTO trading.strategy_infinite_version (strategy_version_id, division_count)
+SELECT v.id, 20
+FROM seed_cycle_tickers t
+JOIN trading.strategy_version v ON v.id = md5('dev-seed:cycles:version:' || t.ticker)::uuid
+ON CONFLICT DO NOTHING;
+
+-- i = 1..closed_n은 3주 간격 종료 사이클(손익 -8%~+12%), i = closed_n+1은 2주 전 시작한 진행 중 사이클
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, end_amount, start_date, end_date, created_at)
+SELECT md5('dev-seed:cycles:cycle:' || t.ticker || ':' || g.i)::uuid, v.strategy_id, v.id,
+       CASE WHEN g.i > t.closed_n THEN 6000 ELSE 5000 + g.i * 120 END,
+       CASE WHEN g.i > t.closed_n THEN NULL ELSE round((5000 + g.i * 120) * (1 + ((g.i * 37) % 21 - 8) / 100.0), 2) END,
+       d.start_date,
+       CASE WHEN g.i > t.closed_n THEN NULL ELSE d.start_date + 18 END,
+       d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+FROM seed_cycle_tickers t
+JOIN trading.strategy_version v ON v.id = md5('dev-seed:cycles:version:' || t.ticker)::uuid
+CROSS JOIN generate_series(1, t.closed_n + 1) g(i)
+CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - (t.closed_n + 1 - g.i) * 21 - 14 AS start_date) d
+ON CONFLICT (id) DO NOTHING;
+
+-- 진행 중 사이클의 개장·최신 포지션(미실현 손익 계산용) — 최신은 보유 30주·종가 +4%
+CREATE TEMP TABLE seed_open_positions ON COMMIT DROP AS
+SELECT md5('dev-seed:cycles:pos:' || t.ticker || ':' || p.kind)::uuid AS id, c.id AS cycle_id,
+       p.usd_deposit, round(t.price * p.price_rate, 2) AS closing_price,
+       CASE WHEN p.holdings > 0 THEN t.price END AS avg_price, p.holdings,
+       CASE WHEN p.kind = 'open' THEN c.created_at ELSE now() END AS created_at
+FROM seed_cycle_tickers t
+JOIN trading.strategy_cycle c ON c.id = md5('dev-seed:cycles:cycle:' || t.ticker || ':' || (t.closed_n + 1))::uuid
+CROSS JOIN (VALUES ('open', 6000, 1.00, 0), ('latest', 4200, 1.04, 30)) AS p(kind, usd_deposit, price_rate, holdings);
+
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at)
+SELECT id, cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at FROM seed_open_positions
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)
+SELECT id, false FROM seed_open_positions
+ON CONFLICT (cycle_position_id) DO NOTHING;
+
 COMMIT;
