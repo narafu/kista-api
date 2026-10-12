@@ -5,16 +5,19 @@ import com.kista.trading.adapter.in.schedule.TradingOpenScheduler;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 // admin(root)의 AdminTradingSchedulerController가 X-Internal-Token으로 호출하는 내부 트리거 엔드포인트 —
 // root가 trading-core 스케쥴러 빈을 컴파일 의존 없이 원격으로 실행하게 한다
+// 스케쥴러 빈과 같은 게이트 — scheduler.enabled=false(local)면 주입 대상이 없어 컨트롤러도 함께 끈다(엔드포인트 404)
 @Slf4j
 @Tag(name = "내부 API", description = "서버 간 내부 호출 전용 엔드포인트 (X-Internal-Token 인증)")
 @RestController
 @RequestMapping("/api/internal/trading/scheduler")
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 public class TradingSchedulerInternalController {
 
     private final TradingOpenScheduler openScheduler;
