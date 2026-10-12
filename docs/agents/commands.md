@@ -85,6 +85,7 @@ docker compose build <service> && docker compose up -d --force-recreate <service
 ### 로컬 서버 로그 (IntelliJ 실행 시)
 ```bash
 tail -f logs/kista-api.log
+tail -f logs/kista-trading.log   # trading-core (kista-trading)
 ```
 # application-local.yml에 logging.file.name: {프로젝트루트}/logs/kista-api.log 설정됨
 
