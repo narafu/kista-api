@@ -5,6 +5,7 @@ import com.kista.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.user.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.TokenUseCase;
+import com.kista.user.application.usecase.UserSettingsUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.UserPort;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,6 +44,7 @@ public class DevAuthController {
     private final UserPort                 userPort;          // ADMIN 테스트 유저 직접 저장용
     private final TokenUseCase             tokenUseCase;      // RT 발급
     private final RefreshTokenCookieHelper cookieHelper;      // RT 쿠키 설정
+    private final UserSettingsUseCase      userSettingsUseCase; // trading-core 복제본 재동기화
 
     @Operation(summary = "[DEV] UID로 사용자 승인 — 로컬 프로파일 전용", description = "지정한 userId를 APPROVED 상태로 변경. Telegram 없이 로컬 승인 처리 시 사용.")
     @ApiResponse(responseCode = "200", description = "승인 성공")
@@ -61,8 +63,7 @@ public class DevAuthController {
     public TokenResponse devToken(HttpServletRequest request, HttpServletResponse response) {
         // 테스트 유저 생성 or 기존 유저 반환 (idempotent)
         User user = userUseCase.register(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID, null);
-        // ACTIVE 상태로 설정 — 이미 ACTIVE면 approve()가 409라 건너뜀
-        if (user.status() != UserStatus.ACTIVE) userUseCase.approve(user.id());
+        activateOrResync(user);
         // RT 발급 후 HttpOnly 쿠키 설정
         String rawRt = tokenUseCase.issueRefreshToken(user.id(), request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
@@ -83,12 +84,18 @@ public class DevAuthController {
         if (admin.role() != UserRole.ADMIN) {
             admin = userPort.save(admin.withRole(UserRole.ADMIN));
         }
-        // user_notify_profile 캐시 동기화 겸용 — approve()가 상태 변경 이벤트를 발행하는 유일한 공개 경로다(이미 ACTIVE면 409라 건너뜀)
-        if (admin.status() != UserStatus.ACTIVE) userUseCase.approve(admin.id());
+        activateOrResync(admin);
         // RT 발급 후 HttpOnly 쿠키 설정
         String rawRt = tokenUseCase.issueRefreshToken(admin.id(), request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
         String at = jwtIssuerService.issue(admin.id(), UserRole.ADMIN); // ADMIN role ES256 서명
         return new TokenResponse(at, "bearer", jwtIssuerService.expiresInSeconds()); // TTL을 expiresInSeconds()로 통일
+    }
+
+    // ACTIVE 전환(approve가 복제본 동기화 이벤트 발행) — 이미 ACTIVE면 approve()가 409라 대신 재동기화만 한다.
+    // 로컬은 Redis 초기화·trading 스키마 재생성으로 trading.user_notify_profile이 유실될 수 있는데, 그대로 두면 전략 등록이 404
+    private void activateOrResync(User user) {
+        if (user.status() != UserStatus.ACTIVE) userUseCase.approve(user.id());
+        else userSettingsUseCase.resyncNotifyProfile(user.id());
     }
 }

@@ -15,4 +15,7 @@ public interface UserSettingsUseCase {
 
     // --- 운영전략 추천 목록 ---
     void updateStrategySuggestions(UUID userId, List<String> suggestions);
+
+    // --- trading-core 복제본 재동기화: 현재 상태·설정을 변경 없이 재발행 ---
+    void resyncNotifyProfile(UUID userId);
 }

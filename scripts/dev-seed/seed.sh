@@ -22,14 +22,10 @@ TOKEN=$(curl -fsS -X POST "$API/api/auth/dev-token" | jq -r .accessToken)
 ADMIN_TOKEN=$(curl -fsS -X POST "$API/api/auth/dev-admin-token" | jq -r .accessToken)
 AUTH=(-H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json')
 
-# trading-core 사용자 복제본(trading.user_notify_profile) 동기화 — dev-token은 사용자를 직접 저장해 동기화 이벤트를 내지 않으므로,
-# 복제본이 없으면 전략 등록이 404("사용자를 찾을 수 없습니다")로 실패한다. 현재 잔고검증 값을 그대로 재저장해 이벤트를 발행
+# dev-token이 trading-core 사용자 복제본(trading.user_notify_profile) 동기화 이벤트를 발행한다 — 복제본이 없으면
+# 전략 등록이 404("사용자를 찾을 수 없습니다"). Redis Stream 경유 비동기 반영이라 최대 10초 대기
 DEV_USER=00000000-0000-0000-0000-000000000001
 psql_val() { docker exec "$PG_CONTAINER" psql -Atq -U kista -d kistadb -c "$1"; }
-BALANCE_CHECK=$(psql_val "SELECT COALESCE((SELECT balance_check_enabled FROM public.user_settings WHERE user_id = '$DEV_USER'), true)")
-[[ $BALANCE_CHECK == t ]] && BALANCE_CHECK=true || BALANCE_CHECK=false
-curl -fsS -o /dev/null -X PATCH "${AUTH[@]}" "$API/api/settings/balance-check" -d "{\"enabled\":$BALANCE_CHECK}"
-# Redis Stream 경유 비동기 반영 — 최대 10초 대기
 for _ in {1..20}; do
   [[ $(psql_val "SELECT count(*) FROM trading.user_notify_profile WHERE user_id = '$DEV_USER'") == 1 ]] && break
   sleep 0.5

@@ -46,6 +46,13 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
 
     @Override
     @Transactional
+    public void resyncNotifyProfile(UUID userId) {
+        // 저장 없이 이벤트만 — 유실된 trading.user_notify_profile 복제본을 현재 값으로 다시 채운다(upsert라 멱등)
+        userNotifyProfilePublisher.publishSettingsChanged(getByUserId(userId));
+    }
+
+    @Override
+    @Transactional
     public void updateBalanceCheck(UUID userId, boolean enabled) {
         UserSettings current = getByUserId(userId);
         boolean previous = current.balanceCheckEnabled();

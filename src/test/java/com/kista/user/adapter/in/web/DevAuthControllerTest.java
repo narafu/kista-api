@@ -4,6 +4,7 @@ import com.kista.user.adapter.in.web.security.*;
 import com.kista.platform.security.*;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.TokenUseCase;
+import com.kista.user.application.usecase.UserSettingsUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.support.DomainFixtures;
@@ -26,6 +27,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -54,6 +57,7 @@ class DevAuthControllerTest {
     @MockitoBean UserPort userPort;
     @MockitoBean TokenUseCase tokenUseCase;                // RT 발급
     @MockitoBean RefreshTokenCookieHelper cookieHelper;    // RT 쿠키 설정
+    @MockitoBean UserSettingsUseCase userSettingsUseCase;  // 복제본 재동기화
 
     private static final UUID DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
@@ -91,6 +95,22 @@ class DevAuthControllerTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("tok"));
+        // 이미 ACTIVE — approve 대신 복제본 재동기화
+        verify(userUseCase, never()).approve(any());
+        verify(userSettingsUseCase).resyncNotifyProfile(DEV_USER_ID);
+    }
+
+    @Test
+    void devToken_신규_유저는_approve로_활성화하고_재동기화하지_않는다() throws Exception {
+        when(userUseCase.register(any(), any(), any(), any()))
+                .thenReturn(DomainFixtures.userWithStatus(DEV_USER_ID, UserStatus.PENDING, UserRole.USER));
+        when(jwtIssuerService.issue(any(), any())).thenReturn("tok");
+
+        mockMvc.perform(post("/api/auth/dev-token")
+                        .with(csrf()))
+                .andExpect(status().isOk());
+        verify(userUseCase).approve(DEV_USER_ID);
+        verify(userSettingsUseCase, never()).resyncNotifyProfile(any());
     }
 
     @Test
@@ -102,5 +122,6 @@ class DevAuthControllerTest {
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("admin-tok"));
+        verify(userSettingsUseCase).resyncNotifyProfile(DEV_ADMIN_ID);
     }
 }

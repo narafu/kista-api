@@ -15,7 +15,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -99,6 +101,17 @@ class UserSettingsServiceTest {
 
         verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s ->
                 s.userId().equals(USER_ID) && !s.balanceCheckEnabled()));
+    }
+
+    @Test
+    void resyncNotifyProfile_저장_없이_현재_설정으로_발행만_한다() {
+        UserSettings existing = new UserSettings(USER_ID, false, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+
+        service.resyncNotifyProfile(USER_ID);
+
+        verify(userNotifyProfilePublisher).publishSettingsChanged(existing);
+        verify(userSettingsPort, never()).save(any());
     }
 
     @Test
