@@ -182,3 +182,13 @@ push·배포는 사용자 요청 시에만 진행한다.
 - root 테스트의 `testImplementation(project(":trading-core"))` 완전 제거(아키텍처 테스트가 교차 서브프로젝트 클래스를 읽는 방식 재설계 필요).
 - 모듈 경계·NamedInterface 재설계, 클래스 개명(패키지 이동 외).
 - kista-ui 변경(API 응답·스키마 이름 불변).
+
+## 10. 계획 단계 보강 (2026-10-13, 구현 계획과 동기화)
+
+구현 계획(`docs/superpowers/plans/2026-10-13-package-root-split.md`) 작성 중 확정된 사항. 위 절과 다르면 이 절이 우선한다.
+
+- **모듈 ID 고정**: 19개 `package-info`에 `@ApplicationModule(id = ...)`를 명시하고 `spring.modulith.detection-strategy: explicitly-annotated`를 쓴다. 패키지 깊이가 바뀌는 중간 커밋에서도 Modulith 검증이 유지되며, 최종 상태에서도 테스트 픽스처 패키지(`support`)가 모듈로 잡히지 않는다. 이행 중에는 `ApplicationModules.of("com.kista")`로 통합 모델을 유지하고, 마지막에 프로세스별 모델(D1)로 전환한다.
+- **아키텍처 맵 모듈 키**: 두 모델을 합치면 `notify`·`web`이 충돌하므로 맵의 모듈 키는 `com.kista` 아래 두 세그먼트(`api.notify`, `tradingcore.trading`, `shared.kernel`)다.
+- **빈 구성 회귀 가드**: 두 앱의 컨텍스트 로드 테스트(trading-core는 신설)가 JPA 리포지토리 수, `SecurityFilterChain` 1개, root 컨텍스트에 trading-core 빈 없음을 단언한다. 자동구성은 `@AutoConfigureOrder(HIGHEST_PRECEDENCE)`로 Boot 기본 빈보다 먼저 평가한다.
+- **경계 규칙**: 6절의 "이행 중 비활성" 대신 마지막 수작업 Task에서 바로 활성 상태로 추가한다. trading-core 테스트의 `com.kista.shared.platform.scheduling`(SchedulerLockService DB 테스트)만 명시 예외.
+- **모듈 문서 위치**: `docs/agents/modules/{api,tradingcore,shared}/<모듈ID>.md`.
