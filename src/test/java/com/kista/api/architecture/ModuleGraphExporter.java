@@ -66,7 +66,7 @@ final class ModuleGraphExporter {
 
     // 모듈 키의 루트 세그먼트로 Gradle 서브프로젝트 판별
     private static String project(String name) {
-        return switch (name.substring(0, name.indexOf('.'))) {
+        return switch (name.split("\\.", 2)[0]) {
             case "tradingcore" -> ":trading-core";
             case "shared" -> ":shared";
             default -> ":api";

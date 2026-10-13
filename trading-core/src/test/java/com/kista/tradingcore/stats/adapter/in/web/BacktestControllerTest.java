@@ -6,7 +6,6 @@ import com.kista.tradingcore.stats.domain.model.backtest.BacktestResult;
 import com.kista.tradingcore.stats.domain.model.backtest.BacktestSummary;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -14,7 +13,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -40,8 +38,6 @@ import com.kista.shared.kernel.StrategyTicker;
 class BacktestControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean BacktestUseCase backtestUseCase;
 
     private static final UUID USER_ID = UUID.randomUUID();

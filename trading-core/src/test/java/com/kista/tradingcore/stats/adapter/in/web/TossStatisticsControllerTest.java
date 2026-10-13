@@ -3,14 +3,12 @@ package com.kista.tradingcore.stats.adapter.in.web;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.*;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,8 +32,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TossStatisticsControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 의존성
     @MockitoBean BrokerStatisticsUseCase brokerStatistics;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");

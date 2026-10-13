@@ -8,7 +8,6 @@ import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyDetail;
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
@@ -19,7 +18,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -51,8 +49,6 @@ class TradingCycleControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean StrategyUseCase tradingCycle;
     @MockitoBean TradingExecutionUseCase tradingExecution;
     @MockitoBean VrReconfigureUseCase vrReconfigure;

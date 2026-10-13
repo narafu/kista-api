@@ -4,13 +4,11 @@ import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionSummary;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,8 +31,6 @@ class DashboardControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AccountStatisticsUseCase accountStatistics;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");

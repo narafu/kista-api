@@ -1,14 +1,12 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,8 +28,6 @@ class OrderCancelControllerTest {
 
     @Autowired MockMvc mockMvc;
 
-    @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean TradingExecutionUseCase tradingExecution;
 
     private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-000000000099");

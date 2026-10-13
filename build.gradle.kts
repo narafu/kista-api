@@ -76,7 +76,7 @@ dependencies {
 
     // Testing
     testImplementation(testFixtures(project(":shared"))) // DataJpaTestBase/WebMvcTestSupport/application-test.yml (shared 소유)
-    testImplementation(project(":trading-core")) // 메인 src는 runtimeOnly로 컴파일 경계 차단, 테스트 소스는 기존대로 trading-core 타입 직접 참조 유지(testImplementation은 implementation을 더 이상 상속하지 않음)
+    testImplementation(project(":trading-core")) // 루트 메인 src는 :trading-core에 의존하지 않음(HTTP·Redis로만 통신), 테스트 소스만 trading-core 타입을 직접 참조(testImplementation은 implementation을 상속하지 않음)
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.security.test)
     testImplementation(libs.spring.boot.starter.security.test)

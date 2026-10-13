@@ -1,7 +1,6 @@
 package com.kista.api.finance.adapter.in.web;
 
 import com.kista.api.finance.domain.model.MonthlyClosing;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.finance.application.usecase.MonthlyClosingUseCase;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -35,8 +33,6 @@ class MonthlyClosingControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean MonthlyClosingUseCase monthlyClosingUseCase;
 
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");

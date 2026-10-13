@@ -2,7 +2,6 @@ package com.kista.api.user.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.kernel.NotificationChannel;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.user.application.usecase.UserSettingsUseCase;
 import com.kista.api.user.application.usecase.UserProfileUseCase;
 import org.junit.jupiter.api.Test;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,8 +32,6 @@ class SettingsControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean UserProfileUseCase userProfileUseCase;
     @MockitoBean UserSettingsUseCase userSettingsUseCase;
 

@@ -7,7 +7,6 @@ import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.Market;
 import com.kista.api.finance.application.usecase.AssetSnapshotUseCase;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.admin.application.port.output.AppErrorLogPort;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import com.kista.api.finance.application.port.output.FinanceCategoryPort;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -44,8 +42,6 @@ class AssetSnapshotControllerTest {
     @Autowired MockMvc mockMvc;
 
     @MockitoBean AppErrorLogPort appErrorLogPort;
-    @MockitoBean JwtDecoder jwtDecoder;
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean AssetSnapshotUseCase assetSnapshotUseCase;
     @MockitoBean FinanceCategoryPort financeCategoryPort;
     @MockitoBean FinanceAccountPort financeAccountPort;

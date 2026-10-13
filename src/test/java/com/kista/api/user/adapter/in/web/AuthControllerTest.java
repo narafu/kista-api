@@ -3,7 +3,6 @@ package com.kista.api.user.adapter.in.web;
 import com.kista.api.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.api.user.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.api.user.domain.model.User;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.api.user.application.usecase.GetUserSettingsQuery;
 import com.kista.api.user.application.usecase.TokenUseCase;
 import com.kista.api.user.application.usecase.UserUseCase;
@@ -50,7 +49,6 @@ class AuthControllerTest {
     @MockitoBean TokenUseCase tokenUseCase; // AuthController RT 발급 의존성
     @MockitoBean RefreshTokenCookieHelper cookieHelper; // RT 쿠키 헬퍼 의존성
     @MockitoBean JwtDecoder jwtDecoder; // JwtDecoderConfig bean — WebMvcTest에서 명시 필요
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean JwtIssuerService jwtIssuerService;   // JWT 발급 서비스
     @MockitoBean GetUserSettingsQuery getUserSettingsQuery; // AuthController.me() / kakaoCallback() 의존성
 

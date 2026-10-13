@@ -2,13 +2,11 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.domain.model.*;
 import com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase;
-import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,8 +31,6 @@ import com.kista.shared.kernel.StrategyTicker;
 class TradingStatsControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
-    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
     @MockitoBean TradingStatsUseCase tradingStats;
 
     private static final UUID USER_ID = UUID.randomUUID();
