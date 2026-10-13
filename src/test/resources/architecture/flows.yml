@@ -222,8 +222,9 @@ flows:
         title: 실시간·푸시 전달
         desc: >-
           체결 이벤트는 Redis Pub/Sub(trade.event)으로, 앱 푸시 요청은 Redis Stream으로 kista-api에 넘긴다(FCM 디바이스 토큰은 root 소유).
-          kista-api는 체결 이벤트를 접속 중인 사용자의 SSE 연결로 보내고, 푸시는 사용자 알림 채널에 FCM이 포함될 때만 발송한다.
-        code: [RedisTradeEventPublisher#notifyTrade, RedisTradeEventSubscriber#onMessage, PushNotificationStreamConsumer, PushNotificationPort#pushIfEnabled]
+          kista-api는 체결 이벤트를 접속 중인 사용자의 SSE 연결로 보내고, 같은 채널을 benchmark도 구독해 그 사용자의 벤치마크 비교 캐시를 비운다.
+          trading-core 통계 캐시(summary/equity-curve)는 SSE 발행보다 먼저 리포트 이벤트로 비워진다. 푸시는 사용자 알림 채널에 FCM이 포함될 때만 발송한다.
+        code: [RedisTradeEventPublisher#notifyTrade, RedisTradeEventSubscriber#onMessage, TradeEventBenchmarkCacheInvalidator#onMessage, TradingStatsService#onTradingReportReady, PushNotificationStreamConsumer, PushNotificationPort#pushIfEnabled]
         fail: SSE는 유실을 허용한다(fire-and-forget). Stream은 5분마다 pending을 복구한다.
 
       - id: report-ui

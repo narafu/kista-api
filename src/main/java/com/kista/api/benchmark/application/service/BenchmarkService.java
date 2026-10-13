@@ -42,6 +42,11 @@ class BenchmarkService implements BenchmarkUseCase {
             String regionCode, String symbol, LocalDate from, LocalDate to) {}
 
     @Override
+    public void invalidateUserCache(UUID userId) {
+        statsResultCache.invalidateIf(key -> key instanceof BenchmarkComparisonKey k && k.userId().equals(userId));
+    }
+
+    @Override
     public BenchmarkComparison getHousingBenchmarkComparison(
             UUID userId, BenchmarkScope scope, UUID strategyId,
             String regionCode, LocalDate from, LocalDate to) {

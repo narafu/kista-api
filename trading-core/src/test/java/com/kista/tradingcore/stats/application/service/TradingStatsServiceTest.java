@@ -11,6 +11,7 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -447,6 +448,33 @@ class TradingStatsServiceTest {
         assertThat(second).isEqualTo(first);
         verify(accountPort, times(1)).findByUserId(USER_ID);
         verify(strategyCyclePort, times(1)).findByStrategyIds(any());
+    }
+
+    @Test
+    void 매매_리포트_이벤트는_해당_사용자의_summary와_equityCurve_캐시만_비운다() {
+        stubUserWithStrategy();
+        StrategyCycle active = activeCycle("1000.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                depositSnapshot(active.id(), "1000.00", "2026-06-02T01:00:00Z")));
+        LocalDate from = LocalDate.parse("2026-06-01");
+        LocalDate to = LocalDate.parse("2026-06-30");
+
+        statsService.getSummary(USER_ID);
+        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.onTradingReportReady(reportEvent(UUID.randomUUID())); // 다른 사용자 — 캐시 유지
+        statsService.getSummary(USER_ID);
+        statsService.getEquityCurve(USER_ID, null, from, to);
+        statsService.onTradingReportReady(reportEvent(USER_ID));
+        statsService.getSummary(USER_ID);
+        statsService.getEquityCurve(USER_ID, null, from, to);
+
+        verify(accountPort, times(4)).findByUserId(USER_ID); // summary·curve 각 2회(무효화 전후)
+        verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any()); // curve 무효화 전후 각 1회
+    }
+
+    private static TradingReportReadyEvent reportEvent(UUID userId) {
+        return new TradingReportReadyEvent(userId, ACCOUNT_ID, STRATEGY_ID, "계좌", null, List.of(), true);
     }
 
     @Test

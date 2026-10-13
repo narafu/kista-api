@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 // 통계 결과 인메모리 TTL 캐시 — 소비처가 각자 인스턴스를 소유한다(root BenchmarkService 10분, trading-core TradingStatsService 5분).
@@ -76,6 +77,11 @@ public class TtlResultCache {
         } finally {
             lock.unlock();
         }
+    }
+
+    // 조건에 맞는 키만 즉시 제거 — 사용자 단위 무효화(체결 직후 stale 방지)용. 전체 clear는 제공하지 않는다
+    public void invalidateIf(Predicate<Object> keyFilter) {
+        cache.keySet().removeIf(keyFilter);
     }
 
     // 임계치 초과 시 만료 엔트리만 제거 — 별도 스케줄러 없이 쓰기 경로에서 기회적 청소

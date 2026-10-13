@@ -13,7 +13,11 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -34,7 +38,7 @@ import com.kista.shared.kernel.StrategyType;
 @RequiredArgsConstructor
 class TradingStatsService implements TradingStatsUseCase {
 
-    // 사이클 스냅샷은 04:30 배치+체결 append-only라 TTL 만료로 충분(수동실행 직후 최대 5분 stale 허용 트레이드오프)
+    // 매매 리포트(체결·포지션 스냅샷 저장) 직후엔 onTradingReportReady가 사용자 키를 비우고, 그 외 변경은 TTL 만료에 맡긴다
     private static final Duration CURVE_CACHE_TTL = Duration.ofMinutes(5);
 
     private final AccountPort accountPort;
@@ -62,6 +66,17 @@ class TradingStatsService implements TradingStatsUseCase {
         BigDecimal realizedPnl() {
             return cycle.endAmount().subtract(startAmount());
         }
+    }
+
+    // 매매 리포트 발행 = 체결·포지션 스냅샷 저장 완료 — 그 사용자의 summary/equity-curve 캐시만 비운다.
+    // 체결 0건이어도 스냅샷이 쌓여 곡선이 바뀌므로 무조건 비운다. 발행처(TradingReporter)가 트랜잭션 밖이라 동기 @EventListener로 충분하고,
+    // HIGHEST_PRECEDENCE로 TradingReportNotifier(SSE 발행)보다 먼저 실행해 UI 재조회가 stale 캐시를 받지 않게 한다
+    @EventListener
+    @Order(Ordered.HIGHEST_PRECEDENCE)
+    void onTradingReportReady(TradingReportReadyEvent event) {
+        UUID userId = event.userId();
+        statsResultCache.invalidateIf(key -> key instanceof SummaryKey(UUID u) && u.equals(userId)
+                || key instanceof EquityCurveKey k && k.userId().equals(userId));
     }
 
     @Override

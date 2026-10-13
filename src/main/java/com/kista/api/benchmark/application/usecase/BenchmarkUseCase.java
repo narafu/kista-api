@@ -31,6 +31,9 @@ public interface BenchmarkUseCase {
     // from/to null 허용 (null이면 전체 구간). symbol은 필수. 투자 데이터와 무관한 원본 일별 종가 시계열
     List<IndexPrice> getEtfPriceSeries(LocalDate from, LocalDate to, EtfBenchmarkSymbol symbol);
 
+    // 체결 발생 시 해당 사용자의 벤치마크 비교 캐시만 비운다 (trade.event 구독자가 호출)
+    void invalidateUserCache(UUID userId);
+
     // 시계열 조회에 사용 가능한 지역 카탈로그 (KB Land 제공 지역 그대로, 하드코딩 아님)
     List<HousingBenchmarkRegion> getHousingBenchmarkRegions();
 }

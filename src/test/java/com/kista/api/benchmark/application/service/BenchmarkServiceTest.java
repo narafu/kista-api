@@ -731,6 +731,23 @@ class BenchmarkServiceTest {
     }
 
     @Test
+    void invalidateUserCache_후_재조회시_본체를_다시_계산한다() {
+        stubWeeklyPortfolioComparison("100.00", "184.20");
+        when(currentExchangeRatePort.getMidRate()).thenReturn(new BigDecimal("1365.20"));
+
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+                "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+        statsService.invalidateUserCache(UUID.randomUUID()); // 다른 사용자 무효화는 영향 없음
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+                "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+        statsService.invalidateUserCache(USER_ID);
+        statsService.getHousingBenchmarkComparison(USER_ID, BenchmarkScope.PORTFOLIO, null,
+                "1100000000", LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+
+        verify(investmentPointsPort, times(2)).fetch(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void 벤치마크_비교는_regionCode가_다르면_별도_캐시_키로_본체를_재계산한다() {
         stubWeeklyPortfolioComparison("100.00", "184.20");
         when(currentExchangeRatePort.getMidRate()).thenReturn(

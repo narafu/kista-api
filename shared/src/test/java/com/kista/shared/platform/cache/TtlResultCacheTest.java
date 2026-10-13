@@ -133,6 +133,19 @@ class TtlResultCacheTest {
     }
 
     @Test
+    void invalidateIf_removesOnlyMatchingKeys() {
+        cache.getOrCompute("user1:a", Duration.ofMinutes(5), () -> "a");
+        cache.getOrCompute("user1:b", Duration.ofMinutes(5), () -> "b");
+        cache.getOrCompute("user2:a", Duration.ofMinutes(5), () -> "c");
+
+        cache.invalidateIf(key -> ((String) key).startsWith("user1:"));
+
+        assertThat((String) cache.peek("user1:a")).isNull();
+        assertThat((String) cache.peek("user1:b")).isNull();
+        assertThat((String) cache.peek("user2:a")).isEqualTo("c");
+    }
+
+    @Test
     void peek_returnsValidCacheOnly_nullWhenExpired() {
         cache.getOrCompute("key", Duration.ofMinutes(5), () -> "value");
 
