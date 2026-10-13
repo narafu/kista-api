@@ -16,7 +16,7 @@ import java.util.List;
 public record DcaResponse(
         OrderDirection direction, BigDecimal amountUsd, OrderType orderType, DcaFrequency frequency,
         DayOfWeek dayOfWeek, Integer dayOfMonth,
-        List<Object> conditions,          // 단계 ①은 항상 빈 배열
+        List<DcaConditionResponse> conditions, // 추가 조건(AND), 입력 순서
         NextExecution nextExecution,      // 보정 반영 판정 예정일 (null 가능)
         LastExecution lastExecution       // 최근 회차 (null 가능)
 ) {
@@ -31,6 +31,6 @@ public record DcaResponse(
         LastExecution last = e == null ? null : new LastExecution(e.tradeDate(), e.status().name(),
                 e.skipReason() == null ? null : e.skipReason().name());
         return new DcaResponse(c.direction(), c.amountUsd(), c.orderType(), c.frequency(), c.dayOfWeek(), c.dayOfMonth(),
-                List.of(), next, last);
+                c.conditions().stream().map(DcaConditionResponse::from).toList(), next, last);
     }
 }

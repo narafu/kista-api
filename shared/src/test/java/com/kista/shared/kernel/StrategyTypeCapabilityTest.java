@@ -72,7 +72,7 @@ class StrategyTypeCapabilityTest {
         assertThat(dca.orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC);
         assertThat(dca.directions()).containsExactly(OrderDirection.BUY, OrderDirection.SELL);
         assertThat(dca.frequencies()).containsExactly(DcaFrequency.values());
-        assertThat(dca.conditionIndicators()).containsExactly(DcaIndicator.values());
+        assertThat(dca.conditionIndicators()).containsExactly(DcaIndicator.AVG_PRICE, DcaIndicator.SMA, DcaIndicator.RSI);
     }
 
     @Test
