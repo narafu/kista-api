@@ -570,7 +570,7 @@ flows:
         desc: >-
           리스너 하나가 한 트랜잭션에서 순서대로 정리한다 — cycle_position → strategy_cycle → strategy 소프트 삭제, 계좌의 증권사 토큰 삭제 후 계좌 소프트 삭제,
           마지막으로 알림 프로필 복제본 행 삭제. 주문(orders)은 보존한다(계좌 소프트 삭제로 조회에서 빠진다).
-        code: [com.kista.trading.adapter.out.UserCascadeListener#onUserDeleted, AccountService#deleteAllByUserId, BrokerTokenCachePort#deleteByAccountIds,
+        code: [com.kista.tradingcore.trading.adapter.out.UserCascadeListener#onUserDeleted, AccountService#deleteAllByUserId, BrokerTokenCachePort#deleteByAccountIds,
                TradingUserProfilePort#deleteByUserId]
         fail: 중간에 실패하면 트랜잭션 전체가 롤백되고 EPR이 재기동 때 이벤트를 다시 처리한다(각 단계는 이미 지운 행을 건너뛰어 멱등).
         state: "cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · broker_tokens·user_notify_profile 삭제"
@@ -605,7 +605,7 @@ flows:
         desc: >-
           보유수량과 매도 계획이 맞는지 점검한다. 차단 사유(보유 0인데 매도, 매도 합 > 보유, 수량 없는 매도 2건 이상)면 저장하지 않고,
           경고 사유(보유 중인데 매도 없음)면 저장은 진행하되, 그날 개장·마감 배치의 장전 점검이 PRIVACY 주문을 막는다. 둘 다 관리자 텔레그램으로 알린다.
-        code: [com.kista.privacy.application.service.PrivacyService#executeFidaOrder, PrivacyTradeValidationService#inspect, PrivacyAlertNotifier#onPrivacyAlert]
+        code: [com.kista.tradingcore.privacy.application.service.PrivacyService#executeFidaOrder, PrivacyTradeValidationService#inspect, PrivacyAlertNotifier#onPrivacyAlert]
         cond: 경고·차단 이슈가 있을 때 알림
         fail: 차단이면 400, 저장 안 됨.
 
@@ -1584,7 +1584,7 @@ lifecycles:
         flow: close-batch/rotate
       - {from: ACTIVE, to: PAUSED, title: 수동 체결 보정으로 보유 0, code: [ManualTradeCorrectionService#correctManualFills, CycleCloser#closeIfExhausted], tag: 관리자, flow: admin-orders/close-cycle}
       - {from: PAUSED, to: ACTIVE, title: 재개, desc: 사이클이 끝나 있으면 새 사이클을 다시 연다., code: [StrategyService#resume, AdminStrategyService#resumeStrategy], flow: pause-stop/resume}
-      - {from: ACTIVE, title: 전략 삭제·회원 탈퇴, desc: 상태와 무관한 소프트 삭제(사이클 이력 포함)., code: [StrategyService#delete, com.kista.trading.adapter.out.UserCascadeListener#onUserDeleted], flow: withdraw/trading-cleanup}
+      - {from: ACTIVE, title: 전략 삭제·회원 탈퇴, desc: 상태와 무관한 소프트 삭제(사이클 이력 포함)., code: [StrategyService#delete, com.kista.tradingcore.trading.adapter.out.UserCascadeListener#onUserDeleted], flow: withdraw/trading-cleanup}
 
   order:
     title: 주문

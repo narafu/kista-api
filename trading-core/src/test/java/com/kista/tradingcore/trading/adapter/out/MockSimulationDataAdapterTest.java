@@ -1,0 +1,49 @@
+package com.kista.tradingcore.trading.adapter.out;
+
+import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.broker.domain.model.StrategyRefLite;
+import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+// broker↔strategy-config 순환 해소로 추가된 findStrategiesByAccountId 매핑만 검증 — 나머지 메서드는 기존 통합 테스트가 간접 커버
+@ExtendWith(MockitoExtension.class)
+class MockSimulationDataAdapterTest {
+
+    @Mock OrderPort orderPort;
+    @Mock CyclePositionPort cyclePositionPort;
+    @Mock StrategyCyclePort strategyCyclePort;
+    @Mock StrategyPort strategyPort;
+
+    private MockSimulationDataAdapter adapter() {
+        return new MockSimulationDataAdapter(orderPort, cyclePositionPort, strategyCyclePort, strategyPort);
+    }
+
+    @Test
+    void findStrategiesByAccountId_mapsStrategyToStrategyRefLite() {
+        UUID accountId = UUID.randomUUID();
+        UUID strategyId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(strategy));
+
+        List<StrategyRefLite> result = adapter().findStrategiesByAccountId(accountId);
+
+        assertThat(result).containsExactly(new StrategyRefLite(strategyId, StrategyTicker.TQQQ));
+    }
+}

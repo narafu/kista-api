@@ -99,10 +99,10 @@ class HexagonalArchitectureTest {
         // 그때는 allowlist에 추가할지 검토할 것.
         ArchRule rule = noClasses()
                 .that().doNotHaveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates")
-                .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisTradingApi")
-                .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisPriceApi")
-                .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.toss.TossPriceApi")
-                .and().doNotHaveFullyQualifiedName("com.kista.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
+                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.kis.KisTradingApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.kis.KisPriceApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
                 .haveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates");
         rule.check(classes);
@@ -115,10 +115,10 @@ class HexagonalArchitectureTest {
         // PRIVACY 기준 매매표는 커널 소유 PrivacyPlan으로 받고, 변환은 privacy(PrivacyTradeBase.toPlan())가 맡는다.
         // 허용 목록 방식이라 신규 모듈(contract/tradingstats/tradingnotify 등)이 생겨도 자동으로 차단된다.
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.matching..")
+                .that().resideInAPackage("com.kista.tradingcore.matching..")
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
-                                .and(resideOutsideOfPackage("com.kista.matching.."))
+                                .and(resideOutsideOfPackage("com.kista.tradingcore.matching.."))
                                 .and(resideOutsideOfPackage("com.kista.shared.kernel..")));
         rule.check(classes);
     }
@@ -153,20 +153,20 @@ class HexagonalArchitectureTest {
         // KIS/Toss 전용 타입(KisApiException/TossCandle 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
         // (BrokerApiException/BrokerCandle 등)만 안다. 신규 브로커 추가가 "구현체 1개 추가"로 끝나도록 잠근다.
         ArchRule rule = noClasses()
-                .that().resideOutsideOfPackage("com.kista.broker..")
+                .that().resideOutsideOfPackage("com.kista.tradingcore.broker..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.broker.domain.model.kis..", "com.kista.broker.domain.model.toss..");
+                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..");
         rule.check(classes);
     }
 
     @Test
     @DisplayName("web·tradingweb(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
     void web_must_stay_pure_inbound_sink() {
-        // com.kista.web·com.kista.tradingweb은 패키지에 adapter/application/domain 세그먼트가 없어
+        // com.kista.web·com.kista.tradingcore.web은 패키지에 adapter/application/domain 세그먼트가 없어
         // 위 도메인/application.service 규칙 와일드카드에 안 걸린다(미검사 표면) — 이 규칙으로 직접 강제한다.
         // tradingweb은 root web과 대칭인 trading-core 앱셸이라 같은 규칙을 적용한다.
         ArchRule rule = noClasses()
-                .that().resideInAnyPackage("com.kista.web..", "com.kista.tradingweb..")
+                .that().resideInAnyPackage("com.kista.web..", "com.kista.tradingcore.web..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage(
                         "com.kista..application.service..",
@@ -199,15 +199,15 @@ class HexagonalArchitectureTest {
         // ManualTradingService/TradingPreviewService는 requireOwnedAccount 결과를 곧바로 TradingAccount.from()에 넘겨
         // Account 타입을 선언·보관하지 않으므로 제외 대상이 아니다 — 나중에 Account를 직접 다루게 되면 이 규칙이 잡는다.
         Set<String> accountAllowed = Set.of(
-                "com.kista.trading.application.service.support.SelectionChain",      // 소유권 검증(verifyOwnedBy)
-                "com.kista.trading.application.service.ReorderService",              // 소유권 검증
-                "com.kista.trading.application.service.OrderCancelService",           // 소유권 검증
-                "com.kista.trading.application.service.VrReconfigureService",        // 소유권 검증
-                "com.kista.trading.application.service.StrategyCreationService",     // 계좌 소유권·브로커 검증
-                "com.kista.trading.application.service.StrategyService",             // 계좌 소유권 검증
-                "com.kista.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
-                "com.kista.trading.application.service.ManualTradeCorrectionService", // 소유권 검증
-                "com.kista.trading.application.service.AccountOpenOrderCanceller"    // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
+                "com.kista.tradingcore.trading.application.service.support.SelectionChain",      // 소유권 검증(verifyOwnedBy)
+                "com.kista.tradingcore.trading.application.service.ReorderService",              // 소유권 검증
+                "com.kista.tradingcore.trading.application.service.OrderCancelService",           // 소유권 검증
+                "com.kista.tradingcore.trading.application.service.VrReconfigureService",        // 소유권 검증
+                "com.kista.tradingcore.trading.application.service.StrategyCreationService",     // 계좌 소유권·브로커 검증
+                "com.kista.tradingcore.trading.application.service.StrategyService",             // 계좌 소유권 검증
+                "com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
+                "com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService", // 소유권 검증
+                "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller"    // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
         );
         // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다
         Set<String> existing = new java.util.HashSet<>();
@@ -216,12 +216,12 @@ class HexagonalArchitectureTest {
         // 중첩 클래스(TradingService$X 등)는 바깥 클래스 기준으로 제외 판정
         DescribedPredicate<JavaClass> isBatchPath = DescribedPredicate.describe(
                 "trading 배치 경로 클래스(application.service 전체 + BatchContext, 제외 목록 제외)",
-                c -> (c.getPackageName().startsWith("com.kista.trading.application.service")
-                        || c.getName().equals("com.kista.trading.domain.model.BatchContext"))
+                c -> (c.getPackageName().startsWith("com.kista.tradingcore.trading.application.service")
+                        || c.getName().equals("com.kista.tradingcore.trading.domain.model.BatchContext"))
                         && !accountAllowed.contains(c.getName().split("\\$")[0]));
         ArchRule rule = noClasses()
                 .that(isBatchPath)
-                .should().dependOnClassesThat().haveFullyQualifiedName("com.kista.account.domain.model.Account");
+                .should().dependOnClassesThat().haveFullyQualifiedName("com.kista.tradingcore.account.domain.model.Account");
         rule.check(classes);
     }
 

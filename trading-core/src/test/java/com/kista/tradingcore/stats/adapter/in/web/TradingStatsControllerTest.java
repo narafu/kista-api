@@ -1,0 +1,127 @@
+package com.kista.tradingcore.stats.adapter.in.web;
+
+import com.kista.tradingcore.web.TradingApplication;
+import org.springframework.test.context.ContextConfiguration;
+import com.kista.tradingcore.stats.domain.model.*;
+import com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase;
+import com.kista.shared.platform.security.TokenBlacklistPort;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static com.kista.shared.support.WebMvcTestSupport.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+
+@WebMvcTest(TradingStatsController.class)
+@ContextConfiguration(classes = TradingApplication.class)
+@Execution(ExecutionMode.SAME_THREAD)
+class TradingStatsControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @MockitoBean JwtDecoder jwtDecoder; // JwtAuthFilter 의존성 — JwtDecoderConfig bean 실제 파싱 방지
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean TradingStatsUseCase tradingStats;
+
+    private static final UUID USER_ID = UUID.randomUUID();
+
+    @Test
+    void summary를_반환한다() throws Exception {
+        when(tradingStats.getSummary(USER_ID)).thenReturn(new StatsSummary(
+                new BigDecimal("50.00"), new BigDecimal("10.00"), new BigDecimal("1000.00"),
+                List.of(new StrategyTypeStats(StrategyType.INFINITE, 2, 1,
+                        new BigDecimal("0.5000"), new BigDecimal("0.0250"), new BigDecimal("20.0"),
+                        new BigDecimal("50.00"), new BigDecimal("10.00")))));
+
+        mockMvc.perform(get("/api/stats/summary").with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRealizedPnl").value(50.00))
+                .andExpect(jsonPath("$.byType[0].type").value("INFINITE"))
+                .andExpect(jsonPath("$.byType[0].winRate").value(0.5));
+    }
+
+    @Test
+    void equity_curve를_반환한다() throws Exception {
+        when(tradingStats.getEquityCurve(eq(USER_ID), isNull(), any(), any()))
+                .thenReturn(new EquityCurve(
+                        List.of(new EquityPoint(LocalDate.parse("2026-06-02"),
+                                new BigDecimal("1000.00"), new BigDecimal("900.00")))));
+
+        mockMvc.perform(get("/api/stats/equity-curve")
+                        .param("from", "2026-06-01").param("to", "2026-06-30")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.points[0].date").value("2026-06-02"))
+                .andExpect(jsonPath("$.points[0].totalAsset").value(1000.00))
+                .andExpect(jsonPath("$.benchmark").doesNotExist());
+    }
+
+    @Test
+    void equity_curve는_type_필터를_전달한다() throws Exception {
+        when(tradingStats.getEquityCurve(eq(USER_ID), eq(StrategyType.VR), any(), any()))
+                .thenReturn(new EquityCurve(List.of()));
+
+        mockMvc.perform(get("/api/stats/equity-curve")
+                        .param("type", "VR")
+                        .param("from", "2026-06-01")
+                        .param("to", "2026-06-30")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk());
+
+        verify(tradingStats).getEquityCurve(
+                USER_ID, StrategyType.VR,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+    }
+
+    @Test
+    void cycles는_계좌와_티커_필터를_전달한다() throws Exception {
+        var accountId = UUID.randomUUID();
+        when(tradingStats.getCyclePerformances(any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(new CyclePerformancePage(List.of(), 0, 0, 0));
+
+        mockMvc.perform(get("/api/stats/cycles")
+                        .param("type", "INFINITE").param("accountId", accountId.toString()).param("ticker", "SOXL")
+                        .param("status", "ACTIVE").param("page", "2")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk());
+
+        verify(tradingStats).getCyclePerformances(
+                USER_ID, StrategyType.INFINITE, accountId, StrategyTicker.SOXL, CycleStatusFilter.ACTIVE, 2, 50);
+    }
+
+    @Test
+    void cycles를_페이지_정보와_함께_반환한다() throws Exception {
+        when(tradingStats.getCyclePerformances(eq(USER_ID), isNull(), isNull(), isNull(), isNull(), eq(0), eq(50)))
+                .thenReturn(new CyclePerformancePage(
+                        List.of(new CyclePerformance(UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
+                                StrategyTicker.SOXL, LocalDate.parse("2026-01-01"),
+                                LocalDate.parse("2026-01-31"), new BigDecimal("1000.00"),
+                                new BigDecimal("1100.00"), new BigDecimal("100.00"),
+                                new BigDecimal("0.1000"), 30, true)),
+                        0, 51, 2));
+
+        mockMvc.perform(get("/api/stats/cycles").with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].closed").value(true))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.totalElements").value(51))
+                .andExpect(jsonPath("$.totalPages").value(2));
+    }
+}

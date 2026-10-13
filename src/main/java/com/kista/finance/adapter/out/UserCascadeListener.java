@@ -20,7 +20,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 // 그룹 소유권 승계 로직은 원본 UserCascadeDeleter 구현을 그대로 이관.
 // AFTER_COMMIT 시점엔 원본 트랜잭션이 종료돼 있으므로 REQUIRES_NEW로 새 트랜잭션을 연다 —
 // 그룹 승계는 read-write-read-write라 6개 포트 호출이 한 트랜잭션 안에서 원자적으로 실행돼야 한다.
-// 빈 이름 명시 — trading 모듈에도 동명 클래스(com.kista.trading.adapter.out.UserCascadeListener)가 있어
+// 빈 이름 명시 — trading 모듈에도 동명 클래스(com.kista.tradingcore.trading.adapter.out.UserCascadeListener)가 있어
 // 컴포넌트 스캔 기본 빈 이름('userCascadeListener')이 충돌한다.
 @Component("financeUserCascadeListener")
 @RequiredArgsConstructor

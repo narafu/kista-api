@@ -60,7 +60,7 @@ class ApplicationContextLoadTest {
     private static final int ROOT_JPA_REPOSITORIES = 21; // 실측값(grep·테스트 일치)
     // trading-core 소유 패키지 — 패키지 이동 후 com.kista.tradingcore 하나로 줄어든다
     private static final List<String> TRADING_CORE_PACKAGES = List.of(
-            "com.kista.trading.", "com.kista.tradingstats.", "com.kista.tradingnotify.", "com.kista.tradingweb.",
-            "com.kista.matching.", "com.kista.broker.", "com.kista.account.", "com.kista.privacy.",
-            "com.kista.marketcalendar.");
+            "com.kista.tradingcore.trading.", "com.kista.tradingcore.stats.", "com.kista.tradingcore.notify.", "com.kista.tradingcore.web.",
+            "com.kista.tradingcore.matching.", "com.kista.tradingcore.broker.", "com.kista.tradingcore.account.", "com.kista.tradingcore.privacy.",
+            "com.kista.tradingcore.marketcalendar.");
 }

@@ -4,7 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.benchmark.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
 import com.kista.shared.platform.PlatformAutoConfiguration;
-import com.kista.tradingstats.adapter.in.web.dto.EquityCurveResponse;
+import com.kista.tradingcore.stats.adapter.in.web.dto.EquityCurveResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;

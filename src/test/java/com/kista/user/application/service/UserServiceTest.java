@@ -9,7 +9,7 @@ import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.user.application.usecase.UserUseCase;
-import com.kista.user.application.port.output.*; import com.kista.trading.application.port.output.*;
+import com.kista.user.application.port.output.*; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.finance.application.port.output.*;
 import com.kista.notify.application.port.output.UserNotificationPort;
 import com.kista.support.DomainFixtures;

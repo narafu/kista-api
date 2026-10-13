@@ -1,0 +1,132 @@
+package com.kista.tradingcore.trading.application.service;
+
+import com.kista.tradingcore.support.StubBrokerApiException;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.trading.domain.model.TradingAccount;
+import com.kista.tradingcore.broker.domain.model.SellableQuantity;
+import com.kista.tradingcore.matching.domain.model.PlannedOrder;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.tradingcore.trading.domain.model.SellSufficiencyPreview;
+import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.support.TradingFixtures;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+
+@ExtendWith(MockitoExtension.class)
+class TradingSellSufficiencySimulatorTest {
+    @Mock SellableQuantityPort sellableQuantityPort;
+    @Mock OrderPort orderPort;
+
+    TradingSellSufficiencySimulator simulator;
+
+    TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+    LocalDate today = LocalDate.now();
+    Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.PRIVACY,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
+
+    @BeforeEach
+    void setUp() {
+        simulator = new TradingSellSufficiencySimulator(sellableQuantityPort, orderPort);
+    }
+
+    private PlannedOrder sellOrder(int quantity, BigDecimal price) {
+        return PlannedOrder.of(today, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.SELL, quantity, price);
+    }
+
+    @Test
+    void simulate_sufficient_whenSellableQuantityCoversRequiredAndReserved() {
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 10));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
+                .thenReturn(2);
+        List<PlannedOrder> sellOrders = List.of(sellOrder(5, new BigDecimal("25.00")));
+
+        SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
+
+        assertThat(result.sufficientQuantity()).isTrue();
+        assertThat(result.sellableQuantity()).isEqualTo(10);
+        assertThat(result.reservedQuantity()).isEqualTo(2);
+        assertThat(result.requiredQuantity()).isEqualTo(5);
+        assertThat(result.liveQuantityUnavailable()).isFalse();
+    }
+
+    @Test
+    void simulate_insufficient_whenRequiredAloneExceedsSellableQuantity() {
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 2));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
+                .thenReturn(0);
+        List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
+
+        SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
+
+        assertThat(result.sufficientQuantity()).isFalse();
+        assertThat(result.sellableQuantity()).isEqualTo(2);
+        assertThat(result.requiredQuantity()).isEqualTo(3);
+    }
+
+    @Test
+    void simulate_insufficient_whenExistingReservationsLeaveNotEnoughQuantity() {
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 5));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
+                .thenReturn(3);
+        List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
+
+        SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
+
+        assertThat(result.sufficientQuantity()).isFalse();
+        assertThat(result.reservedQuantity()).isEqualTo(3);
+    }
+
+    @Test
+    void simulate_sumsMultipleSellOrderQuantities_asRequiredQuantity() {
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 20));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, StrategyTicker.SOXL))
+                .thenReturn(0);
+        List<PlannedOrder> sellOrders = List.of(
+                sellOrder(4, new BigDecimal("25.00")),
+                sellOrder(6, new BigDecimal("26.00")));
+
+        SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
+
+        assertThat(result.requiredQuantity()).isEqualTo(10);
+        assertThat(result.sufficientQuantity()).isTrue();
+    }
+
+    @Test
+    void simulate_returnsUnavailable_whenBrokerQuantityLookupFails() {
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, account.brokerRef()))
+                .thenThrow(new StubBrokerApiException("Toss API 토큰 재시도 실패: 401"));
+        List<PlannedOrder> sellOrders = List.of(sellOrder(3, new BigDecimal("25.00")));
+
+        SellSufficiencyPreview result = simulator.simulate(strategy, account, sellOrders, today);
+
+        assertThat(result.liveQuantityUnavailable()).isTrue();
+        assertThat(result.sufficientQuantity()).isTrue();
+        assertThat(result.sellableQuantity()).isEqualTo(0);
+        assertThat(result.requiredQuantity()).isEqualTo(3);
+    }
+}

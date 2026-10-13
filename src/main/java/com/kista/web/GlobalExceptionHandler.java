@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
         Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
         // broker.domain.model.BrokerCredentialException/BrokerRateLimitException 원본은
         // trading-core 네이티브 컨트롤러(AccountController 등)에서만 던져지므로 trading-core 소유
-        // com.kista.tradingweb.TradingExceptionHandler로 이관됨 — 아래는 admin이
+        // com.kista.tradingcore.web.TradingExceptionHandler로 이관됨 — 아래는 admin이
         // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
         // 코드는 trading-core 원본(BrokerCredential/RateLimit)과 동일 — 내부 API가 status만 전달하므로 root가 같은 코드를 다시 붙인다
         Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
