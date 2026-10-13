@@ -34,7 +34,8 @@
 2. **월말·휴장 경계**: 31일 지정에 30일인 달, 말일이 휴장인 달, 주 전체가 휴장인 주에서 실행일이 정확히 하루여야 한다. Task 3의 `DcaScheduleTest`가 고정한다.
 3. **예산 부족 시 축소가 캡가 기준인지**: 예수금 1000, 전일종가 100, 금액 2000이면 캡가 105 기준으로 9주가 돼야 한다(10주면 APBK0988). Task 6의 `DcaCycleOrderStrategyTest.fitBuysToBudget_shrinks_by_cap_price`가 고정한다.
 4. **Toss 매수 0.01 버그 회귀**: Toss의 BUY MOC/MOO는 캡가로 나가고, SELL만 0.01이어야 한다. Task 2의 `TossOrderApiTest`가 고정한다.
-5. **INFINITE 오염**: UPRO·QLD가 INFINITE capability와 INFINITE 런타임 정책 기본 허용 티커에 섞이지 않아야 한다. Task 1의 `StrategyTypeCapabilityTest`와 `TradingPolicySettingsTest`가 고정한다.
+5. **같은 티커 매수·매도 DCA 공존**: 리포트·포지션·통계가 상대 전략의 체결이나 보유를 섞지 않아야 한다. Task 6의 `TradingReporterTest.dca_report_uses_only_own_order_executions`와 Task 9의 통계 제외 테스트가 고정한다.
+6. **INFINITE 오염**: UPRO·QLD가 INFINITE capability와 INFINITE 런타임 정책 기본 허용 티커에 섞이지 않아야 한다. Task 1의 `StrategyTypeCapabilityTest`와 `TradingPolicySettingsTest`가 고정한다.
 
 ---
 
@@ -1515,7 +1516,7 @@ Expected: 컴파일 실패
 - DCA는 `validateBootstrapPosition`, `validateBalanceIfRequired`, `fetchMarketPrice`를 건너뛴다. 각 호출을 `if (cmd.type() != StrategyType.DCA)` 블록으로 감싼다. `initialHoldings`·`initialUsdDeposit`는 DCA에서 0으로 정규화해 persister에 넘긴다.
 - seedType은 VR처럼 DCA도 `NONE`으로 고정한다(`:82-84`의 VR 조건에 `|| cmd.type() == StrategyType.DCA`).
 - `creationPersister.persist(...)` 호출 마지막 인자로 `cmd.dca()`를 넘긴다.
-- 응답 조립(`:99-105`): DCA면 `new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, 0, null, dcaSummaryAssembler.assemble(cmd.dca(), null, DstInfo.nextTradeDate()))`. 비DCA 분기는 마지막 인자로 `null`을 추가한다. 필드에 `DcaSummaryAssembler dcaSummaryAssembler`를 추가한다.
+- 응답 조립(`:99-105`): DCA면 `new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, 0, null, dcaSummaryAssembler.assemble(cmd.dca(), null, DcaSummaryAssembler.firstEligibleDate(persisted.cycle().startDate(), null)))`. 비DCA 분기는 마지막 인자로 `null`을 추가한다. 필드에 `DcaSummaryAssembler dcaSummaryAssembler`를 추가한다.
 
 `StrategyCreationPersister.persist`
 - 마지막 파라미터로 `DcaConfig dca`를 추가하고, 필드에 `StrategyDcaDetailPort dcaDetailPort`를 추가한다.
@@ -1569,13 +1570,20 @@ class DcaSummaryAssembler {
 }
 ```
 
-`fromKstTradeDate`는 `DstInfo.nextTradeDate()`다. 그날 배치가 이미 판정을 끝냈으면(`last != null && last.tradeDate().equals(from)`) 다음 날부터 센다. `StrategyService`에서 호출할 때 이 보정을 적용한다.
+`fromKstTradeDate`는 배치가 실제로 판정할 수 있는 첫 KST 거래일이다. 계산은 `DcaSummaryAssembler.firstEligibleDate(LocalDate cycleStartDate, DcaExecution last)`(package-private static)에 둔다. `StrategyService`와 `StrategyCreationService`는 이 메서드로 from을 구한다.
 
 ```java
-    // 오늘 회차 판정이 끝났으면 다음 날부터 센다
-    LocalDate from = DstInfo.nextTradeDate();
-    if (last != null && last.tradeDate().equals(from)) from = from.plusDays(1);
+    // 배치가 판정 가능한 첫 KST 거래일 — TradingService.filterScheduledStart는 시작일 당일을 제외(tradeDate.isAfter(startDate))
+    // 오늘 회차 판정이 이미 끝났으면 다음 날부터
+    static LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last) {
+        LocalDate from = DstInfo.nextTradeDate();
+        if (last != null && last.tradeDate().equals(from)) from = from.plusDays(1);
+        LocalDate afterStart = cycleStartDate.plusDays(1);
+        return from.isBefore(afterStart) ? afterStart : from;
+    }
 ```
+
+`DcaSummaryAssemblerTest`에 테스트를 추가한다. `firstEligibleDate(오늘+3일, null)`은 오늘+4일이어야 한다. 시작일이 오늘(`DstInfo.nextTradeDate()`)이면 결과는 다음 날이다.
 
 `plusDays(1)`은 KST 달력일을 하루 넘기는 용도이고, KST↔US 변환이 아니므로 `UsTradeDates` 규칙 대상이 아니다. 다음 날이 휴장이어도 `nextExecutionDay`가 개장일까지 탐색한다.
 
@@ -2194,12 +2202,6 @@ class DcaRoundPlannerTest {
         verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(DcaSkipReason.NO_HOLDINGS), anyString(), any());
     }
 
-    @Test
-    void before_cycle_start_does_nothing() {
-        // ctx 사이클 startDate를 TRADE_DATE 이후로 다시 조립
-        // plan → empty, recorder 상호작용 없음
-    }
-
     private void dca(OrderDirection dir, OrderType type) {
         when(dcaDetailPort.findActiveByStrategyId(ctx.strategy().id())).thenReturn(Optional.of(
                 new DcaConfig(dir, new BigDecimal("300"), type, DcaFrequency.DAILY, null, null)));
@@ -2207,7 +2209,7 @@ class DcaRoundPlannerTest {
 }
 ```
 
-`/* … */`와 `before_cycle_start_does_nothing`의 본문은 기존 `TradingCandidatePlannerTest`·`TradingFixtures`의 Order·사이클 생성 코드를 복제해 채운다. 단언(`isEmpty`, `verifyNoInteractions(recorder)`)은 반드시 작성한다. `OrderPort`의 예약 SELL 합계 메서드명은 testing.md에 기록된 `sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker`다. 반환 타입(int/long)은 실제 시그니처에 맞춘다.
+시작일 필터는 `TradingService.filterScheduledStart`가 planner 호출 전에 적용하므로 planner에서 중복 검사하지 않는다. `/* … */`의 본문은 기존 `TradingCandidatePlannerTest`·`TradingFixtures`의 Order·사이클 생성 코드를 복제해 채운다. 단언(`isEmpty`, `verifyNoInteractions(recorder)`)은 반드시 작성한다. `OrderPort`의 예약 SELL 합계 메서드명은 testing.md에 기록된 `sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker`다. 반환 타입(int/long)은 실제 시그니처에 맞춘다.
 
 `DcaExecutionRecorderTest.java`:
 
@@ -2313,7 +2315,6 @@ class DcaRoundPlanner {
         DcaConfig config = dcaDetailPort.findActiveByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("DCA 설정이 없습니다: " + strategy.id()));
         if (!creatableTimings.contains(config.timing())) return Optional.empty();
-        if (tradeDate.isBefore(ctx.currentCycle().startDate())) return Optional.empty();
         LocalDate usSession = marketCalendarPort.usSessionDateOf(tradeDate);
         if (!DcaSchedule.isExecutionDay(usSession, config, marketCalendarPort::isUsSessionOpen)) return Optional.empty();
         if (dcaExecutionPort.find(strategy.id(), tradeDate).isPresent()) return Optional.empty();
@@ -2378,7 +2379,7 @@ class DcaRoundPlanner {
   - DCA는 `priceCapper.prepareForAllocation`이 no-op여야 한다. `needsCapCheck`가 false이므로 내부에서 거르는지 확인하고, 거르지 않으면 `if (!strategy.isDca())`로 감싼다.
   - `validateConcreteOrderLegs`가 허용 leg 목록을 검사한다면 `DCA_BUY`/`DCA_SELL`을 허용 목록에 추가한다.
 - `saveAllocatedOrders`(`:226-237`): `InsufficientBalanceEvent` 발행 루프에서 DCA 컨텍스트를 제외한다. DCA의 `rejectedBuy`에는 `dcaExecutionRecorder.recordSkipped(ctx, tradeDate, DcaSkipReason.INSUFFICIENT_BALANCE, "예수금 부족(주문가능금액 < 1주 캡가)", null)`를 호출한다. `rejectedSell`이면 `NO_HOLDINGS`를 기록한다. 각 호출은 실패가 격리되도록 기존 루프의 try/catch 범위 안에 둔다.
-- `allocateAndSave`(`:247-283`): 저장된 주문 중 leg가 `DCA_`로 시작하는 주문마다 `dcaExecutionRecorder.recordOrdered(ctx, tradeDate, savedOrder, savedOrder.price())`를 호출한다. referencePrice가 캡가로 남는 것을 피하려면 Planned의 `referencePrice`가 필요하다. 그 값은 `OrderPlan`으로 전달되지 않으므로, 단계 ①에서는 `dca_execution.reference_price`에 BUY는 캡가 ÷ 1.05를 넣지 말고 **null**을 저장한다. 이 결정을 `recordOrdered` 호출부 주석에 남긴다.
+- `allocateAndSave`(`:247-283`): 저장된 주문 중 leg가 `DCA_`로 시작하는 주문마다 `dcaExecutionRecorder.recordOrdered(ctx, tradeDate, savedOrder, savedOrder.price())`를 호출한다. referencePrice가 캡가로 남는 것을 피하려면 Planned의 `referencePrice`가 필요하다. 그 값은 `OrderPlan`으로 전달되지 않으므로, 단계 ①에서는 ORDERED 행의 `reference_price`를 방향과 무관하게 **null**로 저장한다(BUY 캡가 역산 금지). 이 결정을 `recordOrdered` 호출부 주석에 남긴다. spec 7.3과 UI에도 같은 내용으로 정정을 통보했다. SKIPPED 행은 판정에 쓴 전일 종가를 그대로 저장한다.
 
 `TradingReporter.recordAndNotify`(`:63`):
 
@@ -2389,7 +2390,34 @@ class DcaRoundPlanner {
                 : balance.applyExecutions(fills);
 ```
 
-`liveSnapshot`은 `LiveBalancePort.getLiveBalance(ctx.account().brokerRef(), ctx.strategy().ticker())`의 `BrokerBalance`를 `new AccountBalance(b.holdings(), b.avgPrice(), b.usdDeposit())`로 변환한다. 실패하면 empty를 반환하고 warn 로그를 남긴다. `TradingReporter`에 `CycleOrderStrategies cycleStrategies`와 `LiveBalancePort liveBalancePort`가 없으면 생성자에 추가하고, `TradingReporterTest`에 `@Mock`을 추가한다.
+`liveSnapshot`은 `LiveBalancePort.getLiveBalance(ctx.account().brokerRef(), ctx.strategy().ticker())`의 `BrokerBalance`를 `new AccountBalance(b.holdings(), b.avgPrice(), BigDecimal.ZERO)`로 변환한다. 실패하면 empty를 반환하고 warn 로그를 남긴다. 실패 시 폴백인 `balance.applyExecutions(fills)`의 결과도 `withUsdDeposit(BigDecimal.ZERO)`로 맞춘다.
+- **`usd_deposit`은 0으로 기록한다.** `StrategyCreationService.calcFreeCash`가 계좌의 전략별 최신 `cycle_position.usd_deposit`을 "점유 시드"로 합산한다. DCA 행에 계좌 예수금 전체가 들어가면, 같은 계좌의 다른 전략 등록이 가용 예수금 0으로 막힌다. DCA는 시드를 점유하지 않는다.
+
+같은 티커에 매수 DCA와 매도 DCA가 있으면 `executionPort.getExecutions(today, today, ticker, brokerRef)`가 두 전략의 체결을 함께 돌려준다. 주문 상태 기록(`markFilledOrders`)은 externalOrderId로 매칭하므로 안전하다. 반면 `buildReport`, `TradeLegSummary`, 폴백 `applyExecutions`는 체결 전체를 쓴다. 그래서 DCA(`snapshotsBrokerBalance()`)일 때는 조회 직후 자기 주문 체결만 남긴다.
+
+```java
+        // DCA: 같은 계좌·티커의 반대 방향 DCA 체결이 섞이지 않도록 자기 주문(externalOrderId) 체결만 사용
+        if (snapshots) {
+            Set<String> ownIds = mainOrders.stream().map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
+            executions = executions.stream().filter(e -> ownIds.contains(e.externalOrderId())).toList();
+        }
+```
+
+`TradingReporterTest`에 테스트를 추가한다.
+
+```java
+    @Test
+    void dca_report_uses_only_own_order_executions() {
+        // ctx: DCA 매수 전략, mainOrders: externalOrderId "B-1" 1건
+        // executionPort stub: "B-1" BUY 3주 + "S-9"(반대 매도 DCA 주문) SELL 2주
+        // liveBalancePort stub: holdings 10, avg 90, usd 5000
+        // recordAndNotify 후:
+        //  - cyclePositionPersistor.saveCyclePosition에 전달된 balance = (10, 90, 0)
+        //  - 발행된 TradingReportReadyEvent의 legs가 BUY 3주 1건뿐
+    }
+```
+
+주석 단계는 기존 `TradingReporterTest`의 준비 코드로 채운다. 두 단언은 반드시 작성한다. `TradingReporter`에 `CycleOrderStrategies cycleStrategies`와 `LiveBalancePort liveBalancePort`가 없으면 생성자에 추가하고, `TradingReporterTest`에 `@Mock`을 추가한다.
 
 `TradingUserNotificationPort`에 추가한다.
 
@@ -2740,7 +2768,50 @@ git commit -m "feat(dca): DCA 회차 이력 조회 API와 메타 응답 필드�
 
 ---
 
-### Task 9: 문서 동기화와 최종 검증
+### Task 9: 계좌 단위 통계·집계에서 DCA 제외
+
+spec 1장 범위 밖 항목("사이클 성과·equity-curve 통계 반영 제외")을 구현한다. 같은 티커의 매수·매도 DCA가 같은 보유 스냅샷을 각자 기록하기 때문에, 전략별 `cycle_position`을 합산하는 집계는 보유를 이중으로 센다.
+
+**Files:**
+- Modify (집계 지점 확인 후): `trading-core/src/main/java/com/kista/tradingcore/stats/application/service/AccountStatisticsService.java`, `PortfolioService.java`, `TradingStatsService.java`, `InvestmentPointsQueryService.java`, `trading-core/src/main/java/com/kista/tradingcore/stats/application/InvestmentIndexCalculator.java`
+- Test: 각 서비스의 기존 `*Test`
+
+**Interfaces:**
+- Consumes: `Strategy.isDca()` 또는 stats가 받는 전략 projection의 type 필드
+
+- [ ] **Step 1: 집계 지점 전수 확인**
+
+Run: `grep -n "cyclePosition\|CyclePosition\|usdDeposit\|holdings" trading-core/src/main/java/com/kista/tradingcore/stats/application/service/*.java trading-core/src/main/java/com/kista/tradingcore/stats/application/InvestmentIndexCalculator.java`
+
+전략 목록을 순회하거나 여러 사이클의 포지션을 합산하는 지점을 목록으로 만든다. 각 지점에 "DCA 제외" 필터를 넣을 위치를 정한다. 전략 타입을 알 수 없는 쿼리(사이클 id 목록만 받는 경우)는 전략 조회 단계에서 DCA 전략을 거른다. MOCK 계좌 제외 필터가 이미 있으면 그 옆에 둔다.
+
+- [ ] **Step 2: 실패하는 테스트 작성**
+
+각 서비스의 기존 테스트에 "DCA 전략이 섞인 계좌" 케이스를 하나씩 추가한다. INFINITE 1개(holdings 10)와 DCA 매수·매도(각 holdings 50 스냅샷)가 있는 계좌의 집계 결과가 INFINITE만의 결과와 같아야 한다.
+
+```java
+    @Test
+    void excludes_dca_strategies_from_account_aggregation() {
+        // 기존 테스트의 계좌·전략 fixture에 DCA 매수·매도 전략 2개와 그 cycle_position(holdings 50, usd_deposit 0) 추가
+        // 집계 결과 == DCA 없는 기존 기대값
+    }
+```
+
+- [ ] **Step 3: 실패 확인 → 필터 구현 → 통과 확인**
+
+Run: `./gradlew :trading-core:test --tests 'com.kista.tradingcore.stats.*'`
+Expected: 필터 전 FAIL, 필터 후 PASS
+
+- [ ] **Step 4: 커밋**
+
+```bash
+git add trading-core/src
+git commit -m "feat(dca): 계좌 통계·포트폴리오 집계에서 DCA 전략을 제외한다"
+```
+
+---
+
+### Task 10: 문서 동기화와 최종 검증
 
 **Files:**
 - Modify: `src/test/resources/architecture/flows.yml`
@@ -2793,6 +2864,11 @@ git commit -m "docs(dca): DCA 단계 ① 흐름과 모듈 문서를 동기화한
 ---
 
 ## 배포 메모 (실행자 참고, 구현 범위 아님)
+
+- **kista-api와 kista-trading은 같은 커밋으로 동시 배포한다.** `TradingPolicySettings`는 root↔trading-core 내부 API body이고, 모든 `StrategyType` 키를 필수로 요구한다. 두 프로세스의 버전이 어긋난 동안에는 이렇게 동작한다.
+  - root 조회는 `TradingPolicyHttpAdapter`가 기본값으로 폴백한다. 그래서 관리자 화면에는 저장값 대신 기본값이 보인다.
+  - 정책 저장(PUT)은 역직렬화 실패로 거부된다.
+  - trading-core 저장 행은 `TradingPolicySettingsPersistenceAdapter`가 누락 키를 `defaults()`로 보충하므로 기동은 안전하다.
 
 - 런타임 정책 기본값이 `enabled=false`라서, 배포만으로는 사용자에게 DCA가 노출되지 않는다. 운영자가 관리자 설정에서 DCA를 켜야 한다.
 - 개장 배치 시각 변경은 kista-trading 재기동 후 적용된다. 배포는 접수창(22:00·04:30 KST 직후)을 피한다.

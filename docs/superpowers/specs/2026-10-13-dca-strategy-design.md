@@ -253,6 +253,9 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 - 결과
   - 사용자가 같은 계좌에서 수동으로 매매한 수량도 평단과 보유수량에 섞인다. UI에 "계좌 전체 보유 기준"으로 안내한다.
   - `cycle_position`의 DCA 행은 원장이 아니라 리포트 시점의 브로커 스냅샷이다. `StrategyDetail.currentHoldings`도 이 값을 쓴다.
+  - DCA 스냅샷의 `usd_deposit`은 0으로 기록한다. 잔고검증(`calcFreeCash`)이 전략별 `usd_deposit`을 점유 시드로 합산하기 때문이다. 계좌 예수금 전체를 기록하면 같은 계좌의 다른 전략 등록이 막힌다.
+  - 리포트는 자기 주문(externalOrderId) 체결만 사용한다. 같은 티커의 반대 방향 DCA 체결이 섞이지 않게 하기 위함이다.
+  - 계좌 단위 통계·포트폴리오 집계에서 DCA 전략을 제외한다. 매수·매도 DCA가 같은 보유 스냅샷을 각자 기록해 이중으로 집계되기 때문이다.
   - 같은 계좌·티커의 매수 DCA와 매도 DCA는 같은 날 같은 스냅샷을 각자 기록한다.
 
 ### 5.5 브로커 매핑 (`OrderType × OrderDirection`)
@@ -401,7 +404,7 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
       "status": "ORDERED",
       "skipReason": null,
       "detail": null,
-      "referencePrice": 87.12,
+      "referencePrice": null,
       "quantity": 3,
       "order": { "id": "…", "status": "FILLED", "filledQuantity": 3, "filledPrice": 87.40 }
     },
@@ -418,6 +421,8 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 ```
 
 - 실행일이 아니어서 판정하지 않은 날은 행이 없다.
+- `referencePrice`: SKIPPED 행은 판정에 쓴 전일 종가(데이터 실패 시 null)를 담는다. ORDERED 행은 단계 ①에서 null이다.
+- `nextExecution`의 기준일은 배치 규칙과 맞춰 사이클 시작일 다음 날 이후로 잡는다. 배치(`filterScheduledStart`)는 시작일 당일을 제외한다.
 
 ### 7.4 메타 API (`GET /api/meta`)
 
@@ -526,4 +531,6 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
 - **개장 전 KIS 장개시 주문 접수 시각**: 22:00 KST는 DST 기준 개장 30분 전이다. KIS가 이 시각에 31/32 주문을 받는지는 Task 0에서 확인한다. 받지 않으면 5.6을 다시 검토한다.
 - **Toss MOO는 시가 체결을 보장하지 않는다**: 개장 경매 TIF가 없어 개장 직후 지정가로 근사한다. UI에 "Toss는 개장 직후 체결가 기준" 안내가 필요하다.
 - **캡가 미체결**: 매수 LOO/LOC의 캡가가 전일종가 + 5%라, 갭상승이 5%를 넘으면 미체결된다. 3배 레버리지 ETF에서는 드물지만 발생할 수 있다. 미체결은 기존 리포트에서 CANCELLED로 기록되며 이월하지 않는다.
+- **개장 전 접수의 예산 선점**: KIS DCA MOO 매수는 개장 전에 접수된다. 그래서 같은 계좌의 VR·INFINITE AT_OPEN 배정보다 먼저 live 예산을 쓴다. 이 경로에서는 DCA 우선순위 최하(200)가 지켜지지 않는다.
+- **배포 순서**: 정책 맵이 모든 StrategyType 키를 필수로 요구하므로, kista-api와 kista-trading을 같은 커밋으로 동시 배포한다.
 - **계좌 공유 평단**: 수동 매매분이 평단 조건에 섞인다(5.4). 사용자 안내로 대응한다.
