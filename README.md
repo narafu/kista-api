@@ -1,7 +1,7 @@
 # kista-api
 
 [![CI](https://github.com/narafu/kista-api/actions/workflows/ci.yml/badge.svg)](https://github.com/narafu/kista-api/actions/workflows/ci.yml)
-![Java](https://img.shields.io/badge/Java-21-orange)
+![Java](https://img.shields.io/badge/Java-25-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4-brightgreen)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue)
 
@@ -18,7 +18,7 @@ KISTA(Key Investment Strategy & Trading Automation) — 한국투자증권(KIS)�
 
 ## 기술 스택
 
-Java 21 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith · PostgreSQL 17 · Redis · Flyway · Docker Compose · OCI
+Java 25 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith · PostgreSQL 17 · Redis · Flyway · Docker Compose · OCI
 
 ## 구조
 

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
-Java 21 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 모듈 경계는 `ApplicationModules.verify()`가 검증한다.
+Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 모듈 경계는 `ApplicationModules.verify()`가 검증한다.
 
 이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
 
