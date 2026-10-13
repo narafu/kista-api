@@ -16,6 +16,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.OrderPl
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
+import com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
@@ -33,7 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-// DCA 배치 회차 계획 — 기존 주문 복구·timing·실행일·이력 판정 후 250봉 종가(신선도 검증·세션 캐시)·잔고 조회 → DcaCycleOrderStrategy.decide → skip이면 이력·알림 기록
+// DCA 배치 회차 계획 — 기존 주문 복구·timing·실행일·이력 판정 후 250봉 종가(신선도 검증·세션 캐시)·잔고·CNN 지수 조회 → DcaCycleOrderStrategy.decide → skip이면 이력·알림 기록
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -46,6 +47,7 @@ class DcaRoundPlanner {
     private final CandlePort candlePort;
     private final SellableQuantityPort sellableQuantityPort;
     private final LiveBalancePort liveBalancePort;          // AVG_PRICE 조건용 브로커 실잔고
+    private final FearGreedIndexPort fearGreedIndexPort;    // FEAR_GREED 조건용 CNN 지수
     private final OrderPort orderPort;
     private final StrategyDcaDetailPort dcaDetailPort;
     private final DcaExecutionPort dcaExecutionPort;
@@ -53,6 +55,8 @@ class DcaRoundPlanner {
     private final DcaCycleOrderStrategy dcaStrategy;
     // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
+    // US 세션 → 직전 개장일 CNN 지수 — 세션당 1개, 실패는 캐시하지 않음 (spec 6.2)
+    private final Map<LocalDate, BigDecimal> fearGreedCache = new ConcurrentHashMap<>();
 
     private record CandleKey(StrategyTicker ticker, LocalDate usSession) {}
 
@@ -84,7 +88,8 @@ class DcaRoundPlanner {
         }
 
         DcaDecision decision = dcaStrategy.decide(new DcaCycleOrderStrategy.DcaInputs(config, strategy.ticker(), tradeDate,
-                loadCloses(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate), loadHolding(ctx, config)));
+                loadCloses(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate), loadHolding(ctx, config),
+                loadFearGreed(config, usSession)));
         return switch (decision) {
             case DcaDecision.Planned p -> Optional.of(new OrderPlan(null, null, List.of(p.order())));
             case DcaDecision.Skipped s -> {
@@ -124,6 +129,20 @@ class DcaRoundPlanner {
             if (marketCalendarPort.isUsSessionOpen(d)) return d;
         }
         return null;
+    }
+
+    // FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수 — 세션 메모 캐시, 실패·직전 개장일 미확인이면 null(DATA_UNAVAILABLE)
+    private BigDecimal loadFearGreed(DcaConfig config, LocalDate usSession) {
+        if (!config.hasIndicator(DcaIndicator.FEAR_GREED)) return null;
+        BigDecimal cached = fearGreedCache.get(usSession);
+        if (cached != null) return cached;
+        LocalDate previousOpen = previousOpenSession(usSession);
+        if (previousOpen == null) return null;
+        Optional<BigDecimal> value = fearGreedIndexPort.closeOn(previousOpen);
+        if (value.isEmpty()) return null;
+        fearGreedCache.keySet().removeIf(k -> !k.equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 1
+        fearGreedCache.put(usSession, value.get());
+        return value.get();
     }
 
     // AVG_PRICE 조건이 있을 때만 브로커 실잔고(계좌+티커 합산) — 실패 시 null(DATA_UNAVAILABLE)

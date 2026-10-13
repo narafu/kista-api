@@ -25,9 +25,9 @@ import java.util.Optional;
 public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     // DCA 판정 입력 — closes: 조회 US 세션 이전 확정 종가 오름차순(null=조회 실패), sellableQuantity: SELL만(예약분 차감 후),
-    // holding: AVG_PRICE 조건이 있을 때만 브로커 실잔고(null=조회 실패·미조회)
+    // holding: AVG_PRICE 조건이 있을 때만 브로커 실잔고(null=조회 실패·미조회), fearGreed: FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수(null=조회 실패·미조회)
     public record DcaInputs(DcaConfig config, StrategyTicker ticker, LocalDate tradeDate,
-                            List<BigDecimal> closes, Integer sellableQuantity, Holding holding) {
+                            List<BigDecimal> closes, Integer sellableQuantity, Holding holding, BigDecimal fearGreed) {
         public record Holding(int quantity, BigDecimal avgPrice) {} // 계좌+티커 합산 보유
     }
 
@@ -61,7 +61,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         // 모든 조건 지표값을 먼저 계산 — 하나라도 계산 불가면 다른 조건과 무관하게 DATA_UNAVAILABLE
         List<Evaluation> evaluations = new ArrayList<>();
         for (DcaCondition cond : c.conditions()) {
-            Optional<Evaluation> e = evaluate(cond, closes, prevClose, in.holding());
+            Optional<Evaluation> e = evaluate(cond, closes, prevClose, in);
             if (e.isEmpty()) return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, dataFailure(cond), prevClose);
             evaluations.add(e.get());
         }
@@ -84,15 +84,16 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     // 조건 1개 평가 — 지표 계산 불가면 empty
-    private static Optional<Evaluation> evaluate(DcaCondition cond, List<BigDecimal> closes, BigDecimal prevClose, DcaInputs.Holding holding) {
+    private static Optional<Evaluation> evaluate(DcaCondition cond, List<BigDecimal> closes, BigDecimal prevClose, DcaInputs in) {
         String close = "전일 종가 " + money(prevClose);
         return switch (cond.indicator()) {
             case SMA -> DcaIndicators.sma(closes, cond.smaPeriod())
                     .map(v -> compare(cond.operator(), prevClose, v, close, "SMA(" + cond.smaPeriod() + ") " + money(v)));
             case RSI -> DcaIndicators.rsiWilder(closes, DcaIndicators.RSI_PERIOD)
                     .map(v -> compare(cond.operator(), v, cond.threshold(), "RSI(" + DcaIndicators.RSI_PERIOD + ") " + money(v), plain(cond.threshold())));
-            case AVG_PRICE -> evaluateAvgPrice(cond, prevClose, holding, close);
-            case FEAR_GREED -> Optional.empty(); // 단계 ③ — API 경계에서 400이라 도달하지 않음, 도달하면 fail-safe
+            case AVG_PRICE -> evaluateAvgPrice(cond, prevClose, in.holding(), close);
+            case FEAR_GREED -> Optional.ofNullable(in.fearGreed())
+                    .map(v -> compare(cond.operator(), v, cond.threshold(), "공포탐욕지수 " + money(v), plain(cond.threshold())));
         };
     }
 
@@ -128,7 +129,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             case SMA -> "SMA(" + cond.smaPeriod() + ") 계산용 일봉 부족";
             case RSI -> "RSI(" + DcaIndicators.RSI_PERIOD + ") 계산용 일봉 부족";
             case AVG_PRICE -> "보유 평단 조회 실패";
-            case FEAR_GREED -> "공포탐욕지수 미지원";
+            case FEAR_GREED -> "공포탐욕지수 조회 실패";
         };
     }
 

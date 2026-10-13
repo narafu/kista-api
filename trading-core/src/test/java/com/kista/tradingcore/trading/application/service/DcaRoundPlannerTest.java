@@ -25,6 +25,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.OrderPl
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
+import com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
@@ -65,12 +66,13 @@ class DcaRoundPlannerTest {
     CandlePort candlePort = mock(CandlePort.class);
     SellableQuantityPort sellablePort = mock(SellableQuantityPort.class);
     LiveBalancePort liveBalancePort = mock(LiveBalancePort.class);
+    FearGreedIndexPort fearGreedPort = mock(FearGreedIndexPort.class);
     OrderPort orderPort = mock(OrderPort.class);
     StrategyDcaDetailPort dcaDetailPort = mock(StrategyDcaDetailPort.class);
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
     DcaExecutionRecorder recorder = mock(DcaExecutionRecorder.class);
-    DcaRoundPlanner planner = new DcaRoundPlanner(calendar, candlePort, sellablePort, liveBalancePort, orderPort, dcaDetailPort,
-            executionPort, recorder, new DcaCycleOrderStrategy());
+    DcaRoundPlanner planner = new DcaRoundPlanner(calendar, candlePort, sellablePort, liveBalancePort, fearGreedPort, orderPort,
+            dcaDetailPort, executionPort, recorder, new DcaCycleOrderStrategy());
 
     BatchContext ctx;
 
@@ -241,6 +243,55 @@ class DcaRoundPlannerTest {
         when(liveBalancePort.getLiveBalance(any(), any())).thenThrow(new RuntimeException("broker down"));
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
         verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
+    }
+
+    static final LocalDate PREV_OPEN = LocalDate.of(2026, 10, 12); // US_SESSION 직전 개장일 (setUp: 모든 날 개장)
+
+    private void fearGreedDca(String threshold) {
+        when(dcaDetailPort.findActiveByStrategyId(ctx.strategy().id())).thenReturn(Optional.of(
+                new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null,
+                        List.of(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal(threshold))))));
+    }
+
+    @Test
+    void fear_greed_condition_queries_previous_open_session() {
+        fearGreedDca("25");
+        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.of(new BigDecimal("20.00")));
+
+        Optional<OrderPlan> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+
+        assertThat(plan).isPresent();
+        verify(fearGreedPort).closeOn(PREV_OPEN);
+    }
+
+    @Test
+    void fear_greed_unavailable_records_data_unavailable() {
+        fearGreedDca("25");
+        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.empty());
+
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), eq("공포탐욕지수 조회 실패"), any());
+    }
+
+    @Test
+    void no_fear_greed_condition_skips_cnn_call() {
+        dca(OrderDirection.BUY, OrderType.MOC);
+
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+
+        verifyNoInteractions(fearGreedPort);
+    }
+
+    @Test
+    void fear_greed_cached_per_session_and_failure_not_cached() {
+        fearGreedDca("25");
+        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.empty(), Optional.of(new BigDecimal("20.00")));
+
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of()); // 실패 — 캐시 안 됨
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of()); // 재조회 성공 — 캐시
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of()); // 캐시 적중
+
+        verify(fearGreedPort, times(2)).closeOn(PREV_OPEN);
     }
 
     private Order existingOrder(OrderTiming timing, OrderType type) {

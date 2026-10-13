@@ -35,7 +35,44 @@ class DcaCycleOrderStrategyTest {
     }
 
     private DcaDecision decide(DcaConfig c, List<BigDecimal> closes, Integer sellable, DcaCycleOrderStrategy.DcaInputs.Holding holding) {
-        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, closes, sellable, holding));
+        return decideWithFearGreed(c, closes, sellable, holding, null);
+    }
+
+    private DcaDecision decideWithFearGreed(DcaConfig c, List<BigDecimal> closes, Integer sellable,
+                                            DcaCycleOrderStrategy.DcaInputs.Holding holding, BigDecimal fearGreed) {
+        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, closes, sellable, holding, fearGreed));
+    }
+
+    private static DcaConfig fearGreedConfig(DcaOperator op, String threshold) {
+        return new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null,
+                List.of(new DcaCondition(DcaIndicator.FEAR_GREED, op, null, new BigDecimal(threshold))));
+    }
+
+    @Test
+    void fear_greed_condition_met_plans_order() {
+        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.LTE, "25"), List.of(new BigDecimal("100")), null, null,
+                new BigDecimal("20.50"));
+        assertThat(d).isInstanceOf(DcaDecision.Planned.class);
+    }
+
+    @Test
+    void fear_greed_condition_not_met_reports_negated_detail() {
+        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.LTE, "25"), List.of(new BigDecimal("100")), null, null,
+                new BigDecimal("45.09"));
+        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET, "공포탐욕지수 45.09 > 25", new BigDecimal("100")));
+    }
+
+    @Test
+    void fear_greed_equal_to_threshold_passes_lte() {
+        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.LTE, "25"), List.of(new BigDecimal("100")), null, null,
+                new BigDecimal("25.00"));
+        assertThat(d).isInstanceOf(DcaDecision.Planned.class);
+    }
+
+    @Test
+    void fear_greed_null_is_data_unavailable() {
+        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.GTE, "75"), List.of(new BigDecimal("100")), null, null, null);
+        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "공포탐욕지수 조회 실패", new BigDecimal("100")));
     }
 
     private static DcaConfig withConditions(OrderDirection dir, DcaCondition... conds) {
