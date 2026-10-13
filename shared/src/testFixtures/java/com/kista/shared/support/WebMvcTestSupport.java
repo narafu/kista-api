@@ -1,4 +1,4 @@
-package com.kista.support;
+package com.kista.shared.support;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 // 컨트롤러 @WebMvcTest 공통 인증 헬퍼
-// 사용: import static com.kista.support.WebMvcTestSupport.*
+// 사용: import static com.kista.shared.support.WebMvcTestSupport.*
 public final class WebMvcTestSupport {
 
     public static final UUID DEV_USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");

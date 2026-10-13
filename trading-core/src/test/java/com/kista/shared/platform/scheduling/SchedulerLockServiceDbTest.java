@@ -1,6 +1,6 @@
 package com.kista.shared.platform.scheduling;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.support.TradingCoreJpaTestConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

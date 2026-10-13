@@ -21,7 +21,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;

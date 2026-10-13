@@ -5,7 +5,7 @@ import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

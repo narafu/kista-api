@@ -15,7 +15,7 @@ import org.springframework.web.client.RestClient;
 // GradleModuleBoundaryTest가 trading-core→platform.internalapi 참조 자체를 금지한다.
 // root의 InternalApiProperties(token @NotBlank) 등록도 이 조건에 묶이지만, base-url이 없으면 이 빈을 무조건 주입받는
 // admin.adapter.out.internal.*HttpAdapter가 기동 실패하므로 토큰 검증이 조용히 빠지는 경로는 없다.
-// trading-core는 @ConfigurationPropertiesScan(com.kista.shared.platform)으로 같은 record를 등록해 토큰을 검증한다.
+// trading-core는 PlatformAutoConfiguration의 @EnableConfigurationProperties로 같은 record를 등록해 토큰을 검증한다.
 @Configuration
 @ConditionalOnProperty(prefix = "internal.api", name = "base-url")
 @EnableConfigurationProperties(InternalApiProperties.class)

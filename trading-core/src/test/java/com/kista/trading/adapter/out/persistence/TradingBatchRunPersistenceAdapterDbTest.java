@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.support.TradingCoreJpaTestConfig;
 import com.kista.trading.domain.model.TradingBatchJob;
 import com.kista.trading.domain.model.TradingBatchPhase;

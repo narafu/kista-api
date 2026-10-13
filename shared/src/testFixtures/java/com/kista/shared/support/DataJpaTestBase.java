@@ -1,4 +1,4 @@
-package com.kista.support;
+package com.kista.shared.support;
 
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;

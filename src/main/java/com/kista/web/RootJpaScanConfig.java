@@ -11,8 +11,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 // 패키지 목록은 KistaApplication.scanBasePackages와 동기화 — root 소유 패키지가 늘면 함께 갱신할 것.
 @Configuration
 @EntityScan({"com.kista.admin", "com.kista.finance", "com.kista.market", "com.kista.notify", "com.kista.benchmark",
-        "com.kista.user", "com.kista.web", "com.kista.shared.kernel", "com.kista.shared.platform"})
+        "com.kista.user", "com.kista.web"})
 @EnableJpaRepositories({"com.kista.admin", "com.kista.finance", "com.kista.market", "com.kista.notify", "com.kista.benchmark",
-        "com.kista.user", "com.kista.web", "com.kista.shared.kernel", "com.kista.shared.platform"})
+        "com.kista.user", "com.kista.web"})
 class RootJpaScanConfig {
 }

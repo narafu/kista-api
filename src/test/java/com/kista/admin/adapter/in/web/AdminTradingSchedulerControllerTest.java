@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 import com.kista.web.RootSecurityPolicy;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;

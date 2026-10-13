@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
 import com.kista.trading.domain.model.StrategyVersion;
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

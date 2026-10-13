@@ -21,7 +21,7 @@ import com.kista.tradingweb.TradingApplication;
 import java.util.List;
 import java.util.UUID;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;

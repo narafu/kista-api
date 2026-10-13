@@ -35,7 +35,7 @@ import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;

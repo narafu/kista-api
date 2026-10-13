@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;

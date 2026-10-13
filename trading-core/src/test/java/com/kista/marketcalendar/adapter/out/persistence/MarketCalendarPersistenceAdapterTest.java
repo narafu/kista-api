@@ -1,6 +1,6 @@
 package com.kista.marketcalendar.adapter.out.persistence;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.support.TradingCoreJpaTestConfig;
 import org.springframework.test.context.ContextConfiguration;
 import org.junit.jupiter.api.Test;

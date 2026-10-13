@@ -1,6 +1,6 @@
 package com.kista.web;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import org.springframework.context.annotation.Import;
 
 // root 소유 persistence 테스트 공통 베이스 — @DataJpaTest 슬라이스는 RootJpaScanConfig(@Configuration)를 스캔하지 않아

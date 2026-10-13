@@ -17,7 +17,7 @@ import java.util.UUID;
 import com.kista.tradingweb.TradingApplication;
 import org.springframework.test.context.ContextConfiguration;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;

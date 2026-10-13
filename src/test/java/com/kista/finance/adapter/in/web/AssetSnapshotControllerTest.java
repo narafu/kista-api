@@ -26,7 +26,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;

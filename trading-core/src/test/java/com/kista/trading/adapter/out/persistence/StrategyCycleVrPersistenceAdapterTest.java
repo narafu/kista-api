@@ -4,7 +4,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.trading.domain.model.StrategyVersion;
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

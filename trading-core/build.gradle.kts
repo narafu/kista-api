@@ -69,11 +69,10 @@ dependencies {
     testImplementation(libs.spring.boot.starter.security.test) // @WebMvcTest SecurityFilterChain auto-detection (Boot 4 requirement)
     testImplementation(libs.spring.security.test) // SecurityMockMvcRequestPostProcessors
 
-    // testFixtures — DataJpaTestBase/WebMvcTestSupport/TradingFixtures + application-test.yml (루트 :api도 소비)
+    testImplementation(testFixtures(project(":shared"))) // DataJpaTestBase/WebMvcTestSupport + application-test.yml
+
+    // testFixtures — TradingFixtures(trading 전용)
     testFixturesImplementation(project(":shared"))
-    testFixturesImplementation(libs.spring.boot.starter.data.jpa)
-    testFixturesImplementation(libs.spring.boot.starter.data.jpa.test)
-    testFixturesImplementation(libs.spring.boot.starter.security)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

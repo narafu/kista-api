@@ -1,5 +1,6 @@
 plugins {
     java
+    `java-test-fixtures`
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.mgmt)
 }
@@ -63,6 +64,11 @@ dependencies {
     testAnnotationProcessor(libs.lombok)
 
     testImplementation(libs.spring.boot.starter.test)
+
+    // DataJpaTestBase/WebMvcTestSupport + application-test.yml — root·trading-core 테스트가 소비
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa)
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa.test)
+    testFixturesImplementation(libs.spring.boot.starter.security)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

@@ -26,7 +26,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;

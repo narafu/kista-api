@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.toss;
 
-import com.kista.support.DataJpaTestBase;
+import com.kista.shared.support.DataJpaTestBase;
 import com.kista.support.TradingCoreJpaTestConfig;
 import org.springframework.test.context.ContextConfiguration;
 import com.zaxxer.hikari.HikariDataSource;

@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-import static com.kista.support.WebMvcTestSupport.*;
+import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
