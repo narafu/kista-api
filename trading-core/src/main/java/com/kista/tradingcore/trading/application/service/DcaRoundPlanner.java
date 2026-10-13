@@ -1,10 +1,13 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaConfig;
@@ -25,25 +28,33 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-// DCA 배치 회차 계획 — 기존 주문 복구·timing·실행일·이력 판정 후 데이터 조회 → DcaCycleOrderStrategy.decide → skip이면 이력·알림 기록
+// DCA 배치 회차 계획 — 기존 주문 복구·timing·실행일·이력 판정 후 250봉 종가(신선도 검증·세션 캐시)·잔고 조회 → DcaCycleOrderStrategy.decide → skip이면 이력·알림 기록
 @Slf4j
 @Component
 @RequiredArgsConstructor
 class DcaRoundPlanner {
 
-    private static final int PREV_CLOSE_CANDLES = 5; // 전일 종가 확보용 봉 수 (휴장 여유분)
+    private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화 (spec 6.1)
+    private static final int PREVIOUS_SESSION_SCAN_DAYS = 10; // 직전 개장일 역탐색 상한 (연휴 여유)
 
     private final MarketCalendarPort marketCalendarPort;
     private final CandlePort candlePort;
     private final SellableQuantityPort sellableQuantityPort;
+    private final LiveBalancePort liveBalancePort;          // AVG_PRICE 조건용 브로커 실잔고
     private final OrderPort orderPort;
     private final StrategyDcaDetailPort dcaDetailPort;
     private final DcaExecutionPort dcaExecutionPort;
     private final DcaExecutionRecorder recorder;
     private final DcaCycleOrderStrategy dcaStrategy;
+    // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
+    private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
+
+    private record CandleKey(StrategyTicker ticker, LocalDate usSession) {}
 
     // empty = 이번 배치에서 DCA 신규 주문 없음 (비실행일·다른 timing·이미 판정·skip)
     Optional<OrderPlan> plan(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings, List<Order> existingOrders) {
@@ -72,9 +83,8 @@ class DcaRoundPlanner {
             return Optional.empty();
         }
 
-        BigDecimal prevClose = loadPrevClose(strategy.ticker(), usSession);
         DcaDecision decision = dcaStrategy.decide(new DcaCycleOrderStrategy.DcaInputs(config, strategy.ticker(), tradeDate,
-                prevClose == null ? null : List.of(prevClose), loadSellable(ctx, config, tradeDate), null)); // 임시 shim — Task 4가 250봉·실잔고로 대체
+                loadCloses(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate), loadHolding(ctx, config)));
         return switch (decision) {
             case DcaDecision.Planned p -> Optional.of(new OrderPlan(null, null, List.of(p.order())));
             case DcaDecision.Skipped s -> {
@@ -84,13 +94,46 @@ class DcaRoundPlanner {
         };
     }
 
-    // 조회 US 세션 이전 마지막 확정 종가 — 실패·부족 시 null(DATA_UNAVAILABLE)
-    private BigDecimal loadPrevClose(StrategyTicker ticker, LocalDate usSession) {
+    // 조회 US 세션 이전 확정 종가 250봉 — 실패·피드 지연(마지막 봉 ≠ 직전 개장일)이면 null(DATA_UNAVAILABLE)
+    private List<BigDecimal> loadCloses(StrategyTicker ticker, LocalDate usSession) {
+        CandleKey key = new CandleKey(ticker, usSession);
+        List<BigDecimal> cached = closeCache.get(key);
+        if (cached != null) return cached;
         try {
-            List<BrokerCandle> candles = candlePort.getDailyCandlesBefore(ticker.name(), usSession, PREV_CLOSE_CANDLES);
-            return candles.isEmpty() ? null : candles.getLast().close();
+            List<BrokerCandle> candles = candlePort.getDailyCandlesBefore(ticker.name(), usSession, CANDLE_COUNT);
+            LocalDate expected = previousOpenSession(usSession);
+            if (candles.isEmpty() || expected == null || !candles.getLast().date().equals(expected)) {
+                log.warn("[DCA] 일봉 피드 지연·부족: ticker={}, usSession={}, 기대={}, 마지막={}",
+                        ticker, usSession, expected, candles.isEmpty() ? null : candles.getLast().date());
+                return null;
+            }
+            List<BigDecimal> closes = candles.stream().map(BrokerCandle::close).toList();
+            closeCache.keySet().removeIf(k -> !k.usSession().equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 티커 수
+            closeCache.put(key, closes);
+            return closes;
         } catch (RuntimeException e) {
             log.warn("[DCA] 일봉 조회 실패: ticker={}, usSession={}", ticker, usSession, e);
+            return null;
+        }
+    }
+
+    // usSession 직전 US 개장일 — 휴장 데이터 미존재 등으로 못 찾으면 null
+    private LocalDate previousOpenSession(LocalDate usSession) {
+        for (int i = 1; i <= PREVIOUS_SESSION_SCAN_DAYS; i++) {
+            LocalDate d = usSession.minusDays(i);
+            if (marketCalendarPort.isUsSessionOpen(d)) return d;
+        }
+        return null;
+    }
+
+    // AVG_PRICE 조건이 있을 때만 브로커 실잔고(계좌+티커 합산) — 실패 시 null(DATA_UNAVAILABLE)
+    private DcaCycleOrderStrategy.DcaInputs.Holding loadHolding(BatchContext ctx, DcaConfig config) {
+        if (!config.hasIndicator(DcaIndicator.AVG_PRICE)) return null;
+        try {
+            BrokerBalance b = liveBalancePort.getLiveBalance(ctx.account().brokerRef(), ctx.strategy().ticker());
+            return new DcaCycleOrderStrategy.DcaInputs.Holding(b.holdings(), b.avgPrice());
+        } catch (RuntimeException e) {
+            log.warn("[DCA] 실잔고 조회 실패: strategy={}", ctx.strategy().id(), e);
             return null;
         }
     }
