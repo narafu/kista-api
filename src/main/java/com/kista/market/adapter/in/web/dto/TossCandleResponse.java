@@ -1,6 +1,6 @@
 package com.kista.market.adapter.in.web.dto;
 
-import com.kista.contract.broker.DailyCandleResponse;
+import com.kista.shared.contract.broker.DailyCandleResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

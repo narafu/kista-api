@@ -1,6 +1,6 @@
 package com.kista.finance.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseAuditEntity;
+import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupMember;
 import jakarta.persistence.*;

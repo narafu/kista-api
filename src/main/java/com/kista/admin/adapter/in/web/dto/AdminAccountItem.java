@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.contract.account.AccountSummaryResponse;
-import com.kista.sharedkernel.AccountNumberMasker;
+import com.kista.shared.contract.account.AccountSummaryResponse;
+import com.kista.shared.kernel.AccountNumberMasker;
 import com.kista.user.domain.model.UserSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 

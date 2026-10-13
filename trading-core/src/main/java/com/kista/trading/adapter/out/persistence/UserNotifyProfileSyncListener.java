@@ -1,9 +1,9 @@
 package com.kista.trading.adapter.out.persistence;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.platform.crypto.AesCryptoService;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
+import com.kista.shared.platform.crypto.AesCryptoService;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;

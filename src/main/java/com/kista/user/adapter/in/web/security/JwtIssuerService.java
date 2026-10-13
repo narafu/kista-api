@@ -1,7 +1,7 @@
 package com.kista.user.adapter.in.web.security;
 
 import com.kista.user.domain.auth.TokenConstants;
-import com.kista.sharedkernel.UserRole;
+import com.kista.shared.kernel.UserRole;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;

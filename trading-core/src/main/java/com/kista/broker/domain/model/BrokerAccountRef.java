@@ -1,7 +1,7 @@
 package com.kista.broker.domain.model;
 
-import com.kista.sharedkernel.AccountNumberMasker;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.AccountNumberMasker;
+import com.kista.shared.kernel.Broker;
 
 import java.util.UUID;
 

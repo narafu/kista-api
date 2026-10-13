@@ -18,9 +18,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class CycleEndedNotifierTest {

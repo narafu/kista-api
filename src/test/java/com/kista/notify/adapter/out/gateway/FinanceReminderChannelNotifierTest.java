@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.finance.application.event.FinanceRegistrationReminderDueEvent;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

@@ -1,8 +1,8 @@
 package com.kista.trading.application.event;
 
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 import java.util.UUID;
 

@@ -1,11 +1,11 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.trading.domain.model.TradingReport;
-import com.kista.sharedkernel.UserPushNotificationRequestedEvent;
+import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.tradingnotify.application.port.output.TradingUserNotificationPort;
 import lombok.RequiredArgsConstructor;

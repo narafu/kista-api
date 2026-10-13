@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence.policy;
 
-import com.kista.platform.persistence.BaseAuditEntity;
+import com.kista.shared.platform.persistence.BaseAuditEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.out.internal;
 
-import com.kista.contract.account.AccountSummaryResponse;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.contract.account.AccountSummaryResponse;
+import com.kista.shared.kernel.Broker;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;

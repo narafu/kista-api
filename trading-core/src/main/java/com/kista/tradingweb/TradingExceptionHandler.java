@@ -4,11 +4,11 @@ import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerApiException;
 import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.domain.model.BrokerRateLimitException;
-import com.kista.platform.web.ErrorCode;
-import com.kista.platform.web.ProblemDetailMappings;
-import com.kista.platform.web.ProblemDetailMappings.Mapping;
+import com.kista.shared.platform.web.ErrorCode;
+import com.kista.shared.platform.web.ProblemDetailMappings;
+import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
 import com.kista.privacy.domain.model.PrivacyTradeConflictException;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.trading.domain.model.AlreadyOrderedTodayException;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.ManualTradingFailedException;
@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-import static com.kista.platform.web.ProblemDetailMappings.problem;
+import static com.kista.shared.platform.web.ProblemDetailMappings.problem;
 
 // trading-core 프로세스 전역 예외→HTTP 매핑 advice(앱셸 tradingweb 소속 — root com.kista.web.GlobalExceptionHandler와 대칭).
 // 이 프로세스엔 root advice가 없으므로 컨트롤러 패키지 제약 없이 모든 컨트롤러의 예외를 처리한다:

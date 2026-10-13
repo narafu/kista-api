@@ -3,7 +3,7 @@ package com.kista.tradingstats.domain.model;
 import com.kista.trading.domain.model.Strategy;
 
 import java.math.BigDecimal;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 // 전략 타입별 사이클 성과 집계 — 비율 필드는 종료 사이클이 없으면 null
 public record StrategyTypeStats(

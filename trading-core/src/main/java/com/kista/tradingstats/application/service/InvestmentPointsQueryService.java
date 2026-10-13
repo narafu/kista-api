@@ -2,8 +2,8 @@ package com.kista.tradingstats.application.service;
 
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;

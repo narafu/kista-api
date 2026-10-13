@@ -2,7 +2,7 @@ package com.kista.broker.domain.model;
 
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

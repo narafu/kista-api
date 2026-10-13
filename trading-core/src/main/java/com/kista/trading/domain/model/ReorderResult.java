@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderDirection;
 
 import java.math.BigDecimal;
 import java.util.UUID;

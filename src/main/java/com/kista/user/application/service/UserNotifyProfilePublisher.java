@@ -1,8 +1,8 @@
 package com.kista.user.application.service;
 
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
+import com.kista.shared.kernel.UserStatus;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSettingsPort;
 import com.kista.user.domain.model.User;

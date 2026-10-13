@@ -1,7 +1,7 @@
 package com.kista.privacy.domain.model;
 
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.springframework.lang.Nullable;

@@ -1,7 +1,7 @@
 package com.kista.matching.domain.model;
 
 import com.kista.matching.domain.model.ReverseModePosition;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

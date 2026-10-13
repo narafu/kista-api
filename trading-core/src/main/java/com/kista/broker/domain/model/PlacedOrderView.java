@@ -1,7 +1,7 @@
 package com.kista.broker.domain.model;
 
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 
 import java.math.BigDecimal;
 

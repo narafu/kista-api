@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.in.web;
 
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

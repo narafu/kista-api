@@ -1,9 +1,9 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

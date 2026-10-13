@@ -1,8 +1,8 @@
 package com.kista.tradingstats.application.service;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.tradingstats.domain.model.*;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -29,10 +29,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // BenchmarkService(com.kista.benchmark)에서 이관된 trading 소유 통계(summary/equity-curve/cycles) 테스트 —
 // housing/ETF 벤치마크 비교 테스트는 api의 BenchmarkServiceTest에 잔류

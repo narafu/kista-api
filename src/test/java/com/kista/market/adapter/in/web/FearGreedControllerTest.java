@@ -1,11 +1,11 @@
 package com.kista.market.adapter.in.web;
 
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.market.domain.model.FearGreedRating;
 import com.kista.market.domain.model.FearGreedSnapshot;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.market.application.usecase.GetFearGreedUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

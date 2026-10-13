@@ -4,7 +4,7 @@ import com.kista.trading.domain.model.BuyCompetitionPreview;
 import com.kista.trading.domain.model.NextOrdersPreview;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 class NextOrdersResponseTest {
 

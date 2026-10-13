@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.OrderTiming;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderTiming;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

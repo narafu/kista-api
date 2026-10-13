@@ -7,7 +7,7 @@ import com.kista.user.application.event.UserRejectedEvent;
 import com.kista.user.application.event.UserReappliedEvent;
 import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.*; import com.kista.trading.application.port.output.*;
 import com.kista.finance.application.port.output.*;
@@ -35,8 +35,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserService 단위 테스트")

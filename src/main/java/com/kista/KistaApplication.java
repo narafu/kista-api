@@ -17,8 +17,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.kista.benchmark",
         "com.kista.user",
         "com.kista.web",
-        "com.kista.sharedkernel",
-        "com.kista.platform",
+        "com.kista.shared.kernel",
+        "com.kista.shared.platform",
 })
 @EnableScheduling
 public class KistaApplication {

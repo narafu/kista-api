@@ -4,7 +4,7 @@ import com.kista.trading.application.port.output.TradingUserProfilePort;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.tradingnotify.application.port.output.TradingNotifyPort;
 import com.kista.tradingnotify.application.port.output.TradingUserNotificationPort;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.application.event.BatchInterruptedEvent;
 import com.kista.trading.application.event.InsufficientBalanceEvent;
 import com.kista.trading.application.event.MarketClosedEvent;
@@ -28,7 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 // trading이 발행하는 관리자/사용자 알림 이벤트 6종이 TradingNotifyPort/TradingUserNotificationPort로 정확히 라우팅되는지 검증
 @ExtendWith(MockitoExtension.class)

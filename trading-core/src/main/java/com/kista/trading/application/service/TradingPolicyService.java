@@ -1,10 +1,10 @@
 package com.kista.trading.application.service;
 
 import com.kista.account.application.port.output.BrokerEnabledPort;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.trading.application.port.output.TradingPolicySettingsPort;
 import com.kista.trading.application.usecase.TradingPolicyUseCase;

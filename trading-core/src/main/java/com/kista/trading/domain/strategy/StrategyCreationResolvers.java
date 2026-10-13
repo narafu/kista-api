@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 // StrategyCreationResolver 구현체들을 type() 키로 묶어 조회 — 서비스 레이어의 if/else 타입 분기를 대체
 public class StrategyCreationResolvers {

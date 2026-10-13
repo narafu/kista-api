@@ -9,7 +9,7 @@ import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.*;
-import com.kista.platform.persistence.UuidV7;
+import com.kista.shared.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -24,8 +24,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 @Slf4j
 @Service

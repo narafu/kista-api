@@ -5,9 +5,9 @@ import com.kista.admin.application.port.output.TradingPolicyPort;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.RuntimeSettingsBundle;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.TradingPolicySettings;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

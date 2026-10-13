@@ -1,6 +1,6 @@
 package com.kista.user.adapter.in.web.security;
 
-import com.kista.platform.security.JwtDecoderConfig;
+import com.kista.shared.platform.security.JwtDecoderConfig;
 import com.kista.user.domain.auth.TokenConstants;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.ECKey;
@@ -24,7 +24,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.kista.sharedkernel.UserRole;
+import com.kista.shared.kernel.UserRole;
 
 // 테스트용 EC P-256 JWK (비공개키 포함) — 프로덕션 키와 무관
 @ExtendWith(SpringExtension.class)

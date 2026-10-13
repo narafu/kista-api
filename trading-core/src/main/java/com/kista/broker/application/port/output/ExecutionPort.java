@@ -2,7 +2,7 @@ package com.kista.broker.application.port.output;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.Execution;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.time.LocalDate;
 import java.util.List;

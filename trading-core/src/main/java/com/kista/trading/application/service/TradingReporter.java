@@ -1,18 +1,18 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.trading.application.event.TradingReportReadyEvent;
-import com.kista.sharedkernel.TradeLegSummary;
+import com.kista.shared.kernel.TradeLegSummary;
 import com.kista.trading.application.event.TradingErrorEvent;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.*;
 import com.kista.broker.domain.model.BrokerApiException;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.CancelInstruction;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
@@ -28,8 +28,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 체결 조회 + 알림 발송 (포지션 저장은 CyclePositionPersistor에 위임)
 @Component

@@ -8,14 +8,14 @@ import com.kista.tradingstats.domain.model.backtest.BacktestSummary;
 import com.kista.tradingstats.domain.model.DailyCandle;
 import com.kista.privacy.domain.model.PrivacyDates;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
-import com.kista.sharedkernel.ReturnMetrics;
+import com.kista.shared.kernel.ReturnMetrics;
 import com.kista.matching.domain.model.BootstrapPosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.trading.domain.strategy.VrRampValidator;
 import com.kista.trading.domain.strategy.StrategyCreationResolver;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
+import com.kista.shared.kernel.RecurringMode;
+import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.tradingstats.application.usecase.BacktestUseCase;
 import com.kista.tradingstats.application.port.output.HistoricalCandlePort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
@@ -31,7 +31,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 @Service
 @RequiredArgsConstructor

@@ -5,11 +5,11 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.SellSufficiencyPreview;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.support.TradingFixtures;
@@ -29,9 +29,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingSellSufficiencySimulatorTest {

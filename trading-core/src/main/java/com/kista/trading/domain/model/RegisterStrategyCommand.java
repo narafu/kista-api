@@ -2,9 +2,9 @@ package com.kista.trading.domain.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // 전략 등록 인바운드 파라미터
 public record RegisterStrategyCommand(

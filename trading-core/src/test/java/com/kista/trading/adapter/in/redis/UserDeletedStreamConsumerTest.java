@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.in.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreamConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

@@ -5,9 +5,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 
 public record PrivacyTradeBase(
         UUID id,

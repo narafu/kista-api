@@ -1,8 +1,8 @@
 package com.kista.user.domain.model;
 
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 import lombok.With;
 
 import java.time.Instant;

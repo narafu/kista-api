@@ -1,15 +1,15 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.StrategyHistoryQueryService;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*; import com.kista.trading.domain.model.*;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyFieldSettings;
+import com.kista.shared.kernel.RecurringMode;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyFieldSettings;
 import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.trading.application.port.output.StrategyPort; import com.kista.trading.application.port.output.*;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -41,11 +41,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyDefaults;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StrategyService 단위 테스트")

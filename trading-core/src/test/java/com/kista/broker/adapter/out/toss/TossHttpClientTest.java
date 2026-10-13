@@ -3,7 +3,7 @@ package com.kista.broker.adapter.out.toss;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.toss.TossApiException;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

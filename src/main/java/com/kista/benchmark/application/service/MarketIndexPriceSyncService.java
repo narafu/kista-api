@@ -1,6 +1,6 @@
 package com.kista.benchmark.application.service;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.benchmark.domain.model.EtfBenchmarkSymbol;
 import com.kista.benchmark.domain.model.IndexPrice;
 import com.kista.benchmark.application.usecase.SyncMarketIndexPricesUseCase;

@@ -4,8 +4,8 @@ package com.kista.trading.domain.model;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 바로주문 미리보기 시 계좌 내 BUY 예산 경쟁 시뮬레이션 결과 — TradingBuyCompetitionSimulator 산출
 // 실제 야간 배치(TradingOrderBudgetAllocator)와 동일한 우선순위 정렬을 재현한 근사치

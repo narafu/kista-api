@@ -4,9 +4,9 @@ import com.kista.tradingstats.domain.model.backtest.BacktestCommand;
 import com.kista.tradingstats.domain.model.backtest.BacktestResult;
 import com.kista.tradingstats.domain.model.DailyCandle;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.Strategy;
@@ -17,9 +17,9 @@ import com.kista.matching.domain.strategy.CycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.kista.trading.application.port.output.StrategyCreationPolicyPort;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyFieldSettings;
+import com.kista.shared.kernel.RecurringMode;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyFieldSettings;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -42,8 +42,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 @ExtendWith(MockitoExtension.class)
 class BacktestServiceTest {

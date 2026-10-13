@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationType;
 
 import java.util.Map;
 import java.util.UUID;

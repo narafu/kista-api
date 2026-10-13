@@ -3,8 +3,8 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
-import com.kista.contract.trading.TradeCorrectionRequest;
-import com.kista.contract.trading.TradeCorrectionResponse;
+import com.kista.shared.contract.trading.TradeCorrectionRequest;
+import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

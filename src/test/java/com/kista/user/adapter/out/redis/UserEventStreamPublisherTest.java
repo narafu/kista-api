@@ -1,8 +1,8 @@
 package com.kista.user.adapter.out.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.sharedkernel.UserDeletedEvent;
-import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.kernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;

@@ -1,9 +1,9 @@
 package com.kista.privacy.domain.model;
 
 import com.kista.matching.domain.model.PrivacyPlan;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

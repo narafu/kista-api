@@ -13,8 +13,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // VR(밸류리밸런싱) 전략의 주문 계획 + capability 정책
 // holdings=0에도 사이클 유지 — endsCycleOnLiquidation()=false
@@ -108,6 +108,6 @@ public class VrCycleOrderStrategy implements CycleOrderStrategy {
     // bootstrap BUY(LOC+AT_CLOSE)와 정상 매도 사다리(LIMIT+AT_OPEN)가 같은 배치에 섞여 반환될 수 있다.
     // 사다리 매수는 항상 LIMIT+AT_OPEN이므로, BUY 중 하나라도 LOC이면 이번 배치의 매수가 bootstrap이라는 뜻이다.
     private static boolean isVrBootstrapShaped(List<PlannedOrder> buyOrders) {
-        return buyOrders.stream().anyMatch(o -> o.orderType() == com.kista.sharedkernel.OrderType.LOC);
+        return buyOrders.stream().anyMatch(o -> o.orderType() == com.kista.shared.kernel.OrderType.LOC);
     }
 }

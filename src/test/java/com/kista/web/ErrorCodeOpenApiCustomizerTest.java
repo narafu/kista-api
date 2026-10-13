@@ -1,6 +1,6 @@
 package com.kista.web;
 
-import com.kista.platform.web.ErrorCode;
+import com.kista.shared.platform.web.ErrorCode;
 import io.swagger.v3.oas.models.OpenAPI;
 import org.junit.jupiter.api.Test;
 

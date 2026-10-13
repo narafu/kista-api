@@ -2,10 +2,10 @@ package com.kista.admin.application.service;
 
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.TradingCommandPort;
-import com.kista.contract.trading.TradeCorrectionRequest;
-import com.kista.contract.trading.TradeCorrectionResponse;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.contract.trading.TradeCorrectionRequest;
+import com.kista.shared.contract.trading.TradeCorrectionResponse;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

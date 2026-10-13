@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.in.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.platform.redis.RedisStreamSubscriber;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreamSubscriber;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;

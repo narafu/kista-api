@@ -5,7 +5,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

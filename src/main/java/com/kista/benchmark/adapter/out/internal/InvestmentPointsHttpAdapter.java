@@ -1,8 +1,8 @@
 package com.kista.benchmark.adapter.out.internal;
 
-import com.kista.contract.stats.InvestmentPointsResponse;
-import com.kista.platform.internalapi.InternalApiErrorDetails;
-import com.kista.platform.internalapi.InternalApiStatusHandlers;
+import com.kista.shared.contract.stats.InvestmentPointsResponse;
+import com.kista.shared.platform.internalapi.InternalApiErrorDetails;
+import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.benchmark.application.port.output.InvestmentPointsPort;
 import com.kista.benchmark.domain.model.BenchmarkScope;
 import com.kista.benchmark.domain.model.InvestmentPoint;

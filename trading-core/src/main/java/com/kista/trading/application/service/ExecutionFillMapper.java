@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 
 import java.math.BigDecimal;
 

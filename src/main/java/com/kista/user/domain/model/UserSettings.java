@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 
 public record UserSettings(
         UUID userId,

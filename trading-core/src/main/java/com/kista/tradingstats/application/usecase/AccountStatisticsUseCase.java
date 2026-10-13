@@ -4,7 +4,7 @@ import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.trading.domain.model.CycleHistoryPage;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.Instant;

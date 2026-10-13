@@ -1,8 +1,8 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.platform.redis.RedisStreams;
-import com.kista.sharedkernel.UserPushNotificationRequestedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreams;
+import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;

@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out;
 
 import com.kista.account.application.usecase.AccountUseCase;
-import com.kista.sharedkernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;

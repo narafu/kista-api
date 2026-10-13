@@ -3,8 +3,8 @@ package com.kista.web.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
-import com.kista.sharedkernel.StrategyCapability;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCapability;
+import com.kista.shared.kernel.StrategyType;
 
 public record StrategyTypeMeta(
         @Schema(description = "enum name() 값", example = "INFINITE")

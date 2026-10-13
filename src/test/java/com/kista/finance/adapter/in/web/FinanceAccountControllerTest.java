@@ -2,7 +2,7 @@ package com.kista.finance.adapter.in.web;
 
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.finance.domain.model.FinanceAccountCommand;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.finance.application.usecase.FinanceAccountUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;

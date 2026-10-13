@@ -1,6 +1,6 @@
 package com.kista.admin.application.service;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.user.domain.model.User;
 import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminUserUseCase;
@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 @Slf4j
 @Service

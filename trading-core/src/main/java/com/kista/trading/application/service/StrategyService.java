@@ -22,11 +22,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyDefaults;
 
 @Slf4j
 @Service

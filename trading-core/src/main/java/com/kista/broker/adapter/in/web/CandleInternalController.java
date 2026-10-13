@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.in.web;
 
 import com.kista.broker.application.port.output.CandlePort;
-import com.kista.contract.broker.DailyCandleResponse;
+import com.kista.shared.contract.broker.DailyCandleResponse;
 import com.kista.broker.domain.model.BrokerCandle;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

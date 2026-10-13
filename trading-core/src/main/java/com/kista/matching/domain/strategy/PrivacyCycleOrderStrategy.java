@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static java.math.RoundingMode.HALF_UP;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // PRIVACY 전략의 주문 계획 + 최소금액 정책
 // 기존 TradingOrderPlanner.calcPrivacy + CycleRotationService.resolveMinRequired(PRIVACY) 이전

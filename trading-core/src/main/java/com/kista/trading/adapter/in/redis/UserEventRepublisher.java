@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.in.redis;
 
-import com.kista.sharedkernel.UserDeletedEvent;
-import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
+import com.kista.shared.kernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;

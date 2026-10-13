@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence.policy;
 
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.trading.application.port.output.TradingPolicySettingsPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

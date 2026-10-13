@@ -5,9 +5,9 @@ import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.tradingnotify.application.port.output.TradingRealtimeNotificationPort;
 import com.kista.tradingnotify.application.port.output.TradingUserNotificationPort;
 import com.kista.trading.application.event.TradingReportReadyEvent;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.TradeLegSummary;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.TradeLegSummary;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.domain.model.TradingReport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingReportNotifierTest {

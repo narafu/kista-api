@@ -7,10 +7,10 @@ import com.kista.benchmark.domain.model.InvestmentPoint;
 import com.kista.benchmark.domain.model.PerformanceComparisonSummary;
 import com.kista.benchmark.domain.model.StrategyRef;
 
-import static com.kista.sharedkernel.ReturnMetrics.annualizedReturn;
-import static com.kista.sharedkernel.ReturnMetrics.cumulativeReturn;
-import static com.kista.sharedkernel.ReturnMetrics.maxDrawdown;
-import static com.kista.sharedkernel.ReturnMetrics.normalize;
+import static com.kista.shared.kernel.ReturnMetrics.annualizedReturn;
+import static com.kista.shared.kernel.ReturnMetrics.cumulativeReturn;
+import static com.kista.shared.kernel.ReturnMetrics.maxDrawdown;
+import static com.kista.shared.kernel.ReturnMetrics.normalize;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

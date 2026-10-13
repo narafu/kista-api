@@ -1,10 +1,10 @@
 package com.kista.admin.adapter.in.redis;
 
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.platform.redis.RedisStreamSubscriber;
-import com.kista.platform.redis.RedisStreams;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreamSubscriber;
+import com.kista.shared.platform.redis.RedisStreams;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;

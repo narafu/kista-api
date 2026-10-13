@@ -1,11 +1,11 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.BrokerSettings;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyDefaults;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.BrokerSettings;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.trading.application.port.output.TradingPolicySettingsPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

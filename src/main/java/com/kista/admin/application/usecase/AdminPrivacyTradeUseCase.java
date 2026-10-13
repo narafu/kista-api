@@ -1,10 +1,10 @@
 package com.kista.admin.application.usecase;
 
-import com.kista.contract.privacy.FidaOrderRequest;
-import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
-import com.kista.contract.privacy.PrivacyOrderAddRequest;
-import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 
 import java.util.UUID;
 

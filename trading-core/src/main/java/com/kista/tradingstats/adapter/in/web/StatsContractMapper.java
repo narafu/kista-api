@@ -1,8 +1,8 @@
 package com.kista.tradingstats.adapter.in.web;
 
-import com.kista.contract.stats.InvestmentPointsResponse;
-import com.kista.contract.stats.PortfolioCurrentResponse;
-import com.kista.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.contract.stats.InvestmentPointsResponse;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.contract.stats.PortfolioOrderResponse;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.Strategy;

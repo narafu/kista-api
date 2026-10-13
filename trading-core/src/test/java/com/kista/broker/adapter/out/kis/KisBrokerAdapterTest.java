@@ -14,7 +14,7 @@ import com.kista.broker.application.port.output.MarginPort;
 import com.kista.broker.application.port.output.PortfolioPort;
 import com.kista.broker.application.port.output.SellableQuantityPort;
 import com.kista.broker.application.port.output.StockInfoPort;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

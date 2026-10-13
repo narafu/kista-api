@@ -1,7 +1,7 @@
 package com.kista.tradingstats.domain.backtest;
 
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import com.kista.tradingstats.domain.model.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.PlannedOrder;

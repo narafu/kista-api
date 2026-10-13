@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 
 import static java.math.RoundingMode.FLOOR;
 import static java.math.RoundingMode.HALF_UP;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 public record InfinitePosition(
         AccountBalance balance,

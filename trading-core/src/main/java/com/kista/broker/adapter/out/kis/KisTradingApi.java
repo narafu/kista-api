@@ -1,10 +1,10 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.platform.time.UsTradeDates;
+import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.broker.domain.model.*;
 import com.kista.broker.domain.model.kis.KisApiException;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

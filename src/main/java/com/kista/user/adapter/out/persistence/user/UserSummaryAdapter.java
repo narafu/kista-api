@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 @Component
 @RequiredArgsConstructor

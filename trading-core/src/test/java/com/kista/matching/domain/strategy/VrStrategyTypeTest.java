@@ -4,7 +4,7 @@ import com.kista.matching.domain.strategy.VrStrategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.matching.domain.model.VrPosition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,12 +13,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.kista.sharedkernel.OrderDirection.BUY;
-import static com.kista.sharedkernel.OrderDirection.SELL;
-import static com.kista.sharedkernel.OrderTiming.AT_CLOSE;
-import static com.kista.sharedkernel.OrderTiming.AT_OPEN;
-import static com.kista.sharedkernel.OrderType.LOC;
-import static com.kista.sharedkernel.OrderType.LIMIT;
+import static com.kista.shared.kernel.OrderDirection.BUY;
+import static com.kista.shared.kernel.OrderDirection.SELL;
+import static com.kista.shared.kernel.OrderTiming.AT_CLOSE;
+import static com.kista.shared.kernel.OrderTiming.AT_OPEN;
+import static com.kista.shared.kernel.OrderType.LOC;
+import static com.kista.shared.kernel.OrderType.LIMIT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("VrStrategy 매수·매도 사다리 시나리오 검증")

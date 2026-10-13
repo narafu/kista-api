@@ -2,7 +2,7 @@ package com.kista.trading.domain.model;
 
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 import java.util.UUID;
 

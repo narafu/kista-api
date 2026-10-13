@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.event;
 
 import com.kista.admin.application.port.output.AuditLogPort;
-import com.kista.sharedkernel.UserRole;
+import com.kista.shared.kernel.UserRole;
 import com.kista.user.application.event.UserSeedPromotedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

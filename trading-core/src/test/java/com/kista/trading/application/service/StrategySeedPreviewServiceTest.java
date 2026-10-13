@@ -4,9 +4,9 @@ import com.kista.trading.application.service.support.StrategyHistoryQueryService
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.privacy.domain.model.PrivacyCurrentBase;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.broker.application.port.output.BrokerPricePort;

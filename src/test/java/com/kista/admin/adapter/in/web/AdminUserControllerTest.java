@@ -1,12 +1,12 @@
 package com.kista.admin.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.user.domain.model.UserSummary;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -31,8 +31,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(AdminUserController.class)

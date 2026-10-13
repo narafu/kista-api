@@ -4,7 +4,7 @@ import com.kista.account.adapter.in.web.dto.AccountRequest;
 import com.kista.account.adapter.in.web.dto.AccountResponse;
 import com.kista.account.adapter.in.web.dto.TestConnectionRequest;
 import com.kista.account.application.usecase.AccountUseCase;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

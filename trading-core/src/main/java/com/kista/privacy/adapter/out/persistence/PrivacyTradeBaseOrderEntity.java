@@ -1,8 +1,8 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseCreatedAtEntity;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;

@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.persistence;
 
-import com.kista.platform.crypto.AccountNoHasher;
-import com.kista.platform.crypto.AesCryptoService;
+import com.kista.shared.platform.crypto.AccountNoHasher;
+import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.finance.domain.model.FinanceAccount;
 import com.kista.web.RootDataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;

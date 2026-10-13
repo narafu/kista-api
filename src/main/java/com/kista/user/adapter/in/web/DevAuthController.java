@@ -24,8 +24,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 // 로컬 개발 전용 — 운영(prod) 프로파일에서는 빈 자체가 생성되지 않음
 @Tag(name = "[DEV] 개발 도구", description = "로컬 프로파일 전용 — 운영 환경에서는 노출되지 않음")

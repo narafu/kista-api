@@ -1,7 +1,7 @@
 package com.kista.marketcalendar.adapter.in.schedule;
 
-import com.kista.platform.scheduling.SchedulerJobRunner;
-import com.kista.platform.scheduling.SchedulerLockService;
+import com.kista.shared.platform.scheduling.SchedulerJobRunner;
+import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.marketcalendar.application.port.output.MarketCalendarRefreshPort;
 import com.kista.marketcalendar.application.port.output.MarketHolidayStorePort;
 import org.junit.jupiter.api.Test;
@@ -10,7 +10,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.Duration;
 import java.time.LocalDate;
 
-import static com.kista.sharedkernel.TimeZones.KST;
+import static com.kista.shared.kernel.TimeZones.KST;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;

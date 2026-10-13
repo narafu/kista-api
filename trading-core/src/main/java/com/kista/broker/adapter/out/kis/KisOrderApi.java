@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

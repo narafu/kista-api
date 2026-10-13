@@ -1,6 +1,6 @@
 package com.kista.marketcalendar.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseCreatedAtEntity;
+import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;
 import lombok.Getter;

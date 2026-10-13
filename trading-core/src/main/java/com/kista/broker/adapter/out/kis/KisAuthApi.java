@@ -2,13 +2,13 @@ package com.kista.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.broker.domain.model.BrokerCredentialException;
 import com.kista.broker.domain.model.BrokerRateLimitException;
 import com.kista.broker.domain.model.kis.KisApiException;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;

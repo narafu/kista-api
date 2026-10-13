@@ -1,11 +1,11 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.application.event.CycleEndedEvent;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.trading.domain.model.ManualTradeCorrectionResult;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -36,10 +36,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class ManualTradeCorrectionServiceTest {

@@ -1,6 +1,6 @@
 package com.kista.user.application.usecase;
 
-import com.kista.sharedkernel.UserRole;
+import com.kista.shared.kernel.UserRole;
 import com.kista.user.domain.model.User;
 
 import java.util.UUID;

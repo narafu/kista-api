@@ -11,7 +11,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 @Component
 @RequiredArgsConstructor

@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossCandle;
 import org.junit.jupiter.api.BeforeEach;

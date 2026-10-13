@@ -1,8 +1,8 @@
 package com.kista.trading.adapter.in.schedule;
 
-import com.kista.platform.scheduling.SchedulerJobRunner;
-import com.kista.platform.scheduling.SchedulerLifecycleEvent;
-import com.kista.platform.scheduling.SchedulerLockService;
+import com.kista.shared.platform.scheduling.SchedulerJobRunner;
+import com.kista.shared.platform.scheduling.SchedulerLifecycleEvent;
+import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
@@ -33,10 +33,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingCloseSchedulerTest {

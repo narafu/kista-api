@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.AccountQueryPort;
-import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.shared.contract.account.AccountSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;

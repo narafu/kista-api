@@ -2,8 +2,8 @@ package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.TradingPolicyPort;
 import com.kista.admin.domain.model.TradingPolicyUnavailableException;
-import com.kista.platform.internalapi.InternalApiStatusHandlers;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
+import com.kista.shared.kernel.TradingPolicySettings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

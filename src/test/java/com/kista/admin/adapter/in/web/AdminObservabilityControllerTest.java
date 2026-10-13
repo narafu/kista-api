@@ -1,13 +1,13 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
 import com.kista.admin.domain.model.AdminAnomalies;
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

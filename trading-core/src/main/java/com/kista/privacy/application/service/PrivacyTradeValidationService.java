@@ -1,7 +1,7 @@
 package com.kista.privacy.application.service;
 
 import com.kista.privacy.domain.model.FidaOrderCommand;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.privacy.application.usecase.PrivacyTradeValidationUseCase;

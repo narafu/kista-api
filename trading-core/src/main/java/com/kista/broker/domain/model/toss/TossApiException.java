@@ -1,7 +1,7 @@
 package com.kista.broker.domain.model.toss;
 
 import com.kista.broker.domain.model.BrokerApiException;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 // Toss 외부 API 호출 실패 — BrokerApiException으로 503 매핑됨
 public class TossApiException extends BrokerApiException {

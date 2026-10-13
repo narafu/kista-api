@@ -1,7 +1,7 @@
 package com.kista.user.adapter.in.web;
 
 import com.kista.user.adapter.in.web.security.*;
-import com.kista.platform.security.*;
+import com.kista.shared.platform.security.*;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.user.domain.auth.TokenRefreshResult;
 import com.kista.user.domain.model.User;
@@ -32,8 +32,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.UserRole;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.UserRole;
 import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(AuthController.class)

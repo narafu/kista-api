@@ -1,10 +1,10 @@
 package com.kista.notify.adapter.in.redis;
 
 import com.kista.notify.application.port.output.PushNotificationPort;
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.platform.redis.RedisStreamSubscriber;
-import com.kista.platform.redis.RedisStreams;
-import com.kista.sharedkernel.UserPushNotificationRequestedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreamSubscriber;
+import com.kista.shared.platform.redis.RedisStreams;
+import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import jakarta.annotation.PostConstruct;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;

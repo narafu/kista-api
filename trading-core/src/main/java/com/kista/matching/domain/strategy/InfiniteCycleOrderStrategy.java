@@ -1,8 +1,8 @@
 package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.ReverseModePosition;
@@ -18,9 +18,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.math.RoundingMode.HALF_UP;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyDefaults;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyTicker;
 
 
 // INFINITE 전략의 주문 계획 + 최소금액 정책

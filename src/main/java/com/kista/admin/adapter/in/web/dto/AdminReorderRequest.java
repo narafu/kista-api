@@ -1,8 +1,8 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.contract.trading.ReorderRequest;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.contract.trading.ReorderRequest;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 

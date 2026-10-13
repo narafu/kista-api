@@ -1,9 +1,9 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.privacy.domain.model.*;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -1,6 +1,6 @@
 package com.kista.trading.application.event;
 
-import com.kista.sharedkernel.TradeLegSummary;
+import com.kista.shared.kernel.TradeLegSummary;
 import com.kista.trading.domain.model.TradingReport;
 
 import java.util.List;

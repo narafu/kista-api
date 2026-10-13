@@ -1,6 +1,6 @@
 package com.kista.tradingstats.adapter.in.web;
 
-import com.kista.contract.stats.InvestmentPointsResponse;
+import com.kista.shared.contract.stats.InvestmentPointsResponse;
 import com.kista.tradingstats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingstats.application.usecase.InvestmentPointsQuery;
 import com.kista.tradingstats.domain.model.InvestmentPointsResult;

@@ -1,9 +1,9 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 
 import java.util.UUID;
 

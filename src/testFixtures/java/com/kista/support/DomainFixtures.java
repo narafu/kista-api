@@ -2,12 +2,12 @@ package com.kista.support;
 
 import com.kista.notify.domain.model.NotificationRecipient;
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 // 테스트 공용 도메인 fixture — User record 필드 변경 시 이 파일만 수정
 public final class DomainFixtures {

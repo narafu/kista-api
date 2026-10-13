@@ -3,8 +3,8 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.TradingCommandPort;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
-import com.kista.contract.trading.ReorderRequest;
-import com.kista.contract.trading.ReorderResponse;
+import com.kista.shared.contract.trading.ReorderRequest;
+import com.kista.shared.contract.trading.ReorderResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

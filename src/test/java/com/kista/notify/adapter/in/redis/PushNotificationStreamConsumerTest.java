@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.in.redis;
 
 import com.kista.notify.application.port.output.PushNotificationPort;
-import com.kista.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreamConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

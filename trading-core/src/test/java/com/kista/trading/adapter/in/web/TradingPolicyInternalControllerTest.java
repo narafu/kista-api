@@ -1,10 +1,10 @@
 package com.kista.trading.adapter.in.web;
 
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
-import com.kista.platform.security.TokenBlacklistPort;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.TokenBlacklistPort;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.trading.application.usecase.TradingPolicyUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -88,8 +88,8 @@ class TradingPolicyInternalControllerTest {
 
         ArgumentCaptor<TradingPolicySettings> captor = ArgumentCaptor.forClass(TradingPolicySettings.class);
         verify(tradingPolicyUseCase).replacePolicy(captor.capture());
-        assertThat(captor.getValue().brokerEnabled(com.kista.sharedkernel.Broker.TOSS)).isFalse();
-        assertThat(captor.getValue().strategy(com.kista.sharedkernel.StrategyType.PRIVACY).enabled()).isFalse();
+        assertThat(captor.getValue().brokerEnabled(com.kista.shared.kernel.Broker.TOSS)).isFalse();
+        assertThat(captor.getValue().strategy(com.kista.shared.kernel.StrategyType.PRIVACY).enabled()).isFalse();
     }
 
     // enum 키가 빠진 body는 TradingPolicySettings 생성자 검증(IllegalArgumentException)이 거절 — 400

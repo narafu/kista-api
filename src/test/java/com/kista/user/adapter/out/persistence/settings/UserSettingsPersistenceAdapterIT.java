@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.settings;
 
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.web.RootDataJpaTestBase;
 import com.kista.user.domain.model.UserSettings;
 import jakarta.persistence.EntityManager;

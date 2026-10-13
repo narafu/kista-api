@@ -1,6 +1,6 @@
 package com.kista.trading.application.usecase;
 
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 
 // 매매 런타임 정책 조회·교체 — root admin이 내부 API(TradingPolicyInternalController)로 위임 호출한다.
 public interface TradingPolicyUseCase {

@@ -1,6 +1,6 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;

@@ -19,9 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 바로주문 미리보기에서 계좌 내 활성 전략 전체를 야간 배치와 동일한 우선순위로 시뮬레이션해
 // 대상 전략의 BUY가 실제로 승인될지 근사 판정한다

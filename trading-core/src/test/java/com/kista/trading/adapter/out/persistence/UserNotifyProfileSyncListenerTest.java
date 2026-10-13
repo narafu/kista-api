@@ -2,11 +2,11 @@ package com.kista.trading.adapter.out.persistence;
 
 import java.time.Instant;
 import java.util.Optional;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.platform.crypto.AesCryptoService;
-import com.kista.sharedkernel.NotificationType;
-import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
+import com.kista.shared.platform.crypto.AesCryptoService;
+import com.kista.shared.kernel.NotificationType;
+import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

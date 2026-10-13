@@ -3,8 +3,8 @@ package com.kista.tradingstats.domain.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 사이클 1개의 성과 — 진행 중이면 endAmount=최신 스냅샷 평가액, closed=false
 // 근사 한계: 수수료 미반영. VR 적립금(recurringAmount)은 V' 목표값 계산과 주문 사이징 입력으로만 쓰이고

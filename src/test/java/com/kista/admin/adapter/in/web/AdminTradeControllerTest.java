@@ -1,23 +1,23 @@
 package com.kista.admin.adapter.in.web;
 
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.Broker;
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
-import com.kista.contract.trading.ReorderResponse;
-import com.kista.contract.trading.TradeCorrectionResponse;
-import com.kista.contract.trading.OrderResponse;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.shared.contract.trading.ReorderResponse;
+import com.kista.shared.contract.trading.TradeCorrectionResponse;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.usecase.AdminReorderUseCase;
 import com.kista.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.admin.application.usecase.AdminUserUseCase;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.admin.application.port.output.TradingCommandPort;
-import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
+import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -45,11 +45,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(AdminTradeController.class)
@@ -102,7 +102,7 @@ class AdminTradeControllerTest {
         UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
         // 단일 계좌/사용자 조회 — 전체 풀스캔 대신 findAccount/findUser 사용
         when(adminQuery.findAccount(accountId)).thenReturn(Optional.of(
-                new com.kista.contract.account.AccountSummaryResponse(
+                new com.kista.shared.contract.account.AccountSummaryResponse(
                         accountId,
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         "1234-56",
@@ -141,7 +141,7 @@ class AdminTradeControllerTest {
         when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId)))
                 .thenReturn(java.util.Map.of(
                         cycleId,
-                        new com.kista.contract.trading.StrategySummaryResponse(strategyId, StrategyType.PRIVACY)
+                        new com.kista.shared.contract.trading.StrategySummaryResponse(strategyId, StrategyType.PRIVACY)
                 ));
 
         mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)
@@ -312,7 +312,7 @@ class AdminTradeControllerTest {
     void getReorderBuyBudget_adminRole_returnsBudget() throws Exception {
         UUID orderId = UUID.randomUUID();
         when(tradingCommandPort.reorderBuyBudget(List.of(orderId), java.time.LocalDate.of(2026, 10, 6)))
-                .thenReturn(new com.kista.contract.trading.ReorderBuyBudgetResponse(
+                .thenReturn(new com.kista.shared.contract.trading.ReorderBuyBudgetResponse(
                         new BigDecimal("300"), new BigDecimal("1000"), Map.of(orderId, new BigDecimal("200"))));
 
         mockMvc.perform(get("/api/admin/trades/reorder-buy-budget")

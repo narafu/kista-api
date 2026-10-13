@@ -1,6 +1,6 @@
 package com.kista.market.application.port.output;
 
-import com.kista.contract.broker.DailyCandleResponse;
+import com.kista.shared.contract.broker.DailyCandleResponse;
 
 import java.util.List;
 

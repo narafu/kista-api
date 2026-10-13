@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.in.schedule;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.trading.application.port.output.TradingBatchRunPort;
 import com.kista.trading.application.port.output.TradingErrorReportPort;
 import com.kista.trading.domain.model.TradingBatchJob;

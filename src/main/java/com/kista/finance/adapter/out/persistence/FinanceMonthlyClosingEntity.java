@@ -1,6 +1,6 @@
 package com.kista.finance.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseAuditEntity;
+import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.finance.domain.model.MonthlyClosing;
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;

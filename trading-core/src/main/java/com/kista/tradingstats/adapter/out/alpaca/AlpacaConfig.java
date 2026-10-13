@@ -1,6 +1,6 @@
 package com.kista.tradingstats.adapter.out.alpaca;
 
-import com.kista.platform.http.RestClients;
+import com.kista.shared.platform.http.RestClients;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

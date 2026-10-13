@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.platform.telegram.TelegramProperties;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.platform.telegram.TelegramProperties;
 import com.kista.user.domain.model.User;
 import com.kista.support.DomainFixtures;
 import org.junit.jupiter.api.BeforeEach;

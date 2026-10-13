@@ -1,10 +1,10 @@
 package com.kista.trading.application.service;
 
 import com.kista.matching.domain.model.StrategyVrDetail;
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.trading.domain.model.*;

@@ -5,7 +5,7 @@ import com.kista.broker.domain.model.BrokerCandle;
 import com.kista.broker.domain.model.BrokerStockInfo;
 import com.kista.broker.domain.model.ExchangeRateQuote;
 import com.kista.broker.domain.model.MarketCalendarDay;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.time.LocalDate;
 import java.util.List;

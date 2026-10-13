@@ -1,6 +1,6 @@
 package com.kista.notify.domain.model;
 
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 
 import java.util.UUID;
 

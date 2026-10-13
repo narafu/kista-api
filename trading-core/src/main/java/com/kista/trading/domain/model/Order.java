@@ -1,11 +1,11 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderType;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

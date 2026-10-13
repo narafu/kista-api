@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.user;
 
-import com.kista.platform.crypto.AesCryptoService;
+import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.user.domain.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,9 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("UserPersistenceAdapter — telegramBotToken AES 암호화 왕복 매핑 테스트")

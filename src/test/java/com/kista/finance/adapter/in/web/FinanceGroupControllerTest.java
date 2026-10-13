@@ -3,7 +3,7 @@ package com.kista.finance.adapter.in.web;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.finance.application.usecase.FinanceGroupUseCase;
 import com.kista.finance.application.port.output.FinanceMemberPort;
 import com.kista.admin.application.port.output.AppErrorLogPort;

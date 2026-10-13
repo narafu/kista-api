@@ -1,6 +1,6 @@
 package com.kista.user.application.port.output;
 
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 
 import java.time.Duration;
 import java.time.Instant;

@@ -1,6 +1,6 @@
 package com.kista.benchmark.adapter.out.kbland;
 
-import com.kista.platform.http.HttpClientTimeouts;
+import com.kista.shared.platform.http.HttpClientTimeouts;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

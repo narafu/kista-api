@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.marketdata;
 
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

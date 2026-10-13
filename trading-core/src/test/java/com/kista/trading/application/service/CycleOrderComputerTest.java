@@ -1,10 +1,10 @@
 package com.kista.trading.application.service;
 
 import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
 import com.kista.matching.domain.strategy.*;
@@ -25,9 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // CycleOrderComputer 단위 테스트: VR 분기 VrInputs 조립, fail-fast, 비VR null 유지
 @ExtendWith(MockitoExtension.class)

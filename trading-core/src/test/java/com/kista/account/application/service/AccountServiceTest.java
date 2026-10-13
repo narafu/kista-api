@@ -12,7 +12,7 @@ import com.kista.account.application.port.output.BrokerEnabledPort;
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.support.TradingFixtures;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

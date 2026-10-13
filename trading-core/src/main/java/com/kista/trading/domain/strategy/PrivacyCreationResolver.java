@@ -1,9 +1,9 @@
 package com.kista.trading.domain.strategy;
 
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyDefaults;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 public class PrivacyCreationResolver implements StrategyCreationResolver {
 

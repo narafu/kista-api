@@ -1,10 +1,10 @@
 package com.kista.admin.adapter.out.internal;
 
-import com.kista.contract.stats.PortfolioCurrentResponse;
-import com.kista.contract.stats.PortfolioOrderResponse;
-import com.kista.platform.internalapi.InternalApiStatusHandlers;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import com.kista.admin.application.port.output.PortfolioQueryPort;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;

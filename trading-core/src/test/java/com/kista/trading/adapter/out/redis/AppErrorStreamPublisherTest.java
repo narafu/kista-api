@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

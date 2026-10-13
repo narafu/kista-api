@@ -2,7 +2,7 @@ package com.kista.tradingstats.application.service;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingstats.application.usecase.PortfolioUseCase;
 import com.kista.trading.application.port.output.CyclePositionPort;
 import com.kista.trading.application.port.output.OrderPort;

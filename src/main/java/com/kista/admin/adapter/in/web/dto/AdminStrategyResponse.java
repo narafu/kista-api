@@ -1,6 +1,6 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.contract.trading.StrategyResponse;
+import com.kista.shared.contract.trading.StrategyResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;

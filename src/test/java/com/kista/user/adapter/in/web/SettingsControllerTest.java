@@ -1,8 +1,8 @@
 package com.kista.user.adapter.in.web;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.user.application.usecase.UserSettingsUseCase;
 import com.kista.user.application.usecase.UserProfileUseCase;
 import org.junit.jupiter.api.Test;

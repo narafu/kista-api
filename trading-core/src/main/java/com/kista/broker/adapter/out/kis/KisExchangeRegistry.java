@@ -1,6 +1,6 @@
 package com.kista.broker.adapter.out.kis;
 
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;

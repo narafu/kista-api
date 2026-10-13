@@ -1,12 +1,12 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.DstInfo;
 import com.kista.trading.domain.model.ReorderCommand;
 import com.kista.trading.domain.model.ReorderResult;
@@ -38,10 +38,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class ReorderServiceTest {

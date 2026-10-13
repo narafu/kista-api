@@ -2,10 +2,10 @@ package com.kista.broker.adapter.out.mock;
 
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.broker.domain.model.*;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.broker.application.port.output.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

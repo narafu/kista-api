@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.platform.telegram.TelegramHttpClient;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.user.application.port.output.TelegramBotInfoPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

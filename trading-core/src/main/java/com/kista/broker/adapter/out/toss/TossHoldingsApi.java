@@ -7,7 +7,7 @@ import com.kista.broker.domain.model.Currency;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossExchangeRate;
 import lombok.RequiredArgsConstructor;

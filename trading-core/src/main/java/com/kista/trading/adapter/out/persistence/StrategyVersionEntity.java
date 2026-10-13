@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseCreatedAtEntity;
+import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;

@@ -1,7 +1,7 @@
 package com.kista.tradingstats.application.service;
 
 import com.kista.broker.application.service.BrokerCallGuard;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.broker.domain.model.DailyTransaction;
 import com.kista.broker.domain.model.DailyTransactionResult;
@@ -9,10 +9,10 @@ import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.broker.domain.model.MarginItem;
 import com.kista.broker.domain.model.PresentBalanceResult;
 import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.CycleHistoryPage;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingstats.application.usecase.AccountStatisticsUseCase;
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.trading.application.port.output.CyclePositionPort;

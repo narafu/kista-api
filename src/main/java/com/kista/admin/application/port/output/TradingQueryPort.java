@@ -1,8 +1,8 @@
 package com.kista.admin.application.port.output;
 
-import com.kista.contract.trading.OrderResponse;
-import com.kista.contract.trading.StrategySummaryResponse;
-import com.kista.contract.trading.StrategyResponse;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.contract.trading.StrategySummaryResponse;
+import com.kista.shared.contract.trading.StrategyResponse;
 
 import java.time.LocalDate;
 import java.util.List;

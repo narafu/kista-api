@@ -1,6 +1,6 @@
 package com.kista.user.application.service;
 
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.ActiveStrategyCountPort;
 import com.kista.user.application.port.output.UserSettingsPort;

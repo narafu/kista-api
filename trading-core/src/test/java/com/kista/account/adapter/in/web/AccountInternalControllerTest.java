@@ -2,11 +2,11 @@ package com.kista.account.adapter.in.web;
 
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.tradingweb.TradingApplication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

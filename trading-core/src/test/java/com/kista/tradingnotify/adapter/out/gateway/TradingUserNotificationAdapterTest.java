@@ -1,10 +1,10 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.UserPushNotificationRequestedEvent;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import com.kista.trading.domain.model.TradingUserProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

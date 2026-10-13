@@ -1,10 +1,10 @@
 package com.kista.trading.domain.strategy;
 
 import java.math.BigDecimal;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.RecurringMode;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 전략 등록 시 런타임 설정(StrategyCreationSettings) 기반 필드 해석 진입점
 // 각 구현체는 type()으로 자기 타입을 선언하며, 서비스는 Map<StrategyType, StrategyCreationResolver>로 주입받아 사용

@@ -11,7 +11,7 @@ public record ReorderTimingAvailabilityResponse(
         @Schema(description = "즉시 접수 가능 여부 (정규장 중에만 true)")
         boolean immediate   // 즉시 접수 가능 (정규장 중에만)
 ) {
-    public static ReorderTimingAvailabilityResponse from(com.kista.contract.trading.ReorderTimingAvailabilityResponse avail) {
+    public static ReorderTimingAvailabilityResponse from(com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse avail) {
         return new ReorderTimingAvailabilityResponse(avail.atOpen(), avail.atClose(), avail.immediate());
     }
 }

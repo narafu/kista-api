@@ -1,15 +1,15 @@
 package com.kista.trading.application.service.support;
 
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.TradingAccount;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.application.port.output.OrderPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,11 +1,11 @@
 package com.kista.admin.adapter.out.internal;
 
-import com.kista.contract.stats.PortfolioCurrentResponse;
-import com.kista.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.contract.stats.PortfolioOrderResponse;
 import com.kista.admin.application.port.output.PortfolioQueryPort;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;

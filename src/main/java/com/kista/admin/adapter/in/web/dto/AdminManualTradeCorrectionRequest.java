@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.contract.trading.TradeCorrectionRequest;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.contract.trading.TradeCorrectionRequest;
+import com.kista.shared.kernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;

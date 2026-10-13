@@ -2,7 +2,7 @@ package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.account.application.port.output.AccountPort;
@@ -10,12 +10,12 @@ import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.ManualTradingException;
 import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort; import com.kista.trading.application.port.output.*;
 import com.kista.broker.domain.model.BrokerBalance;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
@@ -48,9 +48,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class ManualTradingServiceTest {

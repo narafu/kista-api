@@ -1,8 +1,8 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.contract.account.AccountSummaryResponse;
-import com.kista.contract.trading.OrderResponse;
-import com.kista.contract.trading.StrategySummaryResponse;
+import com.kista.shared.contract.account.AccountSummaryResponse;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.user.domain.model.UserSummary;
 import io.swagger.v3.oas.annotations.media.Schema;
 

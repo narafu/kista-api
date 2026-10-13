@@ -4,7 +4,7 @@ import com.kista.broker.application.port.output.BrokerPricePort;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.support.TradingFixtures;
 import com.kista.trading.application.event.TradingErrorEvent;
 import org.junit.jupiter.api.BeforeEach;

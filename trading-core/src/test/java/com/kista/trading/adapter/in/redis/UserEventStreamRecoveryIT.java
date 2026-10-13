@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.in.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.sharedkernel.UserDeletedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.kernel.UserDeletedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

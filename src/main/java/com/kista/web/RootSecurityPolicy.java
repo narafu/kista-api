@@ -1,6 +1,6 @@
 package com.kista.web;
 
-import com.kista.platform.security.SecurityRoutePolicy;
+import com.kista.shared.platform.security.SecurityRoutePolicy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;

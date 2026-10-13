@@ -1,12 +1,12 @@
 package com.kista.matching.domain.strategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.PrivacyPlan.PrivacyPlannedTrade;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -17,9 +17,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static com.kista.sharedkernel.OrderDirection.BUY;
-import static com.kista.sharedkernel.OrderDirection.SELL;
-import static com.kista.sharedkernel.OrderTiming.AT_CLOSE;
+import static com.kista.shared.kernel.OrderDirection.BUY;
+import static com.kista.shared.kernel.OrderDirection.SELL;
+import static com.kista.shared.kernel.OrderTiming.AT_CLOSE;
 
 @Slf4j
 public class PrivacyStrategy {

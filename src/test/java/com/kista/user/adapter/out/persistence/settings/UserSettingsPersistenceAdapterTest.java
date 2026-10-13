@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.settings;
 
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.user.domain.model.UserSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

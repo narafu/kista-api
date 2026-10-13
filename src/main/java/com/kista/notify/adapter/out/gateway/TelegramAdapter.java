@@ -1,9 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.platform.telegram.TelegramProperties;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.platform.telegram.TelegramProperties;
 import com.kista.notify.application.port.output.NotifyPort;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;

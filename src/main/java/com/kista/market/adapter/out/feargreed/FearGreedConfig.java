@@ -1,6 +1,6 @@
 package com.kista.market.adapter.out.feargreed;
 
-import com.kista.platform.http.HttpClientTimeouts;
+import com.kista.shared.platform.http.HttpClientTimeouts;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;

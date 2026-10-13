@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.shared.contract.account.AccountSummaryResponse;
 
 import java.util.List;
 

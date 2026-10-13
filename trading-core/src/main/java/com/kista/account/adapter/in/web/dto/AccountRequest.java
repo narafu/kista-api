@@ -2,7 +2,7 @@ package com.kista.account.adapter.in.web.dto;
 
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

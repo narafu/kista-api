@@ -1,6 +1,6 @@
 package com.kista.benchmark.application.service;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.benchmark.domain.model.*;
 import com.kista.benchmark.application.port.output.*;
 import org.junit.jupiter.api.Test;
@@ -19,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // Task 5 이후: BenchmarkService는 accountPort/strategyPort/strategyCyclePort/cyclePositionPort를 직접
 // 호출하지 않고 investmentPointsPort(HTTP 경유)로부터 InvestmentPoint 시리즈를 받는다. 소유권 검증·

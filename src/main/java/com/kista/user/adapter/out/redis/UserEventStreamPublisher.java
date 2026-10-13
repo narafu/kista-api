@@ -1,9 +1,9 @@
 package com.kista.user.adapter.out.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.platform.redis.RedisStreams;
-import com.kista.sharedkernel.UserDeletedEvent;
-import com.kista.sharedkernel.UserNotifyProfileChangedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreams;
+import com.kista.shared.kernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;

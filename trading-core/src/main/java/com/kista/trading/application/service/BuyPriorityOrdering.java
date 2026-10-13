@@ -6,7 +6,7 @@ import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.UUID;
 import java.util.function.Function;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 // BUY 예산 배정 우선순위 정렬 규칙의 단일 소스
 // TradingOrderBudgetAllocator(실제 야간 배치)와 TradingBuyCompetitionSimulator(미리보기 시뮬레이션)가

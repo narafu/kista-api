@@ -1,6 +1,6 @@
 package com.kista.tradingstats.adapter.in.web.dto;
 
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

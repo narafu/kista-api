@@ -1,6 +1,6 @@
 package com.kista.matching.domain.model;
 
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 
 import java.math.BigDecimal;
 import java.util.List;

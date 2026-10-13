@@ -1,18 +1,18 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.TradingOrderPlanner;
 
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.TradingAccount;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.domain.model.Order;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrStrategy;
 import com.kista.matching.domain.model.VrPosition;
@@ -39,7 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 // BUY PLANNED 가격이 currentPrice × 1.05 초과 시 전략별 재산정 위임 후 영속화 — I/O 오케스트레이션만 검증
 // 캡 가격 재산정 공식(병합/보정 등)은 InfiniteStrategyTypeTest.buildCappedBuyOrders / VrStrategyTypeTest.buildCappedBuyOrders 참고

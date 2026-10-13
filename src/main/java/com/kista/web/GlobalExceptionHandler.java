@@ -10,10 +10,10 @@ import com.kista.finance.domain.model.FinanceCategory;
 import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.MonthlyClosing;
-import com.kista.platform.web.ErrorCode;
-import com.kista.platform.web.ProblemDetailMappings;
-import com.kista.platform.web.ProblemDetailMappings.Mapping;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.platform.web.ErrorCode;
+import com.kista.shared.platform.web.ProblemDetailMappings;
+import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.user.domain.model.User;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,7 +33,7 @@ import org.springframework.web.context.request.async.AsyncRequestTimeoutExceptio
 
 import java.util.Map;
 
-import static com.kista.platform.web.ProblemDetailMappings.problem;
+import static com.kista.shared.platform.web.ProblemDetailMappings.problem;
 
 @Slf4j
 @RequiredArgsConstructor

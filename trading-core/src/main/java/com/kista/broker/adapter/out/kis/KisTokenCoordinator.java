@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.adapter.out.internal.TokenCoordinator;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

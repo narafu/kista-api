@@ -1,6 +1,6 @@
 package com.kista.admin.application.port.output;
 
-import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.shared.contract.account.AccountSummaryResponse;
 
 import java.time.LocalDate;
 import java.util.List;

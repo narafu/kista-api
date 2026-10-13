@@ -1,8 +1,8 @@
 package com.kista.admin.application.service;
 
-import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.admin.domain.model.AdminStats;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.admin.application.port.output.*;
 import com.kista.user.application.port.output.UserPort;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 @ExtendWith(MockitoExtension.class)
 class AdminQueryServiceTest {

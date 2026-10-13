@@ -1,8 +1,8 @@
 package com.kista.admin.application.port.output;
 
-import com.kista.contract.stats.PortfolioCurrentResponse;
-import com.kista.contract.stats.PortfolioOrderResponse;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.time.LocalDate;
 import java.util.List;

@@ -1,8 +1,8 @@
 package com.kista.market.adapter.out.internal;
 
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
-import com.kista.contract.marketcalendar.MarketSessionResponse;
-import com.kista.sharedkernel.MarketSession;
+import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
+import com.kista.shared.kernel.MarketSession;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;

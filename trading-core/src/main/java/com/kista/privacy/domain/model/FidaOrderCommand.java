@@ -1,8 +1,8 @@
 package com.kista.privacy.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

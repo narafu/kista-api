@@ -1,8 +1,8 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
-import com.kista.contract.notify.TradeEventEnvelope;
-import com.kista.contract.notify.TradeEventMessage;
-import com.kista.platform.redis.RedisPubSubConfig;
+import com.kista.shared.contract.notify.TradeEventEnvelope;
+import com.kista.shared.contract.notify.TradeEventMessage;
+import com.kista.shared.platform.redis.RedisPubSubConfig;
 import com.kista.tradingnotify.application.port.output.TradingRealtimeNotificationPort;
 import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.ObjectMapper;

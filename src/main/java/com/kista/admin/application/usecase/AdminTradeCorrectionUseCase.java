@@ -1,7 +1,7 @@
 package com.kista.admin.application.usecase;
 
-import com.kista.contract.trading.TradeCorrectionRequest;
-import com.kista.contract.trading.TradeCorrectionResponse;
+import com.kista.shared.contract.trading.TradeCorrectionRequest;
+import com.kista.shared.contract.trading.TradeCorrectionResponse;
 
 import java.util.UUID;
 

@@ -6,7 +6,7 @@ import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
 import com.kista.trading.domain.model.CycleHistoryPage;
 import com.kista.tradingstats.application.usecase.AccountStatisticsUseCase;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;

@@ -1,9 +1,9 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.platform.telegram.TelegramProperties;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.platform.telegram.TelegramProperties;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingnotify.application.port.output.TradingNotifyPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -6,8 +6,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 // 관리자 사용자 관리 — 조회 + 상태/역할 변경 + 삭제 통합
 public interface AdminUserUseCase {

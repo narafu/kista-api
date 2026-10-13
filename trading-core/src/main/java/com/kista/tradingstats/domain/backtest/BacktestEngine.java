@@ -5,8 +5,8 @@ import com.kista.tradingstats.domain.model.backtest.BacktestPoint;
 import com.kista.tradingstats.domain.model.DailyCandle;
 import com.kista.broker.domain.model.Execution;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
@@ -30,12 +30,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.kista.sharedkernel.OrderDirection.BUY;
+import static com.kista.shared.kernel.OrderDirection.BUY;
 import static java.math.RoundingMode.HALF_UP;
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyDefaults;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
 // 새 매매 수식은 하나도 만들지 않는다: 주문 생성·V값 갱신·가격 캡·램프는 전부 domain/strategy·domain/model/strategy에 위임

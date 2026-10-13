@@ -1,7 +1,7 @@
 package com.kista.privacy.adapter.in.web;
 
-import com.kista.contract.privacy.FidaOrderRequest;
-import com.kista.contract.privacy.FidaOrderResponse;
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.FidaOrderResponse;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.privacy.application.usecase.PrivacyUseCase;

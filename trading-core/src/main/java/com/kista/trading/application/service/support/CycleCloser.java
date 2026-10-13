@@ -7,7 +7,7 @@ import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
 
 import java.time.LocalDate;
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyStatus;
 
 // 보정 서비스 공용 — holdings 소진(==0) 시 사이클 종료 + 전략 PAUSED 처리
 public final class CycleCloser {

@@ -1,7 +1,7 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseCreatedAtEntity;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
+import com.kista.shared.kernel.StrategyTicker;
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;

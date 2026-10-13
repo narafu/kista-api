@@ -1,10 +1,10 @@
 package com.kista.account.adapter.out.persistence;
 
-import com.kista.platform.crypto.AccountNoHasher;
-import com.kista.platform.crypto.AesCryptoService;
+import com.kista.shared.platform.crypto.AccountNoHasher;
+import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.account.domain.model.Account;
 import com.kista.account.application.port.output.AccountPort;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

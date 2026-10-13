@@ -1,8 +1,8 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.platform.telegram.TelegramProperties;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.platform.telegram.TelegramProperties;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

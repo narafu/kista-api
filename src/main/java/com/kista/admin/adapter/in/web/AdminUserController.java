@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 @Tag(name = "Admin", description = "관리자 API")
 @RestController

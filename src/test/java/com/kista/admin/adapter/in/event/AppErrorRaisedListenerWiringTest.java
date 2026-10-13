@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.event;
 
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

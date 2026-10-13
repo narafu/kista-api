@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 class UserResponseTest {
 

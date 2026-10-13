@@ -1,6 +1,6 @@
 package com.kista.user.application.usecase;
 
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 
 import java.util.UUID;
 

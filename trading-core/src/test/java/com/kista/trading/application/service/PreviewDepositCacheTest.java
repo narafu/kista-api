@@ -5,7 +5,7 @@ import com.kista.support.StubBrokerApiException;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.broker.domain.model.BrokerBalance;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.broker.application.port.output.LiveBalancePort;
 import com.kista.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;

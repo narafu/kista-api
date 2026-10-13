@@ -3,7 +3,7 @@ package com.kista.market.application.service;
 import com.kista.market.application.port.output.CandleQueryPort;
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
 import com.kista.market.application.usecase.MarketUseCase;
-import com.kista.contract.broker.DailyCandleResponse;
+import com.kista.shared.contract.broker.DailyCandleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

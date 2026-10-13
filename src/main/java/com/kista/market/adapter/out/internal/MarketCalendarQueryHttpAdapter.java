@@ -1,6 +1,6 @@
 package com.kista.market.adapter.out.internal;
 
-import com.kista.contract.marketcalendar.MarketSessionResponse;
+import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;

@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.in.redis;
 
-import com.kista.sharedkernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserDeletedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

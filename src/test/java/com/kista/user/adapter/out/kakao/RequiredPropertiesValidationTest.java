@@ -1,7 +1,7 @@
 package com.kista.user.adapter.out.kakao;
 
-import com.kista.platform.internalapi.InternalApiProperties;
-import com.kista.platform.telegram.TelegramProperties;
+import com.kista.shared.platform.internalapi.InternalApiProperties;
+import com.kista.shared.platform.telegram.TelegramProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;

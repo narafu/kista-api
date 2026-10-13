@@ -2,8 +2,8 @@ package com.kista.account.adapter.in.web;
 
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.account.domain.model.Account;
-import com.kista.contract.account.AccountSummaryResponse;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.contract.account.AccountSummaryResponse;
+import com.kista.shared.kernel.TimeZones;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

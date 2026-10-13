@@ -2,8 +2,8 @@ package com.kista.broker.application.service;
 
 import com.kista.broker.application.port.output.*;
 import com.kista.broker.domain.model.*;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 

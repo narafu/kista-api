@@ -1,7 +1,7 @@
 package com.kista.benchmark.adapter.in.schedule;
 
-import com.kista.platform.scheduling.SchedulerJobRunner;
-import com.kista.platform.scheduling.SchedulerLockService;
+import com.kista.shared.platform.scheduling.SchedulerJobRunner;
+import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.benchmark.application.usecase.SyncMarketIndexPricesUseCase;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

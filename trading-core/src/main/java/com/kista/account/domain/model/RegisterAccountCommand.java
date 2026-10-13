@@ -1,6 +1,6 @@
 package com.kista.account.domain.model;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 public record RegisterAccountCommand(
         String nickname,

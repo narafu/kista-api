@@ -9,8 +9,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByKakaoId(String kakaoId);

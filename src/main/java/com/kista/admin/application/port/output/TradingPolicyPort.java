@@ -1,6 +1,6 @@
 package com.kista.admin.application.port.output;
 
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 
 // trading-core가 소유하는 매매 런타임 정책(증권사 등록 허용·전략 생성 정책)의 조회·교체 — admin은 편집 UI로서 위임만 한다.
 // 구현체는 내부 API(TradingPolicyHttpAdapter, root→trading-core 단방향).

@@ -51,10 +51,10 @@ class HexagonalArchitectureTest {
         // 이 패키지가 다른 모듈을 참조하는 순간 여러 모듈이 공유하는 어휘로서의 전제가 깨진다.
         // 그동안 package-info 주석에만 있던 불변식을 실제로 강제한다.
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.sharedkernel..")
+                .that().resideInAPackage("com.kista.shared.kernel..")
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
-                                .and(resideOutsideOfPackage("com.kista.sharedkernel..")));
+                                .and(resideOutsideOfPackage("com.kista.shared.kernel..")));
         rule.check(classes);
     }
 
@@ -63,14 +63,14 @@ class HexagonalArchitectureTest {
     void contract_must_not_depend_on_other_modules() {
         // contract는 프로세스 경계를 넘는 wire 스키마(순수 record)만 담는다 — 도메인 타입을 import하는 순간
         // trading-core가 root를(또는 그 반대를) 컴파일 타임에 알게 된다. sharedkernel(공용 어휘) 참조만 허용하고,
-        // 자기 자신(com.kista.contract..)과 JDK·Jackson·Swagger·Bean Validation 어노테이션 외 의존은
+        // 자기 자신(com.kista.shared.contract..)과 JDK·Jackson·Swagger·Bean Validation 어노테이션 외 의존은
         // InternalApiContractTest.contract_must_only_depend_on_allowed_packages가 별도로 잠근다.
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.contract..")
+                .that().resideInAPackage("com.kista.shared.contract..")
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
-                                .and(resideOutsideOfPackage("com.kista.contract.."))
-                                .and(resideOutsideOfPackage("com.kista.sharedkernel..")));
+                                .and(resideOutsideOfPackage("com.kista.shared.contract.."))
+                                .and(resideOutsideOfPackage("com.kista.shared.kernel..")));
         rule.check(classes);
     }
 
@@ -81,10 +81,10 @@ class HexagonalArchitectureTest {
         // 이 패키지가 다른 애그리게이트 모듈을 참조하는 순간 인프라 leaf 전제가 깨진다 (sharedkernel과 동일 강제).
         // com.kista.common 소멸(모듈 경계 재구성 #3)로 예외 절도 함께 제거 — 이제 sharedkernel과 완전히 동일한 outbound-zero.
         ArchRule rule = noClasses()
-                .that().resideInAPackage("com.kista.platform..")
+                .that().resideInAPackage("com.kista.shared.platform..")
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
-                                .and(resideOutsideOfPackage("com.kista.platform..")));
+                                .and(resideOutsideOfPackage("com.kista.shared.platform..")));
         rule.check(classes);
     }
 
@@ -98,13 +98,13 @@ class HexagonalArchitectureTest {
         // 향후 어댑터 테스트가 기대값 계산에 UsTradeDates를 직접 쓰면 이 규칙이 함께 걸린다 —
         // 그때는 allowlist에 추가할지 검토할 것.
         ArchRule rule = noClasses()
-                .that().doNotHaveFullyQualifiedName("com.kista.platform.time.UsTradeDates")
+                .that().doNotHaveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.kis.KisPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.broker.adapter.out.toss.TossPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
-                .haveFullyQualifiedName("com.kista.platform.time.UsTradeDates");
+                .haveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates");
         rule.check(classes);
     }
 
@@ -119,7 +119,7 @@ class HexagonalArchitectureTest {
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
                                 .and(resideOutsideOfPackage("com.kista.matching.."))
-                                .and(resideOutsideOfPackage("com.kista.sharedkernel..")));
+                                .and(resideOutsideOfPackage("com.kista.shared.kernel..")));
         rule.check(classes);
     }
 

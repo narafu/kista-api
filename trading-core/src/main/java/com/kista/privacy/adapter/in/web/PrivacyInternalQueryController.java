@@ -1,6 +1,6 @@
 package com.kista.privacy.adapter.in.web;
 
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

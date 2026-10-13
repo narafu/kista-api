@@ -1,16 +1,16 @@
 package com.kista.admin.adapter.out.internal;
 
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.contract.trading.TradeCorrectionRequest;
-import com.kista.contract.trading.ReorderRequest;
-import com.kista.contract.trading.ReorderResponse;
-import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.contract.trading.TradeCorrectionRequest;
+import com.kista.shared.contract.trading.ReorderRequest;
+import com.kista.shared.contract.trading.ReorderResponse;
+import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
 import com.kista.admin.domain.model.AdminBrokerCredentialException;
 import com.kista.admin.domain.model.AdminBrokerRateLimitException;
-import com.kista.contract.trading.TradeCorrectionResponse;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.contract.trading.TradeCorrectionResponse;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyStatus;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;

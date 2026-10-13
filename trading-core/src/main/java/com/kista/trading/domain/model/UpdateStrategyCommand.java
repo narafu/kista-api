@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
 import java.math.BigDecimal;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // 전략 수정 인바운드 파라미터
 public record UpdateStrategyCommand(

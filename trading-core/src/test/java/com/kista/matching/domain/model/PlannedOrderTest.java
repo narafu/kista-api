@@ -1,9 +1,9 @@
 package com.kista.matching.domain.model;
 
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

@@ -42,6 +42,6 @@ class RuntimeSettingsTest {
         RuntimeSettingsBundle bundle = RuntimeSettingsBundle.defaults();
 
         assertThat(bundle.runtime()).isEqualTo(RuntimeSettings.defaults());
-        assertThat(bundle.tradingPolicy()).isEqualTo(com.kista.sharedkernel.TradingPolicySettings.defaults());
+        assertThat(bundle.tradingPolicy()).isEqualTo(com.kista.shared.kernel.TradingPolicySettings.defaults());
     }
 }

@@ -1,8 +1,8 @@
 package com.kista.trading.application.port.output;
 
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.trading.domain.model.Order;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

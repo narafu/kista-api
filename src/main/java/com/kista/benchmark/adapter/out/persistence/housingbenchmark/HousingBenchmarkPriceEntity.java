@@ -1,6 +1,6 @@
 package com.kista.benchmark.adapter.out.persistence.housingbenchmark;
 
-import com.kista.platform.persistence.BaseAuditEntity;
+import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.benchmark.domain.model.HousingBenchmarkPrice;
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;

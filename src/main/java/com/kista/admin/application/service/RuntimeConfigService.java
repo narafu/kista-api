@@ -4,7 +4,7 @@ import com.kista.admin.application.port.output.TradingPolicyPort;
 import com.kista.admin.application.usecase.RuntimeSettingsUseCase;
 import com.kista.admin.domain.model.RuntimeSettingsBundle;
 import com.kista.admin.domain.model.TradingPolicyUnavailableException;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

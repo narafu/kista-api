@@ -1,6 +1,6 @@
 package com.kista.benchmark.adapter.out.persistence.marketindex;
 
-import com.kista.platform.persistence.BaseCreatedAtEntity;
+import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
 import com.kista.benchmark.domain.model.IndexPrice;
 import jakarta.persistence.*;
 import org.hibernate.annotations.UuidGenerator;

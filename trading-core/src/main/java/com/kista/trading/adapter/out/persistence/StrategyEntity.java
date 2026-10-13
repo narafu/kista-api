@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.platform.persistence.BaseAuditEntity;
+import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.trading.domain.model.Strategy;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -12,10 +12,10 @@ import org.hibernate.annotations.UuidGenerator;
 
 import java.time.Instant;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @Entity
 @Table(name = "strategy", schema = "trading")

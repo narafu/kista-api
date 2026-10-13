@@ -1,6 +1,6 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

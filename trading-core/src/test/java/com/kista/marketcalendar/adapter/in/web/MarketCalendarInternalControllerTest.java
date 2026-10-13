@@ -1,10 +1,10 @@
 package com.kista.marketcalendar.adapter.in.web;
 
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.platform.security.InternalTokenAuthFilter;
-import com.kista.platform.security.JwtAuthFilter;
-import com.kista.platform.security.SecurityConfig;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.tradingweb.TradingApplication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

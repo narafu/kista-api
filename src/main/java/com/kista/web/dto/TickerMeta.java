@@ -3,7 +3,7 @@ package com.kista.web.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 public record TickerMeta(
         @Schema(description = "enum name() 값", example = "SOXL")

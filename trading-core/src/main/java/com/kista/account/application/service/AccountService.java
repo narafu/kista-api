@@ -2,7 +2,7 @@ package com.kista.account.application.service;
 
 import com.kista.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.broker.application.service.BrokerConnectionTesters;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;

@@ -3,12 +3,12 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.strategy.PrivacyStrategy;
 
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.PrivacyPlan.PrivacyPlannedTrade;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +16,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
-import static com.kista.sharedkernel.OrderDirection.BUY;
-import static com.kista.sharedkernel.OrderDirection.SELL;
+import static com.kista.shared.kernel.OrderDirection.BUY;
+import static com.kista.shared.kernel.OrderDirection.SELL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

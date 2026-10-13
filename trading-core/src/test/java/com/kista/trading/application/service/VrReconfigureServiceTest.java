@@ -7,7 +7,7 @@ import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.application.event.NewCycleStartedEvent;
 import com.kista.trading.domain.model.ReconfigureVrCommand;
 import com.kista.trading.domain.model.Strategy;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.domain.model.StrategyCycle;
 import com.kista.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.matching.domain.model.StrategyVrDetail;
@@ -46,9 +46,9 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // VrReconfigureService 단위 테스트 — 순수 파라미터 수정/자본 주입/램프 시계·검증/소유권 분기 검증
 // package-private VrReconfigureService와 같은 패키지에 위치 (application.service.trading)

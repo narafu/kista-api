@@ -1,6 +1,6 @@
 package com.kista.broker.domain.model;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

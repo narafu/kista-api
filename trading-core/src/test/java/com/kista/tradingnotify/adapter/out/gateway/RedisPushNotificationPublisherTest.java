@@ -1,7 +1,7 @@
 package com.kista.tradingnotify.adapter.out.gateway;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.sharedkernel.UserPushNotificationRequestedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

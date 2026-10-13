@@ -1,7 +1,7 @@
 package com.kista.market.adapter.out.internal;
 
 import com.kista.market.application.port.output.CandleQueryPort;
-import com.kista.contract.broker.DailyCandleResponse;
+import com.kista.shared.contract.broker.DailyCandleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;

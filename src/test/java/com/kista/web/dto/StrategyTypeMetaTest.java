@@ -3,7 +3,7 @@ package com.kista.web.dto;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 class StrategyTypeMetaTest {
 

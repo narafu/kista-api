@@ -1,6 +1,6 @@
 package com.kista.matching.domain.strategy;
 
-import com.kista.sharedkernel.OrderTiming;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.PrivacyPlan;
 import com.kista.matching.domain.model.AccountBalance;
@@ -12,9 +12,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import com.kista.sharedkernel.StrategyCapability;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCapability;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 전략 패턴 진입점 — TradingService/TradingPreviewService/CycleRotationService 의 switch(strategy.type()) 분기를 다형성으로 대체
 // 각 구현체는 cycleType()으로 자기 타입을 선언하며, 서비스는 Map<StrategyType, CycleOrderStrategy>로 주입받아 사용

@@ -2,8 +2,8 @@ package com.kista.broker.adapter.out.kis;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

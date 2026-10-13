@@ -1,7 +1,7 @@
 package com.kista.account.adapter.in.web.dto;
 
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.AccountNumberMasker;
+import com.kista.shared.kernel.AccountNumberMasker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;

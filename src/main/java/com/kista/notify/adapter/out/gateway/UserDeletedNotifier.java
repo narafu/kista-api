@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.sharedkernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.notify.application.port.output.NotifyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

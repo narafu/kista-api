@@ -1,7 +1,7 @@
 package com.kista.admin.adapter.in.event;
 
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;

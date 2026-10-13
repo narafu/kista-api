@@ -1,7 +1,7 @@
 package com.kista.benchmark.domain.model;
 
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 
 import java.util.UUID;
 

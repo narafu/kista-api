@@ -1,8 +1,8 @@
 package com.kista.tradingnotify.application.port.output;
 
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.trading.domain.model.TradingReport;
 import com.kista.trading.domain.model.TradingUserProfile;
 

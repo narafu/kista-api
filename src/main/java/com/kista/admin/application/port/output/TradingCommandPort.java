@@ -1,12 +1,12 @@
 package com.kista.admin.application.port.output;
 
-import com.kista.contract.trading.ReorderBuyBudgetResponse;
-import com.kista.contract.trading.ReorderRequest;
-import com.kista.contract.trading.ReorderResponse;
-import com.kista.contract.trading.ReorderTimingAvailabilityResponse;
-import com.kista.contract.trading.TradeCorrectionRequest;
-import com.kista.contract.trading.TradeCorrectionResponse;
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.contract.trading.ReorderBuyBudgetResponse;
+import com.kista.shared.contract.trading.ReorderRequest;
+import com.kista.shared.contract.trading.ReorderResponse;
+import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
+import com.kista.shared.contract.trading.TradeCorrectionRequest;
+import com.kista.shared.contract.trading.TradeCorrectionResponse;
+import com.kista.shared.kernel.StrategyStatus;
 
 import java.time.LocalDate;
 import java.util.List;

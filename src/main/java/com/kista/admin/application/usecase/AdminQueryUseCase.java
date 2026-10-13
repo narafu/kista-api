@@ -1,12 +1,12 @@
 package com.kista.admin.application.usecase;
 
-import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.admin.domain.model.AdminAnomalies;
-import com.kista.contract.trading.OrderResponse;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.admin.domain.model.AdminStats;
-import com.kista.contract.trading.StrategySummaryResponse;
-import com.kista.contract.trading.StrategyResponse;
+import com.kista.shared.contract.trading.StrategySummaryResponse;
+import com.kista.shared.contract.trading.StrategyResponse;
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.domain.model.AuditLog;
 

@@ -2,7 +2,7 @@ package com.kista.admin.adapter.in.web.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 // 관리자 사용자 상태 변경 요청 body — ACTIVE(승인) / REJECTED(거절)
 // reason은 REJECTED일 때만 사용, ACTIVE면 무시

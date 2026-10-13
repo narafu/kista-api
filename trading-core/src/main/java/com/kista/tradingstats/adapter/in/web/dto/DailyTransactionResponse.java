@@ -3,8 +3,8 @@ package com.kista.tradingstats.adapter.in.web.dto;
 import com.kista.broker.domain.model.DailyTransaction;
 import com.kista.broker.domain.model.DailyTransactionResult;
 import com.kista.broker.domain.model.DailyTransactionSummary;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

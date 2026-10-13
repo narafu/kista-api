@@ -3,7 +3,7 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.TradingPolicyPort;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.RuntimeSettingsBundle;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.user.domain.model.User;
 import com.kista.admin.application.usecase.AdminSettingsUseCase;
 import com.kista.user.application.usecase.UserUseCase;

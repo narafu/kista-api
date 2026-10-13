@@ -1,9 +1,9 @@
 package com.kista.tradingstats.application.service;
 
-import com.kista.platform.cache.TtlResultCache;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.platform.cache.TtlResultCache;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.tradingstats.domain.model.*;
 import com.kista.trading.domain.model.CyclePosition;
 import com.kista.trading.domain.model.Strategy;
@@ -25,8 +25,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 
 // 사용자 통계 중 trading 소유 부분 — 실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록.
 // housing/ETF 벤치마크 비교는 api의 BenchmarkService(com.kista.benchmark)가 계속 소유한다.

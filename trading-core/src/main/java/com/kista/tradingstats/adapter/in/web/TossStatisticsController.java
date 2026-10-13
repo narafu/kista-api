@@ -1,7 +1,7 @@
 package com.kista.tradingstats.adapter.in.web;
 
 import com.kista.tradingstats.adapter.in.web.dto.*;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingstats.application.usecase.BrokerStatisticsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

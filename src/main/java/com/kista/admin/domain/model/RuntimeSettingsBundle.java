@@ -1,6 +1,6 @@
 package com.kista.admin.domain.model;
 
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 
 import java.util.Objects;
 

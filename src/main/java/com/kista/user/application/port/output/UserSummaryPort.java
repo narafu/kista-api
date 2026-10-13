@@ -5,7 +5,7 @@ import com.kista.user.domain.model.UserSummary;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserStatus;
 
 public interface UserSummaryPort {
     // 전체 사용자 요약 목록(관리자 화면용 읽기 투영)

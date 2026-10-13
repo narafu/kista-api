@@ -18,7 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 // trading의 11개 발행 지점 중 어느 하나도 클래스/메서드에 @Transactional이 없음을 확인했다 — phase=AFTER_COMMIT을
 // 단독으로 쓰면 활성 트랜잭션이 없을 때 이벤트가 그냥 버려지므로 phase 미지정 + fallbackExecution=true로 트랜잭션이
 // 있으면 커밋 후, 없으면 즉시 동기 실행되게 한다.
-// 6개 이벤트 전부 com.kista.sharedkernel 소유 — AccountPort 재조회 없이 event 필드만 소비.
+// 6개 이벤트 전부 com.kista.shared.kernel 소유 — AccountPort 재조회 없이 event 필드만 소비.
 // root의 동명 클래스를 이 모듈로 이관 — User/UserNotificationPort/NotifyPort 대신 trading-core 소유
 // TradingUserProfile/TradingUserNotificationPort/TradingNotifyPort를 쓴다(프로세스 분리 후 알림이
 // 발행자와 같은 프로세스에서 발송되도록 하기 위함).

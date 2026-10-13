@@ -3,7 +3,7 @@ package com.kista.user.adapter.in.web;
 import com.kista.user.adapter.in.web.security.JwtIssuerService;
 import com.kista.user.adapter.in.web.security.RefreshTokenCookieHelper;
 import com.kista.user.domain.model.User;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.user.application.usecase.GetUserSettingsQuery;
 import com.kista.user.application.usecase.TokenUseCase;
 import com.kista.user.application.usecase.UserUseCase;

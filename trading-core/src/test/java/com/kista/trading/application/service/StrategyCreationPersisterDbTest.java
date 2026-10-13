@@ -1,8 +1,8 @@
 package com.kista.trading.application.service;
 
-import com.kista.sharedkernel.StrategyCycleSeedType;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.support.DataJpaTestBase;
 import com.kista.support.TradingCoreJpaTestConfig;
 import com.kista.trading.application.port.output.CyclePositionInfiniteDetailPort;

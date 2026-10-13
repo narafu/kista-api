@@ -2,7 +2,7 @@ package com.kista.market.application.service;
 
 import com.kista.market.application.port.output.CandleQueryPort;
 import com.kista.market.application.port.output.MarketCalendarQueryPort;
-import com.kista.contract.broker.DailyCandleResponse;
+import com.kista.shared.contract.broker.DailyCandleResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;

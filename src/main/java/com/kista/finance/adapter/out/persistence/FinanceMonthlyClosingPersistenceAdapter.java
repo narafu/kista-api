@@ -2,7 +2,7 @@ package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.finance.application.port.output.MonthlyClosingPort;
-import com.kista.platform.persistence.UuidV7;
+import com.kista.shared.platform.persistence.UuidV7;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

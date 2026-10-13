@@ -1,9 +1,9 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.domain.model.TradingPolicyUnavailableException;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.TradingPolicySettings;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;

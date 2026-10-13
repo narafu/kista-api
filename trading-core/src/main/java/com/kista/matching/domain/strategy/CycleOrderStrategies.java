@@ -3,7 +3,7 @@ package com.kista.matching.domain.strategy;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyType;
 
 // CycleOrderStrategy 구현체들을 cycleType() 키로 묶어 조회 — 서비스 레이어의 switch 분기를 대체
 public class CycleOrderStrategies {

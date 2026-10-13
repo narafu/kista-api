@@ -1,8 +1,8 @@
 package com.kista.trading.adapter.out.redis;
 
-import com.kista.platform.redis.RedisStreamConfig;
-import com.kista.platform.redis.RedisStreams;
-import com.kista.sharedkernel.AppErrorRaisedEvent;
+import com.kista.shared.platform.redis.RedisStreamConfig;
+import com.kista.shared.platform.redis.RedisStreams;
+import com.kista.shared.kernel.AppErrorRaisedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;

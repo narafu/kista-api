@@ -6,8 +6,8 @@ import com.kista.trading.domain.model.RegisterStrategyCommand;
 import com.kista.trading.domain.model.StrategyDetail;
 import com.kista.trading.domain.model.StrategySeedPreview;
 import com.kista.trading.domain.model.UpdateStrategyCommand;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 
 import java.time.Instant;
 import java.time.LocalDate;

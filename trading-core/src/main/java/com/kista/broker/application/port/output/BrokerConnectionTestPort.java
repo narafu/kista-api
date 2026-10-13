@@ -1,6 +1,6 @@
 package com.kista.broker.application.port.output;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 import java.util.UUID;
 

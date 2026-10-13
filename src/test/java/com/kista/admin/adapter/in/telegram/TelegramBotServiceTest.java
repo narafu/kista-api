@@ -1,10 +1,10 @@
 package com.kista.admin.adapter.in.telegram;
 
-import com.kista.contract.stats.PortfolioCurrentResponse;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.admin.application.port.output.PortfolioQueryPort;
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.platform.telegram.TelegramProperties;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.platform.telegram.TelegramProperties;
 import com.kista.admin.application.usecase.AdminUserUseCase;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.domain.model.User;

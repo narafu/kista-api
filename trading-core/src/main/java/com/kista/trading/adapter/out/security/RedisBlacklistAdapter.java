@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.out.security;
 
-import com.kista.platform.security.RedisTokenBlacklistReader;
+import com.kista.shared.platform.security.RedisTokenBlacklistReader;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 

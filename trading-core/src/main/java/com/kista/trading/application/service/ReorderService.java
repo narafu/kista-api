@@ -1,8 +1,8 @@
 package com.kista.trading.application.service;
 import com.kista.trading.application.service.support.SelectionChain;
 
-import com.kista.sharedkernel.OrderStatus;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.account.domain.model.Account;
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.DstInfo;
@@ -17,7 +17,7 @@ import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyCyclePort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
 import com.kista.broker.application.port.output.BrokerOrderCorrectionPort;
@@ -115,8 +115,8 @@ class ReorderService implements ReorderUseCase {
     }
 
     // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
-    private PlacementResult placeOrSave(Order newOrder, Account account, com.kista.sharedkernel.OrderTiming timing) {
-        if (timing == com.kista.sharedkernel.OrderTiming.IMMEDIATE) {
+    private PlacementResult placeOrSave(Order newOrder, Account account, com.kista.shared.kernel.OrderTiming timing) {
+        if (timing == com.kista.shared.kernel.OrderTiming.IMMEDIATE) {
             BrokerOrderCorrectionPort broker = brokerOrderCorrectionPort;
             try {
                 OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), newOrder.direction(),

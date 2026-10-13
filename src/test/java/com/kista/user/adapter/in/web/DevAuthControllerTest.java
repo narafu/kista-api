@@ -1,7 +1,7 @@
 package com.kista.user.adapter.in.web;
 
 import com.kista.user.adapter.in.web.security.*;
-import com.kista.platform.security.*;
+import com.kista.shared.platform.security.*;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.TokenUseCase;
 import com.kista.user.application.usecase.UserSettingsUseCase;
@@ -35,8 +35,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.admin.application.port.output.AppErrorLogPort;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 import com.kista.web.RootSecurityPolicy;
 
 @WebMvcTest(DevAuthController.class)

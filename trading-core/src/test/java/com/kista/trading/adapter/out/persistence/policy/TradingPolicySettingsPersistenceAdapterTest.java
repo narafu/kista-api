@@ -1,7 +1,7 @@
 package com.kista.trading.adapter.out.persistence.policy;
 
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.TradingPolicySettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

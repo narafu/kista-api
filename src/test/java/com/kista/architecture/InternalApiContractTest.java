@@ -34,7 +34,7 @@ import java.util.stream.Stream;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 내부 API(/api/internal/**) wire 계약 잠금 — Published Language(com.kista.contract) 규칙.
+// 내부 API(/api/internal/**) wire 계약 잠금 — Published Language(com.kista.shared.contract) 규칙.
 // 프로세스 경계(root :api ↔ :trading-core)를 넘는 body 타입은 contract·sharedkernel·JDK만 허용한다.
 // 도메인 record(Order/Strategy 등)를 그대로 직렬화하거나 own-type을 손으로 복제하던 과거 방식(OwnTypeContractTest)을
 // 컴파일 타임 공유 + 이 테스트로 대체한다 — 도메인 필드 추가가 wire 계약을 조용히 바꾸는 일을 막는다.
@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class InternalApiContractTest {
 
     private static final String INTERNAL_PREFIX = "/api/internal";
-    private static final List<String> ALLOWED_PACKAGE_PREFIXES = List.of("java.", "com.kista.contract.", "com.kista.sharedkernel.");
+    private static final List<String> ALLOWED_PACKAGE_PREFIXES = List.of("java.", "com.kista.shared.contract.", "com.kista.shared.kernel.");
     // wire 타입 자체가 아니라 감싸기만 하는 컨테이너 — 타입 인자를 재귀 검사한다
     private static final Set<Class<?>> WRAPPERS = Set.of(
             ResponseEntity.class, List.class, Set.class, Collection.class, Optional.class, Map.class);
@@ -83,9 +83,9 @@ class InternalApiContractTest {
     @Test
     @DisplayName("contract는 JDK·sharedkernel·Jackson/Swagger/Bean Validation 어노테이션 외에 의존하지 않는다")
     void contract_must_only_depend_on_allowed_packages() {
-        classes().that().resideInAPackage("com.kista.contract..")
+        classes().that().resideInAPackage("com.kista.shared.contract..")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
-                        "java..", "com.kista.contract..", "com.kista.sharedkernel..",
+                        "java..", "com.kista.shared.contract..", "com.kista.shared.kernel..",
                         "com.fasterxml.jackson..", "tools.jackson..", "io.swagger..", "jakarta.validation..",
                         "org.springframework.modulith..") // package-info의 @ApplicationModule 선언
                 .check(classes);

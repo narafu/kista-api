@@ -4,7 +4,7 @@ import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
 import com.kista.finance.application.port.output.FinanceGroupPort;
-import com.kista.platform.persistence.UuidV7;
+import com.kista.shared.platform.persistence.UuidV7;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;

@@ -1,7 +1,7 @@
 package com.kista.tradingstats.application.usecase;
 
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingstats.domain.model.CyclePerformancePage;
 import com.kista.tradingstats.domain.model.CycleStatusFilter;
 import com.kista.tradingstats.domain.model.EquityCurve;

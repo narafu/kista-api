@@ -2,10 +2,10 @@ package com.kista.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.broker.adapter.out.marketdata.CommonMarketPriceFeed;
-import com.kista.sharedkernel.TimeZones;
-import com.kista.platform.time.UsTradeDates;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.broker.domain.model.PriceSnapshot;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import com.kista.broker.domain.model.toss.TossCandle;
 import com.kista.broker.domain.model.toss.TossStockInfo;

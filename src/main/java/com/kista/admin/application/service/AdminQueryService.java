@@ -1,15 +1,15 @@
 package com.kista.admin.application.service;
 
-import com.kista.sharedkernel.TimeZones;
-import com.kista.contract.account.AccountSummaryResponse;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.admin.domain.model.AdminAnomalies;
 import com.kista.admin.domain.model.AdminStats;
 import com.kista.admin.domain.model.AppErrorLog;
 import com.kista.admin.domain.model.AuditLog;
-import com.kista.contract.trading.OrderResponse;
-import com.kista.contract.trading.StrategySummaryResponse;
-import com.kista.contract.trading.StrategyResponse;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.contract.trading.StrategySummaryResponse;
+import com.kista.shared.contract.trading.StrategyResponse;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.admin.application.usecase.AdminQueryUseCase;
 import com.kista.admin.application.port.output.*;
 import com.kista.user.application.port.output.UserPort;
@@ -26,8 +26,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.UserStatus;
 
 // 클래스 레벨 @Transactional(readOnly = true) 제거됨 — tradingQueryPort/privacyQueryPort가
 // HTTP 어댑터(내부 API 호출)라 DB 트랜잭션 안에서 호출하면 커넥션 풀 자기잠금 위험이 있다

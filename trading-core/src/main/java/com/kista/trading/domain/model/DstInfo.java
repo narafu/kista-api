@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.MarketSession;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.MarketSession;
+import com.kista.shared.kernel.TimeZones;
 
 import java.time.*;
 

@@ -8,7 +8,7 @@ import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyDetail;
 import com.kista.trading.domain.model.RegisterStrategyCommand;
 import com.kista.trading.domain.model.StrategySeedPreview;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.trading.application.usecase.StrategyUseCase;
 import com.kista.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.trading.application.usecase.VrReconfigureUseCase;
@@ -40,10 +40,10 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.tradingweb.TradingApplication;
 import org.springframework.test.context.ContextConfiguration;
 
@@ -225,10 +225,10 @@ class TradingCycleControllerTest {
         StrategyDetail detail = new StrategyDetail(
                 new Strategy(
                         CYCLE_ID, UUID.randomUUID(),
-                        com.kista.sharedkernel.StrategyType.INFINITE,
-                        com.kista.sharedkernel.StrategyStatus.ACTIVE,
-                        com.kista.sharedkernel.StrategyTicker.SOXL,
-                        com.kista.sharedkernel.StrategyCycleSeedType.NONE),
+                        com.kista.shared.kernel.StrategyType.INFINITE,
+                        com.kista.shared.kernel.StrategyStatus.ACTIVE,
+                        com.kista.shared.kernel.StrategyTicker.SOXL,
+                        com.kista.shared.kernel.StrategyCycleSeedType.NONE),
                 new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 

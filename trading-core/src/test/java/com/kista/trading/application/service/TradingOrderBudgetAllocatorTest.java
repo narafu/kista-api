@@ -4,9 +4,9 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.SellableQuantity;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.matching.domain.model.PlannedOrder;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.trading.domain.model.BatchContext;
 import com.kista.trading.domain.model.Strategy;
 import com.kista.trading.domain.model.StrategyCycle;
@@ -37,12 +37,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.matching.domain.strategy.VrCycleOrderStrategy;
 import com.kista.matching.domain.strategy.VrStrategy;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @ExtendWith(MockitoExtension.class)
 class TradingOrderBudgetAllocatorTest {
@@ -412,7 +412,7 @@ class TradingOrderBudgetAllocatorTest {
 
     private PlannedOrder ladderBuy(int rung, int quantity, String price) {
         return PlannedOrder.of(tradeDate, StrategyTicker.SOXL, OrderType.LIMIT, OrderDirection.BUY,
-                quantity, new BigDecimal(price), com.kista.sharedkernel.OrderTiming.AT_OPEN, PlannedOrder.leg("VR_BUY", rung));
+                quantity, new BigDecimal(price), com.kista.shared.kernel.OrderTiming.AT_OPEN, PlannedOrder.leg("VR_BUY", rung));
     }
 
     private PlannedOrder locBuy(int quantity, String price, String leg) {

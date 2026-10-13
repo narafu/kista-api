@@ -3,7 +3,7 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.InfinitePosition;
 import com.kista.matching.domain.model.VrPosition;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

@@ -1,7 +1,7 @@
 package com.kista.user.adapter.in.web.dto;
 
 import com.kista.user.domain.model.User;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 import com.kista.user.domain.model.UserSettings;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 public record UserResponse(
         @Schema(description = "사용자 고유 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")

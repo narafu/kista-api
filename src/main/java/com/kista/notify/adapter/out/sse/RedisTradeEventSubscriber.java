@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.sse;
 
-import com.kista.contract.notify.TradeEventEnvelope;
-import com.kista.platform.redis.RedisPubSubConfig;
+import com.kista.shared.contract.notify.TradeEventEnvelope;
+import com.kista.shared.platform.redis.RedisPubSubConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.ObjectMapper;

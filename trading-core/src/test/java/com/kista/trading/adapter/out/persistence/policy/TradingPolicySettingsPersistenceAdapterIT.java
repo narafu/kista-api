@@ -1,8 +1,8 @@
 package com.kista.trading.adapter.out.persistence.policy;
 
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.BrokerSettings;
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.BrokerSettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.support.DataJpaTestBase;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

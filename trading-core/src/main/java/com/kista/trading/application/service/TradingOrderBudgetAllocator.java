@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.kista.sharedkernel.OrderDirection.BUY;
-import static com.kista.sharedkernel.OrderDirection.SELL;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyTicker;
+import static com.kista.shared.kernel.OrderDirection.BUY;
+import static com.kista.shared.kernel.OrderDirection.SELL;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
 
 @Slf4j
 @Component

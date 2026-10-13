@@ -3,11 +3,11 @@ package com.kista.admin.application.service;
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.PrivacyQueryPort;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
-import com.kista.contract.privacy.FidaOrderRequest;
-import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
-import com.kista.contract.privacy.PrivacyOrderAddRequest;
-import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

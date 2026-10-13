@@ -1,7 +1,7 @@
 package com.kista.account.domain.model;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 import java.time.Instant;
 import java.util.UUID;

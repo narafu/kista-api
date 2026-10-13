@@ -4,7 +4,7 @@ import com.kista.account.domain.model.Account;
 import com.kista.account.domain.model.RegisterAccountCommand;
 import com.kista.account.domain.model.UpdateAccountCommand;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import java.util.List;
 import java.util.UUID;
 

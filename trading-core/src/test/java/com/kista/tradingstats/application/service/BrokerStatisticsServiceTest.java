@@ -7,7 +7,7 @@ import com.kista.broker.application.service.BrokerStatisticsPorts;
 import com.kista.broker.domain.model.BrokerAccountInfo;
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.ExchangeRateQuote;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

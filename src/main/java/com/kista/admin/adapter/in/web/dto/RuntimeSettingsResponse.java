@@ -1,14 +1,14 @@
 package com.kista.admin.adapter.in.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.RuntimeSettingsBundle;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyFieldSettings;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyFieldSettings;
+import com.kista.shared.kernel.StrategyType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.EnumMap;

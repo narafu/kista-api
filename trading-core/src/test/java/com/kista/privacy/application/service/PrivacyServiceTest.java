@@ -2,12 +2,12 @@ package com.kista.privacy.application.service;
 
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import com.kista.privacy.domain.model.PrivacyTradeSaveResult;
 import com.kista.privacy.domain.model.PrivacyTradeValidationReport;
 import com.kista.privacy.application.event.PrivacyAlertRaisedEvent;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

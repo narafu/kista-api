@@ -1,7 +1,7 @@
 package com.kista.finance.adapter.out.user;
 
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSummaryPort;
 import com.kista.user.domain.model.UserSummary;

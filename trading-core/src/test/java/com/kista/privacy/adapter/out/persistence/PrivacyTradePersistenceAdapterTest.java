@@ -1,12 +1,12 @@
 package com.kista.privacy.adapter.out.persistence;
 
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.privacy.domain.model.FidaOrderCommand;
 import com.kista.privacy.domain.model.FidaPlannedOrder;
 import com.kista.privacy.domain.model.PrivacyDates;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

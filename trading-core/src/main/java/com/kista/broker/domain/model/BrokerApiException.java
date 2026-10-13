@@ -1,6 +1,6 @@
 package com.kista.broker.domain.model;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 // 증권사 외부 API 호출 실패의 벤더 중립 상위 타입 — 소비자(trading 등)는 KIS/Toss 구체 예외를 몰라도 이 타입 하나로 catch한다(503 매핑)
 public abstract class BrokerApiException extends RuntimeException {

@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.gateway;
 
-import com.kista.sharedkernel.UserDeletedEvent;
+import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,6 +1,6 @@
 package com.kista.account.adapter.in.web.dto;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;

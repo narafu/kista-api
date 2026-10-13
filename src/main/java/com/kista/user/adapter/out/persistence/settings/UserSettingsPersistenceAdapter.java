@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.settings;
 
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.user.domain.model.UserSettings;
 import com.kista.user.application.port.output.UserSettingsPort;
 import lombok.RequiredArgsConstructor;

@@ -1,13 +1,13 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.PrivacyQueryPort;
-import com.kista.contract.privacy.FidaOrderRequest;
-import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
-import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;

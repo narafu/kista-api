@@ -77,7 +77,7 @@ class InvestmentPointsHttpAdapterTest {
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
         StrategyRef expected = new StrategyRef(strategyId,
-                com.kista.sharedkernel.StrategyType.INFINITE, com.kista.sharedkernel.StrategyTicker.SOXL);
+                com.kista.shared.kernel.StrategyType.INFINITE, com.kista.shared.kernel.StrategyTicker.SOXL);
         assertThat(result.selectedStrategy()).isEqualTo(expected);
         assertThat(result.points()).hasSize(1);
         // InvestmentIndexCalculator.SCALE=10 정밀도가 HTTP 왕복(직렬화→역직렬화)에서 보존되는지 확인

@@ -1,7 +1,7 @@
 package com.kista.benchmark.adapter.in.web;
 
 import com.kista.benchmark.domain.model.*;
-import com.kista.platform.security.TokenBlacklistPort;
+import com.kista.shared.platform.security.TokenBlacklistPort;
 import com.kista.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.admin.application.port.output.AppErrorLogPort;
 import org.junit.jupiter.api.Test;

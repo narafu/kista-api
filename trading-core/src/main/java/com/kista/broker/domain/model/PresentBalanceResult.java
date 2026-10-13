@@ -1,5 +1,5 @@
 package com.kista.broker.domain.model;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

@@ -1,6 +1,6 @@
 package com.kista.market.application.port.output;
 
-import com.kista.contract.marketcalendar.MarketSessionResponse;
+import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
 
 import java.time.LocalDate;
 import java.util.List;

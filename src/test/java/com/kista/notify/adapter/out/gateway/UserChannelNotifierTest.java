@@ -1,9 +1,9 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.notify.application.port.output.PushNotificationPort;
-import com.kista.platform.telegram.TelegramHttpClient;
-import com.kista.sharedkernel.NotificationChannel;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.platform.telegram.TelegramHttpClient;
+import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.support.DomainFixtures;
 import com.kista.user.application.port.output.UserPort;
 import com.kista.user.application.port.output.UserSettingsPort;

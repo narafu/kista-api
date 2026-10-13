@@ -1,10 +1,10 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.TradingQueryPort;
-import com.kista.contract.trading.OrderResponse;
-import com.kista.contract.trading.StrategySummaryResponse;
-import com.kista.contract.trading.StrategyResponse;
-import com.kista.platform.internalapi.InternalApiStatusHandlers;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.contract.trading.StrategySummaryResponse;
+import com.kista.shared.contract.trading.StrategyResponse;
+import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;

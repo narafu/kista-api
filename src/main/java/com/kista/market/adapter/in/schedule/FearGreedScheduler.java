@@ -1,7 +1,7 @@
 package com.kista.market.adapter.in.schedule;
 
-import com.kista.platform.scheduling.SchedulerJobRunner;
-import com.kista.platform.scheduling.SchedulerLockService;
+import com.kista.shared.platform.scheduling.SchedulerJobRunner;
+import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.market.application.usecase.FetchFearGreedUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

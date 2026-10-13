@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.persistence;
 
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
-import com.kista.platform.persistence.UuidV7;
+import com.kista.shared.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;

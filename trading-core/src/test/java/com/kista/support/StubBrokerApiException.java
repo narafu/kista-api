@@ -1,7 +1,7 @@
 package com.kista.support;
 
 import com.kista.broker.domain.model.BrokerApiException;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 
 // broker 밖 테스트용 벤더 중립 BrokerApiException — KisApiException/TossApiException 등 벤더 타입을 테스트에 들이지 않기 위한 최소 서브클래스
 public class StubBrokerApiException extends BrokerApiException {

@@ -1,6 +1,6 @@
 package com.kista.trading.adapter.in.web;
 
-import com.kista.sharedkernel.TradingPolicySettings;
+import com.kista.shared.kernel.TradingPolicySettings;
 import com.kista.trading.application.usecase.TradingPolicyUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

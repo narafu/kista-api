@@ -2,8 +2,8 @@ package com.kista.trading.application.service;
 
 import com.kista.account.application.port.output.AccountPort;
 import com.kista.broker.application.port.output.LiveBalancePort;
-import com.kista.sharedkernel.OrderDirection;
-import com.kista.sharedkernel.OrderStatus;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.usecase.ReorderBuyBudgetQuery;
 import com.kista.trading.domain.model.Order;

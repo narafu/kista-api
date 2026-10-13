@@ -1,8 +1,8 @@
 package com.kista.trading.adapter.in.web;
 
-import com.kista.contract.trading.OrderResponse;
-import com.kista.contract.trading.StrategyResponse;
-import com.kista.contract.trading.StrategySummaryResponse;
+import com.kista.shared.contract.trading.OrderResponse;
+import com.kista.shared.contract.trading.StrategyResponse;
+import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.trading.application.port.output.OrderPort;
 import com.kista.trading.application.port.output.StrategyPort;
 import com.kista.trading.domain.model.Strategy;

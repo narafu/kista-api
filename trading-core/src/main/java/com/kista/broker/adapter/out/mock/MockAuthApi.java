@@ -1,7 +1,7 @@
 package com.kista.broker.adapter.out.mock;
 
 import com.kista.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;

@@ -1,6 +1,6 @@
 package com.kista.user.adapter.out.persistence.user;
 
-import com.kista.platform.crypto.AesCryptoService;
+import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.port.output.UserPort;
 import lombok.AccessLevel;
@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import com.kista.sharedkernel.UserRole;
-import com.kista.sharedkernel.UserStatus;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)

@@ -1,6 +1,6 @@
 package com.kista.tradingnotify.application.port.output;
 
-import com.kista.contract.notify.TradeEventMessage;
+import com.kista.shared.contract.notify.TradeEventMessage;
 
 import java.util.UUID;
 

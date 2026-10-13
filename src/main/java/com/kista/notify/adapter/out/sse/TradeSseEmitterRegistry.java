@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.sse;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.contract.notify.TradeEventMessage;
+import com.kista.shared.contract.notify.TradeEventMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

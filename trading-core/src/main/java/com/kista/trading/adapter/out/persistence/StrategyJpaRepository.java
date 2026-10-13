@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
 

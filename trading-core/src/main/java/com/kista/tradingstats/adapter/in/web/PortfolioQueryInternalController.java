@@ -1,8 +1,8 @@
 package com.kista.tradingstats.adapter.in.web;
 
-import com.kista.contract.stats.PortfolioCurrentResponse;
-import com.kista.contract.stats.PortfolioOrderResponse;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingstats.application.usecase.PortfolioUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

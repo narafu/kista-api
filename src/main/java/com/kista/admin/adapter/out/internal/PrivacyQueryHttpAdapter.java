@@ -1,15 +1,15 @@
 package com.kista.admin.adapter.out.internal;
 
 import com.kista.admin.application.port.output.PrivacyQueryPort;
-import com.kista.contract.privacy.FidaOrderRequest;
-import com.kista.contract.privacy.FidaOrderResponse;
-import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
-import com.kista.contract.privacy.PrivacyOrderAddRequest;
-import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.FidaOrderResponse;
+import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.admin.domain.model.AdminPrivacyTradeConflictException;
-import com.kista.platform.internalapi.InternalApiErrorDetails;
-import com.kista.platform.internalapi.InternalApiStatusHandlers;
+import com.kista.shared.platform.internalapi.InternalApiErrorDetails;
+import com.kista.shared.platform.internalapi.InternalApiStatusHandlers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;

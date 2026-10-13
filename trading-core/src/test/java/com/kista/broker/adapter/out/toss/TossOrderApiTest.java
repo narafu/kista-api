@@ -2,13 +2,13 @@ package com.kista.broker.adapter.out.toss;
 
 import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.broker.domain.model.CancelInstruction;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.broker.domain.model.Execution;
 import com.kista.broker.domain.model.OrderInstruction;
 import com.kista.broker.domain.model.OrderResult;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.Broker;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;

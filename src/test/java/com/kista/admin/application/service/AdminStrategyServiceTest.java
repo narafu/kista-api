@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
-import com.kista.sharedkernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyStatus;
 
 @ExtendWith(MockitoExtension.class)
 class AdminStrategyServiceTest {

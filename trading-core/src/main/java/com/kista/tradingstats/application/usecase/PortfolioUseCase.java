@@ -2,7 +2,7 @@ package com.kista.tradingstats.application.usecase;
 
 import com.kista.trading.domain.model.Order;
 import com.kista.trading.domain.model.CyclePositionHistoryEntry;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.time.LocalDate;
 import java.util.List;

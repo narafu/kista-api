@@ -4,7 +4,7 @@ import com.kista.trading.application.event.CycleCompletedEvent;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.AccountBalance;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.domain.model.TradingUserProfile;
 import com.kista.trading.application.port.output.*;
 import com.kista.trading.domain.strategy.*;
@@ -27,9 +27,9 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // CyclePositionPersistor 단위 테스트:
 // - VR holdings=0 → markEnded 미호출 + rollIfDue 호출

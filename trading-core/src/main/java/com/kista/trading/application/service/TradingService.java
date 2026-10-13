@@ -4,13 +4,13 @@ import com.kista.trading.application.service.support.TradingParallelRunner;
 import com.kista.trading.application.service.support.TradingBalanceLoader;
 import com.kista.trading.application.service.support.TradingBatchRunState;
 
-import com.kista.sharedkernel.TimeZones;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.kernel.Broker;
 import com.kista.broker.domain.model.PriceSnapshot;
 import com.kista.privacy.domain.model.PrivacyTradeBase;
 import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.privacy.application.port.output.PrivacyTradePort;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.trading.application.port.output.*;

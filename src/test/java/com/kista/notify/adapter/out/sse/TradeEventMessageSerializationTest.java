@@ -1,6 +1,6 @@
 package com.kista.notify.adapter.out.sse;
 
-import com.kista.contract.notify.TradeEventMessage;
+import com.kista.shared.contract.notify.TradeEventMessage;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

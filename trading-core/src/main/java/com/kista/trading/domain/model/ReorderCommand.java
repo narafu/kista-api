@@ -1,7 +1,7 @@
 package com.kista.trading.domain.model;
 
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderDirection;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderDirection;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 

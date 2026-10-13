@@ -1,18 +1,18 @@
 package com.kista.admin.adapter.in.web.dto;
 
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.admin.domain.model.BenchmarkFieldSettings;
 import com.kista.admin.domain.model.BenchmarkSettings;
 import com.kista.admin.domain.model.RuntimeSettings;
 import com.kista.admin.domain.model.RuntimeSettingsBundle;
-import com.kista.sharedkernel.BrokerSettings;
-import com.kista.sharedkernel.TradingPolicySettings;
-import com.kista.sharedkernel.RecurringMode;
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyFieldSettings;
+import com.kista.shared.kernel.BrokerSettings;
+import com.kista.shared.kernel.TradingPolicySettings;
+import com.kista.shared.kernel.RecurringMode;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyFieldSettings;
 import com.kista.benchmark.domain.model.EtfBenchmarkSymbol;
-import com.kista.sharedkernel.StrategyTicker;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;

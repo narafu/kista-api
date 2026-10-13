@@ -14,8 +14,8 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
-import static com.kista.sharedkernel.MarketSession.BLOCKED;
-import static com.kista.sharedkernel.MarketSession.DIRECT;
+import static com.kista.shared.kernel.MarketSession.BLOCKED;
+import static com.kista.shared.kernel.MarketSession.DIRECT;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("DstInfo 검증")

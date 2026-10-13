@@ -2,7 +2,7 @@ package com.kista.trading.adapter.out.persistence;
 
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

@@ -1,6 +1,6 @@
 package com.kista.tradingnotify.application.port.output;
 
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
 

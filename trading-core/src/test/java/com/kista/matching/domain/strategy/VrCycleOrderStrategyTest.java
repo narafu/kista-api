@@ -3,9 +3,9 @@ package com.kista.matching.domain.strategy;
 import com.kista.matching.domain.model.AccountBalance;
 import com.kista.matching.domain.model.PlannedOrder;
 import com.kista.matching.domain.model.VrPosition;
-import com.kista.sharedkernel.OrderTiming;
-import com.kista.sharedkernel.OrderType;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -91,7 +91,7 @@ class VrCycleOrderStrategyTest {
     void fitBuysToBudget_bootstrapBatch_returnedAsIs() {
         VrCycleOrderStrategy strategy = new VrCycleOrderStrategy(new VrStrategy());
         PlannedOrder bootstrap = PlannedOrder.of(TODAY, StrategyTicker.TQQQ, OrderType.LOC,
-                com.kista.sharedkernel.OrderDirection.BUY, 10, new BigDecimal("105.00"), OrderTiming.AT_CLOSE,
+                com.kista.shared.kernel.OrderDirection.BUY, 10, new BigDecimal("105.00"), OrderTiming.AT_CLOSE,
                 PlannedOrder.leg("VR_BUY", 1));
         List<PlannedOrder> buys = List.of(bootstrap);
 
@@ -99,7 +99,7 @@ class VrCycleOrderStrategyTest {
     }
 
     private static PlannedOrder ladderBuy(int rung, int quantity, String price) {
-        return PlannedOrder.of(TODAY, StrategyTicker.TQQQ, OrderType.LIMIT, com.kista.sharedkernel.OrderDirection.BUY,
+        return PlannedOrder.of(TODAY, StrategyTicker.TQQQ, OrderType.LIMIT, com.kista.shared.kernel.OrderDirection.BUY,
                 quantity, new BigDecimal(price), OrderTiming.AT_OPEN, PlannedOrder.leg("VR_BUY", rung));
     }
 }

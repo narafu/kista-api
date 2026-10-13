@@ -1,5 +1,5 @@
 package com.kista.benchmark.domain.model;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 
 // 벤치마크 비교에 쓸 수 있는 ETF 심볼 화이트리스트 — 스케쥴러 동기화 대상과
 // BenchmarkController symbol 파라미터 검증 양쪽의 단일 소스.

@@ -26,8 +26,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.kista.account",
         "com.kista.privacy",
         "com.kista.marketcalendar",
-        "com.kista.sharedkernel",
-        "com.kista.platform",
+        "com.kista.shared.kernel",
+        "com.kista.shared.platform",
 })
 @EntityScan(basePackages = {
         "com.kista.trading",
@@ -40,7 +40,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.kista.trading",
         "com.kista.tradingstats", // AlpacaProperties
         "com.kista.broker",
-        "com.kista.platform", // TelegramProperties
+        "com.kista.shared.platform", // TelegramProperties
 })
 @EnableScheduling
 public class TradingApplication {

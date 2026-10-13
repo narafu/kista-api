@@ -1,7 +1,7 @@
 package com.kista.trading.application.port.output;
 
-import com.kista.sharedkernel.StrategyCreationSettings;
-import com.kista.sharedkernel.StrategyType;
+import com.kista.shared.kernel.StrategyCreationSettings;
+import com.kista.shared.kernel.StrategyType;
 
 import java.util.Optional;
 

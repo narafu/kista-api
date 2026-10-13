@@ -2,12 +2,12 @@ package com.kista.admin.application.service;
 
 import com.kista.admin.application.port.output.AuditLogPort;
 import com.kista.admin.application.port.output.PrivacyQueryPort;
-import com.kista.contract.privacy.FidaOrderRequest;
-import com.kista.contract.privacy.PrivacyBaseUpdateRequest;
-import com.kista.contract.privacy.PrivacyOrderUpdateRequest;
-import com.kista.contract.privacy.PrivacyTradeBaseResponse;
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
 import com.kista.admin.application.usecase.AdminPrivacyTradeUseCase;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

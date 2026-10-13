@@ -1,9 +1,9 @@
 package com.kista.trading.adapter.out.persistence;
 
-import com.kista.sharedkernel.NotificationChannel;
+import com.kista.shared.kernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.platform.crypto.AesCryptoService;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.platform.crypto.AesCryptoService;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.trading.domain.model.TradingUserProfile;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

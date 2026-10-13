@@ -1,7 +1,7 @@
 package com.kista.notify.adapter.out.gateway;
 
 import com.kista.finance.application.event.FinanceRegistrationReminderDueEvent;
-import com.kista.sharedkernel.NotificationType;
+import com.kista.shared.kernel.NotificationType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;

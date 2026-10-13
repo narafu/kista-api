@@ -70,9 +70,9 @@ class GradleModuleBoundaryTest {
                 .that().resideInAPackage("com.kista..")
                 .should().dependOnClassesThat(
                         resideInAPackage("com.kista..")
-                                .and(resideOutsideOfPackage("com.kista.sharedkernel.."))
-                                .and(resideOutsideOfPackage("com.kista.platform.."))
-                                .and(resideOutsideOfPackage("com.kista.contract..")))
+                                .and(resideOutsideOfPackage("com.kista.shared.kernel.."))
+                                .and(resideOutsideOfPackage("com.kista.shared.platform.."))
+                                .and(resideOutsideOfPackage("com.kista.shared.contract..")))
                 .check(importedClasses);
     }
 
@@ -110,7 +110,7 @@ class GradleModuleBoundaryTest {
 
         ArchRuleDefinition.noClasses()
                 .that().resideInAPackage("com.kista..")
-                .should().dependOnClassesThat().resideInAPackage("com.kista.platform.internalapi..")
+                .should().dependOnClassesThat().resideInAPackage("com.kista.shared.platform.internalapi..")
                 .check(importedClasses);
     }
 }

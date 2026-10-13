@@ -1,8 +1,8 @@
 package com.kista.benchmark.adapter.in.schedule;
 
-import com.kista.platform.scheduling.SchedulerJobRunner;
-import com.kista.platform.scheduling.SchedulerLockService;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.platform.scheduling.SchedulerJobRunner;
+import com.kista.shared.platform.scheduling.SchedulerLockService;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.benchmark.application.usecase.FetchHousingPriceIndexUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

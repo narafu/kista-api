@@ -1,7 +1,7 @@
 package com.kista.benchmark.application.service;
 
-import com.kista.platform.cache.TtlResultCache;
-import com.kista.sharedkernel.TimeZones;
+import com.kista.shared.platform.cache.TtlResultCache;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.benchmark.domain.model.*;
 import com.kista.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.benchmark.application.port.output.*;

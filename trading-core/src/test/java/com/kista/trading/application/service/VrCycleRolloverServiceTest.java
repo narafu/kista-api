@@ -5,7 +5,7 @@ import com.kista.broker.domain.model.BrokerAccountRef;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.Strategy; import com.kista.trading.domain.model.*;
 import com.kista.matching.domain.model.*;
-import com.kista.sharedkernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.trading.application.port.output.*;
 import com.kista.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.broker.application.port.output.BrokerPricePort;
@@ -30,9 +30,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import com.kista.sharedkernel.StrategyType;
-import com.kista.sharedkernel.StrategyStatus;
-import com.kista.sharedkernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyCycleSeedType;
 
 // VR N주 사이클 롤오버 단위 테스트
 // due 판정·V′ 계산·markEnded·새 사이클 생성·각종 skip 조건 검증

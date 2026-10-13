@@ -1,7 +1,7 @@
 package com.kista.support;
 
 import com.kista.account.domain.model.Account;
-import com.kista.sharedkernel.Broker;
+import com.kista.shared.kernel.Broker;
 import com.kista.trading.domain.model.TradingAccount;
 import com.kista.trading.domain.model.TradingUserProfile;
 
