@@ -17,11 +17,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.TreeMap;
 
 // Toss 캔들 API 스펙 (openapi.json 검증):
 // - params: symbol(required), interval(1m|1d), count(1~200, default 100), before(ISO8601), adjusted(boolean)
 // - response item: timestamp(ISO8601), openPrice, highPrice, lowPrice, closePrice, volume, currency
 // from/to 범위 조회: before=to+1일(UTC) + count=범위내 최대 봉 수(여유있게)로 1회 호출 후 from 미만 필터링
+// getDailyCandlesBefore: 200봉 단위 페이징 + adjusted=true(분할·배당 조정, 이 경로만)
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -40,7 +42,7 @@ class TossCandleApi {
         long calendarDays = ChronoUnit.DAYS.between(from, to) + 1;
         int count = (int) Math.min(calendarDays * 3 / 2 + 5, MAX_COUNT);
 
-        List<TossCandle> candles = fetchCandles(symbol, interval, count, beforeParam);
+        List<TossCandle> candles = fetchCandles(symbol, interval, count, beforeParam, false);
         // before 방식이므로 from 이전 봉이 포함될 수 있음 — 필터링
         return candles.stream().filter(c -> !c.date().isBefore(from)).toList();
     }
@@ -48,30 +50,45 @@ class TossCandleApi {
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
         int clamped = Math.clamp(count, 1, MAX_COUNT);
         // before 미지정 시 Toss가 최신 봉부터 반환 — 별도 계산 불필요
-        return fetchCandles(symbol, interval, clamped, null);
+        return fetchCandles(symbol, interval, clamped, null, false);
     }
 
-    // beforeUsSession 00:00 UTC 이전 봉만 요청 후 date < beforeUsSession 재필터 — 봉 date()는 US 세션일, fetchCandles가 오름차순 정렬
+    // 200봉 단위 페이징 — 다음 페이지 before = 직전 페이지 가장 오래된 봉일 00:00 UTC, 날짜 기준 중복 제거.
+    // 봉 date()는 US 세션일, adjusted=true(분할·배당 조정 — DCA 지표용, 이 메서드만)
     public List<TossCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count) {
-        String before = beforeUsSession.atStartOfDay(ZoneOffset.UTC).toString();
-        return fetchCandles(symbol, "1d", Math.clamp(count, 1, MAX_COUNT), before).stream()
-                .filter(c -> c.date().isBefore(beforeUsSession))
-                .toList();
+        TreeMap<LocalDate, TossCandle> byDate = new TreeMap<>();
+        LocalDate before = beforeUsSession;
+        int maxPages = count / MAX_COUNT + 2; // 첫 페이지 진행 중 봉 필터 여유
+        for (int page = 0; page < maxPages && byDate.size() < count; page++) {
+            LocalDate pageBefore = before;
+            List<TossCandle> fetched = fetchCandles(symbol, "1d", Math.clamp(count - byDate.size(), 1, MAX_COUNT),
+                    pageBefore.atStartOfDay(ZoneOffset.UTC).toString(), true).stream()
+                    .filter(c -> c.date().isBefore(pageBefore))
+                    .toList();
+            if (fetched.isEmpty()) break;
+            fetched.forEach(c -> byDate.putIfAbsent(c.date(), c));
+            before = fetched.getFirst().date(); // fetchCandles는 오름차순
+        }
+        List<TossCandle> all = List.copyOf(byDate.values());
+        return all.subList(Math.max(0, all.size() - count), all.size());
     }
 
     // before(exclusive 경계로 호출측에서 미리 보정된 시각) 이하 가장 최신 봉 1개만 조회 — 전일종가 확정 조회 전용
     public Optional<TossCandle> getCandleBefore(String symbol, String interval, Instant before) {
-        List<TossCandle> candles = fetchCandles(symbol, interval, 1, before.toString());
+        List<TossCandle> candles = fetchCandles(symbol, interval, 1, before.toString(), false);
         return candles.isEmpty() ? Optional.empty() : Optional.of(candles.getFirst());
     }
 
-    private List<TossCandle> fetchCandles(String symbol, String interval, int count, String beforeParam) {
+    private List<TossCandle> fetchCandles(String symbol, String interval, int count, String beforeParam, boolean adjusted) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbol",   symbol);
         params.add("interval", interval);
         params.add("count",    String.valueOf(count));
         if (beforeParam != null) {
             params.add("before", beforeParam);
+        }
+        if (adjusted) {
+            params.add("adjusted", "true");
         }
 
         // 공통 API — 관리자 토큰 사용

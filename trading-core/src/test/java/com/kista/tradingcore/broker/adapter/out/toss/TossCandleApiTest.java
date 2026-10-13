@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,23 +52,69 @@ class TossCandleApiTest {
         assertThat(paramsCaptor.getValue().getFirst("count")).isEqualTo("65");
     }
 
+    private static TossResult<TossCandleApi.CandlesResult> page(String... dates) {
+        return new TossResult<>(new TossCandleApi.CandlesResult(java.util.Arrays.stream(dates)
+                .map(d -> new TossCandleApi.CandleItem(d + "T00:00:00Z", "1", "1", "1", "1", "1")).toList()));
+    }
+
     @SuppressWarnings("unchecked")
     @Test
     @DisplayName("일봉 이전 조회는 US 세션일 이후 봉을 제외하고 before를 세션일 00:00 UTC로 보낸다")
     void getDailyCandlesBefore_excludesSessionAndLater() {
-        // 응답: 10-14(진행 중 세션), 10-13, 10-12 — 최신순
+        // 1페이지 응답: 10-14(진행 중 세션), 10-13, 10-12 — 최신순, 2페이지는 빈 응답으로 종료
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
-                .thenReturn(new TossResult<>(new TossCandleApi.CandlesResult(java.util.List.of(
-                        new TossCandleApi.CandleItem("2026-10-14T00:00:00Z", "1", "1", "1", "1", "1"),
-                        new TossCandleApi.CandleItem("2026-10-13T00:00:00Z", "1", "1", "1", "2", "1"),
-                        new TossCandleApi.CandleItem("2026-10-12T00:00:00Z", "1", "1", "1", "3", "1")))));
+                .thenReturn(page("2026-10-14", "2026-10-13", "2026-10-12"), page());
 
         var result = tossCandleApi.getDailyCandlesBefore("UPRO", LocalDate.of(2026, 10, 14), 5);
 
         assertThat(result).extracting(c -> c.date()).containsExactly(LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 13));
         ArgumentCaptor<MultiValueMap<String, String>> paramsCaptor = ArgumentCaptor.forClass(MultiValueMap.class);
-        verify(tossHttpClient).getCommon(eq("/api/v1/candles"), paramsCaptor.capture(), any(ParameterizedTypeReference.class));
-        assertThat(paramsCaptor.getValue().getFirst("before")).isEqualTo("2026-10-14T00:00Z");
-        assertThat(paramsCaptor.getValue().getFirst("count")).isEqualTo("5");
+        verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/candles"), paramsCaptor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(paramsCaptor.getAllValues().getFirst().getFirst("before")).isEqualTo("2026-10-14T00:00Z");
+        assertThat(paramsCaptor.getAllValues().getFirst().getFirst("count")).isEqualTo("5");
+        assertThat(paramsCaptor.getAllValues().getFirst().getFirst("adjusted")).isEqualTo("true");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("일봉 이전 조회는 200봉 단위로 페이징하고 경계 중복을 제거해 마지막 count개를 오름차순으로 준다")
+    void paging_dedups_boundary_and_returns_last_count() {
+        // 1페이지: 10-14(진행 중) 10-13 10-12, 2페이지: 10-12(경계 중복) 10-09 10-08, 3페이지: 빈 응답
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(page("2026-10-14", "2026-10-13", "2026-10-12"),
+                        page("2026-10-12", "2026-10-09", "2026-10-08"),
+                        page());
+
+        var result = tossCandleApi.getDailyCandlesBefore("UPRO", LocalDate.of(2026, 10, 14), 4);
+
+        // 1페이지 필터 후 {10-12, 10-13}, 2페이지(before=10-12)는 10-12 제외 {10-08, 10-09} → 4개로 count 충족, 3페이지 미요청
+        assertThat(result).extracting(c -> c.date()).containsExactly(
+                LocalDate.of(2026, 10, 8), LocalDate.of(2026, 10, 9), LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 13));
+        ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient, org.mockito.Mockito.atLeast(2)).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getAllValues().get(1).getFirst("before")).isEqualTo("2026-10-12T00:00Z");
+        assertThat(captor.getAllValues()).allSatisfy(p -> assertThat(p.getFirst("adjusted")).isEqualTo("true"));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("count가 200을 넘으면 요청당 count는 200 이하다")
+    void page_size_is_clamped_to_200() {
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class))).thenReturn(page());
+        tossCandleApi.getDailyCandlesBefore("UPRO", LocalDate.of(2026, 10, 14), 250);
+        ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getValue().getFirst("count")).isEqualTo("200");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("다른 캔들 조회는 adjusted를 보내지 않는다")
+    void other_queries_do_not_send_adjusted() {
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class))).thenReturn(page());
+        tossCandleApi.getLatestCandles("UPRO", "1d", 5);
+        ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getValue().containsKey("adjusted")).isFalse();
     }
 }
