@@ -168,6 +168,7 @@ class TradingStatsService implements TradingStatsUseCase {
         if (accountIds.isEmpty()) return List.of();
         Map<UUID, Strategy> strategies = strategyPort.findByAccountIds(accountIds).values().stream()
                 .flatMap(List::stream)
+                .filter(s -> !s.isDca()) // DCA는 통계 집계 대상에서 제외
                 .collect(Collectors.toMap(Strategy::id, Function.identity()));
         if (strategies.isEmpty()) return List.of();
         return strategyCyclePort.findByStrategyIds(strategies.keySet()).stream()

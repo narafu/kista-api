@@ -137,6 +137,21 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
+    void PORTFOLIO_scope는_DCA_전략을_제외한다() {
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID)));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY, dca)));
+        ArgumentCaptor<Set<UUID>> idsCaptor = ArgumentCaptor.forClass(Set.class);
+        when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of());
+
+        service.fetch(USER_ID, InvestmentPointsQuery.Scope.PORTFOLIO, null,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+
+        assertThat(idsCaptor.getValue()).containsExactly(STRATEGY_ID);
+    }
+
+    @Test
     void from이_없으면_사이클_시작일_중_최소값을_effectiveFrom으로_쓴다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(USER_ID));

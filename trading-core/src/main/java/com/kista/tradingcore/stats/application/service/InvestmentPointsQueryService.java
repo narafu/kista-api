@@ -53,6 +53,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
                     .toList();
             strategies = accountIds.isEmpty() ? List.of() : strategyPort.findByAccountIds(accountIds).values().stream()
                     .flatMap(List::stream)
+                    .filter(s -> !s.isDca()) // DCA는 통계 집계 대상에서 제외
                     .toList();
         }
 

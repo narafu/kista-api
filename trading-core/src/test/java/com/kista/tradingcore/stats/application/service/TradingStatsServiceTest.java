@@ -15,6 +15,7 @@ import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import java.util.Collection;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -372,6 +373,21 @@ class TradingStatsServiceTest {
         // 06-02: endDate(06-01) 경과 → 종료 사이클 제외
         assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("550.00");
         assertThat(curve.points().get(1).principal()).isEqualByComparingTo("500.00");
+    }
+
+    @Test
+    void 요약은_DCA_전략_사이클을_제외한다() {
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY, dca)));
+        ArgumentCaptor<Collection<UUID>> idsCaptor = ArgumentCaptor.forClass(Collection.class);
+        when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of(
+                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
+
+        statsService.getSummary(USER_ID);
+
+        assertThat(idsCaptor.getValue()).containsExactly(STRATEGY.id());
     }
 
     @Test

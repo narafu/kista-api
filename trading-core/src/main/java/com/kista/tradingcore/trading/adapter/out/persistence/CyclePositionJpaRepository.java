@@ -71,25 +71,25 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     // 전체 이력 최근 N건 — 대시보드·텔레그램 현황용 (@SQLRestriction 적용)
     List<CyclePositionEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만, native)
+    // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만, native, DCA 제외: 같은 보유 스냅샷을 중복 기록)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
             JOIN accounts a ON s.account_id = a.id
-            WHERE a.user_id = :userId
+            WHERE a.user_id = :userId AND s.type <> 'DCA'
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
     List<CyclePositionEntity> findRecentByUserId(@Param("userId") UUID userId, Pageable pageable);
 
-    // 사용자 스코프 범위 조회 (통계 — created_at 오름차순, native)
+    // 사용자 스코프 범위 조회 (통계 — created_at 오름차순, native, DCA 제외)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
             JOIN accounts a ON s.account_id = a.id
-            WHERE a.user_id = :userId
+            WHERE a.user_id = :userId AND s.type <> 'DCA'
               AND cp.created_at >= :from AND cp.created_at < :to
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY cp.created_at ASC
@@ -109,12 +109,12 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     List<CyclePositionEntity> findByCycleIdsAndRange(
             @Param("cycleIds") Set<UUID> cycleIds, @Param("from") Instant from, @Param("to") Instant to);
 
-    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy JOIN)
+    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy JOIN, DCA 제외)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
-            WHERE s.account_id = :accountId
+            WHERE s.account_id = :accountId AND s.type <> 'DCA'
               AND cp.created_at >= :from AND cp.created_at < :cursor
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
             ORDER BY cp.created_at DESC
