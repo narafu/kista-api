@@ -1,6 +1,6 @@
-## com.kista.marketcalendar (`:trading-core`)
+## com.kista.tradingcore.marketcalendar (`:trading-core`)
 
-com.kista.marketcalendar/ ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 미국 시장 휴장일 캘린더. "domain"·"port" 2개 NamedInterface, service·adapter internal
+com.kista.tradingcore.marketcalendar/ ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 미국 시장 휴장일 캘린더. "domain"·"port" 2개 NamedInterface, service·adapter internal
   domain/model/       ← MarketSessionSnapshot
   application/port/output/ ← MarketCalendarPort/MarketCalendarRefreshPort/MarketHolidayStorePort
   adapter/in/web/     ← internal — MarketCalendarInternalController(`/api/internal/marketcalendar/{holidays,is-open,session}`) — `session` 라우트는 `contract.marketcalendar.MarketSessionResponse(MarketSession session, boolean isDst)`(`MarketSession`은 `sharedkernel` 공용 enum — `MarketSessionSnapshot`·`DstInfo`도 같은 enum 사용)

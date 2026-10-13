@@ -2,7 +2,10 @@
 
 ### 네이밍·구성
 - 단위 테스트 `*Test`, 통합 테스트 `*IT` + Docker 필요 테스트는 `@Tag("integration")` (`./gradlew integration`으로 실행)
-- 테스트 지원 코드(`com.kista.support`): `DataJpaTestBase`/`WebMvcTestSupport`/`TradingFixtures`는 `trading-core/src/testFixtures`, `DomainFixtures`(User)는 루트 `src/testFixtures`, `TradingCoreJpaTestConfig`/`StubBrokerApiException`은 `trading-core/src/test`
+- 테스트 지원 코드: `com.kista.shared.support`(`DataJpaTestBase`/`WebMvcTestSupport`/`application-test.yml`)는 `:shared` testFixtures, `com.kista.tradingcore.support`(`TradingFixtures`는 trading-core testFixtures, `StubBrokerApiException`은 trading-core test), `com.kista.api.support.DomainFixtures`(User)는 루트 `src/testFixtures`. 루트 테스트는 `testFixtures(project(":shared"))`에 의존하고 trading-core testFixtures에는 의존하지 않는다
+- 슬라이스 테스트(`@DataJpaTest`/`@WebMvcTest`)는 `@SpringBootConfiguration` 상향 탐색이 각 루트의 `ApiApplication`/`TradingApplication`을 찾으므로 `@ContextConfiguration`·`TradingCoreJpaTestConfig`를 쓰지 않는다. 예외는 trading-core `SchedulerLockService{Test,DbTest}`(패키지 `com.kista.shared.platform.scheduling` — package-private 접근용이라 상향 탐색이 앱 클래스에 닿지 않아 `@ContextConfiguration(classes = TradingApplication.class)` 유지, `scheduler_locks`는 trading 마이그레이션이 만든다)
+- `:shared` 빈은 `PlatformAutoConfiguration`이 올린다 — `@WebMvcTest`는 `JwtAuthFilter`/`InternalTokenAuthFilter`를 스캔으로 얻지 못해 필요 시 `@Import`하고, 자체 `@EnableAutoConfiguration` 컨텍스트 테스트는 보안·JWT가 필요 없으면 `PlatformAutoConfiguration`을 exclude한다(예: `HousingBenchmarkApiDocsTest`)
+- ArchUnit `failOnEmptyShould=true`(양 프로젝트 test resources) — 규칙 대상이 비면 실패한다. 컨텍스트 로드 잠금: `com.kista.api.ApplicationContextLoadTest`(리포지토리 21·`SecurityFilterChain` 1·`com.kista.tradingcore` 빈 없음), `com.kista.tradingcore.TradingApplicationContextLoadTest`(리포지토리 15·`SecurityFilterChain` 1)
 
 ### static 필드 forward reference 주의
 - Mockito 테스트 클래스에서 static 상수가 다른 static 상수를 참조할 때 선언 순서 중요 — `CYCLE.id()`를 참조하는 `NORMAL_HISTORY` 등은 반드시 `CYCLE` 선언 뒤에 위치해야 함 (위반 시 `illegal forward reference` 컴파일 오류)
@@ -49,14 +52,14 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 
 서비스별 Flyway baseline이 각자 자기 스키마에 적용된다(root `db/migration`→`public`/`finance`/`kista_ref`, trading-core `db/migration-trading`→`trading`/`trading_ref`). 옛 레이아웃(`kista`/`reference` 스키마 + 공용 `flyway_schema_history`)으로 만들어진 `kistadb_test`가 로컬에 남아 있으면 baseline 판정이 어긋나므로 재생성한다: `DROP DATABASE kistadb_test; CREATE DATABASE kistadb_test OWNER kista;`. trading-core `test` 태스크는 `workingDir = rootProject.projectDir`로 실행된다.
 
-루트 persistence 테스트는 `com.kista.web.RootDataJpaTestBase`(src/test)를 상속한다 — trading-core 공용 `DataJpaTestBase`를 직접 상속하면 `@DataJpaTest` 슬라이스가 `RootJpaScanConfig`를 못 실어 엔티티 스캔이 `com.kista` 전체로 넓어지고, trading 마이그레이션이 없는 DB(CI에서 `:trading-core:test`가 빌드 캐시로 생략될 때)에서 `missing table [trading.xxx]`로 실패한다.
+루트 persistence 테스트는 `com.kista.api.web.RootDataJpaTestBase`(src/test)를 상속한다 — `:shared` 공용 `DataJpaTestBase`를 잇는 얇은 베이스로, 상향 탐색이 `ApiApplication`(루트 `com.kista.api`)을 찾아 엔티티·리포지토리 스캔이 root 범위로 좁혀지므로 classpath의 `:trading-core` 엔티티(`trading.xxx` 테이블)는 검증 대상이 아니다. 옛 `RootJpaScanConfig`는 없다.
 
 ### trading-core 테스트 벤더 타입 금지
-- trading-core 테스트도 `broker.domain.model.kis/toss` 벤더 타입을 쓰지 않는다(`TradingCoreTestVendorModelTest`, broker 모듈 테스트 제외) — broker 밖 테스트의 외부 API 실패는 `com.kista.support.StubBrokerApiException`(벤더 중립 `BrokerApiException` 최소 서브클래스)으로 만든다
+- trading-core 테스트도 `broker.domain.model.kis/toss` 벤더 타입을 쓰지 않는다(`TradingCoreTestVendorModelTest`, broker 모듈 테스트 제외) — broker 밖 테스트의 외부 API 실패는 `com.kista.tradingcore.support.StubBrokerApiException`(벤더 중립 `BrokerApiException` 최소 서브클래스)으로 만든다
 
 ### 전략 테스트 분리 원칙
-- `InfinitePositionTest` (`com.kista.matching.domain.model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
-- `InfiniteStrategyTypeTest` (`com.kista.matching.domain.strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)
+- `InfinitePositionTest` (`com.kista.tradingcore.matching.domain.model`): 매매 변수 계산 검증 (averagePrice, currentRound, priceOffsetRate 등)
+- `InfiniteStrategyTypeTest` (`com.kista.tradingcore.matching.domain.strategy`): 주문 생성 시나리오만 검증 (buildOrders 반환 Order 목록)
 
 ### InfiniteStrategy 테스트 패턴
 - `currentRound`(double) 단언: 정확한 정수 결과는 `isEqualTo(5.0)`, 소수점은 `isCloseTo(1.33, within(0.01))`

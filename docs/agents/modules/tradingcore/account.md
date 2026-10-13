@@ -1,6 +1,6 @@
-## com.kista.account (`:trading-core`)
+## com.kista.tradingcore.account (`:trading-core`)
 
-com.kista.account/   ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 계좌 자격증명·브로커 연결. "domain"·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter internal
+com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 계좌 자격증명·브로커 연결. "domain"·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter internal
   domain/model/       ← Account/RegisterAccountCommand/UpdateAccountCommand. `Account.Broker` nested enum 없음 — `sharedkernel.Broker` 참조. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
   application/usecase/ ← AccountUseCase(조회/등록/수정/삭제/증권사 연결 테스트)
   application/port/output/ ← AccountPort/BrokerEnabledPort(account가 정의, 정책 소유자인 trading `TradingPolicyService`가 구현 — 포트 역전)/AccountOpenOrderCancelPort(계좌 삭제 전 미체결 주문 취소 — account 정의, 주문 소유자인 trading `AccountOpenOrderCanceller`가 구현, 실패 건수>0이면 `AccountService.delete()`가 삭제 중단)
@@ -10,4 +10,4 @@ com.kista.account/   ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 계
   adapter/out/persistence/ ← AccountEntity + AccountJpaRepository + AccountPersistenceAdapter
 
 ### Account ↔ Strategy 분리
-`Account`(이 모듈)와 `Strategy`(trading 소유)는 별도 aggregate — `Account`엔 type/status/ticker/multiple/updatedAt이 없다(전략 속성은 전부 Strategy로 분리). 계좌·전략 이력 계층 상세 규칙은 `docs/agents/modules/trading.md` "Account ↔ Strategy 분리" 참고.
+`Account`(이 모듈)와 `Strategy`(trading 소유)는 별도 aggregate — `Account`엔 type/status/ticker/multiple/updatedAt이 없다(전략 속성은 전부 Strategy로 분리). 계좌·전략 이력 계층 상세 규칙은 `docs/agents/modules/tradingcore/trading.md` "Account ↔ Strategy 분리" 참고.

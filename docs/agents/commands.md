@@ -6,9 +6,10 @@
 ./gradlew :bootRun --args='--spring.profiles.active=local'     # 로컬 실행 (root 지정 필수 — 접두사 없으면 :shared:bootRun이 mainClass 없음으로 실패)
 ./gradlew test                                                  # 전체 테스트
 ./gradlew compileJava                                           # 컴파일만
-./gradlew :test --tests 'com.kista.architecture.*'              # 루트 ArchUnit·Modulith 규칙 (HexagonalArchitectureTest 등)
-./gradlew :trading-core:test --tests 'com.kista.trading.domain.*'  # trading 도메인 단위 테스트 (trading-core 소속 — 루트 test 태스크엔 없음)
-./gradlew :trading-core:test --tests 'com.kista.broker.adapter.out.kis.*'  # KIS Adapter 테스트 (trading-core 소속)
+./gradlew :test --tests 'com.kista.api.architecture.*'              # 루트 ArchUnit·Modulith 규칙 (HexagonalArchitectureTest 등)
+./gradlew :trading-core:test --tests 'com.kista.tradingcore.architecture.*'  # trading-core Modulith 검증(ModulithArchitectureTest 등)
+./gradlew :trading-core:test --tests 'com.kista.tradingcore.trading.domain.*'  # trading 도메인 단위 테스트 (trading-core 소속 — 루트 test 태스크엔 없음)
+./gradlew :trading-core:test --tests 'com.kista.tradingcore.broker.adapter.out.kis.*'  # KIS Adapter 테스트 (trading-core 소속)
 ./gradlew test --rerun-tasks                                    # 캐시 무시 강제 재실행
 ./gradlew :trading-core:test                                     # trading-core 서브프로젝트만 테스트
 ./gradlew clean compileJava                                     # 빌드 캐시 오염 시 클린 컴파일
@@ -52,7 +53,7 @@ scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태�
   - 트리거 후 반드시 `SCHEDULER_ENABLED` 없이 재기동하고 `/api/admin/scheduler/*` 404로 꺼졌는지 확인할 것 — 켜둔 채 두면 로컬 cron이 운영과 같이 돈다(락은 DB별이라 못 막고 관리자 봇은 공유라 시작 알림이 중복 발송).
 
 ### 로컬 2-프로세스 부팅 (root + trading-core)
-2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`tradingweb.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 최소 필요 환경변수는 CLAUDE.md의 필수 목록보다 많다 — 실측 결과:
+2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`com.kista.tradingcore.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 최소 필요 환경변수는 CLAUDE.md의 필수 목록보다 많다 — 실측 결과:
 ```bash
 # 두 jar 빌드
 ./gradlew bootJar                       # root -> build/libs/app.jar

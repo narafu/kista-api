@@ -41,7 +41,7 @@ private SomeUseCase someUseCase;
 ## @SpringBootTest / @DataJpaTest 패턴
 
 ### 타 패키지 FK 삽입 (JpaRepository package-private 우회)
-서비스별 스키마가 분리돼 있다 — `accounts`는 trading 스키마(`:trading-core`)라 root `users`를 참조하는 FK가 없다. trading-core 테스트는 users 삽입 없이 accounts만 넣는다 (`CyclePositionPersistenceAdapterTest` 참고). 테스트 지원 클래스는 `trading-core/src/testFixtures/java/com/kista/support`(`DataJpaTestBase`/`WebMvcTestSupport`/`TradingFixtures`).
+서비스별 스키마가 분리돼 있다 — `accounts`는 trading 스키마(`:trading-core`)라 root `users`를 참조하는 FK가 없다. trading-core 테스트는 users 삽입 없이 accounts만 넣는다 (`CyclePositionPersistenceAdapterTest` 참고). 테스트 지원 클래스는 `shared/src/testFixtures/java/com/kista/shared/support`(`DataJpaTestBase`/`WebMvcTestSupport`, `:shared` testFixtures)와 `trading-core/src/testFixtures/java/com/kista/tradingcore/support`(`TradingFixtures`). 앱 클래스가 각 루트 패키지에 있어 `@ContextConfiguration` 없이 상향 탐색으로 찾는다.
 ```java
 @Autowired JdbcTemplate jdbcTemplate;
 
@@ -91,9 +91,9 @@ docker compose up -d postgres
 ## 테스트 실행
 
 ```bash
-bash gradlew :test --tests "com.kista.architecture.*"               # ArchUnit (root)
-bash gradlew :trading-core:test --tests "com.kista.trading.domain.*" # trading 도메인 단위 테스트
-bash gradlew :trading-core:test --tests "com.kista.SomeTest"         # trading-core 단일 테스트 (root 테스트는 `:test` — 접두사 없는 `test --tests`는 일치 테스트가 없는 `:shared`에서 실패)
+bash gradlew :test --tests "com.kista.api.architecture.*"               # ArchUnit (root)
+bash gradlew :trading-core:test --tests "com.kista.tradingcore.trading.domain.*" # trading 도메인 단위 테스트
+bash gradlew :trading-core:test --tests "com.kista.tradingcore.SomeTest"         # trading-core 단일 테스트 (root 테스트는 `:test` — 접두사 없는 `test --tests`는 일치 테스트가 없는 `:shared`에서 실패)
 ```
 
 실패 진단 (XML이 stdout보다 신뢰성 높음):

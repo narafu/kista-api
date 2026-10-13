@@ -171,7 +171,7 @@ flowchart TB
 
     subgraph tc[":trading-core → trading-core.jar"]
         trading; matching; broker; account; privacy
-        marketcalendar; tradingstats; tradingnotify; tradingweb
+        marketcalendar; stats; notify_t["notify"]; web_t["web"]
     end
 
     api --> shared
@@ -205,7 +205,7 @@ flowchart LR
         tIn["*InternalController<br/>/api/internal/**"]
         tUser["trading<br/>UserDeleted·UserNotifyProfile<br/>StreamConsumer"]
         tErr["trading<br/>AppErrorStreamPublisher"]
-        tNotify["tradingnotify<br/>RedisPushNotificationPublisher<br/>RedisTradeEventPublisher"]
+        tNotify["tradingcore.notify<br/>RedisPushNotificationPublisher<br/>RedisTradeEventPublisher"]
     end
 
     rOut -->|"HTTP · contract.*"| tIn
@@ -220,10 +220,10 @@ flowchart LR
 
 ## L2 모듈 의존 그래프 (자동 생성)
 
-손으로 그리지 않는다. `ModulithArchitectureTest`가 `Documenter`로 실제 의존 기준 PlantUML을 생성한다.
+손으로 그리지 않는다. api 프로세스의 `ModulithArchitectureTest`가 `Documenter`로 실제 의존 기준 PlantUML을 생성한다(`ApplicationModules.of(ApiApplication.class)` 모델 — api 7 + shared 3). trading-core 쪽 `ModulithArchitectureTest`는 `verify()`만 하고 Documenter가 없어 trading-core 모듈 그래프는 생성되지 않는다.
 
 ```bash
-./gradlew :test --tests 'com.kista.architecture.ModulithArchitectureTest'
+./gradlew :test --tests 'com.kista.api.architecture.ModulithArchitectureTest'
 # 출력: build/spring-modulith-docs/components.puml (전체), module-<name>.puml (모듈별)
 ```
 
@@ -235,7 +235,7 @@ flowchart LR
 모듈 구조와 업무 흐름을 한 페이지에서 오간다. 모듈 그래프는 Modulith가, 하루 타임라인은 `@Scheduled`가 자동 공급하고, 흐름 내용만 사람이 `src/test/resources/architecture/flows.yml`에 쓴다.
 
 ```bash
-./gradlew :test --tests 'com.kista.architecture.ArchitectureMapTest'
+./gradlew :test --tests 'com.kista.api.architecture.ArchitectureMapTest'
 # 출력: build/architecture-map/index.html (file://로 연다 — cytoscape만 CDN이라 인터넷 필요)
 ```
 
@@ -262,7 +262,7 @@ sequenceDiagram
     participant B as Broker (KIS/Toss)
     participant DB as trading.orders
     participant R as TradingReporter
-    participant N as tradingnotify
+    participant N as tradingcore.notify
 
     S->>S: StrategyPort.findAllActive() → 사이클별 context 빌드
     S->>Svc: executeBatch(contexts)

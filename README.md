@@ -30,8 +30,8 @@ Gradle 서브프로젝트 3개, 배포 프로세스 3개.
 | `:trading-core` | `trading-core.jar` | `kista-trading` | 매매 실행·주문 계산·증권사 연동·계좌·통계·매매 알림 |
 | `:shared` | (라이브러리) | — | 공용 어휘(sharedkernel)·내부 API wire 계약(contract)·인프라(platform) |
 
-- `:api`와 `:trading-core`는 서로의 main 코드를 참조하지 않는다 — 내부 HTTP API·Redis로만 통신하고, wire 타입은 `:shared`의 `com.kista.contract`를 공유한다.
-- 각 모듈 내부는 Hexagonal(`adapter → application → domain`) 구조다. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 `ModulithArchitectureTest`(`ApplicationModules.verify()`), Gradle 방향은 `GradleModuleBoundaryTest`가 빌드 시 강제한다.
+- `:api`와 `:trading-core`는 서로의 main 코드를 참조하지 않는다 — 내부 HTTP API·Redis로만 통신하고, wire 타입은 `:shared`의 `com.kista.shared.contract`를 공유한다.
+- 각 모듈 내부는 Hexagonal(`adapter → application → domain`) 구조다. 레이어 방향은 `HexagonalArchitectureTest`, 모듈 경계는 프로세스별 `ModulithArchitectureTest`(`ApplicationModules.verify()` — api·trading-core 각 1개), Gradle 방향과 서브프로젝트별 루트 패키지(`com.kista.api`/`com.kista.tradingcore`/`com.kista.shared`)는 `GradleModuleBoundaryTest`가 빌드 시 강제한다.
 
 구조 그림은 [`docs/architecture-map.md`](docs/architecture-map.md), 모듈·흐름·생명주기 인터랙티브 맵은 `./gradlew :test --tests '*ArchitectureMapTest'` 후 `build/architecture-map/index.html`.
 

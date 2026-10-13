@@ -11,7 +11,7 @@
 - 재계산 skip: correction까지 포함된 complete INFINITE concrete leg 조합 또는 direction-aware legacy `UNKNOWN` 양방향 점유처럼 안전한 경우에만 전략 주문 계산을 생략한다. 리버스 `AT_CLOSE`는 `REVERSE_INFINITE_LOC_BUY` BUY 슬롯과 `REVERSE_INFINITE_LOC_SELL` SELL 슬롯이 모두 있어야 complete로 본다. partial concrete leg는 항상 계산해 누락 leg를 복구한다. 개장 스케쥴러는 `AT_OPEN`만 생성 대상이라 이 스킵 판정도 `AT_OPEN` 슬롯 완전성만 본다. VR/PRIVACY concrete compute skip은 ladder 길이가 variable이라 비활성화한다.
 - `BuyOrderPriceCapper.buildCappedBuyOrders`(INFINITE)는 재진입(같은 close 배치 내 접수 직전 재조회 가격이 최초 계산 시점보다 추가로 하락해 캡이 다시 트리거되는 경우) 시 입력에 이미 `INFINITE_CORRECTION_*` leg가 섞여 있으면 base 주문(평단가/기준가)만 추출해 재산정한다 — correction leg를 base로 오인해 잘못 계산하는 것을 방지.
 - 계좌별 브로커 토큰: KIS는 `broker_tokens` 테이블에 account_id(PK) 기준 독립 관리 (`KisTokenEntity`), Toss 계좌·관리자 토큰은 Redis canonical hash에 공유 (`TossDistributedTokenCoordinator` + `TossRedisTokenStore`)
-- 실행 결과: `TradingReporter`가 `TradingReportReadyEvent`를 발행 → `tradingnotify`의 `TradingReportNotifier`가 알림 — 사용자봇 미설정 시 생략
+- 실행 결과: `TradingReporter`가 `TradingReportReadyEvent`를 발행 → `tradingcore.notify`의 `TradingReportNotifier`가 알림 — 사용자봇 미설정 시 생략
 - 오류 시: `TradingErrorEvent` 발행(`TradingBatchGuard.notifyErrorSafely`/`TradingErrorReportPort`)으로 관리자·사용자 알림 + 다음 사이클 계속 실행. 계좌별 예산 배정, 사이클별 PLANNED 저장, 잔고 부족 사용자 알림 실패는 각각 격리되어 다른 계좌·사이클 처리를 막지 않는다.
 - **재기동 종료·재개** (spec `docs/superpowers/specs/2026-10-02-trading-batch-resume-design.md`):
   - 종료 처리: 배치는 `TradingBatchRunState`에 스레드와 임계구역(마감 `placeAll`·리포트, 개장 계획~AT_OPEN 접수)을 등록한다. 종료 시 `TradingBatchShutdownCoordinator`(SmartLifecycle, 웹 graceful보다 먼저 stop)가 임계구역 완료를 최대 150s 기다린 뒤 대기 구간만 인터럽트한다. 이때 `waitFor`는 사용자 "미접수" 알림(`BatchInterruptedEvent`)을 억제하고 관리자 "[재기동] … 재개 예정"만 보낸다. 종료 요청이 아닌 인터럽트는 기존대로 "[스케쥴러 인터럽트]" 관리자 알림과 사용자 알림을 보낸다.

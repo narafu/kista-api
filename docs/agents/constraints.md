@@ -4,22 +4,22 @@
 - `git push`는 사용자가 명시적으로 요청할 때만 실행 — 요청 없이 자동 푸시 금지, 요청하면 즉시 실행
 - 커밋 전 author 확인 (`git config user.name`/`user.email`): `narafu <narafu@kakao.com>`
 - 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`, `fix:`, `docs:`, `debug:` 등) + 명령형 제목
-- 매매 시간대 배포 가드는 폐지됐다 — kista-trading은 재기동 시 진행 중 매매 배치를 재개한다(`TradingBatchResumer`, workflow.md "재기동 종료·재개"). 단 kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s를 유지해야 한다(재개가 잔여 락을 인수하므로 겹침 기동은 이중 실행 — `.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다. EPR 재발행 소유: `KistaApplication.scanBasePackages`가 trading-core 패키지를 원천 배제하므로 kista-scheduler엔 매매 관련 빈이 없다 — `event_publication`이 서비스별로 분리돼 kista-trading은 `trading.event_publication`(4a `de693b5c`에서 매매 알림 6종 리스너 이관), kista-scheduler는 root `public.event_publication`을 각각 재발행한다(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`, kista-api는 false 유지 — 둘 다 true면 이중 claim). 배포 파이프라인 구조 → docker-infra.md "서버 배포 방식"
+- 매매 시간대 배포 가드는 폐지됐다 — kista-trading은 재기동 시 진행 중 매매 배치를 재개한다(`TradingBatchResumer`, workflow.md "재기동 종료·재개"). 단 kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s를 유지해야 한다(재개가 잔여 락을 인수하므로 겹침 기동은 이중 실행 — `.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다. EPR 재발행 소유: root 루트 패키지(`com.kista.api`)가 trading-core(`com.kista.tradingcore`)를 포함하지 않아 kista-scheduler엔 매매 관련 빈이 없다 — `event_publication`이 서비스별로 분리돼 kista-trading은 `trading.event_publication`(4a `de693b5c`에서 매매 알림 6종 리스너 이관), kista-scheduler는 root `public.event_publication`을 각각 재발행한다(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`, kista-api는 false 유지 — 둘 다 true면 이중 claim). 배포 파이프라인 구조 → docker-infra.md "서버 배포 방식"
 
 ### application/port/output/ 네이밍 규칙
 - 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
 
 ### 신규 파일 배치
-신규 코드는 레거시 최상위가 아닌 해당 애그리게이트 모듈(`com.kista.<module>`) 안에 추가한다 — `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 서브구조 준수. 포트는 `domain/port/{in,out}`이 아닌 `application/{usecase,port/output}`에 위치. 모듈별 정확한 NamedInterface 공개 범위·internal 패키지는 `docs/agents/modules/<module>.md`(해당 모듈 디렉토리 작업 시 자동 로드)가 SSOT — 신규 코드 추가 전 해당 모듈 문서에서 확인할 것.
-- broker `adapter/out/*`은 NamedInterface 비공개라 모듈 밖에서 접근 불가 — 새 기능이 필요하면 `com.kista.broker.application.port.output`에 신규 `*Port`를 만들어 노출한다
-- 레거시 `com.kista.adapter`/`com.kista.application` shim은 전부 소멸했다. 여러 모듈을 집계하는 앱 레벨 inbound 관심사(크로스모듈 컨트롤러·`GlobalExceptionHandler` 등 전역 `@ControllerAdvice`)는 `com.kista.web`(pure inbound sink, NamedInterface 0개)에, trading-core 프로세스 전역 web 관심사(부팅 진입점·`TradingExceptionHandler`)는 대칭 앱셸 `com.kista.tradingweb`에 추가 — 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`으로. `@Aspect`는 저장소 전체에서 금지(`HexagonalArchitectureTest.no_aspects_in_codebase` — 포인트컷 문자열은 Modulith·ArchUnit이 못 보는 모듈 간 런타임 결합을 만든다, 횡단 관심사는 이벤트로)
-- persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.platform`(인프라 leaf)에 추가 — 다른 `com.kista` 모듈 참조 시 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 빌드를 깬다
-- 주문생성 알고리즘 커널(전략 계산·position 값객체·`PlannedOrder`·`AccountBalance` 등)은 `com.kista.matching`에 추가, `"kernel"` NamedInterface로 공개 — `com.kista.sharedkernel` 외 다른 `com.kista` 모듈 의존 금지(`HexagonalArchitectureTest.matching_must_not_depend_on_other_modules` — privacy 데이터는 커널 소유 `PrivacyPlan`으로 받는다)
+신규 코드는 레거시 최상위가 아닌 해당 서브프로젝트 루트의 애그리게이트 모듈(`com.kista.api.<module>`·`com.kista.tradingcore.<module>`, 공용은 `com.kista.shared.<module>`) 안에 추가한다 — `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 서브구조 준수. 포트는 `domain/port/{in,out}`이 아닌 `application/{usecase,port/output}`에 위치. 모듈별 정확한 NamedInterface 공개 범위·internal 패키지는 `docs/agents/modules/<루트>/<ID>.md`(해당 모듈 디렉토리 작업 시 자동 로드)가 SSOT — 신규 코드 추가 전 해당 모듈 문서에서 확인할 것.
+- broker `adapter/out/*`은 NamedInterface 비공개라 모듈 밖에서 접근 불가 — 새 기능이 필요하면 `com.kista.tradingcore.broker.application.port.output`에 신규 `*Port`를 만들어 노출한다
+- 레거시 `com.kista.adapter`/`com.kista.application` shim은 전부 소멸했다. 여러 모듈을 집계하는 앱 레벨 inbound 관심사(크로스모듈 컨트롤러·`GlobalExceptionHandler` 등 전역 `@ControllerAdvice`)는 `com.kista.api.web`(pure inbound sink, NamedInterface 0개)에, trading-core 프로세스 전역 web 관심사(`TradingExceptionHandler` — 부팅 진입점 `TradingApplication`은 앱셸이 아니라 `com.kista.tradingcore` 루트)는 대칭 앱셸 `com.kista.tradingcore.web`에 추가 — 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`으로. `@Aspect`는 저장소 전체에서 금지(`HexagonalArchitectureTest.no_aspects_in_codebase` — 포인트컷 문자열은 Modulith·ArchUnit이 못 보는 모듈 간 런타임 결합을 만든다, 횡단 관심사는 이벤트로)
+- persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.shared.platform`(인프라 leaf)에 추가 — 다른 `com.kista` 모듈 참조 시 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 빌드를 깬다
+- 주문생성 알고리즘 커널(전략 계산·position 값객체·`PlannedOrder`·`AccountBalance` 등)은 `com.kista.tradingcore.matching`에 추가, `"kernel"` NamedInterface로 공개 — `com.kista.shared.kernel` 외 다른 `com.kista` 모듈 의존 금지(`HexagonalArchitectureTest.matching_must_not_depend_on_other_modules` — privacy 데이터는 커널 소유 `PrivacyPlan`으로 받는다)
 
 모듈 간 참조가 얽히면 own-type 정의(아래 "모듈 경계 own-type" 게이트 통과 시) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도 보장) 패턴을 사용한다. 마이그레이션 경위·순환 해소 상세는 `docs/agents/modulith-migration-history.md` 참고(필요시 Read).
 
 ### 모듈 경계 own-type — 정당화 게이트
-**프로세스 경계(root `:api` ↔ `:trading-core`)를 넘는 wire 타입(내부 HTTP API 요청·응답 body, Redis payload)은 own-type 복제가 아니라 `com.kista.contract`(`:shared`)에 선언해 양쪽이 컴파일 타임에 공유한다 — 이 게이트를 거치지 않는다.** "Gradle 컴파일 경계 때문에 복제"라는 (a) 논리는 `:shared`가 있는 이상 성립하지 않는다(contract는 JDK+sharedkernel만 참조하는 outbound-zero 값 타입이라 양쪽이 의존 가능). 새 내부 엔드포인트는 (1) `contract.<채널>`에 record를 두고 (2) trading-core 컨트롤러가 도메인 → contract로 매핑하며(도메인 record를 wire에 직접 반환 금지) (3) root 어댑터가 contract를 그대로 포트 시그니처에 쓴다. `InternalApiContractTest`가 이 규칙을 강제한다. 공유 어휘(enum 등)는 sharedkernel, wire 스키마(필드명이 곧 계약)는 contract — `docs/agents/modules/contract.md`.
+**프로세스 경계(root `:api` ↔ `:trading-core`)를 넘는 wire 타입(내부 HTTP API 요청·응답 body, Redis payload)은 own-type 복제가 아니라 `com.kista.shared.contract`(`:shared`)에 선언해 양쪽이 컴파일 타임에 공유한다 — 이 게이트를 거치지 않는다.** "Gradle 컴파일 경계 때문에 복제"라는 (a) 논리는 `:shared`가 있는 이상 성립하지 않는다(contract는 JDK+sharedkernel만 참조하는 outbound-zero 값 타입이라 양쪽이 의존 가능). 새 내부 엔드포인트는 (1) `contract.<채널>`에 record를 두고 (2) trading-core 컨트롤러가 도메인 → contract로 매핑하며(도메인 record를 wire에 직접 반환 금지) (3) root 어댑터가 contract를 그대로 포트 시그니처에 쓴다. `InternalApiContractTest`가 이 규칙을 강제한다. 공유 어휘(enum 등)는 sharedkernel, wire 스키마(필드명이 곧 계약)는 contract — `docs/agents/modules/shared/contract.md`.
 
 아래 게이트는 wire 타입이 아닌 **모듈 간 값 타입** 복제에 적용된다. 값 타입을 다른 모듈에 복제(own-type)하는 것은 다음 둘 중 하나를 만족할 때만 정당하다. 아니면 복제가 아니라 sharedkernel 승격 또는 소유권 이동 대상이다.
 - **(a) 순환 불가피**: 통합하면 모듈 순환이 생기고, 소유권 이동으로도 끊을 수 없다.
@@ -27,7 +27,7 @@
 
 **(b) 주장 시 증거 의무**: "외부 계약에 묶여있다"는 서술만으로는 통과 못 한다 — 그 값이 실제로 wire 포맷 변환 코드(어댑터의 switch/if 매핑, 예: `KisOrderApi.resolveOrderDvsn` 류)에서 소비되는지 grep으로 확인하고 그 파일:라인을 근거로 남길 것(enum 값 자체엔 계약이 없고 매핑은 어댑터가 담당하는 경우가 많다). 새 own-type 복제·게이트 판정을 문서에 적을 때는 이 확인을 거치지 않은 "~로 보인다/추정된다" 식 단정을 넣지 말 것.
 
-**포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`AccountOpenOrderCancelPort`(account 정의·trading `AccountOpenOrderCanceller` 구현 — 주문 소유자)/`ActiveStrategyCountPort`(user 정의·`com.kista.user.adapter.out.internal.ActiveStrategyCountAdapter` 구현 — trading-core 내부 HTTP 호출)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingstats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingstats.application.port.output` 소유 일반 출력 포트다. `TradingUserProfilePort`도 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다.
+**포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`AccountOpenOrderCancelPort`(account 정의·trading `AccountOpenOrderCanceller` 구현 — 주문 소유자)/`ActiveStrategyCountPort`(user 정의·`com.kista.api.user.adapter.out.internal.ActiveStrategyCountAdapter` 구현 — trading-core 내부 HTTP 호출)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingcore.stats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingcore.stats.application.port.output` 소유 일반 출력 포트다. `TradingUserProfilePort`도 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다.
 
 **제3자(정의자도 데이터 소유자도 아닌 모듈, 예: web) 구현을 새 설계의 선례로 삼지 말 것** — root(`:api`)는 `:trading-core`를 컴파일 의존하지 않으므로 trading-core 정의 인터페이스를 root가 구현할 수 없다(스타일 문제가 아니라 컴파일 불가). trading-core는 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·잔고검증·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `user.adapter.out.internal.ActiveStrategyCountAdapter` — trading-core 내부 HTTP 호출).
 
@@ -42,21 +42,21 @@
 ### adapter/out 간 JpaRepository 접근 제한
 - `*JpaRepository`는 package-private — 선언 패키지 외부에서 직접 import 시 컴파일 오류
 - 다른 패키지 adapter에서 DB 조작이 필요하면 아웃바운드 포트(`application/port/output/`) 경유 필수
-- 패턴: `com.kista.marketcalendar.adapter.out.alpaca.AlpacaCalendarAdapter` → `com.kista.marketcalendar.application.port.output.MarketHolidayStorePort` → `com.kista.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter`
-- 참고: `com.kista.broker.adapter.out.kis.KisAuthApi` → `com.kista.broker.application.port.output.BrokerTokenCachePort` → `com.kista.broker.adapter.out.persistence.KisTokenPersistenceAdapter`
+- 패턴: `com.kista.tradingcore.marketcalendar.adapter.out.alpaca.AlpacaCalendarAdapter` → `com.kista.tradingcore.marketcalendar.application.port.output.MarketHolidayStorePort` → `com.kista.tradingcore.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter`
+- 참고: `com.kista.tradingcore.broker.adapter.out.kis.KisAuthApi` → `com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort` → `com.kista.tradingcore.broker.adapter.out.persistence.KisTokenPersistenceAdapter`
 
 
 ### GlobalExceptionHandler 자동 예외 처리
 - Controller에서 별도 catch/rethrow 불필요 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT (예외별 코드는 코드가 SSOT)
 - async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 - **ProblemDetail 응답 계약**: `detail`은 사용자에게 그대로 보여줄 수 있는 한국어 문구다(완전한 문장은 "~습니다."+마침표). 내부 정보(URL·응답 바디·계좌번호·enum 원문·영어 프레임워크 메시지)는 detail에 싣지 말고 로그로 — 원문이 영어 내부 정보인 프레임워크 예외는 `Mapping.fixedDetail`로 고정 문구를 쓴다. 예외: 검증 실패(`MethodArgumentNotValidException`)는 "[field: message]" 형식 유지
-- **기계 판독 코드 `code`**: UI가 분기하거나 문구를 달리 보여줘야 하는 예외만 `ErrorCode`(`com.kista.platform.web`)를 `Mapping`에 지정한다 — 응답 확장 프로퍼티 `code`, 없으면 키 자체가 없다. 상수 이름 변경·삭제 금지(kista-ui 계약). 추가 절차: ① `ErrorCode` 상수 ② 핸들러 매핑 테이블 `Mapping(status, title, code, fixedDetail)` ③ 같은 예외 클래스가 여러 의미면 서브클래스 분리(`resolve()`가 계층 하위부터 탐색 — 예: `AlreadyOrderedTodayException`) ④ openapi는 `ErrorCodeOpenApiCustomizer`가 자동 반영 → kista-ui `gen:types` + 문구 매핑
+- **기계 판독 코드 `code`**: UI가 분기하거나 문구를 달리 보여줘야 하는 예외만 `ErrorCode`(`com.kista.shared.platform.web`)를 `Mapping`에 지정한다 — 응답 확장 프로퍼티 `code`, 없으면 키 자체가 없다. 상수 이름 변경·삭제 금지(kista-ui 계약). 추가 절차: ① `ErrorCode` 상수 ② 핸들러 매핑 테이블 `Mapping(status, title, code, fixedDetail)` ③ 같은 예외 클래스가 여러 의미면 서브클래스 분리(`resolve()`가 계층 하위부터 탐색 — 예: `AlreadyOrderedTodayException`) ④ openapi는 `ErrorCodeOpenApiCustomizer`가 자동 반영 → kista-ui `gen:types` + 문구 매핑
 - **내부 API 경유 한계**: root 내부 API 어댑터는 trading-core 응답의 status만 보고 `Admin*` 예외를 되살린다 — root 테이블이 같은 코드를 다시 붙인다. 같은 status에 서로 다른 코드가 실려 오는 경로가 생기면 `InternalApiErrorDetails`가 `code`도 읽어 전달하도록 확장한다
 
 ### 모듈 문서가 SSOT인 규칙 (해당 모듈 작업 시 자동 로드, 그 외엔 직접 Read)
-- Account ↔ Strategy 분리·잔고검증 토글(`balanceCheckEnabled`)·스케쥴러 주문 예산 배정, 런타임 매매 정책 적용 → `modules/trading.md`
-- 매매 공식·VR 공식(변경 금지 — 단위 테스트로 검증) → `modules/trading-formulas.md`
-- 런타임 설정 API 엔드포인트 규칙 → `modules/admin.md`
+- Account ↔ Strategy 분리·잔고검증 토글(`balanceCheckEnabled`)·스케쥴러 주문 예산 배정, 런타임 매매 정책 적용 → `modules/tradingcore/trading.md`
+- 매매 공식·VR 공식(변경 금지 — 단위 테스트로 검증) → `modules/tradingcore/trading-formulas.md`
+- 런타임 설정 API 엔드포인트 규칙 → `modules/api/admin.md`
 
 ### 아키텍처 맵 flows.yml 동기화
 아키텍처 맵의 랜드스케이프·흐름·생명주기 탭은 `src/test/resources/architecture/flows.yml` 수기 원본이다. `ArchitectureMapTest`는 `code:` 참조 존재와 enum 상수 집합만 검증하고 의미는 검증하지 않는다. 다음을 바꾸면 같은 작업에서 `flows.yml`도 함께 갱신한다.
@@ -80,14 +80,14 @@
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
 ### User/Account/Strategy 공유 enum — sharedkernel 이관 완료
-`User.UserRole`/`UserStatus`/`NotificationType`, `Strategy.Type`/`Status`/`Ticker`/`CycleSeedType`, `Account.Broker`는 여러 모듈이 공유하는 값이라 `com.kista.sharedkernel` 독립 타입이다 — 이 모듈들에 nested enum으로 재도입 금지. `NotificationChannel`도 user(설정 저장)와 notify(채널 라우팅)가 공유하는 `com.kista.sharedkernel` 타입이다. DB `@Enumerated(STRING)` 컬럼 상수명은 모두 byte-identical 유지 — 이동해도 상수명은 절대 바꾸지 않는다.
+`User.UserRole`/`UserStatus`/`NotificationType`, `Strategy.Type`/`Status`/`Ticker`/`CycleSeedType`, `Account.Broker`는 여러 모듈이 공유하는 값이라 `com.kista.shared.kernel` 독립 타입이다 — 이 모듈들에 nested enum으로 재도입 금지. `NotificationChannel`도 user(설정 저장)와 notify(채널 라우팅)가 공유하는 `com.kista.shared.kernel` 타입이다. DB `@Enumerated(STRING)` 컬럼 상수명은 모두 byte-identical 유지 — 이동해도 상수명은 절대 바꾸지 않는다.
 - 신규 유저 기본 알림 채널: `User.DEFAULT_CHANNEL = NotificationChannel.NONE`(domain 상수, `User`에 유지) — 서비스/컨트롤러에서 직접 하드코딩 금지
 
 ### 도메인 Command 명명 규칙
 - `application.usecase` 인바운드 포트 파라미터/입력 모델: `*Command` suffix, `*Request` suffix 금지(외부 HTTP DTO 성격 오인), `domain/model/<도메인>/` 하위 위치
 
 ### Ticker enum (sharedkernel.StrategyTicker)
-- KIS 거래소 코드는 `com.kista.broker.adapter.out.kis.KisExchangeRegistry` 전용 — 새 종목 추가 시 양쪽 갱신 필수
+- KIS 거래소 코드는 `com.kista.tradingcore.broker.adapter.out.kis.KisExchangeRegistry` 전용 — 새 종목 추가 시 양쪽 갱신 필수
 - PRIVACY·VR 신규 등록 ticker는 `StrategyCreationSettings.ticker()`의 고정값 정책으로 결정되며, 다른 명시 입력은 거부한다 (기본값: PRIVACY=SOXL, VR=TQQQ)
 - ticker는 `Account` 아닌 `strategy.ticker()` — 매매 시 strategy에서 참조
 
@@ -104,7 +104,7 @@
 - **Flyway**: `CREATE TYPE` 구문 작성 금지, 컬럼 정의는 `VARCHAR(20)` (값 길이 여유 있게)
 
 ### 계좌번호 마스킹 (AccountNumberMasker)
-- `com.kista.sharedkernel.AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)
+- `com.kista.shared.kernel.AccountNumberMasker.mask(accountNo)` — 계좌번호 마스킹 단일 알고리즘(SSOT). 숫자 이외 문자 전부 제거 후 마지막 4자리만 노출(`"****1234"`)
 - KIS(하이픈 1개)·TOSS(하이픈 2개) 포맷 모두 대응
 - 신규 DTO에서 계좌번호 마스킹이 필요하면 반드시 이 유틸을 재사용 — 개별 `substring`/`replace` 마스킹 로직 신규 작성 금지
 
@@ -125,7 +125,7 @@
 - **CI 강제(`.github/scripts/check-migrations.sh`, `deploy-checks` 잡)**: ① 이미 존재하던 마이그레이션 파일(양 서비스)의 수정·삭제·이름변경 실패 ② root(`db/migration`, V1 baseline 제외)에서 DROP TABLE·DROP COLUMN·RENAME·SET NOT NULL·ALTER COLUMN TYPE·DEFAULT 없는 NOT NULL 컬럼 추가 실패. 두 role을 같은 커밋에서 함께 배포하는 의도적 contract 단계면 파일에 `-- contract-ok: <사유>` 주석으로 예외 표시
 - **2-role 배포 backward-compat (expand/contract)** — root(`db/migration`) 마이그레이션에만 해당하며 trading-core(`db/migration-trading`)는 자기 스키마·이력을 독립으로 가져 이 제약 밖이다: `kista-api`·`kista-scheduler`가 독립 배포되므로, root 새 마이그레이션은 직전 배포 이미지와 호환돼야 한다 — 컬럼 추가는 nullable 또는 DEFAULT, 컬럼/테이블 드롭·리네임은 두 배포에 분리(먼저 코드 참조 제거 → 다음 배포에서 스키마 변경). 이를 못 지키는 마이그레이션을 실은 커밋은 두 role을 함께 배포한다. `ddl-auto: validate`는 기동 시에만 검사하므로, 스큐 상태의 스케쥴러는 드롭된 컬럼을 매매 도중 런타임에 만날 때까지 계속 돈다
   - **스키마뿐 아니라 "이벤트로 채워지는 복제 테이블"도 순서 제약을 만든다**: 복제본을 채우는 발행이 한쪽 role에만 있으면, 그 role이 구버전인 채로 반대쪽만 신버전이 되면 복제본이 비어 신버전이 깨진다. `user_notify_profile`이 그 사례 — 발행은 `kista-api` 경로(가입·승인·거절·재신청·설정변경)에만 있으므로 **`kista-api`를 `kista-scheduler`보다 먼저(또는 동시에) 배포해야 한다**. 반대 순서는 무해하다(구 스케쥴러는 `users`/`user_settings`를 직접 읽음) — 단방향 제약이다. 새 복제 테이블을 추가할 때 "발행 주체가 어느 role인가"를 먼저 확인하고 마이그레이션 헤더에 순서를 명시할 것
-  - **이벤트 클래스·리스너 패키지 이동/개명은 `event_publication`에 고아 row를 남긴다**: Modulith EPR은 이벤트를 FQCN(`event_type`), 리스너를 FQCN+메서드(`listener_id`)로 저장해 재기동 republish 시 그 이름으로 resolve한다 — 옛 이름으로 남은 미완료 row는 `ClassNotFoundException`으로 반복 실패하거나 어떤 리스너와도 매칭되지 않아 자연 치유되지 않는다. 이런 커밋은 소유 서비스(`trading.event_publication`=kista-trading, `public.event_publication`=kista-scheduler) 이미지 교체 직전에 확인·정리해야 한다. `completion_date`를 채워 완료로 위장하지 말고 삭제(재시도 포기)로 처리. 절차와 이관 건별 SQL → `docker-infra.md` "배포 직전 EPR 정리 런북"
+  - **이벤트 클래스·리스너 패키지 이동/개명은 `event_publication`에 고아 row를 남긴다**: Modulith EPR은 이벤트를 FQCN(`event_type`), 리스너를 FQCN+메서드(`listener_id`)로 저장해 재기동 republish 시 그 이름으로 resolve한다 — 옛 이름으로 남은 미완료 row는 `ClassNotFoundException`으로 반복 실패하거나 어떤 리스너와도 매칭되지 않아 자연 치유되지 않는다. 이런 커밋은 소유 서비스(`trading.event_publication`=kista-trading, `public.event_publication`=kista-scheduler) 이미지 교체 직전에 확인·정리해야 한다. `completion_date`를 채워 완료로 위장하지 말고 삭제(재시도 포기)로 처리. 절차와 이관 건별 SQL → `docker-infra.md` "배포 직전 EPR 정리 런북". 패키지 루트 분리(2026-10) 같은 루트 이동은 모든 미완료 row를 고아로 만든다 → `docker-infra.md` "패키지 루트 분리 배포"
 - **Entity ↔ Flyway 크로스체크 필수**: Entity의 `nullable`, `length`, `precision`, `scale` 변경 시 Flyway SQL과 반드시 대조. `ddl-auto: validate`는 타입 불일치를 부팅 시 즉시 `SchemaManagementException`으로 잡음. `NOT NULL` 불일치만 런타임 무증상 → 실제 null 삽입 시 `DataIntegrityViolationException`
 - **`@Column(scale)` 주의**: DDL 힌트일 뿐, JPA 1차 캐시에는 원본 BigDecimal 유지 — `@Transactional` 내 저장 직후 읽으면 DB 반올림 전 값 반환
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤 — 특정 위치 강제는 테이블 재생성 패턴 사용 (`CREATE TABLE _new + INSERT SELECT + DROP + RENAME`)
@@ -141,16 +141,16 @@
 
 ### Adapter 내부 중첩 타입 접근 제어자
 - 같은 패키지 테스트에서 참조하려면 `private record` 금지 — `record`(package-private)으로 선언해야 `Outer.Inner.class` 매처 사용 가능
-- 예: `com.kista.broker.adapter.out.kis.KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
+- 예: `com.kista.tradingcore.broker.adapter.out.kis.KisAuthApi.TokenCheckResponse`, `KisOrderApi.OrderResponse` 패턴
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### AES-256 암호화 위치
 - KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
 
 ### adapter.in.telegram package-private 제약
-- 텔레그램 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아닌 **인바운드 관리자 명령**이라 `com.kista.admin.adapter.in.telegram`이 소유한다. `TelegramBotService`는 package-private → 컨트롤러 외 다른 패키지에서 직접 참조 불가. `/telegram/webhook`은 `platform.security.SecurityConfig`에서 permitAll(경로 불변)
-- 텔레그램 HTTP 전송은 `com.kista.platform.telegram.TelegramHttpClient`(public — `sendMessage`/`sendWithInlineKeyboard`/`answerCallbackQuery`/`getBotUsername`) 하나로 통합돼 root(notify·admin)와 trading-core(`tradingnotify`)가 공용한다. 새 텔레그램 API 호출은 이 클래스에 메서드를 추가하고, notify·admin에 `RestClient`를 직접 쓰지 않는다(`HexagonalArchitectureTest.notify_must_stay_pure_outbound_gateway`가 notify의 `org.springframework.web.client..`·`..application.usecase..` 의존을 잠근다)
-- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `TelegramHttpClient`에 메서드 추가 + 소유 모듈 포트(예: user `TelegramBotInfoPort`)를 `com.kista.notify.adapter.out.gateway` 어댑터(`TelegramBotInfoAdapter`)가 구현·위임하는 패턴
+- 텔레그램 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아닌 **인바운드 관리자 명령**이라 `com.kista.api.admin.adapter.in.telegram`이 소유한다. `TelegramBotService`는 package-private → 컨트롤러 외 다른 패키지에서 직접 참조 불가. `/telegram/webhook`은 `platform.security.SecurityConfig`에서 permitAll(경로 불변)
+- 텔레그램 HTTP 전송은 `com.kista.shared.platform.telegram.TelegramHttpClient`(public — `sendMessage`/`sendWithInlineKeyboard`/`answerCallbackQuery`/`getBotUsername`) 하나로 통합돼 root(notify·admin)와 trading-core(`tradingcore.notify`)가 공용한다. 새 텔레그램 API 호출은 이 클래스에 메서드를 추가하고, notify·admin에 `RestClient`를 직접 쓰지 않는다(`HexagonalArchitectureTest.notify_must_stay_pure_outbound_gateway`가 notify의 `org.springframework.web.client..`·`..application.usecase..` 의존을 잠근다)
+- 사용자 고유 botToken으로 Telegram API 호출이 필요하면: `TelegramHttpClient`에 메서드 추가 + 소유 모듈 포트(예: user `TelegramBotInfoPort`)를 `com.kista.api.notify.adapter.out.gateway` 어댑터(`TelegramBotInfoAdapter`)가 구현·위임하는 패턴
 - `RestClient` 빈이 여러 개이므로 텔레그램 빈은 이름 `telegramRestClient`/`telegramHttpClient` — 주입 지점은 필드명 `telegramRestClient` 또는 `TelegramHttpClient` 타입으로만 받는다(불일치 시 `NoUniqueBeanDefinitionException`)
 
 ### Spring Security Filter 이중 등록 방지
@@ -163,11 +163,11 @@
 - `@WebMvcTest`에서 `/api/internal/**` 경로 테스트: `@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})` + `@TestPropertySource(properties = "internal.api.token=test-token")` + `.header("X-Internal-Token", "test-token")` 패턴 (`FidaOrderControllerTest` 참고)
 
 ### @EnableJpaAuditing 위치
-- `@SpringBootApplication` 아닌 별도 `JpaAuditingConfig.java` (`com.kista.platform.persistence`)에 선언 — 아니면 `@WebMvcTest` `BeanCreationException` 발생
+- `@SpringBootApplication` 아닌 별도 `JpaAuditingConfig.java` (`com.kista.shared.platform.persistence`)에 선언 — 아니면 `@WebMvcTest` `BeanCreationException` 발생
 
 ### Lombok @MappedSuperclass 상속 주의
 - `@MappedSuperclass` 부모 필드의 getter/setter는 서브클래스 `@Getter`/`@Setter`로 생성되지 않음 → 부모 클래스에 직접 선언 필요
-- `@Setter(AccessLevel.PACKAGE)` 범위는 **선언 클래스 패키지 기준** — `BaseAuditEntity`(`com.kista.platform.persistence`)의 package-private setter는 이를 상속하는 각 모듈 persistence 패키지(`com.kista.user.adapter.out.persistence.user` 등)에서 접근 불가. `createdAt`/`updatedAt` 필드 자체는 `protected`라 상속 접근 가능
+- `@Setter(AccessLevel.PACKAGE)` 범위는 **선언 클래스 패키지 기준** — `BaseAuditEntity`(`com.kista.shared.platform.persistence`)의 package-private setter는 이를 상속하는 각 모듈 persistence 패키지(`com.kista.api.user.adapter.out.persistence.user` 등)에서 접근 불가. `createdAt`/`updatedAt` 필드 자체는 `protected`라 상속 접근 가능
 
 ### 자체 JWT 인증 (ECC P-256)
 - `JwtIssuerService`: EC P-256 JWK → ES256 JWT 발급, `JwtAuthFilter`: principal을 `UUID` 타입으로 저장
@@ -215,7 +215,7 @@
 - **거래일(tradeDate) = KST 일자** — 매매가 실행·정산되는 KST 아침이 속한 날. DB(`orders.trade_date`)·도메인·API 모두 동일 값, 변환 없음 (과거 US 거래일 기준에서 KST 기준으로 전환 완료됨)
 - **`privacy_trade_bases.release_date` = FIDA 발행일 원본(KST)** — 거래일 아님. 발행일↔거래일(+1일)은 `PrivacyDates.releaseDateFor()/tradeDateOf()` 업무 규칙 헬퍼만 사용
 - **외부 원본 참조 데이터는 원본 기준 유지**: `us_market_holidays`(US 달력일) — KST↔US 변환은 해당 어댑터 내부에서만 (`UsTradeDates.toUsTradeDate()/toKstTradeDate()`)
-- `UsTradeDates`(`com.kista.platform.time` — 어댑터 전용이라 sharedkernel "공용 어휘"에서 분리) 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter`, `KisPriceApi`(dailyprice BYMD 파라미터), `TossPriceApi.getClosingPrice`(Toss 일봉 캔들 `date()`는 US 세션일 기준) — 도메인·서비스·orders persistence에서 사용 금지. `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`가 이 4클래스 allowlist를 실제로 강제한다
+- `UsTradeDates`(`com.kista.shared.platform.time` — 어댑터 전용이라 sharedkernel "공용 어휘"에서 분리) 사용 허용 위치: `KisTradingApi`(KIS API는 US 거래일 기준), `MarketCalendarPersistenceAdapter`, `KisPriceApi`(dailyprice BYMD 파라미터), `TossPriceApi.getClosingPrice`(Toss 일봉 캔들 `date()`는 US 세션일 기준) — 도메인·서비스·orders persistence에서 사용 금지. `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`가 이 4클래스 allowlist를 실제로 강제한다
 - **Toss API**: 주문 접수일(KST) 기준 — 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후 `filledAt`(KST) 재필터. 예외: 일봉 캔들(`TossCandleApi`)의 `date()`는 US 세션일이라 `TossPriceApi.getClosingPrice`는 KST 거래일 D를 US 세션 D-1로 변환해 조회 (KIS `fetchConfirmedClose`와 동일 규칙)
 - Instant ↔ KST 일자 경계는 `atStartOfDay(TimeZones.KST)` 단일 관용구 — `ZoneOffset.UTC` 자정 경계 금지
 - 거래일 경계 시각: `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` (마감 배치 cron 발화와 동일) — preview·수동실행·주문취소가 `DstInfo.nextTradeDate()` SSOT 사용

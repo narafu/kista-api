@@ -1,6 +1,6 @@
-## com.kista.finance (`:api`)
+## com.kista.api.finance (`:api`)
 
-com.kista.finance/   ← Spring Modulith 모듈(CLOSED) — 가계부 애그리게이트
+com.kista.api.finance/   ← Spring Modulith 모듈(CLOSED) — 가계부 애그리게이트
   domain/model/      ← AssetSnapshot/FinanceAccount/FinanceBudget/FinanceCategory/FinanceGroup/FinanceTransaction/MonthlyClosing 등 record + Command — "domain" NamedInterface
   application/usecase/  ← UseCase 인터페이스(9개) — "usecase" NamedInterface
   application/port/output/ ← *Port(8개 — `FinanceMemberPort` 포함) — "port" NamedInterface
