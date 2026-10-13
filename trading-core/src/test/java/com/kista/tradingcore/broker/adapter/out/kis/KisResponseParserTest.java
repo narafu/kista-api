@@ -73,20 +73,25 @@ class KisResponseParserTest {
         assertThat(KisResponseParser.parseDirection("99")).isEqualTo(OrderDirection.BUY);
     }
 
-    // formatPrice: MOC→"0", LOC/LIMIT→소수 2자리
+    // formatPrice: 매도 MOC/MOO→"0", 그 외→소수 2자리
     @Test
-    void formatPrice_moc_returnsZeroString() {
-        assertThat(KisResponseParser.formatPrice(OrderType.MOC, new BigDecimal("22.5"))).isEqualTo("0");
+    void market_price_zero_only_for_sell_moo_moc() {
+        BigDecimal cap = new BigDecimal("105.1234");
+        assertThat(KisResponseParser.formatPrice(OrderType.MOC, OrderDirection.SELL, cap)).isEqualTo("0");
+        assertThat(KisResponseParser.formatPrice(OrderType.MOO, OrderDirection.SELL, cap)).isEqualTo("0");
+        assertThat(KisResponseParser.formatPrice(OrderType.MOC, OrderDirection.BUY, cap)).isEqualTo("105.12");
+        assertThat(KisResponseParser.formatPrice(OrderType.MOO, OrderDirection.BUY, cap)).isEqualTo("105.12");
+        assertThat(KisResponseParser.formatPrice(OrderType.LOC, OrderDirection.BUY, cap)).isEqualTo("105.12");
     }
 
     @Test
     void formatPrice_loc_returnsTwoDecimalPlaces() {
-        assertThat(KisResponseParser.formatPrice(OrderType.LOC, new BigDecimal("22.5"))).isEqualTo("22.50");
+        assertThat(KisResponseParser.formatPrice(OrderType.LOC, OrderDirection.BUY, new BigDecimal("22.5"))).isEqualTo("22.50");
     }
 
     @Test
     void formatPrice_limit_returnsTwoDecimalPlaces() {
-        assertThat(KisResponseParser.formatPrice(OrderType.LIMIT, new BigDecimal("22"))).isEqualTo("22.00");
+        assertThat(KisResponseParser.formatPrice(OrderType.LIMIT, OrderDirection.BUY, new BigDecimal("22"))).isEqualTo("22.00");
     }
 
     // resolvePrice: last 유효→last, last 빈+base 유효→base, 둘 다 빈→empty

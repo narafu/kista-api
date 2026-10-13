@@ -85,6 +85,8 @@ public record AdminSettingsRequest(
                 case VR -> new StrategyCreationSettings(enabled,
                         value.tickerValue(), null, value.recurringModeValue(),
                         value.bandWidthValue(), value.intervalWeeksValue());
+                case DCA -> new StrategyCreationSettings(enabled,
+                        value.tickerValue(), null, null, null, null);
             };
         }
     }

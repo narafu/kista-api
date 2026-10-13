@@ -2,6 +2,7 @@ package com.kista.shared.kernel;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +18,7 @@ class TradingPolicySettingsTest {
         assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
         assertThat(settings.brokers().values()).allMatch(BrokerSettings::enabled);
         assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
-        assertThat(settings.strategies().values()).allMatch(StrategyCreationSettings::enabled);
+        assertThat(settings.strategies().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != StrategyType.DCA)); // DCA만 기본 비활성
         assertThat(settings.strategy(StrategyType.INFINITE).divisionCount())
                 .isEqualTo(new StrategyFieldSettings<>(true, List.of(20, 30, 40), 20));
         assertThat(settings.strategy(StrategyType.PRIVACY).ticker())
@@ -74,5 +75,33 @@ class TradingPolicySettingsTest {
                 vr.bandWidth(), vr.intervalWeeks()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("HOLD");
+    }
+
+    @Test
+    void defaults_keep_dca_disabled_with_dca_tickers() {
+        StrategyCreationSettings dca = TradingPolicySettings.defaults().strategy(StrategyType.DCA);
+        assertThat(dca.enabled()).isFalse();
+        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD);
+        assertThat(dca.ticker().defaultValue()).isEqualTo(StrategyTicker.UPRO);
+        assertThat(dca.divisionCount()).isNull();
+    }
+
+    @Test
+    void defaults_keep_infinite_tickers_explicit() {
+        assertThat(TradingPolicySettings.defaults().strategy(StrategyType.INFINITE).ticker().allowedValues())
+                .containsExactly(StrategyTicker.MAGX, StrategyTicker.USD, StrategyTicker.TQQQ, StrategyTicker.SOXL);
+    }
+
+    @Test
+    void rejects_ticker_outside_capability() {
+        TradingPolicySettings defaults = TradingPolicySettings.defaults();
+        Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(defaults.strategies());
+        StrategyCreationSettings infinite = strategies.get(StrategyType.INFINITE);
+        strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.SOXL, StrategyTicker.UPRO), StrategyTicker.SOXL),
+                infinite.divisionCount(), null, null, null));
+        assertThatThrownBy(() -> new TradingPolicySettings(defaults.brokers(), strategies))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("INFINITE");
     }
 }

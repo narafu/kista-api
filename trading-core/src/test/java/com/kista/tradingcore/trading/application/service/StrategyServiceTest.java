@@ -213,6 +213,9 @@ class StrategyServiceTest {
                     new StrategyFieldSettings<>(true,
                             List.of(BigDecimal.valueOf(10), BigDecimal.valueOf(15), BigDecimal.valueOf(20)), BigDecimal.valueOf(15)),
                     new StrategyFieldSettings<>(true, List.of(1, 2, 4), 2));
+            case DCA -> new StrategyCreationSettings(false, // 이 테스트는 DCA를 다루지 않음 — 비활성 기본 정책만 제공
+                    new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                    null, null, null, null);
         };
     }
 

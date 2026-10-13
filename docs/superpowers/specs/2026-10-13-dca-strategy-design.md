@@ -280,7 +280,7 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
   - 계획·저장 직후, `waitUntilMarketOpen()` **전에** "개장 전 접수 대상"을 먼저 접수한다.
   - 대상은 KIS 계좌의 DCA `AT_OPEN` 주문(31/32)이다.
   - 기존 AT_OPEN 주문(INFINITE 매도, VR 사다리)과 Toss/MOCK의 DCA AT_OPEN은 지금처럼 개장까지 기다린 뒤 접수한다.
-  - 판정은 브로커 capability로 한다. `BrokerCapabilitiesPort`에 `supportsOpenAuctionOrders()`를 추가하며 KIS만 true다.
+  - 판정은 `Broker.supportsOpenAuctionOrders()`(shared.kernel)로 한다. KIS만 true다. 정적 사실이고 소비처가 trading 한 곳이라 포트를 늘리지 않는다.
 - 개장 전 접수 구간도 배치 임계구역(`TradingBatchRunState`)에 등록한다. 재기동 종료 처리와 재개 규칙은 기존 `PLACING` 단계를 그대로 쓴다.
 - 영향
   - 기존 AT_OPEN 전략의 계획 시점이 30분(DST) 앞당겨진다.

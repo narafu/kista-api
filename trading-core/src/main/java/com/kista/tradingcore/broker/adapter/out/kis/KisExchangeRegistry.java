@@ -17,7 +17,9 @@ class KisExchangeRegistry {
             StrategyTicker.TQQQ, new Mapping("NASD", "NAS"),
             StrategyTicker.SOXL, new Mapping("AMEX", "AMS"),
             StrategyTicker.USD,  new Mapping("AMEX", "AMS"),
-            StrategyTicker.MAGX, new Mapping("AMEX", "AMS")
+            StrategyTicker.MAGX, new Mapping("AMEX", "AMS"),
+            StrategyTicker.UPRO, new Mapping("AMEX", "AMS"), // ProShares UltraPro S&P500 — NYSE Arca
+            StrategyTicker.QLD, new Mapping("AMEX", "AMS")   // ProShares Ultra QQQ — NYSE Arca
     );
 
     public String ovrsExcgCd(StrategyTicker ticker) {

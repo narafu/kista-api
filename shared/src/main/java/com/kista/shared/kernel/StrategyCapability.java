@@ -12,7 +12,11 @@ public record StrategyCapability(
         boolean tickerFixed,                  // 티커 고정 여부 (단일 티커면 선택 불가)
         boolean requiresPrivacyBase,          // basePrice 소스가 기준 매매표인지 (PRIVACY만 true)
         boolean supportsReverseMode,          // 리버스모드(소진 후 모드) 지원 여부 (INFINITE만 true)
-        List<Integer> divisionCounts          // 분할 수 옵션 — 빈 목록이면 분할 개념 없음
+        List<Integer> divisionCounts,         // 분할 수 옵션 — 빈 목록이면 분할 개념 없음
+        List<OrderType> orderTypes,           // 사용자 선택 주문유형 — 빈 목록이면 선택 없음 (DCA만 값)
+        List<OrderDirection> directions,      // 사용자 선택 방향 — 빈 목록이면 선택 없음 (DCA만 값)
+        List<DcaFrequency> frequencies,       // DCA 실행 주기 옵션
+        List<DcaIndicator> conditionIndicators // DCA 조건 지표 옵션
 ) {
     public StrategyCapability {
         // 방어적 복사 — 상수 공유 중 외부 변경 차단, EnumSet 순서(ordinal)를 유지해 UI 티커 정렬을 보존
@@ -21,5 +25,16 @@ public record StrategyCapability(
                 ? EnumSet.noneOf(StrategyTicker.class)
                 : EnumSet.copyOf(availableTickers));
         divisionCounts = List.copyOf(divisionCounts);
+        orderTypes = List.copyOf(orderTypes);
+        directions = List.copyOf(directions);
+        frequencies = List.copyOf(frequencies);
+        conditionIndicators = List.copyOf(conditionIndicators);
+    }
+
+    // 비DCA 전략 공용 — DCA 선택지 4종을 빈 목록으로 채운다
+    public static StrategyCapability basic(Set<StrategyTicker> tickers, boolean tickerFixed, boolean requiresPrivacyBase,
+                                           boolean supportsReverseMode, List<Integer> divisionCounts) {
+        return new StrategyCapability(tickers, tickerFixed, requiresPrivacyBase, supportsReverseMode, divisionCounts,
+                List.of(), List.of(), List.of(), List.of());
     }
 }

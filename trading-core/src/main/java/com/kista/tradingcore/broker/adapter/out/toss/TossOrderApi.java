@@ -42,7 +42,7 @@ class TossOrderApi {
         body.put("orderType", "LIMIT");                                // Toss 지원 타입: LIMIT만
         body.put("timeInForce", resolveTimeInForce(instruction.orderType())); // CLS(장마감) or DAY(정규장)
         body.put("quantity", instruction.quantity());
-        body.put("price", resolvePrice(instruction.orderType(), instruction.price()));
+        body.put("price", resolvePrice(instruction.orderType(), instruction.direction(), instruction.price()));
 
         // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} — TossResult 언랩
         OrderResponse resp = TossResponseParser.unwrap(
@@ -154,17 +154,18 @@ class TossOrderApi {
                 : price.multiply(BigDecimal.valueOf(filledQuantity));
     }
 
-    // LOC/MOC → 장마감 지정가(CLS), LIMIT → 정규장 지정가(DAY)
+    // LOC/MOC → 장마감 지정가(CLS), LIMIT/MOO → 정규장 지정가(DAY — MOO는 개장 후 접수로 근사)
     private String resolveTimeInForce(OrderType type) {
         return switch (type) {
             case LOC, MOC -> "CLS"; // MOC 미지원 → LIMIT+CLS로 장마감 경매 참여
-            case LIMIT -> "DAY";
+            case LIMIT, MOO -> "DAY";
         };
     }
 
-    // MOC 대체 주문: 최저가(0.01)로 장마감 경매에서 시장가처럼 체결되도록 유도
-    private BigDecimal resolvePrice(OrderType type, BigDecimal price) {
-        return type == OrderType.MOC ? new BigDecimal("0.01") : price;
+    // 시장가 근사: 매도 MOC/MOO만 최저가(0.01)로 즉시 체결 유도 — 매수에 0.01을 쓰면 체결되지 않으므로 캡 지정가 유지
+    private BigDecimal resolvePrice(OrderType type, OrderDirection direction, BigDecimal price) {
+        boolean marketSell = direction == OrderDirection.SELL && (type == OrderType.MOC || type == OrderType.MOO);
+        return marketSell ? new BigDecimal("0.01") : price;
     }
 
     // package-private — TossOrderApiTest에서 직접 생성하여 stub에 사용

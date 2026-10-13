@@ -12,25 +12,29 @@ import java.util.Set;
 @Getter
 @RequiredArgsConstructor
 public enum StrategyType {
-    INFINITE("무한매수법"), // 모든 StrategyTicker 지원
+    INFINITE("무한매수법"), // MAGX/USD/TQQQ/SOXL 지원 (DCA 전용 티커 제외)
     PRIVACY("Fanding P전략"), // SOXL 전용
-    VR("밸류리밸런싱"); // TQQQ 전용 — 밸류 기반 리밸런싱
+    VR("밸류리밸런싱"), // TQQQ 전용 — 밸류 기반 리밸런싱
+    DCA("적립식 분할매매"); // UPRO/QLD 전용 — 주기별 고정 금액 단방향 매매
 
     private final String description; // 전략 설명
 
     // 전략 타입별 capability 상수 SSOT — RuntimeSettings 기본 허용 분할 수(20/30/40)와 동기화
     public StrategyCapability capability() {
         return switch (this) {
-            case INFINITE -> new StrategyCapability(
-                    EnumSet.allOf(StrategyTicker.class), false, false, true, List.of(20, 30, 40));
-            case PRIVACY -> new StrategyCapability(
-                    EnumSet.of(StrategyTicker.SOXL), true, true, false, List.of());
-            case VR -> new StrategyCapability(
-                    EnumSet.of(StrategyTicker.TQQQ), true, false, false, List.of());
+            case INFINITE -> StrategyCapability.basic(
+                    EnumSet.of(StrategyTicker.MAGX, StrategyTicker.USD, StrategyTicker.TQQQ, StrategyTicker.SOXL),
+                    false, false, true, List.of(20, 30, 40));
+            case PRIVACY -> StrategyCapability.basic(EnumSet.of(StrategyTicker.SOXL), true, true, false, List.of());
+            case VR -> StrategyCapability.basic(EnumSet.of(StrategyTicker.TQQQ), true, false, false, List.of());
+            case DCA -> new StrategyCapability(EnumSet.of(StrategyTicker.UPRO, StrategyTicker.QLD),
+                    false, false, false, List.of(),
+                    List.of(OrderType.MOO, OrderType.MOC), List.of(OrderDirection.BUY, OrderDirection.SELL),
+                    List.of(DcaFrequency.values()), List.of(DcaIndicator.values()));
         };
     }
 
-    // INFINITE: 전체 StrategyTicker, PRIVACY: SOXL 단일, VR: TQQQ 단일 — capability()에 위임
+    // INFINITE: MAGX/USD/TQQQ/SOXL, PRIVACY: SOXL 단일, VR: TQQQ 단일 — capability()에 위임
     public Set<StrategyTicker> availableTickers() {
         return capability().availableTickers();
     }

@@ -16,6 +16,7 @@ public record TradingPolicySettings(
     public TradingPolicySettings {
         brokers = immutableEnumMap(Broker.class, brokers, "broker");
         strategies = immutableEnumMap(StrategyType.class, strategies, "strategy");
+        validateTickersWithinCapability(strategies);
     }
 
     // 현재 운영 동작을 보존하는 기본값 — 저장 행이 없을 때와 신규 enum 상수 백필에 쓰인다
@@ -26,7 +27,7 @@ public record TradingPolicySettings(
         }
         Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
         strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
-                field(true, List.of(StrategyTicker.values()), StrategyTicker.SOXL),
+                field(true, List.copyOf(StrategyType.INFINITE.capability().availableTickers()), StrategyTicker.SOXL),
                 field(true, List.of(20, 30, 40), StrategyDefaults.DEFAULT_DIVISION_COUNT), null, null, null));
         strategies.put(StrategyType.PRIVACY, new StrategyCreationSettings(true,
                 field(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL), null, null, null, null));
@@ -35,6 +36,8 @@ public record TradingPolicySettings(
                 field(true, List.of(RecurringMode.values()), RecurringMode.HOLD),
                 field(true, List.of(BigDecimal.valueOf(10), BigDecimal.valueOf(15), BigDecimal.valueOf(20)), BigDecimal.valueOf(15)),
                 field(true, List.of(1, 2, 4), 2)));
+        strategies.put(StrategyType.DCA, new StrategyCreationSettings(false, // 단계 배포 — 운영자가 관리자 설정에서 켠다
+                field(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO), null, null, null, null));
         return new TradingPolicySettings(brokers, strategies);
     }
 
@@ -50,6 +53,15 @@ public record TradingPolicySettings(
 
     private static <T> StrategyFieldSettings<T> field(boolean customizable, List<T> values, T defaultValue) {
         return new StrategyFieldSettings<>(customizable, values, defaultValue);
+    }
+
+    // 각 타입 ticker 허용값은 capability 티커의 부분집합 — 관리자가 INFINITE에 DCA 전용 티커를 여는 설정을 저장 시점에 거부
+    private static void validateTickersWithinCapability(Map<StrategyType, StrategyCreationSettings> strategies) {
+        strategies.forEach((type, settings) -> {
+            if (!type.capability().availableTickers().containsAll(settings.ticker().allowedValues())) {
+                throw new IllegalArgumentException(type + " ticker allowedValues must be within capability tickers");
+            }
+        });
     }
 
     // 알 수 없는 문자열 키는 JSON 역직렬화에서 거부되고, 누락된 enum 키·null 값은 여기서 거부한다

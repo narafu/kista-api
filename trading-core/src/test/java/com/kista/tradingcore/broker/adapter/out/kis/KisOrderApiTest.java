@@ -12,6 +12,8 @@ import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -58,10 +60,17 @@ class KisOrderApiTest {
         assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"25.50\"");
     }
 
-    @Test
-    @DisplayName("BUY+MOC: ORD_DVSN=33, 가격=0")
-    void place_buyMoc_usesOrdDvsn33() {
-        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.MOC, 5, BigDecimal.ZERO);
+    @ParameterizedTest
+    @CsvSource({
+            "MOO,SELL,31,0",
+            "MOO,BUY,32,105.00",
+            "MOC,SELL,33,0",
+            "MOC,BUY,34,105.00",
+            "LOC,BUY,34,105.00",
+            "LIMIT,BUY,00,105.00"
+    })
+    void place_maps_order_type_and_direction(OrderType type, OrderDirection direction, String ordDvsn, String price) {
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, direction, type, 3, new BigDecimal("105"));
         KisOrderApi.OrderResponse ok =
                 new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", new KisOrderApi.OrderResponse.Output("ORD"));
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(ok);
@@ -70,8 +79,8 @@ class KisOrderApiTest {
         api.place(instruction, ACCOUNT);
 
         verify(kisHttpClient).post(anyString(), anyString(), any(), bodyCaptor.capture(), any());
-        assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"33\"");
-        assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"0\"");
+        assertThat(bodyCaptor.getValue()).contains("\"ORD_DVSN\": \"" + ordDvsn + "\"");
+        assertThat(bodyCaptor.getValue()).contains("\"OVRS_ORD_UNPR\": \"" + price + "\"");
     }
 
     @Test

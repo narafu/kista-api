@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service.support;
 
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.tradingcore.trading.domain.strategy.DcaCreationResolver;
 import com.kista.tradingcore.trading.domain.strategy.InfiniteCreationResolver;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
@@ -63,6 +64,11 @@ class CycleStrategyBeanConfig {
 
     @Bean
     VrCreationResolver vrCreationResolver() { return new VrCreationResolver(); }
+
+    @Bean
+    DcaCreationResolver dcaCreationResolver() {
+        return new DcaCreationResolver();
+    }
 
     // 타입 → 구현 라우터 — Spring이 위 @Bean 컬렉션을 주입
     @Bean

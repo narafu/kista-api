@@ -21,7 +21,7 @@ public final class FillSimulator {
     // 기존 MockBrokerAdapter.fills()와 완전히 동일한 시그니처·동작 — 모의계좌는 LIMIT도 종가 기준으로 판정한다(변경 금지)
     // MOC: 항상 체결 / LOC·LIMIT: 매수는 종가<=지정가, 매도는 종가>=지정가 (경계값 포함)
     public static boolean fills(PlannedOrder order, BigDecimal closingPrice) {
-        if (order.orderType() == OrderType.MOC) return true;
+        if (order.orderType() == OrderType.MOC || order.orderType() == OrderType.MOO) return true;
         return order.direction() == OrderDirection.BUY
                 ? closingPrice.compareTo(order.price()) <= 0
                 : closingPrice.compareTo(order.price()) >= 0;

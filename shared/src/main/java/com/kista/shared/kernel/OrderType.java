@@ -4,5 +4,6 @@ package com.kista.shared.kernel;
 public enum OrderType {
     LOC,   // Limit On Close: 종가 지정가 주문
     MOC,   // Market On Close: 종가 시장가 주문
-    LIMIT  // 일반 지정가 주문
+    LIMIT, // 일반 지정가 주문
+    MOO    // Market On Open: 장개시 시장가 — 매수는 브로커 어댑터가 캡 지정가(KIS LOO)로 변환
 }

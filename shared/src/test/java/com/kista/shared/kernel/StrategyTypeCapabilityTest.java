@@ -3,6 +3,7 @@ package com.kista.shared.kernel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
@@ -15,7 +16,8 @@ class StrategyTypeCapabilityTest {
     @DisplayName("INFINITE: 전체 티커, 고정 아님, 리버스모드 지원, 분할 수 20/30/40")
     void infinite() {
         StrategyCapability c = StrategyType.INFINITE.capability();
-        assertThat(c.availableTickers()).containsExactlyInAnyOrder(StrategyTicker.values());
+        assertThat(c.availableTickers())
+                .containsExactly(StrategyTicker.MAGX, StrategyTicker.USD, StrategyTicker.TQQQ, StrategyTicker.SOXL);
         assertThat(c.tickerFixed()).isFalse();
         assertThat(c.requiresPrivacyBase()).isFalse();
         assertThat(c.supportsReverseMode()).isTrue();
@@ -56,8 +58,39 @@ class StrategyTypeCapabilityTest {
     @Test
     @DisplayName("빈 availableTickers(Set.of())도 예외 없이 빈 집합으로 방어 복사한다")
     void emptyAvailableTickersIsAccepted() {
-        StrategyCapability c = new StrategyCapability(Set.of(), false, false, false, List.of());
+        StrategyCapability c = StrategyCapability.basic(Set.of(), false, false, false, List.of());
         assertThat(c.availableTickers()).isEmpty();
         assertThat(c.divisionCounts()).isEmpty();
+    }
+
+    @Test
+    void dca_capability_exposes_dca_choices() {
+        StrategyCapability dca = StrategyType.DCA.capability();
+        assertThat(dca.availableTickers()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD);
+        assertThat(dca.tickerFixed()).isFalse();
+        assertThat(dca.divisionCounts()).isEmpty();
+        assertThat(dca.orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC);
+        assertThat(dca.directions()).containsExactly(OrderDirection.BUY, OrderDirection.SELL);
+        assertThat(dca.frequencies()).containsExactly(DcaFrequency.values());
+        assertThat(dca.conditionIndicators()).containsExactly(DcaIndicator.values());
+    }
+
+    @Test
+    void non_dca_types_have_empty_dca_choices() {
+        for (StrategyType type : List.of(StrategyType.INFINITE, StrategyType.PRIVACY, StrategyType.VR)) {
+            StrategyCapability c = type.capability();
+            assertThat(c.orderTypes()).isEmpty();
+            assertThat(c.directions()).isEmpty();
+            assertThat(c.frequencies()).isEmpty();
+            assertThat(c.conditionIndicators()).isEmpty();
+        }
+    }
+
+    @Test
+    void operator_compares_by_value() {
+        assertThat(DcaOperator.LTE.test(new BigDecimal("10.0"), new BigDecimal("10"))).isTrue();
+        assertThat(DcaOperator.LT.test(new BigDecimal("10"), new BigDecimal("10"))).isFalse();
+        assertThat(DcaOperator.GTE.test(new BigDecimal("10"), new BigDecimal("10.00"))).isTrue();
+        assertThat(DcaOperator.GT.test(new BigDecimal("11"), new BigDecimal("10"))).isTrue();
     }
 }

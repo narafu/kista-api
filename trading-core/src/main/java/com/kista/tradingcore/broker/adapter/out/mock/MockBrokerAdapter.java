@@ -167,7 +167,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     // broker는 더 이상 trading 타입을 참조할 수 없으므로 동일 판정 로직을 broker 소유 타입으로 재구현한다.
     // 순수 3줄 판정이라 포트 우회보다 저비용 복제로 판단(PersistenceSupport/DstInfo 부분 복제와 동일 기준, 변경 금지)
     private static boolean fills(PlacedOrderView order, BigDecimal closingPrice) {
-        if (order.orderType() == OrderType.MOC) return true;
+        if (order.orderType() == OrderType.MOC || order.orderType() == OrderType.MOO) return true; // 시장가 계열은 항상 체결(체결가는 종가 근사)
         return order.direction() == OrderDirection.BUY
                 ? closingPrice.compareTo(order.price()) <= 0
                 : closingPrice.compareTo(order.price()) >= 0;

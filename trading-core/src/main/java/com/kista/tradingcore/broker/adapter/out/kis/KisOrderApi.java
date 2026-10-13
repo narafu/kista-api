@@ -48,10 +48,10 @@ class KisOrderApi {
                 }""".formatted(
                 cano,
                 acntPrdtCd,
-                resolveOrderDvsn(instruction.orderType()),
+                resolveOrderDvsn(instruction.orderType(), instruction.direction()),
                 exchangeRegistry.ovrsExcgCd(instruction.ticker()),
                 instruction.ticker().name(),
-                KisResponseParser.formatPrice(instruction.orderType(), instruction.price()),
+                KisResponseParser.formatPrice(instruction.orderType(), instruction.direction(), instruction.price()),
                 instruction.quantity(),
                 kisSllType(instruction.direction()));
 
@@ -106,11 +106,14 @@ class KisOrderApi {
         return KisHttpClient.splitAccountNo(account.accountNo());
     }
 
-    private String resolveOrderDvsn(OrderType type) {
+    // KIS 미국 ORD_DVSN — MOO(31)/MOC(33)는 매도 전용이라 매수는 LOO(32)/LOC(34) 캡 지정가로 대체
+    private String resolveOrderDvsn(OrderType type, OrderDirection direction) {
+        boolean buy = direction == OrderDirection.BUY;
         return switch (type) {
-            case LOC   -> "34"; // 장마감지정가(LOC)
-            case MOC   -> "33"; // 장마감시장가(MOC)
-            case LIMIT -> "00"; // 지정가
+            case LOC   -> "34";             // 장마감지정가(LOC)
+            case MOC   -> buy ? "34" : "33"; // 장마감시장가(MOC) — 매수는 LOC
+            case MOO   -> buy ? "32" : "31"; // 장개시시장가(MOO) — 매수는 LOO
+            case LIMIT -> "00";             // 지정가
         };
     }
 

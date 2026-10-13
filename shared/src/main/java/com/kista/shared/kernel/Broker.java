@@ -14,4 +14,9 @@ public enum Broker {
 
     private final String label;      // 한국어 전체 이름
     private final String shortLabel; // UI 모바일 약칭
+
+    // 개장 경매 주문(MOO/LOO)을 개장 전에 접수할 수 있는 증권사 — KIS만 31/32 지원, Toss·MOCK은 개장 후 지정가 근사
+    public boolean supportsOpenAuctionOrders() {
+        return this == KIS;
+    }
 }

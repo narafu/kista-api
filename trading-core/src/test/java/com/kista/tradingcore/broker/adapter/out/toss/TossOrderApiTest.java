@@ -15,6 +15,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -80,10 +82,18 @@ class TossOrderApiTest {
         assertThat(body.get("timeInForce")).isEqualTo("CLS");
     }
 
-    @Test
-    @DisplayName("MOC 주문 → timeInForce=CLS, price=0.01 (장마감 LIMIT 대체)")
-    void place_moc_usesLimitClsWithMinPrice() {
-        OrderInstruction instruction = mocSellInstruction();
+    @ParameterizedTest
+    @CsvSource({
+            "MOC,BUY,CLS,105",
+            "MOC,SELL,CLS,0.01",
+            "MOO,BUY,DAY,105",
+            "MOO,SELL,DAY,0.01",
+            "LOC,BUY,CLS,105",
+            "LIMIT,SELL,DAY,105"
+    })
+    void place_uses_cap_price_for_buys_and_floor_price_only_for_market_sells(
+            OrderType type, OrderDirection direction, String timeInForce, String price) {
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, direction, type, 3, new BigDecimal("105"));
         when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
             .thenReturn(wrap("toss-order-id-2"));
 
@@ -93,8 +103,8 @@ class TossOrderApiTest {
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
         Map<String, Object> body = captor.getValue();
-        assertThat(body.get("timeInForce")).isEqualTo("CLS");
-        assertThat(body.get("price")).isEqualTo(new BigDecimal("0.01"));
+        assertThat(body.get("timeInForce")).isEqualTo(timeInForce);
+        assertThat(new BigDecimal(body.get("price").toString())).isEqualByComparingTo(price);
     }
 
     @Test
