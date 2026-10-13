@@ -61,6 +61,7 @@ class TradingCycleControllerTest {
     @MockitoBean TradingExecutionUseCase tradingExecution;
     @MockitoBean VrReconfigureUseCase vrReconfigure;
     @MockitoBean DcaConfigUseCase dcaConfig;
+    @MockitoBean com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery dcaExecutionQuery;
 
     private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -487,5 +488,22 @@ class TradingCycleControllerTest {
                                 {"direction":"SELL","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY"}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void lists_dca_executions() throws Exception {
+        when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), eq(0), eq(20))).thenReturn(new com.kista.tradingcore.trading.domain.model.DcaExecutionPage(List.of(
+                new com.kista.tradingcore.trading.domain.model.DcaExecutionPage.Row(
+                        com.kista.tradingcore.trading.domain.model.DcaExecution.skipped(CYCLE_ID, LocalDate.of(2026, 8, 31),
+                                com.kista.shared.kernel.DcaSkipReason.CONDITION_NOT_MET, "RSI(14) 48.20 > 35", null),
+                        LocalDate.of(2026, 8, 30), null)), 0, 20, 1));
+        mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].status").value("SKIPPED"))
+                .andExpect(jsonPath("$.content[0].skipReason").value("CONDITION_NOT_MET"))
+                .andExpect(jsonPath("$.content[0].kstTradeDate").value("2026-08-31"))
+                .andExpect(jsonPath("$.content[0].usSessionDate").value("2026-08-30"))
+                .andExpect(jsonPath("$.content[0].order").doesNotExist())
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 }

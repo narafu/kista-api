@@ -78,5 +78,7 @@ public interface OrderPort {
 
     // 사이클 기준 FILLED/PARTIALLY_FILLED BUY 체결금액 합계 (VR 전략 누적 매수금 계산용)
     BigDecimal sumFilledBuyAmountByCycleId(UUID strategyCycleId);
-}
 
+    // id 목록 일괄 조회 (DCA 회차 이력의 주문 조인용)
+    List<Order> findAllByIds(Collection<UUID> ids);
+}

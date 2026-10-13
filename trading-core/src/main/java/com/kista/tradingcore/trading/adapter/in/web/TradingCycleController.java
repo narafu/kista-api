@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 import com.kista.tradingcore.trading.adapter.in.web.dto.*;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
+import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
@@ -35,6 +36,7 @@ public class TradingCycleController {
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
     private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
     private final DcaConfigUseCase dcaConfig;                    // DCA 설정 수정
+    private final DcaExecutionQuery dcaExecutionQuery;           // DCA 회차 이력 조회
 
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
     @Operation(summary = "내 전체 거래 사이클 목록")
@@ -211,5 +213,16 @@ public class TradingCycleController {
         LocalDate resolvedTo = to != null ? to : LocalDate.now(TimeZones.KST);
         return StrategyOrdersResponse.from(
                 tradingCycle.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
+    }
+
+    // DCA 회차 이력 — 거래일 DESC 페이지 (미주문 사유 포함)
+    @Operation(summary = "DCA 회차 이력 조회")
+    @GetMapping("/api/trading-cycles/{id}/dca-executions")
+    public DcaExecutionPageResponse listDcaExecutions(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return DcaExecutionPageResponse.from(dcaExecutionQuery.list(id, userId, page, size));
     }
 }

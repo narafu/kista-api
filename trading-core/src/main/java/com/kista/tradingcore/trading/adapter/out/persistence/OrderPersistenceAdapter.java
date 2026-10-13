@@ -79,6 +79,11 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findAllByIds(Collection<UUID> ids) {
+        return repository.findAllById(ids).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     @Transactional
     public void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
         // 증권사 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음

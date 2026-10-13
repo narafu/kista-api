@@ -75,4 +75,21 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.cycleSeedTypes").isArray())
                 .andExpect(jsonPath("$.cycleSeedTypes.length()").value(StrategyCycleSeedType.values().length));
     }
+
+    @Test
+    void getBundle_authenticated_includesDcaMeta() throws Exception {
+        mockMvc.perform(get("/api/meta")
+                        .with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes[0]").value(org.hamcrest.Matchers.contains("MOO")))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].divisionCounts").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='INFINITE')].orderTypes[0]").isEmpty())
+                .andExpect(jsonPath("$.orderTypes[?(@.code=='MOO')]").exists())
+                .andExpect(jsonPath("$.orderDirections[0].label").value("매수"))
+                .andExpect(jsonPath("$.dcaFrequencies[2].code").value("MONTHLY"))
+                .andExpect(jsonPath("$.dcaOperators[0].label").value("이하"))
+                .andExpect(jsonPath("$.dcaSkipReasons[0].code").value("DATA_UNAVAILABLE"))
+                .andExpect(jsonPath("$.dcaIndicators[?(@.code=='SMA')].smaPeriods[0]").value(org.hamcrest.Matchers.contains(20)))
+                .andExpect(jsonPath("$.dcaIndicators[?(@.code=='RSI')].smaPeriods").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
+    }
 }

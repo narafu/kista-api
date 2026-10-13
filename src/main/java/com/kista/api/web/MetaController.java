@@ -1,5 +1,6 @@
 package com.kista.api.web;
 
+import com.kista.api.web.dto.DcaIndicatorMeta;
 import com.kista.api.web.dto.EnumMeta;
 import com.kista.api.web.dto.MetaBundle;
 import com.kista.api.web.dto.StrategyTypeMeta;
@@ -9,6 +10,12 @@ import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.Market;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.DcaFrequency;
+import com.kista.shared.kernel.DcaIndicator;
+import com.kista.shared.kernel.DcaOperator;
+import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.CacheControl;
@@ -43,7 +50,13 @@ public class MetaController {
                 toEnumMeta(AssetClass.values(), AssetClass::getLabel),
                 toEnumMeta(Market.values(), Market::getLabel),
                 toEnumMeta(FinanceAccount.Type.values(), FinanceAccount.Type::getLabel),
-                toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel)
+                toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel),
+                toEnumMeta(OrderType.values(), Enum::name),
+                toEnumMeta(OrderDirection.values(), OrderDirection::getLabel),
+                toEnumMeta(DcaFrequency.values(), DcaFrequency::getLabel),
+                toEnumMeta(DcaOperator.values(), DcaOperator::getLabel),
+                toEnumMeta(DcaSkipReason.values(), DcaSkipReason::getLabel),
+                Arrays.stream(DcaIndicator.values()).map(DcaIndicatorMeta::from).toList()
         );
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);
     }
