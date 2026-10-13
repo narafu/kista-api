@@ -4,6 +4,8 @@ import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort
 import com.kista.tradingcore.broker.application.port.output.BrokerCapabilitiesPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerBalance;
+import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,6 +121,75 @@ class BrokerRouterTest {
         assertThat(router.getClosingPrice(StrategyTicker.SOXL, d, tossRef)).isEqualByComparingTo("5");
         assertThat(router.getClosingPrice(StrategyTicker.TQQQ, d, tossRef)).isEqualByComparingTo("7");
         verify(toss, never()).getClosingPrice(StrategyTicker.SOXL, d, tossRef);
+    }
+
+    @Test
+    @DisplayName("getPrices: 관리자 우선, 누락 종목만 계좌 어댑터로 조회해 합친다")
+    void pricesAdminFirstThenAccountForMissing() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        when(admin.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("1")));
+        when(kis.getPrices(List.of(StrategyTicker.TQQQ), kisRef)).thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("2")));
+
+        assertThat(router.getPrices(both, kisRef)).containsEntry(StrategyTicker.SOXL, new BigDecimal("1"))
+                .containsEntry(StrategyTicker.TQQQ, new BigDecimal("2"));
+    }
+
+    @Test
+    @DisplayName("getPrice 단건: 관리자 값이 있으면 그대로, 없으면 계좌 단건 조회로 폴백")
+    void priceSingleAdminThenAccount() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        when(admin.getPrices(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("5")));
+        when(kis.getPrice(StrategyTicker.TQQQ, kisRef)).thenReturn(new BigDecimal("7"));
+
+        assertThat(router.getPrice(StrategyTicker.SOXL, kisRef)).isEqualByComparingTo("5");
+        assertThat(router.getPrice(StrategyTicker.TQQQ, kisRef)).isEqualByComparingTo("7");
+        verify(kis, never()).getPrice(StrategyTicker.SOXL, kisRef);
+    }
+
+    @Test
+    @DisplayName("다건: 계좌 보충이 실패해도 관리자 결과가 있으면 부분 결과를 반환한다")
+    void multiKeepsAdminPartialWhenAccountFails() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        LocalDate d = LocalDate.of(2026, 10, 14);
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
+        Map<StrategyTicker, BigDecimal> soxl = Map.of(StrategyTicker.SOXL, BigDecimal.ONE);
+        when(admin.getPrices(both)).thenReturn(soxl);
+        when(admin.getPrevCloses(both)).thenReturn(soxl);
+        when(admin.getClosingPrices(both, d)).thenReturn(soxl);
+        when(kis.getPrices(missing, kisRef)).thenThrow(new RuntimeException("실패"));
+        when(kis.getPrevCloses(missing, kisRef)).thenThrow(new RuntimeException("실패"));
+        when(kis.getClosingPrices(missing, d, kisRef)).thenThrow(new RuntimeException("실패"));
+
+        assertThat(router.getPrices(both, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThat(router.getPrevCloses(both, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
+        assertThat(router.getClosingPrices(both, d, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
+    }
+
+    @Test
+    @DisplayName("다건: 계좌 보충의 인증·한도 예외는 관리자 결과가 있어도 그대로 전파한다")
+    void multiPropagatesCredentialAndRateLimitEvenWithAdminPartial() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
+        when(admin.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.ONE));
+        when(kis.getPrices(missing, kisRef))
+                .thenThrow(new BrokerCredentialException())
+                .thenThrow(new BrokerRateLimitException());
+
+        assertThatThrownBy(() -> router.getPrices(both, kisRef)).isInstanceOf(BrokerCredentialException.class);
+        assertThatThrownBy(() -> router.getPrices(both, kisRef)).isInstanceOf(BrokerRateLimitException.class);
+    }
+
+    @Test
+    @DisplayName("다건: 관리자 결과가 비어 있으면 계좌 조회 예외를 그대로 전파한다")
+    void multiPropagatesAccountFailureWhenAdminEmpty() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        List<StrategyTicker> one = List.of(StrategyTicker.SOXL);
+        when(kis.getPrices(one, kisRef)).thenThrow(new IllegalStateException("503"));
+
+        assertThatThrownBy(() -> router.getPrices(one, kisRef)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

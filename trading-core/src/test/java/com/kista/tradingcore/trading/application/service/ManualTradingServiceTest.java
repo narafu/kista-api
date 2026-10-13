@@ -20,7 +20,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
-import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
@@ -62,7 +61,6 @@ class ManualTradingServiceTest {
     @Mock AccountPort accountPort;
     @Mock OrderPort orderPort;
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock AdminMarketPricePort adminMarketPricePort; // 기본 빈 결과 → 계좌 경로로 흐름
     @Mock BrokerPricePort kisPricePort;      // BrokerPricePort 직접 mock (KisPricePort 삭제됨)
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -113,7 +111,7 @@ class ManualTradingServiceTest {
                 cycleStrategies, cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, adminMarketPricePort, eventPublisher, privacyTradePort);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
         StrategyOrderPlanBuilder planBuilder = new StrategyOrderPlanBuilder(
                 balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(

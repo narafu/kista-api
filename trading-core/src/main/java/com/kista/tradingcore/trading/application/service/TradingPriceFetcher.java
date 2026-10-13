@@ -9,7 +9,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
-import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,15 +26,14 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-// 복수종목 시세 일괄 조회(관리자 → 계좌) + 누락분 단건 fallback + 배치 시작 시점 가격 컨텍스트 조립
+// 복수종목 시세 일괄 조회 + 누락분 단건 fallback (관리자 → 계좌 체인은 BrokerRouter가 처리) + 배치 시작 시점 가격 컨텍스트 조립
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class TradingPriceFetcher {
 
     private final BrokerPricePort brokerPricePort;
-    private final AdminMarketPricePort adminMarketPricePort; // 관리자 키 시세(Toss→KIS) — 현재가 조회 1·2순위
-    private final ApplicationEventPublisher eventPublisher; // 모든 단계가 실패한 종목을 관리자에게 이벤트로 통지
+    private final ApplicationEventPublisher eventPublisher; // 관리자·계좌 모든 단계가 실패한 종목을 관리자에게 이벤트로 통지
     private final PrivacyTradePort privacyTradePort; // loadPriceContext의 PRIVACY 기준 매매표 조회용
 
     // 배치 시작 시점 현재가 + 전일종가 + 기준 매매표(PRIVACY) 일괄 조회 결과 — executeBatch/placeOpenOrders 공통
@@ -63,7 +61,6 @@ class TradingPriceFetcher {
         // 현재가가 없는 종목은 어차피 제외되므로 전일종가 조회 대상에서 뺀다
         List<StrategyTicker> prevTargets = cycleTickers.stream().filter(t -> !currentFailed.contains(t)).toList();
         Set<StrategyTicker> prevFailed = new LinkedHashSet<>();
-        // 전일종가는 BrokerRouter가 관리자 시세 우선 → 누락분 계좌 순으로 처리
         Map<StrategyTicker, BigDecimal> prevCloses = prevTargets.isEmpty() ? Map.of()
                 : fetchWithFallback(prevTargets, priceAccount, "전일종가", prevFailed,
                         (t, acc) -> brokerPricePort.getPrevCloses(t, acc),
@@ -88,7 +85,7 @@ class TradingPriceFetcher {
         return new PriceContext(cycleTickers, priceAccount, startPriceSnapshots, privacyBase);
     }
 
-    // 증권사 접수 직전 ticker별 현재가 일괄 재조회 — 관리자 시세 우선, 누락분만 계좌 기준
+    // 증권사 접수 직전 ticker별 현재가 일괄 재조회
     // prevClose는 필요 없으므로(cap 판단은 현재가만 사용) 현재가 경로만 사용
     Map<StrategyTicker, BigDecimal> reloadPlacementPrices(List<TradingCandidatePlanner.CycleState> states) {
         List<StrategyTicker> tickers = states.stream()
@@ -125,15 +122,15 @@ class TradingPriceFetcher {
                 .orElseGet(() -> contexts.getFirst().account().brokerRef());
     }
 
-    // 현재가만 필요한 경우 (수동 실행) — 관리자 시세 없이 계좌 기준만 사용
+    // 현재가만 필요한 경우 (수동 실행)
     Map<StrategyTicker, BigDecimal> fetchPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
         Set<StrategyTicker> failed = new LinkedHashSet<>();
-        Map<StrategyTicker, BigDecimal> prices = fetchAccountPrices(tickers, account, failed);
-        alertFailed(failed, "현재가", "일괄+단건 모두 실패");
+        Map<StrategyTicker, BigDecimal> prices = fetchCurrentPrices(tickers, account, failed);
+        alertFailed(failed, "현재가", "관리자·계좌 모두 실패");
         return prices;
     }
 
-    // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회, BrokerRouter가 관리자 시세 우선
+    // 전일종가만 필요한 경우 (매매 미리보기 배치 등) — 종목 수만큼 순차 단건 조회 대신 1회 일괄 조회
     // 관리자 알림 없음: 유일한 호출부인 미리보기는 readOnly 트랜잭션이라 EPR insert가 실패해 500이 되고,
     // 실패는 이후 StrategyOrderPlanBuilder 단건 재조회(BrokerCallGuard)가 사용자 응답(503 등)으로 직접 드러낸다
     Map<StrategyTicker, BigDecimal> fetchPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
@@ -142,7 +139,7 @@ class TradingPriceFetcher {
                 (t, acc) -> brokerPricePort.getPrevClose(t, acc));
     }
 
-    // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용) — BrokerRouter가 관리자 시세 우선
+    // 정규장 확정 종가만 필요한 경우 (마감 리포트 전용)
     Map<StrategyTicker, BigDecimal> fetchClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         Set<StrategyTicker> failed = new LinkedHashSet<>();
         Map<StrategyTicker, BigDecimal> prices = fetchWithFallback(tickers, account, "확정종가", failed,
@@ -152,19 +149,8 @@ class TradingPriceFetcher {
         return prices;
     }
 
-    // 관리자 현재가(Toss→KIS) 우선, 관리자 단계에서 빠진 종목만 계좌 기준(③)으로 조회
+    // 현재가 일괄 조회 → 누락분 단건 fallback (BrokerRouter가 관리자 → 계좌 순으로 처리)
     private Map<StrategyTicker, BigDecimal> fetchCurrentPrices(List<StrategyTicker> tickers, BrokerAccountRef account,
-                                                               Set<StrategyTicker> failed) {
-        Map<StrategyTicker, BigDecimal> result = new HashMap<>(adminMarketPricePort.getPrices(tickers));
-        List<StrategyTicker> missing = tickers.stream().filter(t -> result.get(t) == null).toList();
-        if (!missing.isEmpty()) {
-            result.putAll(fetchAccountPrices(missing, account, failed));
-        }
-        return result;
-    }
-
-    // 계좌 기준 현재가: 일괄 조회 → 누락분 단건 fallback
-    private Map<StrategyTicker, BigDecimal> fetchAccountPrices(List<StrategyTicker> tickers, BrokerAccountRef account,
                                                                Set<StrategyTicker> failed) {
         return fetchWithFallback(tickers, account, "현재가", failed,
                 (t, acc) -> brokerPricePort.getPrices(t, acc),

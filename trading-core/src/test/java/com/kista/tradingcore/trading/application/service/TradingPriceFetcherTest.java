@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
@@ -39,7 +38,6 @@ import static org.mockito.Mockito.when;
 @DisplayName("TradingPriceFetcher 단위 테스트")
 class TradingPriceFetcherTest {
     @Mock BrokerPricePort pricePort;
-    @Mock AdminMarketPricePort adminPort; // 기본 빈 결과 → 계좌 경로
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock PrivacyTradePort privacyTradePort;
     TradingPriceFetcher priceFetcher;
@@ -47,7 +45,7 @@ class TradingPriceFetcherTest {
 
     @BeforeEach
     void setUp() {
-        priceFetcher = new TradingPriceFetcher(pricePort, adminPort, eventPublisher, privacyTradePort);
+        priceFetcher = new TradingPriceFetcher(pricePort, eventPublisher, privacyTradePort);
     }
 
     @Test
@@ -107,40 +105,8 @@ class TradingPriceFetcherTest {
     }
 
     @Test
-    @DisplayName("loadPriceContext: 관리자가 현재가를 모두 주면 계좌 현재가 조회 생략, 전일종가는 라우터 경로")
-    void loadPriceContext_adminAll_skipsAccountPrices() {
-        when(adminPort.getPrices(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
-        when(pricePort.getPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef()))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("29.00")));
-
-        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL), java.time.LocalDate.now());
-
-        assertThat(ctx.startPriceSnapshots()).containsEntry(StrategyTicker.SOXL, new PriceSnapshot(D_SOXL, new BigDecimal("29.00")));
-        verify(pricePort, never()).getPrices(any(), any());
-        verify(eventPublisher, never()).publishEvent(any(Object.class));
-    }
-
-    @Test
-    @DisplayName("loadPriceContext: 관리자 일부 누락 시 누락 종목만 계좌 조회")
-    void loadPriceContext_adminPartial_accountFillsMissingOnly() {
-        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
-        when(adminPort.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
-        when(pricePort.getPrices(List.of(StrategyTicker.TQQQ), account.brokerRef()))
-                .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("55.00")));
-        when(pricePort.getPrevCloses(both, account.brokerRef())).thenReturn(Map.of(
-                StrategyTicker.SOXL, new BigDecimal("29.00"), StrategyTicker.TQQQ, new BigDecimal("54.00")));
-
-        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL, StrategyTicker.TQQQ), java.time.LocalDate.now());
-
-        assertThat(ctx.startPriceSnapshots()).hasSize(2);
-        assertThat(ctx.startPriceSnapshots().get(StrategyTicker.TQQQ).current()).isEqualByComparingTo("55.00");
-        verify(pricePort, never()).getPrices(eq(both), any());
-        verify(eventPublisher, never()).publishEvent(any(Object.class));
-    }
-
-    @Test
-    @DisplayName("loadPriceContext: 관리자 빈 결과(①② 실패)면 계좌 조회(③)로 채운다")
-    void loadPriceContext_adminEmpty_fallsBackToAccount() {
+    @DisplayName("loadPriceContext: 현재가·전일종가를 BrokerPricePort(라우터)로 조회해 스냅샷을 만든다")
+    void loadPriceContext_buildsSnapshotFromPricePort() {
         when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef()))
                 .thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
         when(pricePort.getPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef()))
@@ -170,8 +136,7 @@ class TradingPriceFetcherTest {
     void loadPriceContext_currentFailedExcludedFromPrev_splitMessage() {
         BigDecimal tqqq = new BigDecimal("55.00");
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
-        when(adminPort.getPrices(both)).thenReturn(Map.of(StrategyTicker.TQQQ, tqqq));
-        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrices(both, account.brokerRef())).thenReturn(Map.of(StrategyTicker.TQQQ, tqqq)); // 부분 결과
         when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenThrow(new RuntimeException("실패"));
         when(pricePort.getPrevCloses(List.of(StrategyTicker.TQQQ), account.brokerRef())).thenThrow(new RuntimeException("실패"));
         when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.brokerRef())).thenThrow(new RuntimeException("실패"));
@@ -200,7 +165,7 @@ class TradingPriceFetcherTest {
     @Test
     @DisplayName("loadPriceContext: 전일종가만 끝내 실패하면 current로 대체하고 알림 1건에 포함")
     void loadPriceContext_prevCloseFailed_usesCurrentAndAlerts() {
-        when(adminPort.getPrices(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
         when(pricePort.getPrevCloses(any(), any())).thenThrow(new RuntimeException("실패"));
         when(pricePort.getPrevClose(any(), any())).thenThrow(new RuntimeException("실패"));
 
@@ -211,7 +176,7 @@ class TradingPriceFetcherTest {
     }
 
     @Test
-    @DisplayName("reloadPlacementPrices: 관리자 우선, 누락분만 계좌 조회, 전부 실패분만 알림 1건")
+    @DisplayName("reloadPlacementPrices: 부분 결과의 누락분은 단건 fallback, 끝내 실패한 종목만 알림 1건")
     void reloadPlacementPrices_adminThenAccount_singleAlert() {
         var ctxs = contexts(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         var states = ctxs.stream().map(c -> {
@@ -220,8 +185,7 @@ class TradingPriceFetcherTest {
             return st;
         }).toList();
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
-        when(adminPort.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
-        when(pricePort.getPrices(List.of(StrategyTicker.TQQQ), account.brokerRef())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrices(both, account.brokerRef())).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
         when(pricePort.getPrice(StrategyTicker.TQQQ, account.brokerRef())).thenThrow(new RuntimeException("실패"));
 
         Map<StrategyTicker, BigDecimal> result = priceFetcher.reloadPlacementPrices(states);

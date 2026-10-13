@@ -34,7 +34,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
@@ -91,7 +90,6 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
-    @Mock AdminMarketPricePort adminMarketPricePort; // 기본 빈 결과 → 계좌 경로로 흐름
     @Mock com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
     @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
     @Mock com.kista.tradingcore.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
@@ -184,7 +182,7 @@ class TradingServiceTest {
 
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, adminMarketPricePort, eventPublisher, privacyTradePort);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies, liveBalancePort, new AccountBudgetLock());
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
