@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionPage;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -15,7 +14,7 @@ public record DcaExecutionPageResponse(List<Item> content, int page, int size, l
 
     public record Item(LocalDate kstTradeDate, LocalDate usSessionDate, String status, String skipReason, String detail,
                        BigDecimal referencePrice, Integer quantity,
-                       @JsonInclude(JsonInclude.Include.NON_NULL) OrderSummary order) {}
+                       OrderSummary order) {}
 
     public record OrderSummary(UUID id, String status, Integer filledQuantity, BigDecimal filledPrice) {}
 

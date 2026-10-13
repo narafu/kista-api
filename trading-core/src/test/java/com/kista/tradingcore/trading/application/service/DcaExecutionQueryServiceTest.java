@@ -20,6 +20,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -76,5 +78,18 @@ class DcaExecutionQueryServiceTest {
 
         assertThatThrownBy(() -> service.list(strategyId, UUID.randomUUID(), 0, 20))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void rejects_when_account_not_owned() {
+        UUID strategyId = UUID.randomUUID();
+        UUID accountId = UUID.randomUUID();
+        UUID requester = UUID.randomUUID();
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(new Strategy(strategyId, accountId,
+                StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
+        when(accountPort.requireOwnedAccount(accountId, requester)).thenThrow(new SecurityException("소유권 불일치"));
+
+        assertThatThrownBy(() -> service.list(strategyId, requester, 0, 20)).isInstanceOf(SecurityException.class);
+        verify(executionPort, never()).findPage(any(), anyInt(), anyInt());
     }
 }
