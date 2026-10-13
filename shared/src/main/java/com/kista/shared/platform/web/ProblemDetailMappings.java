@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -41,7 +42,9 @@ public final class ProblemDetailMappings {
             // 요청 바디 파싱 실패(잘못된 JSON, enum에 없는 값 등) — 매핑 누락 시 catch-all이 500으로 처리해 클라이언트 오류가 서버 오류로 잘못 보고됨
             HttpMessageNotReadableException.class,         new Mapping(HttpStatus.BAD_REQUEST, "Malformed Request", null, "요청 형식이 올바르지 않습니다."),
             // 존재하지 않는 정적 리소스·경로(취약점 스캐너의 /actuator/** probe 등) — 매핑 없으면 catch-all이 500 + 오류 로그로 처리해 오염
-            NoResourceFoundException.class,                new Mapping(HttpStatus.NOT_FOUND,   "Not Found", null, "요청한 경로를 찾을 수 없습니다.")
+            NoResourceFoundException.class,                new Mapping(HttpStatus.NOT_FOUND,   "Not Found", null, "요청한 경로를 찾을 수 없습니다."),
+            // 경로는 있으나 HTTP 메서드 미지원(PUT 전용 경로에 GET 등) — 매핑 없으면 catch-all이 500 + 오류 로그로 처리
+            HttpRequestMethodNotSupportedException.class,  new Mapping(HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed", null, "지원하지 않는 요청 방식입니다.")
     );
 
     private ProblemDetailMappings() {}

@@ -4,6 +4,7 @@ import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -170,5 +171,13 @@ class ProblemDetailMappingsTest {
             assertThat(p.getDetail()).as(ex.getClass().getSimpleName()).isEqualTo(detail);
             assertThat(p.getStatus()).isBetween(400, 404);
         });
+    }
+
+    @Test
+    void unsupported_http_method_maps_to_405_not_500() {
+        var p = ProblemDetailMappings.catchAll(new HttpRequestMethodNotSupportedException("GET"), ProblemDetailMappings.GENERIC,
+                e -> { throw new AssertionError("미매핑으로 보고되면 안 된다"); });
+        assertThat(p.getStatus()).isEqualTo(405);
+        assertThat(p.getDetail()).isEqualTo("지원하지 않는 요청 방식입니다.");
     }
 }
