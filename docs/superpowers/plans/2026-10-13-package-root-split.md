@@ -1238,11 +1238,22 @@ DB·Flyway·Redis 키/페이로드는 변하지 않는다. 런타임 위험은 E
 
 ## 실행 모델 가이드
 
-| Task | 성격 | 구현 모델 | 리뷰 모델 |
-|---|---|---|---|
-| 0 | 판단(빈 규칙 판정, 기준선) | opus | sonnet |
-| 1, 3, 5 | 기계적(스크립트) | sonnet | sonnet |
-| 2, 4, 6 | 판단(자동구성·부팅·Modulith) | opus | opus |
-| 7 | 판단(규칙 설계) | sonnet | sonnet |
-| 8 | 문서 | sonnet | 생략(문서 전용) |
-| 9 | 검증 | sonnet | — |
+모델은 파일 수가 아니라 판단 필요도로 고른다. fix-round 재검토는 표의 리뷰 모델보다 한 단계 낮춘다(opus→sonnet, sonnet→haiku).
+
+| Task | 성격 | 구현 모델 | 리뷰 모델 | fix-round 재검토 |
+|---|---|---|---|---|
+| 0 | 판단(빈 규칙 판정, 기준선) | opus | sonnet | haiku |
+| 1, 3, 5 | 기계적(스크립트) | sonnet | haiku (범위 제한 — 아래) | haiku |
+| 2, 4, 6 | 판단(자동구성·부팅·Modulith) | opus | opus | sonnet |
+| 7 | 판단(규칙 설계) | sonnet | sonnet | haiku |
+| 8 | 문서 | sonnet | 생략(문서 전용) | — |
+| 9 | 검증 | sonnet | — | — |
+
+**기계적 Task(1·3·5) 리뷰 범위**: rename diff 전체를 읽지 않는다. 리뷰어는 아래 셋만 확인한다.
+1. `git show --stat HEAD | grep -c '=>'` — rename 감지 수가 이동 파일 수와 맞는지
+2. 해당 Task Step 2의 잔여 grep 재실행 결과가 비었는지
+3. 스크립트 외 변경이 섞이지 않았는지 — 수정 파일의 변경 줄이 package/import/FQCN 문자열 치환뿐인지:
+   ```bash
+   git show -M HEAD --diff-filter=MR -U0 | grep -E '^[+-][^+-]' | grep -vE '^[+-](package |import |.*com\.kista\.)' | head -20
+   ```
+   출력이 있으면 그 줄만 판정한다(정상: `KistaApplication`→`ApiApplication` 개명, 주석 속 패키지명).
