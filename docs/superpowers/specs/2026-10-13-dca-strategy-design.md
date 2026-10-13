@@ -1,7 +1,7 @@
 # DCA(적립식 분할매매) 전략 설계
 
 - 작성일: 2026-10-13
-- 상태: 단계 ①·② 구현 완료(feat/dca-stage2), 단계 ③ 설계 확정(feat/dca-stage3), 구현 미착수
+- 상태: 단계 ①·②·③ 구현 완료(feat/dca-stage3)
 - 요청: kista-ui 세션(kista-ui-d9)에서 확정한 요구사항 기반. 이 문서는 kista-api 백엔드 설계만 다룬다.
 
 ## 1. 목표와 범위
@@ -563,6 +563,15 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
 - 조건 저장 `save()`는 scale 정규화 전 threshold를 반환하고, 조회는 scale 2로 돌려준다. 키가 빈 목록일 때 IN 쿼리가 나간다.
 - 세션 캐시는 get-then-put이라 병렬 그룹에서 같은 캔들을 두 번 조회할 수 있고, 세션 간 eviction이 원자적이지 않다(둘 다 무해). eviction·티커 2종·expected==null 테스트가 없다.
 - DCA 조건 응답 테스트가 GET 단건 대신 PUT 응답으로 검증하고, 본문 substring 단언이 읽기 어렵다.
+
+### 단계 ③ 리뷰에서 미뤄 둔 minor (후속 후보)
+
+- CNN 어댑터는 같은 날짜 일별 점이 둘이면 마지막 점을 고른다(`reduce`). 실데이터에는 중복이 없어 무해하지만, `findFirst`나 주석으로 의도를 밝히면 더 명확하다. 응답의 `y`가 null이면 예외가 나지만 잡혀서 empty가 된다.
+- 운영 RestClient 배선(`HttpClientTimeouts`, 헤더)은 컨텍스트 로드 테스트로만 검증한다. 어댑터 테스트는 인터셉터만 공유한다.
+- `DcaRoundPlanner`가 직전 US 개장일을 `loadCloses`와 `loadFearGreed`에서 두 번 계산한다. `plan()`에서 한 번 구해 넘기면 캘린더 조회가 줄어든다.
+- `fearGreedCache`의 `removeIf` + `put`은 원자적이지 않다(`closeCache`와 같은 패턴). 세션이 바뀌는 순간 병렬 그룹에서 CNN을 한 번 더 호출할 수 있을 뿐 결과는 같다.
+- `DcaRoundPlannerTest`의 `PREV_OPEN` 상수가 테스트 메서드 사이에 있다.
+- DCA 재설정(`PUT /dca-config`) 경로에는 FEAR_GREED 테스트가 없다. 등록과 같은 `toDomain()`을 쓴다.
 
 ## 12. 남은 위험
 
