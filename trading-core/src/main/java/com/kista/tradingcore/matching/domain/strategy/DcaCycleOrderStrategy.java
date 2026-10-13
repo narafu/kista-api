@@ -25,9 +25,11 @@ import java.util.Optional;
 public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     // DCA 판정 입력 — closes: 조회 US 세션 이전 확정 종가 오름차순(null=조회 실패), sellableQuantity: SELL만(예약분 차감 후),
-    // holding: AVG_PRICE 조건이 있을 때만 브로커 실잔고(null=조회 실패·미조회), fearGreed: FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수(null=조회 실패·미조회)
+    // holding: AVG_PRICE 조건이 있을 때만 브로커 실잔고(null=조회 실패·미조회), fearGreed: FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수(null=조회 실패·미조회),
+    // currentPrice: 배치 시작 시점 현재가(개장 배치=프리마켓, 마감 배치=장중, null=조회 실패) — BUY 기준가 산정용
     public record DcaInputs(DcaConfig config, StrategyTicker ticker, LocalDate tradeDate,
-                            List<BigDecimal> closes, Integer sellableQuantity, Holding holding, BigDecimal fearGreed) {
+                            List<BigDecimal> closes, Integer sellableQuantity, Holding holding, BigDecimal fearGreed,
+                            BigDecimal currentPrice) {
         public record Holding(int quantity, BigDecimal avgPrice) {} // 계좌+티커 합산 보유
     }
 
@@ -54,33 +56,40 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         }
         DcaConfig c = in.config();
         boolean sell = c.direction() == OrderDirection.SELL;
+        // 주문 기준가 — 수량·지정가·이력 기록 공용. 조건 평가는 전일 종가 그대로
+        BigDecimal basis = sell ? prevClose : referencePriceForBuy(prevClose, in.currentPrice());
         // skip 우선순위(spec 9장): DATA_UNAVAILABLE → CONDITION_NOT_MET → NO_HOLDINGS(SELL) → BELOW_ONE_SHARE
         if (sell && in.sellableQuantity() == null) {
-            return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "판매가능수량 조회 실패", prevClose);
+            return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "판매가능수량 조회 실패", basis);
         }
         // 모든 조건 지표값을 먼저 계산 — 하나라도 계산 불가면 다른 조건과 무관하게 DATA_UNAVAILABLE
         List<Evaluation> evaluations = new ArrayList<>();
         for (DcaCondition cond : c.conditions()) {
             Optional<Evaluation> e = evaluate(cond, closes, prevClose, in);
-            if (e.isEmpty()) return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, dataFailure(cond), prevClose);
+            if (e.isEmpty()) return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, dataFailure(cond), basis);
             evaluations.add(e.get());
         }
         Optional<Evaluation> failed = evaluations.stream().filter(e -> !e.passed()).findFirst();
-        if (failed.isPresent()) return new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET, failed.get().detail(), prevClose);
+        if (failed.isPresent()) return new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET, failed.get().detail(), basis);
         if (sell && in.sellableQuantity() <= 0) {
-            return new DcaDecision.Skipped(DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", prevClose);
+            return new DcaDecision.Skipped(DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", basis);
         }
-        int quantity = c.amountUsd().divide(prevClose, 0, RoundingMode.FLOOR).intValueExact();
+        int quantity = c.amountUsd().divide(basis, 0, RoundingMode.FLOOR).intValueExact();
         if (quantity == 0) {
             return new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE,
-                    "회차 금액 " + c.amountUsd().stripTrailingZeros().toPlainString() + " < 전일 종가 " + prevClose.toPlainString(), prevClose);
+                    "회차 금액 " + plain(c.amountUsd()) + " < 기준가 " + money(basis), basis);
         }
         if (sell) quantity = Math.min(quantity, in.sellableQuantity()); // 보유 부족 → 보유 전량
         // BUY는 캡 지정가(LOO/LOC로 접수), SELL은 시장가라 가격은 기준가 기록용
-        BigDecimal price = c.direction() == OrderDirection.BUY ? PriceCapPolicy.capFor(prevClose) : prevClose;
+        BigDecimal price = sell ? basis : PriceCapPolicy.capFor(basis);
         PlannedOrder order = PlannedOrder.of(in.tradeDate(), in.ticker(), c.orderType(), c.direction(),
                 quantity, price, c.timing(), c.orderLeg());
-        return new DcaDecision.Planned(order, prevClose);
+        return new DcaDecision.Planned(order, basis);
+    }
+
+    // BUY 기준가 = max(전일 종가, 현재가) — 밤사이·장중 급등 시 캡 초과 미체결 방지. 현재가 없음·0 이하면 전일 종가
+    private static BigDecimal referencePriceForBuy(BigDecimal prevClose, BigDecimal currentPrice) {
+        return currentPrice != null && currentPrice.compareTo(prevClose) > 0 ? currentPrice : prevClose;
     }
 
     // 조건 1개 평가 — 지표 계산 불가면 empty

@@ -12,7 +12,6 @@ import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaConfig;
 import com.kista.tradingcore.matching.domain.model.DcaDecision;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.OrderPlan;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
@@ -63,7 +62,9 @@ class DcaRoundPlanner {
     private record CandleKey(StrategyTicker ticker, LocalDate usSession) {}
 
     // empty = 이번 배치에서 DCA 신규 주문 없음 (비실행일·다른 timing·이미 판정·skip)
-    Optional<OrderPlan> plan(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings, List<Order> existingOrders) {
+    // currentPrice: 배치 시작 시점 현재가(null 허용) — BUY 기준가 max(전일 종가, 현재가) 산정용
+    Optional<DcaDecision.Planned> plan(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings,
+                                       List<Order> existingOrders, BigDecimal currentPrice) {
         Strategy strategy = ctx.strategy();
         DcaConfig config = dcaDetailPort.findActiveByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("DCA 설정이 없습니다: " + strategy.id()));
@@ -91,9 +92,13 @@ class DcaRoundPlanner {
 
         DcaDecision decision = dcaStrategy.decide(new DcaCycleOrderStrategy.DcaInputs(config, strategy.ticker(), tradeDate,
                 loadCloses(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate), loadHolding(ctx, config),
-                loadFearGreed(config, usSession)));
+                loadFearGreed(config, usSession), currentPrice));
         return switch (decision) {
-            case DcaDecision.Planned p -> Optional.of(new OrderPlan(null, null, List.of(p.order())));
+            case DcaDecision.Planned p -> {
+                log.info("[DCA] 회차 계획: strategy={}, 현재가={}, 기준가={}, 수량={}, 지정가={}",
+                        strategy.id(), currentPrice, p.referencePrice(), p.order().quantity(), p.order().price());
+                yield Optional.of(p);
+            }
             case DcaDecision.Skipped s -> {
                 recorder.recordSkipped(ctx, tradeDate, s.reason(), s.detail(), s.referencePrice());
                 yield Optional.empty();

@@ -21,7 +21,7 @@ import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.DcaConfig;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.OrderPlan;
+import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
@@ -95,15 +95,23 @@ class DcaRoundPlannerTest {
     @Test
     void plans_buy_when_due_and_timing_matches() {
         dca(OrderDirection.BUY, OrderType.MOC);
-        Optional<OrderPlan> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
-        assertThat(plan).get().extracting(p -> p.orders().getFirst().quantity()).isEqualTo(3);
+        Optional<DcaDecision.Planned> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
+        assertThat(plan).get().extracting(p -> p.order().quantity()).isEqualTo(3);
         verifyNoInteractions(recorder);
+    }
+
+    @Test
+    void current_price_above_prev_close_becomes_reference_price() {
+        dca(OrderDirection.BUY, OrderType.MOC);
+        Optional<DcaDecision.Planned> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(),
+                new BigDecimal("95.00"));
+        assertThat(plan).get().extracting(DcaDecision.Planned::referencePrice).isEqualTo(new BigDecimal("95.00"));
     }
 
     @Test
     void ignores_other_timing_batch() {
         dca(OrderDirection.BUY, OrderType.MOO);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verifyNoInteractions(candlePort, recorder);
     }
 
@@ -111,7 +119,7 @@ class DcaRoundPlannerTest {
     void not_execution_day_records_nothing() {
         when(dcaDetailPort.findActiveByStrategyId(ctx.strategy().id())).thenReturn(Optional.of(
                 new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY, null, 1)));
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verifyNoInteractions(candlePort, recorder);
     }
 
@@ -120,7 +128,7 @@ class DcaRoundPlannerTest {
         dca(OrderDirection.BUY, OrderType.MOC);
         when(executionPort.find(ctx.strategy().id(), TRADE_DATE))
                 .thenReturn(Optional.of(DcaExecution.skipped(ctx.strategy().id(), TRADE_DATE, DcaSkipReason.NO_HOLDINGS, null, null)));
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verifyNoInteractions(candlePort, recorder);
     }
 
@@ -128,7 +136,7 @@ class DcaRoundPlannerTest {
     void existing_dca_order_without_execution_row_recovers_ordered() {
         dca(OrderDirection.BUY, OrderType.MOC);
         Order existing = existingOrder(OrderTiming.AT_CLOSE, OrderType.MOC);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing))).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing), null)).isEmpty();
         verify(recorder).recordOrdered(ctx, TRADE_DATE, existing, null);
         verifyNoInteractions(candlePort); // 재판정(시세 재조회) 없이 복구만
     }
@@ -139,7 +147,7 @@ class DcaRoundPlannerTest {
         when(executionPort.find(ctx.strategy().id(), TRADE_DATE)).thenReturn(Optional.of(
                 DcaExecution.ordered(ctx.strategy().id(), TRADE_DATE, UUID.randomUUID(), 3, null)));
         Order existing = existingOrder(OrderTiming.AT_CLOSE, OrderType.MOC);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing))).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing), null)).isEmpty();
         verify(recorder, never()).recordOrdered(any(), any(), any(), any());
     }
 
@@ -152,7 +160,7 @@ class DcaRoundPlannerTest {
                 OrderStatus.FILLED, "E1", 3, new BigDecimal("88.00"));
         when(orderPort.findByStrategyId(ctx.strategy().id(), TRADE_DATE, TRADE_DATE)).thenReturn(List.of(filled));
 
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
 
         verify(recorder).recordOrdered(ctx, TRADE_DATE, filled, null);
         verifyNoInteractions(candlePort);
@@ -163,7 +171,7 @@ class DcaRoundPlannerTest {
         // MOO 주문 저장 후 이력 기록 전 중단 — 마감 배치(AT_CLOSE)에서도 ORDERED 복구되어야 이력이 누락되지 않는다
         dca(OrderDirection.BUY, OrderType.MOO);
         Order existing = existingOrder(OrderTiming.AT_OPEN, OrderType.MOO);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing))).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing), null)).isEmpty();
         verify(recorder).recordOrdered(ctx, TRADE_DATE, existing, null);
     }
 
@@ -171,7 +179,7 @@ class DcaRoundPlannerTest {
     void candle_failure_records_data_unavailable() {
         dca(OrderDirection.BUY, OrderType.MOC);
         when(candlePort.getDailyCandlesBefore(any(), any(), anyInt())).thenThrow(new RuntimeException("toss down"));
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), isNull());
     }
 
@@ -180,7 +188,7 @@ class DcaRoundPlannerTest {
         dca(OrderDirection.SELL, OrderType.MOC);
         when(sellablePort.getSellableQuantity(StrategyTicker.UPRO, ctx.account().brokerRef())).thenReturn(new SellableQuantity("UPRO", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(ctx.account().id(), TRADE_DATE, StrategyTicker.UPRO)).thenReturn(5);
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
         verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(DcaSkipReason.NO_HOLDINGS), anyString(), any());
     }
 
@@ -190,7 +198,7 @@ class DcaRoundPlannerTest {
         when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250)).thenReturn(List.of(
                 new BrokerCandle(LocalDate.of(2026, 10, 9), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), isNull());
     }
 
@@ -201,14 +209,14 @@ class DcaRoundPlannerTest {
         when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250)).thenReturn(List.of(
                 new BrokerCandle(LocalDate.of(2026, 10, 9), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isPresent();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isPresent();
     }
 
     @Test
     void candles_are_cached_per_ticker_and_session() {
         dca(OrderDirection.BUY, OrderType.MOC);
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
         verify(candlePort, times(1)).getDailyCandlesBefore("UPRO", US_SESSION, 250);
     }
 
@@ -216,8 +224,8 @@ class DcaRoundPlannerTest {
     void previous_open_session_looked_up_once_per_session() {
         fearGreedDca("25");
         when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.of(new BigDecimal("20.00")));
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
         verify(calendar, times(1)).isUsSessionOpen(PREV_OPEN); // 일봉·공포탐욕·같은 세션 재계획이 직전 개장일 메모를 공유
     }
 
@@ -227,8 +235,8 @@ class DcaRoundPlannerTest {
                 .thenThrow(new RuntimeException("toss down"))
                 .thenReturn(List.of(new BrokerCandle(LocalDate.of(2026, 10, 12), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isPresent();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isPresent();
     }
 
     @Test
@@ -236,14 +244,14 @@ class DcaRoundPlannerTest {
         dcaWith(OrderDirection.BUY, OrderType.MOC, new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
         when(liveBalancePort.getLiveBalance(ctx.account().brokerRef(), StrategyTicker.UPRO))
                 .thenReturn(new BrokerBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO)); // 80×0.95=76 < 87.12 → 미충족
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(DcaSkipReason.CONDITION_NOT_MET), anyString(), any());
     }
 
     @Test
     void no_avg_price_condition_skips_live_balance() {
         dca(OrderDirection.BUY, OrderType.MOC);
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
         verifyNoInteractions(liveBalancePort);
     }
 
@@ -251,7 +259,7 @@ class DcaRoundPlannerTest {
     void live_balance_failure_is_data_unavailable() {
         dcaWith(OrderDirection.BUY, OrderType.MOC, new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
         when(liveBalancePort.getLiveBalance(any(), any())).thenThrow(new RuntimeException("broker down"));
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
         verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
     }
 
@@ -266,7 +274,7 @@ class DcaRoundPlannerTest {
         fearGreedDca("25");
         when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.of(new BigDecimal("20.00")));
 
-        Optional<OrderPlan> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        Optional<DcaDecision.Planned> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
 
         assertThat(plan).isPresent();
         verify(fearGreedPort).closeOn(PREV_OPEN);
@@ -277,7 +285,7 @@ class DcaRoundPlannerTest {
         fearGreedDca("25");
         when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.empty());
 
-        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), eq("공포탐욕지수 조회 실패"), any());
     }
 
@@ -285,7 +293,7 @@ class DcaRoundPlannerTest {
     void no_fear_greed_condition_skips_cnn_call() {
         dca(OrderDirection.BUY, OrderType.MOC);
 
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
 
         verifyNoInteractions(fearGreedPort);
     }
@@ -295,9 +303,9 @@ class DcaRoundPlannerTest {
         fearGreedDca("25");
         when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.empty(), Optional.of(new BigDecimal("20.00")));
 
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of()); // 실패 — 캐시 안 됨
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of()); // 재조회 성공 — 캐시
-        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of()); // 캐시 적중
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 실패 — 캐시 안 됨
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 재조회 성공 — 캐시
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 캐시 적중
 
         verify(fearGreedPort, times(2)).closeOn(PREV_OPEN);
     }

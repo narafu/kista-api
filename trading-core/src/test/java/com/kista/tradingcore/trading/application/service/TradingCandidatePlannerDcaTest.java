@@ -9,10 +9,15 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchGuard;
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
 import com.kista.tradingcore.trading.application.service.support.TradingParallelRunner;
@@ -28,12 +33,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -68,13 +74,37 @@ class TradingCandidatePlannerDcaTest {
                 new BigDecimal("91.48"), OrderTiming.AT_CLOSE, "DCA_BUY");
     }
 
+    static final BigDecimal REFERENCE = new BigDecimal("87.12"); // DCA 주문 기준가
+
     private TradingCandidatePlanner.CyclePlanCandidate candidate() {
         return new TradingCandidatePlanner.CyclePlanCandidate(
-                new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(planned), false);
+                new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(planned), false, REFERENCE);
     }
 
     @Test
-    void approved_dca_order_is_saved_then_recorded_ordered_without_reference_price() throws Exception {
+    void open_candidate_passes_current_price_and_carries_reference_price() throws Exception {
+        DcaRoundPlanner dcaRoundPlanner = mock(DcaRoundPlanner.class);
+        TradingBalanceLoader balanceLoader = mock(TradingBalanceLoader.class);
+        CycleOrderStrategies strategies = mock(CycleOrderStrategies.class);
+        TradingCandidatePlanner withPlanner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, strategies, allocator,
+                balanceLoader, publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), dcaRoundPlanner, recorder,
+                new TradingParallelRunner(0));
+        when(balanceLoader.loadBalanceOrThrow(ctx.strategy()))
+                .thenReturn(new TradingBalanceLoader.BalanceLoad(new AccountBalance(0, null, BigDecimal.ZERO), null));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
+        BigDecimal premarket = new BigDecimal("95.00");
+        when(dcaRoundPlanner.plan(eq(ctx), eq(DAY), any(), eq(List.of()), eq(premarket)))
+                .thenReturn(Optional.of(new DcaDecision.Planned(planned, premarket)));
+
+        List<TradingCandidatePlanner.CyclePlanCandidate> candidates = withPlanner.collectOpenCandidates(List.of(ctx),
+                Map.of(StrategyTicker.UPRO, new PriceSnapshot(premarket, REFERENCE)), null, DAY);
+
+        assertThat(candidates).singleElement().extracting(TradingCandidatePlanner.CyclePlanCandidate::dcaReferencePrice)
+                .isEqualTo(premarket);
+    }
+
+    @Test
+    void approved_dca_order_is_saved_then_recorded_ordered_with_reference_price() throws Exception {
         when(allocator.allocate(any(), eq(DAY))).thenReturn(new TradingOrderBudgetAllocator.Allocation(
                 List.of(new TradingOrderBudgetAllocator.Candidate(ctx, List.of(planned))), List.of(), List.of()));
         Order saved = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO,
@@ -87,7 +117,7 @@ class TradingCandidatePlannerDcaTest {
 
         assertThat(result.savedContexts()).contains(ctx);
         verify(orderPlanner).savePlannedOrders(List.of(planned), ctx.account(), ctx.currentCycle().id());
-        verify(recorder).recordOrdered(ctx, DAY, saved, null);
+        verify(recorder).recordOrdered(ctx, DAY, saved, REFERENCE);
     }
 
     @Test
@@ -99,7 +129,7 @@ class TradingCandidatePlannerDcaTest {
         TradingCandidatePlanner.SaveAllocationResult result = planner.saveAllocatedOrders(List.of(candidate()), DAY);
 
         assertThat(result.savedContexts()).doesNotContain(ctx);
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), isNull());
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), eq(REFERENCE));
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
@@ -112,7 +142,7 @@ class TradingCandidatePlannerDcaTest {
 
         planner.saveAllocatedOrders(List.of(candidate()), DAY);
 
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(DcaSkipReason.NO_HOLDINGS), any(), isNull());
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 }

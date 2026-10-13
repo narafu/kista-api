@@ -40,7 +40,13 @@ class DcaCycleOrderStrategyTest {
 
     private DcaDecision decideWithFearGreed(DcaConfig c, List<BigDecimal> closes, Integer sellable,
                                             DcaCycleOrderStrategy.DcaInputs.Holding holding, BigDecimal fearGreed) {
-        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, closes, sellable, holding, fearGreed));
+        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, closes, sellable, holding, fearGreed, null));
+    }
+
+    // 현재가(프리마켓·장중) 주입 판정
+    private DcaDecision decideAt(DcaConfig c, String prevClose, String currentPrice, Integer sellable) {
+        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, List.of(new BigDecimal(prevClose)),
+                sellable, null, null, currentPrice == null ? null : new BigDecimal(currentPrice)));
     }
 
     private static DcaConfig fearGreedConfig(DcaOperator op, String threshold) {
@@ -186,7 +192,54 @@ class DcaCycleOrderStrategyTest {
     @Test
     void below_one_share_skips() {
         DcaDecision d = decide(config(OrderDirection.BUY, "50", OrderType.MOC), "87.12", null);
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 50 < 전일 종가 87.12", new BigDecimal("87.12")));
+        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 50 < 기준가 87.12", new BigDecimal("87.12")));
+    }
+
+    @Test
+    void buy_uses_current_price_when_above_prev_close() {
+        DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "95", null);
+        assertThat(p.order().quantity()).isEqualTo(10);                       // floor(1000 / 95), 전일 종가 기준이면 11
+        assertThat(p.order().price()).isEqualByComparingTo("99.75");          // 95 × 1.05
+        assertThat(p.referencePrice()).isEqualByComparingTo("95");
+    }
+
+    @Test
+    void buy_keeps_prev_close_when_current_price_is_lower() {
+        DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "80", null);
+        assertThat(p.order().quantity()).isEqualTo(11);
+        assertThat(p.order().price()).isEqualByComparingTo("91.48");
+        assertThat(p.referencePrice()).isEqualByComparingTo("87.12");
+    }
+
+    @Test
+    void buy_falls_back_to_prev_close_when_current_price_missing_or_zero() {
+        for (String current : new String[]{null, "0"}) {
+            DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", current, null);
+            assertThat(p.order().quantity()).isEqualTo(11);
+            assertThat(p.order().price()).isEqualByComparingTo("91.48");
+            assertThat(p.referencePrice()).isEqualByComparingTo("87.12");
+        }
+    }
+
+    @Test
+    void below_one_share_reports_current_price_basis() {
+        DcaDecision d = decideAt(config(OrderDirection.BUY, "90", OrderType.MOO), "87.12", "95.0039", null);
+        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 90 < 기준가 95.00", new BigDecimal("95.0039")));
+    }
+
+    @Test
+    void sell_ignores_current_price() {
+        DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.SELL, "1000", OrderType.MOC), "100", "120", 50);
+        assertThat(p.order().quantity()).isEqualTo(10);
+        assertThat(p.order().price()).isEqualByComparingTo("100");
+        assertThat(p.referencePrice()).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void fitBuysToBudget_shrinks_current_price_basis_order_by_its_cap() {
+        PlannedOrder buy = ((DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "95", null)).order();
+        assertThat(strategy.fitBuysToBudget(List.of(buy), new BigDecimal("500")))
+                .singleElement().extracting(PlannedOrder::quantity).isEqualTo(5); // floor(500 / 99.75)
     }
 
     @Test

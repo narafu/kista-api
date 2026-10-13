@@ -16,7 +16,7 @@
    - 해당 월에 지정일이 없으면 그 달 말일로 보정.
    - 지정일이 휴장이면 다음 거래일로 이월하되 같은 기간(주/월) 안에서만. 기간 안에 이후 거래일이 없으면 직전 거래일로 당김.
    - DAILY는 매 거래일. 날짜 기준은 미국 거래일.
-4. 회차당 고정 금액(USD). 주문유형은 MOO 또는 MOC만. MOO는 개장 배치, MOC는 마감 배치에서 전송. 수량 = floor(금액 / 전일 종가).
+4. 회차당 고정 금액(USD). 주문유형은 MOO 또는 MOC만. MOO는 개장 배치, MOC는 마감 배치에서 전송. 수량 = floor(금액 / 기준가). 기준가: 매수는 max(전일 종가, 배치 시작 시점 현재가 — 개장 배치는 프리마켓가, 마감 배치는 장중가; 조회 실패·0이면 전일 종가), 매도는 전일 종가. 매수 지정가 = 기준가 × 1.05(2026-10-14 변경 — 밤사이·장중 +5% 초과 상승 시 상한 미체결 방지).
 5. 잔고: 매수 예수금 부족 시 가능한 만큼 축소, 매도 보유 부족 시 보유 전량. 0주면 회차 skip + 알림. 1주 미만 금액도 skip + 알림. 이월·합산 없음. MOC 매수가 종가 변동으로 금액을 소폭 초과하는 것은 허용. 종료일·총 한도 없음(일시정지·삭제로 종료).
 6. 추가 조건 0개 이상, AND 결합. 조건 = 지표 / 연산자(LTE, LT, GTE, GT) / 기준값.
    - 평단가: 전일 종가 vs 평단가 × (1 + n%). 보유 0주면 미성립. 단, 매수 DCA는 보유 0주일 때 평단 조건을 무시하고 매수.
@@ -122,7 +122,7 @@ CREATE TABLE trading.dca_execution (
     skip_reason  varchar(30),                                -- DcaSkipReason, SKIPPED일 때만
     order_id     uuid,                                       -- ORDERED일 때 orders.id
     quantity     integer,                                    -- 계획 수량 (축소 반영)
-    reference_price numeric(12,2),                           -- 판정에 쓴 전일 종가 (데이터 실패 시 NULL)
+    reference_price numeric(12,2),                           -- 주문 기준가(매수 max(전일 종가, 현재가)·매도 전일 종가, 데이터 실패 시 NULL)
     detail       varchar(500),                               -- 사람용 사유 상세 (예: "RSI 41.2 > 30")
     created_at   timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_dca_execution_strategy_trade_date UNIQUE (strategy_id, trade_date)
@@ -448,7 +448,7 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 ```
 
 - 실행일이 아니어서 판정하지 않은 날은 행이 없다.
-- `referencePrice`: SKIPPED 행은 판정에 쓴 전일 종가(데이터 실패 시 null)를 담는다. ORDERED 행은 단계 ①에서 null이다.
+- `referencePrice`: 주문 기준가(매수 max(전일 종가, 현재가)·매도 전일 종가)를 담는다. SKIPPED 행은 전일 종가 데이터 실패 시 null, ORDERED 행은 신규 계획 시 기록되고 기존 주문 복구 경로에서만 null이다(2026-10-14 변경).
 - `nextExecution`의 기준일은 배치 규칙과 맞춰 사이클 시작일 다음 날 이후로 잡는다. 배치(`filterScheduledStart`)는 시작일 당일을 제외한다.
 
 ### 7.4 메타 API (`GET /api/meta`)

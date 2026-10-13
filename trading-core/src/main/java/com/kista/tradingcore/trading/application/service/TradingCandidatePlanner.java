@@ -63,8 +63,13 @@ class TradingCandidatePlanner {
     record CyclePlanCandidate(
             CycleState state,
             List<PlannedOrder> creatableOrders,
-            boolean hasExistingOrders
-    ) {}
+            boolean hasExistingOrders,
+            BigDecimal dcaReferencePrice    // DCA 신규 계획만 non-null — 주문 기준가(이력 reference_price 기록용)
+    ) {
+        CyclePlanCandidate(CycleState state, List<PlannedOrder> creatableOrders, boolean hasExistingOrders) {
+            this(state, creatableOrders, hasExistingOrders, null);
+        }
+    }
 
     // 예산 배정 후 실제 저장된 컨텍스트만 다음 단계 진입 대상으로 사용한다
     record SaveAllocationResult(Set<BatchContext> savedContexts) {}
@@ -140,8 +145,12 @@ class TradingCandidatePlanner {
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), false);
             return new CyclePlanCandidate(existingState, List.of(), true);
         }
+        // DCA는 판정·이력 기록 경로가 별도 — 기준가는 이력 기록용으로 후보에 싣는다
+        Optional<DcaDecision.Planned> dcaPlan = strategy.isDca()
+                ? dcaRoundPlanner.plan(ctx, tradeDate, creatableTimings, existingOrders, price)
+                : Optional.empty();
         Optional<CycleOrderStrategy.OrderPlan> planOpt = strategy.isDca()
-                ? dcaRoundPlanner.plan(ctx, tradeDate, creatableTimings, existingOrders) // DCA는 판정·이력 기록 경로가 별도
+                ? dcaPlan.map(p -> new CycleOrderStrategy.OrderPlan(null, null, List.of(p.order())))
                 : orderComputer.compute(balance, strategy, prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), price);
         if (planOpt.isEmpty()) {
             if (strategy.isDca()) {
@@ -166,7 +175,8 @@ class TradingCandidatePlanner {
                 preparedOrders, existingOrders, creatableTimings);
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
         CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
-        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty());
+        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty(),
+                dcaPlan.map(DcaDecision.Planned::referencePrice).orElse(null));
     }
 
     private void validateConcreteOrderLegs(Strategy strategy, List<PlannedOrder> orders) {
@@ -214,6 +224,10 @@ class TradingCandidatePlanner {
                 .forEach(candidate -> candidatesByAccount
                         .computeIfAbsent(candidate.ctx().account().id(), _ -> new ArrayList<>())
                         .add(candidate));
+        // DCA 사이클별 주문 기준가 — ORDERED·거절 skip 이력의 reference_price (병렬 태스크는 읽기만 한다)
+        Map<BatchContext, BigDecimal> dcaReferencePrices = candidates.stream()
+                .filter(candidate -> candidate.dcaReferencePrice() != null)
+                .collect(Collectors.toMap(candidate -> candidate.state().ctx(), CyclePlanCandidate::dcaReferencePrice, (a, b) -> a));
 
         Set<BatchContext> savedContexts = new LinkedHashSet<>();
 
@@ -225,7 +239,7 @@ class TradingCandidatePlanner {
                     BatchContext firstContext = accountCandidates.getFirst().ctx();
                     UUID accountId = firstContext.account().id();
                     return new TradingParallelRunner.Task<AccountAllocation>(accountId,
-                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountCandidates, firstContext, tradeDate)));
+                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountCandidates, firstContext, tradeDate, dcaReferencePrices)));
                 })
                 .toList();
 
@@ -234,8 +248,8 @@ class TradingCandidatePlanner {
             TradingOrderBudgetAllocator.Allocation allocation = accountAllocation.allocation();
 
             // DCA 거절은 잔고 부족 알림이 아니라 회차 skip 이력(+DCA 미주문 알림)으로 기록한다
-            recordDcaRejections(allocation.rejectedBuy(), tradeDate, DcaSkipReason.INSUFFICIENT_BALANCE, "예수금 부족(주문가능금액 < 1주 캡가)");
-            recordDcaRejections(allocation.rejectedSell(), tradeDate, DcaSkipReason.NO_HOLDINGS, "판매가능수량 부족");
+            recordDcaRejections(allocation.rejectedBuy(), tradeDate, DcaSkipReason.INSUFFICIENT_BALANCE, "예수금 부족(주문가능금액 < 1주 캡가)", dcaReferencePrices);
+            recordDcaRejections(allocation.rejectedSell(), tradeDate, DcaSkipReason.NO_HOLDINGS, "판매가능수량 부족", dcaReferencePrices);
             Set<BatchContext> rejectedContexts = Stream.concat(
                             allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
                     .map(TradingOrderBudgetAllocator.Candidate::ctx)
@@ -256,23 +270,24 @@ class TradingCandidatePlanner {
 
     // 거절된 DCA 후보의 회차 skip 기록 — 기록 실패는 사이클 단위로 격리(다음 배치가 재판정)
     private void recordDcaRejections(List<TradingOrderBudgetAllocator.Candidate> rejected, LocalDate tradeDate,
-                                     DcaSkipReason reason, String detail) throws InterruptedException {
+                                     DcaSkipReason reason, String detail,
+                                     Map<BatchContext, BigDecimal> dcaReferencePrices) throws InterruptedException {
         for (TradingOrderBudgetAllocator.Candidate candidate : rejected) {
             if (!candidate.ctx().strategy().isDca()) continue;
             batchGuard.runSafely("DCA 미주문 기록", candidate.ctx(), () -> {
-                dcaExecutionRecorder.recordSkipped(candidate.ctx(), tradeDate, reason, detail, null);
+                dcaExecutionRecorder.recordSkipped(candidate.ctx(), tradeDate, reason, detail, dcaReferencePrices.get(candidate.ctx()));
                 return candidate.ctx();
             });
         }
     }
 
     // 저장된 DCA 주문을 조회해 ORDERED 이력 기록 — saveAll이 id를 돌려주지 않아 당일 PLANNED/PLACED에서 DCA leg로 찾는다
-    // reference_price는 null로 저장: 판정 기준가(전일 종가)가 OrderPlan으로 전달되지 않고, BUY 캡가 역산은 오해를 부른다(spec 7.3)
-    private void recordDcaOrdered(BatchContext ctx, LocalDate tradeDate) throws InterruptedException {
+    // referencePrice: 판정 시점 주문 기준가(BUY=max(전일 종가, 현재가), SELL=전일 종가) — 캡가 역산 대신 후보에 실어 온 값
+    private void recordDcaOrdered(BatchContext ctx, LocalDate tradeDate, BigDecimal referencePrice) throws InterruptedException {
         batchGuard.runSafely("DCA 회차 이력 기록", ctx, () -> {
             orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate).stream()
                     .filter(order -> order.orderLeg().startsWith("DCA_"))
-                    .forEach(order -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, order, null));
+                    .forEach(order -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, order, referencePrice));
             return ctx;
         });
     }
@@ -282,7 +297,8 @@ class TradingCandidatePlanner {
 
     // 계좌 예산 락 안에서 실행 — 배정 실패면 empty(runSafely가 알림), 승인분 저장 실패는 사이클 단위로 격리
     private Optional<AccountAllocation> allocateAndSave(List<TradingOrderBudgetAllocator.Candidate> accountCandidates,
-                                                        BatchContext firstContext, LocalDate tradeDate)
+                                                        BatchContext firstContext, LocalDate tradeDate,
+                                                        Map<BatchContext, BigDecimal> dcaReferencePrices)
             throws InterruptedException {
         // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 저장한 슬롯을 배정 전에 제외 — 중복 주문과 예산 이중 계상 방지.
         // 전부 겹친 사이클은 이미 PLANNED가 있으므로 배정 없이 접수 대상(saved)에 넣는다
@@ -317,7 +333,7 @@ class TradingCandidatePlanner {
             });
             savedCtx.ifPresent(saved::add);
             if (savedCtx.isPresent() && approved.ctx().strategy().isDca()) {
-                recordDcaOrdered(approved.ctx(), tradeDate); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
+                recordDcaOrdered(approved.ctx(), tradeDate, dcaReferencePrices.get(approved.ctx())); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
             }
         }
         return Optional.of(new AccountAllocation(allocation.get(), saved));
