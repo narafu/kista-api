@@ -28,7 +28,7 @@ import java.time.ZonedDateTime;
 public class TradingBatchResumer {
 
     private static final LocalTime CLOSE_CRON = LocalTime.of(4, 30);  // TradingCloseScheduler cron 시각
-    private static final LocalTime OPEN_CRON = LocalTime.of(22, 30);  // TradingOpenScheduler cron 시각
+    private static final LocalTime OPEN_CRON = LocalTime.of(22, 0);  // TradingOpenScheduler cron 시각
     private static final Duration CLOSE_PLACEMENT_MARGIN = Duration.ofMinutes(10); // 장마감 10분 전까지만 마감 접수 재개
 
     private final TradingBatchRunPort batchRunPort;
@@ -55,7 +55,7 @@ public class TradingBatchResumer {
         }
     }
 
-    // 화~토 04:30~22:30 — 당일 마감 배치
+    // 화~토 04:30~22:00 — 당일 마감 배치
     private void resumeClose(ZonedDateTime nowKst) throws InterruptedException {
         int day = nowKst.getDayOfWeek().getValue();
         LocalTime time = nowKst.toLocalTime();
@@ -83,7 +83,7 @@ public class TradingBatchResumer {
         closeScheduler.resume();
     }
 
-    // 월~금 22:30~24:00(거래일 익일) 또는 화~토 00:00~04:30(거래일 당일) — DstInfo.nextTradeDate()와 같은 04:30 경계
+    // 월~금 22:00~24:00(거래일 익일) 또는 화~토 00:00~04:30(거래일 당일) — DstInfo.nextTradeDate()와 같은 04:30 경계
     private void resumeOpen(ZonedDateTime nowKst) throws InterruptedException {
         int day = nowKst.getDayOfWeek().getValue();
         LocalTime time = nowKst.toLocalTime();

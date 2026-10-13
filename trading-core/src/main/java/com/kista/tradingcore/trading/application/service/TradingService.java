@@ -9,6 +9,7 @@ import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
@@ -58,6 +59,7 @@ class TradingService {
     private final TradingBatchRunPort batchRunPort;            // 재개 체크포인트 (단계 기록·리포트 마커 조회)
     private final TradingBatchRunState runState;               // 협조적 종료 — 배치 스레드·임계구역 등록
     private final TradingBalanceLoader balanceLoader;          // 리포트 재개 시 사전 잔고(최신 cycle_position) 재구성
+    private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(KIS DCA MOO) 판별용 DCA 설정 조회
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
@@ -281,6 +283,9 @@ class TradingService {
         // 가격 스냅샷 + PRIVACY 기준 매매표 일괄 조회 (개장 전 현시점, 내일 기준 — FIDA가 미리 송신했을 경우)
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
 
+        // KIS DCA MOO/LOO는 개장 경매 참여를 위해 개장 전에 접수한다(spec 5.6) — 나머지 AT_OPEN은 개장 후 기존 흐름
+        placePreOpenDcaOrders(started, tradeDate, priceCtx);
+
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
             waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
@@ -293,40 +298,60 @@ class TradingService {
         runState.critical(() -> {
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.PLACING);
             marketEventNotifier.notifyMarketOpen();
-
-            // 후보를 모두 수집한 뒤 계좌별 BUY 예산을 배정하고 AT_OPEN 주문만 선접수
-            // AT_CLOSE는 여기서 생성하지 않는다 — 캡(BuyOrderPriceCapper)이 개장 시점 가격으로 고정돼 마감 접수 시점까지
-            // 재평가되지 않는 stale-cap 문제를 막기 위해, AT_CLOSE 계산·캡·예산배정·접수는 close 스케쥴러가 전담한다
-            List<TradingCandidatePlanner.CyclePlanCandidate> candidates =
-                    candidatePlanner.collectOpenCandidates(started, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), tradeDate);
-
-            TradingCandidatePlanner.SaveAllocationResult result = candidatePlanner.saveAllocatedOrders(candidates, tradeDate);
-            // position/vrPosition/시작가까지 담긴 CycleState 그대로 접수 단계로 전달 — BatchContext만 넘기면
-            // VR 등 전략별 capBuyOrders()에 필요한 position/vrPosition 정보가 유실된다 (planAll()과 동일 패턴)
-            List<TradingCandidatePlanner.CycleState> placeableStates = candidates.stream()
-                    .filter(candidate -> candidate.hasExistingOrders()
-                            || result.savedContexts().contains(candidate.state().ctx()))
-                    .map(TradingCandidatePlanner.CyclePlanCandidate::state)
-                    .toList();
-
-            if (!placeableStates.isEmpty()) {
-                // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
-                // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
-                Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(placeableStates);
-                for (TradingCandidatePlanner.CycleState state : placeableStates) {
-                    batchGuard.runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
-                        BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
-                                .orElse(state.startPrice());
-                        placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
-                        return null;
-                    });
-                }
-            }
-
+            planAndPlaceAtOpen(started, tradeDate, priceCtx);
             log.info("개장 order 생성 + INFINITE 매도 선접수 완료");
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
             return null;
         });
+    }
+
+    // 개장 전 접수 대상: KIS 계좌의 DCA AT_OPEN(MOO) 전략 — 계획·배정·저장·접수를 임계구역에서 수행
+    // 개장 후 기존 흐름이 같은 컨텍스트를 다시 처리해도 중복 없음 — DcaRoundPlanner가 이력 행으로, 슬롯 로직이 기존 주문으로 거르고 placeAtOpenOrders는 PLANNED만 접수
+    private void placePreOpenDcaOrders(List<BatchContext> started, LocalDate tradeDate, TradingPriceFetcher.PriceContext priceCtx) throws InterruptedException {
+        List<BatchContext> targets = started.stream()
+                .filter(c -> c.strategy().isDca() && c.account().broker().supportsOpenAuctionOrders())
+                .toList();
+        if (targets.isEmpty()) return;
+        Map<UUID, DcaConfig> configs = dcaDetailPort.findActiveByStrategyIds(targets.stream().map(c -> c.strategy().id()).toList());
+        List<BatchContext> moo = targets.stream()
+                .filter(c -> configs.containsKey(c.strategy().id()) && configs.get(c.strategy().id()).timing() == OrderTiming.AT_OPEN)
+                .toList();
+        if (moo.isEmpty()) return;
+        runState.critical(() -> {
+            checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.PLACING);
+            planAndPlaceAtOpen(moo, tradeDate, priceCtx);
+            return null;
+        });
+    }
+
+    // 후보를 모두 수집한 뒤 계좌별 BUY 예산을 배정하고 AT_OPEN 주문만 선접수
+    // AT_CLOSE는 여기서 생성하지 않는다 — 캡(BuyOrderPriceCapper)이 개장 시점 가격으로 고정돼 마감 접수 시점까지
+    // 재평가되지 않는 stale-cap 문제를 막기 위해, AT_CLOSE 계산·캡·예산배정·접수는 close 스케쥴러가 전담한다
+    private void planAndPlaceAtOpen(List<BatchContext> contexts, LocalDate tradeDate, TradingPriceFetcher.PriceContext priceCtx) throws InterruptedException {
+        List<TradingCandidatePlanner.CyclePlanCandidate> candidates =
+                candidatePlanner.collectOpenCandidates(contexts, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), tradeDate);
+
+        TradingCandidatePlanner.SaveAllocationResult result = candidatePlanner.saveAllocatedOrders(candidates, tradeDate);
+        // position/vrPosition/시작가까지 담긴 CycleState 그대로 접수 단계로 전달 — BatchContext만 넘기면
+        // VR 등 전략별 capBuyOrders()에 필요한 position/vrPosition 정보가 유실된다 (planAll()과 동일 패턴)
+        List<TradingCandidatePlanner.CycleState> placeableStates = candidates.stream()
+                .filter(candidate -> candidate.hasExistingOrders()
+                        || result.savedContexts().contains(candidate.state().ctx()))
+                .map(TradingCandidatePlanner.CyclePlanCandidate::state)
+                .toList();
+        if (placeableStates.isEmpty()) return;
+
+        // 개장 시각 대기(waitUntilMarketOpen) 이후 접수 대상 ticker의 현재가를 다시 일괄 조회한다.
+        // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
+        Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(placeableStates);
+        for (TradingCandidatePlanner.CycleState state : placeableStates) {
+            batchGuard.runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
+                BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
+                        .orElse(state.startPrice());
+                placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
+                return null;
+            });
+        }
     }
 
     // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용

@@ -42,7 +42,7 @@ public record TradingCycleResponse(
         @Schema(description = "DCA 전략 상세 (DCA 전략만 non-null)")
         @JsonInclude(JsonInclude.Include.NON_NULL)
         DcaResponse dca,
-        @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:30 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
+        @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:00 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean todayOpenBatchMissed
 ) {

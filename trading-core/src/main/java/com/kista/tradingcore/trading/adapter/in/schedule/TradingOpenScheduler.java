@@ -28,7 +28,7 @@ public class TradingOpenScheduler {
     private final SchedulerJobRunner jobRunner;
     private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
 
-    @Scheduled(cron = "0 30 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:30 KST (DST 개장 시각, 비DST는 waitUntilMarketOpen 60분 대기)
+    @Scheduled(cron = "0 0 22 * * MON-FRI", zone = TimeZones.KST_ID) // 월~금 22:00 KST — DST 개장 30분 전(KIS DCA MOO 개장 전 접수), 비DST는 waitUntilMarketOpen 90분 대기
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("trading-open", Duration.ofHours(2), this::runLocked);
     }

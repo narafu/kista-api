@@ -110,6 +110,22 @@ class TradingBatchResumerTest {
     }
 
     @Test
+    void open_mondayAfter2200_resumesWithTuesdayTradeDate() throws Exception {
+        phase(TradingBatchJob.OPEN, LocalDate.of(2026, 10, 6), null);
+
+        resumer.resume(kst(10, 5, 22, 10)); // 월 22:10 — 개장 배치 cron(22:00) 이후
+
+        verify(openScheduler).resume();
+    }
+
+    @Test
+    void open_mondayBefore2200_noWindow() {
+        resumer.resume(kst(10, 5, 21, 59));
+
+        verifyNoInteractions(openScheduler);
+    }
+
+    @Test
     void open_afterMidnight_tradeDateIsToday() throws Exception {
         phase(TradingBatchJob.OPEN, LocalDate.of(2026, 10, 6), null);
 
