@@ -43,4 +43,11 @@ class DcaConfigTest {
         assertThatThrownBy(() -> new DcaConfig(OrderDirection.BUY, AMOUNT, OrderType.MOC, DcaFrequency.DAILY, null, 5))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void rejects_more_than_ten_conditions() {
+        DcaCondition rsi = new DcaCondition(com.kista.shared.kernel.DcaIndicator.RSI, com.kista.shared.kernel.DcaOperator.LTE, null, new BigDecimal("30"));
+        assertThatThrownBy(() -> new DcaConfig(OrderDirection.BUY, AMOUNT, OrderType.MOC, DcaFrequency.DAILY, null, null,
+                java.util.Collections.nCopies(11, rsi))).isInstanceOf(IllegalArgumentException.class);
+    }
 }

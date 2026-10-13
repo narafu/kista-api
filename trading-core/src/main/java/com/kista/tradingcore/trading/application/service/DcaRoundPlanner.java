@@ -72,8 +72,9 @@ class DcaRoundPlanner {
             return Optional.empty();
         }
 
+        BigDecimal prevClose = loadPrevClose(strategy.ticker(), usSession);
         DcaDecision decision = dcaStrategy.decide(new DcaCycleOrderStrategy.DcaInputs(config, strategy.ticker(), tradeDate,
-                loadPrevClose(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate)));
+                prevClose == null ? null : List.of(prevClose), loadSellable(ctx, config, tradeDate), null)); // 임시 shim — Task 4가 250봉·실잔고로 대체
         return switch (decision) {
             case DcaDecision.Planned p -> Optional.of(new OrderPlan(null, null, List.of(p.order())));
             case DcaDecision.Skipped s -> {
