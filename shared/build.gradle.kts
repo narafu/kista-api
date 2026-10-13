@@ -1,5 +1,6 @@
 plugins {
     java
+    `java-test-fixtures`
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.mgmt)
 }
@@ -31,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    // package-info.java의 @ApplicationModule(OPEN) 선언 — sharedkernel/platform 모두 Modulith 모듈
+    // package-info.java의 @ApplicationModule(OPEN) 선언 — shared.kernel/platform 모두 Modulith 모듈
     implementation(libs.spring.modulith.starter.core)
 
     // platform.persistence(JPA Auditing) + platform.internalapi(RestClient) — Spring/JPA 바인딩
@@ -52,7 +53,7 @@ dependencies {
     // platform.redis(RedisPubSubConfig) — trade.event 채널 공통 배선
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
-    // com.kista.contract 요청 record의 Bean Validation·Swagger 어노테이션 — 소비 프로세스(root/trading-core)가 런타임 구현을 가진다
+    // com.kista.shared.contract 요청 record의 Bean Validation·Swagger 어노테이션 — 소비 프로세스(root/trading-core)가 런타임 구현을 가진다
     compileOnly("jakarta.validation:jakarta.validation-api")
     compileOnly(libs.swagger.annotations)
 
@@ -63,6 +64,11 @@ dependencies {
     testAnnotationProcessor(libs.lombok)
 
     testImplementation(libs.spring.boot.starter.test)
+
+    // DataJpaTestBase/WebMvcTestSupport + application-test.yml — root·trading-core 테스트가 소비
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa)
+    testFixturesImplementation(libs.spring.boot.starter.data.jpa.test)
+    testFixturesImplementation(libs.spring.boot.starter.security)
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

@@ -1,0 +1,43 @@
+package com.kista.tradingcore.privacy.domain.model;
+
+import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
+
+public record PrivacyTradeBase(
+        UUID id,
+        BigDecimal avgPrice,
+        int holdings,
+        BigDecimal currentCycleStart, // 현재 사이클 기준가 — PRIVACY multiple 동적 산출 기준
+        List<PrivacyTrade> trades
+) {
+    public PrivacyTradeBase {
+        if (currentCycleStart == null || currentCycleStart.signum() <= 0) {
+            throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + currentCycleStart);
+        }
+    }
+
+    // 커널 입력 타입으로 변환 — 데이터 소유자(privacy)가 matching 커널 계약에 맞춰 준다(matching은 privacy 비참조)
+    public PrivacyPlan toPlan() {
+        List<PrivacyPlan.PrivacyPlannedTrade> planned = trades.stream()
+                .map(t -> new PrivacyPlan.PrivacyPlannedTrade(
+                        t.tradeDate(), t.ticker(), t.orderType(), t.direction(), t.quantity(), t.price()))
+                .toList();
+        return new PrivacyPlan(holdings, currentCycleStart, planned);
+    }
+
+    public record PrivacyTrade(
+            LocalDate tradeDate,             // 거래일
+            StrategyTicker ticker,          // 거래 종목
+            OrderType orderType,      // 주문 유형 (LOC/MOC/LIMIT)
+            OrderDirection direction, // 매수/매도 방향
+            Integer quantity,                // 주문 수량(nullable)
+            BigDecimal price                 // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
+    ) {
+    }
+}

@@ -1,0 +1,7 @@
+package com.kista.api.admin.application.usecase;
+
+import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
+
+public interface RuntimeSettingsUseCase {
+    RuntimeSettingsBundle getSettings(); // 공개 런타임 설정 조회 — root 설정 + trading-core 정책 묶음
+}

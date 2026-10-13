@@ -1,0 +1,10 @@
+package com.kista.tradingcore.broker.application.port.output;
+
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.SellableQuantity;
+import com.kista.shared.kernel.StrategyTicker;
+
+// 판매 가능 수량 조회 — KIS: CTRP6504R 잔고수량 / Toss: /api/v1/sellable-quantity
+public interface SellableQuantityPort {
+    SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account);
+}

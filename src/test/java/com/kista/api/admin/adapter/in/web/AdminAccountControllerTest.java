@@ -1,0 +1,118 @@
+package com.kista.api.admin.adapter.in.web;
+
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.shared.contract.trading.StrategyResponse;
+import com.kista.api.admin.application.usecase.AdminQueryUseCase;
+import com.kista.api.admin.application.usecase.AdminStrategyUseCase;
+import com.kista.api.admin.application.usecase.AdminUserUseCase;
+import com.kista.shared.platform.security.TokenBlacklistPort;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
+import java.util.UUID;
+
+import static com.kista.shared.support.WebMvcTestSupport.*;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.kista.api.admin.application.port.output.AppErrorLogPort;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.api.web.RootSecurityPolicy;
+
+@WebMvcTest(AdminAccountController.class)
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Execution(ExecutionMode.SAME_THREAD)
+class AdminAccountControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort; // JwtAuthFilter 블랙리스트 체크 의존성
+    @MockitoBean AdminQueryUseCase adminQuery;
+    @MockitoBean AdminUserUseCase adminUser;
+    @MockitoBean AdminStrategyUseCase adminStrategy;
+
+    private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @Test
+    void listAccounts_anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/admin/accounts"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listAccounts_userRole_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/accounts")
+                        .with(authentication(userTokenWithRole(USER_UUID))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listAccounts_adminRole_returns200() throws Exception {
+        when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
+        when(adminUser.listAll(null, null)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/accounts")
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void listStrategiesByAccount_adminRole_returns200() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        when(adminQuery.listStrategies(accountId)).thenReturn(List.of(
+                new StrategyResponse(UUID.randomUUID(), accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                        StrategyTicker.SOXL, StrategyCycleSeedType.MAX)));
+
+        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies", accountId)
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("PRIVACY"))
+                .andExpect(jsonPath("$[0].ticker").value("SOXL"));
+    }
+
+    @Test
+    void pauseStrategy_adminRole_returns204() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        UUID strategyId = UUID.randomUUID();
+        doNothing().when(adminStrategy).pauseStrategy(ADMIN_UUID, accountId, strategyId);
+
+        mockMvc.perform(patch("/api/admin/accounts/{accountId}/strategies/{strategyId}/status", accountId, strategyId)
+                        .with(authentication(adminToken(ADMIN_UUID)))
+                        .contentType("application/json")
+                        .content("{\"status\":\"PAUSED\"}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void resumeStrategy_adminRole_returns204() throws Exception {
+        UUID accountId = UUID.randomUUID();
+        UUID strategyId = UUID.randomUUID();
+        doNothing().when(adminStrategy).resumeStrategy(ADMIN_UUID, accountId, strategyId);
+
+        mockMvc.perform(patch("/api/admin/accounts/{accountId}/strategies/{strategyId}/status", accountId, strategyId)
+                        .with(authentication(adminToken(ADMIN_UUID)))
+                        .contentType("application/json")
+                        .content("{\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isNoContent());
+    }
+}

@@ -17,9 +17,9 @@ Read the relevant shared documents before changing related code:
 - `docs/agents/docker-infra.md`: OCI server, Docker, and deployment operations.
 - `docs/agents/scheduler-time-table.md`: batch scheduler run times per module.
 - `docs/agents/modulith-migration-history.md`: module migration history (not auto-loaded; read only when investigating boundary history).
-- `docs/agents/modules/<module>.md`: per-module package tree and strategy patterns — Read the relevant one before changing that module's code (Claude Code loads these automatically via nested `CLAUDE.md`; Codex does not, so read explicitly).
+- `docs/agents/modules/<root>/<module-id>.md`: per-module package tree and strategy patterns — Read the relevant one before changing that module's code (Claude Code loads these automatically via nested `CLAUDE.md`; Codex does not, so read explicitly).
 - `docs/agents/own-type-ledger.md`: ledger of allowed own-type duplicates across module boundaries — required reading before proposing a new one.
-- `docs/agents/modules/trading-formulas.md`: trading/VR formulas (change-controlled SSOT).
+- `docs/agents/modules/tradingcore/trading-formulas.md`: trading/VR formulas (change-controlled SSOT).
 
 Claude-specific agents, hooks, and skills remain under `.claude/`. Codex does not execute those hooks automatically, so after Java edits run `./gradlew compileJava` or the focused test command explicitly when practical.
 

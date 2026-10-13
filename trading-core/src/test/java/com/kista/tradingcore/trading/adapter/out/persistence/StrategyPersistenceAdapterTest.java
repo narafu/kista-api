@@ -1,0 +1,169 @@
+package com.kista.tradingcore.trading.adapter.out.persistence;
+
+import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyInfiniteDetail;
+import com.kista.tradingcore.trading.domain.model.StrategyVersion;
+import com.kista.shared.support.DataJpaTestBase;
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.StrategyStatus;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyCycleSeedType;
+
+@Import({
+        StrategyPersistenceAdapter.class,
+        StrategyInfiniteDetailPersistenceAdapter.class,
+        StrategyVersionPersistenceAdapter.class
+})
+class StrategyPersistenceAdapterTest extends DataJpaTestBase {
+
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired EntityManager entityManager;
+    @Autowired StrategyPersistenceAdapter strategyAdapter;
+    @Autowired StrategyInfiniteDetailPersistenceAdapter strategyInfiniteDetailAdapter;
+    @Autowired StrategyVersionPersistenceAdapter strategyVersionAdapter;
+
+    private UUID userId;
+    private UUID accountId;
+
+    @BeforeEach
+    void setUp() {
+        userId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+    }
+
+    @Test
+    void findAllActive_usesNotifyProfileActiveFlag_notUsersTable() {
+        // 활성 프로필 → 포함 (trading 스키마엔 users 테이블이 없어 users 비의존은 스키마가 보장한다)
+        Strategy included = saveActiveStrategy(insertAccountOfUser(Boolean.TRUE), StrategyTicker.SOXL);
+        // 프로필 inactive → 제외
+        saveActiveStrategy(insertAccountOfUser(Boolean.FALSE), StrategyTicker.SOXL);
+        // 프로필 행 자체가 없음 → 제외
+        saveActiveStrategy(insertAccountOfUser(null), StrategyTicker.SOXL);
+        // 활성 프로필이지만 계좌 소프트 삭제 → 제외
+        UUID deletedAccountId = insertAccountOfUser(Boolean.TRUE);
+        saveActiveStrategy(deletedAccountId, StrategyTicker.SOXL);
+        jdbcTemplate.update("UPDATE accounts SET deleted_at = now() WHERE id = ?", deletedAccountId);
+        // 활성 프로필이지만 PAUSED 전략 → 제외
+        strategyAdapter.save(new Strategy(null, insertAccountOfUser(Boolean.TRUE), StrategyType.INFINITE,
+                StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(strategyAdapter.findAllActive()).extracting(Strategy::id).containsExactly(included.id());
+    }
+
+    // 계좌 삽입 후 accountId 반환. profileActive=null이면 프로필 행을 만들지 않는다
+    private UUID insertAccountOfUser(Boolean profileActive) {
+        UUID uid = UUID.randomUUID();
+        UUID aid = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                aid, uid, "계좌", "KIS", "74420614" + aid, "01", "key", "secret");
+        if (profileActive != null) {
+            jdbcTemplate.update(
+                    "INSERT INTO trading.user_notify_profile (user_id, notification_prefs, balance_check_enabled, is_active, updated_at) VALUES (?, '{}', TRUE, ?, now())",
+                    uid, profileActive);
+        }
+        return aid;
+    }
+
+    private Strategy saveActiveStrategy(UUID acctId, StrategyTicker ticker) {
+        return strategyAdapter.save(new Strategy(null, acctId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, ticker, StrategyCycleSeedType.NONE));
+    }
+
+    @Test
+    void save_infiniteStrategy_persistsCommonAndDetailRows() {
+        Strategy strategy = new Strategy(
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
+        );
+
+        Strategy saved = strategyAdapter.save(strategy);
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, saved.id(), 1, null, null));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(version.id(), 20));
+        entityManager.flush();
+
+        Integer strategyRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy WHERE id = ?",
+                Integer.class,
+                saved.id());
+        Integer detailRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ? AND division_count = 20",
+                Integer.class,
+                version.id());
+        Integer auditedRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM strategy_infinite_version WHERE strategy_version_id = ? AND created_at IS NOT NULL AND updated_at IS NOT NULL AND deleted_at IS NULL",
+                Integer.class,
+                version.id());
+
+        assertThat(saved.id()).isNotNull();
+        assertThat(strategyRows).isEqualTo(1);
+        assertThat(detailRows).isEqualTo(1);
+        assertThat(auditedRows).isEqualTo(1);
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionId(version.id()))
+                .contains(new StrategyInfiniteDetail(version.id(), 20));
+        assertThat(strategyInfiniteDetailAdapter.findActiveByStrategyId(saved.id()))
+                .contains(new StrategyInfiniteDetail(version.id(), 20));
+    }
+
+    @Test
+    void findByStrategyVersionIds_returnsDetailsKeyedByVersionId() {
+        Strategy strategyA = strategyAdapter.save(new Strategy(
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+        Strategy strategyB = strategyAdapter.save(new Strategy(
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE));
+        StrategyVersion versionA = strategyVersionAdapter.save(new StrategyVersion(null, strategyA.id(), 1, null, null));
+        StrategyVersion versionB = strategyVersionAdapter.save(new StrategyVersion(null, strategyB.id(), 1, null, null));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(versionA.id(), 20));
+        strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(versionB.id(), 30));
+
+        var result = strategyInfiniteDetailAdapter.findByStrategyVersionIds(
+                java.util.List.of(versionA.id(), versionB.id(), UUID.randomUUID()));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(versionA.id()).divisionCount()).isEqualTo(20);
+        assertThat(result.get(versionB.id()).divisionCount()).isEqualTo(30);
+    }
+
+    @Test
+    void findByStrategyVersionIds_emptyCollection_returnsEmptyMap() {
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionIds(java.util.List.of())).isEmpty();
+    }
+
+    @Test
+    void strategyInfiniteSchema_followAuditConventionAndKeepDeletedHistory() throws Exception {
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'trading' AND table_name = 'strategy_infinite_version'
+                ORDER BY ordinal_position
+                """, String.class))
+                .containsExactly("strategy_version_id", "division_count", "created_at", "updated_at", "deleted_at");
+
+        assertThat(jdbcTemplate.queryForList("""
+                SELECT column_name || ':' || data_type || ':' || is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = 'trading' AND table_name = 'strategy_infinite_version'
+                  AND column_name IN ('division_count', 'deleted_at')
+                ORDER BY column_name
+                """, String.class))
+                .containsExactly("deleted_at:timestamp with time zone:YES", "division_count:integer:NO");
+    }
+}

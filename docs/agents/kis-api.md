@@ -45,7 +45,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - 국내주식 API는 UPPERCASE — 혼동 주의, `@JsonProperty` 값 반드시 소문자로
 
 ### 노출된 KIS live REST 엔드포인트 (신규 추가 전 확인)
-- `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `StatisticsController`(tradingstats), `MultiPriceResponse`(`prices[{ticker, price}]`) 응답(**전일종가**, current 아님 — 전략 생성 화면 최소 시드 기준가와 통일), `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
+- `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `StatisticsController`(tradingcore.stats), `MultiPriceResponse`(`prices[{ticker, price}]`) 응답(**전일종가**, current 아님 — 전략 생성 화면 최소 시드 기준가와 통일), `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
 - `GET /api/accounts/{accountId}/margin` — `StatisticsController`, `List<MarginResponse>` 응답(도메인 `MarginItem` 변환), USD 예수금은 `currency==USD` 행
 - `GET /api/market/holidays?year=YYYY&month=MM` — `MarketHolidayController`(root `market` 모듈), 해당 월 미국 시장 휴장일 날짜 목록(`List<String>`, ISO 형식), JWT 인증 필요
 
@@ -64,7 +64,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 전 구간에서 LOC/MOC 모두 지원하므로 불필요 (코드에 없음)
 
 ### KIS 어댑터 공통 파싱 헬퍼 (KisResponseParser)
-- `com.kista.broker.adapter.out.kis.KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
+- `com.kista.tradingcore.broker.adapter.out.kis.KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
 - 어댑터 내부에 파싱 헬퍼 직접 정의 금지 — KisResponseParser 사용
 - `parseIntSafe`: `(int) Double.parseDouble()` 경유 — KIS 응답이 `"5.0"` 같은 소수 형식일 수 있음
 - `KisTradingApi.getMargin()`(`KisBrokerAdapter.getMargin`이 위임, TTTC2101R) — USD 행 필터는 `currency()` 필드 기준
@@ -80,14 +80,14 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   - 응답: `output2[]` 종목별 — `symb`(종목코드), `last`(현재가) 필드 사용
 - `getPrice(StrategyTicker, BrokerAccountRef)` — 단건 API(`HHDFS00000300`) 유지
 - KIS 거래소 코드 두 체계 혼용 주의: `OVRS_EXCG_CD` (주문·체결·잔고 API) = 4자리 `NASD`/`AMEX`/`NYSE`, `EXCD` (시세 API) = 3자리 `NAS`/`AMS`/`NYS`
-- `KisExchangeRegistry`(com.kista.broker.adapter.out.kis): `StrategyTicker → (ovrsExcgCd, excd)` 매핑 전담 — TQQQ=NASD/NAS, SOXL/USD/MAGX=AMEX/AMS
+- `KisExchangeRegistry`(com.kista.tradingcore.broker.adapter.out.kis): `StrategyTicker → (ovrsExcgCd, excd)` 매핑 전담 — TQQQ=NASD/NAS, SOXL/USD/MAGX=AMEX/AMS
 
 ### 전일종가(prevClose) 조회 — KisPriceApi.getPriceSnapshot()/getPriceSnapshots()
 
 - 단건(`HHDFS00000300`)·복수종목(`HHDFS76220000`) 응답 모두 `base`(전일종가) 필드를 `last`(현재가)와 함께 반환 — **별도 API 호출 없이 `base` 필드를 그대로 prevClose로 사용** (빈값이면 current로 fallback)
 - `base`는 장 시작 전엔 하루 더 과거 종가일 수 있다 — 개장 전 시간대에 이상 종가가 관측되면 이 트레이드오프부터 의심할 것
 - 마감 리포트 확정 종가는 별도 `getClosingPrice(s)`(dailyprice `HHDFS76240000`, `fetchConfirmedClose`)로 조회한다 — 호출량 증가를 마감 리포트 1일 1회로 한정하려고 `getPrevClose(s)`(미리보기·통계 핫패스 공용)와 분리했다. 응답 봉 날짜가 기대 거래일과 다르면 라이브 현재가로 fallback
-- **전략 생성 화면과 실제 매매의 기준가 통일**: `AccountStatisticsService.getPrices()`(tradingstats, `GET /prices` 티커 목록)와 `StrategyHistoryQueryService.strategySeedPreview()`(trading, 최소 시드 미리보기 — `StrategyService`가 위임) 모두 `BrokerPricePort.getPrevClose(s)`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
+- **전략 생성 화면과 실제 매매의 기준가 통일**: `AccountStatisticsService.getPrices()`(tradingcore.stats, `GET /prices` 티커 목록)와 `StrategyHistoryQueryService.strategySeedPreview()`(trading, 최소 시드 미리보기 — `StrategyService`가 위임) 모두 `BrokerPricePort.getPrevClose(s)`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
 - **`BrokerPricePort`에 `getPrevClose`/`getPrevCloses` 전용 메서드 존재**: `getPriceSnapshot(s)`(현재가+전일종가 조합)와 별개로, 전일종가만 필요하면 이걸 사용 — KIS는 응답이 한 API에 묶여 있어 내부적으로 `getPriceSnapshot(s)`를 재사용(호출 절감 없음)하지만, Toss는 현재가 API(`/api/v1/prices`) 호출을 완전히 생략하고 캔들 API만 호출하므로 실질적 절감이 있음 (`toss-api.md` "가격 조회 API 3분리" 참고)
 
 ### KIS 응답 Ticker 필터링 패턴

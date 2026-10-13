@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
-Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 모듈 경계는 `ApplicationModules.verify()`가 검증한다.
+Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 루트 패키지는 서브프로젝트별 `com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`이고, 모듈 경계는 프로세스별 `ApplicationModules.verify()`(api·trading-core 각 1개)가 검증한다.
 
 이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
 
@@ -44,9 +44,9 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 ## 모듈별 상세 문서 (해당 디렉토리 작업 시 로드)
 
-각 모듈 디렉토리의 `CLAUDE.md`가 `docs/agents/modules/<module>.md`를 import한다 — 그 모듈의 파일을 다루면 자동 로드된다. 여러 모듈을 동시에 설계하거나 own-type 신설을 검토할 때는 직접 Read:
+각 모듈 디렉토리의 `CLAUDE.md`가 `docs/agents/modules/<루트>/<ID>.md`를 import한다 — 그 모듈의 파일을 다루면 자동 로드된다. 여러 모듈을 동시에 설계하거나 own-type 신설을 검토할 때는 직접 Read:
 - `docs/agents/own-type-ledger.md` — own-type 허용 원장 (필수 Read)
-- `docs/agents/modules/trading-formulas.md` — 매매·VR 공식 (변경 금지 SSOT)
+- `docs/agents/modules/tradingcore/trading-formulas.md` — 매매·VR 공식 (변경 금지 SSOT)
 
 ## 운영 도구
 

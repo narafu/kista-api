@@ -1,0 +1,16 @@
+package com.kista.tradingcore.broker.domain.model;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
+
+import java.math.BigDecimal;
+
+public record DailyTransaction(
+        String tradeDate,                    // 매매일자 (trad_dt)
+        OrderDirection direction,            // 매도/매수 방향 (sll_buy_dvsn_cd: 01=매도, 02=매수)
+        StrategyTicker ticker,                       // 종목코드 (pdno)
+        String symbolName,                   // 종목명 (ovrs_item_name)
+        int quantity,                        // 체결수량 (ccld_qty)
+        BigDecimal price,                    // 해외주식체결단가 (ovrs_stck_ccld_unpr)
+        BigDecimal tradeAmountUsd,           // 거래외화금액 (tr_frcr_amt2)
+        String currency                      // 통화코드 (crcy_cd)
+) {}

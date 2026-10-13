@@ -1,0 +1,37 @@
+package com.kista.api.notify.adapter.out.gateway;
+
+import com.kista.api.market.application.event.FearGreedFetchFailedEvent;
+import com.kista.api.benchmark.application.event.BenchmarkAlertRaisedEvent;
+import com.kista.api.notify.application.port.output.NotifyPort;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
+
+// market/stats가 발행하는 외부 데이터 수집 실패 이벤트가 기존 NotifyPort.notifyError로 정확히 라우팅되는지 검증
+@ExtendWith(MockitoExtension.class)
+class AlertNotifierTest {
+
+    @Mock NotifyPort notifyPort;
+
+    private AlertNotifier notifier() {
+        return new AlertNotifier(notifyPort);
+    }
+
+    @Test
+    void onFearGreedFetchFailed_callsNotifyPortWithMessage() {
+        notifier().onFearGreedFetchFailed(new FearGreedFetchFailedEvent("crypto api down"));
+
+        verify(notifyPort).notifyError(argThat(e -> "crypto api down".equals(e.getMessage())));
+    }
+
+    @Test
+    void onBenchmarkAlertRaised_callsNotifyPortWithMessage() {
+        notifier().onBenchmarkAlertRaised(new BenchmarkAlertRaisedEvent("kbland api down"));
+
+        verify(notifyPort).notifyError(argThat(e -> "kbland api down".equals(e.getMessage())));
+    }
+}

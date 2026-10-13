@@ -1,0 +1,65 @@
+package com.kista.tradingcore.trading.adapter.out;
+
+import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.broker.domain.model.PlacedOrderView;
+import com.kista.tradingcore.broker.domain.model.PositionView;
+import com.kista.tradingcore.broker.domain.model.StrategyRefLite;
+import com.kista.tradingcore.broker.application.port.output.MockSimulationDataPort;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+// MockBrokerAdapter(broker 모듈)가 정의한 MockSimulationDataPort 구현체 — trading 소유 영속 포트(OrderPort/
+// CyclePositionPort/StrategyCyclePort)를 내부적으로 호출해 broker 소유 뷰 레코드로 매핑한다.
+// trading→broker(정상, 유지 방향) 참조만 발생 — broker는 더 이상 trading 타입을 참조하지 않는다.
+@Component
+@RequiredArgsConstructor
+class MockSimulationDataAdapter implements MockSimulationDataPort {
+
+    private final OrderPort orderPort;
+    private final CyclePositionPort cyclePositionPort;
+    private final StrategyCyclePort strategyCyclePort;
+    private final StrategyPort strategyPort;
+
+    @Override
+    public List<StrategyRefLite> findStrategiesByAccountId(UUID accountId) {
+        return strategyPort.findByAccountId(accountId).stream()
+                .map(s -> new StrategyRefLite(s.id(), s.ticker()))
+                .toList();
+    }
+
+    @Override
+    public UUID findActiveCycleId(UUID strategyId) {
+        return strategyCyclePort.requireLatestByStrategyId(strategyId).id();
+    }
+
+    @Override
+    public List<PlacedOrderView> findPlacedOrders(UUID cycleId, LocalDate tradeDate) {
+        return orderPort.findPlacedByCycleAndDate(cycleId, tradeDate).stream()
+                .map(MockSimulationDataAdapter::toPlacedOrderView)
+                .toList();
+    }
+
+    @Override
+    public Optional<PositionView> findLatestPosition(UUID strategyId) {
+        return cyclePositionPort.findLatestOneByStrategyId(strategyId).map(MockSimulationDataAdapter::toPositionView);
+    }
+
+    private static PlacedOrderView toPlacedOrderView(Order order) {
+        return new PlacedOrderView(order.direction(), order.orderType(),
+                order.quantity(), order.price(), order.externalOrderId());
+    }
+
+    private static PositionView toPositionView(CyclePosition position) {
+        return new PositionView(position.holdings(), position.avgPrice(), position.usdDeposit());
+    }
+}

@@ -1,0 +1,25 @@
+package com.kista.api.admin.application.usecase;
+
+import com.kista.shared.contract.privacy.FidaOrderRequest;
+import com.kista.shared.contract.privacy.PrivacyBaseUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
+import com.kista.shared.contract.privacy.PrivacyOrderUpdateRequest;
+import com.kista.shared.contract.privacy.PrivacyTradeBaseResponse;
+
+import java.util.UUID;
+
+// 관리자 PRIVACY 기준 매매표 수동 보정 — 등록(FIDA 오류 대응)·마스터 필드 수정·개별 주문 가격·수량 수정
+public interface AdminPrivacyTradeUseCase {
+    // FIDA 수신 경로(executeFidaOrder) 재사용 — 동일 (releaseDate, ticker) 존재+내용 동일 시 created=false(멱등)
+    record CreateResult(PrivacyTradeBaseResponse view, boolean created) {}
+
+    CreateResult createBase(UUID adminId, FidaOrderRequest command);
+
+    PrivacyTradeBaseResponse updateBase(UUID adminId, UUID baseId, PrivacyBaseUpdateRequest command);
+
+    PrivacyTradeBaseResponse updateOrder(UUID adminId, UUID baseId, UUID orderId, PrivacyOrderUpdateRequest command);
+
+    PrivacyTradeBaseResponse addOrder(UUID adminId, UUID baseId, PrivacyOrderAddRequest command);
+
+    PrivacyTradeBaseResponse deleteOrder(UUID adminId, UUID baseId, UUID orderId);
+}

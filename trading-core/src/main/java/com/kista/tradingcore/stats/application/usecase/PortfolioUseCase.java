@@ -1,0 +1,14 @@
+package com.kista.tradingcore.stats.application.usecase;
+
+import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
+import com.kista.shared.kernel.StrategyTicker;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+public interface PortfolioUseCase {
+    CyclePositionHistoryEntry getCurrent(UUID userId);
+    List<Order> getHistory(UUID userId, LocalDate from, LocalDate to, StrategyTicker ticker);
+}

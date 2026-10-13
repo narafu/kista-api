@@ -1,0 +1,65 @@
+package com.kista.tradingcore.trading.adapter.in.schedule;
+
+import com.kista.shared.platform.scheduling.SchedulerJobRunner;
+import com.kista.shared.platform.scheduling.SchedulerLockService;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
+import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // local에서 끄면 운영 DB·텔레그램과 중복 알림 발생 방지
+public class TradingCloseScheduler {
+
+    private final TradingExecutionUseCase useCase;
+    private final StrategyPort strategyPort;        // ACTIVE 전략 목록 조회
+    private final SchedulerLockService schedulerLockService;
+    private final BatchContextFactory contextFactory;
+    private final SchedulerJobRunner jobRunner;
+    private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
+
+    @Scheduled(cron = "0 30 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 waitUntilOrderTime 60분 대기)
+    public void run() throws InterruptedException {
+        schedulerLockService.tryRun("trading-close", Duration.ofHours(3), this::runLocked);
+    }
+
+    // 수동 트리거 — 주문 대기 없이 즉시 실행
+    public void runNow() throws InterruptedException {
+        schedulerLockService.tryRun("trading-close", Duration.ofHours(3), () ->
+                jobRunner.run("마감 매매 스케쥴러 수동",
+                        () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                        useCase::executeBatchNow));
+    }
+
+    // 재기동 재개 — 이전 프로세스 락을 인수해 마감 배치 전체 재실행 (slot 멱등 재계획, 남은 시간만 대기)
+    public void resume() throws InterruptedException {
+        schedulerLockService.takeOver("trading-close", Duration.ofHours(3), this::runLocked);
+    }
+
+    // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 리포트 미완료 전략만 리포트
+    public void resumeReport() throws InterruptedException {
+        schedulerLockService.takeOver("trading-close", Duration.ofHours(3), () -> {
+            jobRunner.run("마감 리포트 재개",
+                    () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                    useCase::resumeCloseReport);
+            heartbeatPort.pingClose(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
+        });
+    }
+
+    private void runLocked() throws InterruptedException {
+        // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
+        jobRunner.run("마감 매매 스케쥴러",
+                () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                useCase::executeBatch);
+        heartbeatPort.pingClose(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
+    }
+}

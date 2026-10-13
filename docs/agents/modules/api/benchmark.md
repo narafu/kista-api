@@ -1,0 +1,18 @@
+## com.kista.api.benchmark (`:api`)
+
+root `com.kista.stats`에서 개명한 모듈이다(당시 trading-core `tradingstats`, 현재 `tradingcore.stats`와 이름 충돌 해소). HTTP 경로는 `/api/stats/**` 그대로다. 이벤트 FQCN이 바뀌었으므로 배포 절차는 `docker-infra.md` "배포 직전 EPR 정리 런북" 참고.
+
+com.kista.api.benchmark/    ← Spring Modulith 모듈(CLOSED, root) — 주택/ETF 벤치마크 비교·KB Land/Alpaca 지수 시세 수집만 담당(계좌·Toss 통계·백테스트·포트폴리오·summary/equity-curve/cycles는 `com.kista.tradingcore.stats` 소유). "domain"·"usecase"·"port"·"event"·"schedule" 5개 NamedInterface, service·adapter.in.web·adapter.out.*은 internal. root `BenchmarkController`는 `/api/stats/housing-benchmark{,/series,/index-series,/etf-series,/regions}` 5개 라우트만 소유
+  domain/model/       ← 벤치마크 11타입(BenchmarkAssetType/BenchmarkScope/CurrentExchangeRate/EtfBenchmarkSymbol/BenchmarkComparison/BenchmarkPoint/HousingBenchmarkPrice/HousingBenchmarkRegion/HousingPriceIndex/IndexPrice/PerformanceComparisonSummary) + InvestmentPoint/StrategyRef(`Strategy`의 id/type/ticker 3필드 narrowing — 벤치마크 계산 입력. 내부 API 응답 `contract.stats.InvestmentPointsResponse`에서 `InvestmentPointsHttpAdapter`가 명시 매핑) — "domain"
+  application/usecase/ ← BenchmarkUseCase(벤치마크 비교 6개 메서드)/FetchHousingBenchmarkUseCase/FetchHousingPriceIndexUseCase/SyncMarketIndexPricesUseCase
+  application/port/output/ ← HousingBenchmarkFeedPort/HousingBenchmarkPricePort/HousingPriceIndexPort/IndexPriceFeedPort/IndexPricePort/InvestmentPointsPort(trading-core 내부 API 호출 — `Result`는 benchmark 도메인 타입, 어댑터가 contract에서 변환)/CurrentExchangeRatePort(현재 환율 조회 — trading-core 내부 API 호출).
+  application/event/  ← BenchmarkAlertRaisedEvent(String message) — KB Land 수집 실패 알림, notify `AlertNotifier.onBenchmarkAlertRaised`가 구독. "event"
+  application/service/ ← internal — BenchmarkService(벤치마크 비교 6개 — 비교 본체를 platform `TtlResultCache` 인스턴스에 10분 캐시)/BenchmarkComparisonBuilder(Spring·포트 비의존 순수 계산 — 정규화 비교 조립, ETF 비교에도 재사용. TWR 계산은 tradingcore.stats 소유 `InvestmentIndexCalculator`가 담당하고 일별 InvestmentPoint만 전달받음 — 아파트는 KB 주간 조사일에 as-of 스냅, ETF는 US 거래일+1 KST 날짜 교집합. 1년 미만 구간은 연환산 null)/HousingBenchmarkService(FetchHousingBenchmarkUseCase+FetchHousingPriceIndexUseCase 병합 구현 — KB Land 수집 실패 시 `BenchmarkAlertRaisedEvent` 발행)/MarketIndexPriceSyncService(심볼별 실패를 격리해 순회한 뒤 실패가 있으면 `IllegalStateException` — 이벤트 발행 없음)
+                         getHousingBenchmarkComparison: currentExchangeRate는 요청마다 실시간 조회하는 정보성 필드일 뿐 수익률·공통월·summary에는 미반영(조회 실패 시 null, 200 정상) — 투자(USD)·벤치마크(HOUSING=KRW/ETF=USD) 현지통화 그대로 비교, 환율 변환 없음
+  adapter/in/web/     ← internal — BenchmarkController + openapi/HousingBenchmarkOpenApiCustomizer + dto/ 5종
+  adapter/in/schedule/ ← KbLandHousingBenchmarkScheduler/KbLandPriceIndexScheduler/MarketIndexPriceSyncScheduler — `com.kista.api.web.AdminSchedulerController`가 3개 모두 수동 트리거용으로 주입(공개 "schedule"). MarketIndexPriceSyncScheduler는 비거래일에도 Alpaca 빈 배열 반환으로 무해한 no-op이라 요일 조건 없음
+  adapter/out/alpaca/  ← AlpacaIndexPriceAdapter/AlpacaConfig/AlpacaProperties (빈 이름 `alpacaRestClient`)
+  adapter/out/kbland/  ← KbLandHousingBenchmarkAdapter/KbLandConfig/KbLandProperties (아파트 5분위 매매평균가격(월간) + 주간 매매가격지수)
+  adapter/out/internal/ ← InvestmentPointsHttpAdapter(`GET /api/internal/trading/stats/investment-points`)/CurrentExchangeRateHttpAdapter(`CurrentExchangeRatePort` 구현 — 내부 API `GET /api/internal/trading/stats/exchange-rate`, bare `BigDecimal` body(JDK 타입이라 contract 대상 아님), 실패 시 null로 강등해 비교 응답 200 유지) — 둘 다 trading-core 내부 API를 호출하는 순수 HTTP 어댑터
+  adapter/out/persistence/housingbenchmark/ ← HousingBenchmarkPriceEntity/HousingPriceIndexEntity + JpaRepository + PersistenceAdapter 6개
+  adapter/out/persistence/marketindex/ ← MarketIndexPriceEntity + JpaRepository + PersistenceAdapter 3개

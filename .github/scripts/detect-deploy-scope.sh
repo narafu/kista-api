@@ -30,7 +30,7 @@ while IFS= read -r f; do
     src/main/resources/db/migration/*)
       verify=true; api=true; scheduler=true ;;
     # scheduler role에만 등록되는 빈 — kista-api에는 존재하지 않음
-    src/main/java/*/adapter/in/schedule/*|src/main/java/com/kista/web/AdminSchedulerController.java)
+    src/main/java/*/adapter/in/schedule/*|src/main/java/com/kista/api/web/AdminSchedulerController.java)
       verify=true; scheduler=true ;;
     # 그 외 app.jar — 스케쥴러가 서비스·어댑터를 그대로 호출하므로 둘 다
     src/main/*)
