@@ -455,6 +455,22 @@ EnumMeta label은 각 enum의 `label` 필드가 SSOT다. 위 한국어 값은 �
 - 브로커 정보는 `TradingCycleResponse`에 추가하지 않는다. `accountId`로 계좌 응답(`AccountResponse.broker`)을 참조한다.
 - `/pause`, `/resume`, 삭제: 기존 그대로. 일시정지·삭제 시 미체결 주문 취소 경로도 기존 그대로다.
 
+### 7.6 런타임 생성 정책 (runtime-config / 관리자 설정)
+
+DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 폼은 지금처럼 `runtimeConfig.strategies[code].enabled === true`인 타입만 노출하면 된다.
+
+- `TradingPolicySettings.strategies`에 `DCA` 키를 추가한다. 이 맵은 모든 StrategyType 키가 필수다.
+- 기본값(`TradingPolicySettings.defaults()`)
+  - `StrategyCreationSettings(enabled=false, ticker=field(customizable=true, allowed=[UPRO, QLD], default=UPRO), 나머지 필드 null)`
+  - 저장 행에 DCA 키가 없으면 기존 "신규 enum 상수 백필" 경로로 이 기본값이 들어간다.
+  - 기본이 비활성인 이유: 단계 ①(조건 미지원)이 배포되는 순간 사용자에게 노출되지 않도록 하기 위함이다. 운영자가 관리자 설정에서 켠다.
+- 관리자 설정
+  - `AdminSettingsRequest.StrategyRequest.toDomain`의 switch에 `case DCA -> new StrategyCreationSettings(enabled, value.tickerValue(), null, null, null, null)`을 추가한다.
+  - 관리자 화면은 DCA 행의 enabled 토글과 ticker 필드만 편집한다. DCA 전용 필드(주기·금액 등)는 사용자 입력이라 런타임 정책 대상이 아니다.
+- INFINITE 기본 ticker 허용값도 `List.of(StrategyTicker.values())`라서 그대로 두면 UPRO·QLD가 섞인다. INFINITE capability와 같은 명시 목록(MAGX, USD, TQQQ, SOXL)으로 바꾼다.
+- 정책 저장 검증을 추가한다: 각 타입의 ticker `allowedValues`는 `StrategyType.capability().availableTickers()`의 부분집합이어야 한다. 관리자가 INFINITE에 UPRO를 허용하는 식의 설정을 저장 시점에 거부(400)한다.
+- `DcaCreationResolver`(trading `domain/strategy`)는 ticker만 해석한다. 반환은 `ResolvedCreation(ticker, StrategyDefaults.DEFAULT_DIVISION_COUNT, null, null, null)`이고, 빈은 `CycleStrategyBeanConfig`에 등록한다.
+
 ## 8. 아키텍처 배치 요약
 
 | 구성요소 | 모듈·패키지 |
