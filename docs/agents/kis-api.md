@@ -15,6 +15,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - **`KisAuthApi`는 `KisHttpClient` 빈 미주입** — `kisRestClient`(RestClient) 직접 사용 (순환 의존 방지, 정적 헬퍼 `splitAccountNo`/`buildHeaders`만 참조)
 - `BrokerConnectionTestPort` 구현 (`verifyCredentials`/`verifyAccount`): `verifyCredentials(appKey, secretKey, accountId)` — accountId=null이면 캐시 저장 생략(등록 전 사전 검증), 성공 토큰은 90초 단기 캐시(EGW00133 회피)
 - `verifyAccount(appKey, secretKey, accountNo)` — TTTC2101R로 계좌 실소유 검증 후 `null` 반환 (KIS는 brokerAccountCode 없음), 실패 시 `BrokerCredentialException`
+- **관리자(시세 전용) 자격증명**: `kis.admin-app-key`/`admin-app-secret`(env `KIS_ADMIN_APP_KEY`/`KIS_ADMIN_APP_SECRET`, 둘 중 하나라도 비면 비활성 — 기동 실패 아님). `KisAdminPriceSource`가 nil UUID(`KisAdminTokenCoordinator.ADMIN_TOKEN_ID`)를 id로 한 `BrokerAccountRef`(accountNo=null)로 `pricingGet`을 호출한다 — 해외시세 TR(`HHDFS00000300`·`HHDFS76220000`·`HHDFS76240000`)은 계좌번호 없이 `AUTH`/`EXCD`/`SYMB` 파라미터와 토큰·appkey·appsecret 헤더만 필요(공식 예제 `open-trading-api/examples_user/overseas_stock` 확인). `KisAuthApi.getToken/recoverToken`이 이 id를 `KisAdminTokenCoordinator`(Redis `kis:admin:token:<sha256(appKey) 앞 8자>` — 앱키 교체 시 옛 토큰 미사용, TTL=만료 1분 전, JVM 락 더블체크, Redis 장애 시 JVM 메모리 폴백)로 보낸다 — `broker_tokens.account_id`는 accounts FK라 저장 불가. 재기동해도 Redis 토큰을 재사용해 24시간 재사용·1분 1회 발급(EGW00133) 규칙을 지킨다. 관리자 앱키는 등록 계좌 앱키와 다른 것을 쓸 것(같으면 토큰이 DB·Redis 두 곳에 캐시돼 첫 발급이 겹칠 때 EGW00133 위험, 호출 간격 게이트는 appKey 기준이라 공유)
 - 모든 브로커 포트 메서드는 `BrokerAccountRef account`를 받는다 — `getPrices(tickers, account)`, `place(OrderInstruction, account)` 등 (`Account.toBrokerRef()` 1곳에서 변환, broker는 Account 애그리게이트를 참조하지 않음)
 - KIS 포트 인터페이스에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
 - Base URL: `https://openapi.koreainvestment.com:9443`
@@ -86,8 +87,9 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 - 단건(`HHDFS00000300`)·복수종목(`HHDFS76220000`) 응답 모두 `base`(전일종가) 필드를 `last`(현재가)와 함께 반환 — **별도 API 호출 없이 `base` 필드를 그대로 prevClose로 사용** (빈값이면 current로 fallback)
 - `base`는 장 시작 전엔 하루 더 과거 종가일 수 있다 — 개장 전 시간대에 이상 종가가 관측되면 이 트레이드오프부터 의심할 것
+- 관리자 시세 2단계(`KisAdminPriceSource`, Toss 관리자 실패분만)는 `KisPriceApi.fetchQuotes`의 원시 `last`/`base`를 대체 없이 쓴다 — `last`는 현재가로만, `base`는 전일종가로만(빈값이면 누락 → 계좌 단계). 위 `last→base`·`base→current` 폴백은 계좌 단계(③)에만 남는다
 - 마감 리포트 확정 종가는 별도 `getClosingPrice(s)`(dailyprice `HHDFS76240000`, `fetchConfirmedClose`)로 조회한다 — 호출량 증가를 마감 리포트 1일 1회로 한정하려고 `getPrevClose(s)`(미리보기·통계 핫패스 공용)와 분리했다. 응답 봉 날짜가 기대 거래일과 다르면 라이브 현재가로 fallback
-- **전략 생성 화면과 실제 매매의 기준가 통일**: `AccountStatisticsService.getPrices()`(tradingcore.stats, `GET /prices` 티커 목록)와 `StrategyHistoryQueryService.strategySeedPreview()`(trading, 최소 시드 미리보기 — `StrategyService`가 위임) 모두 `BrokerPricePort.getPrevClose(s)`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
+- **전략 생성 화면과 실제 매매의 기준가 통일** (전일종가는 `BrokerRouter`가 관리자 시세 우선으로 조회하므로 계좌 브로커와 무관하게 대부분 Toss 캔들 기준): `AccountStatisticsService.getPrices()`(tradingcore.stats, `GET /prices` 티커 목록)와 `StrategyHistoryQueryService.strategySeedPreview()`(trading, 최소 시드 미리보기 — `StrategyService`가 위임) 모두 `BrokerPricePort.getPrevClose(s)`를 사용 — `TradingPreviewService`·실제 매매 실행(`InfinitePosition.averagePrice()`, holdings==0→prevClose)과 동일한 소스로 맞춰, "전략 생성 시 본 기준가"와 "실제 첫 주문가"가 항상 일치하도록 함. 순수 현재가(`getPrice`/`getPrices`)는 이 두 화면 어디에도 쓰지 않음
 - **`BrokerPricePort`에 `getPrevClose`/`getPrevCloses` 전용 메서드 존재**: `getPriceSnapshot(s)`(현재가+전일종가 조합)와 별개로, 전일종가만 필요하면 이걸 사용 — KIS는 응답이 한 API에 묶여 있어 내부적으로 `getPriceSnapshot(s)`를 재사용(호출 절감 없음)하지만, Toss는 현재가 API(`/api/v1/prices`) 호출을 완전히 생략하고 캔들 API만 호출하므로 실질적 절감이 있음 (`toss-api.md` "가격 조회 API 3분리" 참고)
 
 ### KIS 응답 Ticker 필터링 패턴

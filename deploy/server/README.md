@@ -86,6 +86,8 @@ INTERNAL_API_TOKEN=
 
 TOSS_ADMIN_CLIENT_ID=
 TOSS_ADMIN_CLIENT_SECRET=
+KIS_ADMIN_APP_KEY=                # 선택 — 관리자 KIS 시세(Toss 관리자 시세 실패분 폴백). 비우면 그 단계만 건너뜀. 등록 계좌와 다른 앱키 권장
+KIS_ADMIN_APP_SECRET=
 ALPACA_API_KEY=
 ALPACA_API_SECRET=
 FIREBASE_SERVICE_ACCOUNT_JSON=   # 반드시 단일 행 JSON

@@ -49,20 +49,30 @@ class KisAuthApi implements BrokerConnectionTestPort {
     // verifyCredentials/verifyAccount(계좌 등록 전, accountId 없을 수 있음) 전용 — 코디네이터를 거치지 않는 단순 캐시 접근
     private final BrokerTokenCachePort brokerTokenCachePort;
     // getToken/recoverToken 전용 — JVM-local 더블체크락 + DB 캐시 조정 (Toss는 별도 Redis 분산 구현체).
-    // TokenCoordinator를 구현하는 빈이 2개(KIS/Toss)라 인터페이스로 주입하면 Spring이 모호해짐 —
+    // TokenCoordinator 구현 빈이 2개(KIS/Toss)라 인터페이스로 주입하면 Spring이 모호해짐 —
     // TossAuthApi가 TossDistributedTokenCoordinator를 구체 타입으로 주입받는 것과 동일하게 구체 타입 사용
     private final KisTokenCoordinator tokenCoordinator;
+    // 관리자 시세 키 전용(ADMIN_TOKEN_ID) — accounts FK가 있는 broker_tokens를 못 써서 Redis 캐시 사용.
+    // 키가 앱키별이라 TokenCoordinator 계약(accountId 기준)을 구현하지 않고 appKey를 받는 전용 메서드를 쓴다
+    private final KisAdminTokenCoordinator adminCoordinator;
 
     // ── 토큰 발급 / 401 복구 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
 
     public String getToken(UUID accountId, String appKey, String appSecret) {
-        return tokenCoordinator.obtain(accountId, () -> issueAccountToken(accountId, appKey, appSecret));
+        TokenCoordinator.TokenIssuer issuer = () -> issueAccountToken(accountId, appKey, appSecret);
+        return isAdmin(accountId) ? adminCoordinator.obtain(appKey, issuer) : tokenCoordinator.obtain(accountId, issuer);
     }
 
     public TokenCoordinator.RecoveredToken recoverToken(
             UUID accountId, String appKey, String appSecret, String rejectedAccessToken) {
-        return tokenCoordinator.recover(accountId, rejectedAccessToken,
-                () -> issueAccountToken(accountId, appKey, appSecret));
+        TokenCoordinator.TokenIssuer issuer = () -> issueAccountToken(accountId, appKey, appSecret);
+        return isAdmin(accountId)
+                ? adminCoordinator.recover(appKey, rejectedAccessToken, issuer)
+                : tokenCoordinator.recover(accountId, rejectedAccessToken, issuer);
+    }
+
+    private static boolean isAdmin(UUID accountId) {
+        return KisAdminTokenCoordinator.ADMIN_TOKEN_ID.equals(accountId);
     }
 
     private TokenCoordinator.IssuedToken issueAccountToken(UUID accountId, String appKey, String appSecret) {

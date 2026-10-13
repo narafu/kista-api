@@ -55,6 +55,22 @@ class TossPriceApi implements CommonMarketPriceFeed {
     public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers) {
         if (tickers.isEmpty()) return Map.of();
 
+        Map<StrategyTicker, BigDecimal> result = fetchPricesPartial(tickers);
+
+        // 요청 티커 중 응답에 없는 종목이 있는 부분 실패 — 0 대체 대신 예외로 알려 호출부가 잘못된 값으로 계산하지 않게 함
+        List<StrategyTicker> missing = tickers.stream().filter(t -> !result.containsKey(t)).toList();
+        if (!missing.isEmpty()) {
+            throw new TossApiException("Toss 가격 조회 응답 누락(부분 실패): 요청=" + tickers + ", 누락=" + missing, null);
+        }
+
+        return result;
+    }
+
+    // 현재가 HTTP 조회 + 파싱 — 응답에 없는 종목은 결과에서 빠질 뿐 예외 아님(관리자 시세 소스가 누락분을 다음 단계로 넘김)
+    // package-private — TossAdminPriceSource, 테스트
+    Map<StrategyTicker, BigDecimal> fetchPricesPartial(List<StrategyTicker> tickers) {
+        if (tickers.isEmpty()) return Map.of();
+
         // symbols 쿼리 파라미터: 콤마 구분 종목 코드 목록
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("symbols", tickers.stream().map(StrategyTicker::name).collect(Collectors.joining(",")));
@@ -69,18 +85,22 @@ class TossPriceApi implements CommonMarketPriceFeed {
             throw new TossApiException("Toss 가격 조회 응답 없음(전체 실패): tickers=" + tickers, null);
         }
 
-        Map<StrategyTicker, BigDecimal> result = items.stream()
-                .flatMap(item -> StrategyTicker.tryParse(item.symbol())  // StrategyTicker 외 종목(예: AAPL) silent drop
-                        .map(t -> Map.entry(t, new BigDecimal(item.lastPrice())))
-                        .stream())
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-        // 요청 티커 중 응답에 없는 종목이 있는 부분 실패 — 0 대체 대신 예외로 알려 호출부가 잘못된 값으로 계산하지 않게 함
-        List<StrategyTicker> missing = tickers.stream().filter(t -> !result.containsKey(t)).toList();
-        if (!missing.isEmpty()) {
-            throw new TossApiException("Toss 가격 조회 응답 누락(부분 실패): 요청=" + tickers + ", 누락=" + missing, null);
+        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
+        for (var item : items) {
+            Optional<StrategyTicker> ticker = StrategyTicker.tryParse(item.symbol()); // StrategyTicker 외 종목(예: AAPL) silent drop
+            if (ticker.isEmpty()) continue;
+            // lastPrice null·비숫자·0 이하는 그 종목만 건너뜀(대체값 금지)
+            try {
+                BigDecimal price = new BigDecimal(item.lastPrice());
+                if (price.signum() > 0) {
+                    result.putIfAbsent(ticker.get(), price);
+                    continue;
+                }
+            } catch (NumberFormatException | NullPointerException _) {
+                // 아래 warn으로 처리
+            }
+            log.warn("Toss 현재가 파싱 실패 — 종목 건너뜀: symbol={}, lastPrice={}", item.symbol(), item.lastPrice());
         }
-
         return result;
     }
 
@@ -98,7 +118,10 @@ class TossPriceApi implements CommonMarketPriceFeed {
         return getPrices(tickers).entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        e -> new PriceSnapshot(e.getValue(), fetchPrevCloseCached(e.getKey().name()).orElse(e.getValue()))));
+                        e -> new PriceSnapshot(e.getValue(), fetchPrevCloseCached(e.getKey().name()).orElseGet(() -> {
+                            log.warn("Toss {} 전일종가 없음 — prevClose=current 사용", e.getKey());
+                            return e.getValue();
+                        }))));
     }
 
     // 전일종가만 필요한 경우 — 현재가 API(/api/v1/prices) 미호출, 캔들 API만 호출
@@ -131,7 +154,7 @@ class TossPriceApi implements CommonMarketPriceFeed {
     // 같은 (symbol, KST 날짜, 정규장 진행 여부) 재조회는 캐시 히트 — 정규장 진행 여부를 버킷으로 분리해
     // 정규장 종료로 확정 종가가 바뀌는 순간에는 캐시를 재사용하지 않고 새로 조회하도록 함
     // 실패(empty)도 캐싱되어 같은 버킷 내 재시도하지 않음(허용된 트레이드오프)
-    private Optional<BigDecimal> fetchPrevCloseCached(String symbol) {
+    Optional<BigDecimal> fetchPrevCloseCached(String symbol) {
         MarketSessionInfo session = resolveMarketSession();
         Instant before = session.regularSessionActive()
                 ? session.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
@@ -187,12 +210,15 @@ class TossPriceApi implements CommonMarketPriceFeed {
     // 특정 거래일 확정 종가 — 일봉 캔들에서 해당 날짜 봉의 종가를 직접 조회 (라이브 현재가와 무관)
     // 실패/미발행 시 현재가로 폴백 (KIS KisPriceApi.getClosingPrice와 동일 정책)
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate) {
-        return fetchConfirmedClose(ticker, tradeDate).orElseGet(() -> getPrice(ticker));
+        return fetchConfirmedClose(ticker, tradeDate).orElseGet(() -> {
+            log.warn("Toss {} 확정 종가 없음 — 현재가로 폴백: tradeDate={}", ticker, tradeDate);
+            return getPrice(ticker);
+        });
     }
 
     // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환 (KIS fetchConfirmedClose와 동일 규칙)
     // 봉 날짜가 기대 US 세션일과 다르면(미발행 등) filter에서 탈락 → Optional.empty()
-    private Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate) {
+    Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate) {
         LocalDate usSessionDate = UsTradeDates.toUsTradeDate(tradeDate);
         try {
             Optional<BigDecimal> close = tossCandleApi.getCandles(ticker.name(), "1d", usSessionDate, usSessionDate).stream()
@@ -200,11 +226,11 @@ class TossPriceApi implements CommonMarketPriceFeed {
                     .findFirst()
                     .map(TossCandle::close);
             if (close.isEmpty()) {
-                log.warn("Toss {} 확정 종가 캔들 없음(기대 US세션일={}), 현재가로 폴백: tradeDate={}", ticker, usSessionDate, tradeDate);
+                log.warn("Toss {} 확정 종가 캔들 없음(기대 US세션일={}): tradeDate={}", ticker, usSessionDate, tradeDate);
             }
             return close;
         } catch (Exception e) {
-            log.warn("Toss {} 확정 종가 조회 실패, 현재가로 폴백: tradeDate={}, error={}", ticker, tradeDate, e.getMessage());
+            log.warn("Toss {} 확정 종가 조회 실패: tradeDate={}, error={}", ticker, tradeDate, e.getMessage());
             return Optional.empty();
         }
     }
@@ -216,9 +242,9 @@ class TossPriceApi implements CommonMarketPriceFeed {
             if (candle.isPresent()) {
                 return Optional.of(candle.get().close());
             }
-            log.warn("Toss 캔들 없음, prevClose=current 사용: symbol={}", symbol);
+            log.warn("Toss 전일종가 캔들 없음: symbol={}", symbol);
         } catch (Exception e) {
-            log.warn("Toss 전일종가 조회 실패, prevClose=current 사용: symbol={}, error={}", symbol, e.getMessage());
+            log.warn("Toss 전일종가 조회 실패: symbol={}, error={}", symbol, e.getMessage());
         }
         return Optional.empty();
     }

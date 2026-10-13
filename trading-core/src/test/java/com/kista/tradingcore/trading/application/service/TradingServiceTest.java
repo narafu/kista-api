@@ -34,6 +34,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
+import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
@@ -56,6 +57,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -89,6 +91,7 @@ class TradingServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
+    @Mock AdminMarketPricePort adminMarketPricePort; // 기본 빈 결과 → 계좌 경로로 흐름
     @Mock com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
     @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
     @Mock com.kista.tradingcore.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
@@ -147,6 +150,18 @@ class TradingServiceTest {
         return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price());
     }
 
+    // 배치 시작 스냅샷 스텁 — fetcher가 현재가(getPrices)와 전일종가(getPrevCloses)를 따로 조회해 조립한다
+    private void stubStartSnapshots(BrokerAccountRef ref, Map<StrategyTicker, PriceSnapshot> snaps) {
+        Map<StrategyTicker, BigDecimal> currents = new HashMap<>();
+        Map<StrategyTicker, BigDecimal> prevCloses = new HashMap<>();
+        snaps.forEach((t, snap) -> {
+            currents.put(t, snap.current());
+            prevCloses.put(t, snap.prevClose());
+        });
+        lenient().when(kisPricePort.getPrices(anyList(), eq(ref))).thenReturn(currents);
+        lenient().when(kisPricePort.getPrevCloses(anyList(), eq(ref))).thenReturn(prevCloses);
+    }
+
     @BeforeEach
     void setUp() {
         // USER(TradingUserProfile) — balanceCheckEnabled=true, notificationPrefs 비어있어 isNotificationEnabled()도 기본 true(활성)
@@ -169,7 +184,7 @@ class TradingServiceTest {
 
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
-        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
+        TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, adminMarketPricePort, eventPublisher, privacyTradePort);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies, liveBalancePort, new AccountBudgetLock());
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
@@ -242,8 +257,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_NORMAL_BUY");
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00"))));
         lenient().when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, startPrice));
         lenient().when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF)))
@@ -283,8 +297,7 @@ class TradingServiceTest {
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, startPrice, OrderStatus.PLACED, "ORD-001", null, null);
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose))); // 시작가+전일종가
         // 접수 직전 재조회 — 시작가와 동일값으로 스텁해 기존 캡 판단 결과를 그대로 유지
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, startPrice));
@@ -313,10 +326,10 @@ class TradingServiceTest {
         assertThat(savedInLock).isTrue();
         verify(marketCalendarPort).isMarketOpen(any());
         verify(cycleHistoryPort).findLatestOneByStrategyId(STRATEGY.id());
-        verify(kisPricePort, never()).getPriceSnapshot(any(), any()); // 단건 fallback 없음 — getPriceSnapshots 성공
+        verify(kisPricePort, never()).getPrevClose(any(), any()); // 단건 fallback 없음 — getPrevCloses 성공
         verify(kisPricePort, never()).getPrice(any(), any());         // 단건 fallback 없음
-        verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT_REF)); // 시작가(Phase A) 1회
-        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT_REF)); // 접수 직전 재조회(Placement) 1회
+        verify(kisPricePort).getPrevCloses(anyList(), eq(ACCOUNT_REF)); // 전일종가(Phase A) 1회
+        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT_REF)); // 시작가(Phase A) + 접수 직전 재조회(Placement) 각 1회
         verify(kisPricePort).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF));         // 종가(PostClose) 1회
         verify(orderPort).saveAll(anyList());
         verify(orderPort, atLeastOnce()).findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any());
@@ -339,7 +352,7 @@ class TradingServiceTest {
         Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLACED, "ORD-001", null, null);
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -397,8 +410,7 @@ class TradingServiceTest {
                 OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00")))); // 시작가+전일종가
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, new BigDecimal("19.00")))); // 시작가+전일종가
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, closingPrice)); // 종가
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -447,8 +459,7 @@ class TradingServiceTest {
                 OrderStatus.PLACED, "ORD-SELL-001", null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, prevClose)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned(), sellTemplate.toPlanned()));
@@ -488,8 +499,7 @@ class TradingServiceTest {
                 OrderStatus.PLACED, "ORD-SELL-002", null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellTemplate.toPlanned()));
@@ -518,8 +528,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), prevClose)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), prevClose)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(LOW_HISTORY)); // usdDeposit=10
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(bigBuy.toPlanned()));
@@ -549,8 +558,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_SELL");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, prevClose)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(bigSell.toPlanned()));
@@ -575,8 +583,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sell.toPlanned()));
@@ -603,8 +610,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buy.toPlanned(), sell.toPlanned()));
@@ -633,8 +639,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_CAPPED_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("50.00"), new BigDecimal("49.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("50.00"), new BigDecimal("49.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(originalBuy.toPlanned(), sell.toPlanned()));
@@ -685,7 +690,7 @@ class TradingServiceTest {
                 10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(
+        stubStartSnapshots(ACCOUNT_REF, Map.of(
                 StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("1000.00"), new BigDecimal("19.00")),
                 StrategyTicker.TQQQ, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
@@ -753,10 +758,11 @@ class TradingServiceTest {
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         // 계획 시점 시작가=100.00 → cap=105.00 (사다리 BUY 90.00은 이 시점엔 cap 이하 — prepareForAllocation 무보정)
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.TQQQ, new PriceSnapshot(new BigDecimal("100.00"), new BigDecimal("95.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(new BigDecimal("100.00"), new BigDecimal("95.00"))));
         // 개장 대기 이후 재조회한 최신가=80.00 → cap=84.00으로 좁아짐 (Task 3 reloadPlacementPrices와 동일 메커니즘)
+        // 첫 호출은 배치 시작 스냅샷(100.00), 두 번째가 접수 직전 재조회(80.00)
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("100.00")))
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("80.00")));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
         when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
@@ -823,8 +829,7 @@ class TradingServiceTest {
                 .withLeg("TEST_OPEN_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, prevClose)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, prevClose)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
@@ -858,8 +863,7 @@ class TradingServiceTest {
 
     private void stubOpenBatchBasics(BrokerAccountRef ref) {
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ref)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ref, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         lenient().when(kisPricePort.getPrices(anyList(), eq(ref))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(brokerOrderPort.place(any(), eq(ref))).thenReturn(brokerResult("ORD-DCA"));
     }
@@ -935,8 +939,7 @@ class TradingServiceTest {
                 Instant.now().plusMillis(300));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
 
         Thread.currentThread().interrupt();
 
@@ -957,8 +960,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), prevClose)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), prevClose)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(bigBuy.toPlanned()));
@@ -995,8 +997,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_CORRECTION_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -1029,8 +1030,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_REJECTED_SELL");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(rejectedBuy.toPlanned(), rejectedSell.toPlanned()));
@@ -1064,8 +1064,7 @@ class TradingServiceTest {
         RuntimeException balanceFailure = new RuntimeException("account A balance failure");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.brokerRef())))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(failingAccount.brokerRef(), Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount.brokerRef()))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -1105,8 +1104,7 @@ class TradingServiceTest {
         RuntimeException saveFailure = new RuntimeException("account A save failure");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.brokerRef())))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
+        stubStartSnapshots(failingAccount.brokerRef(), Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(failingAccount.brokerRef()))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -1150,8 +1148,7 @@ class TradingServiceTest {
         RuntimeException notificationFailure = new RuntimeException("account A notification failure");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(failingAccount.brokerRef())))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
+        stubStartSnapshots(failingAccount.brokerRef(), Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(failingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestOneByStrategyId(succeedingStrategy.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class))).thenReturn(List.of(rejectedBuy.toPlanned()));
@@ -1191,8 +1188,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_PRIVACY_SELL");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(privacyBase));
@@ -1221,8 +1217,7 @@ class TradingServiceTest {
                 1, new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -1253,8 +1248,7 @@ class TradingServiceTest {
         Order correction = buyTemplate(StrategyTicker.SOXL, "18.00", OrderTiming.AT_CLOSE).withLeg("INFINITE_CORRECTION_01");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -1294,8 +1288,7 @@ class TradingServiceTest {
                 null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -1329,8 +1322,7 @@ class TradingServiceTest {
                 .withLeg("INFINITE_CORRECTION_01");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -1368,8 +1360,7 @@ class TradingServiceTest {
                 null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of(avg, ref, correction1, correction2, correction3));
@@ -1395,8 +1386,7 @@ class TradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of());
@@ -1421,8 +1411,7 @@ class TradingServiceTest {
                 .withLeg("INFINITE_EARLY_REF_BUY");
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(avg));
@@ -1444,8 +1433,7 @@ class TradingServiceTest {
                 1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -1470,8 +1458,7 @@ class TradingServiceTest {
         CyclePositionInfiniteDetail previousReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 5)).thenReturn(List.of(NORMAL_HISTORY));
@@ -1507,8 +1494,7 @@ class TradingServiceTest {
         CyclePositionInfiniteDetail previousReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 5)).thenReturn(List.of(NORMAL_HISTORY));
@@ -1548,8 +1534,7 @@ class TradingServiceTest {
         CyclePositionInfiniteDetail previousReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(cycleHistoryPort.findLatestByCycleId(STRATEGY_CYCLE.id(), 5)).thenReturn(List.of(NORMAL_HISTORY));
@@ -1589,8 +1574,7 @@ class TradingServiceTest {
                 1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.empty());
@@ -1624,8 +1608,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(missingSellBase));
@@ -1659,8 +1642,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(missingSellBase));
         when(privacyValidation.inspect(missingSellBase)).thenReturn(missingSellReport());
@@ -1687,8 +1669,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(cycleHistoryPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(history));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(missingSellBase));
         when(privacyValidation.inspect(missingSellBase)).thenReturn(missingSellReport());
@@ -1722,8 +1703,7 @@ class TradingServiceTest {
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLACED, "ORD-BUY-001", null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, new BigDecimal("19.00"))));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         // 오늘 주문 이미 존재 (SELL은 PLACED, BUY는 PLANNED)
@@ -1761,7 +1741,7 @@ class TradingServiceTest {
         Order existingFirst = placedOrder(ACCOUNT, STRATEGY_CYCLE);
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -1779,8 +1759,8 @@ class TradingServiceTest {
                 new BatchContext(strategy2, cycle2, ACCOUNT, USER)
         ), PAST_DST);
 
-        verify(kisPricePort).getPriceSnapshots(anyList(), eq(ACCOUNT_REF)); // 시작가(Phase A) 1회
-        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT_REF)); // 접수 직전 재조회(Placement) 1회 — ticker당 1회, 사이클별 아님
+        verify(kisPricePort).getPrevCloses(anyList(), eq(ACCOUNT_REF)); // 전일종가(Phase A) 1회
+        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT_REF)); // 시작가(Phase A) + 접수 직전 재조회(Placement) 각 1회 — ticker당 1회, 사이클별 아님
         verify(kisPricePort).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF));         // 종가(PostClose) 1회
         verify(kisPricePort, never()).getPrice(any(), any());
         verify(kisPricePort, never()).getPriceSnapshot(any(), any());
@@ -1806,10 +1786,11 @@ class TradingServiceTest {
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, plannedBuyPrice, OrderStatus.PLACED, "ORD-REFRESH", null, null);
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(startPrice, prevClose)));
+        // 첫 호출은 배치 시작 스냅샷(startPrice), 두 번째가 접수 직전 재조회(placementPrice)
         when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, placementPrice)); // 접수 직전 재조회
+                .thenReturn(Map.of(StrategyTicker.SOXL, startPrice))
+                .thenReturn(Map.of(StrategyTicker.SOXL, placementPrice));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -1825,8 +1806,8 @@ class TradingServiceTest {
 
         service.execute(STRATEGY, ACCOUNT, USER, PAST_DST);
 
-        // ticker당 1회만 재조회
-        verify(kisPricePort).getPrices(anyList(), eq(ACCOUNT_REF));
+        // 시작 스냅샷 1회 + ticker당 접수 직전 재조회 1회
+        verify(kisPricePort, times(2)).getPrices(anyList(), eq(ACCOUNT_REF));
         // cap 보정이 시작가(50.00×1.05=52.50)가 아닌 재조회된 현재가(10.00×1.05=10.50) 기준으로 수행됨
         verify(infiniteStrategy).buildCappedBuyOrders(any(), any(), anyList(), eq(new BigDecimal("10.50")));
     }
@@ -1841,8 +1822,7 @@ class TradingServiceTest {
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE), StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE), StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE, StrategyTicker.TQQQ, PRICE));
         // STRATEGY: 잔고 조회에서 예외
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -1874,8 +1854,7 @@ class TradingServiceTest {
                 Instant.now().minusSeconds(7200));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any(LocalDate.class)))
                 .thenReturn(List.of(placedOrder(ACCOUNT, STRATEGY_CYCLE)));
@@ -1891,15 +1870,16 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_getPricesFails_cycleFailsAndNotifiesAdmin() throws InterruptedException {
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenThrow(new RuntimeException("API 오류"));
-        // getPriceSnapshot 단건 fallback도 실패 → snapshot=null → price=null + prevClosePrice=null → holdings=0 → IllegalStateException
+        when(kisPricePort.getPrices(anyList(), eq(ACCOUNT_REF))).thenThrow(new RuntimeException("API 오류"));
+        // getPrice 단건 fallback도 실패(null) → snapshot 제외 → price=null + prevClosePrice=null → holdings=0 → IllegalStateException
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(FRESH_HISTORY));
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        verify(kisPricePort).getPriceSnapshot(StrategyTicker.SOXL, ACCOUNT_REF); // 단건 fallback 시도 확인
-        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
+        verify(kisPricePort).getPrice(StrategyTicker.SOXL, ACCOUNT_REF); // 단건 fallback 시도 확인
+        // 시세 조회 실패 알림 1건 + 사이클 실패 알림 1건
+        verify(eventPublisher, times(2)).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null)); // 현재가·전일종가 null → 실패
     }
 
@@ -1914,7 +1894,7 @@ class TradingServiceTest {
         StrategyCycle maintainCycle = new StrategyCycle(
                 UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now().minusDays(1), null, null, null);
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maintainStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
@@ -1947,7 +1927,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
         BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
@@ -1978,7 +1958,7 @@ class TradingServiceTest {
         StrategyCycle maxCycle = new StrategyCycle(
                 UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
@@ -2000,7 +1980,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_firstDayBuyFails_doesNotEndCycle() throws InterruptedException {
         // 0회차(holdings=0) 매수 실패 — 이전 포지션이 initialSnapshot(holdings=0)이므로 사이클 종료가 아님
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(FRESH_HISTORY)); // holdings=0
@@ -2052,8 +2032,7 @@ class TradingServiceTest {
                 1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_VR_SELL");
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         // 잔고: VR도 cycle_position DB 이력에서 로드 (TradingBalanceLoader.loadBalanceOrThrow)
         when(cycleHistoryPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
         when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
@@ -2130,7 +2109,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
         RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
 
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
@@ -2193,8 +2172,7 @@ class TradingServiceTest {
         Order template = buyTemplate(StrategyTicker.SOXL, "20.00", OrderTiming.AT_CLOSE);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
@@ -2236,8 +2214,7 @@ class TradingServiceTest {
         Order template = buyTemplate(StrategyTicker.SOXL, "20.00", OrderTiming.AT_OPEN);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF)))
-                .thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(template.toPlanned()));
@@ -2254,7 +2231,7 @@ class TradingServiceTest {
     private void stubExistingPlannedFlow() {
         Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLANNED, null, null, null);
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
@@ -2309,7 +2286,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_stoppingDuringOrderWait_suppressesUserNotice() {
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
@@ -2356,7 +2333,7 @@ class TradingServiceTest {
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.PLACED, "ORD-9", null, null);
         when(orderPort.findByStrategyId(pendingStrategy.id(), today, today)).thenReturn(List.of(pendingOrder));
         when(orderPort.findByStrategyId(idleStrategy.id(), today, today)).thenReturn(List.of());
-        when(kisPricePort.getPriceSnapshots(anyList(), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(pendingStrategy.id())).thenReturn(Optional.of(new CyclePosition(
                 null, pendingCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null)));

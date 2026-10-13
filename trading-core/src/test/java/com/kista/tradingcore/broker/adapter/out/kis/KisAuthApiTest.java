@@ -34,6 +34,7 @@ class KisAuthApiTest {
 
     @Mock BrokerTokenCachePort brokerTokenCachePort;
     @Mock KisTokenCoordinator tokenCoordinator;
+    @Mock KisAdminTokenCoordinator adminCoordinator;
 
     RestClient.Builder restClientBuilder;
     MockRestServiceServer server;
@@ -47,7 +48,7 @@ class KisAuthApiTest {
         // baseUrl은 이제 RestClient(=KisConfig 빈)에 고정 — 테스트도 KisConfig와 동일하게 builder에 설정
         restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        api = new KisAuthApi(restClientBuilder.build(), brokerTokenCachePort, tokenCoordinator);
+        api = new KisAuthApi(restClientBuilder.build(), brokerTokenCachePort, tokenCoordinator, adminCoordinator);
     }
 
     private void expectOAuthToken(String accessToken, String expiredAt) {
@@ -108,6 +109,29 @@ class KisAuthApiTest {
 
             assertThat(result.accessToken()).isEqualTo("fresh-token");
             assertThat(result.freshlyIssued()).isTrue();
+        }
+
+        @Test
+        @DisplayName("nil UUID(관리자 id)면 getToken/recoverToken이 관리자 코디네이터(앱키 기반)로 간다")
+        void adminId_routesToAdminCoordinator() {
+            when(adminCoordinator.obtain(eq("admin-key"), any())).thenReturn("admin-token");
+            when(adminCoordinator.recover(eq("admin-key"), eq("rejected"), any()))
+                    .thenReturn(new TokenCoordinator.RecoveredToken("admin-fresh", true));
+
+            assertThat(api.getToken(KisAdminTokenCoordinator.ADMIN_TOKEN_ID, "admin-key", "s")).isEqualTo("admin-token");
+            assertThat(api.recoverToken(KisAdminTokenCoordinator.ADMIN_TOKEN_ID, "admin-key", "s", "rejected").accessToken())
+                    .isEqualTo("admin-fresh");
+            verifyNoInteractions(tokenCoordinator);
+        }
+
+        @Test
+        @DisplayName("일반 계좌 id는 관리자 코디네이터를 쓰지 않는다")
+        void accountId_routesToAccountCoordinator() {
+            when(tokenCoordinator.obtain(eq(ACCOUNT_ID), any())).thenReturn("t");
+
+            api.getToken(ACCOUNT_ID, "key", "secret");
+
+            verifyNoInteractions(adminCoordinator);
         }
 
         @Test

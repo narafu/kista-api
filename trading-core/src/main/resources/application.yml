@@ -84,6 +84,9 @@ crypto:
 
 kis:
   base-url: https://openapi.koreainvestment.com:9443
+  # 관리자 시세 전용 앱키(계좌 없음) — 비어 있으면 KIS 관리자 시세 단계를 건너뜀(기동 실패 아님)
+  admin-app-key: ${KIS_ADMIN_APP_KEY:}
+  admin-app-secret: ${KIS_ADMIN_APP_SECRET:}
 
 toss:
   base-url: https://openapi.tossinvest.com

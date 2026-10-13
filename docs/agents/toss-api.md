@@ -49,6 +49,8 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 
 **소비처 선택 기준**: 실제 주문가 예측/계산(전략 생성 기준가, 다음 주문 미리보기, 매매 실행 시작가)은 `getPrevClose(s)`만 필요 — `getPriceSnapshot`을 쓰면 쓰지도 않는 현재가 API 호출이 낭비된다.
 
+**관리자 시세 1단계(`TossAdminPriceSource`)**: 계좌 브로커와 무관하게 모든 배치·전일종가·확정 종가 조회의 첫 단계다(`workflow.md` "시세 출처"). 위 public 메서드 대신 대체값 없는 package-private 변형을 쓴다 — `fetchPricesPartial`(응답에 있는 종목만, 누락 시 예외 없음), `fetchPrevCloseCached` 성공분만(현재가 폴백 없음), `fetchConfirmedClose` 성공분만(라이브가 폴백 없음). 빠진 종목은 KIS 관리자 → 계좌 순으로 넘어간다. 기존 public 메서드(MOCK·Toss 어댑터 경로)의 예외·폴백 동작은 그대로다. 캔들 실패(empty)도 `prevCloseCache` 버킷에 캐시되므로 그 버킷 동안은 1단계 전일종가가 계속 누락으로 처리된다
+
 ### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
 
 - `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회

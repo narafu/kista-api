@@ -127,7 +127,10 @@ class KisPriceApi {
     // 정규장 확정 종가 — 마감 리포트 전용(dailyprice, HHDFS76240000). 응답 봉 날짜가 기대 거래일과 다르면
     // (미발행 등) 라이브 현재가로 fallback — "하루 전 종가를 오늘 종가로 오기록"하는 사고를 방지한다.
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
-        return fetchConfirmedClose(ticker, tradeDate, account).orElseGet(() -> getPrice(ticker, account));
+        return fetchConfirmedClose(ticker, tradeDate, account).orElseGet(() -> {
+            log.warn("확정 종가 없음 — 라이브 현재가로 fallback: ticker={}", ticker);
+            return getPrice(ticker, account);
+        });
     }
 
     // dailyprice는 종목당 단건 TR이라 벌크 API 없음 — 종목 수만큼 순차 호출(마감 리포트 1일 1회라 허용)
@@ -139,8 +142,21 @@ class KisPriceApi {
         return result;
     }
 
+    // 관리자 시세용 multprice 원본 — last/base를 그대로 노출(대체·단건 보충 없음), 응답 없거나 StrategyTicker 외 종목은 제외
+    Map<StrategyTicker, MultiPriceResponse.Output2> fetchQuotes(List<StrategyTicker> tickers, BrokerAccountRef account) {
+        if (tickers.isEmpty()) return Map.of();
+        MultiPriceResponse response = fetchMultiPrice(tickers, account);
+        Map<StrategyTicker, MultiPriceResponse.Output2> result = new LinkedHashMap<>();
+        if (response == null || response.output2() == null) return result;
+        for (MultiPriceResponse.Output2 item : response.output2()) {
+            if (item.symb() == null) continue;
+            StrategyTicker.tryParse(item.symb()).ifPresent(t -> result.put(t, item));
+        }
+        return result;
+    }
+
     // dailyprice 확정 종가 조회 — 응답 봉 날짜(xymd)가 기대 US 거래일과 일치할 때만 신뢰
-    private Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
+    Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         String expectedUsDate = UsTradeDates.toUsTradeDate(tradeDate).format(DateTimeFormatter.BASIC_ISO_DATE);
         try {
             DailyPriceResponse response = kisHttpClient.pricingGet(
@@ -153,22 +169,22 @@ class KisPriceApi {
                         p.add("MODP", "0");
                     });
             if (response == null || response.output2() == null || response.output2().isEmpty()) {
-                log.warn("확정 종가(dailyprice) 응답 없음 — 라이브 현재가로 fallback: ticker={}", ticker);
+                log.warn("확정 종가(dailyprice) 응답 없음: ticker={}", ticker);
                 return Optional.empty();
             }
             DailyPriceResponse.Output2 bar = response.output2().getFirst();
             if (bar.clos() == null || bar.clos().isBlank()) {
-                log.warn("확정 종가(dailyprice) 종가 빈값 — 라이브 현재가로 fallback: ticker={}", ticker);
+                log.warn("확정 종가(dailyprice) 종가 빈값: ticker={}", ticker);
                 return Optional.empty();
             }
             if (bar.xymd() == null || !bar.xymd().equals(expectedUsDate)) {
-                log.warn("확정 종가(dailyprice) 봉 날짜 불일치(기대={}, 응답={}) — 아직 미발행으로 보고 라이브 현재가로 fallback: ticker={}",
+                log.warn("확정 종가(dailyprice) 봉 날짜 불일치(기대={}, 응답={}) — 아직 미발행으로 봄: ticker={}",
                         expectedUsDate, bar.xymd(), ticker);
                 return Optional.empty();
             }
             return Optional.of(KisResponseParser.parseBd(bar.clos()));
         } catch (Exception e) {
-            log.warn("확정 종가(dailyprice) 조회 실패 — 라이브 현재가로 fallback: ticker={}", ticker, e);
+            log.warn("확정 종가(dailyprice) 조회 실패: ticker={}", ticker, e);
             return Optional.empty();
         }
     }

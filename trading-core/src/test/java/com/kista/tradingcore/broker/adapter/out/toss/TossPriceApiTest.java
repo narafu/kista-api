@@ -72,6 +72,44 @@ class TossPriceApiTest {
     }
 
     @Test
+    @DisplayName("fetchPricesPartial: 일부 종목 누락이어도 예외 없이 있는 것만 반환")
+    void fetchPricesPartial_missingTicker_returnsPartial() {
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "25.50")));
+
+        Map<StrategyTicker, BigDecimal> result =
+                tossPriceApi.fetchPricesPartial(List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ));
+
+        assertThat(result).containsOnlyKeys(StrategyTicker.SOXL);
+    }
+
+    @Test
+    @DisplayName("fetchPricesPartial: lastPrice null·비숫자·0 이하인 종목만 건너뛰고 나머지는 반환")
+    void fetchPricesPartial_badLastPrice_skipsOnlyThatTicker() {
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "abc"),
+                    new TossPriceApi.PriceItem("TQQQ", "30.10"),
+                    new TossPriceApi.PriceItem("UPRO", null),
+                    new TossPriceApi.PriceItem("QLD", "0")));
+
+        Map<StrategyTicker, BigDecimal> result = tossPriceApi.fetchPricesPartial(
+                List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ, StrategyTicker.UPRO, StrategyTicker.QLD));
+
+        assertThat(result).containsOnlyKeys(StrategyTicker.TQQQ);
+    }
+
+    @Test
+    @DisplayName("getPrices: 종목 하나가 파싱 실패면 기존 누락 예외")
+    void getPrices_unparsableLastPrice_throwsMissing() {
+        when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap(new TossPriceApi.PriceItem("SOXL", "abc")));
+
+        assertThatThrownBy(() -> tossPriceApi.getPrices(List.of(StrategyTicker.SOXL)))
+                .isInstanceOf(TossApiException.class)
+                .hasMessageContaining("누락=[SOXL]");
+    }
+
+    @Test
     @DisplayName("getPrice: 응답에 티커가 없으면 예외 (0 반환 금지)")
     void getPrice_missingFromResponse_throws() {
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))

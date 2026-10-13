@@ -1,6 +1,10 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
+import com.kista.tradingcore.trading.domain.model.BatchContext;
+import org.mockito.ArgumentCaptor;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
@@ -23,8 +27,11 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +39,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("TradingPriceFetcher 단위 테스트")
 class TradingPriceFetcherTest {
     @Mock BrokerPricePort pricePort;
+    @Mock AdminMarketPricePort adminPort; // 기본 빈 결과 → 계좌 경로
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock PrivacyTradePort privacyTradePort;
     TradingPriceFetcher priceFetcher;
@@ -39,7 +47,7 @@ class TradingPriceFetcherTest {
 
     @BeforeEach
     void setUp() {
-        priceFetcher = new TradingPriceFetcher(pricePort, eventPublisher, privacyTradePort);
+        priceFetcher = new TradingPriceFetcher(pricePort, adminPort, eventPublisher, privacyTradePort);
     }
 
     @Test
@@ -53,20 +61,6 @@ class TradingPriceFetcherTest {
         Map<StrategyTicker, BigDecimal> result = priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account.brokerRef());
 
         assertThat(result).containsEntry(StrategyTicker.SOXL, new BigDecimal("25.50"));
-    }
-
-    @Test
-    @DisplayName("fetchPriceSnapshots: bulk·단건 fallback 모두 null이면 NPE 없이 결과에서 제외")
-    void fetchPriceSnapshots_bothNull_excludedFromResultWithoutThrowing() {
-        Map<StrategyTicker, com.kista.tradingcore.broker.domain.model.PriceSnapshot> bulkResult = new HashMap<>();
-        bulkResult.put(StrategyTicker.SOXL, null); // 정상 계약 위반이지만 방어적으로 처리돼야 함(null 값 제외 회귀 방지)
-        when(pricePort.getPriceSnapshots(List.of(StrategyTicker.SOXL), account.brokerRef())).thenReturn(bulkResult);
-        when(pricePort.getPriceSnapshot(StrategyTicker.SOXL, account.brokerRef())).thenReturn(null);
-
-        Map<StrategyTicker, com.kista.tradingcore.broker.domain.model.PriceSnapshot> result =
-                priceFetcher.fetchPriceSnapshots(List.of(StrategyTicker.SOXL), account.brokerRef());
-
-        assertThat(result).doesNotContainKey(StrategyTicker.SOXL);
     }
 
     @Test
@@ -90,5 +84,149 @@ class TradingPriceFetcherTest {
         priceFetcher.fetchPrices(List.of(StrategyTicker.SOXL), account.brokerRef());
 
         verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    // 배치 컨텍스트 — priceAccount 선택(selectPriceAccount)과 티커 추출에 필요한 최소 mock
+    private static final BigDecimal D_SOXL = new BigDecimal("30.00");
+
+    private List<BatchContext> contexts(StrategyTicker... tickers) {
+        return java.util.Arrays.stream(tickers).map(t -> {
+            BatchContext ctx = mock(BatchContext.class, org.mockito.Answers.RETURNS_DEEP_STUBS);
+            when(ctx.strategy().ticker()).thenReturn(t);
+            when(ctx.account()).thenReturn(account);
+            return ctx;
+        }).toList();
+    }
+
+    private void verifySingleAlert(String... expectedParts) {
+        ArgumentCaptor<TradingErrorEvent> captor = ArgumentCaptor.forClass(TradingErrorEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        for (String part : expectedParts) {
+            assertThat(captor.getValue().message()).contains(part);
+        }
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 관리자가 현재가를 모두 주면 계좌 현재가 조회 생략, 전일종가는 라우터 경로")
+    void loadPriceContext_adminAll_skipsAccountPrices() {
+        when(adminPort.getPrices(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
+        when(pricePort.getPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef()))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("29.00")));
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots()).containsEntry(StrategyTicker.SOXL, new PriceSnapshot(D_SOXL, new BigDecimal("29.00")));
+        verify(pricePort, never()).getPrices(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 관리자 일부 누락 시 누락 종목만 계좌 조회")
+    void loadPriceContext_adminPartial_accountFillsMissingOnly() {
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        when(adminPort.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
+        when(pricePort.getPrices(List.of(StrategyTicker.TQQQ), account.brokerRef()))
+                .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("55.00")));
+        when(pricePort.getPrevCloses(both, account.brokerRef())).thenReturn(Map.of(
+                StrategyTicker.SOXL, new BigDecimal("29.00"), StrategyTicker.TQQQ, new BigDecimal("54.00")));
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL, StrategyTicker.TQQQ), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots()).hasSize(2);
+        assertThat(ctx.startPriceSnapshots().get(StrategyTicker.TQQQ).current()).isEqualByComparingTo("55.00");
+        verify(pricePort, never()).getPrices(eq(both), any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 관리자 빈 결과(①② 실패)면 계좌 조회(③)로 채운다")
+    void loadPriceContext_adminEmpty_fallsBackToAccount() {
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef()))
+                .thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
+        when(pricePort.getPrevCloses(List.of(StrategyTicker.SOXL), account.brokerRef()))
+                .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("29.00")));
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots().get(StrategyTicker.SOXL).current()).isEqualByComparingTo(D_SOXL);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 현재가·전일종가 모두 실패해도 알림은 1건, 해당 종목은 스냅샷에서 제외")
+    void loadPriceContext_allFailed_singleAlertAndExcluded() {
+        when(pricePort.getPrices(any(), any())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrice(any(), any())).thenThrow(new RuntimeException("실패"));
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots()).doesNotContainKey(StrategyTicker.SOXL);
+        verifySingleAlert("[SOXL] 현재가 조회 실패", "관리자·계좌 모두 실패");
+        verify(pricePort, never()).getPrevCloses(any(), any()); // 현재가 실패 종목은 전일종가 조회 대상 아님
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 현재가 실패 종목은 전일종가 요청에서 빼고, 알림은 한 메시지에 문구를 나눠 담는다")
+    void loadPriceContext_currentFailedExcludedFromPrev_splitMessage() {
+        BigDecimal tqqq = new BigDecimal("55.00");
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        when(adminPort.getPrices(both)).thenReturn(Map.of(StrategyTicker.TQQQ, tqqq));
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrevCloses(List.of(StrategyTicker.TQQQ), account.brokerRef())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.brokerRef())).thenThrow(new RuntimeException("실패"));
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL, StrategyTicker.TQQQ), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots()).containsOnlyKeys(StrategyTicker.TQQQ);
+        verify(pricePort, never()).getPrevCloses(eq(both), any());
+        verifySingleAlert("[SOXL] 현재가 조회 실패", "[TQQQ] 전일종가 조회 실패(현재가로 대체)", "관리자·계좌 모두 실패");
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 다건 현재가가 null 값이고 단건도 null이면 결과에서 제외하고 알림")
+    void loadPriceContext_nullValueBulkAndSingle_excludedAndAlerted() {
+        Map<StrategyTicker, BigDecimal> nullValued = new java.util.HashMap<>();
+        nullValued.put(StrategyTicker.SOXL, null);
+        when(pricePort.getPrices(List.of(StrategyTicker.SOXL), account.brokerRef())).thenReturn(nullValued);
+        when(pricePort.getPrice(StrategyTicker.SOXL, account.brokerRef())).thenReturn(null);
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots()).isEmpty();
+        verifySingleAlert("[SOXL] 현재가 조회 실패");
+    }
+
+    @Test
+    @DisplayName("loadPriceContext: 전일종가만 끝내 실패하면 current로 대체하고 알림 1건에 포함")
+    void loadPriceContext_prevCloseFailed_usesCurrentAndAlerts() {
+        when(adminPort.getPrices(List.of(StrategyTicker.SOXL))).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
+        when(pricePort.getPrevCloses(any(), any())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrevClose(any(), any())).thenThrow(new RuntimeException("실패"));
+
+        var ctx = priceFetcher.loadPriceContext(contexts(StrategyTicker.SOXL), java.time.LocalDate.now());
+
+        assertThat(ctx.startPriceSnapshots()).containsEntry(StrategyTicker.SOXL, new PriceSnapshot(D_SOXL, D_SOXL));
+        verifySingleAlert("[SOXL] 전일종가 조회 실패(현재가로 대체)");
+    }
+
+    @Test
+    @DisplayName("reloadPlacementPrices: 관리자 우선, 누락분만 계좌 조회, 전부 실패분만 알림 1건")
+    void reloadPlacementPrices_adminThenAccount_singleAlert() {
+        var ctxs = contexts(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        var states = ctxs.stream().map(c -> {
+            var st = mock(TradingCandidatePlanner.CycleState.class);
+            when(st.ctx()).thenReturn(c);
+            return st;
+        }).toList();
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        when(adminPort.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, D_SOXL));
+        when(pricePort.getPrices(List.of(StrategyTicker.TQQQ), account.brokerRef())).thenThrow(new RuntimeException("실패"));
+        when(pricePort.getPrice(StrategyTicker.TQQQ, account.brokerRef())).thenThrow(new RuntimeException("실패"));
+
+        Map<StrategyTicker, BigDecimal> result = priceFetcher.reloadPlacementPrices(states);
+
+        assertThat(result).containsOnlyKeys(StrategyTicker.SOXL);
+        verifySingleAlert("TQQQ", "현재가 조회 실패");
     }
 }
