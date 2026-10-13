@@ -5,6 +5,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HttpClientTimeoutsTest {
@@ -21,6 +23,14 @@ class HttpClientTimeoutsTest {
     void RestClients는_baseUrl_유무와_무관하게_클라이언트를_만든다() {
         assertTimeouts(RestClients.withTimeouts(3_000, 7_000));
         assertTimeouts(RestClients.withTimeouts("https://example.test", 3_000, 7_000));
+    }
+
+    @Test
+    void CnnRestClients는_타임아웃과_브라우저_헤더_인터셉터를_함께_단다() {
+        RestClient client = CnnRestClients.withTimeouts(3_000, 7_000);
+
+        assertTimeouts(client);
+        assertThat((List<?>) ReflectionTestUtils.getField(client, "interceptors")).hasSize(1);
     }
 
     // RestClient 내부 요청 팩토리가 SimpleClientHttpRequestFactory이고 연결 3s·읽기 7s인지 검증

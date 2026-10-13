@@ -555,7 +555,7 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
 
 ### 단계 ② 리뷰에서 미뤄 둔 minor (후속 후보)
 
-> 2026-10-14 feat/dca-followup에서 처리했다. 남은 것: 세션 캐시 get-then-put·eviction 비원자성(무해, 유지), DCA 조건 응답 GET 단건 검증(단건 GET 엔드포인트가 없어 해당 없음 — PUT 응답 테스트는 이미 jsonPath 단언).
+> 2026-10-14 feat/dca-followup에서 처리했다. 세션 캐시 get-then-put도 같은 날 후속 정리에서 `computeIfAbsent`로 바꿔 병렬 그룹의 중복 조회를 없앴다(실패 null은 저장되지 않음, 세션 간 eviction은 배치가 세션을 섞지 않아 그대로 둠). 남은 것: DCA 조건 응답 GET 단건 검증(단건 GET 엔드포인트가 없어 해당 없음 — PUT 응답 테스트는 이미 jsonPath 단언).
 
 태스크 리뷰에서 나왔지만 동작 영향이 없거나 작아서 미룬 항목이다. 필요할 때 골라서 처리한다.
 
@@ -568,7 +568,7 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
 
 ### 단계 ③ 리뷰에서 미뤄 둔 minor (후속 후보)
 
-> 2026-10-14 feat/dca-followup에서 처리했다. 남은 것: `fearGreedCache` 비원자성(무해, 유지), 운영 RestClient 배선은 여전히 컨텍스트 로드 테스트로만 검증(인터셉터·빌더는 `CnnRestClients`로 공용화).
+> 2026-10-14 feat/dca-followup에서 처리했다. `fearGreedCache`도 `computeIfAbsent`로 바꿨고, `CnnRestClients.withTimeouts`의 타임아웃·인터셉터 배선은 `HttpClientTimeoutsTest`가 검증한다. 남은 것 없음.
 
 - CNN 어댑터는 같은 날짜 일별 점이 둘이면 마지막 점을 고른다(`reduce`). 실데이터에는 중복이 없어 무해하지만, `findFirst`나 주석으로 의도를 밝히면 더 명확하다. 응답의 `y`가 null이면 예외가 나지만 잡혀서 empty가 된다.
 - 운영 RestClient 배선(`HttpClientTimeouts`, 헤더)은 컨텍스트 로드 테스트로만 검증한다. 어댑터 테스트는 인터셉터만 공유한다.

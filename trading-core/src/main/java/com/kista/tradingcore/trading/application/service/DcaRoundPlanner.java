@@ -103,9 +103,12 @@ class DcaRoundPlanner {
 
     // 조회 US 세션 이전 확정 종가 250봉 — 실패·피드 지연(마지막 봉 ≠ 직전 개장일)이면 null(DATA_UNAVAILABLE)
     private List<BigDecimal> loadCloses(StrategyTicker ticker, LocalDate usSession) {
-        CandleKey key = new CandleKey(ticker, usSession);
-        List<BigDecimal> cached = closeCache.get(key);
-        if (cached != null) return cached;
+        closeCache.keySet().removeIf(k -> !k.usSession().equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 티커 수
+        // computeIfAbsent — 병렬 그룹이 같은 키를 동시에 조회해도 피드 호출 1회, null(실패)은 저장되지 않는다
+        return closeCache.computeIfAbsent(new CandleKey(ticker, usSession), k -> fetchCloses(ticker, usSession));
+    }
+
+    private List<BigDecimal> fetchCloses(StrategyTicker ticker, LocalDate usSession) {
         try {
             List<BrokerCandle> candles = candlePort.getDailyCandlesBefore(ticker.name(), usSession, CANDLE_COUNT);
             LocalDate expected = previousOpenSession(usSession);
@@ -114,10 +117,7 @@ class DcaRoundPlanner {
                         ticker, usSession, expected, candles.isEmpty() ? null : candles.getLast().date());
                 return null;
             }
-            List<BigDecimal> closes = candles.stream().map(BrokerCandle::close).toList();
-            closeCache.keySet().removeIf(k -> !k.usSession().equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 티커 수
-            closeCache.put(key, closes);
-            return closes;
+            return candles.stream().map(BrokerCandle::close).toList();
         } catch (RuntimeException e) {
             log.warn("[DCA] 일봉 조회 실패: ticker={}, usSession={}", ticker, usSession, e);
             return null;
@@ -126,15 +126,14 @@ class DcaRoundPlanner {
 
     // usSession 직전 US 개장일 — 휴장 데이터 미존재 등으로 못 찾으면 null
     private LocalDate previousOpenSession(LocalDate usSession) {
-        LocalDate cached = previousOpenCache.get(usSession);
-        if (cached != null) return cached;
+        previousOpenCache.keySet().removeIf(k -> !k.equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 1
+        return previousOpenCache.computeIfAbsent(usSession, this::scanPreviousOpen);
+    }
+
+    private LocalDate scanPreviousOpen(LocalDate usSession) {
         for (int i = 1; i <= PREVIOUS_SESSION_SCAN_DAYS; i++) {
             LocalDate d = usSession.minusDays(i);
-            if (marketCalendarPort.isUsSessionOpen(d)) {
-                previousOpenCache.keySet().removeIf(k -> !k.equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 1
-                previousOpenCache.put(usSession, d);
-                return d;
-            }
+            if (marketCalendarPort.isUsSessionOpen(d)) return d;
         }
         return null;
     }
@@ -142,15 +141,11 @@ class DcaRoundPlanner {
     // FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수 — 세션 메모 캐시, 실패·직전 개장일 미확인이면 null(DATA_UNAVAILABLE)
     private BigDecimal loadFearGreed(DcaConfig config, LocalDate usSession) {
         if (!config.hasIndicator(DcaIndicator.FEAR_GREED)) return null;
-        BigDecimal cached = fearGreedCache.get(usSession);
-        if (cached != null) return cached;
-        LocalDate previousOpen = previousOpenSession(usSession);
-        if (previousOpen == null) return null;
-        Optional<BigDecimal> value = fearGreedIndexPort.closeOn(previousOpen);
-        if (value.isEmpty()) return null;
         fearGreedCache.keySet().removeIf(k -> !k.equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 1
-        fearGreedCache.put(usSession, value.get());
-        return value.get();
+        return fearGreedCache.computeIfAbsent(usSession, s -> {
+            LocalDate previousOpen = previousOpenSession(s);
+            return previousOpen == null ? null : fearGreedIndexPort.closeOn(previousOpen).orElse(null);
+        });
     }
 
     // AVG_PRICE 조건이 있을 때만 브로커 실잔고(계좌+티커 합산) — 실패 시 null(DATA_UNAVAILABLE)
