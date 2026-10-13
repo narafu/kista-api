@@ -180,6 +180,8 @@ class TradingReporterTest {
         ArgumentCaptor<TradingReportReadyEvent> captor = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().executions()).hasSize(2);
+        assertThat(captor.getValue().accountId()).isEqualTo(ACCOUNT.id());
+        assertThat(captor.getValue().strategyId()).isEqualTo(STRATEGY.id());
     }
 
     @Test

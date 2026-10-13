@@ -41,8 +41,10 @@ class TradingReportNotifier {
         // 체결 건별 SSE 실시간 알림 — 알림 설정과 무관하게 항상 발송
         for (TradeLegSummary e : event.executions()) {
             TradeEventMessage tradeEvent = e.direction() == OrderDirection.SELL
-                    ? TradeEventMessage.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.accountNickname())
-                    : TradeEventMessage.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(), event.accountNickname());
+                    ? TradeEventMessage.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(),
+                            event.accountNickname(), event.accountId(), event.strategyId())
+                    : TradeEventMessage.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(),
+                            event.accountNickname(), event.accountId(), event.strategyId());
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", event.accountNickname(), event.executions().size());

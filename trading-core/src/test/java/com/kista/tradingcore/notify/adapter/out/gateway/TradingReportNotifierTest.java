@@ -9,6 +9,8 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.TradeLegSummary;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.TradingReport;
+import com.kista.shared.contract.notify.TradeEventMessage;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -39,6 +42,7 @@ class TradingReportNotifierTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
+    private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final String ACCOUNT_NICKNAME = "테스트계좌";
     private static final TradingUserProfile PROFILE = new TradingUserProfile(USER_ID, Map.of(), true, "token", "chat");
     private static final LocalDate TODAY = LocalDate.of(2026, 7, 30);
@@ -61,7 +65,7 @@ class TradingReportNotifierTest {
     @Test
     void reportEnabled_true이면_리포트를_발송한다() {
         TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
-        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME, REPORT, List.of(), true);
+        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(), true);
 
         notifier.onTradingReportReady(event);
 
@@ -71,7 +75,7 @@ class TradingReportNotifierTest {
     @Test
     void reportEnabled_false이면_리포트_발송을_생략한다() {
         TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
-        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME, REPORT, List.of(), false);
+        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(), false);
 
         notifier.onTradingReportReady(event);
 
@@ -82,7 +86,7 @@ class TradingReportNotifierTest {
     void reportEnabled_false여도_SSE_알림은_항상_발송된다() {
         TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
         TradingReportReadyEvent event = new TradingReportReadyEvent(
-                USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME, REPORT, List.of(buyLeg(), sellLeg()), false);
+                USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(buyLeg(), sellLeg()), false);
 
         notifier.onTradingReportReady(event);
 
@@ -94,18 +98,22 @@ class TradingReportNotifierTest {
     void BUY_체결_건별로_SSE_알림을_발송한다() {
         TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
         TradeLegSummary buy = buyLeg();
-        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME, REPORT, List.of(buy), true);
+        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(buy), true);
 
         notifier.onTradingReportReady(event);
 
-        verify(realtimeNotificationPort, times(1)).notifyTrade(eq(PROFILE.userId()), any());
+        // SSE payload에 계좌·전략 ID가 실려 UI가 해당 키만 무효화할 수 있다
+        ArgumentCaptor<TradeEventMessage> captor = ArgumentCaptor.forClass(TradeEventMessage.class);
+        verify(realtimeNotificationPort, times(1)).notifyTrade(eq(PROFILE.userId()), captor.capture());
+        assertThat(captor.getValue().accountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(captor.getValue().strategyId()).isEqualTo(STRATEGY_ID);
     }
 
     @Test
     void SELL_체결_건별로_SSE_알림을_발송한다() {
         TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
         TradeLegSummary sell = sellLeg();
-        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME, REPORT, List.of(sell), true);
+        TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(sell), true);
 
         notifier.onTradingReportReady(event);
 
@@ -116,7 +124,7 @@ class TradingReportNotifierTest {
     void BUY와_SELL이_섞이면_체결건수만큼_SSE_알림이_발송된다() {
         TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
         TradingReportReadyEvent event = new TradingReportReadyEvent(
-                USER_ID, ACCOUNT_ID, ACCOUNT_NICKNAME, REPORT, List.of(buyLeg(), sellLeg()), true);
+                USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(buyLeg(), sellLeg()), true);
 
         notifier.onTradingReportReady(event);
 

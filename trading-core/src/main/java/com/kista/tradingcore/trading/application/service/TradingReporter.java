@@ -72,7 +72,7 @@ class TradingReporter {
         List<TradeLegSummary> legs = executions.stream()
                 .map(e -> new TradeLegSummary(e.direction(), e.ticker(), e.quantity(), e.price(), e.amountUsd()))
                 .toList();
-        eventPublisher.publishEvent(new TradingReportReadyEvent(userProfile.userId(), account.id(), account.nickname(), report, legs, reportEnabled));
+        eventPublisher.publishEvent(new TradingReportReadyEvent(userProfile.userId(), account.id(), strategy.id(), account.nickname(), report, legs, reportEnabled));
         log.info("[{}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.nickname(), executions.size());
     }
 

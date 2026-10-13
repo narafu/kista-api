@@ -65,7 +65,7 @@ class RedisTradeEventSubscriberTest {
 
         // 리스너 등록이 비동기라 발행 전 잠깐의 여유가 필요 — 실패 시 sleep 연장 대신 원인 재확인
         UUID userId = UUID.randomUUID();
-        TradeEventMessage event = TradeEventMessage.sell("TQQQ", 3, 45.0, 135.0, "테스트계좌");
+        TradeEventMessage event = TradeEventMessage.sell("TQQQ", 3, 45.0, 135.0, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
         String payload = "{\"userId\":\"" + userId + "\",\"event\":"
                 + objectMapper.writeValueAsString(event) + "}";
         await();
