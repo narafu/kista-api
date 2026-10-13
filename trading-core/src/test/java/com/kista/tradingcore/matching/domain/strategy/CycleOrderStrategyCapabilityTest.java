@@ -65,7 +65,7 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.allocationPriority()).isZero();
     }
 
-    // capability 기본 메서드는 구현체별 재정의 없이 StrategyType.capability()(sharedkernel SSOT)로 위임한다
+    // capability 기본 메서드는 구현체별 재정의 없이 StrategyType.capability()(shared.kernel SSOT)로 위임한다
     @Test
     void capability_methods_delegate_to_strategy_type_constant() {
         for (CycleOrderStrategy strategy : new CycleOrderStrategy[]{

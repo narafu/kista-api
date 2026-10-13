@@ -166,7 +166,7 @@ class AccountControllerTest {
 
     @Test
     void delete_notOwned_returns403() throws Exception {
-        // SecurityException은 tradingweb.TradingExceptionHandler의 6종 전용 매핑 대상이 아니지만,
+        // SecurityException은 tradingcore.web.TradingExceptionHandler의 6종 전용 매핑 대상이 아니지만,
         // ProblemDetailMappings.GENERIC(handleGeneric)이 root GlobalExceptionHandler와 동일하게 403으로 매핑한다 —
         // testConnection_failure_returns422(위, 6종 전용 매핑)와 짝을 이뤄 TradingExceptionHandler
         // 내부의 두 매핑 경로(전용 6종 vs 범용 GENERIC)를 모두 실측한다.

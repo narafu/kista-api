@@ -2,7 +2,7 @@ package com.kista.shared.kernel;
 
 import java.util.Optional;
 
-// 알림 수단 — user(설정 저장)와 notify(채널 라우팅)가 공유하는 어휘라 sharedkernel 소속(2026-09-30, notify 순수 게이트웨이화).
+// 알림 수단 — user(설정 저장)와 notify(채널 라우팅)가 공유하는 어휘라 shared.kernel 소속(2026-09-30, notify 순수 게이트웨이화).
 // 상수명 byte-identical 유지 필수 — UserEntity.notificationChannel @Enumerated(STRING) DB 컬럼과 직결.
 public enum NotificationChannel {
     NONE,       // 알림 없음

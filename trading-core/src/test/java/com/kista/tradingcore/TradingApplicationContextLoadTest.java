@@ -13,7 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // kista-trading 전체 부팅 스모크 — trading-core에는 슬라이스 테스트만 있어 JPA 리포지토리 미등록 같은 부팅 결함을
-// 로컬 2-프로세스 부팅 전까지 못 잡았다(JpaRepositoryConfig 도입 경위). 스캔 설정 변경의 회귀 가드
+// 로컬 2-프로세스 부팅 전까지 못 잡았다(미등록 JPA 리포지토리 가드). 스캔 설정 변경의 회귀 가드
 @SpringBootTest(properties = {
         "spring.data.redis.url=redis://localhost:6379" // trading-core application.yml은 REDIS_URL 기본값이 없다(필수)
 })

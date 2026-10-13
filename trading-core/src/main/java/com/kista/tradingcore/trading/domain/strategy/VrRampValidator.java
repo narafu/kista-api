@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.domain.strategy;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-// VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService(등록)·VrReconfigureService(재설정)·tradingstats BacktestService(백테스트) 공유
+// VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService(등록)·VrReconfigureService(재설정)·stats BacktestService(백테스트) 공유
 // (docs/agents/modules/trading-formulas.md "VR 공식" 변경 금지 대상 — 검증 조건 자체는 옮기기 전과 byte-for-byte 동일)
 public final class VrRampValidator {
 

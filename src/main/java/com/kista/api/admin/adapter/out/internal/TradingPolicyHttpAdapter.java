@@ -13,7 +13,7 @@ import org.springframework.web.client.RestClientException;
 
 // trading-core TradingPolicyInternalController(GET|PUT /api/internal/trading/policy-settings) 호출 —
 // 매매 런타임 정책의 소유자는 trading-core라 admin은 읽고 쓰기를 위임만 한다. TradingPolicySettings는
-// sharedkernel 어휘라 own-type 없이 그대로 역직렬화한다.
+// shared.kernel 어휘라 own-type 없이 그대로 역직렬화한다.
 // 배포 전환기 호환: server-deploy.yml은 kista-api를 즉시, kista-trading은 매매 시간대 가드 뒤에 배포하므로 root가 먼저
 // 새 버전이 되는 창이 있다. 그동안 옛 trading-core는 이 엔드포인트가 없어 404를 돌려주는데, 공개 /api/runtime-config까지
 // 500으로 무너지지 않도록 조회는 기본값(TradingPolicySettings.defaults() — 새 trading-core도 행이 없으면 같은 값)으로

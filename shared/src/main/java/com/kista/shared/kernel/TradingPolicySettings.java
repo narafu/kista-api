@@ -8,7 +8,7 @@ import java.util.Objects;
 
 // 매매 프로세스가 소유하는 런타임 정책 묶음 — 증권사별 신규 등록 허용 + 전략 타입별 생성 정책.
 // 저장·집행은 trading-core(TradingPolicyService)가, 편집은 root admin이 내부 API(PUT)로 위임한다.
-// root↔trading-core 사이 내부 API body이기도 해서 JDK + sharedkernel 타입만 참조한다(outbound-zero).
+// root↔trading-core 사이 내부 API body이기도 해서 JDK + shared.kernel 타입만 참조한다(outbound-zero).
 public record TradingPolicySettings(
         Map<Broker, BrokerSettings> brokers, // 증권사별 신규 등록 설정 (모든 Broker 키 필수)
         Map<StrategyType, StrategyCreationSettings> strategies // 전략별 신규 생성 설정 (모든 StrategyType 키 필수)

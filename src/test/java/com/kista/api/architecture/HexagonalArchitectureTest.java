@@ -45,9 +45,9 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("sharedkernel은 다른 com.kista 모듈에 의존하지 않는다 — 전역 공용 어휘 불변식")
-    void sharedkernel_must_not_depend_on_other_modules() {
-        // sharedkernel은 outbound reference 0인 순수 값 타입만 담는다는 전제로 OPEN 선언됨 —
+    @DisplayName("shared.kernel은 다른 com.kista 모듈에 의존하지 않는다 — 전역 공용 어휘 불변식")
+    void kernel_must_not_depend_on_other_modules() {
+        // shared.kernel은 outbound reference 0인 순수 값 타입만 담는다는 전제로 OPEN 선언됨 —
         // 이 패키지가 다른 모듈을 참조하는 순간 여러 모듈이 공유하는 어휘로서의 전제가 깨진다.
         // 그동안 package-info 주석에만 있던 불변식을 실제로 강제한다.
         ArchRule rule = noClasses()
@@ -59,10 +59,10 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("contract는 sharedkernel 외 다른 com.kista 모듈에 의존하지 않는다 — Published Language 불변식")
+    @DisplayName("contract는 shared.kernel 외 다른 com.kista 모듈에 의존하지 않는다 — Published Language 불변식")
     void contract_must_not_depend_on_other_modules() {
         // contract는 프로세스 경계를 넘는 wire 스키마(순수 record)만 담는다 — 도메인 타입을 import하는 순간
-        // trading-core가 root를(또는 그 반대를) 컴파일 타임에 알게 된다. sharedkernel(공용 어휘) 참조만 허용하고,
+        // trading-core가 root를(또는 그 반대를) 컴파일 타임에 알게 된다. shared.kernel(공용 어휘) 참조만 허용하고,
         // 자기 자신(com.kista.shared.contract..)과 JDK·Jackson·Swagger·Bean Validation 어노테이션 외 의존은
         // InternalApiContractTest.contract_must_only_depend_on_allowed_packages가 별도로 잠근다.
         ArchRule rule = noClasses()
@@ -78,8 +78,8 @@ class HexagonalArchitectureTest {
     @DisplayName("platform은 다른 com.kista 모듈에 의존하지 않는다 — 인프라 leaf 불변식")
     void platform_must_not_depend_on_other_modules() {
         // platform은 persistence base·crypto·스케쥴러 골격 등 순수 인프라만 담는다는 전제로 OPEN 선언됨 —
-        // 이 패키지가 다른 애그리게이트 모듈을 참조하는 순간 인프라 leaf 전제가 깨진다 (sharedkernel과 동일 강제).
-        // com.kista.common 소멸(모듈 경계 재구성 #3)로 예외 절도 함께 제거 — 이제 sharedkernel과 완전히 동일한 outbound-zero.
+        // 이 패키지가 다른 애그리게이트 모듈을 참조하는 순간 인프라 leaf 전제가 깨진다 (shared.kernel과 동일 강제).
+        // com.kista.common 소멸(모듈 경계 재구성 #3)로 예외 절도 함께 제거 — 이제 shared.kernel과 완전히 동일한 outbound-zero.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista.shared.platform..")
                 .should().dependOnClassesThat(
@@ -109,11 +109,11 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("matching 커널은 sharedkernel 외 다른 com.kista 모듈에 의존하지 않는다")
+    @DisplayName("matching 커널은 shared.kernel 외 다른 com.kista 모듈에 의존하지 않는다")
     void matching_must_not_depend_on_other_modules() {
-        // matching은 주문생성 순수 계산 커널만 담는다 — outbound는 sharedkernel(공용 어휘)뿐이다.
+        // matching은 주문생성 순수 계산 커널만 담는다 — outbound는 shared.kernel(공용 어휘)뿐이다.
         // PRIVACY 기준 매매표는 커널 소유 PrivacyPlan으로 받고, 변환은 privacy(PrivacyTradeBase.toPlan())가 맡는다.
-        // 허용 목록 방식이라 신규 모듈(contract/tradingstats/tradingnotify 등)이 생겨도 자동으로 차단된다.
+        // 허용 목록 방식이라 신규 모듈(contract/stats/notify 등)이 생겨도 자동으로 차단된다.
         ArchRule rule = noClasses()
                 .that().resideInAPackage("com.kista.tradingcore.matching..")
                 .should().dependOnClassesThat(
@@ -160,11 +160,11 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("web·tradingweb(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
+    @DisplayName("web·tradingcore.web(앱셸)은 순수 inbound sink — application.service/adapter.out에 의존하지 않는다")
     void web_must_stay_pure_inbound_sink() {
         // com.kista.api.web·com.kista.tradingcore.web은 패키지에 adapter/application/domain 세그먼트가 없어
         // 위 도메인/application.service 규칙 와일드카드에 안 걸린다(미검사 표면) — 이 규칙으로 직접 강제한다.
-        // tradingweb은 root web과 대칭인 trading-core 앱셸이라 같은 규칙을 적용한다.
+        // tradingcore.web은 root web과 대칭인 trading-core 앱셸이라 같은 규칙을 적용한다.
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage("com.kista.api.web..", "com.kista.tradingcore.web..")
                 .should().dependOnClassesThat()

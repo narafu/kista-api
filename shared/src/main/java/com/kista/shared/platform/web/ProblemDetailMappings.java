@@ -78,7 +78,7 @@ public final class ProblemDetailMappings {
     }
 
     // 두 advice의 catch-all 공통 본문 — 클라이언트 이탈 → 매핑 테이블 → 미매핑 500 순으로 처리한다.
-    // 이벤트 발행은 platform이 sharedkernel을 참조할 수 없어 호출자가 넘기는 onUnmapped Consumer(보고·로그 담당)에 남긴다
+    // 이벤트 발행은 platform이 shared.kernel을 참조할 수 없어 호출자가 넘기는 onUnmapped Consumer(보고·로그 담당)에 남긴다
     public static ProblemDetail catchAll(Exception ex, Map<Class<? extends Exception>, Mapping> mappings, Consumer<Exception> onUnmapped) {
         // 클라이언트가 응답 수신 전 연결을 끊으면 직렬화·응답 쓰기가 실패해 catch-all로 떨어진다 — 기록 없이 종료
         if (isClientDisconnect(ex)) {

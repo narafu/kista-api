@@ -6,7 +6,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 증권사 등록 허용·전략 생성 정책은 sharedkernel.TradingPolicySettings(trading-core 소유)로 이동했다 —
+// 증권사 등록 허용·전략 생성 정책은 shared.kernel.TradingPolicySettings(trading-core 소유)로 이동했다 —
 // 그 검증은 shared 모듈의 TradingPolicySettingsTest가 담당하고 여기서는 root 소유 필드만 본다.
 class RuntimeSettingsTest {
 

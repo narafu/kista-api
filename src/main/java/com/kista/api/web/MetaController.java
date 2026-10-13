@@ -48,7 +48,7 @@ public class MetaController {
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);
     }
 
-    // capability는 sharedkernel 상수(StrategyType.capability()) — 다른 프로세스 호출 없음
+    // capability는 shared.kernel 상수(StrategyType.capability()) — 다른 프로세스 호출 없음
     private List<StrategyTypeMeta> getStrategyTypeList() {
         return Arrays.stream(StrategyType.values())
                 .map(StrategyTypeMeta::from)

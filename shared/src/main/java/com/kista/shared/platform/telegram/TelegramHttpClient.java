@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-// 텔레그램 Bot API HTTP 전송 공통 유틸 — root notify·admin(봇 명령)·trading-core tradingnotify가 공용으로 사용
+// 텔레그램 Bot API HTTP 전송 공통 유틸 — root notify·admin(봇 명령)·trading-core notify가 공용으로 사용
 @Slf4j
 @RequiredArgsConstructor
 public class TelegramHttpClient {

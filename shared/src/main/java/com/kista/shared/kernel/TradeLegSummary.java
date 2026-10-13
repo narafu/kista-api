@@ -3,7 +3,7 @@ package com.kista.shared.kernel;
 import java.math.BigDecimal;
 
 // broker.domain.model.Execution의 notify 전용 narrowing — TradingReportReadyEvent.executions가
-// 이벤트 payload를 sharedkernel+JDK로만 구성하기 위해 필요한 최소 필드만 담는다
+// 이벤트 payload를 shared.kernel+JDK로만 구성하기 위해 필요한 최소 필드만 담는다
 public record TradeLegSummary(
         OrderDirection direction,  // 매수/매도 방향
         StrategyTicker ticker,     // 종목 코드

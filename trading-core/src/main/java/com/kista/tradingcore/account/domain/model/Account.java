@@ -24,7 +24,7 @@ public record Account(
     }
 
     // broker 포트 시그니처용 자격증명 투영 — broker 모듈이 account.Account를 참조하지 않도록 Account가 스스로 변환한다
-    // (broker↔account 순환 해소 산물: broker는 BrokerAccountRef만 알고 역방향 참조는 0. broker enum은 sharedkernel 공용)
+    // (broker↔account 순환 해소 산물: broker는 BrokerAccountRef만 알고 역방향 참조는 0. broker enum은 shared.kernel 공용)
     public BrokerAccountRef toBrokerRef() {
         return new BrokerAccountRef(id, appKey, secretKey, accountNo, brokerAccountCode, broker);
     }

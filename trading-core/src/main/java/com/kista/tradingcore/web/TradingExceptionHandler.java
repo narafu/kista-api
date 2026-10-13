@@ -28,12 +28,12 @@ import java.util.Map;
 
 import static com.kista.shared.platform.web.ProblemDetailMappings.problem;
 
-// trading-core 프로세스 전역 예외→HTTP 매핑 advice(앱셸 tradingweb 소속 — root com.kista.api.web.GlobalExceptionHandler와 대칭).
+// trading-core 프로세스 전역 예외→HTTP 매핑 advice(앱셸 tradingcore.web 소속 — root com.kista.api.web.GlobalExceptionHandler와 대칭).
 // 이 프로세스엔 root advice가 없으므로 컨트롤러 패키지 제약 없이 모든 컨트롤러의 예외를 처리한다:
 // trading-core 고유 예외 + BrokerApiException(503) + 범용 JDK/Spring 예외(ProblemDetailMappings.GENERIC) + catch-all 500.
 //
 // BrokerApiException(KIS/Toss 예외의 벤더 중립 상위 타입, trading-core 소유)은 app_error_logs가 root 소유 테이블이라
-// AppErrorRaisedEvent(sharedkernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream(stream:app.error)으로 root에 push한다.
+// AppErrorRaisedEvent(shared.kernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream(stream:app.error)으로 root에 push한다.
 // trading-core는 root를 호출하지 않는다(프로세스 간 단방향 root→trading-core).
 //
 // ManualTradingFailedException(바로주문 비증권사 실패, 500)은 이 클래스가 에러 로그를 남기지 않는다 —

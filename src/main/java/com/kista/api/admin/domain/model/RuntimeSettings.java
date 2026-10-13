@@ -1,7 +1,7 @@
 package com.kista.api.admin.domain.model;
 
 // root가 소유하는 런타임 설정 — 가입 승인 정책(user 불변식) + ETF 벤치마크 비교 자산(stats 소비).
-// 증권사 신규 등록 허용·전략 생성 정책은 집행 주체인 trading-core가 소유한다(sharedkernel.TradingPolicySettings) —
+// 증권사 신규 등록 허용·전략 생성 정책은 집행 주체인 trading-core가 소유한다(shared.kernel.TradingPolicySettings) —
 // 관리자 화면·공개 설정 응답에서는 RuntimeSettingsBundle이 둘을 합쳐 보여준다.
 public record RuntimeSettings(
         boolean approvalRequired, // 신규 가입 승인 필요 여부

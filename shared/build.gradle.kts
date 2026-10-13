@@ -32,7 +32,7 @@ dependencyManagement {
 }
 
 dependencies {
-    // package-info.java의 @ApplicationModule(OPEN) 선언 — sharedkernel/platform 모두 Modulith 모듈
+    // package-info.java의 @ApplicationModule(OPEN) 선언 — shared.kernel/platform 모두 Modulith 모듈
     implementation(libs.spring.modulith.starter.core)
 
     // platform.persistence(JPA Auditing) + platform.internalapi(RestClient) — Spring/JPA 바인딩

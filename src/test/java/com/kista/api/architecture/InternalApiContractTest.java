@@ -35,7 +35,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // 내부 API(/api/internal/**) wire 계약 잠금 — Published Language(com.kista.shared.contract) 규칙.
-// 프로세스 경계(root :api ↔ :trading-core)를 넘는 body 타입은 contract·sharedkernel·JDK만 허용한다.
+// 프로세스 경계(root :api ↔ :trading-core)를 넘는 body 타입은 contract·shared.kernel·JDK만 허용한다.
 // 도메인 record(Order/Strategy 등)를 그대로 직렬화하거나 own-type을 손으로 복제하던 과거 방식(OwnTypeContractTest)을
 // 컴파일 타임 공유 + 이 테스트로 대체한다 — 도메인 필드 추가가 wire 계약을 조용히 바꾸는 일을 막는다.
 @DisplayName("내부 API wire 계약 규칙")
@@ -55,7 +55,7 @@ class InternalApiContractTest {
     }
 
     @Test
-    @DisplayName("내부 API 핸들러의 반환·@RequestBody 타입은 contract·sharedkernel·JDK 타입만 쓴다")
+    @DisplayName("내부 API 핸들러의 반환·@RequestBody 타입은 contract·shared.kernel·JDK 타입만 쓴다")
     void internal_api_handlers_must_only_use_contract_types() {
         List<String> violations = new ArrayList<>();
         int handlerCount = 0;
@@ -81,7 +81,7 @@ class InternalApiContractTest {
     }
 
     @Test
-    @DisplayName("contract는 JDK·sharedkernel·Jackson/Swagger/Bean Validation 어노테이션 외에 의존하지 않는다")
+    @DisplayName("contract는 JDK·shared.kernel·Jackson/Swagger/Bean Validation 어노테이션 외에 의존하지 않는다")
     void contract_must_only_depend_on_allowed_packages() {
         classes().that().resideInAPackage("com.kista.shared.contract..")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(

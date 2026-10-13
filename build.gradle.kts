@@ -97,7 +97,7 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver3:5.5.0")
 
     // testFixtures 소스셋 — DomainFixtures(User fixture)만 남음
-    testFixturesImplementation(project(":shared")) // sharedkernel(UserRole/UserStatus) 접근
+    testFixturesImplementation(project(":shared")) // shared.kernel(UserRole/UserStatus) 접근
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {

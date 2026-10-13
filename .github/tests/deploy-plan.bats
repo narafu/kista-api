@@ -11,7 +11,7 @@ scope() { printf '%s\n' "$@" | bash "$SCRIPTS/detect-deploy-scope.sh" | tr '\n' 
 
 @test "scope: trading-core 소스는 trading만, 스케쥴러 전용 빈은 scheduler만" {
   [ "$(scope trading-core/src/main/java/A.java)" = "verify=true config=false api=false scheduler=false trading=true " ]
-  [ "$(scope src/main/java/com/kista/benchmark/adapter/in/schedule/S.java)" = "verify=true config=false api=false scheduler=true trading=false " ]
+  [ "$(scope src/main/java/com/kista/api/benchmark/adapter/in/schedule/S.java)" = "verify=true config=false api=false scheduler=true trading=false " ]
 }
 
 @test "scope: compose·roles·hook은 config만, Caddy는 config+verify" {

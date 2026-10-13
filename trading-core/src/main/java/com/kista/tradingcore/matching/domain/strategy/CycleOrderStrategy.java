@@ -23,7 +23,7 @@ public interface CycleOrderStrategy {
     // 이 전략이 담당하는 사이클 타입
     StrategyType cycleType();
 
-    // 정적 capability 상수 — SSOT는 StrategyType.capability()(sharedkernel), 구현체는 재정의하지 않는다
+    // 정적 capability 상수 — SSOT는 StrategyType.capability()(shared.kernel), 구현체는 재정의하지 않는다
     default StrategyCapability capability() { return cycleType().capability(); }
 
     // 미리보기 실행 전 전일종가 조회 필요 여부 (INFINITE만 true — 0회차 평단가 대용)

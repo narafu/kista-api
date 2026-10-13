@@ -51,7 +51,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.strategyStatuses").isArray());
     }
 
-    // capability는 sharedkernel 상수에서 직접 조립한다 — 내부 API(RestClient) 없이 JSON shape 유지
+    // capability는 shared.kernel 상수에서 직접 조립한다 — 내부 API(RestClient) 없이 JSON shape 유지
     // StrategyType 선언 순서(INFINITE, PRIVACY, VR)대로 직렬화된다
     @Test
     void getBundle_authenticated_strategyTypesCarryCapabilityFields() throws Exception {

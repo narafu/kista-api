@@ -1,6 +1,6 @@
 package com.kista.shared.kernel;
 
-// 계정 상태 — User 도메인 nested enum에서 sharedkernel로 이관.
+// 계정 상태 — User 도메인 nested enum에서 shared.kernel로 이관.
 // 상수명 byte-identical 유지 필수 — UserEntity.status @Enumerated(STRING) DB 컬럼과 직결.
 public enum UserStatus {
     PENDING,  // 관리자 승인 대기 중
