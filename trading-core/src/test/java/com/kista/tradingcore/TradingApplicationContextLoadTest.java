@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB 연결 컨텍스트 로드
 class TradingApplicationContextLoadTest {
 
-    private static final int TRADING_JPA_REPOSITORIES = 17; // 실측값(grep·테스트 일치) — DCA 설정·회차 리포지토리 2개 포함
+    private static final int TRADING_JPA_REPOSITORIES = 18; // 실측값(grep·테스트 일치) — DCA 설정·조건·회차 리포지토리 3개 포함
 
     @Autowired
     private ApplicationContext context; // 컨텍스트 로드 성공 자체가 1차 검증
