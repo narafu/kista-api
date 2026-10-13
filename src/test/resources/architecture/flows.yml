@@ -139,8 +139,8 @@ flows:
         to: [broker, db, telegram]
         title: DCA 회차 판정
         desc: >-
-          DCA 전략은 일반 공식 대신 회차 판정을 거친다. 기존 주문·timing·실행일·이력(UNIQUE 전략+거래일)을 확인하고 전일 종가·잔고를 조회해
-          주문을 만들거나 skip 사유와 함께 이력을 남긴다. skip이면 사용자에게 "미주문" 알림을 보낸다(이력 삽입 성공 시에만 발행해 재개 때 중복 없음).
+          DCA 전략은 일반 공식 대신 회차 판정을 거친다. 기존 주문·timing·실행일·이력(UNIQUE 전략+거래일)을 확인하고, 티커·세션별로 캐시한 250봉 종가(마지막 봉이 직전 개장일이 아니면 데이터 실패)와 판매가능수량·실잔고 평단을 조회해
+          평단가·이평선·RSI 조건을 AND로 평가한다. 데이터 실패 → 조건 미충족 → 보유 없음 → 1주 미만 순으로 skip 사유를 정하고 이력·알림을 남긴다. skip이면 사용자에게 "미주문" 알림을 보낸다(이력 삽입 성공 시에만 발행해 재개 때 중복 없음).
         code: [DcaRoundPlanner#plan, DcaRoundSkippedEvent, TradingAlertNotifier#onDcaRoundSkipped]
         cond: DCA 전략이 있을 때
         state: "dca_execution 기록"

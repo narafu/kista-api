@@ -18,4 +18,7 @@ com.kista.tradingcore.matching/  ← Spring Modulith 모듈(CLOSED) — 주문�
 
 ### DCA 전략 (무조건 적립식, 단계 ①)
 - `DcaCycleOrderStrategy`(`matching.domain.strategy`): `decide(...)` 진입으로 `DcaDecision`(`Planned`/`Skipped`)을 돌려준다 — 공통 `plan` 경로는 쓰지 않는다. `snapshotsBrokerBalance()=true`(보유·평단 SSOT가 브로커 실잔고), `needsCapCheck=false`.
-- `DcaSchedule`: 빈도(`DcaFrequency`)별 실행일 판정. `DcaConfig`: 전략 버전의 DCA 설정 값 객체(티커 UPRO/QLD, 방향·금액·빈도·조건 지표 `DcaIndicator`/`DcaOperator`). `DcaDecision.Skipped`는 `DcaSkipReason`을 담는다.
+- `DcaSchedule`: 빈도(`DcaFrequency`)별 실행일 판정. `DcaConfig`: 전략 버전의 DCA 설정 값 객체(티커 UPRO/QLD, 방향·금액·빈도·조건 목록 최대 10개). `DcaDecision.Skipped`는 `DcaSkipReason`을 담는다.
+- `DcaIndicators`(순수 계산): SMA는 마지막 N개 종가 평균, RSI는 기간 14 고정 Wilder 평활. 결과는 소수 둘째 자리 HALF_UP으로 반올림하며 데이터가 부족하면 빈 값을 돌려준다.
+- `DcaCondition` 검증: 지표는 `AVG_PRICE`·`SMA`·`RSI`(`FEAR_GREED`는 단계 ③ 전까지 API에서 400). SMA는 `smaPeriod` ∈ 20/50/120/200이고 threshold를 두지 않는다. RSI는 0~100, AVG_PRICE는 -100 초과, threshold는 소수 둘째 자리까지 허용한다.
+- 판정 순서(`decide`): ① 데이터(종가·판매가능수량·모든 지표 계산 가능 여부) → ② 조건 AND 평가(입력 순서대로, 처음 실패한 조건이 `CONDITION_NOT_MET`와 뒤집힌 연산자 detail을 남긴다) → ③ `NO_HOLDINGS`(SELL) → ④ `BELOW_ONE_SHARE`. AVG_PRICE는 보유 0주일 때 BUY는 통과하고 SELL은 통과 후 `NO_HOLDINGS`로 막힌다.

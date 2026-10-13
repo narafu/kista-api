@@ -69,7 +69,8 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - `RegisterStrategyCommand.divisionCount=0`은 INFINITE 신규 등록의 미입력 sentinel이며 런타임 기본값으로 치환. VR `recurringMode`는 `recurringAmount` 부호(DEPOSIT/HOLD/WITHDRAW)로만 검증하고 금액 크기는 기존 VR 자산 규칙에 맡김. `recurringMode.customizable=false` 설정은 기본값과 유일한 허용값이 모두 `HOLD`여야 함
 
 ### DCA 회차 실행 (단계 ①)
-- `DcaRoundPlanner`(마감·개장 배치): 기존 주문 복구 → timing·실행일·이력 판정 → 캔들(`CandlePort.getDailyCandlesBefore`)·잔고 조회 → `DcaCycleOrderStrategy.decide`. skip이면 `DcaExecutionRecorder`가 이력을 쓰고 `DcaRoundSkippedEvent`를 발행한다(→ `TradingAlertNotifier`가 사용자 알림).
+- `DcaRoundPlanner`(마감·개장 배치): 기존 주문 복구 → timing·실행일·이력 판정 → 250봉 종가 조회(`CandlePort.getDailyCandlesBefore`) → `DcaCycleOrderStrategy.decide`. 마지막 봉 날짜가 직전 US 개장일이 아니면 `DATA_UNAVAILABLE`이다. 검증을 통과한 종가는 (티커, US 세션) 단위로 프로세스 메모리에 캐시하며, 지난 세션 항목은 제거하고 실패는 캐시하지 않는다. 실잔고(`LiveBalancePort`)는 AVG_PRICE 조건이 있을 때만 조회한다. skip이면 `DcaExecutionRecorder`가 이력을 쓰고 `DcaRoundSkippedEvent`를 발행한다(→ `TradingAlertNotifier`가 사용자 알림).
+- 조건 저장: `trading.strategy_dca_condition`(V7, 전략 버전별 `strategy_dca_version` 참조, `sort_order`로 입력 순서 보존). API는 `dca.conditions[]`(`indicator`·`operator`·`smaPeriod`·`threshold`)이며, 메타 `strategyTypes[DCA].conditionIndicators`는 `[AVG_PRICE, SMA, RSI]`다.
 - `DcaExecutionRecorder` + `dca_execution` UNIQUE(strategy, tradeDate): 삽입 성공 시에만 알림을 발행해 재개·중복 진입의 알림 중복을 막는다. 이력 조회 API는 `GET /api/trading-cycles/{id}/dca-executions`(`DcaExecutionQueryService`), 등록·설정은 `DcaConfigService`.
 - 계좌+티커 중복 규칙 예외: DCA는 방향이 다르면 같은 종목에 매수 1 + 매도 1 공존.
 - 보유·평단 SSOT는 브로커 실잔고(`CycleOrderStrategy.snapshotsBrokerBalance()`) — 자체 포지션 누적을 쓰지 않는다. 계좌 통계·포트폴리오 집계에서는 DCA를 제외한다(→ stats.md).
