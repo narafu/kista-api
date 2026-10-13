@@ -34,7 +34,7 @@ class TradingNotifyAdapter implements TradingNotifyPort {
         } catch (Exception publishEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", publishEx.getMessage());
         }
-        send(String.format("<b>⚠️ 관리자 알림</b>%n%s", e.getMessage()));
+        send("<b>⚠️ 관리자 알림</b>%n%s".formatted(e.getMessage()));
     }
 
     @Override
@@ -46,7 +46,7 @@ class TradingNotifyAdapter implements TradingNotifyPort {
     public void notifyInsufficientBalance(int holdings, BigDecimal usdDeposit, StrategyTicker ticker) {
         // userId=null 경로 전용(CycleRotationService.rotate()) — 사이클 재등록의 목표 시드가 최소금액에
         // 못 미쳐도 더는 등록을 막지 않고 그대로 진행하므로 "건너뜁니다"가 아닌 "축소 시작"으로 안내한다
-        send(String.format("잔고 부족: %s %d주, 예수금 $%.2f — 축소된 배수로 사이클을 시작합니다.",
+        send("잔고 부족: %s %d주, 예수금 $%.2f — 축소된 배수로 사이클을 시작합니다.".formatted(
                 ticker.name(), holdings, usdDeposit));
     }
 

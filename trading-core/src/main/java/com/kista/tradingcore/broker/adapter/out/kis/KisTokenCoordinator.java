@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -32,19 +31,17 @@ class KisTokenCoordinator implements TokenCoordinator {
     @Override
     public String obtain(UUID accountId, TokenIssuer issuer) {
         // 1차 조회 — 락 없이 빠른 경로
-        Optional<String> cached = cachePort.findValidToken(accountId, threshold());
-        if (cached.isPresent()) {
-            return cached.get();
-        }
+        return cachePort.findValidToken(accountId, threshold())
+                .orElseGet(() -> obtainLocked(accountId, issuer));
+    }
+
+    private String obtainLocked(UUID accountId, TokenIssuer issuer) {
         ReentrantLock lock = locks.computeIfAbsent(accountId, _ -> new ReentrantLock());
         lock.lock();
         try {
             // 2차 조회(double-check) — 다른 스레드가 이미 발급했을 수 있음
-            Optional<String> doubleChecked = cachePort.findValidToken(accountId, threshold());
-            if (doubleChecked.isPresent()) {
-                return doubleChecked.get();
-            }
-            return issueAndCache(accountId, issuer);
+            return cachePort.findValidToken(accountId, threshold())
+                    .orElseGet(() -> issueAndCache(accountId, issuer));
         } finally {
             lock.unlock();
         }

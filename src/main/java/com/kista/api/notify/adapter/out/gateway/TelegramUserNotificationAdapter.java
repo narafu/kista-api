@@ -22,8 +22,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     @Override
     public void notifyNewUser(NotificationRecipient user) {
         // 관리자에게 신규 가입 알림 + [승인]/[거절] 인라인 버튼
-        String text = String.format("🆕 <b>신규 가입 신청</b>%n닉네임: %s%nUID: %s",
-                user.nickname(), user.userId());
+        String text = "🆕 <b>신규 가입 신청</b>%n닉네임: %s%nUID: %s".formatted(user.nickname(), user.userId());
         telegramHttpClient.sendWithInlineKeyboard(props.chatId(), text, props.botToken(),
                 List.of(
                         Map.of("text", "✅ 승인", "callback_data", "approve:" + user.userId()),
@@ -34,8 +33,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     @Override
     public void notifyAutoApprovedUser(NotificationRecipient user) {
         // 승인 불필요 설정으로 즉시 활성화된 신규 가입 — 관리자 조치 불필요라 버튼 없이 정보만 전달
-        String text = String.format("🆕 <b>신규 가입 (자동 승인)</b>%n닉네임: %s%nUID: %s",
-                user.nickname(), user.userId());
+        String text = "🆕 <b>신규 가입 (자동 승인)</b>%n닉네임: %s%nUID: %s".formatted(user.nickname(), user.userId());
         telegramHttpClient.sendMessage(props.chatId(), text, props.botToken());
     }
 
@@ -48,7 +46,7 @@ class TelegramUserNotificationAdapter implements UserNotificationPort {
     public void notifyRejected(NotificationRecipient user) {
         String text = "❌ 가입 신청이 거절되었습니다.";
         if (user.rejectReason() != null && !user.rejectReason().isBlank()) {
-            text += String.format("\n사유: %s", user.rejectReason());
+            text += "\n사유: %s".formatted(user.rejectReason());
         }
         sendIfLinked(user, text);
     }

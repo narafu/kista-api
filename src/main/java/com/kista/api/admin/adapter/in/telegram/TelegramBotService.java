@@ -131,8 +131,7 @@ class TelegramBotService {
                                 ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
                         double totalAsset = marketValue + (s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0);
                         double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
-                        return String.format(
-                                "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
+                        return "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f".formatted(
                                 s.holdings(), avgPrice, marketValue,
                                 s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0, totalAsset);
                     } catch (NoSuchElementException _) {
@@ -151,7 +150,7 @@ class TelegramBotService {
                     List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
                     StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
-                    list.forEach(h -> sb.append(String.format("%s %s %s %d주 $%.4f%n",
+                    list.forEach(h -> sb.append("%s %s %s %d주 $%.4f%n".formatted(
                             h.tradeDate(), h.direction(), h.orderType(), h.quantity(), h.price())));
                     return sb.toString().trim();
                 })

@@ -181,7 +181,7 @@ class KisPriceApi {
                     p.add("NREC", String.valueOf(tickers.size()));
                     for (int i = 0; i < tickers.size(); i++) {
                         StrategyTicker ticker = tickers.get(i);
-                        String num = String.format("%02d", i + 1);
+                        String num = "%02d".formatted(i + 1);
                         p.add("EXCD_" + num, exchangeRegistry.excd(ticker));
                         p.add("SYMB_" + num, ticker.name());
                     }

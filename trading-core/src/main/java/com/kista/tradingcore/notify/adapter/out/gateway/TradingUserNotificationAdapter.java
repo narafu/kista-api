@@ -71,7 +71,7 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
 
     @Override
     public void notifyError(TradingUserProfile profile, Exception e) {
-        notify(profile, "매매 오류 발생", String.format("⚠️ <b>매매 오류 발생</b>%n%s", e.getMessage()));
+        notify(profile, "매매 오류 발생", "⚠️ <b>매매 오류 발생</b>%n%s".formatted(e.getMessage()));
     }
 
     @Override
