@@ -3,6 +3,7 @@ package com.kista.benchmark.adapter.in.web.dto;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.benchmark.adapter.in.web.openapi.HousingBenchmarkOpenApiCustomizer;
+import com.kista.shared.platform.PlatformAutoConfiguration;
 import com.kista.tradingstats.adapter.in.web.dto.EquityCurveResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration;
@@ -122,7 +123,8 @@ class HousingBenchmarkApiDocsTest {
             UserDetailsServiceAutoConfiguration.class,
             ManagementWebSecurityAutoConfiguration.class,
             ServletWebSecurityAutoConfiguration.class,
-            EventPublicationAutoConfiguration.class // DataSource 없는 최소 컨텍스트라 Modulith EPR도 함께 제외
+            EventPublicationAutoConfiguration.class, // DataSource 없는 최소 컨텍스트라 Modulith EPR도 함께 제외
+            PlatformAutoConfiguration.class // :shared 인프라(보안·JWT·JPA Auditing) — 스키마 문서 검증엔 불필요
     }, excludeName = "org.springframework.modulith.events.jdbc.JdbcEventPublicationAutoConfiguration") // package-private이라 클래스 참조 불가, 이름으로 제외
     @Import({SchemaController.class, HousingBenchmarkOpenApiCustomizer.class})
     static class TestApplication {}
