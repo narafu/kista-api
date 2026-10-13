@@ -261,8 +261,22 @@ final class ArchitectureMapExporter {
     }
 
     // com.kista.<module>.… 의 첫 세그먼트 — 잡·단계 모두 이 규칙
+    // 임시: 패키지 루트 이동 중간 단계용 — 프로세스별 모델 전환 태스크가 <루트>.<모듈> 키로 대체한다
+    private static final Map<String, String> MODULE_ALIASES = Map.of(
+            "shared.kernel", "sharedkernel",
+            "tradingcore.stats", "tradingstats",
+            "tradingcore.notify", "tradingnotify",
+            "tradingcore.web", "tradingweb");
+
     static String moduleOf(JavaClass owner) {
-        return owner.getPackageName().replaceFirst("^com\\.kista\\.", "").split("\\.")[0];
+        var rel = owner.getPackageName().replaceFirst("^com\\.kista\\.", "");
+        var seg = rel.split("\\.");
+        // 개명 모듈은 앞 두 세그먼트로 별칭 해석
+        if (seg.length > 1 && MODULE_ALIASES.containsKey(seg[0] + "." + seg[1])) {
+            return MODULE_ALIASES.get(seg[0] + "." + seg[1]);
+        }
+        // 선택적 루트 세그먼트(api/tradingcore/shared) 제거 후 첫 세그먼트가 모듈
+        return rel.replaceFirst("^(api|tradingcore|shared)\\.", "").split("\\.")[0];
     }
 
     // 단계 code: 클래스의 소속 모듈 (flowId → stepId → 모듈명) — flows.yml 키가 아니라 출력 전용
