@@ -42,9 +42,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 //
 // 4a단계(패키징 분리)로 root(ApiApplication)와 trading-core(TradingApplication)가 서로 다른 부트
 // 진입점을 가진 완전히 별도 프로세스가 되면서 이 테스트의 전제(한 JVM/한 Spring 컨텍스트 안에 admin과
-// trading-core 빈이 함께 떠서 자기 자신을 호출) 자체가 성립하지 않는다 — root의 scanBasePackages가
-// trading-core 패키지(com.kista.tradingcore.account 등)를 의도적으로 배제하도록 고쳐졌기 때문(빈 중복 등록 버그
-// 수정, 이 자체가 4a의 목표). 진짜 프로세스 간 HTTP 왕복 검증은 4a 최종 게이트의 로컬 2-프로세스
+// trading-core 빈이 함께 떠서 자기 자신을 호출) 자체가 성립하지 않는다 — root의 기본 컴포넌트 스캔은
+// com.kista.api만 덮어 trading-core 패키지(com.kista.tradingcore.account 등)의 빈이 root 컨텍스트에
+// 들어오지 않기 때문(빈 중복 등록 방지, 이 자체가 4a의 목표). 진짜 프로세스 간 HTTP 왕복 검증은
+// 4a 최종 게이트의 로컬 2-프로세스
 // 스모크 테스트(수동)로 대체된다 — 이 테스트를 2-프로세스 방식으로 재작성하는 건 별도 작업 범위.
 @Disabled("4a단계로 root/trading-core가 별도 프로세스가 되며 단일 JVM 자가호출 전제가 깨짐 — 2-프로세스 스모크 테스트로 대체 예정")
 @SpringBootTest(

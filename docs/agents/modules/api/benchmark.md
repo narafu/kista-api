@@ -1,6 +1,6 @@
 ## com.kista.api.benchmark (`:api`)
 
-root `com.kista.stats`에서 개명한 모듈이다(trading-core `tradingcore.stats`와 이름 충돌 해소). HTTP 경로는 `/api/stats/**` 그대로다. 이벤트 FQCN이 바뀌었으므로 배포 절차는 `docker-infra.md` "배포 직전 EPR 정리 런북" 참고.
+root `com.kista.stats`에서 개명한 모듈이다(당시 trading-core `tradingstats`, 현재 `tradingcore.stats`와 이름 충돌 해소). HTTP 경로는 `/api/stats/**` 그대로다. 이벤트 FQCN이 바뀌었으므로 배포 절차는 `docker-infra.md` "배포 직전 EPR 정리 런북" 참고.
 
 com.kista.api.benchmark/    ← Spring Modulith 모듈(CLOSED, root) — 주택/ETF 벤치마크 비교·KB Land/Alpaca 지수 시세 수집만 담당(계좌·Toss 통계·백테스트·포트폴리오·summary/equity-curve/cycles는 `com.kista.tradingcore.stats` 소유). "domain"·"usecase"·"port"·"event"·"schedule" 5개 NamedInterface, service·adapter.in.web·adapter.out.*은 internal. root `BenchmarkController`는 `/api/stats/housing-benchmark{,/series,/index-series,/etf-series,/regions}` 5개 라우트만 소유
   domain/model/       ← 벤치마크 11타입(BenchmarkAssetType/BenchmarkScope/CurrentExchangeRate/EtfBenchmarkSymbol/BenchmarkComparison/BenchmarkPoint/HousingBenchmarkPrice/HousingBenchmarkRegion/HousingPriceIndex/IndexPrice/PerformanceComparisonSummary) + InvestmentPoint/StrategyRef(`Strategy`의 id/type/ticker 3필드 narrowing — 벤치마크 계산 입력. 내부 API 응답 `contract.stats.InvestmentPointsResponse`에서 `InvestmentPointsHttpAdapter`가 명시 매핑) — "domain"
