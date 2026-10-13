@@ -465,11 +465,26 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void register_dca_with_fear_greed_is_400() throws Exception {
+    void register_dca_with_fear_greed_passes_condition() throws Exception {
+        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
+
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(DCA_PREFIX + "[{\"indicator\":\"FEAR_GREED\",\"operator\":\"LTE\",\"threshold\":25}]}}"))
+                .andExpect(status().isCreated());
+        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
+        verify(tradingCycle).register(any(), any(), captor.capture());
+        assertThat(captor.getValue().dca().conditions()).containsExactly(
+                new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
+    }
+
+    @Test
+    void register_dca_with_fear_greed_threshold_over_100_is_400() throws Exception {
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(DCA_PREFIX + "[{\"indicator\":\"FEAR_GREED\",\"operator\":\"LTE\",\"threshold\":101}]}}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -488,16 +503,6 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(DCA_PREFIX + "[null]}}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void reconfigureDca_with_fear_greed_is_400() throws Exception {
-        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"direction\":\"BUY\",\"amountUsd\":300,\"orderType\":\"MOC\",\"frequency\":\"DAILY\","
-                                + "\"conditions\":[{\"indicator\":\"FEAR_GREED\",\"operator\":\"LTE\",\"threshold\":25}]}"))
                 .andExpect(status().isBadRequest());
     }
 

@@ -87,7 +87,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("MOO", "MOC"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].directions").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("BUY", "SELL"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].frequencies").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("DAILY", "WEEKLY", "MONTHLY"))))
-                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].conditionIndicators").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("AVG_PRICE", "SMA", "RSI"))))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].conditionIndicators").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("AVG_PRICE", "SMA", "RSI", "FEAR_GREED"))))
                 .andExpect(jsonPath("$.orderTypes.length()").value(com.kista.shared.kernel.OrderType.values().length))
                 .andExpect(jsonPath("$.orderTypes[?(@.code=='MOO')].label").value(org.hamcrest.Matchers.contains("MOO")))
                 .andExpect(jsonPath("$.orderDirections[0].label").value("매수"))

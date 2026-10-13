@@ -20,7 +20,7 @@ class DcaConditionTest {
         assertThatCode(() -> of(DcaIndicator.SMA, 200, null)).doesNotThrowAnyException();
         assertThatCode(() -> of(DcaIndicator.RSI, null, "35")).doesNotThrowAnyException();
         assertThatCode(() -> of(DcaIndicator.AVG_PRICE, null, "-5.5")).doesNotThrowAnyException();
-        assertThatCode(() -> of(DcaIndicator.FEAR_GREED, null, "25")).doesNotThrowAnyException(); // 도메인은 허용, 단계 ② 차단은 API 경계
+        assertThatCode(() -> of(DcaIndicator.FEAR_GREED, null, "25")).doesNotThrowAnyException(); // FEAR_GREED 0~100 허용
     }
 
     @Test

@@ -30,7 +30,7 @@ public enum StrategyType {
             case DCA -> new StrategyCapability(EnumSet.of(StrategyTicker.UPRO, StrategyTicker.QLD),
                     false, false, false, List.of(),
                     List.of(OrderType.MOO, OrderType.MOC), List.of(OrderDirection.BUY, OrderDirection.SELL),
-                    List.of(DcaFrequency.values()), List.of(DcaIndicator.AVG_PRICE, DcaIndicator.SMA, DcaIndicator.RSI)); // FEAR_GREED는 단계 ③(CNN 어댑터)에서 추가
+                    List.of(DcaFrequency.values()), List.of(DcaIndicator.values()));
         };
     }
 
