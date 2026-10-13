@@ -136,6 +136,8 @@ CREATE TABLE trading.dca_execution (
   - RSI·FEAR_GREED: `threshold`가 0~100이어야 한다.
   - AVG_PRICE: `threshold`는 -100 초과여야 한다.
   - 같은 indicator가 여러 번 나와도 허용한다(예: RSI ≥ 20 AND RSI ≤ 40).
+  - 조건은 전략당 최대 10개다.
+  - 검증은 `DcaCondition` 컴팩트 생성자에서 하고, DB CHECK로도 함께 건다(단계 ② V7 마이그레이션).
 
 ### 3.3 도메인 타입
 
@@ -212,15 +214,18 @@ DCA는 별도 배치를 만들지 않는다. `CycleOrderStrategy` 구현체 `Dca
 2. **이미 처리됨**: `dca_execution(strategy, tradeDate)` 행이 있으면 종료한다. 기존 주문이 있으면 슬롯 로직이 접수만 이어간다.
 3. **데이터 확보**(티커별 배치 메모 캐시)
    - 일봉: 4.3의 US 세션일 `s`를 기준으로 `date < s`인 확정 봉만 쓴다. 전일 종가 = 그중 마지막 봉의 close.
-   - 지표 조건이 있으면 필요한 봉 수(SMA 최대 기간, RSI용 250봉)를 확보한다.
-   - 평단가 조건이 있거나 SELL이면 브로커 실잔고(holdings, avgPrice)를 조회한다.
+   - 봉은 항상 250봉을 확보한다(SMA 최대 200, RSI 안정화 250). 마지막 봉이 직전 US 개장일이 아니면 실패로 본다(6.1 신선도 검증).
+   - 평단가 조건이 있으면 브로커 실잔고(holdings, avgPrice)를 조회한다. SELL이면 판매가능수량을 조회한다(6단계).
    - FEAR_GREED 조건이 있으면 CNN 값을 조회한다(6.2).
    - 하나라도 실패하면 `SKIPPED(DATA_UNAVAILABLE)`.
 4. **조건 평가**(AND)
-   - 하나라도 거짓이면 `SKIPPED(CONDITION_NOT_MET)`. `detail`에 첫 번째 미충족 조건과 실측값을 기록한다.
-   - AVG_PRICE: `prevClose op avgPrice × (1 + n/100)`.
+   - 모든 조건의 지표값을 먼저 계산한다. 하나라도 계산할 수 없으면(봉 수 부족 등) 다른 조건의 참·거짓과 관계없이 `SKIPPED(DATA_UNAVAILABLE)`.
+   - 그다음 입력 순서대로 평가한다. 하나라도 거짓이면 `SKIPPED(CONDITION_NOT_MET)`. `detail`에 첫 번째 미충족 조건과 실측값을 기록한다. 연산자는 뒤집어 표시한다.
+     - 예: `RSI(14) 48.20 > 35`, `전일 종가 92.10 ≥ SMA(200) 88.40`, `전일 종가 90.00 > 평단 85.00 × (1 − 5%) = 80.75`
+     - 수치는 소수 둘째 자리까지, 기준값은 trailing zero를 제거해 표시한다.
+   - AVG_PRICE: `prevClose op avgPrice × (1 + n/100)`. holdings·avgPrice는 브로커 실잔고(`LiveBalancePort`)이고, AVG_PRICE 조건이 있을 때만 조회한다.
      - 보유 0주이고 BUY면 조건을 참으로 본다(첫 매수 허용).
-     - 보유 0주이고 SELL이면 거짓으로 본다. 다만 SELL은 6단계에서 어차피 NO_HOLDINGS로 끝나므로, 사유 우선순위를 위해 이 조건은 NO_HOLDINGS로 보고한다.
+     - 보유 0주이고 SELL이면 이 조건은 평가를 건너뛴다(참으로 취급). SELL은 6단계에서 NO_HOLDINGS로 끝나므로 사유 우선순위상 NO_HOLDINGS로 보고된다.
    - SMA: `prevClose op SMA(period)`
    - RSI: `RSI14 op threshold`
    - FEAR_GREED: `value op threshold`
@@ -304,16 +309,22 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 
 ### 6.1 일봉과 지표
 
-- **조회**: `CandlePort`에 `getDailyCandlesBefore(symbol, beforeUsSession, count)`를 추가한다.
-  - Toss 구현은 `before`를 이용해 200봉 단위로 페이지를 넘기며 조회한다(최대 2회로 260봉).
+- **조회**: `CandlePort.getDailyCandlesBefore(symbol, beforeUsSession, count)`(단계 ①에서 추가됨)
+  - Toss 구현은 200봉 단위로 페이지를 넘기며 조회한다. 다음 페이지의 `before`는 직전 페이지에서 가장 오래된 봉 날짜의 00:00 UTC다. 빈 페이지가 오거나 count를 채우면 멈추고, 날짜 기준으로 중복을 제거한다.
   - 반환은 `date < beforeUsSession`인 확정 봉만, 오름차순으로 준다.
-  - Toss `adjusted` 파라미터는 true로 보낸다. 분할·배당 조정이 안 된 봉으로 지표를 계산하면 SMA가 왜곡된다. 기존 호출에 영향이 없도록 신규 메서드에만 적용한다.
+  - Toss `adjusted` 파라미터는 true로 보낸다. 분할·배당 조정이 안 된 봉으로 지표를 계산하면 SMA가 왜곡된다. 이 메서드에만 적용한다(기존 호출 영향 없음). 실측은 구현 Task 0에서 한다.
+  - DCA는 조건 유무와 관계없이 항상 250봉을 요청한다.
+- **신선도 검증**: 마지막 봉 날짜가 `beforeUsSession` 직전 US 개장일(시장 캘린더로 역탐색)과 다르면, 피드 지연으로 보고 `DATA_UNAVAILABLE`로 처리한다. 오래된 종가로 수량·조건을 판정하지 않기 위함이다.
 - **계산**: `matching.domain.model.DcaIndicators`(순수 정적 메서드)
   - `sma(closes, period)`: 마지막 period개 종가의 평균. 데이터가 period개 미만이면 empty.
   - `rsiWilder(closes, 14)`: Wilder 평활. 종가가 15개 미만이면 empty. 안정화를 위해 호출 측은 250봉을 넘긴다.
   - empty면 `DATA_UNAVAILABLE`.
-- **캐시**: 배치 실행 단위의 티커별 메모(Map)만 둔다. DCA 티커가 2종이라 배치당 Toss 호출은 최대 4회다. 영속 캐시는 두지 않는다.
-- 전일 종가도 같은 봉 데이터의 마지막 close를 쓴다. 조건 평가와 수량 계산이 같은 값을 보게 하기 위함이다. `BrokerPricePort.getPrevClose`는 쓰지 않는다.
+- **캐시**: `DcaRoundPlanner`가 프로세스 메모리에 `(ticker, usSession) → 검증된 봉 목록`을 둔다.
+  - 세션일 이전 확정 봉은 바뀌지 않으므로, 같은 세션의 개장·마감 배치와 여러 전략이 공유해도 안전하다.
+  - 새 세션 키가 들어오면 다른 세션 키를 지운다. 따라서 맵 크기는 DCA 티커 수를 넘지 않는다.
+  - 조회 실패나 신선도 검증 실패 결과는 캐시하지 않는다. 다음 전략·배치가 다시 조회한다.
+  - 영속 캐시는 두지 않는다.
+- 전일 종가도 같은 봉 데이터의 마지막 close를 쓴다. 조건 평가와 수량 계산이 같은 값을 보게 하기 위함이다. `BrokerPricePort.getPrevClose`는 쓰지 않는다. adjusted 시계열이라 배당락일에는 배당만큼 낮은 값이 되지만 허용한다.
 
 ### 6.2 CNN 공포탐욕지수 (trading-core 직접 조회)
 
@@ -437,6 +448,8 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 
 DCA의 `divisionCounts`는 `[]`, `supportsReverseMode`와 `requiresPrivacyBase`는 false다.
 
+`conditionIndicators`는 서버가 등록을 허용하는 지표만 단계별로 노출한다. 단계 ②는 `["AVG_PRICE","SMA","RSI"]`이고, FEAR_GREED는 단계 ③에서 추가한다. 최상위 `dcaIndicators`는 처음부터 4개 전부를 노출한다.
+
 `MetaBundle` 최상위에 키를 추가한다. 기존 키 뒤에 붙인다.
 
 - `orderTypes: EnumMeta[]` — LOC, MOC, LIMIT, MOO 전체
@@ -521,7 +534,7 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
    - KIS 공식 문서에서 미국 매수 ORD_DVSN 허용값과, 프리마켓 시간대 31/32 접수 가능 여부를 확인한다.
    - Toss 캔들 `adjusted` 파라미터와 CNN historical 응답 구조를 실측한다.
 1. **무조건 DCA**: enum, 티커, capability 명시화, 스키마, 등록·수정, 중복 규칙 완화, DcaSchedule, 계획·배정·접수, 이력, skip 알림, 브로커 매핑, 개장 배치 22:00 이동, API·메타
-2. **지표 조건**: AVG_PRICE, SMA, RSI, CandlePort 페이징
+2. **지표 조건**: AVG_PRICE, SMA, RSI, CandlePort 페이징·adjusted·신선도 검증, 조건 테이블(V7). FEAR_GREED는 계속 400이고 메타 `conditionIndicators`에서도 뺀다(7.4)
 3. **공포탐욕지수**: CNN 어댑터, FEAR_GREED 조건
 
 각 단계는 독립적으로 배포할 수 있다. 1단계만 배포된 상태에서 조건이 포함된 등록 요청이 오면, 미지원 indicator로 400을 반환한다.
