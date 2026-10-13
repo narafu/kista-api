@@ -9,6 +9,7 @@ import com.kista.shared.platform.web.ErrorCode;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.tradingcore.trading.domain.model.AlreadyOrderedTodayException;
+import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.ManualTradingException;
 import com.kista.tradingcore.trading.domain.model.ManualTradingFailedException;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
@@ -168,5 +169,13 @@ class TradingExceptionHandlerTest {
 
         assertThat(detail.getStatus()).isEqualTo(500);
         verify(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
+    }
+
+    @Test
+    void dcaManualExecutionUnsupported_is409WithCode() {
+        var detail = handler.handleTradingCoreExceptions(new DcaManualExecutionUnsupportedException());
+        assertThat(detail.getStatus()).isEqualTo(409);
+        assertThat(detail.getProperties()).containsEntry("code", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED.name());
+        assertThat(detail.getDetail()).isEqualTo("DCA 전략은 바로 주문과 미리보기를 지원하지 않습니다.");
     }
 }

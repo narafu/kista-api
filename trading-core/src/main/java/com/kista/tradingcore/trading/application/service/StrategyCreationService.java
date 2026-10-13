@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
+import com.kista.tradingcore.matching.domain.model.DcaConfig;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.shared.kernel.*;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
@@ -25,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -44,21 +47,29 @@ class StrategyCreationService {
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
+    private final StrategyDcaDetailPort dcaDetailPort;          // DCA 중복 판정용 기존 전략 방향 조회
+    private final DcaSummaryAssembler dcaSummaryAssembler;      // DCA 등록 응답의 다음 실행일 요약
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
         ResolvedCreation resolved = resolveCreationSettings(cmd);
+        boolean dca = cmd.type() == StrategyType.DCA;
+        // DCA는 설정 필수, 보유·평단은 브로커 실잔고가 SSOT라 bootstrap 입력을 받지 않는다
+        if (dca && cmd.dca() == null) {
+            throw new IllegalArgumentException("DCA 설정(dca)은 필수입니다");
+        }
 
         // 중간부터 시작 입력 검증 (세 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부
-        int initialHoldings = validateBootstrapPosition(cmd);
+        int initialHoldings = dca ? 0 : validateBootstrapPosition(cmd);
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
         StrategyTicker resolvedTicker = resolved.ticker();
 
         // 종목 중복 + 잔고 검증
-        validateUniqueTicker(accountId, resolvedTicker);
-        validateBalanceIfRequired(account, accountId, userId, cmd.initialUsdDeposit());
+        validateUniqueTicker(accountId, resolvedTicker, cmd);
+        BigDecimal initialUsdDeposit = dca ? BigDecimal.ZERO : cmd.initialUsdDeposit(); // DCA는 예수금 시드 없음
+        if (!dca) validateBalanceIfRequired(account, accountId, userId, initialUsdDeposit);
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         BigDecimal marketPrice = initialHoldings > 0 ? fetchMarketPrice(account, resolvedTicker) : null;
@@ -79,8 +90,8 @@ class StrategyCreationService {
         }
 
         // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
-        StrategyCycleSeedType seedType = cmd.type() == StrategyType.VR
-                ? StrategyCycleSeedType.NONE  // VR은 NONE 강제 (순환 재등록 불가)
+        StrategyCycleSeedType seedType = cmd.type() == StrategyType.VR || dca
+                ? StrategyCycleSeedType.NONE  // VR·DCA는 NONE 강제 (순환 재등록 불가)
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
         int divisionCount = resolved.divisionCount();
@@ -90,8 +101,8 @@ class StrategyCreationService {
         StrategyCreationPersister.Persisted persisted = creationPersister.persist(
                 accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
                 resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), ramp,
-                cmd.initialUsdDeposit(), initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue,
-                vrValue, scheduledStart);
+                initialUsdDeposit, initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue,
+                vrValue, scheduledStart, cmd.dca());
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
 
@@ -100,9 +111,14 @@ class StrategyCreationService {
             VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
                     persisted.vrDetail(), persisted.cycleVr(), persisted.initialPosition().usdDeposit(),
                     persisted.initialPosition().usdDeposit()); // 등록 직후엔 개장 pool=현재 pool 동일
-            return new StrategyDetail(persisted.strategy(), persisted.initialPosition().usdDeposit(), persisted.cycle().startDate(), null, false, null, initialHoldings, vrSummary);
+            return new StrategyDetail(persisted.strategy(), persisted.initialPosition().usdDeposit(), persisted.cycle().startDate(), null, false, null, initialHoldings, vrSummary, null);
         }
-        return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null);
+        if (dca) {
+            DcaSummary summary = dcaSummaryAssembler.assemble(cmd.dca(), null,
+                    DcaSummaryAssembler.firstEligibleDate(persisted.cycle().startDate(), null));
+            return new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, 0, null, summary);
+        }
+        return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null, null);
     }
 
     // 중간부터 시작 입력 검증 — BootstrapPosition.validate()에 위임 (BacktestService와 공용 규칙)
@@ -186,10 +202,16 @@ class StrategyCreationService {
         return value != null ? value : BigDecimal.ZERO;
     }
 
-    // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장
-    private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {
-        if (strategyPort.existsByAccountIdAndTicker(accountId, ticker)) {
+    // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장. 예외: DCA끼리는 방향이 다르면 공존(매수 1 + 매도 1)
+    private void validateUniqueTicker(UUID accountId, StrategyTicker ticker, RegisterStrategyCommand cmd) {
+        List<Strategy> existing = strategyPort.findByAccountIdAndTicker(accountId, ticker);
+        if (existing.isEmpty()) return;
+        if (cmd.type() != StrategyType.DCA || existing.stream().anyMatch(s -> !s.isDca())) {
             throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + ticker);
+        }
+        Map<UUID, DcaConfig> configs = dcaDetailPort.findActiveByStrategyIds(existing.stream().map(Strategy::id).toList());
+        if (configs.values().stream().anyMatch(c -> c.direction() == cmd.dca().direction())) {
+            throw new IllegalStateException("같은 계좌·종목에 같은 방향의 DCA 전략이 이미 있습니다.");
         }
     }
 

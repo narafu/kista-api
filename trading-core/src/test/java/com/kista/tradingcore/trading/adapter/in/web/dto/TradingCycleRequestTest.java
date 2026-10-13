@@ -17,7 +17,7 @@ class TradingCycleRequestTest {
                 StrategyType.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, null);
+                null, null, null);
 
         assertThat(request.toRegisterCommand().divisionCount()).isZero();
     }
@@ -29,7 +29,7 @@ class TradingCycleRequestTest {
                 StrategyType.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                scheduledStartDate, null);
+                scheduledStartDate, null, null);
 
         assertThat(request.toRegisterCommand().scheduledStartDate()).isEqualTo(scheduledStartDate);
     }
@@ -40,7 +40,7 @@ class TradingCycleRequestTest {
                 StrategyType.VR, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, new BigDecimal("5000.00"));
+                null, new BigDecimal("5000.00"), null);
 
         assertThat(request.toRegisterCommand().initialVrValue()).isEqualByComparingTo("5000.00");
     }

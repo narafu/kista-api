@@ -13,5 +13,6 @@ public record StrategyDetail(
         boolean isReverseMode,
         Double currentRound,    // INFINITE 전략만 non-null, 이력 없으면 null
         Integer currentHoldings, // 최신 cycle_position 기준 보유 수량
-        VrSummary vr            // VR 전략만 non-null, 비VR은 null (com.kista.tradingcore.trading.domain.model.VrSummary)
+        VrSummary vr,           // VR 전략만 non-null, 비VR은 null (com.kista.tradingcore.trading.domain.model.VrSummary)
+        DcaSummary dca          // DCA 전략만 non-null
 ) {}

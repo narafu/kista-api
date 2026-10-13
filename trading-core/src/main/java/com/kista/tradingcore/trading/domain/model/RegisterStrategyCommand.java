@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.domain.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.tradingcore.matching.domain.model.DcaConfig;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 
@@ -31,8 +32,21 @@ public record RegisterStrategyCommand(
         BigDecimal poolLimitFloor,                     // poolLimitRate 램프의 하한값
         LocalDate scheduledStartDate,                  // 시작예정일 (null이면 오늘, 과거 거부)
         // VR: 초기 V값 직접 지정 (VR 전용, null/0 이하면 미지정 취급 — 평가금 기준으로 대체)
-        BigDecimal initialVrValue
+        BigDecimal initialVrValue,
+        DcaConfig dca                                  // DCA 전용 설정 (비DCA는 null)
 ) {
+    // 기존 20개 필드 호출부 호환용 — dca 생략 시 null
+    public RegisterStrategyCommand(StrategyType type, StrategyTicker ticker, BigDecimal initialUsdDeposit,
+            StrategyCycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
+            Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, Integer initialGradient,
+            Integer gGraceWeeks, Integer gStepWeeks, Integer gMax, BigDecimal initialPoolLimitRate,
+            Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor, LocalDate scheduledStartDate,
+            BigDecimal initialVrValue) {
+        this(type, ticker, initialUsdDeposit, cycleSeedType, divisionCount, initialHoldings, initialAvgPrice,
+                intervalWeeks, bandWidth, recurringAmount, initialGradient, gGraceWeeks, gStepWeeks, gMax,
+                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor, scheduledStartDate, initialVrValue, null);
+    }
+
     // 기존 19개 필드 호출부(테스트 등) 호환용 — initialVrValue 생략 시 null(미지정)
     public RegisterStrategyCommand(StrategyType type, StrategyTicker ticker, BigDecimal initialUsdDeposit,
             StrategyCycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
@@ -41,6 +55,6 @@ public record RegisterStrategyCommand(
             Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor, LocalDate scheduledStartDate) {
         this(type, ticker, initialUsdDeposit, cycleSeedType, divisionCount, initialHoldings, initialAvgPrice,
                 intervalWeeks, bandWidth, recurringAmount, initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor, scheduledStartDate, null);
+                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor, scheduledStartDate, null, null);
     }
 }

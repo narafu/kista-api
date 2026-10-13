@@ -85,8 +85,8 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     @Override
-    public boolean existsByAccountIdAndTicker(UUID accountId, StrategyTicker ticker) {
-        return jpaRepository.existsByAccountIdAndTicker(accountId, ticker);
+    public List<Strategy> findByAccountIdAndTicker(UUID accountId, StrategyTicker ticker) {
+        return jpaRepository.findAllByAccountIdAndTicker(accountId, ticker).stream().map(this::toDomain).toList();
     }
 
     @Override

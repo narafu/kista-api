@@ -46,6 +46,9 @@ class StrategyService implements StrategyUseCase {
     private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
     private final OrderCancelService orderCancelService;           // 일시정지·삭제 전 미체결 주문 정리
+    private final StrategyDcaDetailPort dcaDetailPort;             // DCA 활성 설정 조회
+    private final DcaExecutionPort dcaExecutionPort;               // DCA 최근 회차 조회
+    private final DcaSummaryAssembler dcaSummaryAssembler;         // DCA 조회 요약 조립
     private final StrategyStateWriter stateWriter;                 // 일시정지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
@@ -218,7 +221,19 @@ class StrategyService implements StrategyUseCase {
                 ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle, openingPosition, latestPos).orElse(null)
                 : null;
 
-        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary);
+        DcaSummary dcaSummary = null;
+        if (strategy.isDca()) {
+            DcaExecution last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id())).get(strategy.id());
+            dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
+                    .map(config -> buildDcaSummary(config, last, c))).orElse(null);
+        }
+
+        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
+    }
+
+    // DCA 요약 — 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산
+    private DcaSummary buildDcaSummary(DcaConfig config, DcaExecution last, StrategyCycle cycle) {
+        return dcaSummaryAssembler.assemble(config, last, DcaSummaryAssembler.firstEligibleDate(cycle.startDate(), last));
     }
 
     // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
@@ -244,6 +259,11 @@ class StrategyService implements StrategyUseCase {
         Map<UUID, StrategyInfiniteDetail> infiniteDetails = strategyInfiniteDetailPort.findByStrategyVersionIds(versionIds);
         Map<UUID, StrategyVrDetail> vrDetails = vrStrategyLifecycle.findVrDetailsByVersionIds(versionIds);
         Map<UUID, StrategyCycleVrDetail> cycleVrDetails = vrStrategyLifecycle.findCycleVrDetailsByCycleIds(cycleIds);
+
+        // DCA만 설정·최근 회차 배치 조회 (각 1회)
+        List<UUID> dcaIds = strategies.stream().filter(Strategy::isDca).map(Strategy::id).toList();
+        Map<UUID, DcaConfig> dcaConfigs = dcaIds.isEmpty() ? Map.of() : dcaDetailPort.findActiveByStrategyIds(dcaIds);
+        Map<UUID, DcaExecution> dcaLast = dcaIds.isEmpty() ? Map.of() : dcaExecutionPort.findLatestByStrategyIds(dcaIds);
 
         List<UUID> positionIds = latestPositions.values().stream().map(CyclePosition::id).toList();
         Map<UUID, CyclePositionInfiniteDetail> infinitePositionDetails =
@@ -282,28 +302,34 @@ class StrategyService implements StrategyUseCase {
                             .orElse(null)
                     : null;
 
-            return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary);
+            DcaSummary dcaSummary = null;
+            if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
+                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.get(strategy.id()), latestCycle.get());
+            }
+
+            return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
         }).toList();
     }
 
     // 이미 조회된 입력들을 조합만 하는 순수 조립 메서드 — toDetail/toDetails 공용
     private StrategyDetail assemble(Strategy strategy, Optional<StrategyCycle> latestCycle,
                                      Optional<CyclePosition> openingPosition, Optional<CyclePosition> latestPosition,
-                                     Integer divisionCount, boolean isReverseMode, VrSummary vrSummary) {
+                                     Integer divisionCount, boolean isReverseMode, VrSummary vrSummary,
+                                     DcaSummary dcaSummary) {
         BigDecimal initialUsdDeposit = strategy.isVr()
                 ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
                 : latestCycle.map(StrategyCycle::startAmount).orElse(null);
         LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
-        // VR은 currentRound 없음 — INFINITE만 계산
-        Double currentRound = strategy.isVr() ? null :
+        // VR·DCA는 currentRound 없음 — INFINITE·PRIVACY만 계산
+        Double currentRound = strategy.isVr() || strategy.isDca() ? null :
                 latestPosition.map(pos -> InfinitePosition.calcCurrentRound(
                         pos.avgPrice(), pos.holdings(), pos.usdDeposit(),
                         divisionCount == null ? 0 : divisionCount)).orElse(null);
 
         Integer currentHoldings = latestPosition.map(CyclePosition::holdings).orElse(null);
 
-        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary);
+        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary);
     }
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────

@@ -13,6 +13,7 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
+import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.Strategy; import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
@@ -553,5 +554,17 @@ class ManualTradingServiceTest {
             }
         }).when(lock).call(any(), any());
         return held;
+    }
+
+    @Test
+    void execute_dca_throwsManualExecutionUnsupported() {
+        Strategy dca = new Strategy(STRATEGY.id(), ACCOUNT.id(), StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(dca.id())).thenReturn(dca);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
+
+        assertThatThrownBy(() -> service.execute(dca.id(), REQUESTER_ID))
+                .isInstanceOf(DcaManualExecutionUnsupportedException.class);
+        verifyNoInteractions(strategyCyclePort, orderExecutor);
     }
 }

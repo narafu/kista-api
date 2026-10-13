@@ -34,6 +34,10 @@ public record Strategy(
         return type == StrategyType.PRIVACY;
     }
 
+    public boolean isDca() {
+        return type == StrategyType.DCA;
+    }
+
     public boolean isVr() {
         return type == StrategyType.VR;
     }

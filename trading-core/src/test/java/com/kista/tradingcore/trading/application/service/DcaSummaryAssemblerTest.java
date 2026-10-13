@@ -1,0 +1,72 @@
+package com.kista.tradingcore.trading.application.service;
+
+import com.kista.shared.kernel.DcaFrequency;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.trading.domain.model.DcaExecution;
+import com.kista.tradingcore.trading.domain.model.DcaSummary;
+import com.kista.tradingcore.trading.domain.model.DstInfo;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class DcaSummaryAssemblerTest {
+
+    private final MarketCalendarPort calendar = mock(MarketCalendarPort.class);
+    private final DcaSummaryAssembler assembler = new DcaSummaryAssembler(calendar);
+
+    @Test
+    void next_execution_converts_us_session_back_to_kst() {
+        // KST 2026-10-14 <-> US 10-13, 평일 전부 개장
+        when(calendar.usSessionDateOf(LocalDate.of(2026, 10, 14))).thenReturn(LocalDate.of(2026, 10, 13));
+        when(calendar.isUsSessionOpen(any())).thenAnswer(inv -> {
+            DayOfWeek d = inv.<LocalDate>getArgument(0).getDayOfWeek();
+            return d != DayOfWeek.SATURDAY && d != DayOfWeek.SUNDAY;
+        });
+        when(calendar.kstTradeDateOf(LocalDate.of(2026, 10, 30))).thenReturn(LocalDate.of(2026, 10, 31));
+        DcaConfig monthlyEnd = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY, null, null);
+
+        DcaSummary summary = assembler.assemble(monthlyEnd, null, LocalDate.of(2026, 10, 14));
+
+        assertThat(summary.nextUsSessionDate()).isEqualTo(LocalDate.of(2026, 10, 30));
+        assertThat(summary.nextKstTradeDate()).isEqualTo(LocalDate.of(2026, 10, 31));
+        assertThat(summary.lastExecution()).isNull();
+    }
+
+    @Test
+    void next_execution_null_when_calendar_unknown() {
+        when(calendar.usSessionDateOf(any())).thenReturn(LocalDate.of(2026, 10, 13));
+        when(calendar.isUsSessionOpen(any())).thenReturn(false);
+        DcaConfig daily = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null);
+
+        DcaSummary summary = assembler.assemble(daily, null, LocalDate.of(2026, 10, 14));
+
+        assertThat(summary.nextUsSessionDate()).isNull();
+        assertThat(summary.nextKstTradeDate()).isNull();
+    }
+
+    @Test
+    void firstEligibleDate_skips_start_day_itself() {
+        LocalDate today = DstInfo.nextTradeDate();
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today.plusDays(3), null)).isEqualTo(today.plusDays(4));
+        // 시작일이 오늘이면 시작일 당일은 판정 제외 — 다음 날부터
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null)).isEqualTo(today.plusDays(1));
+    }
+
+    @Test
+    void firstEligibleDate_moves_to_next_day_when_today_already_decided() {
+        LocalDate today = DstInfo.nextTradeDate();
+        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), 1, BigDecimal.ONE);
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday)).isEqualTo(today.plusDays(1));
+    }
+}

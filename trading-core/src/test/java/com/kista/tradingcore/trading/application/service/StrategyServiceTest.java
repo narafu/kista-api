@@ -15,6 +15,11 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort; impor
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.shared.kernel.DcaFrequency;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.tradingcore.trading.domain.strategy.DcaCreationResolver;
 import com.kista.tradingcore.trading.domain.strategy.InfiniteCreationResolver;
 import com.kista.tradingcore.trading.domain.strategy.PrivacyCreationResolver;
 import com.kista.tradingcore.trading.domain.strategy.StrategyCreationResolvers;
@@ -67,6 +72,9 @@ class StrategyServiceTest {
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort; // 신규 전략 생성 설정 조회
     @Mock OrderPort orderPort;                                   // 전략별 주문 내역 조회
     @Mock com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort privacyTradePort; // 시드 미리보기 PRIVACY 기준표
+    @Mock StrategyDcaDetailPort dcaDetailPort;                   // DCA 버전 설정 포트
+    @Mock DcaExecutionPort dcaExecutionPort;                     // DCA 회차 이력 포트
+    @Mock MarketCalendarPort marketCalendarPort;                 // DCA 다음 실행일 계산용 캘린더
     @Mock OrderCancelService orderCancelService;                 // 일시정지·삭제 전 미체결 주문 정리
 
     private StrategyService strategyService;
@@ -97,6 +105,7 @@ class StrategyServiceTest {
 
     @BeforeEach
     void setUp() {
+        DcaSummaryAssembler dcaSummaryAssembler = new DcaSummaryAssembler(marketCalendarPort);
         StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
                 vrStrategyLifecycle,
@@ -107,9 +116,11 @@ class StrategyServiceTest {
                 marginPort,
                 strategyCreationPolicyPort,
                 new StrategyCreationResolvers(List.of(
-                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver())),
+                        new InfiniteCreationResolver(), new PrivacyCreationResolver(), new VrCreationResolver(), new DcaCreationResolver())),
                 new StrategyCreationPersister(strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
-                        vrStrategyLifecycle, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort));
+                        vrStrategyLifecycle, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
+                        dcaDetailPort),
+                dcaDetailPort, dcaSummaryAssembler);
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort,
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
@@ -130,6 +141,7 @@ class StrategyServiceTest {
                 new CycleSnapshotCreator(
                         strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle),
                 orderCancelService,
+                dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
@@ -244,7 +256,6 @@ class StrategyServiceTest {
         Strategy saved = new Strategy(strategyId, ACCOUNT_ID, type, StrategyStatus.ACTIVE, ticker,
                 StrategyCycleSeedType.NONE);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, ticker)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(strategyPort.save(any())).thenReturn(saved);
         // 저장 인자(특히 startDate)를 그대로 반영 — 고정값 반환 시 scheduledStartDate 검증이 무의미해짐
@@ -661,7 +672,7 @@ class StrategyServiceTest {
                 new StrategyFieldSettings<>(false, List.of(StrategyTicker.SOXL), StrategyTicker.SOXL),
                 new StrategyFieldSettings<>(false, List.of(30), 30), null, null, null);
         when(strategyCreationPolicyPort.find(StrategyType.INFINITE)).thenReturn(Optional.of(fixed));
-        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+        when(strategyPort.findByAccountIdAndTicker(any(), any())).thenReturn(List.of(ACTIVE_STRATEGY));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 30, null, null, null)))
@@ -679,7 +690,7 @@ class StrategyServiceTest {
     @DisplayName("INFINITE register()는 기본 설정의 divisionCount 30과 40을 계속 허용한다")
     void register_infinite_preservesDivisionCountThirtyAndForty() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+        when(strategyPort.findByAccountIdAndTicker(any(), any())).thenReturn(List.of(ACTIVE_STRATEGY));
 
         for (int divisionCount : List.of(30, 40)) {
             assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
@@ -740,7 +751,7 @@ class StrategyServiceTest {
                 new StrategyFieldSettings<>(false, List.of(new BigDecimal("15")), new BigDecimal("15")),
                 new StrategyFieldSettings<>(false, List.of(2), 2));
         when(strategyCreationPolicyPort.find(StrategyType.VR)).thenReturn(Optional.of(fixed));
-        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+        when(strategyPort.findByAccountIdAndTicker(any(), any())).thenReturn(List.of(ACTIVE_STRATEGY));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 commandFor(StrategyType.VR, null, 0, 2, new BigDecimal("15"), 0)))
@@ -767,7 +778,7 @@ class StrategyServiceTest {
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), -999)))
                 .isInstanceOf(IllegalArgumentException.class);
-        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+        when(strategyPort.findByAccountIdAndTicker(any(), any())).thenReturn(List.of(ACTIVE_STRATEGY));
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), 999)))
                 .isInstanceOf(IllegalStateException.class)
@@ -783,7 +794,7 @@ class StrategyServiceTest {
                 new StrategyFieldSettings<>(false, List.of(RecurringMode.HOLD), RecurringMode.HOLD),
                 vr.bandWidth(), vr.intervalWeeks());
         when(strategyCreationPolicyPort.find(StrategyType.VR)).thenReturn(Optional.of(holdOnly));
-        when(strategyPort.existsByAccountIdAndTicker(any(), any())).thenReturn(true);
+        when(strategyPort.findByAccountIdAndTicker(any(), any())).thenReturn(List.of(ACTIVE_STRATEGY));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 commandFor(StrategyType.VR, null, 20, 2, new BigDecimal("15"), null)))
@@ -818,7 +829,7 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(true);
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(List.of(ACTIVE_STRATEGY));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalStateException.class);
@@ -839,7 +850,6 @@ class StrategyServiceTest {
                 new BigDecimal("500"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile())); // balanceCheckEnabled=true
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
@@ -871,7 +881,6 @@ class StrategyServiceTest {
                 new BigDecimal("500"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile())); // balanceCheckEnabled=true
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("1000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(ACTIVE_STRATEGY));
@@ -913,7 +922,6 @@ class StrategyServiceTest {
                 BigDecimal.ZERO, null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -945,7 +953,6 @@ class StrategyServiceTest {
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(brokerPricePort.getPrevClose(StrategyTicker.TQQQ, account.toBrokerRef())).thenReturn(new BigDecimal("50.00"));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
@@ -1000,7 +1007,6 @@ class StrategyServiceTest {
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
@@ -1030,7 +1036,6 @@ class StrategyServiceTest {
                 vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.75"));
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1085,7 +1090,6 @@ class StrategyServiceTest {
                 new BigDecimal("1000"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("3000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1124,7 +1128,6 @@ class StrategyServiceTest {
                 vrCycleId, BigDecimal.ZERO, 10, BigDecimal.ONE);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1211,7 +1214,6 @@ class StrategyServiceTest {
                 new BigDecimal("2000"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1250,7 +1252,6 @@ class StrategyServiceTest {
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1279,7 +1280,6 @@ class StrategyServiceTest {
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(strategyPort.save(any(Strategy.class))).thenReturn(savedVrStrategy);
         when(strategyCyclePort.save(any(StrategyCycle.class))).thenReturn(savedCycle);
@@ -1311,7 +1311,6 @@ class StrategyServiceTest {
                 new BigDecimal("1000"), null, null, 0, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("3000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1433,7 +1432,6 @@ class StrategyServiceTest {
     void register_vr_pStepWeeksZero_poolLimitFloorExceedsInitial_stillThrows() {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1456,7 +1454,6 @@ class StrategyServiceTest {
     void register_vr_gMaxLessThanInitialGradient_throws() {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1479,7 +1476,6 @@ class StrategyServiceTest {
     void register_vr_poolLimitFloorGreaterThanInitial_throws() {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1820,7 +1816,6 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("2000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1860,7 +1855,6 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, ticker)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1893,7 +1887,6 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.TQQQ)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
@@ -1986,7 +1979,6 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        when(strategyPort.existsByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(false);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(brokerPricePort.getPrevClose(StrategyTicker.SOXL, account.toBrokerRef()))
                 .thenThrow(new RuntimeException("증권사 API 조회 실패"));
@@ -2060,5 +2052,159 @@ class StrategyServiceTest {
                 .hasMessageContaining("시작예정일");
 
         verify(strategyPort, never()).save(any());
+    }
+
+    // ── DCA 등록·조회 ──────────────────────────────────────────────
+
+    private static DcaConfig dcaConfig(OrderDirection direction) {
+        return new DcaConfig(direction, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null);
+    }
+
+    private static RegisterStrategyCommand dcaCommand(StrategyTicker ticker, DcaConfig dca) {
+        return new RegisterStrategyCommand(StrategyType.DCA, ticker, null, null, 0, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, dca);
+    }
+
+    private static Strategy dcaStrategy(UUID id, StrategyTicker ticker) {
+        return new Strategy(id, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE, ticker, StrategyCycleSeedType.NONE);
+    }
+
+    // DCA 등록 성공 경로 공통 stub — 잔고·시세 검증을 건너뛰므로 사용자 프로필·마진·시세 stub은 없다(strict stubs)
+    private void stubDcaRegistration(StrategyTicker ticker) {
+        UUID cycleId = UUID.randomUUID();
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.save(any())).thenReturn(dcaStrategy(UUID.randomUUID(), ticker));
+        when(strategyCyclePort.save(any())).thenAnswer(inv -> {
+            StrategyCycle arg = inv.getArgument(0);
+            return new StrategyCycle(cycleId, arg.strategyId(), arg.strategyVersionId(), arg.startAmount(),
+                    arg.endAmount(), arg.startDate(), arg.endDate(), arg.createdAt(), arg.deletedAt());
+        });
+        when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
+        when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
+        when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("DCA는 같은 종목에 반대 방향 DCA가 있으면 공존 등록되고 설정 1행이 저장된다")
+    void register_dca_allowsOppositeDirectionOnSameTicker() {
+        stubDcaRegistration(StrategyTicker.UPRO);
+        Strategy buyDca = dcaStrategy(UUID.randomUUID(), StrategyTicker.UPRO);
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of(buyDca));
+        when(dcaDetailPort.findActiveByStrategyIds(List.of(buyDca.id())))
+                .thenReturn(Map.of(buyDca.id(), dcaConfig(OrderDirection.BUY)));
+
+        StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID,
+                dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.SELL)));
+
+        verify(dcaDetailPort).save(STRATEGY_VERSION_ID, dcaConfig(OrderDirection.SELL));
+        assertThat(detail.strategy().type()).isEqualTo(StrategyType.DCA);
+        assertThat(detail.dca().config()).isEqualTo(dcaConfig(OrderDirection.SELL));
+        assertThat(detail.dca().nextKstTradeDate()).isNotNull();
+        assertThat(detail.initialUsdDeposit()).isEqualByComparingTo("0");
+        // DCA는 잔고 검증·시세 조회·사용자 프로필 조회를 하지 않는다
+        verifyNoInteractions(marginPort, brokerPricePort, tradingUserProfilePort);
+    }
+
+    @Test
+    @DisplayName("DCA 등록은 보유수량 입력(initialHoldings)을 무시하고 0으로 시작한다")
+    void register_dca_ignoresBootstrapHoldings() {
+        stubDcaRegistration(StrategyTicker.UPRO);
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of());
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.DCA, StrategyTicker.UPRO,
+                new BigDecimal("5000"), null, 0, 10, new BigDecimal("40"),
+                null, null, null, null, null, null, null, null, null, null, null, null, null, dcaConfig(OrderDirection.BUY));
+
+        StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
+
+        assertThat(detail.currentHoldings()).isZero();
+        verify(cyclePositionPort).save(argThat(p -> p.holdings() == 0 && p.usdDeposit().signum() == 0));
+        verifyNoInteractions(marginPort, brokerPricePort);
+    }
+
+    @Test
+    @DisplayName("같은 계좌·종목·방향의 DCA가 이미 있으면 거부한다")
+    void register_dca_rejectsSameDirection() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        Strategy buyDca = dcaStrategy(UUID.randomUUID(), StrategyTicker.UPRO);
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of(buyDca));
+        when(dcaDetailPort.findActiveByStrategyIds(List.of(buyDca.id())))
+                .thenReturn(Map.of(buyDca.id(), dcaConfig(OrderDirection.BUY)));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.BUY))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("같은 계좌·종목에 같은 방향의 DCA 전략이 이미 있습니다.");
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("DCA 등록도 같은 종목에 비DCA 전략이 있으면 기존 중복 메시지로 거부한다")
+    void register_dca_rejectsWhenNonDcaExists() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of(ACTIVE_STRATEGY));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.SELL))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("이미 해당 종목으로 등록된 전략이 있습니다");
+    }
+
+    @Test
+    @DisplayName("비DCA 등록은 같은 종목에 DCA가 있어도 거부한다")
+    void register_nonDca_rejectsWhenDcaExists() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL))
+                .thenReturn(List.of(dcaStrategy(UUID.randomUUID(), StrategyTicker.SOXL)));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("이미 해당 종목으로 등록된 전략이 있습니다");
+    }
+
+    @Test
+    @DisplayName("DCA 등록은 dca 설정이 없으면 거부한다")
+    void register_dca_requiresConfig() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.UPRO, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("DCA 전략 조회는 활성 설정·최근 회차·다음 실행일을 싣는다")
+    void getById_dca_includesSummary() {
+        Strategy dca = dcaStrategy(STRATEGY_ID, StrategyTicker.UPRO);
+        DcaExecution last = DcaExecution.skipped(STRATEGY_ID, LocalDate.of(2026, 9, 30),
+                com.kista.shared.kernel.DcaSkipReason.CONDITION_NOT_MET, "상세", null);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        when(dcaDetailPort.findActiveByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(dcaConfig(OrderDirection.BUY)));
+        when(dcaExecutionPort.findLatestByStrategyIds(List.of(STRATEGY_ID))).thenReturn(Map.of(STRATEGY_ID, last));
+        when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
+        when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
+        when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
+
+        StrategyDetail detail = strategyService.getById(STRATEGY_ID, USER_ID);
+
+        assertThat(detail.dca().config()).isEqualTo(dcaConfig(OrderDirection.BUY));
+        assertThat(detail.dca().lastExecution()).isEqualTo(last);
+        assertThat(detail.dca().nextKstTradeDate()).isNotNull();
+        assertThat(detail.currentRound()).isNull();
     }
 }

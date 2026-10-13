@@ -4,6 +4,7 @@ import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.UpdateStrategyCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
@@ -54,7 +55,9 @@ public record TradingCycleRequest(
         @Schema(description = "시작예정일, 기본값=오늘, 오늘 이후만 허용", example = "2026-08-01")
         LocalDate scheduledStartDate,
         @Schema(description = "VR: 초기 V값 직접 지정 (지정 시 전일종가×보유수량 계산을 대체, 생략 시 평가금 기준. 첫 매수 후 산정하려면 평가금·예수금과 함께 생략)", example = "5000.00")
-        BigDecimal initialVrValue
+        BigDecimal initialVrValue,
+        @Schema(description = "DCA 설정 (type=DCA일 때 필수, 그 외 무시)")
+        @Valid DcaConfigRequest dca
 ) {
     public RegisterStrategyCommand toRegisterCommand() {
         return new RegisterStrategyCommand(type, ticker, initialUsdDeposit, cycleSeedType,
@@ -64,7 +67,8 @@ public record TradingCycleRequest(
                 recurringAmount != null ? recurringAmount : 0,
                 initialGradient, gGraceWeeks, gStepWeeks, gMax,
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor,
-                scheduledStartDate, initialVrValue);
+                scheduledStartDate, initialVrValue,
+                dca != null ? dca.toDomain() : null);
     }
 
     public UpdateStrategyCommand toUpdateCommand() {

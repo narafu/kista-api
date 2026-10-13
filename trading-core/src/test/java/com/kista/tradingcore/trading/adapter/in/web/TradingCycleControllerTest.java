@@ -10,6 +10,7 @@ import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
+import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
 import com.kista.tradingcore.trading.domain.model.VrSummary;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,7 @@ class TradingCycleControllerTest {
     @MockitoBean StrategyUseCase tradingCycle;
     @MockitoBean TradingExecutionUseCase tradingExecution;
     @MockitoBean VrReconfigureUseCase vrReconfigure;
+    @MockitoBean DcaConfigUseCase dcaConfig;
 
     private static final UUID CYCLE_ID   = UUID.fromString("00000000-0000-0000-0000-000000000010");
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -186,7 +188,7 @@ class TradingCycleControllerTest {
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), LocalDate.now(), 20, false, null, 0, null);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), LocalDate.now(), 20, false, null, 0, null, null);
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
@@ -222,7 +224,7 @@ class TradingCycleControllerTest {
                         com.kista.shared.kernel.StrategyStatus.ACTIVE,
                         com.kista.shared.kernel.StrategyTicker.SOXL,
                         com.kista.shared.kernel.StrategyCycleSeedType.NONE),
-                new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null);
+                new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
         mockMvc.perform(get("/api/trading-cycles").with(authentication(userToken(USER_ID))))
@@ -308,7 +310,7 @@ class TradingCycleControllerTest {
                 new BigDecimal("1000.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 10,
                 10, 52, 26, 10,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
-        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);
+        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary, null);
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
@@ -337,7 +339,7 @@ class TradingCycleControllerTest {
     void register_omittedDivisionCount_passesRuntimeDefaultSentinel() throws Exception {
         Strategy strategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.now(), 30, false, 0.0, 0, null);
+        StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.now(), 30, false, 0.0, 0, null, null);
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
@@ -363,7 +365,7 @@ class TradingCycleControllerTest {
                 new BigDecimal("1500.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 12,
                 12, 52, 26, 20,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
-        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary);
+        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary, null);
         when(tradingCycle.getById(eq(CYCLE_ID), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}/vr-config", CYCLE_ID)
@@ -389,5 +391,94 @@ class TradingCycleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private static final com.kista.tradingcore.matching.domain.model.DcaConfig DCA_CONFIG =
+            new com.kista.tradingcore.matching.domain.model.DcaConfig(com.kista.shared.kernel.OrderDirection.BUY,
+                    new BigDecimal("300"), com.kista.shared.kernel.OrderType.MOC, com.kista.shared.kernel.DcaFrequency.MONTHLY, null, null);
+
+    private StrategyDetail dcaDetail() {
+        Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+        return new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.of(2026, 10, 20), null, false, null, 0, null,
+                new com.kista.tradingcore.trading.domain.model.DcaSummary(DCA_CONFIG,
+                        LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null));
+    }
+
+    @Test
+    void register_dca_mapsDcaBodyToCommandAndReturnsDcaBlock() throws Exception {
+        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
+
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amountUsd":300,
+                                 "orderType":"MOC","frequency":"MONTHLY","dayOfWeek":null,"dayOfMonth":null,"conditions":[]}}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("DCA"))
+                .andExpect(jsonPath("$.dca.frequency").value("MONTHLY"))
+                .andExpect(jsonPath("$.dca.conditions").isEmpty())
+                .andExpect(jsonPath("$.dca.nextExecution.usSessionDate").value("2026-10-30"))
+                .andExpect(jsonPath("$.dca.nextExecution.kstTradeDate").value("2026-10-31"))
+                .andExpect(jsonPath("$.dca.lastExecution").doesNotExist())
+                .andExpect(jsonPath("$.todayOpenBatchMissed").value(false));
+        org.mockito.ArgumentCaptor<RegisterStrategyCommand> captor = org.mockito.ArgumentCaptor.forClass(RegisterStrategyCommand.class);
+        verify(tradingCycle).register(any(), any(), captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().dca()).isEqualTo(DCA_CONFIG);
+    }
+
+    @Test
+    void register_dca_withConditions_returns400InStage1() throws Exception {
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amountUsd":300,"orderType":"MOC",
+                                 "frequency":"DAILY","conditions":[{"indicator":"RSI","operator":"LTE","threshold":30}]}}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void register_dca_invalidDayOfWeek_returns400() throws Exception {
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amountUsd":300,"orderType":"MOC",
+                                 "frequency":"WEEKLY","dayOfWeek":"SATURDAY"}}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reconfigureDca_returns200WithDcaBlock() throws Exception {
+        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
+
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"direction":"BUY","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY","conditions":[]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dca.amountUsd").value(300));
+        verify(dcaConfig).updateConfig(CYCLE_ID, USER_ID, DCA_CONFIG);
+    }
+
+    @Test
+    void reconfigureDca_directionChange_returns400() throws Exception {
+        doThrow(new IllegalArgumentException("DCA 방향은 변경할 수 없습니다"))
+                .when(dcaConfig).updateConfig(eq(CYCLE_ID), any(), any());
+
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"direction":"SELL","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY"}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 }

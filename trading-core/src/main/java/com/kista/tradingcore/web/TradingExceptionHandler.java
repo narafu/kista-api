@@ -10,6 +10,7 @@ import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.tradingcore.trading.domain.model.AlreadyOrderedTodayException;
+import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.ManualTradingException;
 import com.kista.tradingcore.trading.domain.model.ManualTradingFailedException;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
@@ -58,6 +59,7 @@ public class TradingExceptionHandler {
             BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID),
             BrokerRateLimitException.class,          new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "KIS Rate Limit", ErrorCode.BROKER_RATE_LIMITED),
             AlreadyOrderedTodayException.class,      new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ALREADY_ORDERED_TODAY),
+            DcaManualExecutionUnsupportedException.class, new Mapping(HttpStatus.CONFLICT,         "Conflict", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED),
             ManualTradingFailedException.class,      new Mapping(HttpStatus.INTERNAL_SERVER_ERROR, "Manual Trading Failed", null,
                                                              "주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
             ManualTradingException.class,            new Mapping(HttpStatus.CONFLICT,              "Conflict"),
@@ -68,7 +70,7 @@ public class TradingExceptionHandler {
 
     @ExceptionHandler({
             BrokerCredentialException.class, BrokerRateLimitException.class,
-            ManualTradingException.class, OrderCancelException.class,
+            ManualTradingException.class, DcaManualExecutionUnsupportedException.class, OrderCancelException.class,
             PrivacyTradeConflictException.class, Account.DuplicateAccountException.class
     })
     public ProblemDetail handleTradingCoreExceptions(Exception ex) {

@@ -39,6 +39,9 @@ public record TradingCycleResponse(
         @Schema(description = "VR 전략 상세 (VR 전략만 non-null)")
         @JsonInclude(JsonInclude.Include.NON_NULL)
         VrSummary vr,
+        @Schema(description = "DCA 전략 상세 (DCA 전략만 non-null)")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        DcaResponse dca,
         @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:30 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean todayOpenBatchMissed
@@ -100,6 +103,7 @@ public record TradingCycleResponse(
                 detail.currentRound(),
                 detail.currentHoldings(),
                 detail.vr() != null ? VrSummary.from(detail.vr()) : null,
+                detail.dca() != null ? DcaResponse.from(detail.dca()) : null,
                 null
         );
     }
@@ -109,7 +113,7 @@ public record TradingCycleResponse(
     public static TradingCycleResponse forRegistration(StrategyDetail detail) {
         TradingCycleResponse r = from(detail);
         return new TradingCycleResponse(r.id, r.accountId, r.type, r.status, r.ticker, r.initialUsdDeposit, r.startDate,
-                r.cycleSeedType, r.divisionCount, r.isReverseMode, r.currentRound, r.currentHoldings, r.vr,
-                !detail.strategy().isPrivacy() && DstInfo.openBatchMissedFor(detail.startDate())); // PRIVACY는 AT_OPEN 주문이 없어 해당 없음
+                r.cycleSeedType, r.divisionCount, r.isReverseMode, r.currentRound, r.currentHoldings, r.vr, r.dca,
+                !detail.strategy().isPrivacy() && !detail.strategy().isDca() && DstInfo.openBatchMissedFor(detail.startDate())); // PRIVACY는 AT_OPEN 주문이 없고 DCA는 자체 판정 기준이 있어 해당 없음
     }
 }

@@ -48,7 +48,7 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - 설정 이력 계층: `StrategyVersion`(버전 부모) → `StrategyInfiniteDetail`(divisionCount) / `StrategyVrDetail`(intervalWeeks·bandWidth·recurringAmount + 램프 8필드; `gradientAt(weeks)`/`poolLimitRateAt(weeks)`는 VR 공식 메서드 — `com.kista.tradingcore.matching.domain.model` 소유, "kernel" 공개). `StrategyVersion`/`StrategyInfiniteDetail`은 `com.kista.tradingcore.trading.domain.model`("domain" 공개)
 - 실행 이력 계층: `StrategyCycle`(실행된 사이클 + 적용 버전 고정값; `startAmount` 계약 → trading-formulas.md "VR 공식"의 "개장 금액 계약")은 비-VR 최신 포지션 `holdings=0`일 때만 `StrategyCyclePort.updateStartAmount()`로 in-place 갱신. VR 일반 시드 수정은 저장 전에 거부하고 VR 재설정을 사용한다. VR의 개장 USD pool은 개장 `CyclePosition.usdDeposit`(`initialUsdDeposit`)으로 별도 보존 → `CyclePosition`(체결마다 append되는 포지션 스냅샷, dedup/UNIQUE 없음) + 타입별 detail `CyclePositionInfiniteDetail`(isReverseMode) / `StrategyCycleVrDetail`(사이클 시작 VR 파라미터 스냅샷 value·gradient·poolLimitRate)
 - `StrategyDetail`: 최신 사이클·활성 버전·최신 포지션을 합쳐 만드는 응답 조립 DTO(`StrategyService.toDetail()`), `vr` 필드는 top-level `com.kista.tradingcore.trading.domain.model.VrSummary`(VR 외 null)
-- 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.existsByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개)
+- 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.findByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개 — 예외: DCA는 방향이 다르면 같은 종목에 매수 1 + 매도 1 공존)
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (기본 `NONE`); **VR은 NONE 강제** — 롤오버가 사이클 교체 담당
 
 ### 잔고검증 토글 (balanceCheckEnabled)

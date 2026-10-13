@@ -46,6 +46,17 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findByAccountIdAndTicker_returnsOnlyMatchingTickerOfAccount() {
+        Strategy upro = saveActiveStrategy(accountId, StrategyTicker.UPRO);
+        saveActiveStrategy(accountId, StrategyTicker.SOXL);
+        saveActiveStrategy(insertAccountOfUser(Boolean.TRUE), StrategyTicker.UPRO);
+
+        assertThat(strategyAdapter.findByAccountIdAndTicker(accountId, StrategyTicker.UPRO))
+                .extracting(Strategy::id).containsExactly(upro.id());
+        assertThat(strategyAdapter.findByAccountIdAndTicker(accountId, StrategyTicker.QLD)).isEmpty();
+    }
+
+    @Test
     void findAllActive_usesNotifyProfileActiveFlag_notUsersTable() {
         // 활성 프로필 → 포함 (trading 스키마엔 users 테이블이 없어 users 비의존은 스키마가 보장한다)
         Strategy included = saveActiveStrategy(insertAccountOfUser(Boolean.TRUE), StrategyTicker.SOXL);

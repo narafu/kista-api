@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.adapter.in.web.dto.*;
 import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
@@ -33,6 +34,7 @@ public class TradingCycleController {
     private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
     private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
+    private final DcaConfigUseCase dcaConfig;                    // DCA 설정 수정
 
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
     @Operation(summary = "내 전체 거래 사이클 목록")
@@ -87,6 +89,17 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @RequestBody VrConfigRequest request) {
         vrReconfigure.reconfigure(id, userId, request.toCommand());
+        return TradingCycleResponse.from(tradingCycle.getById(id, userId));
+    }
+
+    // DCA 설정 수정 — 새 버전 발급, 사이클 유지. 종목·방향 변경 불가
+    @Operation(summary = "DCA 설정 수정")
+    @PutMapping("/api/trading-cycles/{id}/dca-config")
+    public TradingCycleResponse reconfigureDca(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody DcaConfigRequest request) {
+        dcaConfig.updateConfig(id, userId, request.toDomain());
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 

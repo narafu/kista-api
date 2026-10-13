@@ -10,6 +10,7 @@ import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
+import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -578,5 +579,25 @@ class TradingPreviewServiceTest {
         BuyCompetitionPreview competition = result.get(started.id()).competition();
         assertThat(competition.consumedByHigherPriority()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(competition.blockedByHigherPriority()).isEmpty();
+    }
+
+    @Test
+    void preview_dca_throwsManualExecutionUnsupported() {
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(dca.id())).thenReturn(dca);
+
+        assertThatThrownBy(() -> service.preview(dca.id(), ACCOUNT.userId()))
+                .isInstanceOf(DcaManualExecutionUnsupportedException.class);
+    }
+
+    @Test
+    void previewBatch_excludesDcaStrategies() {
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(dca));
+
+        assertThat(service.previewBatch(ACCOUNT.id(), ACCOUNT.userId())).isEmpty();
+        verifyNoInteractions(planBuilder);
     }
 }

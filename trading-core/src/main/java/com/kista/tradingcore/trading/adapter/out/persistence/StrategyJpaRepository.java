@@ -35,8 +35,8 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
     // 여러 계좌 ID 일괄 조회 (관리자 계좌 목록 전략 표시용)
     List<StrategyEntity> findAllByAccountIdIn(Collection<UUID> accountIds);
 
-    // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
-    boolean existsByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
+    // 같은 계좌·종목의 전략 조회 (@SQLRestriction이 soft delete 제외)
+    List<StrategyEntity> findAllByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
 
     // ACTIVE 사용자의 ACTIVE 전략 전체 조회 (스케쥴러용) — 소프트 삭제 행 명시적 제외
     // 사용자 활성 여부는 trading 소유 복제본(user_notify_profile.is_active)만 본다 — root 소유 users 비의존

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.matching.domain.model.DcaConfig;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
@@ -31,17 +32,19 @@ class StrategyCreationPersister {
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
+    private final StrategyDcaDetailPort dcaDetailPort;
 
     // 저장 결과 — VR이 아니면 vrDetail·cycleVr는 null
     record Persisted(Strategy strategy, StrategyVrDetail vrDetail, StrategyCycle cycle,
                      CyclePosition initialPosition, StrategyCycleVrDetail cycleVr) {}
 
-    // ramp: VR 등록일 때만 non-null, vrValue: VR V값(override 반영) — 비VR은 null
+    // ramp: VR 등록일 때만 non-null, vrValue: VR V값(override 반영) — 비VR은 null, dca: DCA 등록일 때만 non-null
     @Transactional
     Persisted persist(UUID accountId, StrategyType type, StrategyTicker ticker, StrategyCycleSeedType seedType,
                       int divisionCount, Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount,
                       VrRampParams ramp, BigDecimal initialUsdDeposit, int initialHoldings, BigDecimal initialAvgPrice,
-                      BigDecimal marketPrice, BigDecimal initialStockValue, BigDecimal vrValue, LocalDate scheduledStart) {
+                      BigDecimal marketPrice, BigDecimal initialStockValue, BigDecimal vrValue, LocalDate scheduledStart,
+                      DcaConfig dca) {
         // strategy → strategy_versions → 전략 타입별 detail 순 저장
         Strategy saved = strategyPort.save(new Strategy(null, accountId, type, StrategyStatus.ACTIVE, ticker, seedType));
         StrategyVersion version = strategyVersionPort.save(
@@ -54,6 +57,8 @@ class StrategyCreationPersister {
             vrDetail = vrStrategyLifecycle.saveVersionDetail(version.id(), intervalWeeks, bandWidth, recurringAmount,
                     ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
                     ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
+        } else if (saved.isDca()) {
+            dcaDetailPort.save(version.id(), dca); // DCA 버전 설정 1행
         }
 
         // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장

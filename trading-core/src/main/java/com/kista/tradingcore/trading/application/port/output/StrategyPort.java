@@ -39,8 +39,8 @@ public interface StrategyPort {
     // strategyId 집합 → ticker 배치 조회 (com.kista.tradingcore.trading의 CyclePositionPersistenceAdapter가 StrategyEntity 직접 접근 불가라 포트 경유)
     Map<UUID, StrategyTicker> findTickersByIds(Collection<UUID> strategyIds);
 
-    // 같은 계좌에 같은 종목 중복 방지 (체결 귀속을 위해 계좌 내 종목 유니크)
-    boolean existsByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
+    // 같은 계좌·종목의 전략 — 등록 중복 규칙(DCA는 방향별 공존) 판정용
+    List<Strategy> findByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
 
     // 단건 ticker 조회 — 없으면 null (배치는 findTickersByIds 사용)
     default StrategyTicker findTickerById(UUID id) {

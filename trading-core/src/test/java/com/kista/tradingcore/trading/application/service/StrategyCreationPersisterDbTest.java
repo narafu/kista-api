@@ -38,14 +38,14 @@ import static org.mockito.Mockito.doThrow;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class StrategyCreationPersisterDbTest extends DataJpaTestBase {
 
-    // persister + 실제 저장 어댑터 4종(package-private이라 클래스 리터럴 대신 이름 필터로 스캔)
+    // persister + 실제 저장 어댑터 6종(package-private이라 클래스 리터럴 대신 이름 필터로 스캔)
     @TestConfiguration
     @Import(StrategyCreationPersister.class)
     @ComponentScan(basePackages = "com.kista.tradingcore.trading.adapter.out.persistence", useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
                     ".*\\.StrategyPersistenceAdapter", ".*\\.StrategyVersionPersistenceAdapter",
                     ".*\\.StrategyInfiniteDetailPersistenceAdapter", ".*\\.StrategyCyclePersistenceAdapter",
-                    ".*\\.CyclePositionPersistenceAdapter"}))
+                    ".*\\.CyclePositionPersistenceAdapter", ".*\\.StrategyDcaDetailPersistenceAdapter"}))
     static class PersisterTestConfig {
     }
 
@@ -90,9 +90,25 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
                 Integer.class, accountId)).isEqualTo(1);
     }
 
+    @Test
+    void persist_dca_savesDcaVersionRowAndZeroPosition() {
+        var config = new com.kista.tradingcore.matching.domain.model.DcaConfig(com.kista.shared.kernel.OrderDirection.BUY,
+                new BigDecimal("300"), com.kista.shared.kernel.OrderType.MOC, com.kista.shared.kernel.DcaFrequency.DAILY, null, null);
+
+        persister.persist(accountId, StrategyType.DCA, StrategyTicker.UPRO, StrategyCycleSeedType.NONE, 20,
+                null, null, null, null, BigDecimal.ZERO, 0, null, null, BigDecimal.ZERO, null, LocalDate.now(), config);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM strategy_dca_version dv JOIN strategy_version sv ON sv.id = dv.strategy_version_id JOIN strategy s ON s.id = sv.strategy_id WHERE s.account_id = ?",
+                Integer.class, accountId)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM cycle_position cp JOIN strategy_cycle sc ON sc.id = cp.strategy_cycle_id JOIN strategy s ON s.id = sc.strategy_id WHERE s.account_id = ?",
+                Integer.class, accountId)).isEqualTo(1);
+    }
+
     private void persistInfinite() {
         persister.persist(accountId, StrategyType.INFINITE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE, 20,
-                null, null, null, null, new BigDecimal("1000"), 0, null, null, BigDecimal.ZERO, null, LocalDate.now());
+                null, null, null, null, new BigDecimal("1000"), 0, null, null, BigDecimal.ZERO, null, LocalDate.now(), null);
     }
 
     private Integer countStrategyRows() {
