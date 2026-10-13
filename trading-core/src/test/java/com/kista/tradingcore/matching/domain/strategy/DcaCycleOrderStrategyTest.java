@@ -82,6 +82,18 @@ class DcaCycleOrderStrategyTest {
     }
 
     @Test
+    void sell_below_one_share_with_unknown_sellable_is_data_unavailable() {
+        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.SELL, "50", OrderType.MOC), "87.12", null)).reason())
+                .isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+    }
+
+    @Test
+    void sell_below_one_share_with_zero_sellable_is_no_holdings() {
+        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.SELL, "50", OrderType.MOC), "87.12", 0)).reason())
+                .isEqualTo(DcaSkipReason.NO_HOLDINGS);
+    }
+
+    @Test
     void fitBuysToBudget_shrinks_by_cap_price() {
         PlannedOrder buy = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 20,
                 new BigDecimal("105"), OrderTiming.AT_CLOSE, "DCA_BUY");

@@ -42,20 +42,20 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null);
         }
         DcaConfig c = in.config();
+        boolean sell = c.direction() == OrderDirection.SELL;
+        // skip 우선순위(spec 9장): DATA_UNAVAILABLE → NO_HOLDINGS(SELL) → BELOW_ONE_SHARE
+        if (sell && in.sellableQuantity() == null) {
+            return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "판매가능수량 조회 실패", prevClose);
+        }
+        if (sell && in.sellableQuantity() <= 0) {
+            return new DcaDecision.Skipped(DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", prevClose);
+        }
         int quantity = c.amountUsd().divide(prevClose, 0, RoundingMode.FLOOR).intValueExact();
         if (quantity == 0) {
             return new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE,
                     "회차 금액 " + c.amountUsd().stripTrailingZeros().toPlainString() + " < 전일 종가 " + prevClose.toPlainString(), prevClose);
         }
-        if (c.direction() == OrderDirection.SELL) {
-            if (in.sellableQuantity() == null) {
-                return new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "판매가능수량 조회 실패", prevClose);
-            }
-            if (in.sellableQuantity() <= 0) {
-                return new DcaDecision.Skipped(DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", prevClose);
-            }
-            quantity = Math.min(quantity, in.sellableQuantity()); // 보유 부족 → 보유 전량
-        }
+        if (sell) quantity = Math.min(quantity, in.sellableQuantity()); // 보유 부족 → 보유 전량
         // BUY는 캡 지정가(LOO/LOC로 접수), SELL은 시장가라 가격은 기준가 기록용
         BigDecimal price = c.direction() == OrderDirection.BUY ? PriceCapPolicy.capFor(prevClose) : prevClose;
         PlannedOrder order = PlannedOrder.of(in.tradeDate(), in.ticker(), c.orderType(), c.direction(),

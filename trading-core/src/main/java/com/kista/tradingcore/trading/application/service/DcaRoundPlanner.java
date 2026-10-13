@@ -51,19 +51,26 @@ class DcaRoundPlanner {
         DcaConfig config = dcaDetailPort.findActiveByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("DCA 설정이 없습니다: " + strategy.id()));
 
+        if (dcaExecutionPort.find(strategy.id(), tradeDate).isPresent()) return Optional.empty(); // 이미 판정됨
+
         // 주문 저장 후 이력 기록 전 중단된 재개 — 기존 DCA 주문으로 ORDERED 복구 (다른 timing 배치에서도 복구되도록 timing 판정보다 먼저)
         Optional<Order> existing = existingOrders.stream().filter(o -> config.orderLeg().equals(o.orderLeg())).findFirst();
         if (existing.isPresent()) {
-            if (dcaExecutionPort.find(strategy.id(), tradeDate).isEmpty()) {
-                recorder.recordOrdered(ctx, tradeDate, existing.get(), null);
-            }
+            recorder.recordOrdered(ctx, tradeDate, existing.get(), null);
             return Optional.empty();
         }
 
         if (!creatableTimings.contains(config.timing())) return Optional.empty();
         LocalDate usSession = marketCalendarPort.usSessionDateOf(tradeDate);
         if (!DcaSchedule.isExecutionDay(usSession, config, marketCalendarPort::isUsSessionOpen)) return Optional.empty();
-        if (dcaExecutionPort.find(strategy.id(), tradeDate).isPresent()) return Optional.empty(); // 이미 판정됨
+
+        // PLANNED/PLACED 외 상태(FILLED 등)로 넘어간 당일 DCA 주문 — 이력만 누락된 경우 재주문하지 않고 복구
+        Optional<Order> terminal = orderPort.findByStrategyId(strategy.id(), tradeDate, tradeDate).stream()
+                .filter(o -> config.orderLeg().equals(o.orderLeg())).findFirst();
+        if (terminal.isPresent()) {
+            recorder.recordOrdered(ctx, tradeDate, terminal.get(), null);
+            return Optional.empty();
+        }
 
         DcaDecision decision = dcaStrategy.decide(new DcaCycleOrderStrategy.DcaInputs(config, strategy.ticker(), tradeDate,
                 loadPrevClose(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate)));

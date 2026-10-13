@@ -80,4 +80,21 @@ class TradingUserNotificationAdapterTest {
         String text = ((Map<String, String>) captor.getValue()).get("text");
         assertThat(text).contains("예수금 부족").contains("내계좌").contains("INFINITE").contains("SOXL");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyDcaRoundSkipped_bodyContainsReasonDirectionAndDetail() {
+        var event = new com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "내계좌", StrategyTicker.UPRO,
+                com.kista.shared.kernel.OrderDirection.SELL, java.time.LocalDate.of(2026, 10, 14),
+                com.kista.shared.kernel.DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주");
+
+        adapter.notifyDcaRoundSkipped(LINKED_PROFILE, event);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("DCA 미주문").contains("내계좌").contains("UPRO")
+                .contains("2026-10-14").contains("보유 수량 없음").contains("판매가능수량 0주");
+    }
 }

@@ -134,6 +134,21 @@ class DcaRoundPlannerTest {
     }
 
     @Test
+    void filled_dca_order_without_execution_row_recovers_ordered_and_plans_nothing() {
+        // PLANNED/PLACED 조회에는 안 잡히는 종결 상태(FILLED) 주문 — 이력 누락 재진입에서 2번째 주문을 만들면 안 된다
+        dca(OrderDirection.BUY, OrderType.MOC);
+        Order filled = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
+                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", 3, new BigDecimal("91.48"),
+                OrderStatus.FILLED, "E1", 3, new BigDecimal("88.00"));
+        when(orderPort.findByStrategyId(ctx.strategy().id(), TRADE_DATE, TRADE_DATE)).thenReturn(List.of(filled));
+
+        assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of())).isEmpty();
+
+        verify(recorder).recordOrdered(ctx, TRADE_DATE, filled, null);
+        verifyNoInteractions(candlePort);
+    }
+
+    @Test
     void existing_open_order_is_recovered_even_in_close_batch() {
         // MOO 주문 저장 후 이력 기록 전 중단 — 마감 배치(AT_CLOSE)에서도 ORDERED 복구되어야 이력이 누락되지 않는다
         dca(OrderDirection.BUY, OrderType.MOO);

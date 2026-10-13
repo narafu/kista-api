@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import com.kista.shared.kernel.StrategyType;
 
-// trading이 발행하는 관리자/사용자 알림 이벤트 6종이 TradingNotifyPort/TradingUserNotificationPort로 정확히 라우팅되는지 검증
+// trading이 발행하는 관리자/사용자 알림 이벤트 7종이 TradingNotifyPort/TradingUserNotificationPort로 정확히 라우팅되는지 검증
 @ExtendWith(MockitoExtension.class)
 class TradingAlertNotifierTest {
 
@@ -119,5 +119,18 @@ class TradingAlertNotifierTest {
         notifier().onBatchInterrupted(new BatchInterruptedEvent(userId, accountId, accountNickname));
 
         verify(userNotificationPort).notifyBatchInterrupted(profile, accountNickname);
+    }
+
+    @Test
+    void onDcaRoundSkipped_userPath_callsUserNotificationPort() {
+        when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
+        var event = new com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent(
+                userId, UUID.randomUUID(), accountNickname, StrategyTicker.UPRO,
+                com.kista.shared.kernel.OrderDirection.BUY, java.time.LocalDate.of(2026, 10, 14),
+                com.kista.shared.kernel.DcaSkipReason.BELOW_ONE_SHARE, "x");
+
+        notifier().onDcaRoundSkipped(event);
+
+        verify(userNotificationPort).notifyDcaRoundSkipped(profile, event);
     }
 }

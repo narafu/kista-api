@@ -144,7 +144,11 @@ class TradingCandidatePlanner {
                 ? dcaRoundPlanner.plan(ctx, tradeDate, creatableTimings, existingOrders) // DCA는 판정·이력 기록 경로가 별도
                 : orderComputer.compute(balance, strategy, prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), price);
         if (planOpt.isEmpty()) {
-            log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
+            if (strategy.isDca()) {
+                log.debug("[{}] DCA 이번 배치 신규 주문 없음 (비실행일·다른 timing·판정 완료·skip)", account.nickname());
+            } else {
+                log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
+            }
             if (existingOrders.isEmpty()) return null;
             CycleState existingState = buildCycleStateFromExistingOrders(
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), true);
@@ -306,12 +310,13 @@ class TradingCandidatePlanner {
         }
 
         for (TradingOrderBudgetAllocator.Candidate approved : allocation.get().approved()) {
-            batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
+            Optional<BatchContext> savedCtx = batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
                 orderPlanner.savePlannedOrders(
                         approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
                 return approved.ctx();
-            }).ifPresent(saved::add);
-            if (approved.ctx().strategy().isDca() && saved.contains(approved.ctx())) {
+            });
+            savedCtx.ifPresent(saved::add);
+            if (savedCtx.isPresent() && approved.ctx().strategy().isDca()) {
                 recordDcaOrdered(approved.ctx(), tradeDate); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
             }
         }
