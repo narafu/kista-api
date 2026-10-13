@@ -18,7 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 // 중간 실패 시 전부 롤백되고 EPR이 이벤트 전체를 재시도한다(각 단계는 이미 지운 행을 건너뛰어 멱등).
 // 소프트 삭제 쿼리가 accounts를 user_id로 조인하므로 계좌는 하위 데이터 정리 뒤에 지운다.
 // 클래스 FQCN·메서드명은 EPR listener_id라 유지한다 — 바꾸면 미완료 row가 고아가 된다(docker-infra.md "배포 직전 EPR 정리 런북").
-// 빈 이름 명시 — finance 모듈에도 동명 클래스(com.kista.finance.adapter.out.UserCascadeListener)가 있어
+// 빈 이름 명시 — finance 모듈에도 동명 클래스(com.kista.api.finance.adapter.out.UserCascadeListener)가 있어
 // 컴포넌트 스캔 기본 빈 이름('userCascadeListener')이 충돌한다.
 @Component("tradingUserCascadeListener")
 @RequiredArgsConstructor

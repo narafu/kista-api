@@ -1,4 +1,4 @@
-// trading-core 앱셸 — root com.kista.web과 대칭인 프로세스 부팅·전역 web 관심사 모듈:
+// trading-core 앱셸 — root com.kista.api.web과 대칭인 프로세스 부팅·전역 web 관심사 모듈:
 // 프로세스 전역 예외→HTTP 매핑(TradingExceptionHandler).
 // CLOSED이되 NamedInterface 0개 — 아무 모듈도 tradingweb을 참조하지 않는 sink라 모든 trading-core 모듈에 의존해도
 // 순환에 참여할 수 없다(root web과 동일 원칙).

@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 // root market 모듈(공포탐욕지수)이 marketcalendar 값을 직접 참조하지 않도록 하는 내부 전용 엔드포인트 —
-// com.kista.market.adapter.out.internal.MarketCalendarQueryHttpAdapter가 소비
+// com.kista.api.market.adapter.out.internal.MarketCalendarQueryHttpAdapter가 소비
 @Tag(name = "내부 API", description = "서버 간 내부 호출 전용 엔드포인트 (X-Internal-Token 인증)")
 @RestController
 @RequestMapping("/api/internal/marketcalendar")

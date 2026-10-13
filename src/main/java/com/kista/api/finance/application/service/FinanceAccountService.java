@@ -1,0 +1,104 @@
+package com.kista.api.finance.application.service;
+
+import com.kista.api.finance.domain.model.FinanceAccount;
+import com.kista.api.finance.domain.model.FinanceAccountCommand;
+import com.kista.api.finance.application.usecase.FinanceAccountUseCase;
+import com.kista.api.finance.application.port.output.AssetSnapshotPort;
+import com.kista.api.finance.application.port.output.FinanceAccountPort;
+import com.kista.api.finance.application.port.output.FinanceGroupPort;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional
+class FinanceAccountService implements FinanceAccountUseCase {
+
+    private final FinanceAccountPort accountPort;
+    private final FinanceGroupPort financeGroupPort;
+    private final AssetSnapshotPort assetSnapshotPort;
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FinanceAccount> list(UUID userId) {
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return accountPort.findMyScope(userId, currentGroupId);
+    }
+
+    // 신규 등록은 기본 개인 소유. shareToGroup=true면 등록자의 현재 그룹 소유로 원자적 생성.
+    @Override
+    public FinanceAccount create(UUID userId, boolean shareToGroup, FinanceAccountCommand command) {
+        if (command.accountNo() != null && accountPort.existsByAccountNo(command.accountNo(), null)) {
+            throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
+        }
+        // 대상 그룹은 클라가 아닌 서버가 현재 그룹으로 해석 — 단건 share PATCH와 동일 모델
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        GroupShareSupport.requireGroupIfSharing(shareToGroup, currentGroupId);
+        UUID ownerGroupId = shareToGroup ? currentGroupId : null;
+        FinanceAccount account = new FinanceAccount(null, ownerGroupId, userId, command.accountType(),
+                command.name(), command.accountNo(), command.memo(), command.institution(), command.owner(), null);
+        FinanceAccount saved = accountPort.save(account);
+        log.info("계좌 등록: userId={}, accountId={}", userId, saved.id());
+        return saved;
+    }
+
+    @Override
+    public FinanceAccount update(UUID accountId, UUID userId, FinanceAccountCommand command) {
+        // findByIdOrThrow(삭제된 계좌도 조회됨)를 쓰면 안 됨 — FinanceAccount에 deletedAt이 없어
+        // save() merge 시 삭제 상태가 조용히 풀려버린다(코드리뷰에서 발견, 2026-08-19).
+        FinanceAccount existing = FinanceAccessSupport.loadAccessible(
+                accountPort::findActiveByIdOrThrow, accountId, userId, financeGroupPort);
+        if (command.accountNo() != null && accountPort.existsByAccountNo(command.accountNo(), accountId)) {
+            throw new FinanceAccount.DuplicateAccountNoException(command.accountNo());
+        }
+        FinanceAccount updated = new FinanceAccount(existing.id(), existing.groupId(), existing.userId(),
+                command.accountType(), command.name(), command.accountNo(), command.memo(),
+                command.institution(), command.owner(), existing.createdAt());
+        return accountPort.save(updated);
+    }
+
+    @Override
+    public void delete(UUID accountId, UUID userId) {
+        FinanceAccount existing = FinanceAccessSupport.loadAccessible(
+                accountPort::findByIdOrThrow, accountId, userId, financeGroupPort);
+        if (assetSnapshotPort.existsByAccountId(accountId)) {
+            throw new FinanceAccount.LinkedAssetSnapshotsException();
+        }
+        accountPort.softDelete(accountId);
+        log.info("계좌 삭제: accountId={}, userId={}", accountId, userId);
+    }
+
+    // 개인 소유 계좌를 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
+    @Override
+    public FinanceAccount shareToGroup(UUID accountId, UUID userId) {
+        FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
+        return GroupShareSupport.shareToGroup(existing, userId, financeGroupPort.findCurrentGroupId(userId),
+                        "본인 소유 계좌만 그룹에 공유할 수 있습니다")
+                .map(shared -> {
+                    FinanceAccount saved = accountPort.save(shared);
+                    log.info("계좌 그룹 공유 전환: accountId={}, groupId={}", accountId, saved.groupId());
+                    return saved;
+                })
+                .orElse(existing);
+    }
+
+    // 그룹 공유 계좌를 개인 소유로 되돌린다. 소유자는 그대로 유지, groupId만 null로.
+    @Override
+    public FinanceAccount unshare(UUID accountId, UUID userId) {
+        FinanceAccount existing = accountPort.findActiveByIdOrThrow(accountId);
+        UUID currentGroupId = financeGroupPort.findCurrentGroupId(userId).orElse(null);
+        return GroupShareSupport.unshare(existing, userId, currentGroupId)
+                .map(personal -> {
+                    FinanceAccount saved = accountPort.save(personal);
+                    log.info("계좌 그룹 공유 해제: accountId={}, userId={}", accountId, userId);
+                    return saved;
+                })
+                .orElse(existing);
+    }
+}

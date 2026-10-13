@@ -1,0 +1,59 @@
+package com.kista.api.support;
+
+import com.kista.api.notify.domain.model.NotificationRecipient;
+import com.kista.api.user.domain.model.User;
+import com.kista.shared.kernel.NotificationChannel;
+
+import java.time.Instant;
+import java.util.UUID;
+import com.kista.shared.kernel.UserRole;
+import com.kista.shared.kernel.UserStatus;
+
+// 테스트 공용 도메인 fixture — User record 필드 변경 시 이 파일만 수정
+public final class DomainFixtures {
+
+    private DomainFixtures() {}
+
+    // 기본 ACTIVE 사용자 (텔레그램 미설정, 알림채널 지정 가능)
+    public static User activeUser(UUID id, NotificationChannel channel) {
+        return userWithStatus(id, UserStatus.ACTIVE, UserRole.USER, channel, null);
+    }
+
+    // 스케쥴러 테스트용 — 알림채널 TELEGRAM 고정 (도메인 실제 기본값은 User.DEFAULT_CHANNEL=NONE, 혼동 방지용으로 이름에 명시)
+    public static User activeUserWithTelegram(UUID id) {
+        return activeUser(id, NotificationChannel.TELEGRAM);
+    }
+
+    // status만 파라미터화 (role=USER, channel=TELEGRAM, lastReappliedAt=null 고정) — kakaoId/nickname 기본값 유지
+    public static User userWithStatus(UUID id, UserStatus status) {
+        return userWithStatus(id, status, UserRole.USER, NotificationChannel.TELEGRAM, null);
+    }
+
+    // status + role 파라미터화 (channel=TELEGRAM, lastReappliedAt=null 고정)
+    public static User userWithStatus(UUID id, UserStatus status, UserRole role) {
+        return userWithStatus(id, status, role, NotificationChannel.TELEGRAM, null);
+    }
+
+    // status + lastReappliedAt 파라미터화 (쿨다운 테스트용 — role=USER, channel=TELEGRAM 고정)
+    public static User userWithStatus(UUID id, UserStatus status, Instant lastReappliedAt) {
+        return userWithStatus(id, status, UserRole.USER, NotificationChannel.TELEGRAM, lastReappliedAt);
+    }
+
+    // 전체 파라미터화 — kakaoId/nickname은 "kakao-1"/"홍길동" 기본값 고정, 나머지 필드 커스터마이즈
+    public static User userWithStatus(UUID id, UserStatus status, UserRole role,
+                                       NotificationChannel channel, Instant lastReappliedAt) {
+        return new User(id, "kakao-1", "홍길동", null, status, role,
+                null, null, null, null, lastReappliedAt, channel);
+    }
+
+    // 텔레그램 설정된 사용자 — 알림 어댑터 테스트용 (botUsername은 null 고정)
+    public static User telegramUser(UUID id, String botToken, String chatId) {
+        return activeUser(id, NotificationChannel.TELEGRAM).withTelegram(botToken, chatId, null);
+    }
+
+    // User → NotificationRecipient 투영 — 알림 어댑터/리마인더의 변환과 동일 필드 매핑 (record 동등성으로 verify)
+    public static NotificationRecipient recipientOf(User user) {
+        return new NotificationRecipient(user.id(), user.nickname(), user.notificationChannel(),
+                user.telegramBotToken(), user.telegramChatId(), user.rejectReason());
+    }
+}

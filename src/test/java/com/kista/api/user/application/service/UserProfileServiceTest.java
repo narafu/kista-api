@@ -1,0 +1,103 @@
+package com.kista.api.user.application.service;
+
+import com.kista.api.user.domain.model.User;
+import com.kista.api.user.application.port.output.TelegramBotInfoPort;
+import com.kista.api.user.application.port.output.UserPort;
+import com.kista.api.support.DomainFixtures;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import com.kista.shared.kernel.NotificationChannel;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("UserProfileService 단위 테스트")
+class UserProfileServiceTest {
+
+    @Mock UserPort userPort;
+    @Mock TelegramBotInfoPort telegramBotInfoPort;
+    @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
+
+    @InjectMocks UserProfileService userProfileService;
+
+    private User user(UUID id) {
+        return DomainFixtures.activeUser(id, NotificationChannel.NONE);
+    }
+
+    @Test
+    @DisplayName("텔레그램 설정 시 봇 username 검증 후 저장")
+    void updateTelegram_validatesAndSaves() {
+        UUID userId = UUID.randomUUID();
+        when(telegramBotInfoPort.getUsername("bot-token")).thenReturn("kista_bot");
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userProfileService.updateTelegram(userId, "bot-token", "chat-1");
+
+        // 채널 NONE 사용자가 봇을 연결하면 채널이 TELEGRAM으로 — 고르지 않아도 매매 리포트가 텔레그램으로 온다
+        verify(userPort).save(argThat(u -> "bot-token".equals(u.telegramBotToken())
+                && "chat-1".equals(u.telegramChatId())
+                && u.notificationChannel() == NotificationChannel.TELEGRAM));
+        verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> "bot-token".equals(u.telegramBotToken())));
+    }
+
+    @Test
+    @DisplayName("텔레그램 해제 시 봇 토큰/채팅 ID null 저장")
+    void removeTelegram_clears() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userProfileService.removeTelegram(userId);
+
+        verify(userPort).save(argThat(u -> u.telegramBotToken() == null && u.telegramChatId() == null));
+        verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> u.telegramBotToken() == null));
+    }
+
+    @Test
+    @DisplayName("알림 채널 변경 시 저장")
+    void updateNotificationChannel_saves() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userProfileService.updateNotificationChannel(userId, NotificationChannel.FCM);
+
+        verify(userPort).save(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
+        // 매매 알림도 채널을 따르므로 kista-trading 복제본에 전달
+        verify(userNotifyProfilePublisher).publishStatusChanged(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
+    }
+
+    @Test
+    @DisplayName("텔레그램 해제 시 채널에서 텔레그램을 뺀다 — ALL이면 FCM")
+    void removeTelegram_dropsTelegramFromChannel() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(DomainFixtures.activeUser(userId, NotificationChannel.ALL));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userProfileService.removeTelegram(userId);
+
+        verify(userPort).save(argThat(u -> u.notificationChannel() == NotificationChannel.FCM));
+    }
+
+    @Test
+    @DisplayName("닉네임 변경 시 strip 후 저장")
+    void updateNickname_stripsAndSaves() {
+        UUID userId = UUID.randomUUID();
+        when(userPort.findByIdOrThrow(userId)).thenReturn(user(userId));
+        when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        userProfileService.updateNickname(userId, "  새닉네임  ");
+
+        verify(userPort).save(argThat(u -> "새닉네임".equals(u.nickname())));
+    }
+}

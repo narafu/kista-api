@@ -1,0 +1,17 @@
+package com.kista.api.finance.application.port.output;
+
+import com.kista.api.finance.domain.model.MonthlyClosing;
+
+import java.util.List;
+import java.util.UUID;
+
+public interface MonthlyClosingPort {
+    // currentGroupId는 무그룹 유저면 null(개인 마감 이력만 조회).
+    List<MonthlyClosing> findMyScope(UUID userId, UUID currentGroupId);
+
+    // (group_id, month) 유니크 제약 위 upsert — 어댑터가 ON CONFLICT로 race 없이 처리
+    MonthlyClosing upsert(UUID groupId, UUID userId, String month, boolean completed);
+
+    // 현재 그룹 있으면 그룹 마감, 없으면 개인 마감의 completed 여부. 행 없으면 false.
+    boolean isMonthClosed(UUID currentGroupId, UUID userId, String month);
+}

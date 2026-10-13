@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 // root market 모듈이 broker.CandlePort를 직접 참조하지 않도록 하는 내부 전용 엔드포인트 —
-// com.kista.market.adapter.out.internal.CandleQueryHttpAdapter가 소비
+// com.kista.api.market.adapter.out.internal.CandleQueryHttpAdapter가 소비
 @Tag(name = "내부 API", description = "서버 간 내부 호출 전용 엔드포인트 (X-Internal-Token 인증)")
 @RestController
 @RequestMapping("/api/internal/broker/candles")

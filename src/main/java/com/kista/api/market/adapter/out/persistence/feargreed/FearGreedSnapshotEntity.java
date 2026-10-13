@@ -1,0 +1,56 @@
+package com.kista.api.market.adapter.out.persistence.feargreed;
+
+import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
+import com.kista.api.market.domain.model.FearGreedRating;
+import com.kista.api.market.domain.model.FearGreedSnapshot;
+import jakarta.persistence.*;
+import org.hibernate.annotations.UuidGenerator;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(
+    name = "fear_greed_snapshots",
+    schema = "kista_ref",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_fear_greed_source_date",
+        columnNames = {"source", "snapshot_date"}
+    )
+)
+@Getter
+@NoArgsConstructor
+class FearGreedSnapshotEntity extends BaseCreatedAtEntity {
+
+    @Id
+    @UuidGenerator(style = UuidGenerator.Style.VERSION_7) // 시간순 UUID v7 — 인덱스 끝에 append
+    private UUID id;
+
+    @Column(name = "source", nullable = false, length = 20)
+    private String source; // "CRYPTO" | "CNN"
+
+    @Column(name = "snapshot_date", nullable = false)
+    private Instant snapshotDate;
+
+    @Column(name = "value", nullable = false)
+    private int value; // 0-100
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rating", nullable = false, length = 20)
+    private FearGreedRating rating;
+
+    static FearGreedSnapshotEntity from(FearGreedSnapshot snapshot) {
+        FearGreedSnapshotEntity entity = new FearGreedSnapshotEntity();
+        entity.source       = snapshot.source();
+        entity.snapshotDate = snapshot.snapshotDate();
+        entity.value        = snapshot.value();
+        entity.rating       = snapshot.rating();
+        return entity;
+    }
+
+    FearGreedSnapshot toDomain() {
+        return new FearGreedSnapshot(id, source, snapshotDate, value, rating, createdAt);
+    }
+}

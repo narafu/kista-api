@@ -1,0 +1,22 @@
+package com.kista.api.finance.application.usecase;
+
+import com.kista.api.finance.domain.model.FinanceBudget;
+import com.kista.api.finance.domain.model.FinanceBudgetCommand;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+public interface FinanceBudgetUseCase {
+    List<FinanceBudget> list(UUID userId, UUID categoryId, LocalDate date);
+    // shareToGroup=true면 소유자의 현재 그룹 소유로, false면 개인 소유로 원자적 생성한다.
+    FinanceBudget create(UUID userId, boolean shareToGroup, FinanceBudgetCommand command);
+    FinanceBudget update(UUID budgetId, UUID userId, FinanceBudgetCommand command);
+    void delete(UUID budgetId, UUID userId);
+
+    // 개인 소유 예산을 소유자의 현재 그룹으로 공유 전환한다.
+    FinanceBudget shareToGroup(UUID budgetId, UUID userId);
+
+    // 그룹 공유 예산을 개인 소유로 되돌린다. 같은 그룹 멤버면 누구든 가능(소유자 한정 아님).
+    FinanceBudget unshare(UUID budgetId, UUID userId);
+}

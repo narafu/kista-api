@@ -1,0 +1,51 @@
+package com.kista.api.admin.adapter.in.web;
+
+import com.kista.shared.platform.security.InternalTokenAuthFilter;
+import com.kista.shared.platform.security.JwtAuthFilter;
+import com.kista.shared.platform.security.SecurityConfig;
+import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
+import com.kista.shared.platform.security.TokenBlacklistPort;
+import com.kista.api.admin.application.usecase.RuntimeSettingsUseCase;
+import com.kista.api.admin.application.port.output.AppErrorLogPort;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import com.kista.api.web.RootSecurityPolicy;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@WebMvcTest(RuntimeConfigController.class)
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Execution(ExecutionMode.SAME_THREAD)
+class RuntimeConfigControllerTest {
+
+    @Autowired MockMvc mockMvc;
+    @MockitoBean RuntimeSettingsUseCase runtimeSettingsUseCase; // 공개 설정 조회 대역
+    @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean TokenBlacklistPort tokenBlacklistPort;
+    @MockitoBean AppErrorLogPort appErrorLogPort;
+
+    @Test
+    void getRuntimeConfig_isPublicAndDisablesCaching() throws Exception {
+        when(runtimeSettingsUseCase.getSettings()).thenReturn(RuntimeSettingsBundle.defaults());
+
+        mockMvc.perform(get("/api/runtime-config"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.auth.approvalRequired").value(true))
+                .andExpect(jsonPath("$.brokers.KIS.enabled").value(true))
+                .andExpect(jsonPath("$.strategies.INFINITE.fields.divisionCount.allowedValues[2]").value(40))
+                .andExpect(jsonPath("$.strategies.VR.fields.recurringMode.defaultValue").value("HOLD"))
+                .andExpect(jsonPath("$.strategies.INFINITE.fields.recurringMode").doesNotExist())
+                .andExpect(jsonPath("$.strategies.PRIVACY.fields.divisionCount").doesNotExist())
+                .andExpect(jsonPath("$.strategies.PRIVACY.fields.bandWidth").doesNotExist());
+    }
+}
