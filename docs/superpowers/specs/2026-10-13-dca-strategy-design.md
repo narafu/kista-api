@@ -358,7 +358,10 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 - `dayOfWeek`: `MONDAY`~`FRIDAY`(java `DayOfWeek` 이름). 주말은 거부한다.
 - 설정 수정: `PUT /api/trading-cycles/{id}/dca-config`(본문은 위 `dca` 객체와 같음)
   - 티커와 방향은 바꿀 수 없다. 방향을 바꾸면 매수/매도 동시 등록 규칙을 우회하게 되므로, 다르게 보내면 400.
-- 검증 실패는 400 ProblemDetail. 같은 계좌·티커·방향의 DCA가 이미 있으면 409(기존 중복 등록 코드와 동일 계열).
+- 검증 실패는 400 ProblemDetail.
+- 같은 계좌·티커·방향의 DCA가 이미 있으면 기존 종목 중복 등록과 같은 경로를 탄다. `IllegalStateException`은 공통 매핑에 따라 400("Invalid State")이 되고, `code`는 없다.
+  - detail: "같은 계좌·종목에 같은 방향의 DCA 전략이 이미 있습니다."
+  - 비DCA 중복의 기존 detail은 "이미 해당 종목으로 등록된 전략이 있습니다: {ticker}"이며 바꾸지 않는다.
 
 ### 7.2 조회 응답
 
@@ -418,19 +421,38 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 
 ### 7.4 메타 API (`GET /api/meta`)
 
-`StrategyCapability`에 필드를 추가한다. 기존 필드는 유지한다.
+`StrategyCapability`에 필드 4개를 추가한다. 기존 필드는 유지한다. `StrategyTypeMeta`에는 `availableTickers`와 같은 레벨로 평탄하게 노출하며, 값은 code 문자열 배열이다. 기존 전략은 모두 `[]`.
 
-- `orderTypes: List<OrderType>`: DCA는 `[MOO, MOC]`. 기존 전략은 빈 목록(사용자 선택 없음).
-- `directions: List<OrderDirection>`: DCA는 `[BUY, SELL]`. 기존 전략은 빈 목록.
-- `frequencies: List<DcaFrequency>`: DCA는 전체. 기존 전략은 빈 목록.
-- `conditionIndicators: List<DcaIndicator>`: DCA는 전체. 기존 전략은 빈 목록.
-- 추가 enum 메타(label/description): `DcaFrequency`, `DcaIndicator`(SMA 기간 옵션 `[20, 50, 120, 200]` 포함), `DcaOperator`, `DcaSkipReason`, `OrderType.MOO`
-- DCA의 `divisionCounts`는 `[]`, `supportsReverseMode`는 false, `requiresPrivacyBase`는 false.
+| 필드 | DCA 값 |
+|---|---|
+| `orderTypes` | `["MOO","MOC"]` |
+| `directions` | `["BUY","SELL"]` |
+| `frequencies` | `["DAILY","WEEKLY","MONTHLY"]` |
+| `conditionIndicators` | `["AVG_PRICE","SMA","RSI","FEAR_GREED"]` |
+
+DCA의 `divisionCounts`는 `[]`, `supportsReverseMode`와 `requiresPrivacyBase`는 false다.
+
+`MetaBundle` 최상위에 키를 추가한다. 기존 키 뒤에 붙인다.
+
+- `orderTypes: EnumMeta[]` — LOC, MOC, LIMIT, MOO 전체
+- `orderDirections: EnumMeta[]` — BUY("매수"), SELL("매도")
+- `dcaFrequencies: EnumMeta[]` — DAILY("매일"), WEEKLY("매주"), MONTHLY("매월")
+- `dcaOperators: EnumMeta[]` — LTE("이하"), LT("미만"), GTE("이상"), GT("초과")
+- `dcaSkipReasons: EnumMeta[]` — DATA_UNAVAILABLE("데이터 확보 실패"), CONDITION_NOT_MET("조건 미충족"), NO_HOLDINGS("보유 수량 없음"), INSUFFICIENT_BALANCE("예수금 부족"), BELOW_ONE_SHARE("1주 미만 금액")
+- `dcaIndicators: DcaIndicatorMeta[]` — `{code, label, description, smaPeriods}`
+  - `smaPeriods`는 SMA만 `[20,50,120,200]`이고, 나머지는 `[]`.
+  - label: AVG_PRICE("평단가"), SMA("이동평균선"), RSI("RSI(14)"), FEAR_GREED("공포탐욕지수(CNN)")
+  - `smaPeriods` 값의 SSOT는 `DcaIndicator.SMA_PERIODS` 상수(shared.kernel)로 두고, 등록 검증도 같은 상수를 쓴다.
+
+EnumMeta label은 각 enum의 `label` 필드가 SSOT다. 위 한국어 값은 그 초기값이다.
 - openapi는 `ErrorCodeOpenApiCustomizer`/springdoc 자동 반영이므로 UI는 `gen:types`로 받는다.
 
 ### 7.5 기존 엔드포인트의 DCA 처리
 
 - `/execute`(수동 실행), 미리보기: DCA면 409. 신규 `ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED`.
+  - detail: "DCA 전략은 바로 주문과 미리보기를 지원하지 않습니다."
+  - 계좌 단위 미리보기(`previewBatch`)는 409로 막지 않고 DCA 전략만 결과에서 제외한다. 같은 계좌의 다른 전략 미리보기까지 막지 않기 위함이다.
+- 브로커 정보는 `TradingCycleResponse`에 추가하지 않는다. `accountId`로 계좌 응답(`AccountResponse.broker`)을 참조한다.
 - `/pause`, `/resume`, 삭제: 기존 그대로. 일시정지·삭제 시 미체결 주문 취소 경로도 기존 그대로다.
 
 ## 8. 아키텍처 배치 요약
