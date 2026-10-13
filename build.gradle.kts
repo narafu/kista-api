@@ -90,10 +90,6 @@ dependencies {
     testImplementation(libs.spring.boot.resttestclient)
     testImplementation(libs.spring.boot.http.client)
     testImplementation(libs.spring.boot.restclient)
-    // Testcontainers — @DataJpaTest + PostgreSQL 통합 테스트 (*IT.java)
-    testImplementation(libs.spring.boot.testcontainers)
-    testImplementation(libs.testcontainers.junit.jupiter)
-    testImplementation(libs.testcontainers.postgresql)
     // Spring Modulith 테스트 지원 (ApplicationModuleTest) + 모듈 구조 다이어그램 생성
     testImplementation(libs.spring.modulith.starter.test)
     testImplementation(libs.spring.modulith.docs)
@@ -120,7 +116,7 @@ allprojects {
 
 tasks.named<Test>("test") {
     useJUnitPlatform {
-        // Docker/Testcontainers 필요 테스트는 기본 test 태스크에서 제외 — 별도 integration 태스크 사용
+        // 로컬 PostgreSQL·Redis 필요 테스트는 기본 test 태스크에서 제외 — 별도 integration 태스크 사용
         excludeTags("integration")
     }
     maxHeapSize = "2g" // Boot 4 테스트 슬라이스 세분화로 캐시되는 ApplicationContext 수 증가 — 기본 힙으로 OOM 발생
@@ -133,10 +129,10 @@ tasks.named<Test>("test") {
     inputs.file("deploy/server/caddy/kista-api.caddy")
 }
 
-// Docker + Testcontainers 통합 테스트 전용 태스크 — ./gradlew integration
+// 로컬 PostgreSQL·Redis(docker compose) 필요 통합 테스트 전용 태스크 — ./gradlew integration
 tasks.register<Test>("integration") {
     group = "verification"
-    description = "Testcontainers PG 통합 테스트 (*IT.java)"
+    description = "로컬 PostgreSQL·Redis 필요 통합 테스트 (*IT.java, @Tag(\"integration\"))"
     useJUnitPlatform {
         includeTags("integration")
     }

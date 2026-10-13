@@ -67,9 +67,6 @@ dependencies {
     testImplementation(libs.spring.boot.starter.data.jpa.test)
     testImplementation(libs.spring.boot.starter.webmvc.test) // @WebMvcTest for controller tests
     testImplementation(libs.spring.boot.starter.security.test) // @WebMvcTest SecurityFilterChain auto-detection (Boot 4 requirement)
-    testImplementation(libs.spring.boot.testcontainers)
-    testImplementation(libs.testcontainers.junit.jupiter)
-    testImplementation(libs.testcontainers.postgresql)
     testImplementation(libs.spring.security.test) // SecurityMockMvcRequestPostProcessors
 
     // testFixtures — DataJpaTestBase/WebMvcTestSupport/TradingFixtures + application-test.yml (루트 :api도 소비)

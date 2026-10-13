@@ -6,7 +6,6 @@ springdoc                = "3.1.1"
 lombok                   = "1.18.48"
 firebase-admin           = "9.11.0"
 gson                     = "2.14.0"
-testcontainers           = "1.21.4"
 # Spring Modulith — 2.x가 Boot 4/Spring Framework 7 baseline (Boot 자체 BOM은 버전 미관리, 별도 BOM platform import 필요). 2.1.1이 최신 GA(2.2.0-M1은 마일스톤)
 spring-modulith           = "2.1.1"
 
@@ -52,10 +51,6 @@ spring-boot-starter-jdbc-test      = { module = "org.springframework.boot:spring
 spring-boot-resttestclient          = { module = "org.springframework.boot:spring-boot-resttestclient" } # TestRestTemplate 제공
 spring-boot-http-client             = { module = "org.springframework.boot:spring-boot-http-client" } # TestRestTemplate이 참조하는 ClientHttpRequestFactoryBuilder
 spring-boot-restclient              = { module = "org.springframework.boot:spring-boot-restclient" } # TestRestTemplate이 참조하는 RestTemplateBuilder
-# Testcontainers — Boot 4 BOM이 더 이상 버전 관리하지 않아 직접 핀
-spring-boot-testcontainers     = { module = "org.springframework.boot:spring-boot-testcontainers" }
-testcontainers-junit-jupiter   = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
-testcontainers-postgresql      = { module = "org.testcontainers:postgresql", version.ref = "testcontainers" }
 
 # Firebase
 firebase-admin                 = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
