@@ -89,4 +89,29 @@ class DcaScheduleTest {
     void next_returns_empty_when_calendar_unknown() {
         assertThat(DcaSchedule.nextExecutionDay(LocalDate.of(2026, 10, 1), monthly(1), d -> false)).isEmpty();
     }
+
+    @Test
+    void nextExecutionDay_probesEachDateAtMostOnce() {
+        java.util.Map<LocalDate, Integer> calls = new java.util.HashMap<>();
+        Predicate<LocalDate> open = d -> {
+            calls.merge(d, 1, Integer::sum);
+            return d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY;
+        };
+
+        assertThat(DcaSchedule.nextExecutionDay(LocalDate.of(2026, 10, 14), monthly(null), open))
+                .contains(LocalDate.of(2026, 10, 30));
+        assertThat(calls.values()).allMatch(n -> n == 1);
+    }
+
+    @Test
+    void nextExecutionDay_stopsEarlyWhenCalendarMissing() {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        Predicate<LocalDate> neverOpen = d -> {
+            calls.incrementAndGet();
+            return false;
+        };
+
+        assertThat(DcaSchedule.nextExecutionDay(LocalDate.of(2027, 1, 4), monthly(null), neverOpen)).isEmpty();
+        assertThat(calls.get()).isLessThanOrEqualTo(20);
+    }
 }

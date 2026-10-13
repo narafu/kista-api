@@ -2072,7 +2072,7 @@ class StrategyServiceTest {
     // DCA 등록 성공 경로 공통 stub — 잔고·시세 검증을 건너뛰므로 사용자 프로필·마진·시세 stub은 없다(strict stubs)
     private void stubDcaRegistration(StrategyTicker ticker) {
         UUID cycleId = UUID.randomUUID();
-        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
                 new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
                 null, null, null, null)));
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -2086,6 +2086,7 @@ class StrategyServiceTest {
         when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
         when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
         when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
     }
 
     @Test
@@ -2106,7 +2107,7 @@ class StrategyServiceTest {
         assertThat(detail.dca().nextKstTradeDate()).isNotNull();
         assertThat(detail.initialUsdDeposit()).isEqualByComparingTo("0");
         // DCA는 잔고 검증·시세 조회·사용자 프로필 조회를 하지 않는다
-        verifyNoInteractions(marginPort, brokerPricePort, tradingUserProfilePort);
+        verifyNoInteractions(marginPort, brokerPricePort);
     }
 
     @Test
@@ -2206,5 +2207,21 @@ class StrategyServiceTest {
         assertThat(detail.dca().lastExecution()).isEqualTo(last);
         assertThat(detail.dca().nextKstTradeDate()).isNotNull();
         assertThat(detail.currentRound()).isNull();
+    }
+
+    @Test
+    @DisplayName("DCA 등록도 사용자 프로필(복제본)이 없으면 거부한다")
+    void register_dca_rejectsWhenProfileMissing() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.BUY))))
+                .isInstanceOf(java.util.NoSuchElementException.class);
+        verify(strategyPort, never()).save(any());
     }
 }

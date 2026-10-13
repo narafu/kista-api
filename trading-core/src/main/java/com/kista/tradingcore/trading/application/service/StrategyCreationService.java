@@ -69,7 +69,7 @@ class StrategyCreationService {
         // 종목 중복 + 잔고 검증
         validateUniqueTicker(accountId, resolvedTicker, cmd);
         BigDecimal initialUsdDeposit = dca ? BigDecimal.ZERO : cmd.initialUsdDeposit(); // DCA는 예수금 시드 없음
-        if (!dca) validateBalanceIfRequired(account, accountId, userId, initialUsdDeposit);
+        validateBalanceIfRequired(account, accountId, userId, initialUsdDeposit, !dca);
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         BigDecimal marketPrice = initialHoldings > 0 ? fetchMarketPrice(account, resolvedTicker) : null;
@@ -216,10 +216,11 @@ class StrategyCreationService {
     }
 
     // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
-    private void validateBalanceIfRequired(Account account, UUID accountId, UUID userId, BigDecimal initialUsdDeposit) {
+    private void validateBalanceIfRequired(Account account, UUID accountId, UUID userId, BigDecimal initialUsdDeposit,
+                                           boolean compareFreeCash) {
         TradingUserProfile userProfile = tradingUserProfilePort.findByUserId(userId) // 사용자 존재 확인 겸용
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-        if (userProfile.balanceCheckEnabled() && initialUsdDeposit != null) {
+        if (compareFreeCash && userProfile.balanceCheckEnabled() && initialUsdDeposit != null) {
             BigDecimal freeCash = calcFreeCash(account, accountId);
             if (initialUsdDeposit.compareTo(freeCash) > 0) {
                 throw new IllegalArgumentException(

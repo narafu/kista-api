@@ -567,4 +567,15 @@ class ManualTradingServiceTest {
                 .isInstanceOf(DcaManualExecutionUnsupportedException.class);
         verifyNoInteractions(strategyCyclePort, orderExecutor);
     }
+
+    @Test
+    void execute_pausedDca_stillThrowsManualExecutionUnsupported() {
+        Strategy dca = new Strategy(STRATEGY.id(), ACCOUNT.id(), StrategyType.DCA,
+                StrategyStatus.PAUSED, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(dca.id())).thenReturn(dca);
+        when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
+
+        assertThatThrownBy(() -> service.execute(dca.id(), REQUESTER_ID))
+                .isInstanceOf(DcaManualExecutionUnsupportedException.class);
+    }
 }

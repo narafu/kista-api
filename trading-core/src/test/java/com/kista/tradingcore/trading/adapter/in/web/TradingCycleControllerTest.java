@@ -1,5 +1,12 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
+import com.kista.shared.kernel.DcaFrequency;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.trading.domain.model.DcaSummary;
+import org.mockito.ArgumentCaptor;
+import static org.assertj.core.api.Assertions.assertThat;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
 import com.kista.tradingcore.trading.domain.model.ManualTradingException;
@@ -393,15 +400,15 @@ class TradingCycleControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    private static final com.kista.tradingcore.matching.domain.model.DcaConfig DCA_CONFIG =
-            new com.kista.tradingcore.matching.domain.model.DcaConfig(com.kista.shared.kernel.OrderDirection.BUY,
-                    new BigDecimal("300"), com.kista.shared.kernel.OrderType.MOC, com.kista.shared.kernel.DcaFrequency.MONTHLY, null, null);
+    private static final DcaConfig DCA_CONFIG =
+            new DcaConfig(OrderDirection.BUY,
+                    new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY, null, null);
 
     private StrategyDetail dcaDetail() {
         Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
         return new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.of(2026, 10, 20), null, false, null, 0, null,
-                new com.kista.tradingcore.trading.domain.model.DcaSummary(DCA_CONFIG,
+                new DcaSummary(DCA_CONFIG,
                         LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null));
     }
 
@@ -424,9 +431,9 @@ class TradingCycleControllerTest {
                 .andExpect(jsonPath("$.dca.nextExecution.kstTradeDate").value("2026-10-31"))
                 .andExpect(jsonPath("$.dca.lastExecution").doesNotExist())
                 .andExpect(jsonPath("$.todayOpenBatchMissed").value(false));
-        org.mockito.ArgumentCaptor<RegisterStrategyCommand> captor = org.mockito.ArgumentCaptor.forClass(RegisterStrategyCommand.class);
+        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
         verify(tradingCycle).register(any(), any(), captor.capture());
-        org.assertj.core.api.Assertions.assertThat(captor.getValue().dca()).isEqualTo(DCA_CONFIG);
+        assertThat(captor.getValue().dca()).isEqualTo(DCA_CONFIG);
     }
 
     @Test
