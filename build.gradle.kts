@@ -133,6 +133,9 @@ tasks.named<Test>("test") {
 tasks.register<Test>("integration") {
     group = "verification"
     description = "로컬 PostgreSQL·Redis 필요 통합 테스트 (*IT.java, @Tag(\"integration\"))"
+    // Gradle 9부터 직접 등록한 Test 태스크는 test 소스셋을 자동으로 쓰지 않는다 — 생략하면 NO-SOURCE로 조용히 통과
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
     useJUnitPlatform {
         includeTags("integration")
     }
