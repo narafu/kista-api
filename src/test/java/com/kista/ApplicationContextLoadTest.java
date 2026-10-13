@@ -6,7 +6,13 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,4 +41,26 @@ class ApplicationContextLoadTest {
         // "정상 부팅" 검증은 충분하다.
         assertThat(context.getBeanDefinitionNames()).isNotEmpty();
     }
+
+    @Test
+    void 루트_컨텍스트는_JPA_리포지토리_전부와_보안_필터체인_하나만_갖고_trading_core_빈은_없다() {
+        // 리포지토리 스캔 범위 회귀 가드 — RootJpaScanConfig 제거 후에도 같은 수여야 한다
+        assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(ROOT_JPA_REPOSITORIES);
+        // shared 자동구성 순서 회귀 가드 — Boot 기본 필터 체인이 함께 등록되면 2개가 된다
+        assertThat(context.getBeanNamesForType(SecurityFilterChain.class)).hasSize(1);
+        // root 테스트 classpath에 trading-core가 있어도 컨텍스트에 섞이지 않는다
+        assertThat(Arrays.stream(context.getBeanDefinitionNames())
+                .map(context::getType)
+                .filter(Objects::nonNull)
+                .map(Class::getPackageName)
+                .filter(p -> TRADING_CORE_PACKAGES.stream().anyMatch(p::startsWith)))
+                .isEmpty();
+    }
+
+    private static final int ROOT_JPA_REPOSITORIES = 21; // 실측값(grep·테스트 일치)
+    // trading-core 소유 패키지 — 패키지 이동 후 com.kista.tradingcore 하나로 줄어든다
+    private static final List<String> TRADING_CORE_PACKAGES = List.of(
+            "com.kista.trading.", "com.kista.tradingstats.", "com.kista.tradingnotify.", "com.kista.tradingweb.",
+            "com.kista.matching.", "com.kista.broker.", "com.kista.account.", "com.kista.privacy.",
+            "com.kista.marketcalendar.");
 }

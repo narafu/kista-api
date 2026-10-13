@@ -4,6 +4,7 @@
 // HexagonalArchitectureTest.platform_must_not_depend_on_other_modules가 outbound-zero를 강제한다
 // — sharedkernel과 동일하게 "OPEN은 outbound-zero를 증명할 때만 안전" 원칙.
 @org.springframework.modulith.ApplicationModule(
+    id = "platform",
     type = org.springframework.modulith.ApplicationModule.Type.OPEN
 )
 package com.kista.platform;

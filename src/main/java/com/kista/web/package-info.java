@@ -8,6 +8,7 @@
 // CLOSED이되 NamedInterface 0개 — 컨트롤러/@ControllerAdvice는 아무 모듈도 참조하지 않으므로
 // 모든 모듈 NamedInterface로 fan-out해도 순환에 참여 불가(sink 모듈).
 @org.springframework.modulith.ApplicationModule(
+    id = "web",
     type = org.springframework.modulith.ApplicationModule.Type.CLOSED
 )
 package com.kista.web;

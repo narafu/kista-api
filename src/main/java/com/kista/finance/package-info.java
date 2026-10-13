@@ -1,3 +1,3 @@
 // finance 애그리게이트(가계부) 모듈 — domain.model·application.usecase·application.port.output·application.event만 공개 계약, application.service·adapter는 internal.
-@org.springframework.modulith.ApplicationModule
+@org.springframework.modulith.ApplicationModule(id = "finance")
 package com.kista.finance;

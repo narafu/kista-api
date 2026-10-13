@@ -2,5 +2,5 @@
 // 라이브 실행(trading)과 백테스트(tradingstats) 두 소비자가 공유. domain-only(레이어 서브구조·adapter 없음),
 // outbound 엣지는 sharedkernel뿐(HexagonalArchitectureTest.matching_must_not_depend_on_other_modules 강제).
 // "kernel" NamedInterface로 domain.model + domain.strategy 병합 공개.
-@org.springframework.modulith.ApplicationModule
+@org.springframework.modulith.ApplicationModule(id = "matching")
 package com.kista.matching;

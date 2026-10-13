@@ -37,6 +37,7 @@ spring:
     default-schema: trading             # 서비스 소유 스키마여야 baseline 판정(비어있음 여부)이 정확하다 — 설계 문서 "실측 근거"
 
   modulith:
+    detection-strategy: explicitly-annotated   # @ApplicationModule(id) 붙은 패키지만 모듈 — 패키지 깊이와 무관하게 ID 고정
     events:
       jdbc:
         schema: trading                 # trading 전용 event_publication — root(public)와 분리

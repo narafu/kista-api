@@ -6,6 +6,7 @@
 // 필드 이름·타입을 바꾸면 wire 계약이 바뀐다(두 프로세스가 독립 배포되므로 expand/contract 순서를 지킬 것).
 // Type.OPEN이되 InternalApiContractTest·HexagonalArchitectureTest.contract_must_not_depend_on_other_modules가 outbound를 강제한다.
 @org.springframework.modulith.ApplicationModule(
+    id = "contract",
     type = org.springframework.modulith.ApplicationModule.Type.OPEN
 )
 package com.kista.contract;

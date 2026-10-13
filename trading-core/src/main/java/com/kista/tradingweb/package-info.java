@@ -5,6 +5,7 @@
 // 라우트 정책 기여 없음 — 이 프로세스의 모든 라우트가 인증 필수 또는 /api/internal/** 이라 platform.security.SecurityConfig의
 // 공통 규칙(내부/관리자/anyRequest authenticated)만으로 충분하다(SecurityRoutePolicy 빈이 없어도 무해).
 @org.springframework.modulith.ApplicationModule(
+    id = "tradingweb",
     type = org.springframework.modulith.ApplicationModule.Type.CLOSED
 )
 package com.kista.tradingweb;

@@ -11,5 +11,5 @@
 // adapter/in/redis/AppErrorStreamConsumer. 옛 adapter/out/aop/ErrorLogAspect(NotifyPort.notifyError 문자열 포인트컷 —
 // 정적 분석 사각지대의 admin→notify 런타임 결합)는 2026-09-30 이벤트 경로로 대체돼 삭제됐다(@Aspect는
 // HexagonalArchitectureTest.no_aspects_in_codebase가 저장소 전체에서 금지).
-@org.springframework.modulith.ApplicationModule
+@org.springframework.modulith.ApplicationModule(id = "admin")
 package com.kista.admin;

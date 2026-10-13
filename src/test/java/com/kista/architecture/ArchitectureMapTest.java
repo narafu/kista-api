@@ -1,6 +1,5 @@
 package com.kista.architecture;
 
-import com.kista.KistaApplication;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +34,7 @@ class ArchitectureMapTest {
                     assertThat(j.times()).containsExactly("04:30");
                 });
 
-        var modules = ModuleGraphExporter.graph(ApplicationModules.of(KistaApplication.class));
+        var modules = ModuleGraphExporter.graph(ApplicationModules.of("com.kista"));
         // 단계 code: 클래스는 전부 모듈 소속이어야 하고, 오버레이 회귀 가드 — 마감 배치 락 단계는 trading을 거친다
         var moduleNames = modules.stream().map(ModuleGraphExporter.Module::name).collect(Collectors.toSet());
         assertThat(ArchitectureMapExporter.moduleViolations(map, classes, moduleNames)).isEmpty();
