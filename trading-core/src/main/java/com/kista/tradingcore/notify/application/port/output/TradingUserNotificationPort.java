@@ -6,6 +6,8 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.domain.model.TradingReport;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 
+import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
+
 import java.math.BigDecimal;
 
 // root UserNotificationPort의 매매 관련 8개 메서드를 trading-core 소유로 재정의 — User 도메인 객체
@@ -22,4 +24,6 @@ public interface TradingUserNotificationPort {
     void notifyBatchInterrupted(TradingUserProfile profile, String accountNickname);
     void notifyMarketOpen(TradingUserProfile profile);
     void notifyMarketClose(TradingUserProfile profile);
+    // DCA 회차 미주문 사용자 알림
+    void notifyDcaRoundSkipped(TradingUserProfile profile, DcaRoundSkippedEvent event);
 }

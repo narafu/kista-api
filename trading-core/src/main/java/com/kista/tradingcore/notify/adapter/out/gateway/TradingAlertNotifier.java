@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingNotifyPort;
 import com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort;
 import com.kista.tradingcore.trading.application.event.BatchInterruptedEvent;
+import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.MarketClosedEvent;
 import com.kista.tradingcore.trading.application.event.MarketCloseEvent;
@@ -63,6 +64,11 @@ public class TradingAlertNotifier {
     @TransactionalEventListener(fallbackExecution = true)
     public void onMarketClose(MarketCloseEvent event) {
         userNotificationPort.notifyMarketClose(TradingUserProfiles.requireProfile(userProfilePort, event.userId()));
+    }
+
+    @TransactionalEventListener(fallbackExecution = true)
+    public void onDcaRoundSkipped(DcaRoundSkippedEvent event) {
+        userNotificationPort.notifyDcaRoundSkipped(TradingUserProfiles.requireProfile(userProfilePort, event.userId()), event);
     }
 
     @TransactionalEventListener(fallbackExecution = true)

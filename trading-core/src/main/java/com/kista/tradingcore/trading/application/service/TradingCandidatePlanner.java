@@ -10,6 +10,7 @@ import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
+import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
@@ -44,6 +45,8 @@ class TradingCandidatePlanner {
     private final ApplicationEventPublisher eventPublisher; // 예수금 부족 알림(InsufficientBalanceEvent)
     private final TradingBatchGuard batchGuard;
     private final AccountBudgetLock budgetLock;                 // 계좌별 배정~저장 직렬화 — 수동 실행·재캡과 같은 락
+    private final DcaRoundPlanner dcaRoundPlanner;              // DCA 회차 판정 (일반 전략의 orderComputer 대체 경로)
+    private final DcaExecutionRecorder dcaExecutionRecorder;    // DCA 회차 이력·skip 알림 기록
     private final TradingParallelRunner parallelRunner;         // 계좌별 조회+예산배정 병렬 실행
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
@@ -137,8 +140,9 @@ class TradingCandidatePlanner {
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), false);
             return new CyclePlanCandidate(existingState, List.of(), true);
         }
-        Optional<CycleOrderStrategy.OrderPlan> planOpt = orderComputer.compute(
-                balance, strategy, prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), price);
+        Optional<CycleOrderStrategy.OrderPlan> planOpt = strategy.isDca()
+                ? dcaRoundPlanner.plan(ctx, tradeDate, creatableTimings, existingOrders) // DCA는 판정·이력 기록 경로가 별도
+                : orderComputer.compute(balance, strategy, prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), price);
         if (planOpt.isEmpty()) {
             log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
             if (existingOrders.isEmpty()) return null;
@@ -148,9 +152,11 @@ class TradingCandidatePlanner {
         }
 
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
-        List<PlannedOrder> preparedOrders = priceCapper.prepareForAllocation(
-                planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
-                strategy.type(), tradeDate);
+        List<PlannedOrder> preparedOrders = strategy.isDca()
+                ? planOpt.get().orders() // DCA는 계획 시점 캡가 고정 — 현재가 기준 재캡 없음
+                : priceCapper.prepareForAllocation(
+                        planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
+                        strategy.type(), tradeDate);
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<PlannedOrder> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
@@ -223,9 +229,13 @@ class TradingCandidatePlanner {
             savedContexts.addAll(accountAllocation.savedContexts());
             TradingOrderBudgetAllocator.Allocation allocation = accountAllocation.allocation();
 
+            // DCA 거절은 잔고 부족 알림이 아니라 회차 skip 이력(+DCA 미주문 알림)으로 기록한다
+            recordDcaRejections(allocation.rejectedBuy(), tradeDate, DcaSkipReason.INSUFFICIENT_BALANCE, "예수금 부족(주문가능금액 < 1주 캡가)");
+            recordDcaRejections(allocation.rejectedSell(), tradeDate, DcaSkipReason.NO_HOLDINGS, "판매가능수량 부족");
             Set<BatchContext> rejectedContexts = Stream.concat(
                             allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
                     .map(TradingOrderBudgetAllocator.Candidate::ctx)
+                    .filter(ctx -> !ctx.strategy().isDca())
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             for (BatchContext ctx : rejectedContexts) {
                 batchGuard.runSafely("예수금 부족 알림", ctx, () -> {
@@ -238,6 +248,29 @@ class TradingCandidatePlanner {
         }
 
         return new SaveAllocationResult(Set.copyOf(savedContexts));
+    }
+
+    // 거절된 DCA 후보의 회차 skip 기록 — 기록 실패는 사이클 단위로 격리(다음 배치가 재판정)
+    private void recordDcaRejections(List<TradingOrderBudgetAllocator.Candidate> rejected, LocalDate tradeDate,
+                                     DcaSkipReason reason, String detail) throws InterruptedException {
+        for (TradingOrderBudgetAllocator.Candidate candidate : rejected) {
+            if (!candidate.ctx().strategy().isDca()) continue;
+            batchGuard.runSafely("DCA 미주문 기록", candidate.ctx(), () -> {
+                dcaExecutionRecorder.recordSkipped(candidate.ctx(), tradeDate, reason, detail, null);
+                return candidate.ctx();
+            });
+        }
+    }
+
+    // 저장된 DCA 주문을 조회해 ORDERED 이력 기록 — saveAll이 id를 돌려주지 않아 당일 PLANNED/PLACED에서 DCA leg로 찾는다
+    // reference_price는 null로 저장: 판정 기준가(전일 종가)가 OrderPlan으로 전달되지 않고, BUY 캡가 역산은 오해를 부른다(spec 7.3)
+    private void recordDcaOrdered(BatchContext ctx, LocalDate tradeDate) throws InterruptedException {
+        batchGuard.runSafely("DCA 회차 이력 기록", ctx, () -> {
+            orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate).stream()
+                    .filter(order -> order.orderLeg().startsWith("DCA_"))
+                    .forEach(order -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, order, null));
+            return ctx;
+        });
     }
 
     // 계좌 1개의 배정 결과와 저장 성공 사이클
@@ -278,6 +311,9 @@ class TradingCandidatePlanner {
                         approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
                 return approved.ctx();
             }).ifPresent(saved::add);
+            if (approved.ctx().strategy().isDca() && saved.contains(approved.ctx())) {
+                recordDcaOrdered(approved.ctx(), tradeDate); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
+            }
         }
         return Optional.of(new AccountAllocation(allocation.get(), saved));
     }

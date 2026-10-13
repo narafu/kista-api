@@ -17,6 +17,9 @@ import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
+import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
+import com.kista.tradingcore.broker.domain.model.BrokerBalance;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +30,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -43,6 +49,8 @@ class TradingReporter {
     private final OrderPort orderPort;                              // 주문 체결 상태 갱신
     private final CyclePositionPersistor cyclePositionPersistor;   // 포지션 스냅샷 저장 위임
     private final ApplicationEventPublisher eventPublisher;        // 리포트/SSE 알림 이벤트 발행
+    private final CycleOrderStrategies cycleStrategies;            // 전략별 포지션 기록 방식(snapshotsBrokerBalance) 조회
+    private final LiveBalancePort liveBalancePort;                 // DCA 브로커 실잔고 스냅샷
 
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
@@ -54,13 +62,23 @@ class TradingReporter {
 
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
+        boolean snapshots = cycleStrategies.of(strategy.type()).snapshotsBrokerBalance();
+        if (snapshots) {
+            // DCA: 같은 계좌·티커의 반대 방향 DCA 체결이 섞이지 않도록 자기 주문(externalOrderId) 체결만 사용
+            Set<String> ownIds = mainOrders.stream().map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
+            executions = executions.stream().filter(e -> ownIds.contains(e.externalOrderId())).toList();
+        }
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
         List<AccountBalance.Fill> fills = executions.stream()
                 .map(ExecutionFillMapper::toFill)
                 .toList();
-        AccountBalance postBalance = balance.applyExecutions(fills);
+        // DCA: 매수·매도 DCA가 한 포지션을 공유해 내부 원장 대신 브로커 실잔고 스냅샷 기록(spec 5.4) — usd_deposit은 0
+        // (calcFreeCash가 전략별 최신 cycle_position.usd_deposit을 점유 시드로 합산하므로 DCA는 시드를 점유하지 않는다)
+        AccountBalance postBalance = snapshots
+                ? liveSnapshot(ctx).orElseGet(() -> balance.applyExecutions(fills).withUsdDeposit(BigDecimal.ZERO))
+                : balance.applyExecutions(fills);
         cyclePositionPersistor.saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
 
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
@@ -74,6 +92,17 @@ class TradingReporter {
                 .toList();
         eventPublisher.publishEvent(new TradingReportReadyEvent(userProfile.userId(), account.id(), strategy.id(), account.nickname(), report, legs, reportEnabled));
         log.info("[{}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.nickname(), executions.size());
+    }
+
+    // 브로커 실잔고(보유·평단) 스냅샷 — 조회 실패 시 empty(호출부가 내부 원장 폴백)
+    private Optional<AccountBalance> liveSnapshot(BatchContext ctx) {
+        try {
+            BrokerBalance b = liveBalancePort.getLiveBalance(ctx.account().brokerRef(), ctx.strategy().ticker());
+            return Optional.of(new AccountBalance(b.holdings(), b.avgPrice(), BigDecimal.ZERO));
+        } catch (RuntimeException e) {
+            log.warn("[{}] 브로커 잔고 스냅샷 실패 — 내부 원장으로 폴백: {}", ctx.account().nickname(), e.getMessage());
+            return Optional.empty();
+        }
     }
 
     // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 이미 체결된 주문의 취소는 브로커가 거부(무시)한다.

@@ -83,6 +83,9 @@ public interface CycleOrderStrategy {
     // 계좌별 주문 예산 배정 우선순위 — 값이 작을수록 먼저 승인
     default int allocationPriority() { return 100; }
 
+    // 리포트 후 cycle_position을 내부 원장(applyExecutions) 대신 브로커 실잔고 스냅샷으로 기록할지 (DCA만 true — 매수·매도 DCA가 한 포지션 공유)
+    default boolean snapshotsBrokerBalance() { return false; }
+
     // 기존 주문만으로 오늘 생성 가능한 주문 슬롯이 모두 점유됐는지 여부
     // existingOrders: 호출부(TradingService)가 영속 Order를 Order::toPlanned로 강등해 전달한다
     default boolean canSkipOrderComputation(List<PlannedOrder> existingOrders, Set<OrderTiming> creatableTimings) {

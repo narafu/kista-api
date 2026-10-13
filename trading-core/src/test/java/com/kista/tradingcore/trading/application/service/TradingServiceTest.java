@@ -92,6 +92,8 @@ class TradingServiceTest {
     @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
     @Mock com.kista.tradingcore.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
     @Mock LiveBalancePort liveBalancePort;
+    @Mock DcaRoundPlanner dcaRoundPlanner; // DCA 경로 — 기존 시나리오는 DCA 전략이 없어 미사용
+    @Mock DcaExecutionRecorder dcaExecutionRecorder;
     @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingUserProfilePort tradingUserProfilePort;
     @Mock StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 조회 (CycleOrderComputer용)
@@ -172,7 +174,7 @@ class TradingServiceTest {
                 strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService, batchRunPort);
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, brokerOrderPort, orderPort,
-                positionPersistor, eventPublisher);
+                positionPersistor, eventPublisher, cycleStrategies, liveBalancePort);
         // 계좌 기준 테스트 — live 잔고 체크 시 liveBalancePort.getLiveBalance() 호출
         // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
         lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), any()))
@@ -210,7 +212,7 @@ class TradingServiceTest {
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
                 orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
-                budgetAllocator, balanceLoader, eventPublisher, batchGuard, budgetLock, new TradingParallelRunner(0));
+                budgetAllocator, balanceLoader, eventPublisher, batchGuard, budgetLock, dcaRoundPlanner, dcaExecutionRecorder, new TradingParallelRunner(0));
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
                 orderPort, strategyCyclePort,

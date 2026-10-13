@@ -8,6 +8,7 @@ import com.kista.tradingcore.trading.domain.model.TradingReport;
 import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort;
+import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -87,6 +88,18 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     @Override
     public void notifyMarketClose(TradingUserProfile profile) {
         notify(profile, "장 마감", "🔴 미국 장이 마감되었습니다.");
+    }
+
+    @Override
+    public void notifyDcaRoundSkipped(TradingUserProfile profile, DcaRoundSkippedEvent e) {
+        String direction = e.direction() == null ? "" : e.direction().getLabel() + " ";
+        String text = """
+                ⏭️ <b>DCA 미주문</b> — %s%n\
+                %s %sDCA (%s)%n\
+                사유: %s%s""".formatted(
+                e.accountNickname(), e.ticker().name(), direction, e.tradeDate(), e.reason().getLabel(),
+                e.detail() == null ? "" : " — " + e.detail());
+        notify(profile, "DCA 미주문", text);
     }
 
     // 텔레그램 직접 발송 + FCM은 root PushNotificationStreamConsumer(Redis Stream 구독)에 위임

@@ -9,4 +9,6 @@ import java.util.List;
 public interface CandlePort {
     List<BrokerCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to);
     List<BrokerCandle> getLatestCandles(String symbol, String interval, int count);
+    // beforeUsSession(미포함) 이전 확정 일봉 최대 count개, 오름차순 — 진행 중인 당일 봉 배제(DCA 전일 종가·지표 공용)
+    List<BrokerCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count);
 }

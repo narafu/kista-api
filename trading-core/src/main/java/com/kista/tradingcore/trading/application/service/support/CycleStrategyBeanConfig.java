@@ -4,6 +4,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.trading.domain.strategy.DcaCreationResolver;
 import com.kista.tradingcore.trading.domain.strategy.InfiniteCreationResolver;
+import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.trading.domain.strategy.PrivacyCreationResolver;
@@ -54,6 +55,9 @@ class CycleStrategyBeanConfig {
     VrCycleOrderStrategy vrCycleOrderStrategy(VrStrategy vrStrategy) {
         return new VrCycleOrderStrategy(vrStrategy);
     }
+
+    @Bean
+    DcaCycleOrderStrategy dcaCycleOrderStrategy() { return new DcaCycleOrderStrategy(); }
 
     // 전략 등록 시 런타임 설정 해석 리졸버 — 의존성 없음
     @Bean

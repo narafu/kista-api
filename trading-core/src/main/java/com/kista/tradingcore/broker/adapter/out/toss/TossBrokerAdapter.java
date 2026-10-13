@@ -80,6 +80,11 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
     }
 
     @Override
+    public List<BrokerCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count) {
+        return tossCandleApi.getDailyCandlesBefore(symbol, beforeUsSession, count).stream().map(TossCandle::toBrokerCandle).toList();
+    }
+
+    @Override
     public ExchangeRateQuote getExchangeRate() {
         return tossHoldingsApi.getExchangeRate().toExchangeRateQuote();
     }

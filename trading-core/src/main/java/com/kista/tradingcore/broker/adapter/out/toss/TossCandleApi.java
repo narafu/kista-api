@@ -51,6 +51,14 @@ class TossCandleApi {
         return fetchCandles(symbol, interval, clamped, null);
     }
 
+    // beforeUsSession 00:00 UTC 이전 봉만 요청 후 date < beforeUsSession 재필터 — 봉 date()는 US 세션일, fetchCandles가 오름차순 정렬
+    public List<TossCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count) {
+        String before = beforeUsSession.atStartOfDay(ZoneOffset.UTC).toString();
+        return fetchCandles(symbol, "1d", Math.clamp(count, 1, MAX_COUNT), before).stream()
+                .filter(c -> c.date().isBefore(beforeUsSession))
+                .toList();
+    }
+
     // before(exclusive 경계로 호출측에서 미리 보정된 시각) 이하 가장 최신 봉 1개만 조회 — 전일종가 확정 조회 전용
     public Optional<TossCandle> getCandleBefore(String symbol, String interval, Instant before) {
         List<TossCandle> candles = fetchCandles(symbol, interval, 1, before.toString());

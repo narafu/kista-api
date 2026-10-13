@@ -50,4 +50,24 @@ class TossCandleApiTest {
         // 정상 계산: calendarDays=40 -> count = 40*3/2+5 = 65 (버그 시 calendarDays=9 -> count=18)
         assertThat(paramsCaptor.getValue().getFirst("count")).isEqualTo("65");
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("일봉 이전 조회는 US 세션일 이후 봉을 제외하고 before를 세션일 00:00 UTC로 보낸다")
+    void getDailyCandlesBefore_excludesSessionAndLater() {
+        // 응답: 10-14(진행 중 세션), 10-13, 10-12 — 최신순
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(new TossResult<>(new TossCandleApi.CandlesResult(java.util.List.of(
+                        new TossCandleApi.CandleItem("2026-10-14T00:00:00Z", "1", "1", "1", "1", "1"),
+                        new TossCandleApi.CandleItem("2026-10-13T00:00:00Z", "1", "1", "1", "2", "1"),
+                        new TossCandleApi.CandleItem("2026-10-12T00:00:00Z", "1", "1", "1", "3", "1")))));
+
+        var result = tossCandleApi.getDailyCandlesBefore("UPRO", LocalDate.of(2026, 10, 14), 5);
+
+        assertThat(result).extracting(c -> c.date()).containsExactly(LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 13));
+        ArgumentCaptor<MultiValueMap<String, String>> paramsCaptor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient).getCommon(eq("/api/v1/candles"), paramsCaptor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(paramsCaptor.getValue().getFirst("before")).isEqualTo("2026-10-14T00:00Z");
+        assertThat(paramsCaptor.getValue().getFirst("count")).isEqualTo("5");
+    }
 }
