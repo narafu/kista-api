@@ -24,10 +24,10 @@ interface FinanceGroupMemberJpaRepository extends JpaRepository<FinanceGroupMemb
     @Modifying
     @Query(nativeQuery = true, value = """
             INSERT INTO finance_group_members (id, group_id, user_id, role, joined_at)
-            VALUES (gen_random_uuid(), :groupId, :userId, :role, now())
+            VALUES (:id, :groupId, :userId, :role, now())
             ON CONFLICT (group_id, user_id) WHERE deleted_at IS NULL DO NOTHING
             """)
-    void insertIfAbsent(@Param("groupId") UUID groupId, @Param("userId") UUID userId, @Param("role") String role);
+    void insertIfAbsent(@Param("id") UUID id, @Param("groupId") UUID groupId, @Param("userId") UUID userId, @Param("role") String role);
 
     @Modifying
     @Query("UPDATE FinanceGroupMemberEntity m SET m.deletedAt = :now WHERE m.groupId = :groupId AND m.userId = :userId")

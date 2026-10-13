@@ -4,6 +4,7 @@ import com.kista.finance.domain.model.FinanceGroup;
 import com.kista.finance.domain.model.FinanceGroupInvitation;
 import com.kista.finance.domain.model.FinanceGroupMember;
 import com.kista.finance.application.port.output.FinanceGroupPort;
+import com.kista.platform.persistence.UuidV7;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -69,7 +70,7 @@ public class FinanceGroupPersistenceAdapter implements FinanceGroupPort {
         // 못 막는 창구)의 최종 방어선. 트랜잭션이 이 지점에서 즉시 abort되므로 다음 문장을 실행하지 않고
         // 곧바로 도메인 예외로 변환해 던진다 — 어차피 join 실패는 전체 트랜잭션 롤백이 맞는 동작이다.
         try {
-            memberJpaRepository.insertIfAbsent(groupId, userId, role.name());
+            memberJpaRepository.insertIfAbsent(UuidV7.next(), groupId, userId, role.name());
         } catch (DataIntegrityViolationException e) {
             throw new FinanceGroup.MembershipConflictException("이미 다른 그룹에 소속되어 있습니다. 먼저 탈퇴해 주세요.", e);
         }

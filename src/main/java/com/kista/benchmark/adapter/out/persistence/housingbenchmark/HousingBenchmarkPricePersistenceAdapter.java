@@ -3,6 +3,7 @@ package com.kista.benchmark.adapter.out.persistence.housingbenchmark;
 import com.kista.benchmark.domain.model.HousingBenchmarkPrice;
 import com.kista.benchmark.domain.model.HousingBenchmarkRegion;
 import com.kista.benchmark.application.port.output.HousingBenchmarkPricePort;
+import com.kista.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ public class HousingBenchmarkPricePersistenceAdapter implements HousingBenchmark
         // batchUpdate로 1회 왕복으로 처리 (행마다 개별 update 제거)
         String sql = """
                 INSERT INTO housing_benchmark_prices (
+                    id,
                     source,
                     metric_code,
                     region_code,
@@ -38,7 +40,7 @@ public class HousingBenchmarkPricePersistenceAdapter implements HousingBenchmark
                     source_updated_date,
                     fetched_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (source, metric_code, region_code, base_month) DO UPDATE
                    SET region_name = EXCLUDED.region_name,
                        first_quintile_price = EXCLUDED.first_quintile_price,
@@ -53,19 +55,20 @@ public class HousingBenchmarkPricePersistenceAdapter implements HousingBenchmark
                 """;
 
         jdbcTemplate.batchUpdate(sql, prices, prices.size(), (ps, price) -> {
-            ps.setString(1, price.source());
-            ps.setString(2, price.metricCode());
-            ps.setString(3, price.regionCode());
-            ps.setString(4, price.regionName());
-            ps.setObject(5, price.baseMonth());
-            ps.setBigDecimal(6, price.firstQuintilePrice());
-            ps.setBigDecimal(7, price.secondQuintilePrice());
-            ps.setBigDecimal(8, price.thirdQuintilePrice());
-            ps.setBigDecimal(9, price.fourthQuintilePrice());
-            ps.setBigDecimal(10, price.fifthQuintilePrice());
-            ps.setBigDecimal(11, price.fifthQuintileRatio());
-            ps.setObject(12, price.sourceUpdatedDate());
-            ps.setTimestamp(13, Timestamp.from(price.fetchedAt()));
+            ps.setObject(1, UuidV7.next()); // PK — 충돌(update) 시엔 무시된다
+            ps.setString(2, price.source());
+            ps.setString(3, price.metricCode());
+            ps.setString(4, price.regionCode());
+            ps.setString(5, price.regionName());
+            ps.setObject(6, price.baseMonth());
+            ps.setBigDecimal(7, price.firstQuintilePrice());
+            ps.setBigDecimal(8, price.secondQuintilePrice());
+            ps.setBigDecimal(9, price.thirdQuintilePrice());
+            ps.setBigDecimal(10, price.fourthQuintilePrice());
+            ps.setBigDecimal(11, price.fifthQuintilePrice());
+            ps.setBigDecimal(12, price.fifthQuintileRatio());
+            ps.setObject(13, price.sourceUpdatedDate());
+            ps.setTimestamp(14, Timestamp.from(price.fetchedAt()));
         });
     }
 

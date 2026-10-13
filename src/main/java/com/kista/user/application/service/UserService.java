@@ -9,6 +9,7 @@ import com.kista.user.domain.auth.TokenConstants;
 import com.kista.user.domain.model.User;
 import com.kista.user.application.usecase.UserUseCase;
 import com.kista.user.application.port.output.*;
+import com.kista.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -73,7 +74,7 @@ class UserService implements UserUseCase {
             // 신규 사용자 등록 시도 (기존 사용자면 그대로 반환)
             // 외부 OAuth 호출이 끝난 뒤 프록시를 통해 가입 트랜잭션만 시작한다.
             user = userUseCaseProvider.getObject()
-                    .register(kakaoUser.kakaoId(), kakaoUser.nickname(), UUID.randomUUID(), kakaoUser.email());
+                    .register(kakaoUser.kakaoId(), kakaoUser.nickname(), UuidV7.next(), kakaoUser.email());
         } catch (DataIntegrityViolationException e) {
             // 동시 가입 경쟁 조건 → 기존 사용자 직접 조회 (self-invocation 방지)
             log.debug("중복 가입 시도 → 기존 사용자 반환: kakaoId={}", kakaoUser.kakaoId());

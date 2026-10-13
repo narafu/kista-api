@@ -1,6 +1,7 @@
 package com.kista.notify.adapter.out.persistence;
 
 import com.kista.notify.application.port.output.FcmDeviceTokenPort;
+import com.kista.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
@@ -18,7 +19,7 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     @Override
     @Transactional
     public void save(UUID userId, String token, String platform) {
-        repository.upsert(userId, token, normalizePlatform(platform));
+        repository.upsert(UuidV7.next(), userId, token, normalizePlatform(platform));
     }
 
     @Override

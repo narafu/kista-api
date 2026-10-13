@@ -32,7 +32,8 @@ class FcmDeviceTokenPersistenceAdapterTest {
 
         adapter.save(userId, "token-new", " web ");
 
-        verify(repository).upsert(userId, "token-new", "WEB");
+        // 신규 행 PK는 어댑터가 UUID v7로 만들어 넘긴다 (native upsert라 JPA 생성기를 못 탄다)
+        verify(repository).upsert(argThat(id -> id.version() == 7), eq(userId), eq("token-new"), eq("WEB"));
     }
 
     @Test

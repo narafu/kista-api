@@ -30,26 +30,26 @@ interface FinanceMonthlyClosingJpaRepository extends JpaRepository<FinanceMonthl
     // closed_at은 completed=true일 때 값을 갖고 false로 전환되면 NULL로 되돌린다.
     @Modifying
     @Query(value = """
-            INSERT INTO finance_monthly_closings (group_id, user_id, month, completed, closed_at)
-            VALUES (:groupId, :userId, :month, :completed, CASE WHEN :completed THEN now() END)
+            INSERT INTO finance_monthly_closings (id, group_id, user_id, month, completed, closed_at)
+            VALUES (:id, :groupId, :userId, :month, :completed, CASE WHEN :completed THEN now() END)
             ON CONFLICT (group_id, month) WHERE group_id IS NOT NULL
             DO UPDATE SET completed = excluded.completed,
                           user_id = excluded.user_id,
                           closed_at = excluded.closed_at,
                           updated_at = now()
             """, nativeQuery = true)
-    void upsertGroup(@Param("groupId") UUID groupId, @Param("userId") UUID userId,
+    void upsertGroup(@Param("id") UUID id, @Param("groupId") UUID groupId, @Param("userId") UUID userId,
             @Param("month") String month, @Param("completed") boolean completed);
 
     // 개인 마감(group_id IS NULL) 전용 — uq_finance_monthly_closings_personal_month(user_id, month) partial index 대상.
     @Modifying
     @Query(value = """
-            INSERT INTO finance_monthly_closings (group_id, user_id, month, completed, closed_at)
-            VALUES (NULL, :userId, :month, :completed, CASE WHEN :completed THEN now() END)
+            INSERT INTO finance_monthly_closings (id, group_id, user_id, month, completed, closed_at)
+            VALUES (:id, NULL, :userId, :month, :completed, CASE WHEN :completed THEN now() END)
             ON CONFLICT (user_id, month) WHERE group_id IS NULL AND user_id IS NOT NULL
             DO UPDATE SET completed = excluded.completed,
                           closed_at = excluded.closed_at,
                           updated_at = now()
             """, nativeQuery = true)
-    void upsertPersonal(@Param("userId") UUID userId, @Param("month") String month, @Param("completed") boolean completed);
+    void upsertPersonal(@Param("id") UUID id, @Param("userId") UUID userId, @Param("month") String month, @Param("completed") boolean completed);
 }

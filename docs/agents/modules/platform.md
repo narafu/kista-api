@@ -1,7 +1,7 @@
 ## com.kista.platform (`:shared`)
 
 com.kista.platform/  ← 전역 인프라 leaf 모듈. `@ApplicationModule(Type.OPEN)` — `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 outbound-zero를 강제(`com.kista.platform..` 외 `com.kista..` 전부 금지). Spring/JPA 바인딩이 있어 sharedkernel(순수 JDK)과 분리
-  persistence/   ← BaseAuditEntity(`createdAt`+`updatedAt`)/BaseCreatedAtEntity(`createdAt`만)/JpaAuditingConfig(`@EnableJpaAuditing` 단독 선언 — `@SpringBootApplication`에 두면 `@WebMvcTest` BeanCreationException). `@Setter(AccessLevel.PACKAGE)` 범위 주의 → constraints.md "Lombok @MappedSuperclass 상속 주의"
+  persistence/   ← BaseAuditEntity(`createdAt`+`updatedAt`)/BaseCreatedAtEntity(`createdAt`만)/`UuidV7.next()`(RFC 9562 v7 PK 생성 — JPA `@UuidGenerator(VERSION_7)`를 못 타는 native INSERT·도메인 부여 id(신규 사용자) 전용. DB 기본값 `gen_random_uuid()`는 v4라 native INSERT는 id를 직접 넘긴다)/JpaAuditingConfig(`@EnableJpaAuditing` 단독 선언 — `@SpringBootApplication`에 두면 `@WebMvcTest` BeanCreationException). `@Setter(AccessLevel.PACKAGE)` 범위 주의 → constraints.md "Lombok @MappedSuperclass 상속 주의"
   crypto/        ← AesCryptoService(AES-256, persistence 경계에서만 사용)/AccountNoHasher(계좌번호 결정론적 HMAC-SHA256 해시 — 전역 중복 체크용)/Sha256(RT 해시·Toss token fingerprint 공용)
   time/          ← UsTradeDates(KST↔US 거래일 단순 ±1 변환). 사용처는 `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`가 4클래스(KisTradingApi/KisPriceApi/TossPriceApi/MarketCalendarPersistenceAdapter)로 강제
   http/          ← HttpClientTimeouts(타임아웃 request factory — SimpleClient/JDK 2종)/`RestClients.withTimeouts([baseUrl,] connectMs, readMs)`(외부 API RestClient 공용 팩토리 — Alpaca 3개 Config(`benchmark`/`marketcalendar`/`tradingstats`, 빈 이름 `alpacaRestClient`/`marketAlpacaRestClient`/`tradingStatsAlpacaRestClient` 유지)와 Telegram이 한 줄로 사용)

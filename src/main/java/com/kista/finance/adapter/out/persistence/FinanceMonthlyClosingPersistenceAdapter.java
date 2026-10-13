@@ -2,6 +2,7 @@ package com.kista.finance.adapter.out.persistence;
 
 import com.kista.finance.domain.model.MonthlyClosing;
 import com.kista.finance.application.port.output.MonthlyClosingPort;
+import com.kista.platform.persistence.UuidV7;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -31,12 +32,12 @@ public class FinanceMonthlyClosingPersistenceAdapter implements MonthlyClosingPo
         // group_id IS NULL만으로 조회하면 유저 무관하게 매칭돼(다른 유저의 같은 달 개인 마감과 충돌)
         // 2건 이상 잡힐 수 있어 반드시 user_id까지 좁힌 전용 조회를 쓴다.
         if (groupId != null) {
-            jpaRepository.upsertGroup(groupId, userId, month, completed);
+            jpaRepository.upsertGroup(UuidV7.next(), groupId, userId, month, completed);
             return jpaRepository.findByGroupIdAndMonth(groupId, month)
                     .map(FinanceMonthlyClosingEntity::toDomain)
                     .orElseThrow(() -> new NoSuchElementException("월 마감 upsert 직후 조회 실패: " + groupId + "/" + month));
         }
-        jpaRepository.upsertPersonal(userId, month, completed);
+        jpaRepository.upsertPersonal(UuidV7.next(), userId, month, completed);
         return jpaRepository.findByUserIdAndGroupIdIsNullAndMonth(userId, month)
                 .map(FinanceMonthlyClosingEntity::toDomain)
                 .orElseThrow(() -> new NoSuchElementException("월 마감 upsert 직후 조회 실패: " + userId + "/" + month));

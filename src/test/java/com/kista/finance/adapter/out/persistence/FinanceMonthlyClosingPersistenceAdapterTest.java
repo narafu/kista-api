@@ -58,6 +58,8 @@ class FinanceMonthlyClosingPersistenceAdapterTest extends RootDataJpaTestBase {
         assertThat(result.completed()).isTrue();
         assertThat(result.userId()).isEqualTo(userId); // 소유자 축 — 마감 해제해도 null로 되돌지 않는다
         assertThat(result.closedAt()).isNotNull();
+        // native upsert도 DB 기본값(v4) 대신 어댑터가 넘긴 v7 PK로 저장된다
+        assertThat(result.id().version()).isEqualTo(7);
     }
 
     @Test
