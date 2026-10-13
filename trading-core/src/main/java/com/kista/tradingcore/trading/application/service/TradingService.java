@@ -284,7 +284,13 @@ class TradingService {
         TradingPriceFetcher.PriceContext priceCtx = screenPrivacyBase(priceFetcher.loadPriceContext(started, tradeDate), tradeDate, "개장 배치");
 
         // KIS DCA MOO/LOO는 개장 경매 참여를 위해 개장 전에 접수한다(spec 5.6) — 나머지 AT_OPEN은 개장 후 기존 흐름
-        placePreOpenDcaOrders(started, tradeDate, priceCtx);
+        try {
+            placePreOpenDcaOrders(started, tradeDate, priceCtx);
+        } catch (RuntimeException e) {
+            // 실패해도 INFINITE/VR 개장 접수를 막지 않는다 — DCA 컨텍스트는 개장 후 기존 흐름이 접수
+            log.error("KIS DCA 개장 전 접수 실패 — 개장 후 접수로 대체", e);
+            eventPublisher.publishEvent(new TradingErrorEvent(null, "[DCA 개장 전 접수] 실패 — 개장 후 접수로 대체: " + e.getMessage()));
+        }
 
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
@@ -320,6 +326,8 @@ class TradingService {
         runState.critical(() -> {
             checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.PLACING);
             planAndPlaceAtOpen(moo, tradeDate, priceCtx);
+            // 개장 대기 동안 PLACING이 남으면 재기동 재개가 접수 도중 중단 오경고를 내므로 STARTED로 되돌린다
+            checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
             return null;
         });
     }

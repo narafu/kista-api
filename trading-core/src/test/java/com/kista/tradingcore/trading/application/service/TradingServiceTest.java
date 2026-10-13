@@ -159,7 +159,7 @@ class TradingServiceTest {
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy),
                 new VrCycleOrderStrategy(vrStrategy),
-                new DcaCycleOrderStrategy())); // DCA 개장 전 접수 테스트용 — VR 전략 추가 — VR executeBatch 테스트용
+                new DcaCycleOrderStrategy())); // VR executeBatch 테스트용 · DCA 개장 전 접수 테스트용
         CycleOrderComputer orderComputer = new CycleOrderComputer(
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
@@ -851,6 +851,7 @@ class TradingServiceTest {
                 OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, 1, new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("DCA_BUY");
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(cycle.id()), any())).thenReturn(List.of(planned));
+        // 개장 후 두 번째 조회는 이미 PLACED 상태 — PLANNED만 접수하므로 재접수 대상이 아니다(어댑터 필터 동작을 stub으로 표현)
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(cycle.id()), any())).thenReturn(List.of(planned), List.of());
         return new BatchContext(dca, cycle, account, USER);
     }
@@ -874,7 +875,14 @@ class TradingServiceTest {
         InOrder inOrder = inOrder(brokerOrderPort, tradingUserProfilePort);
         inOrder.verify(brokerOrderPort).place(any(), eq(ACCOUNT_REF));
         inOrder.verify(tradingUserProfilePort).findAllActive();
-        verify(brokerOrderPort, times(1)).place(any(), eq(ACCOUNT_REF)); // 개장 후 흐름에서 중복 접수 없음
+        verify(brokerOrderPort, times(1)).place(any(), eq(ACCOUNT_REF));
+        // 체크포인트: 개장 전 접수 PLACING → 대기 중 STARTED 복귀 → 개장 후 PLACING → DONE
+        InOrder phases = inOrder(batchRunPort);
+        phases.verify(batchRunPort).recordPhase(any(), any(), eq(TradingBatchPhase.STARTED));
+        phases.verify(batchRunPort).recordPhase(any(), any(), eq(TradingBatchPhase.PLACING));
+        phases.verify(batchRunPort).recordPhase(any(), any(), eq(TradingBatchPhase.STARTED));
+        phases.verify(batchRunPort).recordPhase(any(), any(), eq(TradingBatchPhase.PLACING));
+        phases.verify(batchRunPort).recordPhase(any(), any(), eq(TradingBatchPhase.DONE));
     }
 
     @Test
@@ -889,6 +897,33 @@ class TradingServiceTest {
         inOrder.verify(tradingUserProfilePort).findAllActive();
         inOrder.verify(brokerOrderPort).place(any(), eq(toss.brokerRef()));
         verifyNoInteractions(dcaDetailPort); // KIS 외 브로커는 개장 전 접수 대상 판별 자체를 하지 않는다
+    }
+
+    @Test
+    void dca_pre_open_failure_is_reported_and_open_orders_still_placed() throws InterruptedException {
+        // 개장 전 DCA 단계 실패가 INFINITE 개장 접수를 막지 않아야 한다
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_OPEN, OrderDirection.SELL, 1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_OPEN_SELL");
+        Order sellPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, 1, new BigDecimal("25.00"),
+                OrderStatus.PLANNED, null, null, null);
+        stubOpenBatchBasics(ACCOUNT_REF);
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(sellTemplate.toPlanned()));
+        when(orderPort.findAtOpenPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(sellPlanned));
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(dcaDetailPort.findActiveByStrategyIds(anyCollection())).thenThrow(new IllegalStateException("db down"));
+        lenient().when(cycleHistoryPort.findLatestOneByStrategyId(dca.id())).thenReturn(Optional.of(NORMAL_HISTORY));
+
+        service.placeOpenOrders(List.of(
+                new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER),
+                new BatchContext(dca, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof TradingErrorEvent te && te.message().contains("DCA 개장 전 접수")));
+        verify(brokerOrderPort).place(any(), eq(ACCOUNT_REF));
     }
 
     @Test
