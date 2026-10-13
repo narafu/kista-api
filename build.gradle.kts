@@ -98,7 +98,7 @@ dependencies {
     testImplementation(libs.spring.modulith.starter.test)
     testImplementation(libs.spring.modulith.docs)
     // InvestmentPointsHttpAdapter 등 내부 API HTTP 어댑터 테스트용 (버전 카탈로그 미등록 — 단일 사용처라 직접 좌표 지정)
-    testImplementation("com.squareup.okhttp3:mockwebserver3:5.0.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver3:5.5.0")
 
     // testFixtures 소스셋 — DomainFixtures(User fixture)만 남음
     testFixturesImplementation(project(":shared")) // sharedkernel(UserRole/UserStatus) 접근

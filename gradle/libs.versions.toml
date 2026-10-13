@@ -1,10 +1,10 @@
 [versions]
 spring-boot              = "4.1.1"
 spring-dependency-mgmt   = "1.1.7"
-archunit                 = "1.5.0"
-springdoc                = "3.1.0"
-lombok                   = "1.18.46"
-firebase-admin           = "9.10.0"
+archunit                 = "1.5.1"
+springdoc                = "3.1.1"
+lombok                   = "1.18.48"
+firebase-admin           = "9.11.0"
 gson                     = "2.14.0"
 testcontainers           = "1.21.4"
 # Spring Modulith — 2.x가 Boot 4/Spring Framework 7 baseline (Boot 자체 BOM은 버전 미관리, 별도 BOM platform import 필요). 2.1.1이 최신 GA(2.2.0-M1은 마일스톤)
@@ -26,7 +26,7 @@ spring-boot-starter-flyway     = { module = "org.springframework.boot:spring-boo
 flyway-postgresql              = { module = "org.flywaydb:flyway-database-postgresql" }
 
 # API Documentation
-swagger-annotations            = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version = "2.2.52" } # shared contract 패키지의 @Schema용(springdoc 3.1.0이 끌어오는 버전과 동일)
+swagger-annotations            = { module = "io.swagger.core.v3:swagger-annotations-jakarta", version = "2.2.55" } # shared contract 패키지의 @Schema용(springdoc 3.1.1이 끌어오는 버전과 동일)
 springdoc-openapi-webmvc-ui    = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
 
 # Observability
