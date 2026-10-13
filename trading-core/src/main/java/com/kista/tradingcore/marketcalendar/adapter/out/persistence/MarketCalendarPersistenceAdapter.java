@@ -22,7 +22,11 @@ public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, Mar
     @Override
     public boolean isMarketOpen(LocalDate date) {
         // date는 KST 거래일 — 휴장일 테이블은 US 달력 기준이므로 변환 필수
-        LocalDate usDate = UsTradeDates.toUsTradeDate(date);
+        return isUsSessionOpen(UsTradeDates.toUsTradeDate(date));
+    }
+
+    @Override
+    public boolean isUsSessionOpen(LocalDate usDate) {
         if (usDate.getDayOfWeek() == DayOfWeek.SATURDAY || usDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
             return false;
         }
@@ -31,6 +35,16 @@ public class MarketCalendarPersistenceAdapter implements MarketCalendarPort, Mar
             return false;
         }
         return !holidayRepository.existsByTradeDate(usDate);
+    }
+
+    @Override
+    public LocalDate usSessionDateOf(LocalDate kstTradeDate) {
+        return UsTradeDates.toUsTradeDate(kstTradeDate);
+    }
+
+    @Override
+    public LocalDate kstTradeDateOf(LocalDate usSessionDate) {
+        return UsTradeDates.toKstTradeDate(usSessionDate);
     }
 
     @Override
