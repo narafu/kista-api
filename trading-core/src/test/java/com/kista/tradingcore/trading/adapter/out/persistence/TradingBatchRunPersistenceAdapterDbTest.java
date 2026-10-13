@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.support.DataJpaTestBase;
-import com.kista.tradingcore.support.TradingCoreJpaTestConfig;
 import com.kista.tradingcore.trading.domain.model.TradingBatchJob;
 import com.kista.tradingcore.trading.domain.model.TradingBatchPhase;
 import org.junit.jupiter.api.Test;
@@ -9,7 +8,6 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ContextConfiguration;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -19,7 +17,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 체크포인트 upsert·마커 멱등 insert 실 DB 왕복 검증
 @Import(TradingBatchRunPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD)
-@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class TradingBatchRunPersistenceAdapterDbTest extends DataJpaTestBase {
 
     private static final LocalDate DAY = LocalDate.of(2026, 10, 7);

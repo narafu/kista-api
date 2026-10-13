@@ -1,4 +1,4 @@
-package com.kista.tradingcore.web;
+package com.kista.tradingcore;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;

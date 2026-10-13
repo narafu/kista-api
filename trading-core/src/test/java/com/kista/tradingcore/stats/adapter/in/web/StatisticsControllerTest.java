@@ -1,8 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.support.StubBrokerApiException;
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.AccountStatisticsUseCase;
@@ -32,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(StatisticsController.class)
-@ContextConfiguration(classes = TradingApplication.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class StatisticsControllerTest {
 

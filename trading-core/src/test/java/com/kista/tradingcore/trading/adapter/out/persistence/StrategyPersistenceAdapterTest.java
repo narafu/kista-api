@@ -18,15 +18,12 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
-import com.kista.tradingcore.support.TradingCoreJpaTestConfig;
-import org.springframework.test.context.ContextConfiguration;
 
 @Import({
         StrategyPersistenceAdapter.class,
         StrategyInfiniteDetailPersistenceAdapter.class,
         StrategyVersionPersistenceAdapter.class
 })
-@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;

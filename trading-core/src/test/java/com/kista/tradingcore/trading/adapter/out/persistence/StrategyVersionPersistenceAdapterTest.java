@@ -14,8 +14,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import com.kista.tradingcore.support.TradingCoreJpaTestConfig;
-import org.springframework.test.context.ContextConfiguration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 // (CycleSnapshotCreator.reconfigureVrCycle이 "소프트 삭제 전에 nextVersionNo를 먼저 계산해야 하는" 이유)
 @Import(StrategyVersionPersistenceAdapter.class)
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
-@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;

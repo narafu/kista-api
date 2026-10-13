@@ -1,7 +1,7 @@
 package com.kista.shared.platform.scheduling;
 
 import com.kista.shared.support.DataJpaTestBase;
-import com.kista.tradingcore.support.TradingCoreJpaTestConfig;
+import com.kista.tradingcore.TradingApplication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // takeOver: 다른 owner의 미만료 락은 인수, 자기 owner 락은 인수 거부 (기동 직후 cron과의 이중 실행 방지)
 @Import(SchedulerLockService.class)
+@ContextConfiguration(classes = TradingApplication.class) // com.kista.shared 패키지라 @SpringBootConfiguration 상향 탐색이 TradingApplication에 닿지 않는다
 @Execution(ExecutionMode.SAME_THREAD)
-@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 class SchedulerLockServiceDbTest extends DataJpaTestBase {
 
     private static final String LOCK = "test-takeover-lock";

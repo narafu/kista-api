@@ -1,7 +1,5 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -35,7 +33,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PortfolioQueryInternalController.class)
-@ContextConfiguration(classes = TradingApplication.class)
 @Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
 @TestPropertySource(properties = "internal.api.token=test-internal-token")
 @Execution(ExecutionMode.SAME_THREAD)

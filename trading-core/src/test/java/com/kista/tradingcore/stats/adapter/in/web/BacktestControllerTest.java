@@ -1,7 +1,5 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
 import com.kista.tradingcore.stats.domain.model.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.model.backtest.BacktestResult;
@@ -38,7 +36,6 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 
 @WebMvcTest(BacktestController.class)
-@ContextConfiguration(classes = TradingApplication.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class BacktestControllerTest {
 

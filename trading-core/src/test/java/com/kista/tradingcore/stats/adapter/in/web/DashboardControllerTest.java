@@ -1,7 +1,5 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionSummary;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
@@ -30,7 +28,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DashboardController.class)
-@ContextConfiguration(classes = TradingApplication.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class DashboardControllerTest {
 

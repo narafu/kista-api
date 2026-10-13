@@ -1,7 +1,7 @@
 package com.kista.shared.platform.scheduling;
 
 import com.kista.shared.support.DataJpaTestBase;
-import com.kista.tradingcore.support.TradingCoreJpaTestConfig;
+import com.kista.tradingcore.TradingApplication;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // 배포 가드가 쓰는 "실행 중" 판정(lock_until > now() 이고 완료 기록이 없거나 이번 획득보다 이전)이 락 수명주기와 맞는지 검증
-@ContextConfiguration(classes = TradingCoreJpaTestConfig.class)
 @Import(SchedulerLockService.class)
+@ContextConfiguration(classes = TradingApplication.class) // com.kista.shared 패키지라 @SpringBootConfiguration 상향 탐색이 TradingApplication에 닿지 않는다
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class SchedulerLockServiceTest extends DataJpaTestBase {
 

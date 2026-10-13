@@ -44,12 +44,9 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 
 @WebMvcTest(TradingCycleController.class)
 @Execution(ExecutionMode.SAME_THREAD)
-@ContextConfiguration(classes = TradingApplication.class)
 class TradingCycleControllerTest {
 
     @Autowired MockMvc mockMvc;

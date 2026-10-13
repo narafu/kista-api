@@ -1,8 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.support.StubBrokerApiException;
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.shared.platform.security.TokenBlacklistPort;
@@ -32,7 +30,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TossStatisticsController.class)
-@ContextConfiguration(classes = TradingApplication.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class TossStatisticsControllerTest {
 

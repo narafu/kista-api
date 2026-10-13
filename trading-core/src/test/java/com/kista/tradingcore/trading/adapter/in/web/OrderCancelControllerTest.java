@@ -14,8 +14,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 
 import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +26,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(OrderCancelController.class)
 @Execution(ExecutionMode.SAME_THREAD)
-@ContextConfiguration(classes = TradingApplication.class)
 class OrderCancelControllerTest {
 
     @Autowired MockMvc mockMvc;

@@ -1,7 +1,5 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.web.TradingApplication;
-import org.springframework.test.context.ContextConfiguration;
 import com.kista.tradingcore.stats.domain.model.*;
 import com.kista.tradingcore.stats.application.usecase.TradingStatsUseCase;
 import com.kista.shared.platform.security.TokenBlacklistPort;
@@ -31,7 +29,6 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 
 @WebMvcTest(TradingStatsController.class)
-@ContextConfiguration(classes = TradingApplication.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class TradingStatsControllerTest {
 
