@@ -91,9 +91,33 @@ class TossCandleApiTest {
         assertThat(result).extracting(c -> c.date()).containsExactly(
                 LocalDate.of(2026, 10, 8), LocalDate.of(2026, 10, 9), LocalDate.of(2026, 10, 12), LocalDate.of(2026, 10, 13));
         ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
-        verify(tossHttpClient, org.mockito.Mockito.atLeast(2)).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
         assertThat(captor.getAllValues().get(1).getFirst("before")).isEqualTo("2026-10-12T00:00Z");
         assertThat(captor.getAllValues()).allSatisfy(p -> assertThat(p.getFirst("adjusted")).isEqualTo("true"));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("250봉 요청은 200봉 + 50봉 두 페이지로 채우고 오름차순으로 준다")
+    void paging_fills_250_candles_over_two_pages() {
+        LocalDate latest = LocalDate.of(2026, 10, 13);
+        // 최신 200봉(오름차순) → 그 이전 50봉(오름차순)
+        String[] newer = java.util.stream.IntStream.rangeClosed(0, 199).map(i -> 199 - i)
+                .mapToObj(i -> latest.minusDays(i).toString()).toArray(String[]::new);
+        String[] older = java.util.stream.IntStream.rangeClosed(200, 249).map(i -> 449 - i)
+                .mapToObj(i -> latest.minusDays(i).toString()).toArray(String[]::new);
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class))).thenReturn(page(newer), page(older));
+
+        var result = tossCandleApi.getDailyCandlesBefore("UPRO", LocalDate.of(2026, 10, 14), 250);
+
+        assertThat(result).hasSize(250);
+        assertThat(result.getFirst().date()).isEqualTo(latest.minusDays(249));
+        assertThat(result.getLast().date()).isEqualTo(latest);
+        assertThat(result).extracting(c -> c.date()).isSorted();
+        ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getAllValues().get(0).getFirst("count")).isEqualTo("200");
+        assertThat(captor.getAllValues().get(1).getFirst("count")).isEqualTo("50");
     }
 
     @SuppressWarnings("unchecked")

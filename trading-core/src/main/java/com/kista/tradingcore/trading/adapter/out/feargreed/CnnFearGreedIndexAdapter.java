@@ -39,7 +39,7 @@ class CnnFearGreedIndexAdapter implements FearGreedIndexPort {
                     .filter(p -> (long) p.x() % DAY_MS == 0)
                     .filter(p -> Instant.ofEpochMilli((long) p.x()).atZone(ZoneOffset.UTC).toLocalDate().equals(usSessionDate))
                     .map(p -> BigDecimal.valueOf(p.y()).setScale(2, RoundingMode.HALF_UP))
-                    .reduce((first, second) -> second);
+                    .reduce((first, second) -> second); // 같은 날 점이 여럿이면 마지막(가장 늦은) 값
             if (value.isEmpty()) log.warn("[DCA] CNN 공포탐욕지수 {} 일별 점 없음(피드 지연)", usSessionDate);
             return value;
         } catch (RuntimeException e) {

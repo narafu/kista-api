@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
+import jakarta.persistence.EntityManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager em;
     @Autowired StrategyDcaDetailPersistenceAdapter dcaDetail;
     @Autowired DcaExecutionPersistenceAdapter executions;
 
@@ -115,6 +117,23 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         dcaDetail.save(versionId, configWith(List.of(rsi("30.00"), rsi("40.00"))));
         dcaDetail.save(versionId, configWith(List.of(rsi("50.00"))));
         assertThat(dcaDetail.findActiveByStrategyId(strategyId).orElseThrow().conditions()).containsExactly(rsi("50.00"));
+    }
+
+    @Test
+    void save_returns_threshold_normalized_to_scale_2() {
+        // 입력 scale(0)이 달라도 save() 반환값은 조회와 같은 scale 2
+        DcaConfig saved = dcaDetail.save(versionId, configWith(List.of(rsi("35"))));
+        assertThat(saved.conditions().getFirst().threshold()).isEqualByComparingTo("35").hasScaleOf(2);
+        em.flush();
+        em.clear(); // 1차 캐시가 아닌 DB 재조회 값과 비교
+        assertThat(dcaDetail.findActiveByStrategyIds(List.of(strategyId)).get(strategyId)).isEqualTo(saved);
+    }
+
+    @Test
+    void find_by_empty_keys_returns_empty_map() {
+        assertThat(dcaDetail.findActiveByStrategyIds(List.of())).isEmpty();
+        // 활성 버전이 없는 전략 키도 빈 결과
+        assertThat(dcaDetail.findActiveByStrategyIds(List.of(UUID.randomUUID()))).isEmpty();
     }
 
     @Test

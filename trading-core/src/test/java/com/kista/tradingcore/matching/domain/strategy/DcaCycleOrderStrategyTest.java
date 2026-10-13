@@ -109,7 +109,7 @@ class DcaCycleOrderStrategyTest {
         DcaDecision d = decide(withConditions(OrderDirection.BUY, sma(DcaOperator.LT, 20)), rising(30, "87.12"), null, null);
         DcaDecision.Skipped s = (DcaDecision.Skipped) d;
         assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
-        assertThat(s.detail()).startsWith("전일 종가 87.12 ≥ SMA(20) ");
+        assertThat(s.detail()).isEqualTo("전일 종가 87.12 ≥ SMA(20) 82.16");
     }
 
     @Test

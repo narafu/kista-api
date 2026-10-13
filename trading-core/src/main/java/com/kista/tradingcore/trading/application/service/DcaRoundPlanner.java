@@ -57,6 +57,8 @@ class DcaRoundPlanner {
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
     // US 세션 → 직전 개장일 CNN 지수 — 세션당 1개, 실패는 캐시하지 않음 (spec 6.2)
     private final Map<LocalDate, BigDecimal> fearGreedCache = new ConcurrentHashMap<>();
+    // 직전 US 개장일 세션 메모 — 일봉 신선도·공포탐욕 조회와 같은 세션의 전략들이 캘린더 스캔을 공유
+    private final Map<LocalDate, LocalDate> previousOpenCache = new ConcurrentHashMap<>();
 
     private record CandleKey(StrategyTicker ticker, LocalDate usSession) {}
 
@@ -124,9 +126,15 @@ class DcaRoundPlanner {
 
     // usSession 직전 US 개장일 — 휴장 데이터 미존재 등으로 못 찾으면 null
     private LocalDate previousOpenSession(LocalDate usSession) {
+        LocalDate cached = previousOpenCache.get(usSession);
+        if (cached != null) return cached;
         for (int i = 1; i <= PREVIOUS_SESSION_SCAN_DAYS; i++) {
             LocalDate d = usSession.minusDays(i);
-            if (marketCalendarPort.isUsSessionOpen(d)) return d;
+            if (marketCalendarPort.isUsSessionOpen(d)) {
+                previousOpenCache.keySet().removeIf(k -> !k.equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 1
+                previousOpenCache.put(usSession, d);
+                return d;
+            }
         }
         return null;
     }

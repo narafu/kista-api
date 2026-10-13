@@ -344,7 +344,7 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 - HTTP 오류, 파싱 실패, 해당 점 없음이면 empty를 반환하고, 판정은 `DATA_UNAVAILABLE`이 된다.
 - 설정 `trading.adapter.out.feargreed.TradingFearGreedConfig`
   - RestClient 빈 이름은 `fearGreedRestClient`이고, 연결 3초·읽기 5초다.
-  - 브라우저 헤더 인터셉터(Cloudflare 봇 감지 우회)는 root `FearGreedConfig`의 것을 복제한다. 두 프로세스는 컴파일 의존이 없어 공유할 수 없다. `shared.platform.http`로 올리면 하나로 합칠 수 있지만, root를 건드려야 하므로 범위 밖이다.
+  - 브라우저 헤더 인터셉터(Cloudflare 봇 감지 우회)는 `shared.platform.http.CnnRestClients`가 제공하고, root `FearGreedConfig`와 함께 쓴다.
 - **캐시**: `DcaRoundPlanner`가 프로세스 메모리에 `usSessionDate → 값`을 하나만 둔다. 규칙은 일봉 캐시(6.1)와 같다.
   - 실패는 캐시하지 않는다.
   - 새 세션 키가 들어오면 기존 키를 교체한다.
@@ -555,6 +555,8 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
 
 ### 단계 ② 리뷰에서 미뤄 둔 minor (후속 후보)
 
+> 2026-10-14 feat/dca-followup에서 처리했다. 남은 것: 세션 캐시 get-then-put·eviction 비원자성(무해, 유지), DCA 조건 응답 GET 단건 검증(단건 GET 엔드포인트가 없어 해당 없음 — PUT 응답 테스트는 이미 jsonPath 단언).
+
 태스크 리뷰에서 나왔지만 동작 영향이 없거나 작아서 미룬 항목이다. 필요할 때 골라서 처리한다.
 
 - SMA·AVG_PRICE 판정은 반올림하지 않은 전일종가를 쓰고, 상세 문구는 소수 2자리로 보여 준다. 현재 종가가 소수 2자리라 차이는 없다.
@@ -565,6 +567,8 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
 - DCA 조건 응답 테스트가 GET 단건 대신 PUT 응답으로 검증하고, 본문 substring 단언이 읽기 어렵다.
 
 ### 단계 ③ 리뷰에서 미뤄 둔 minor (후속 후보)
+
+> 2026-10-14 feat/dca-followup에서 처리했다. 남은 것: `fearGreedCache` 비원자성(무해, 유지), 운영 RestClient 배선은 여전히 컨텍스트 로드 테스트로만 검증(인터셉터·빌더는 `CnnRestClients`로 공용화).
 
 - CNN 어댑터는 같은 날짜 일별 점이 둘이면 마지막 점을 고른다(`reduce`). 실데이터에는 중복이 없어 무해하지만, `findFirst`나 주석으로 의도를 밝히면 더 명확하다. 응답의 `y`가 null이면 예외가 나지만 잡혀서 empty가 된다.
 - 운영 RestClient 배선(`HttpClientTimeouts`, 헤더)은 컨텍스트 로드 테스트로만 검증한다. 어댑터 테스트는 인터셉터만 공유한다.

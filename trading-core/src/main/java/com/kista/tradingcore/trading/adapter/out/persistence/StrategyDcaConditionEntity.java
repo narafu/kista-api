@@ -17,6 +17,7 @@ import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.UUID;
 
 @Entity
@@ -58,7 +59,8 @@ class StrategyDcaConditionEntity extends BaseCreatedAtEntity {
         e.indicator = c.indicator();
         e.operator = c.operator();
         e.smaPeriod = c.smaPeriod();
-        e.threshold = c.threshold();
+        // DB numeric(10,2)와 같은 scale로 정규화 — save() 반환값과 조회값을 일치시킨다
+        e.threshold = c.threshold() == null ? null : c.threshold().setScale(2, RoundingMode.HALF_UP);
         return e;
     }
 

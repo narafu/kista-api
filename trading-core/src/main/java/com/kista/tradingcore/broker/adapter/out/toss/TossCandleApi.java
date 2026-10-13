@@ -14,10 +14,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.TreeMap;
 
 // Toss 캔들 API 스펙 (openapi.json 검증):
 // - params: symbol(required), interval(1m|1d), count(1~200, default 100), before(ISO8601), adjusted(boolean)
@@ -53,24 +53,23 @@ class TossCandleApi {
         return fetchCandles(symbol, interval, clamped, null, false);
     }
 
-    // 200봉 단위 페이징 — 다음 페이지 before = 직전 페이지 가장 오래된 봉일 00:00 UTC, 날짜 기준 중복 제거.
+    // 200봉 단위 페이징 — 다음 페이지 before = 직전 페이지 가장 오래된 봉일 00:00 UTC (isBefore 필터가 엄격해 중복 없음).
     // 봉 date()는 US 세션일, adjusted=true(분할·배당 조정 — DCA 지표용, 이 메서드만)
     public List<TossCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count) {
-        TreeMap<LocalDate, TossCandle> byDate = new TreeMap<>();
+        List<TossCandle> all = new ArrayList<>(); // 오름차순 유지 — 더 오래된 페이지는 앞에 붙인다
         LocalDate before = beforeUsSession;
         int maxPages = count / MAX_COUNT + 2; // 첫 페이지 진행 중 봉 필터 여유
-        for (int page = 0; page < maxPages && byDate.size() < count; page++) {
+        for (int page = 0; page < maxPages && all.size() < count; page++) {
             LocalDate pageBefore = before;
-            List<TossCandle> fetched = fetchCandles(symbol, "1d", Math.clamp(count - byDate.size(), 1, MAX_COUNT),
+            List<TossCandle> fetched = fetchCandles(symbol, "1d", Math.clamp(count - all.size(), 1, MAX_COUNT),
                     pageBefore.atStartOfDay(ZoneOffset.UTC).toString(), true).stream()
                     .filter(c -> c.date().isBefore(pageBefore))
                     .toList();
             if (fetched.isEmpty()) break;
-            fetched.forEach(c -> byDate.putIfAbsent(c.date(), c));
+            all.addAll(0, fetched);
             before = fetched.getFirst().date(); // fetchCandles는 오름차순
         }
-        List<TossCandle> all = List.copyOf(byDate.values());
-        return all.subList(Math.max(0, all.size() - count), all.size());
+        return List.copyOf(all.subList(Math.max(0, all.size() - count), all.size()));
     }
 
     // before(exclusive 경계로 호출측에서 미리 보정된 시각) 이하 가장 최신 봉 1개만 조회 — 전일종가 확정 조회 전용

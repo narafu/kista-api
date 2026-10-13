@@ -61,6 +61,7 @@ class DcaRoundPlannerTest {
 
     static final LocalDate TRADE_DATE = LocalDate.of(2026, 10, 14); // KST
     static final LocalDate US_SESSION = LocalDate.of(2026, 10, 13);
+    static final LocalDate PREV_OPEN = LocalDate.of(2026, 10, 12); // US_SESSION 직전 개장일 (setUp: 모든 날 개장)
 
     MarketCalendarPort calendar = mock(MarketCalendarPort.class);
     CandlePort candlePort = mock(CandlePort.class);
@@ -212,6 +213,15 @@ class DcaRoundPlannerTest {
     }
 
     @Test
+    void previous_open_session_looked_up_once_per_session() {
+        fearGreedDca("25");
+        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.of(new BigDecimal("20.00")));
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
+        verify(calendar, times(1)).isUsSessionOpen(PREV_OPEN); // 일봉·공포탐욕·같은 세션 재계획이 직전 개장일 메모를 공유
+    }
+
+    @Test
     void candle_failure_is_not_cached() {
         when(candlePort.getDailyCandlesBefore("UPRO", US_SESSION, 250))
                 .thenThrow(new RuntimeException("toss down"))
@@ -244,8 +254,6 @@ class DcaRoundPlannerTest {
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of());
         verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
     }
-
-    static final LocalDate PREV_OPEN = LocalDate.of(2026, 10, 12); // US_SESSION 직전 개장일 (setUp: 모든 날 개장)
 
     private void fearGreedDca(String threshold) {
         when(dcaDetailPort.findActiveByStrategyId(ctx.strategy().id())).thenReturn(Optional.of(

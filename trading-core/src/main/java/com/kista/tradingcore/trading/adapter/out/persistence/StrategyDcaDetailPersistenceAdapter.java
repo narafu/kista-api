@@ -56,6 +56,7 @@ class StrategyDcaDetailPersistenceAdapter implements StrategyDcaDetailPort {
         if (strategyIds.isEmpty()) return Map.of();
         // 활성 versionId 링크 → 엔티티 일괄 조회 → strategyId 키로 조립
         var links = jpaRepository.findActiveLinks(strategyIds);
+        if (links.isEmpty()) return Map.of(); // 활성 버전이 없으면 후속 IN 쿼리 생략
         Map<UUID, StrategyDcaVersionEntity> byVersion = jpaRepository
                 .findAllById(links.stream().map(StrategyDcaVersionJpaRepository.StrategyVersionLink::getStrategyVersionId).toList())
                 .stream().collect(Collectors.toMap(StrategyDcaVersionEntity::getStrategyVersionId, e -> e));

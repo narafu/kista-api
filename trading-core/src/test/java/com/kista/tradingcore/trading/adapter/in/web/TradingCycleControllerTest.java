@@ -556,6 +556,24 @@ class TradingCycleControllerTest {
     }
 
     @Test
+    void reconfigureDca_with_fear_greed_passes_condition() throws Exception {
+        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
+
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"direction":"BUY","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY",
+                                 "conditions":[{"indicator":"FEAR_GREED","operator":"LTE","threshold":25}]}
+                                """))
+                .andExpect(status().isOk());
+        ArgumentCaptor<DcaConfig> captor = ArgumentCaptor.forClass(DcaConfig.class);
+        verify(dcaConfig).updateConfig(eq(CYCLE_ID), eq(USER_ID), captor.capture());
+        assertThat(captor.getValue().conditions()).containsExactly(
+                new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
+    }
+
+    @Test
     void reconfigureDca_directionChange_returns400() throws Exception {
         doThrow(new IllegalArgumentException("DCA 방향은 변경할 수 없습니다"))
                 .when(dcaConfig).updateConfig(eq(CYCLE_ID), any(), any());

@@ -1,6 +1,8 @@
 package com.kista.tradingcore.matching.domain.model;
 
 import com.kista.shared.kernel.DcaFrequency;
+import com.kista.shared.kernel.DcaIndicator;
+import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderType;
@@ -8,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,8 +49,8 @@ class DcaConfigTest {
 
     @Test
     void rejects_more_than_ten_conditions() {
-        DcaCondition rsi = new DcaCondition(com.kista.shared.kernel.DcaIndicator.RSI, com.kista.shared.kernel.DcaOperator.LTE, null, new BigDecimal("30"));
+        DcaCondition rsi = new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("30"));
         assertThatThrownBy(() -> new DcaConfig(OrderDirection.BUY, AMOUNT, OrderType.MOC, DcaFrequency.DAILY, null, null,
-                java.util.Collections.nCopies(11, rsi))).isInstanceOf(IllegalArgumentException.class);
+                Collections.nCopies(11, rsi))).isInstanceOf(IllegalArgumentException.class);
     }
 }
