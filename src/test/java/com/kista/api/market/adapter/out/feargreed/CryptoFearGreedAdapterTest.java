@@ -1,6 +1,7 @@
 package com.kista.api.market.adapter.out.feargreed;
 
 import com.kista.api.market.domain.model.FearGreedRating;
+import com.kista.shared.platform.http.CnnRestClients;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -17,7 +18,7 @@ class CryptoFearGreedAdapterTest {
 
     @Test
     void fetch_parses_plain_json_response_without_accept_encoding_header() {
-        RestClient.Builder builder = RestClient.builder().requestInterceptor(FearGreedConfig.fearGreedHeaderInterceptor());
+        RestClient.Builder builder = RestClient.builder().requestInterceptor(CnnRestClients.browserHeaderInterceptor());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         CryptoFearGreedAdapter adapter = new CryptoFearGreedAdapter(builder.build());
 

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.feargreed;
 
+import com.kista.shared.platform.http.CnnRestClients;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -36,7 +37,7 @@ class CnnFearGreedIndexAdapterTest {
             """;
 
     private final RestClient.Builder builder = RestClient.builder()
-            .requestInterceptor(TradingFearGreedConfig.fearGreedHeaderInterceptor());
+            .requestInterceptor(CnnRestClients.browserHeaderInterceptor());
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
     private final CnnFearGreedIndexAdapter adapter = new CnnFearGreedIndexAdapter(builder.build());
 
