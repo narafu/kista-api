@@ -502,7 +502,7 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void get_dca_returns_conditions() throws Exception {
+    void reconfigureDca_returns_typed_conditions() throws Exception {
         DcaConfig cfg = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY,
                 null, null, List.of(
                 new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("35")),

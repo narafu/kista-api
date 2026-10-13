@@ -94,6 +94,8 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.dcaFrequencies[2].code").value("MONTHLY"))
                 .andExpect(jsonPath("$.dcaOperators[0].label").value("이하"))
                 .andExpect(jsonPath("$.dcaSkipReasons[0].code").value("DATA_UNAVAILABLE"))
+                .andExpect(jsonPath("$.dcaIndicators.length()").value(4))
+                .andExpect(jsonPath("$.dcaIndicators[?(@.code=='FEAR_GREED')]").isNotEmpty())
                 .andExpect(jsonPath("$.dcaIndicators[?(@.code=='SMA')].smaPeriods[0]").value(org.hamcrest.Matchers.contains(20)))
                 .andExpect(jsonPath("$.dcaIndicators[?(@.code=='RSI')].smaPeriods").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
     }
