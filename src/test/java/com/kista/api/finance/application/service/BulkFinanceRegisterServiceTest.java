@@ -69,7 +69,7 @@ class BulkFinanceRegisterServiceTest {
 
         assertThat(result.assetSuccessCount()).isEqualTo(1);
         assertThat(result.failures()).hasSize(1);
-        assertThat(result.failures().get(0)).contains("메모1", "카테고리 없음");
+        assertThat(result.failures().getFirst()).contains("메모1", "카테고리 없음");
         verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("메모2")));
     }
 
@@ -85,7 +85,7 @@ class BulkFinanceRegisterServiceTest {
 
         assertThat(result.assetSuccessCount()).isEqualTo(1);
         assertThat(result.failures()).hasSize(1);
-        assertThat(result.failures().get(0)).contains("마감월자산", "기록 점검이 완료된 달");
+        assertThat(result.failures().getFirst()).contains("마감월자산", "기록 점검이 완료된 달");
         verify(assetSnapshotUseCase, times(1)).create(eq(userId), eq(false), argThat(c -> c.memo().equals("정상월자산")));
     }
 
@@ -135,6 +135,6 @@ class BulkFinanceRegisterServiceTest {
 
         assertThat(result.transactionSuccessCount()).isEqualTo(1);
         assertThat(result.failures()).hasSize(1);
-        assertThat(result.failures().get(0)).contains("거래1");
+        assertThat(result.failures().getFirst()).contains("거래1");
     }
 }

@@ -72,7 +72,7 @@ class FillSimulatorTest {
         List<Execution> executions = FillSimulator.simulate(List.of(fillable), touchesLow);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("100.00"); // 체결가는 종가 아닌 지정가
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00"); // 체결가는 종가 아닌 지정가
 
         PlannedOrder unfillable = order(OrderType.LIMIT, OrderDirection.BUY, new BigDecimal("100.00"));
         DailyCandle missesLow = new DailyCandle(TRADE_DATE, new BigDecimal("105.00"), new BigDecimal("106.00"),
@@ -91,7 +91,7 @@ class FillSimulatorTest {
         List<Execution> executions = FillSimulator.simulate(List.of(fillable), touchesHigh);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("100.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
 
         PlannedOrder unfillable = order(OrderType.LIMIT, OrderDirection.SELL, new BigDecimal("100.00"));
         DailyCandle missesHigh = new DailyCandle(TRADE_DATE, new BigDecimal("95.00"), new BigDecimal("99.99"),
@@ -107,13 +107,13 @@ class FillSimulatorTest {
         PlannedOrder buy = order(OrderType.LIMIT, OrderDirection.BUY, new BigDecimal("100.00"));
         DailyCandle gapDown = new DailyCandle(TRADE_DATE, new BigDecimal("95.00"), new BigDecimal("97.00"),
                 new BigDecimal("94.00"), new BigDecimal("96.00"));
-        assertThat(FillSimulator.simulate(List.of(buy), gapDown).get(0).price()).isEqualByComparingTo("95.00");
+        assertThat(FillSimulator.simulate(List.of(buy), gapDown).getFirst().price()).isEqualByComparingTo("95.00");
 
         // 매도 지정가 100인데 시가 105로 갭업 개장 — 개장 즉시 105에 체결된다
         PlannedOrder sell = order(OrderType.LIMIT, OrderDirection.SELL, new BigDecimal("100.00"));
         DailyCandle gapUp = new DailyCandle(TRADE_DATE, new BigDecimal("105.00"), new BigDecimal("106.00"),
                 new BigDecimal("103.00"), new BigDecimal("104.00"));
-        assertThat(FillSimulator.simulate(List.of(sell), gapUp).get(0).price()).isEqualByComparingTo("105.00");
+        assertThat(FillSimulator.simulate(List.of(sell), gapUp).getFirst().price()).isEqualByComparingTo("105.00");
     }
 
     @Test
@@ -131,7 +131,7 @@ class FillSimulatorTest {
         List<Execution> executions = FillSimulator.simulate(List.of(moc), candle);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("101.00"); // 종가
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("101.00"); // 종가
     }
 
     @Test
@@ -144,6 +144,6 @@ class FillSimulatorTest {
 
         List<Execution> executions = FillSimulator.simulate(List.of(withLeg), candle);
 
-        assertThat(executions.get(0).externalOrderId()).isEqualTo("BUY_LADDER_1");
+        assertThat(executions.getFirst().externalOrderId()).isEqualTo("BUY_LADDER_1");
     }
 }

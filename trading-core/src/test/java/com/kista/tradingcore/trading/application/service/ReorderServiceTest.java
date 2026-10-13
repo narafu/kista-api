@@ -244,8 +244,8 @@ class ReorderServiceTest {
     private static java.util.List<Order> argOrdersMatch(OrderStatus status, OrderTiming timing) {
         return org.mockito.ArgumentMatchers.argThat(orders ->
                 ((java.util.List<Order>) orders).size() == 1
-                && ((java.util.List<Order>) orders).get(0).status() == status
-                && ((java.util.List<Order>) orders).get(0).timing() == timing);
+                && ((java.util.List<Order>) orders).getFirst().status() == status
+                && ((java.util.List<Order>) orders).getFirst().timing() == timing);
     }
 
     private Account account() {

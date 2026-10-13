@@ -60,7 +60,7 @@ class AuditLogPersistenceAdapterIT extends RootDataJpaTestBase {
         List<AuditLog> all = adapter.findAll();
         assertThat(all).isNotEmpty();
 
-        AuditLog saved = all.get(0);
+        AuditLog saved = all.getFirst();
         assertThat(saved.adminId()).isEqualTo(adminId);
         assertThat(saved.action()).isEqualTo("USER_APPROVE");
         assertThat(saved.targetType()).isEqualTo("USER");
@@ -86,6 +86,6 @@ class AuditLogPersistenceAdapterIT extends RootDataJpaTestBase {
         List<AuditLog> all = adapter.findAll();
         assertThat(all).hasSizeGreaterThanOrEqualTo(2);
         // 최신순 — ACTION_B가 더 나중에 저장됐으므로 앞에 와야 함
-        assertThat(all.get(0).action()).isEqualTo("ACTION_B");
+        assertThat(all.getFirst().action()).isEqualTo("ACTION_B");
     }
 }

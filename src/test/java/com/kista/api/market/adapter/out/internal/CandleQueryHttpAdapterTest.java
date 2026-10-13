@@ -48,7 +48,7 @@ class CandleQueryHttpAdapterTest {
         List<DailyCandleResponse> candles = adapter.latestDailyCandles("QQQ", 1);
 
         assertThat(candles).hasSize(1);
-        assertThat(candles.get(0).close()).isEqualByComparingTo("105");
+        assertThat(candles.getFirst().close()).isEqualByComparingTo("105");
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/broker/candles/latest");
         assertThat(recorded.getTarget()).contains("symbol=QQQ");

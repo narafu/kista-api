@@ -399,7 +399,7 @@ class BacktestServiceTest {
         ArgumentCaptor<CycleOrderStrategy.PlanContext> ctxCaptor =
                 ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
         verify(planner, org.mockito.Mockito.times(2)).plan(ctxCaptor.capture());
-        assertThat(ctxCaptor.getAllValues().get(0).privacy().privacyPlan()).isNull();
+        assertThat(ctxCaptor.getAllValues().getFirst().privacy().privacyPlan()).isNull();
         assertThat(ctxCaptor.getAllValues().get(1).privacy().privacyPlan()).isNotNull();
     }
 
@@ -428,7 +428,7 @@ class BacktestServiceTest {
                 ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
         verify(planner, org.mockito.Mockito.times(2)).plan(ctxCaptor.capture()); // 1/8은 마지막 캔들이라 계획 없음
         // 금요일 세션 1/5 → 1/5 발행분(적용 거래일 1/6)
-        assertThat(appliedBaseTradeDate(ctxCaptor.getAllValues().get(0))).isEqualTo(LocalDate.of(2024, 1, 6));
+        assertThat(appliedBaseTradeDate(ctxCaptor.getAllValues().getFirst())).isEqualTo(LocalDate.of(2024, 1, 6));
         // 월요일 세션 1/8 → 1/8 발행분(적용 거래일 1/9). 캔들 날짜로 그대로 조회하면 이 날은 통째로 매매 없음이 된다
         assertThat(appliedBaseTradeDate(ctxCaptor.getAllValues().get(1))).isEqualTo(LocalDate.of(2024, 1, 9));
     }

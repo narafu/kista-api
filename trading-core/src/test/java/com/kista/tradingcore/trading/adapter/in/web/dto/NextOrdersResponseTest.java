@@ -45,8 +45,8 @@ class NextOrdersResponseTest {
         assertThat(response.competition().sufficientBudget()).isFalse();
         assertThat(response.competition().availableDeposit()).isEqualByComparingTo("1000.00");
         assertThat(response.competition().blockedByHigherPriority()).hasSize(1);
-        assertThat(response.competition().blockedByHigherPriority().get(0).strategyId()).isEqualTo(competitorId);
-        assertThat(response.competition().blockedByHigherPriority().get(0).type()).isEqualTo(StrategyType.VR);
+        assertThat(response.competition().blockedByHigherPriority().getFirst().strategyId()).isEqualTo(competitorId);
+        assertThat(response.competition().blockedByHigherPriority().getFirst().type()).isEqualTo(StrategyType.VR);
         assertThat(response.competition().liveBalanceUnavailable()).isFalse();
     }
 

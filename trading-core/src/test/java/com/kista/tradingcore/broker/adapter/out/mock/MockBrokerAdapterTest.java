@@ -93,7 +93,7 @@ class MockBrokerAdapterTest {
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        Execution execution = executions.get(0);
+        Execution execution = executions.getFirst();
         assertThat(execution.price()).isEqualByComparingTo("999.99");
         assertThat(execution.quantity()).isEqualTo(10);
         assertThat(execution.direction()).isEqualTo(OrderDirection.BUY);
@@ -112,7 +112,7 @@ class MockBrokerAdapterTest {
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("95.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("95.00");
     }
 
     @Test
@@ -141,7 +141,7 @@ class MockBrokerAdapterTest {
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("105.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("105.00");
     }
 
     @Test
@@ -171,7 +171,7 @@ class MockBrokerAdapterTest {
 
         assertThat(executions).hasSize(1);
         // LOC와 달리 체결가는 종가(90.00)가 아니라 지정가(100.00) 그대로
-        assertThat(executions.get(0).price()).isEqualByComparingTo("100.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -200,7 +200,7 @@ class MockBrokerAdapterTest {
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("100.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -229,7 +229,7 @@ class MockBrokerAdapterTest {
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).price()).isEqualByComparingTo("100.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -256,7 +256,7 @@ class MockBrokerAdapterTest {
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.get(0).externalOrderId()).isEqualTo("MOCK-CYCLE-SCOPED");
+        assertThat(executions.getFirst().externalOrderId()).isEqualTo("MOCK-CYCLE-SCOPED");
     }
 
     // --- place()/cancel() ---
@@ -394,6 +394,6 @@ class MockBrokerAdapterTest {
         List<MarginItem> margin = adapter().getMargin(ACCOUNT);
 
         assertThat(margin).isNotEmpty();
-        assertThat(margin.get(0).currency()).isEqualTo(com.kista.tradingcore.broker.domain.model.Currency.USD);
+        assertThat(margin.getFirst().currency()).isEqualTo(com.kista.tradingcore.broker.domain.model.Currency.USD);
     }
 }

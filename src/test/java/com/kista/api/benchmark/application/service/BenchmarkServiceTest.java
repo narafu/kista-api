@@ -593,8 +593,8 @@ class BenchmarkServiceTest {
         // 다운샘플링 없이 IndexPrice가 존재하는 3개 거래일이 +1일 보정된 KST 날짜로 그대로 포인트가 생긴다.
         assertThat(result.points()).extracting(BenchmarkPoint::baseDate)
                 .containsExactly(LocalDate.of(2026, 1, 6), LocalDate.of(2026, 1, 7), LocalDate.of(2026, 2, 28));
-        assertThat(result.points().get(0).investmentIndexUsd()).isEqualByComparingTo("100.0");
-        assertThat(result.points().get(0).benchmarkIndex()).isEqualByComparingTo("100.0");
+        assertThat(result.points().getFirst().investmentIndexUsd()).isEqualByComparingTo("100.0");
+        assertThat(result.points().getFirst().benchmarkIndex()).isEqualByComparingTo("100.0");
         assertThat(result.points().get(1).investmentIndexUsd()).isEqualByComparingTo("102.0");
         assertThat(result.points().get(1).benchmarkIndex()).isEqualByComparingTo(
                 new BigDecimal("404.00").divide(new BigDecimal("400.00"), 10, java.math.RoundingMode.HALF_UP)

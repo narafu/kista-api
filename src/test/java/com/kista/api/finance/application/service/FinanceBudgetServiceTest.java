@@ -136,8 +136,8 @@ class FinanceBudgetServiceTest {
 
         ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
         verify(budgetPort, times(2)).save(captor.capture()); // 1) 트림된 개인 예산 2) 신규 그룹 예산
-        assertThat(captor.getAllValues().get(0).id()).isEqualTo(personalOverlap.id());
-        assertThat(captor.getAllValues().get(0).applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
+        assertThat(captor.getAllValues().getFirst().id()).isEqualTo(personalOverlap.id());
+        assertThat(captor.getAllValues().getFirst().applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
         assertThat(captor.getAllValues().get(1).groupId()).isEqualTo(groupId);
     }
 
@@ -363,7 +363,7 @@ class FinanceBudgetServiceTest {
 
         ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
         verify(budgetPort, times(2)).save(captor.capture()); // 1) 트림된 기존 2) 신규
-        FinanceBudget trimmed = captor.getAllValues().get(0);
+        FinanceBudget trimmed = captor.getAllValues().getFirst();
         assertThat(trimmed.id()).isEqualTo(existing.id());
         assertThat(trimmed.applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
         verify(budgetPort, never()).delete(any());
@@ -433,8 +433,8 @@ class FinanceBudgetServiceTest {
         verify(budgetPort).delete(toDelete.id());
         ArgumentCaptor<FinanceBudget> captor = ArgumentCaptor.forClass(FinanceBudget.class);
         verify(budgetPort, times(2)).save(captor.capture());
-        assertThat(captor.getAllValues().get(0).id()).isEqualTo(toTrim.id());
-        assertThat(captor.getAllValues().get(0).applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
+        assertThat(captor.getAllValues().getFirst().id()).isEqualTo(toTrim.id());
+        assertThat(captor.getAllValues().getFirst().applyEndDate()).isEqualTo(LocalDate.of(2026, 5, 31));
     }
 
     @Test

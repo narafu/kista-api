@@ -153,7 +153,7 @@ class TradingBuyCompetitionSimulatorTest {
 
         assertThat(result.consumedByHigherPriority()).isEqualByComparingTo("900.00");
         assertThat(result.blockedByHigherPriority()).hasSize(1);
-        assertThat(result.blockedByHigherPriority().get(0).strategyId()).isEqualTo(vrStrategy.id());
+        assertThat(result.blockedByHigherPriority().getFirst().strategyId()).isEqualTo(vrStrategy.id());
         assertThat(result.sufficientBudget()).isFalse(); // 900 + 200 > 1000
     }
 

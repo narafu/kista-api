@@ -328,7 +328,7 @@ class VrStrategyTypeTest {
 
         // 매도는 정확히 holdings(3)개 단
         assertThat(sells).hasSize(3);
-        assertThat(sells.get(0).price()).isEqualByComparingTo("366.67");
+        assertThat(sells.getFirst().price()).isEqualByComparingTo("366.67");
         assertThat(sells.get(1).price()).isEqualByComparingTo("550.00");
         assertThat(sells.get(2).price()).isEqualByComparingTo("1100.00");
         assertThat(sells).allMatch(o -> o.quantity() == 1);

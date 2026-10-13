@@ -31,10 +31,10 @@ class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
         List<FearGreedSnapshot> found = snapshotAdapter.findBySourceSince("CNN", snapshotDate.minus(1, ChronoUnit.HOURS));
 
         assertThat(found).hasSize(1);
-        assertThat(found.get(0).source()).isEqualTo("CNN");
-        assertThat(found.get(0).value()).isEqualTo(42);
-        assertThat(found.get(0).rating()).isEqualTo(FearGreedRating.FEAR);
-        assertThat(found.get(0).id()).isNotNull();
+        assertThat(found.getFirst().source()).isEqualTo("CNN");
+        assertThat(found.getFirst().value()).isEqualTo(42);
+        assertThat(found.getFirst().rating()).isEqualTo(FearGreedRating.FEAR);
+        assertThat(found.getFirst().id()).isNotNull();
     }
 
     @Test
@@ -49,7 +49,7 @@ class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
 
         assertThat(found).hasSize(3);
         assertThat(found).extracting(FearGreedSnapshot::value).containsExactly(10, 50, 90); // 시각 오름차순
-        FearGreedSnapshot latest = found.get(found.size() - 1);
+        FearGreedSnapshot latest = found.getLast();
         assertThat(latest.value()).isEqualTo(90);
         assertThat(latest.rating()).isEqualTo(FearGreedRating.EXTREME_GREED);
     }
@@ -65,11 +65,11 @@ class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
         List<FearGreedSnapshot> cnnOnly = snapshotAdapter.findBySourceSince("CNN", now.minus(1, ChronoUnit.HOURS));
 
         assertThat(cryptoOnly).hasSize(1);
-        assertThat(cryptoOnly.get(0).source()).isEqualTo("CRYPTO");
-        assertThat(cryptoOnly.get(0).value()).isEqualTo(20);
+        assertThat(cryptoOnly.getFirst().source()).isEqualTo("CRYPTO");
+        assertThat(cryptoOnly.getFirst().value()).isEqualTo(20);
         assertThat(cnnOnly).hasSize(1);
-        assertThat(cnnOnly.get(0).source()).isEqualTo("CNN");
-        assertThat(cnnOnly.get(0).value()).isEqualTo(80);
+        assertThat(cnnOnly.getFirst().source()).isEqualTo("CNN");
+        assertThat(cnnOnly.getFirst().value()).isEqualTo(80);
     }
 
     @Test
@@ -83,6 +83,6 @@ class FearGreedSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
         List<FearGreedSnapshot> found = snapshotAdapter.findBySourceSince("CNN", now.minus(1, ChronoUnit.HOURS));
 
         assertThat(found).hasSize(1);
-        assertThat(found.get(0).value()).isEqualTo(60);
+        assertThat(found.getFirst().value()).isEqualTo(60);
     }
 }

@@ -83,7 +83,7 @@ class TradingQueryHttpAdapterTest {
         List<OrderResponse> result = adapter.findAllOrders(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 1));
 
         assertThat(result).hasSize(1);
-        OrderResponse order = result.get(0);
+        OrderResponse order = result.getFirst();
         assertThat(order.id()).isEqualTo(id);
         assertThat(order.accountId()).isEqualTo(accountId);
         assertThat(order.strategyCycleId()).isEqualTo(strategyCycleId);
@@ -137,7 +137,7 @@ class TradingQueryHttpAdapterTest {
         var result = adapter.findStrategiesByAccountId(accountId);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo(strategyId);
+        assertThat(result.getFirst().id()).isEqualTo(strategyId);
     }
 
     // trading-core의 TradingInternalQueryController.requireStrategyOwnedByAccount가 소유권

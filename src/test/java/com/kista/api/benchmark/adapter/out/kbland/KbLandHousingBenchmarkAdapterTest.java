@@ -65,7 +65,7 @@ class KbLandHousingBenchmarkAdapterTest {
         List<HousingBenchmarkPrice> prices = adapter.fetchAptQteSalePrices();
 
         assertThat(prices).hasSize(1);
-        HousingBenchmarkPrice seoul = prices.get(0);
+        HousingBenchmarkPrice seoul = prices.getFirst();
         assertThat(seoul.source()).isEqualTo("KBLAND");
         assertThat(seoul.metricCode()).isEqualTo("APT_QTE_SALE_PRICE");
         assertThat(seoul.regionCode()).isEqualTo("1100000000");
@@ -143,7 +143,7 @@ class KbLandHousingBenchmarkAdapterTest {
         // 정상 데이터만 포함되고 결측 데이터는 제외됨을 검증한다.
         assertThat(prices).hasSize(1);
         assertThat(prices).allMatch(p -> p.regionCode().equals("1100000000"), "only Seoul data should be included");
-        HousingBenchmarkPrice seoul = prices.get(0);
+        HousingBenchmarkPrice seoul = prices.getFirst();
         assertThat(seoul.regionName()).isEqualTo("서울");
         assertThat(seoul.fifthQuintilePrice()).isEqualByComparingTo(new BigDecimal("344468.13"));
         assertThat(seoul.fifthQuintileRatio()).isEqualByComparingTo(new BigDecimal("6.55"));
@@ -196,7 +196,7 @@ class KbLandHousingBenchmarkAdapterTest {
                 LocalDate.of(2026, 7, 6), LocalDate.of(2026, 7, 13), LocalDate.of(2026, 7, 20));
         assertThat(indices).extracting(HousingPriceIndex::indexValue).containsExactly(
                 new BigDecimal("100.0"), new BigDecimal("101.5"), new BigDecimal("102.75"));
-        HousingPriceIndex first = indices.get(0);
+        HousingPriceIndex first = indices.getFirst();
         assertThat(first.source()).isEqualTo("KBLAND");
         assertThat(first.metricCode()).isEqualTo("WEEKLY_APT_SALE_PRICE_INDEX");
         assertThat(first.regionCode()).isEqualTo("1100000000");
@@ -239,8 +239,8 @@ class KbLandHousingBenchmarkAdapterTest {
 
         // null 값 첫 원소는 스킵되고 두 번째 값만 남는다.
         assertThat(indices).hasSize(1);
-        assertThat(indices.get(0).baseDate()).isEqualTo(LocalDate.of(2026, 7, 13));
-        assertThat(indices.get(0).indexValue()).isEqualByComparingTo(new BigDecimal("50.25"));
+        assertThat(indices.getFirst().baseDate()).isEqualTo(LocalDate.of(2026, 7, 13));
+        assertThat(indices.getFirst().indexValue()).isEqualByComparingTo(new BigDecimal("50.25"));
         server.verify();
     }
 

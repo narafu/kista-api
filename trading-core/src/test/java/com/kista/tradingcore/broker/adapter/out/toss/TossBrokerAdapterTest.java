@@ -128,9 +128,9 @@ class TossBrokerAdapterTest {
                 .isEqualTo(new BrokerStockInfo("SOXL", "반도체", "Semi", "NYSE ARCA", "USD", "NORMAL"));
         List<MarketCalendarDay> calendar = adapter.getMarketCalendar(day, day);
         assertThat(calendar).hasSize(1);
-        assertThat(calendar.get(0).isOpen()).isTrue();
-        assertThat(calendar.get(0).preMarket()).isNull();
-        assertThat(calendar.get(0).regularMarket()).isEqualTo(new MarketCalendarDay.SessionHours(start, end));
+        assertThat(calendar.getFirst().isOpen()).isTrue();
+        assertThat(calendar.getFirst().preMarket()).isNull();
+        assertThat(calendar.getFirst().regularMarket()).isEqualTo(new MarketCalendarDay.SessionHours(start, end));
     }
 
     @Test

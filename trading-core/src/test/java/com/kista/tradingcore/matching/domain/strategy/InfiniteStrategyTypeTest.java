@@ -139,7 +139,7 @@ class InfiniteStrategyTypeTest {
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(2);
-        assertThat(orders.get(0)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.quantity() == 1
+        assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.quantity() == 1
                 && o.price().compareTo(new BigDecimal("100")) == 0);
         assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.quantity() == 1
                 && o.price().compareTo(new BigDecimal("120.00")) == 0);
@@ -191,8 +191,8 @@ class InfiniteStrategyTypeTest {
         List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
 
         assertThat(result).hasSize(5);
-        assertThat(result.get(0).quantity()).isEqualTo(9);
-        assertThat(result.get(0).price()).isEqualByComparingTo("55.00");
+        assertThat(result.getFirst().quantity()).isEqualTo(9);
+        assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
         assertThat(result.get(1).quantity()).isEqualTo(9);
         assertThat(result.get(1).price()).isEqualByComparingTo("52.00");
         assertThat(result.get(2).quantity()).isEqualTo(1);
@@ -267,8 +267,8 @@ class InfiniteStrategyTypeTest {
 
         // buy①+buy②+보정3 = 5건
         assertThat(result).hasSize(5);
-        assertThat(result.get(0).quantity()).isEqualTo(10);
-        assertThat(result.get(0).price()).isEqualByComparingTo("5.00");
+        assertThat(result.getFirst().quantity()).isEqualTo(10);
+        assertThat(result.getFirst().price()).isEqualByComparingTo("5.00");
         // qty=9 (priceOffsetRate=0.02 기준), targetProfitRate(0.20) 사용 시 qty=8
         assertThat(result.get(1).quantity()).isEqualTo(9);
         assertThat(result.get(1).price()).isEqualByComparingTo("5.10");
@@ -356,8 +356,8 @@ class InfiniteStrategyTypeTest {
 
         assertThat(result).extracting(PlannedOrder::orderLeg)
                 .containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01");
-        assertThat(result.get(0).quantity()).isEqualTo(3);
-        assertThat(result.get(0).price()).isEqualByComparingTo("73.50");
+        assertThat(result.getFirst().quantity()).isEqualTo(3);
+        assertThat(result.getFirst().price()).isEqualByComparingTo("73.50");
         assertThat(result.get(1).price()).isEqualByComparingTo("59.31");
         assertThat(AccountBalance.buyTotal(result)).isEqualByComparingTo("279.81");
     }

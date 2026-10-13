@@ -50,8 +50,8 @@ class HousingBenchmarkPricePersistenceAdapterTest extends RootDataJpaTestBase {
                 "APT_QTE_SALE_PRICE", "1100000000", baseMonth, baseMonth);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).regionName()).isEqualTo("서울특별시");
-        assertThat(result.get(0).firstQuintilePrice()).isEqualByComparingTo(new BigDecimal("53000.123456"));
+        assertThat(result.getFirst().regionName()).isEqualTo("서울특별시");
+        assertThat(result.getFirst().firstQuintilePrice()).isEqualByComparingTo(new BigDecimal("53000.123456"));
     }
 
     @Test

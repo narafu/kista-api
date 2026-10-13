@@ -59,7 +59,7 @@ class ReverseInfiniteStrategyTest {
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
         assertThat(orders).hasSize(1);
-        PlannedOrder order = orders.get(0);
+        PlannedOrder order = orders.getFirst();
         assertThat(order.orderLeg()).isEqualTo("REVERSE_INFINITE_QUOTA_MOC_SELL");
         assertThat(order.orderType()).isEqualTo(OrderType.MOC);
         assertThat(order.direction()).isEqualTo(OrderDirection.SELL);

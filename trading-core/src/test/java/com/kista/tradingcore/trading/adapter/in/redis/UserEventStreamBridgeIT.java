@@ -62,7 +62,7 @@ class UserEventStreamBridgeIT {
                 org.springframework.data.redis.connection.stream.StreamOffset.create(RedisStreamConfig.USER_DELETED_STREAM,
                         org.springframework.data.redis.connection.stream.ReadOffset.lastConsumed()));
 
-        consumer.handle(records.get(0)); // 베이스 handle: onRecord → 브릿지 재발행 + ack
+        consumer.handle(records.getFirst()); // 베이스 handle: onRecord → 브릿지 재발행 + ack
 
         Mockito.verify(eventPublisher).publishEvent(new UserDeletedEvent(userId));
         var pending = redisTemplate.opsForStream().pending(RedisStreamConfig.USER_DELETED_STREAM, RedisStreamConfig.TRADING_CONSUMER_GROUP);

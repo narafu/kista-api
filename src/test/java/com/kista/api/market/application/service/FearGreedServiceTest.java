@@ -69,9 +69,9 @@ class FearGreedServiceTest {
         List<FearGreedSnapshot> saved = captor.getAllValues();
 
         assertThat(saved).hasSize(2);
-        assertThat(saved.get(0).source()).isEqualTo("CRYPTO");
-        assertThat(saved.get(0).value()).isEqualTo(30);
-        assertThat(saved.get(0).rating()).isEqualTo(FearGreedRating.FEAR);
+        assertThat(saved.getFirst().source()).isEqualTo("CRYPTO");
+        assertThat(saved.getFirst().value()).isEqualTo(30);
+        assertThat(saved.getFirst().rating()).isEqualTo(FearGreedRating.FEAR);
         assertThat(saved.get(1).source()).isEqualTo("CNN");
         assertThat(saved.get(1).value()).isEqualTo(70);
         assertThat(saved.get(1).rating()).isEqualTo(FearGreedRating.GREED);

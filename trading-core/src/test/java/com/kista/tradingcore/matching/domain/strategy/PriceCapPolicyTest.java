@@ -76,7 +76,7 @@ class PriceCapPolicyTest {
         List<PlannedOrder> result = PriceCapPolicy.replaceBuysPreservingOrder(
                 List.of(originalBuy), List.of(cappedBuy));
 
-        assertThat(result.get(0).orderLeg()).isEqualTo("INFINITE_BUY_02");
+        assertThat(result.getFirst().orderLeg()).isEqualTo("INFINITE_BUY_02");
     }
 
     @Test

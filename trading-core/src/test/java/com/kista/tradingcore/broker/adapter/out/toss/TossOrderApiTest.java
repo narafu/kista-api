@@ -172,7 +172,7 @@ class TossOrderApiTest {
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        Execution e = executions.get(0);
+        Execution e = executions.getFirst();
         assertThat(e.quantity()).isEqualTo(3);
         assertThat(e.price()).isEqualByComparingTo("25.50");
         assertThat(e.amountUsd()).isEqualByComparingTo("76.50");
@@ -217,8 +217,8 @@ class TossOrderApiTest {
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).direction()).isEqualTo(OrderDirection.SELL);
-        assertThat(result.get(0).quantity()).isEqualTo(2);
+        assertThat(result.getFirst().direction()).isEqualTo(OrderDirection.SELL);
+        assertThat(result.getFirst().quantity()).isEqualTo(2);
     }
 
     @Test
@@ -238,7 +238,7 @@ class TossOrderApiTest {
             LocalDate.of(2026, 6, 17), LocalDate.of(2026, 6, 17), StrategyTicker.SOXL, ACCOUNT);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).amountUsd()).isEqualByComparingTo("50.00");
+        assertThat(result.getFirst().amountUsd()).isEqualByComparingTo("50.00");
     }
 
     // --- helpers ---

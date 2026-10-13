@@ -104,7 +104,7 @@ class TradingStatsServiceTest {
         StatsSummary summary = statsService.getSummary(USER_ID);
 
         assertThat(summary.totalRealizedPnl()).isEqualByComparingTo("50.00");
-        StrategyTypeStats infinite = summary.byType().get(0);
+        StrategyTypeStats infinite = summary.byType().getFirst();
         assertThat(infinite.type()).isEqualTo(StrategyType.INFINITE);
         assertThat(infinite.closedCycleCount()).isEqualTo(2);
         assertThat(infinite.winRate()).isEqualByComparingTo("0.5");
@@ -185,10 +185,10 @@ class TradingStatsServiceTest {
                 USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 
         assertThat(curve.points()).hasSize(1);
-        assertThat(curve.points().get(0).date()).isEqualTo(LocalDate.parse("2026-06-02"));
+        assertThat(curve.points().getFirst().date()).isEqualTo(LocalDate.parse("2026-06-02"));
         // 800 + 20 × 10.00 = 1000
-        assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1000.00");
-        assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1000.00");
+        assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("1000.00");
+        assertThat(curve.points().getFirst().principal()).isEqualByComparingTo("1000.00");
     }
 
     @Test
@@ -223,7 +223,7 @@ class TradingStatsServiceTest {
         CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 1);
 
         assertThat(page.items()).hasSize(1);
-        assertThat(page.items().get(0).startDate()).isEqualTo(LocalDate.parse("2026-02-01")); // 최신순
+        assertThat(page.items().getFirst().startDate()).isEqualTo(LocalDate.parse("2026-02-01")); // 최신순
         assertThat(page.page()).isZero();
         assertThat(page.totalElements()).isEqualTo(2);
         assertThat(page.totalPages()).isEqualTo(2);
@@ -238,7 +238,7 @@ class TradingStatsServiceTest {
 
         StatsSummary summary = statsService.getSummary(USER_ID);
 
-        StrategyTypeStats stats = summary.byType().get(0);
+        StrategyTypeStats stats = summary.byType().getFirst();
         assertThat(stats.closedCycleCount()).isEqualTo(1);
         assertThat(stats.winRate()).isEqualByComparingTo("1"); // 승률·실현손익은 전체 closed 기준 유지
         assertThat(stats.avgReturnRate()).isNull(); // 0-start만 있으면 평균 수익률 없음
@@ -246,8 +246,8 @@ class TradingStatsServiceTest {
 
         CyclePerformancePage page = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10);
 
-        assertThat(page.items().get(0).pnl()).isEqualByComparingTo("500.00");
-        assertThat(page.items().get(0).returnRate()).isNull();
+        assertThat(page.items().getFirst().pnl()).isEqualByComparingTo("500.00");
+        assertThat(page.items().getFirst().returnRate()).isNull();
     }
 
     @Test
@@ -366,8 +366,8 @@ class TradingStatsServiceTest {
 
         assertThat(curve.points()).hasSize(2);
         // 06-01: 종료 사이클 포함 (endDate 당일까지 유효)
-        assertThat(curve.points().get(0).totalAsset()).isEqualByComparingTo("1700.00");
-        assertThat(curve.points().get(0).principal()).isEqualByComparingTo("1500.00");
+        assertThat(curve.points().getFirst().totalAsset()).isEqualByComparingTo("1700.00");
+        assertThat(curve.points().getFirst().principal()).isEqualByComparingTo("1500.00");
         // 06-02: endDate(06-01) 경과 → 종료 사이클 제외
         assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("550.00");
         assertThat(curve.points().get(1).principal()).isEqualByComparingTo("500.00");

@@ -25,7 +25,7 @@ class PresentBalanceResultTest {
 
         // 종목별: eval = 22×5 = 110.00, 손익 = (22-20)×5 = 10.00, 수익률 = 2/20×100 = 10.00%
         assertThat(result.items()).hasSize(1);
-        PresentBalanceResult.Item item = result.items().get(0);
+        PresentBalanceResult.Item item = result.items().getFirst();
         assertThat(item.ticker()).isEqualTo(StrategyTicker.SOXL);
         assertThat(item.holdings()).isEqualTo(5);
         assertThat(item.evalAmountUsd()).isEqualByComparingTo("110.00");
@@ -55,7 +55,7 @@ class PresentBalanceResultTest {
                 List.of(holding), new BigDecimal("1000.00"), new BigDecimal("50000"), BigDecimal.ZERO);
 
         // 종목별 계산은 환율과 무관하게 동일하게 수행됨
-        assertThat(result.items().get(0).evalAmountUsd()).isEqualByComparingTo("110.00");
+        assertThat(result.items().getFirst().evalAmountUsd()).isEqualByComparingTo("110.00");
         // 환율 0 → totalAssetKrw = krwDeposit = 50,000
         assertThat(result.totalAssetUsd()).isEqualByComparingTo("50000");
         assertThat(result.totalEvalProfit()).isEqualByComparingTo("0");
@@ -74,7 +74,7 @@ class PresentBalanceResultTest {
         PresentBalanceResult result = PresentBalanceResult.aggregateToss(
                 List.of(holding), new BigDecimal("100.00"), new BigDecimal("14000"), new BigDecimal("1400"));
 
-        PresentBalanceResult.Item item = result.items().get(0);
+        PresentBalanceResult.Item item = result.items().getFirst();
         assertThat(item.profitRate()).isEqualByComparingTo("0");
         // eval = 15×3 = 45.00, 손익 = (15-0)×3 = 45.00
         assertThat(item.evalAmountUsd()).isEqualByComparingTo("45.00");

@@ -301,8 +301,8 @@ class TradingOrderExecutorTest {
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
         assertThat(result).hasSize(2);
-        assertThat(result.get(0).id()).isEqualTo(id1);
-        assertThat(result.get(0).externalOrderId()).isEqualTo("KIS-101");
+        assertThat(result.getFirst().id()).isEqualTo(id1);
+        assertThat(result.getFirst().externalOrderId()).isEqualTo("KIS-101");
         assertThat(result.get(1).id()).isEqualTo(id2);
         assertThat(result.get(1).externalOrderId()).isEqualTo("KIS-102");
         verify(orderPort).markPlaced(id1, "KIS-101");

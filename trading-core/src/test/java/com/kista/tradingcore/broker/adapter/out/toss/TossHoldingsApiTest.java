@@ -163,7 +163,7 @@ class TossHoldingsApiTest {
 
         // 통합 아님 — USD·KRW 원본 금액 각각 반환
         assertThat(items).hasSize(2);
-        MarginItem usdItem = items.get(0);
+        MarginItem usdItem = items.getFirst();
         assertThat(usdItem.currency()).isEqualTo(Currency.USD);
         assertThat(usdItem.purchasableAmount()).isEqualByComparingTo("100.00");
         assertThat(usdItem.usdToKrwRate()).isEqualByComparingTo("1400.00");
@@ -191,8 +191,8 @@ class TossHoldingsApiTest {
         List<MarginItem> items = tossHoldingsApi.getMargin(ACCOUNT);
 
         assertThat(items).hasSize(2);
-        assertThat(items.get(0).currency()).isEqualTo(Currency.USD);
-        assertThat(items.get(0).purchasableAmount()).isEqualByComparingTo("100.00");
+        assertThat(items.getFirst().currency()).isEqualTo(Currency.USD);
+        assertThat(items.getFirst().purchasableAmount()).isEqualByComparingTo("100.00");
         assertThat(items.get(1).currency()).isEqualTo(Currency.KRW);
         assertThat(items.get(1).purchasableAmount()).isEqualByComparingTo("50000");
     }

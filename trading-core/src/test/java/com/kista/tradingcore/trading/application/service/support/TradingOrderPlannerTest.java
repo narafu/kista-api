@@ -61,7 +61,7 @@ class TradingOrderPlannerTest {
         List<Order> saved = ordersCaptor.getValue();
         assertThat(saved).hasSize(2);
 
-        Order savedBuy = saved.get(0);
+        Order savedBuy = saved.getFirst();
         assertThat(savedBuy.id()).isNull();
         assertThat(savedBuy.accountId()).isEqualTo(ACCOUNT.id());
         assertThat(savedBuy.strategyCycleId()).isEqualTo(STRATEGY_CYCLE_ID);

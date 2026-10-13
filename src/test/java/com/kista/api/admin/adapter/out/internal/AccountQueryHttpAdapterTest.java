@@ -76,7 +76,7 @@ class AccountQueryHttpAdapterTest {
         List<AccountSummaryResponse> result = adapter.findAll(null, null);
 
         assertThat(result).hasSize(1);
-        AccountSummaryResponse view = result.get(0);
+        AccountSummaryResponse view = result.getFirst();
         assertThat(view.id()).isEqualTo(id);
         assertThat(view.userId()).isEqualTo(userId);
         assertThat(view.accountNo()).isEqualTo("74420614-01");

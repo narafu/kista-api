@@ -75,7 +75,7 @@ class BacktestEngineTest {
         ), vrCommand("2000", "1000", 4, 0));
 
         // 1일차: 체결 없음 — 예수금 2000 그대로
-        assertThat(output.points().get(0).totalAsset()).isEqualByComparingTo("2000");
+        assertThat(output.points().getFirst().totalAsset()).isEqualByComparingTo("2000");
         // 2일차: 1일차 주문이 지정가 850.00에 체결 → 예수금 1150.00 + 1주×종가 800 = 1950.00
         assertThat(output.points().get(1).totalAsset()).isEqualByComparingTo("1950");
         assertThat(output.tradeCount()).isEqualTo(1);
@@ -551,8 +551,8 @@ class BacktestEngineTest {
         assertThat(secondDay.inputs().starPointPrice()).isEqualByComparingTo("62.00");
         assertThat(secondDay.legs()).containsExactly("REVERSE_INFINITE_LOC_SELL", "REVERSE_INFINITE_LOC_BUY");
         // LOC 매도 = 6주 ÷ 2 = 3주 @별지점, 쿼터매수 = (예수금 405 ÷ 4) ÷ 61.99 내림 = 1주 @별지점−0.01
-        assertThat(secondDay.orders().get(0).quantity()).isEqualTo(3);
-        assertThat(secondDay.orders().get(0).price()).isEqualByComparingTo("62.00");
+        assertThat(secondDay.orders().getFirst().quantity()).isEqualTo(3);
+        assertThat(secondDay.orders().getFirst().price()).isEqualByComparingTo("62.00");
         assertThat(secondDay.orders().get(1).quantity()).isEqualTo(1);
         assertThat(secondDay.orders().get(1).price()).isEqualByComparingTo("61.99");
 

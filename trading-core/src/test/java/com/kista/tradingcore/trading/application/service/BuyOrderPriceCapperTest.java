@@ -125,8 +125,8 @@ class BuyOrderPriceCapperTest {
                 List.of(exceedingBuy, sell, withinCapBuy), new BigDecimal("30.00"), null, null, StrategyTicker.SOXL,
                 StrategyType.PRIVACY, TODAY);
 
-        assertThat(prepared.get(0).price()).isEqualByComparingTo("31.50");
-        assertThat(prepared.get(0).quantity()).isEqualTo(5);
+        assertThat(prepared.getFirst().price()).isEqualByComparingTo("31.50");
+        assertThat(prepared.getFirst().quantity()).isEqualTo(5);
         assertThat(prepared.get(1)).isSameAs(sell);
         assertThat(prepared.get(2)).isSameAs(withinCapBuy);
         verifyNoInteractions(orderPort, orderPlanner);
@@ -272,7 +272,7 @@ class BuyOrderPriceCapperTest {
         List<Order> buyOrders = List.of(buy("40.00", 5), buy("28.00", 3));
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(buyOrders);
         List<PlannedOrder> plannedBuyOrders = buyOrders.stream().map(Order::toPlanned).toList();
-        PlannedOrder cappedFirst = plannedBuyOrders.get(0).withPrice(new BigDecimal("31.50"));
+        PlannedOrder cappedFirst = plannedBuyOrders.getFirst().withPrice(new BigDecimal("31.50"));
         when(privacyType.capBuyOrders(eq(plannedBuyOrders), eq(new BigDecimal("31.50")), isNull(), isNull(), eq(StrategyTicker.SOXL), eq(TODAY)))
                 .thenReturn(List.of(cappedFirst, plannedBuyOrders.get(1))); // 두 번째는 변경 없음(동일 값)
 
@@ -288,8 +288,8 @@ class BuyOrderPriceCapperTest {
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
         List<PlannedOrder> saved = ordersCaptor.getValue();
         assertThat(saved).hasSize(1);
-        assertThat(saved.get(0).price()).isEqualByComparingTo("31.50");
-        assertThat(saved.get(0).quantity()).isEqualTo(5);
+        assertThat(saved.getFirst().price()).isEqualByComparingTo("31.50");
+        assertThat(saved.getFirst().quantity()).isEqualTo(5);
     }
 
     @Test

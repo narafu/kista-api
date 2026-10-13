@@ -95,9 +95,9 @@ class PortfolioQueryHttpAdapterTest {
         List<PortfolioOrderResponse> history = adapter.getHistory(userId, from, to, StrategyTicker.TQQQ);
 
         assertThat(history).hasSize(1);
-        assertThat(history.get(0).direction()).isEqualTo(OrderDirection.BUY);
-        assertThat(history.get(0).orderType()).isEqualTo(OrderType.LOC);
-        assertThat(history.get(0).quantity()).isEqualTo(3);
+        assertThat(history.getFirst().direction()).isEqualTo(OrderDirection.BUY);
+        assertThat(history.getFirst().orderType()).isEqualTo(OrderType.LOC);
+        assertThat(history.getFirst().quantity()).isEqualTo(3);
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/portfolio/history");
         assertThat(recorded.getTarget()).contains("userId=" + userId);

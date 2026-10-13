@@ -74,8 +74,8 @@ class TossMarketApiTest {
         List<TossMarketSession> result = tossMarketApi.getMarketCalendar(date, date);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).isOpen()).isTrue();
-        assertThat(result.get(0).date()).isEqualTo(date);
+        assertThat(result.getFirst().isOpen()).isTrue();
+        assertThat(result.getFirst().date()).isEqualTo(date);
     }
 
     @Test
@@ -103,8 +103,8 @@ class TossMarketApiTest {
         List<TossMarketSession> first = tossMarketApi.getMarketCalendar(date, date);
         List<TossMarketSession> second = tossMarketApi.getMarketCalendar(date, date);
 
-        assertThat(first.get(0).isOpen()).isFalse();
-        assertThat(second.get(0).isOpen()).isFalse();
+        assertThat(first.getFirst().isOpen()).isFalse();
+        assertThat(second.getFirst().isOpen()).isFalse();
         // 캐싱되지 않았으므로 매 호출마다 재조회
         verify(tossHttpClient, times(2)).getCommon(any(), any(), any(ParameterizedTypeReference.class));
     }

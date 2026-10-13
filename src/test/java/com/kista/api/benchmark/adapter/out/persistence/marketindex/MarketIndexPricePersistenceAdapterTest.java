@@ -54,8 +54,8 @@ class MarketIndexPricePersistenceAdapterTest extends RootDataJpaTestBase {
         List<IndexPrice> spyOnly = adapter.findBySymbolAndRange("SPY", base, base);
 
         assertThat(spyOnly).hasSize(1);
-        assertThat(spyOnly.get(0).symbol()).isEqualTo("SPY");
-        assertThat(spyOnly.get(0).close()).isEqualByComparingTo(new BigDecimal("500.00"));
+        assertThat(spyOnly.getFirst().symbol()).isEqualTo("SPY");
+        assertThat(spyOnly.getFirst().close()).isEqualByComparingTo(new BigDecimal("500.00"));
     }
 
     @Test

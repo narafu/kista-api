@@ -56,7 +56,7 @@ class PrivacyQueryHttpAdapterTest {
         List<PrivacyTradeBaseResponse> result = adapter.findBasesFromTradeDate(LocalDate.of(2026, 1, 1));
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo(id);
+        assertThat(result.getFirst().id()).isEqualTo(id);
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/privacy/trade-bases");
         assertThat(recorded.getTarget()).contains("fromReleaseDate=2026-01-01");

@@ -1533,7 +1533,7 @@ class StrategyServiceTest {
         List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
 
         assertThat(result).hasSize(1);
-        StrategyDetail detail = result.get(0);
+        StrategyDetail detail = result.getFirst();
         assertThat(detail.divisionCount()).isNull();
         assertThat(detail.currentRound()).isNull();
         // toDetail()이 조립하는 startDate는 findLatestByStrategyId로 조회한 사이클의 startDate와 일치해야 함
@@ -1610,7 +1610,7 @@ class StrategyServiceTest {
         List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
 
         assertThat(batch).hasSize(1);
-        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.divisionCount()).isEqualTo(30);
         assertThat(single.isReverseMode()).isTrue();
     }
@@ -1660,7 +1660,7 @@ class StrategyServiceTest {
         List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
 
         assertThat(batch).hasSize(1);
-        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.vr()).isNotNull();
         assertThat(single.divisionCount()).isNull();
         assertThat(single.currentRound()).isNull();
@@ -1696,7 +1696,7 @@ class StrategyServiceTest {
         List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
 
         assertThat(batch).hasSize(1);
-        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.divisionCount()).isNull();
         assertThat(single.vr()).isNull();
     }
@@ -1724,7 +1724,7 @@ class StrategyServiceTest {
         List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
 
         assertThat(batch).hasSize(1);
-        assertThat(batch.get(0)).isEqualTo(single);
+        assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.startDate()).isNull();
         assertThat(single.initialUsdDeposit()).isNull();
         assertThat(single.divisionCount()).isEqualTo(StrategyDefaults.DEFAULT_DIVISION_COUNT);
