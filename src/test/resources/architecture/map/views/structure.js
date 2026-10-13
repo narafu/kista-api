@@ -8,7 +8,7 @@
     DEFAULT: ['타입 참조', '--default'],
   };
   const TYPE_PRIORITY = ['EVENT_LISTENER', 'USES_COMPONENT', 'ENTITY', 'DEFAULT']; // 엣지 색은 가장 의미 있는 종류로
-  const INFRA = new Set(['platform', 'sharedkernel']); // 거의 모든 모듈이 참조하는 노이즈 모듈
+  const INFRA = new Set(['shared.platform', 'shared.kernel']); // 거의 모든 모듈이 참조하는 노이즈 모듈
   // Gradle 서브프로젝트별 색·카드 열(모델 좌표) — api | shared | trading-core, shared를 가운데 두어 양쪽 엣지가 짧게 모인다
   const PROJECTS = {
     ':api': { accent: '--api', tint: '--api-tint', box: { x1: 0, y1: 0, x2: 400, y2: 640 }, cols: 2 },

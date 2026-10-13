@@ -7,7 +7,7 @@
 // US 거래일 변환 유틸(UsTradeDates)은 어댑터 전용이라 com.kista.shared.platform.time으로 분리됐다.
 // 이 패키지가 다른 모듈을 참조하는 순간 sharedkernel 전제가 깨진다.
 @org.springframework.modulith.ApplicationModule(
-    id = "sharedkernel",
+    id = "kernel",
     type = org.springframework.modulith.ApplicationModule.Type.OPEN
 )
 package com.kista.shared.kernel;

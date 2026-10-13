@@ -64,6 +64,7 @@ dependencies {
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.archunit.junit5)
+    testImplementation(libs.spring.modulith.starter.test) // ModulithArchitectureTest(프로세스별 모델 검증)
     testImplementation(libs.spring.boot.starter.data.jpa.test)
     testImplementation(libs.spring.boot.starter.webmvc.test) // @WebMvcTest for controller tests
     testImplementation(libs.spring.boot.starter.security.test) // @WebMvcTest SecurityFilterChain auto-detection (Boot 4 requirement)

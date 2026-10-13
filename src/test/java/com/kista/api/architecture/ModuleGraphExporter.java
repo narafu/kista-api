@@ -7,14 +7,12 @@ import org.springframework.modulith.core.NamedInterface;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 // Modulith 모듈 그래프를 아키텍처 맵 데이터(DATA.modules)로 조립한다
 final class ModuleGraphExporter {
-
-    private static final Set<String> EXCLUDED = Set.of("support"); // 테스트 픽스처(com.kista.support) — 운영 모듈 아님
 
     private ModuleGraphExporter() {
     }
@@ -35,46 +33,43 @@ final class ModuleGraphExporter {
         }
     }
 
-    static List<Module> graph(ApplicationModules modules) {
-        return modules.stream()
-                .filter(m -> !EXCLUDED.contains(name(m)))
-                .sorted(Comparator.comparing(ModuleGraphExporter::name))
-                .map(m -> toModule(m, modules))
-                .toList();
+    // 프로세스별 모델을 합친다 — 모듈 키는 com.kista 아래 두 세그먼트(api.notify / tradingcore.notify)라 동명 모듈이 충돌하지 않고,
+    // 두 모델에 모두 있는 shared 모듈은 한 번만 남긴다
+    static List<Module> graph(ApplicationModules... models) {
+        var merged = new TreeMap<String, Module>();
+        for (var modules : models) {
+            modules.forEach(m -> merged.putIfAbsent(name(m), toModule(m, modules)));
+        }
+        return List.copyOf(merged.values());
     }
 
     private static Module toModule(ApplicationModule module, ApplicationModules modules) {
-        // 클래스 단위 의존 수집 — 제외 모듈로 향하는 의존은 버린다
+        // 클래스 단위 의존 수집
         var deps = module.getDirectDependencies(modules).stream()
-                .filter(d -> !EXCLUDED.contains(name(d.getTargetModule())))
                 .map(d -> new Dependency(name(d.getTargetModule()), d.getDependencyType().name(),
                         d.getSourceType().getSimpleName(), d.getTargetType().getSimpleName()))
                 .collect(Collectors.toCollection(TreeSet::new));
 
+        var name = name(module);
         return new Module(
-                name(module),
-                project(module),
+                name,
+                project(name),
                 module.getNamedInterfaces().stream().filter(NamedInterface::isNamed).map(NamedInterface::getName).sorted().toList(),
                 module.getEventsListenedTo(modules).stream().map(JavaClass::getSimpleName).sorted().distinct().toList(),
                 List.copyOf(deps));
     }
 
+    // com.kista.<루트>.<모듈> → "<루트>.<모듈>" — ArchitectureMapExporter.moduleOf와 같은 규칙
     private static String name(ApplicationModule module) {
-        return module.getIdentifier().toString();
+        return module.getBasePackage().getName().replaceFirst("^com\\.kista\\.", "");
     }
 
-    // 클래스 산출물 경로로 Gradle 서브프로젝트 판별 (루트 테스트 classpath에 세 프로젝트가 함께 올라온다)
-    private static String project(ApplicationModule module) {
-        var uri = module.getBasePackage().stream().findFirst()
-                .flatMap(JavaClass::getSource)
-                .map(s -> s.getUri().toString().replace('\\', '/'))
-                .orElse("");
-        if (uri.contains("/trading-core/")) {
-            return ":trading-core";
-        }
-        if (uri.contains("/shared/")) {
-            return ":shared";
-        }
-        return ":api";
+    // 모듈 키의 루트 세그먼트로 Gradle 서브프로젝트 판별
+    private static String project(String name) {
+        return switch (name.substring(0, name.indexOf('.'))) {
+            case "tradingcore" -> ":trading-core";
+            case "shared" -> ":shared";
+            default -> ":api";
+        };
     }
 }

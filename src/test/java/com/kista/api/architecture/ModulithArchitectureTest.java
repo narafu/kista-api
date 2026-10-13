@@ -1,5 +1,7 @@
 package com.kista.api.architecture;
 
+import com.kista.api.ApiApplication;
+import com.tngtech.archunit.ArchConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
@@ -11,16 +13,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ModulithArchitectureTest {
 
     @Test
-    @DisplayName("모듈 간 의존이 허용된 방향으로만 존재하고 순환이 없다")
+    @DisplayName("kista-api 프로세스 모듈 간 의존이 허용된 방향으로만 존재하고 순환이 없다")
     void verifyModularStructure() {
-        // 패키지 이동 중에도 모델 루트가 흔들리지 않도록 앱 클래스가 아닌 루트 패키지로 고정 — 프로세스별 모델 전환은 패키지 이동 완료 후
-        var modules = ApplicationModules.of("com.kista").verify();
+        // 프로세스별 모델 — root와 trading-core는 같은 JVM에서 돌지 않으므로 각자 검증한다(trading-core는 자기 테스트에서)
+        // additionalPackages로 붙은 shared 루트는 모듈이 전부 OPEN이라 Modulith 순환 규칙이 검사할 슬라이스가 0개다 —
+        // failOnEmptyShould=true(archunit.properties)가 이를 실패로 만들므로 이 호출에만 스레드 로컬로 완화한다.
+        // 공허 통과는 바로 아래 모듈 ID 집합 단언이 막는다
+        var modules = ArchConfiguration.withThreadLocalScope(config -> {
+            config.setProperty("archRule.failOnEmptyShould", "false");
+            return ApplicationModules.of(ApiApplication.class).verify();
+        });
 
-        // 모듈이 조용히 빠지거나 합쳐지는 것을 막는 기준선(19개)
         assertThat(modules.stream().map(m -> m.getIdentifier().toString()))
-                .containsExactlyInAnyOrder("account", "admin", "benchmark", "broker", "contract", "finance", "market",
-                        "marketcalendar", "matching", "notify", "platform", "privacy", "sharedkernel", "trading",
-                        "tradingnotify", "tradingstats", "tradingweb", "user", "web");
+                .containsExactlyInAnyOrder("admin", "benchmark", "finance", "market", "notify", "user", "web",
+                        "kernel", "contract", "platform");
 
         new Documenter(modules)
                 .writeModulesAsPlantUml()

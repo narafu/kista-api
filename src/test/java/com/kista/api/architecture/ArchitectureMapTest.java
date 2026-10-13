@@ -1,5 +1,7 @@
 package com.kista.api.architecture;
 
+import com.kista.api.ApiApplication;
+import com.kista.tradingcore.TradingApplication;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.DisplayName;
@@ -34,12 +36,14 @@ class ArchitectureMapTest {
                     assertThat(j.times()).containsExactly("04:30");
                 });
 
-        var modules = ModuleGraphExporter.graph(ApplicationModules.of("com.kista"));
+        var modules = ModuleGraphExporter.graph(
+                ApplicationModules.of(ApiApplication.class), ApplicationModules.of(TradingApplication.class));
         // 단계 code: 클래스는 전부 모듈 소속이어야 하고, 오버레이 회귀 가드 — 마감 배치 락 단계는 trading을 거친다
         var moduleNames = modules.stream().map(ModuleGraphExporter.Module::name).collect(Collectors.toSet());
+        assertThat(moduleNames).contains("api.notify", "tradingcore.notify", "shared.kernel"); // 동명 모듈이 프로세스로 구분된다
         assertThat(ArchitectureMapExporter.moduleViolations(map, classes, moduleNames)).isEmpty();
         var stepModules = ArchitectureMapExporter.stepModules(map, classes);
-        assertThat(stepModules.get("close-batch").get("lock")).contains("trading");
+        assertThat(stepModules.get("close-batch").get("lock")).contains("tradingcore.trading");
 
         ArchitectureMapExporter.write(modules, map, stepModules, jobs);
 

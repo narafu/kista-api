@@ -2,22 +2,13 @@ package com.kista.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.modulith.Modulithic;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-// scanBasePackages 명시 — root 테스트 classpath(testImplementation(":trading-core"))에 trading-core
-// 전체가 올라오면서 기본 스캔 범위(암묵적 com.kista)가 trading-core 컴포넌트까지 함께 잡아 빈 중복
-// 등록을 일으키는 문제 발생. root가 실제로 소유한 패키지만 명시해(shared는 자동구성으로 등록)
-// trading-core 패키지(trading/matching/broker/account/privacy/marketcalendar)는 스캔 범위에서
-// 원천 배제 — TradingApplication(:trading-core)이 반대 방향으로 이미 쓰는 것과 동일한 allowlist 패턴
-@SpringBootApplication(scanBasePackages = {
-        "com.kista.api.admin",
-        "com.kista.api.finance",
-        "com.kista.api.market",
-        "com.kista.api.notify",
-        "com.kista.api.benchmark",
-        "com.kista.api.user",
-        "com.kista.api.web",
-})
+// kista-api·kista-scheduler 프로세스 부팅 진입점 — 루트 패키지 com.kista.api에 두어 스캔이 기본값(자기 루트)으로
+// root 전체를 덮는다. :shared 빈은 PlatformAutoConfiguration이 등록하고, Modulith 검증 모델에만 shared를 포함한다
+@SpringBootApplication
+@Modulithic(additionalPackages = "com.kista.shared")
 @EnableScheduling
 public class ApiApplication {
     public static void main(String[] args) {

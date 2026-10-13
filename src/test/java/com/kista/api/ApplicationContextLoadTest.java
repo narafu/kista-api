@@ -44,7 +44,7 @@ class ApplicationContextLoadTest {
 
     @Test
     void 루트_컨텍스트는_JPA_리포지토리_전부와_보안_필터체인_하나만_갖고_trading_core_빈은_없다() {
-        // 리포지토리 스캔 범위 회귀 가드 — RootJpaScanConfig 제거 후에도 같은 수여야 한다
+        // 리포지토리 스캔 범위 회귀 가드 — 기본 스캔(루트 com.kista.api)만으로 root 리포지토리 전부가 잡혀야 한다
         assertThat(context.getBeanNamesForType(JpaRepository.class)).hasSize(ROOT_JPA_REPOSITORIES);
         // shared 자동구성 순서 회귀 가드 — Boot 기본 필터 체인이 함께 등록되면 2개가 된다
         assertThat(context.getBeanNamesForType(SecurityFilterChain.class)).hasSize(1);
