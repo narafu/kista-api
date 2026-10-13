@@ -244,7 +244,7 @@ class TossPriceApi implements CommonMarketPriceFeed {
             log.warn("Toss 종목 정보 응답 없음: ticker={}", ticker);
             return Optional.empty();
         }
-        StockItem s = items.get(0);
+        StockItem s = items.getFirst();
         return Optional.of(new TossStockInfo(
                 s.symbol(),
                 s.name()         != null ? s.name()         : ticker.name(),

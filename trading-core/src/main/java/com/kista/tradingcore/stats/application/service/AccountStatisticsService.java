@@ -126,7 +126,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private CycleHistoryPage toPage(List<CyclePositionHistoryEntry> raw, int size) {
         boolean hasMore = raw.size() > size;
         List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
-        Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
+        Instant nextCursor = hasMore ? items.getLast().createdAt() : null;
         return new CycleHistoryPage(items, nextCursor, hasMore);
     }
 

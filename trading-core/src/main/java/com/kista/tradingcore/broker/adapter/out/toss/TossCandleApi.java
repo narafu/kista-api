@@ -46,7 +46,7 @@ class TossCandleApi {
     }
 
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
-        int clamped = Math.max(1, Math.min(count, MAX_COUNT));
+        int clamped = Math.clamp(count, 1, MAX_COUNT);
         // before 미지정 시 Toss가 최신 봉부터 반환 — 별도 계산 불필요
         return fetchCandles(symbol, interval, clamped, null);
     }
@@ -54,7 +54,7 @@ class TossCandleApi {
     // before(exclusive 경계로 호출측에서 미리 보정된 시각) 이하 가장 최신 봉 1개만 조회 — 전일종가 확정 조회 전용
     public Optional<TossCandle> getCandleBefore(String symbol, String interval, Instant before) {
         List<TossCandle> candles = fetchCandles(symbol, interval, 1, before.toString());
-        return candles.isEmpty() ? Optional.empty() : Optional.of(candles.get(0));
+        return candles.isEmpty() ? Optional.empty() : Optional.of(candles.getFirst());
     }
 
     private List<TossCandle> fetchCandles(String symbol, String interval, int count, String beforeParam) {

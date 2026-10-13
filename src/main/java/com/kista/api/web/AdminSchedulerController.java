@@ -41,7 +41,7 @@ public class AdminSchedulerController {
         Thread.ofVirtual().start(() -> {
             try {
                 action.run();
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
                 log.warn("{} 수동 트리거 인터럽트", label);
             } catch (Exception e) {

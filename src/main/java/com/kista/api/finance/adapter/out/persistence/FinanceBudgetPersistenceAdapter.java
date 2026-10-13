@@ -44,7 +44,7 @@ public class FinanceBudgetPersistenceAdapter implements FinanceBudgetPort {
             // saveAndFlush 필수 — save()만 쓰면 finance_budgets_no_overlap EXCLUDE 위반이 커밋 시점에
             // 터져 이 어댑터 밖으로 새고, 매핑 없는 500으로 떨어진다 (§4.1).
             return FinanceBudgetEntity.toDomain(jpaRepository.saveAndFlush(entity));
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException _) {
             throw new FinanceBudget.OverlappingPeriodException("해당 기간에 이미 적용 중인 예산이 있습니다");
         }
     }

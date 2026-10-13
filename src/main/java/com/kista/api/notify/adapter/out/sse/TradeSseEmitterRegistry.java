@@ -26,7 +26,7 @@ public class TradeSseEmitterRegistry {
     // 30분 timeout (매매 시간 커버)
     public SseEmitter connect(UUID userId) {
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
-        emitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        emitters.computeIfAbsent(userId, _ -> new CopyOnWriteArrayList<>()).add(emitter);
 
         // 연결 해제 시 emitter 제거
         Runnable cleanup = () -> emitters.getOrDefault(userId, List.of()).remove(emitter);
@@ -37,7 +37,7 @@ public class TradeSseEmitterRegistry {
         // 초기 연결 확인 ping
         try {
             emitter.send(SseEmitter.event().name("ping").data("connected"));
-        } catch (IOException e) {
+        } catch (IOException _) {
             log.warn("Trade SSE initial ping failed userId={}", userId);
         }
         return emitter;
@@ -62,7 +62,7 @@ public class TradeSseEmitterRegistry {
             try {
                 emitter.send(SseEmitter.event().name("trade").data(finalPayload));
                 return false;
-            } catch (IOException ex) {
+            } catch (IOException _) {
                 return true;
             }
         });

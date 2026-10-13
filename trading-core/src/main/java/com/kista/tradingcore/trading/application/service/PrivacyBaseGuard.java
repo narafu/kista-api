@@ -42,7 +42,7 @@ class PrivacyBaseGuard {
         if (base == null) return false;
         try {
             return !validationService.inspect(base).hasIssues();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             return false;
         }
     }

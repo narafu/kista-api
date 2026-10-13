@@ -23,7 +23,7 @@ public final class InternalApiErrorDetails {
             if (detail != null && detail.isTextual() && !detail.asText().isBlank()) {
                 return detail.asText();
             }
-        } catch (Exception e) {
+        } catch (Exception _) {
             // 바디 파싱 실패 — 고정 문구로 폴백
         }
         return fallback;

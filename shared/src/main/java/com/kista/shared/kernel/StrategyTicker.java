@@ -24,7 +24,7 @@ public enum StrategyTicker {
         if (name == null) return Optional.empty();
         try {
             return Optional.of(valueOf(name.trim()));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

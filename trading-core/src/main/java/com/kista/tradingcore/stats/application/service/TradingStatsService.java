@@ -223,7 +223,7 @@ class TradingStatsService implements TradingStatsUseCase {
         TreeMap<LocalDate, Map<UUID, CyclePosition>> byDate = new TreeMap<>();
         for (CyclePosition pos : positions) {
             LocalDate date = pos.createdAt().atZone(TimeZones.KST).toLocalDate();
-            byDate.computeIfAbsent(date, d -> new HashMap<>()).put(pos.strategyCycleId(), pos);
+            byDate.computeIfAbsent(date, _ -> new HashMap<>()).put(pos.strategyCycleId(), pos);
         }
 
         Map<UUID, CyclePosition> latest = new HashMap<>(); // carry-forward 상태

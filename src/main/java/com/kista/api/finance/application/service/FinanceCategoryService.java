@@ -180,7 +180,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         }
         try {
             parent.verifyAccessibleBy(userId, currentGroupId);
-        } catch (SecurityException e) {
+        } catch (SecurityException _) {
             throw new IllegalArgumentException("다른 그룹의 카테고리를 부모로 지정할 수 없습니다");
         }
         return parent;

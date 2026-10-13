@@ -23,7 +23,7 @@ class AccountBudgetLock {
 
     // 종료 인터럽트 시 락 대기로 stop_grace_period를 잠식하지 않도록 lockInterruptibly
     <T> T call(UUID accountId, Body<T> body) throws InterruptedException {
-        ReentrantLock lock = locks.computeIfAbsent(accountId, ignored -> new ReentrantLock());
+        ReentrantLock lock = locks.computeIfAbsent(accountId, _ -> new ReentrantLock());
         lock.lockInterruptibly();
         try {
             return body.get();

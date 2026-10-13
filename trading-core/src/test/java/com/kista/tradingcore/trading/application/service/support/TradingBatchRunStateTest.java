@@ -86,7 +86,7 @@ class TradingBatchRunStateTest {
                     releaseCritical.await();
                     return null;
                 }));
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException _) {
             }
         });
         inCritical.await(5, TimeUnit.SECONDS);
@@ -130,7 +130,7 @@ class TradingBatchRunStateTest {
                         try {
                             go.await();
                             break;
-                        } catch (InterruptedException ignored) {
+                        } catch (InterruptedException _) {
                         }
                     }
                     Thread.interrupted(); // 인터럽트 플래그를 삼킨 코드 경로 모사

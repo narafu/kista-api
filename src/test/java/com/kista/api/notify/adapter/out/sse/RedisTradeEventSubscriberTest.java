@@ -77,7 +77,7 @@ class RedisTradeEventSubscriberTest {
     private static void await() {
         try {
             Thread.sleep(200);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

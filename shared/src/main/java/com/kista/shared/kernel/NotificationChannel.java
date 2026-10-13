@@ -15,7 +15,7 @@ public enum NotificationChannel {
         if (value == null) return Optional.empty();
         try {
             return Optional.of(valueOf(value.toUpperCase()));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

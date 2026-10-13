@@ -16,7 +16,7 @@ public final class ErrorBodyDecoder {
         if (body == null || body.isBlank()) return Optional.empty();
         try {
             return Optional.ofNullable(objectMapper.readValue(body, type));
-        } catch (Exception e) {
+        } catch (Exception _) {
             return Optional.empty();
         }
     }

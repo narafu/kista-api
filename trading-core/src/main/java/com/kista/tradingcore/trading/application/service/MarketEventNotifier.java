@@ -55,7 +55,7 @@ class MarketEventNotifier {
     private void sendWithLimit(Semaphore limiter, TradingUserProfile user, Consumer<TradingUserProfile> action) {
         try {
             limiter.acquire();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return;
         }

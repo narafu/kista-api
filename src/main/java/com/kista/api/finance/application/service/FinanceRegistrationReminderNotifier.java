@@ -59,7 +59,7 @@ class FinanceRegistrationReminderNotifier implements FinanceRegistrationReminder
     private void checkAndRequestWithLimit(Semaphore limiter, UUID userId, String body, LocalDate from, LocalDate to) {
         try {
             limiter.acquire();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return;
         }

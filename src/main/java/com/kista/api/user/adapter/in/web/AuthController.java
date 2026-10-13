@@ -96,7 +96,7 @@ public class AuthController {
                 Jwt jwt = jwtDecoder.decode(authHeader.substring(7));
                 jti = jwt.getId();           // jti 클레임
                 atExpiresAt = jwt.getExpiresAt(); // exp 클레임
-            } catch (Exception ignored) {
+            } catch (Exception _) {
                 // AT 파싱 실패는 무시 — RT 삭제만으로도 로그아웃 효과
             }
         }

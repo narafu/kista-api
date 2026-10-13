@@ -62,7 +62,7 @@ class MarketEventNotifierTest {
             try {
                 barrier.await(3, TimeUnit.SECONDS);
                 barrierResults.add(true);
-            } catch (Exception e) {
+            } catch (Exception _) {
                 barrierResults.add(false);
             }
             return null;

@@ -23,13 +23,13 @@ final class KisResponseParser {
     // KIS 응답 숫자 문자열 → BigDecimal, 빈 값·오류 시 ZERO
     static BigDecimal parseBd(String s) {
         try { return s == null || s.isBlank() ? BigDecimal.ZERO : new BigDecimal(s.trim()); }
-        catch (NumberFormatException e) { return BigDecimal.ZERO; }
+        catch (NumberFormatException _) { return BigDecimal.ZERO; }
     }
 
     // KIS 응답 정수 문자열 → int, "5.0" 같은 소수 형식도 수용 (Double 경유)
     static int parseIntSafe(String s) {
         try { return s == null || s.isBlank() ? 0 : (int) Double.parseDouble(s.trim()); }
-        catch (NumberFormatException e) { return 0; }
+        catch (NumberFormatException _) { return 0; }
     }
 
     // sll_buy_dvsn_cd: 01=매도, 02=매수
@@ -56,7 +56,7 @@ final class KisResponseParser {
     static LocalDate parseDate(String yyyymmdd, LocalDate fallback) {
         if (yyyymmdd == null || yyyymmdd.isBlank()) return fallback;
         try { return LocalDate.parse(yyyymmdd.trim(), DateTimeFormatter.BASIC_ISO_DATE); }
-        catch (DateTimeParseException e) { return fallback; }
+        catch (DateTimeParseException _) { return fallback; }
     }
 
     // 응답 행 목록 → null 가드 + StrategyTicker 외 종목 필터링(silent drop) + 도메인 매핑 골격

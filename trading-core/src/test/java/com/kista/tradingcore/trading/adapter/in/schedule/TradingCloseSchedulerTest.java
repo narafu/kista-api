@@ -138,7 +138,7 @@ class TradingCloseSchedulerTest {
 
         try {
             scheduler.run();
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             // 인터럽트 플래그 복원 확인
         }
 

@@ -41,7 +41,7 @@ class PreviewDepositCache {
             return cached.usdDeposit();
         }
 
-        ReentrantLock lock = locks.computeIfAbsent(account.id(), k -> new ReentrantLock());
+        ReentrantLock lock = locks.computeIfAbsent(account.id(), _ -> new ReentrantLock());
         lock.lock();
         try {
             Entry doubleChecked = cache.get(account.id());

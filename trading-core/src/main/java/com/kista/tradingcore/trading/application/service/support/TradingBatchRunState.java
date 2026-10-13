@@ -67,7 +67,7 @@ public class TradingBatchRunState {
             if (critical) return false;
             if (batchThread != null) batchThread.interrupt(); // 대기 중 배치가 끝났으면 null
             return true;
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return !critical;
         } finally {

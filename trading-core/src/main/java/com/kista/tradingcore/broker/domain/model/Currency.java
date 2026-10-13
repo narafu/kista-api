@@ -12,7 +12,7 @@ public enum Currency {
         if (code == null) return Optional.empty();
         try {
             return Optional.of(valueOf(code.trim()));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return Optional.empty();
         }
     }

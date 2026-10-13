@@ -91,7 +91,7 @@ public class StrategyHistoryQueryService {
                 cyclePositionPort.findByStrategyIdWithCursor(strategyId, fromInstant, effectiveCursor, size + 1);
         boolean hasMore = raw.size() > size;
         List<CyclePositionHistoryEntry> items = hasMore ? raw.subList(0, size) : raw;
-        Instant nextCursor = hasMore ? items.get(items.size() - 1).createdAt() : null;
+        Instant nextCursor = hasMore ? items.getLast().createdAt() : null;
         return new CycleHistoryPage(items, nextCursor, hasMore);
     }
 

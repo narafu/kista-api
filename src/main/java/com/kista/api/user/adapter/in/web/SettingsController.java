@@ -88,7 +88,7 @@ public class SettingsController {
         NotificationType notificationType;
         try {
             notificationType = NotificationType.valueOf(type.toUpperCase());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new IllegalArgumentException("알 수 없는 알림 타입: " + type + ". 허용값: " + Arrays.stream(NotificationType.values()).map(Enum::name).collect(Collectors.joining(", ")));
         }
         userSettingsUseCase.updateNotificationPref(userId, notificationType, body.enabled());

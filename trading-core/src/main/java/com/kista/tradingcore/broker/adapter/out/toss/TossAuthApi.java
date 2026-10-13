@@ -138,7 +138,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
                 log.warn("Toss 계좌 목록 비어있음 — clientId 확인 필요");
                 throw new BrokerCredentialException();
             }
-            return String.valueOf(accounts.get(0).accountSeq());
+            return String.valueOf(accounts.getFirst().accountSeq());
         } catch (RestClientException e) {
             log.warn("Toss 계좌 조회 실패: {}", e.getMessage(), e);
             throw new BrokerCredentialException();

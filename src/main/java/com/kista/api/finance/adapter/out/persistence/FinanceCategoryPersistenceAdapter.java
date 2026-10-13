@@ -42,7 +42,7 @@ public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
         try {
             // saveAndFlush로 uq_finance_categories_group_parent_name 위반을 이 어댑터 안에서 즉시 터뜨린다
             return FinanceCategoryEntity.toDomain(jpaRepository.saveAndFlush(entity));
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException _) {
             throw new FinanceCategory.DuplicateNameException(category.name());
         }
     }

@@ -80,7 +80,7 @@ public class InfiniteStrategy {
 
     // 전반 2건: buy①(averagePrice 기반), buy②(referencePrice 기반)
     private List<PlannedOrder> computeEarlyBuys(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> buyOrders, BigDecimal cap, BigDecimal unitAmount) {
-        PlannedOrder buy1 = buyOrders.get(0);
+        PlannedOrder buy1 = buyOrders.getFirst();
         PlannedOrder buy2 = buyOrders.get(1);
         BigDecimal cappedAvg = buy1.price().min(cap);
         BigDecimal cappedRef = buy2.price().min(cap);

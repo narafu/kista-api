@@ -116,7 +116,7 @@ public class SchedulerLockService {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         try {
             return InetAddress.getLocalHost().getHostName() + "-" + ManagementFactory.getRuntimeMXBean().getName() + "-" + suffix;
-        } catch (Exception e) {
+        } catch (Exception _) {
             return UUID.randomUUID().toString();
         }
     }

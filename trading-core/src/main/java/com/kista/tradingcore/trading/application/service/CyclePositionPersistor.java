@@ -45,7 +45,7 @@ class CyclePositionPersistor {
 
         // 저장 전 이전 포지션 확인 — 0회차 매수 실패(holdings=0)와 진짜 청산(이전 holdings>0→현재 0) 구분
         List<CyclePosition> prevPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1);
-        boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.get(0).holdings() > 0;
+        boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.getFirst().holdings() > 0;
 
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
         CyclePosition savedPosition = cyclePositionPort.save(position);
@@ -80,7 +80,7 @@ class CyclePositionPersistor {
     private boolean computeNewReverseMode(StrategyCycle currentCycle, Strategy strategy,
                                           AccountBalance balance, BigDecimal closingPrice) {
         List<CyclePositionInfiniteDetail> recent = cyclePositionInfiniteDetailPort.findLatestByCycleId(currentCycle.id(), 1);
-        boolean prevReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
+        boolean prevReverseMode = !recent.isEmpty() && recent.getFirst().isReverseMode();
         int divisionCount = strategyInfiniteDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
                 .map(StrategyInfiniteDetail::divisionCount)
                 .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT);

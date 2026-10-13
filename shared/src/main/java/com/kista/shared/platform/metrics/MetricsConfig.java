@@ -36,7 +36,7 @@ public class MetricsConfig {
                     return Long.parseLong(parts[1]) * 1024.0; // kB -> bytes
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException _) {
             // /proc 미지원 환경 — 정상 케이스로 취급
         }
         return Double.NaN;

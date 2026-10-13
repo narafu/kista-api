@@ -53,7 +53,7 @@ public final class InvestmentIndexCalculator {
             if (date.isAfter(to)) {
                 continue;
             }
-            positionsByDate.computeIfAbsent(date, ignored -> new HashMap<>())
+            positionsByDate.computeIfAbsent(date, _ -> new HashMap<>())
                     .merge(position.strategyCycleId(), position, InvestmentIndexCalculator::laterPosition);
         }
 
@@ -176,7 +176,7 @@ public final class InvestmentIndexCalculator {
                 continue;
             }
             LocalDate date = position.createdAt().atZone(TimeZones.KST).toLocalDate();
-            dailyPositionsByCycle.computeIfAbsent(cycle.id(), ignored -> new TreeMap<>())
+            dailyPositionsByCycle.computeIfAbsent(cycle.id(), _ -> new TreeMap<>())
                     .merge(date, position, InvestmentIndexCalculator::laterPosition);
         }
 
@@ -185,7 +185,7 @@ public final class InvestmentIndexCalculator {
             for (var dailyPosition : entry.getValue().entrySet()) {
                 BigDecimal value = dailyPosition.getValue().totalAssetAtCloseOrNull();
                 if (value != null) {
-                    valuesByCycle.computeIfAbsent(entry.getKey(), ignored -> new TreeMap<>())
+                    valuesByCycle.computeIfAbsent(entry.getKey(), _ -> new TreeMap<>())
                             .put(dailyPosition.getKey(), value);
                 }
             }

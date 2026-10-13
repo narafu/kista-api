@@ -202,7 +202,7 @@ class TradingCandidatePlanner {
                 .map(candidate -> new TradingOrderBudgetAllocator.Candidate(
                         candidate.state().ctx(), candidate.creatableOrders()))
                 .forEach(candidate -> candidatesByAccount
-                        .computeIfAbsent(candidate.ctx().account().id(), ignored -> new ArrayList<>())
+                        .computeIfAbsent(candidate.ctx().account().id(), _ -> new ArrayList<>())
                         .add(candidate));
 
         Set<BatchContext> savedContexts = new LinkedHashSet<>();

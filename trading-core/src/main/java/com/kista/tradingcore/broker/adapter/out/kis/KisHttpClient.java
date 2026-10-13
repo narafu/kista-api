@@ -142,13 +142,13 @@ class KisHttpClient {
         }
     }
 
-    // 같은 앱키로의 연속 호출 사이 최소 간격을 보장 — 락 없는 슬롯 예약(가상스레드가 synchronized 안에서 sleep하면
-    // 캐리어 스레드에 pin되는 함정을 피하기 위해 명시적 CAS 루프만 사용). System.nanoTime()은 상대 경과 시간
+    // 같은 앱키로의 연속 호출 사이 최소 간격을 보장 — 락 없는 슬롯 예약(CAS 루프로 슬롯만 확정하고 대기는 락 밖에서
+    // 하므로 같은 앱키 호출끼리 sleep 동안 서로를 막지 않는다). System.nanoTime()은 상대 경과 시간
     // 측정용이라 NTP 보정 등 벽시계 역행에 영향받지 않는다.
     // 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않는다 — accumulateAndGet처럼 무조건 먼저 예약해버리면
     // 거부된 호출도 대기열을 뒤로 밀어버려 반복 거부가 대기열을 무한히 미래로 누적시키는 회귀가 생긴다.
     private void awaitAccountSlot(BrokerAccountRef account) {
-        AtomicLong nextSlot = nextSlotByAppKey.computeIfAbsent(account.appKey(), key -> new AtomicLong(0));
+        AtomicLong nextSlot = nextSlotByAppKey.computeIfAbsent(account.appKey(), _ -> new AtomicLong(0));
         long intervalNanos = MIN_CALL_INTERVAL_MILLIS * 1_000_000L;
         long maxWaitNanos = MAX_QUEUE_WAIT_MILLIS * 1_000_000L;
         while (true) {
@@ -188,7 +188,7 @@ class KisHttpClient {
         try {
             Thread.sleep(delay);
             return true;
-        } catch (InterruptedException ie) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return false;
         }

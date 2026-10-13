@@ -59,7 +59,7 @@ class CycleOrderComputer {
         BigDecimal starPointPrice = null;
         if (strategy.isInfinite() && currentCycle != null) {
             List<CyclePositionInfiniteDetail> recent = cyclePositionInfiniteDetailPort.findLatestByCycleId(currentCycle.id(), 2);
-            isReverseMode = !recent.isEmpty() && recent.get(0).isReverseMode();
+            isReverseMode = !recent.isEmpty() && recent.getFirst().isReverseMode();
             isFirstReverseDay = isReverseMode && (recent.size() < 2 || !recent.get(1).isReverseMode());
             // 별지점: 리버스모드 2일차+에서만 계산 (첫날은 MOC 즉시 청산이라 별지점 불필요)
             if (isReverseMode && !isFirstReverseDay) {

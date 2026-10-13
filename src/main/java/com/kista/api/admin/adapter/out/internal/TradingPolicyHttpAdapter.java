@@ -34,7 +34,7 @@ class TradingPolicyHttpAdapter implements TradingPolicyPort {
                     .body(TradingPolicySettings.class);
             if (settings == null) throw new IllegalStateException("매매 런타임 정책 응답이 비어 있습니다");
             return settings;
-        } catch (HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound _) {
             log.warn("trading-core가 아직 정책 API를 제공하지 않아 기본 정책으로 응답 — kista-trading 배포 전환기 (404)");
             return TradingPolicySettings.defaults();
         } catch (RestClientException e) {
@@ -56,7 +56,7 @@ class TradingPolicyHttpAdapter implements TradingPolicyPort {
                     .body(TradingPolicySettings.class);
             if (saved == null) throw new IllegalStateException("매매 런타임 정책 교체 응답이 비어 있습니다");
             return saved;
-        } catch (HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound _) {
             throw new IllegalStateException("trading-core가 아직 정책 API를 제공하지 않습니다 — kista-trading 배포 후 다시 시도하세요");
         } catch (IllegalArgumentException e) {
             throw e; // 400 → badRequestAsIllegalArgument가 이미 변환 — 그대로 관리자에게 400

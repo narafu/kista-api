@@ -37,7 +37,7 @@ class AccountQueryHttpAdapter implements AccountQueryPort {
             return Optional.ofNullable(internalApiRestClient.get()
                     .uri("/api/internal/accounts/{id}", accountId)
                     .retrieve().body(AccountSummaryResponse.class));
-        } catch (HttpClientErrorException.NotFound e) {
+        } catch (HttpClientErrorException.NotFound _) {
             // trading-core 쪽 findByIdOrThrow가 NoSuchElementException -> 404로 매핑되는 경우 —
             // 없음을 나타내는 Optional.empty()로 되돌린다
             return Optional.empty();

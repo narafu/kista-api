@@ -47,7 +47,7 @@ public class TradingBatchResumer {
         try {
             resumeClose(nowKst);
             resumeOpen(nowKst);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt(); // 재개 도중 다시 종료 — 다음 기동이 이어받음
         } catch (Exception e) {
             log.error("매매 배치 재개 실패: {}", e.getMessage(), e);

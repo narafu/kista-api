@@ -111,7 +111,7 @@ class TradingOrderBudgetAllocator {
                     .collect(java.util.stream.Collectors.groupingBy(
                             PlannedOrder::ticker, LinkedHashMap::new, java.util.stream.Collectors.toList()));
             sellsByTicker.forEach((ticker, sells) -> requestsByTicker
-                    .computeIfAbsent(ticker, ignored -> new ArrayList<>())
+                    .computeIfAbsent(ticker, _ -> new ArrayList<>())
                     .add(new SellRequest(candidate, sells)));
         }
 
@@ -247,7 +247,7 @@ class TradingOrderBudgetAllocator {
         // 승인 SELL은 원본 인스턴스 그대로, 승인 BUY는 축소본(주문 제외·수량 축소)일 수 있어 ctx별로 따로 모은다
         Map<BatchContext, List<PlannedOrder>> approvedSells = new LinkedHashMap<>();
         sellApproved.forEach(candidate -> approvedSells
-                .computeIfAbsent(candidate.ctx(), ignored -> new ArrayList<>())
+                .computeIfAbsent(candidate.ctx(), _ -> new ArrayList<>())
                 .addAll(candidate.orders()));
         Map<BatchContext, List<PlannedOrder>> approvedBuys = new LinkedHashMap<>();
         buyApproved.forEach(candidate -> approvedBuys.put(candidate.ctx(), candidate.orders()));

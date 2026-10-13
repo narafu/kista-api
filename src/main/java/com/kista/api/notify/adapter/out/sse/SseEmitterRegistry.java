@@ -35,7 +35,7 @@ public class SseEmitterRegistry {
         try {
             emitter.send(SseEmitter.event().name("status").data(status.name()));
             emitter.complete();
-        } catch (IOException e) {
+        } catch (IOException _) {
             emitters.remove(userId, emitter);
         }
     }

@@ -41,7 +41,7 @@ public class TradingParallelRunner {
                     .map(task -> (Callable<Optional<T>>) () -> {
                         // 같은 계좌의 동시 호출 상한 — KIS rate limit·Toss 공유 토큰 갱신 경합 완화
                         Semaphore gate = gates.computeIfAbsent(task.groupKey(),
-                                ignored -> new Semaphore(maxConcurrentPerGroup));
+                                _ -> new Semaphore(maxConcurrentPerGroup));
                         gate.acquire();
                         try {
                             return task.action().call();

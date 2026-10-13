@@ -95,7 +95,7 @@ class TradingOrderExecutor {
                 return buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
                         currentPrice, position, vrPosition, strategy.ticker(), freeBudget);
             });
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt(); // placeEach 상단 체크가 남은 접수를 중단
         }
     }
@@ -152,7 +152,7 @@ class TradingOrderExecutor {
             log.warn("markPlaced 1차 실패 — 1초 후 재시도: {}", first.getMessage());
             try {
                 Thread.sleep(1000);
-            } catch (InterruptedException ie) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
             orderPort.markPlaced(orderId, externalOrderId);

@@ -74,7 +74,7 @@ class TelegramBotService {
         UUID targetUserId;
         try {
             targetUserId = UUID.fromString(parts[1]);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             log.warn("callback_data UUID 파싱 실패: {}", data);
             return;
         }
@@ -95,7 +95,7 @@ class TelegramBotService {
                     yield null;
                 }
             };
-        } catch (User.AlreadyActiveException e) {
+        } catch (User.AlreadyActiveException _) {
             // 버튼 중복 클릭·웹에서 먼저 승인 — webhook은 200으로 끝내고(재전송 방지) 안내만 보낸다
             reply = "ℹ️ 이미 승인된 사용자입니다: " + targetUserId;
         }
@@ -135,7 +135,7 @@ class TelegramBotService {
                                 "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f",
                                 s.holdings(), avgPrice, marketValue,
                                 s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0, totalAsset);
-                    } catch (NoSuchElementException e) {
+                    } catch (NoSuchElementException _) {
                         return "포트폴리오 데이터가 없습니다.";
                     }
                 })
@@ -161,7 +161,7 @@ class TelegramBotService {
     private int parseHistoryDays(String text) {
         String[] parts = text.split("\\s+");
         if (parts.length >= 2) {
-            try { return Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+            try { return Integer.parseInt(parts[1]); } catch (NumberFormatException _) {}
         }
         return 7;
     }

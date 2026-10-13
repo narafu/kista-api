@@ -28,7 +28,7 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
         // 동일 무효 토큰을 여러 전략 리포트 스레드가 동시에 삭제 시도할 수 있음 — 이미 삭제됐으면 목적 달성으로 간주
         try {
             repository.deleteByUserIdAndToken(userId, token);
-        } catch (ObjectOptimisticLockingFailureException ignored) {
+        } catch (ObjectOptimisticLockingFailureException _) {
         }
     }
 

@@ -156,7 +156,7 @@ class KisPriceApi {
                 log.warn("확정 종가(dailyprice) 응답 없음 — 라이브 현재가로 fallback: ticker={}", ticker);
                 return Optional.empty();
             }
-            DailyPriceResponse.Output2 bar = response.output2().get(0);
+            DailyPriceResponse.Output2 bar = response.output2().getFirst();
             if (bar.clos() == null || bar.clos().isBlank()) {
                 log.warn("확정 종가(dailyprice) 종가 빈값 — 라이브 현재가로 fallback: ticker={}", ticker);
                 return Optional.empty();
@@ -210,7 +210,7 @@ class KisPriceApi {
             try {
                 result.put(ticker, singleCall.apply(ticker));
                 log.info("단건 API fallback 성공: ticker={}", ticker);
-            } catch (Exception e) {
+            } catch (Exception _) {
                 log.warn("단건 API fallback도 실패: ticker={}", ticker);
             }
         }

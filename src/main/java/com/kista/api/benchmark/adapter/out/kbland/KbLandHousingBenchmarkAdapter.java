@@ -166,7 +166,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
         for (String baseDate : baseDates) {
             try {
                 parsed.add(baseDate == null ? null : LocalDate.parse(baseDate, UPDATED_DATE_FORMATTER));
-            } catch (DateTimeParseException e) {
+            } catch (DateTimeParseException _) {
                 log.warn("KB Land 주간 아파트 매매가격지수 날짜 파싱 실패 스킵: baseDate={}", baseDate);
                 parsed.add(null);
             }

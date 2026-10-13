@@ -104,7 +104,7 @@ class TossHttpClient {
     private void sleepBackoff(int attempt) {
         try {
             Thread.sleep(RETRY_BACKOFF_MILLIS * (attempt + 1));
-        } catch (InterruptedException ie) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }

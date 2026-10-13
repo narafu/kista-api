@@ -36,7 +36,7 @@ class KisTokenCoordinator implements TokenCoordinator {
         if (cached.isPresent()) {
             return cached.get();
         }
-        ReentrantLock lock = locks.computeIfAbsent(accountId, k -> new ReentrantLock());
+        ReentrantLock lock = locks.computeIfAbsent(accountId, _ -> new ReentrantLock());
         lock.lock();
         try {
             // 2차 조회(double-check) — 다른 스레드가 이미 발급했을 수 있음

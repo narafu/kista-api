@@ -35,7 +35,7 @@ public record FearGreedResponse(
     private static SourceView toView(List<FearGreedSnapshot> snapshots) {
         List<Point> history = snapshots.stream().map(FearGreedResponse::toPoint).toList();
         // 오름차순이므로 마지막이 최신 — 비어있으면 current=null
-        Point current = history.isEmpty() ? null : history.get(history.size() - 1);
+        Point current = history.isEmpty() ? null : history.getLast();
         return new SourceView(current, history);
     }
 

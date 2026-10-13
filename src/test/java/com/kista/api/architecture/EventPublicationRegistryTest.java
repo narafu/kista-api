@@ -44,7 +44,7 @@ class EventPublicationRegistryTest {
 
         try {
             eventPublisher.publishEvent(new BenchmarkAlertRaisedEvent("테스트 알림"));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException _) {
             // fallbackExecution 동기 리스너 예외가 발행자까지 전파됨 — 이 테스트에서는 무시
         }
 
