@@ -35,8 +35,9 @@ landscape:
       - {id: signup, title: 가입·승인, flow: signup}
       - {id: account-link, title: 계좌 연결, flow: account-link}
       - {id: strategy-register, title: 전략 등록, flow: strategy-register}
-      - {id: daily-trading, title: 매일 자동 매매, when: "개장 22:30 · 마감 04:30", flow: close-batch}
+      - {id: daily-trading, title: 매일 자동 매매, when: "개장 22:00 · 마감 04:30", flow: close-batch}
       - {id: result, title: 결과 확인, flow: result}
+      - {id: dca-history, title: DCA 회차 이력 조회, when: "GET /api/trading-cycles/{id}/dca-executions", flow: result}
       - {id: pause-stop, title: 일시정지·재개·삭제, flow: pause-stop}
       - {id: withdraw, title: 탈퇴, flow: withdraw}
   - group: 사용자 기능
@@ -47,7 +48,7 @@ landscape:
       - {id: group-share, title: 그룹 공유, flow: group-share}
   - group: 자동 프로세스
     steps:
-      - {id: open-batch, title: 개장 배치, when: "월~금 22:30", flow: open-batch}
+      - {id: open-batch, title: 개장 배치, when: "월~금 22:00", flow: open-batch}
       - {id: close-batch, title: 마감 배치, when: "화~토 04:30", flow: close-batch}
       - {id: report-notify, title: 리포트·알림, when: "마감 배치 끝", flow: close-batch}
       - {id: fida-receive, title: FIDA 기준표 수신, when: "매일 07:00 (fida 프로젝트)", flow: fida-receive}
@@ -128,10 +129,22 @@ flows:
         title: 주문 계획·예산 배정
         desc: >-
           전략 공식으로 주문을 계산하고, 오늘 아직 없는 AT_CLOSE 슬롯만 후보로 남긴다. BUY는 현재가×1.05 cap을 미리 적용한다.
-          계좌별 실시간 잔고·판매가능수량 안에서 VR → INFINITE → PRIVACY 순서로 예산을 배정하고, 승인된 주문을 PLANNED로 저장한다.
+          계좌별 실시간 잔고·판매가능수량 안에서 VR → INFINITE → PRIVACY → DCA 순서로 예산을 배정하고, 승인된 주문을 PLANNED로 저장한다.
         code: [TradingCandidatePlanner#planAll, TradingOrderBudgetAllocator#allocate]
         state: "orders → PLANNED · trading_batch_run → PLANNED"
         fail: 예산이 부족해 거절된 전략은 사용자에게 잔고 부족을 알린다. 계좌나 사이클 하나가 실패해도 그 단위만 격리하고 나머지는 계속 진행한다.
+
+      - id: dca-round
+        lane: trading
+        to: [broker, db, telegram]
+        title: DCA 회차 판정
+        desc: >-
+          DCA 전략은 일반 공식 대신 회차 판정을 거친다. 기존 주문·timing·실행일·이력(UNIQUE 전략+거래일)을 확인하고 전일 종가·잔고를 조회해
+          주문을 만들거나 skip 사유와 함께 이력을 남긴다. skip이면 사용자에게 "미주문" 알림을 보낸다(이력 삽입 성공 시에만 발행해 재개 때 중복 없음).
+        code: [DcaRoundPlanner#plan, DcaRoundSkippedEvent, TradingAlertNotifier#onDcaRoundSkipped]
+        cond: DCA 전략이 있을 때
+        state: "dca_execution 기록"
+        fail: 전략 하나가 실패해도 그 전략만 격리한다.
 
       - id: wait-order
         lane: trading
@@ -245,7 +258,7 @@ flows:
 
   open-batch:
     title: 개장 매매 배치
-    trigger: 월~금 22:30 KST cron (kista-trading)
+    trigger: 월~금 22:00 KST cron (kista-trading)
     summary: >-
       ACTIVE 전략마다 다음 거래일의 장 시작 주문(AT_OPEN)만 계산·예산 배정해 개장 직후 증권사에 미리 접수한다.
       장마감 주문(AT_CLOSE)·체결 기록·리포트는 마감 배치가 맡는다.
@@ -263,7 +276,7 @@ flows:
         to: [db]
         title: 대상 전략 수집
         desc: >-
-          ACTIVE 전략마다 배치 컨텍스트를 만든다. 거래일은 다음 거래일(22:30이면 내일 KST 날짜)이고, 이 날짜로 체크포인트를 남긴다.
+          ACTIVE 전략마다 배치 컨텍스트를 만든다. 거래일은 다음 거래일(22:00이면 내일 KST 날짜)이고, 이 날짜로 체크포인트를 남긴다.
           AT_OPEN 주문이 있는 전략만 고르지 않는다 — 걸러지는 건 뒤의 주문 계획 단계다.
         code: [BatchContextFactory#buildAll, TradingService#runOpenBatch]
         state: "trading_batch_run(OPEN) → STARTED"
@@ -281,7 +294,7 @@ flows:
       - id: start-filter
         lane: trading
         title: 아직 시작 전인 전략 제외
-        desc: 마감 배치와 같은 규칙이다. 거래일이 시작예정일보다 뒤인 전략만 남는다 — 시작예정일 당일 22:30 개장 배치부터 대상이다.
+        desc: 마감 배치와 같은 규칙이다. 거래일이 시작예정일보다 뒤인 전략만 남는다 — 시작예정일 당일 22:00 개장 배치부터 대상이다.
         code: [TradingService#filterScheduledStart]
         fail: 모두 제외되면 DONE으로 끝낸다.
 
@@ -304,10 +317,22 @@ flows:
         cond: PRIVACY 전략이 있고 기준표가 있을 때
         fail: 기준표가 아예 없으면 점검을 건너뛴다.
 
+      - id: dca-preopen
+        lane: trading
+        to: [broker, db]
+        title: KIS DCA 개장 전 접수
+        desc: >-
+          개장 대기 전에 KIS 계좌의 DCA 개장(MOO) 전략만 먼저 회차를 판정해 접수한다. 접수 뒤 체크포인트를 STARTED로 되돌려 대기 중 재기동이 오경고를 내지 않게 하고,
+          이 단계가 실패해도 일반 전략 흐름은 계속된다.
+        code: [TradingService#placePreOpenDcaOrders, DcaRoundPlanner#plan]
+        cond: KIS 계좌에 DCA 개장 주문 전략이 있을 때
+        state: "orders → PLACED · trading_batch_run → STARTED"
+        fail: 실패는 격리하고 개장 후 경로가 이어받는다(이력 행·기존 주문으로 중복 방지).
+
       - id: wait-open
         lane: trading
         title: 개장 시각까지 대기
-        desc: DST면 22:30이 곧 개장이라 바로 진행하고, 비DST면 23:30까지 약 60분 기다린다.
+        desc: 22:00 발화 후 DST면 22:30, 비DST면 23:30 개장까지 기다린다(DST 약 30분, 비DST 약 90분).
         code: [DstInfo#waitUntilMarketOpen, TradingService#waitFor]
         fail: 재기동 종료면 기동 후 재개된다. 그 밖의 인터럽트는 사용자에게 "미접수" 알림을 보낸다.
 
@@ -477,7 +502,7 @@ flows:
           시작예정일은 오늘 이후만 허용한다. 같은 계좌에 같은 종목 전략이 이미 있으면 거부한다.
         code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
                StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker]
-        fail: 위반이면 400(중복은 409 성격의 상태 오류).
+        fail: 위반이면 400(중복은 409 성격의 상태 오류). DCA(UPRO/QLD)는 방향이 다르면 같은 종목에 매수 1 + 매도 1을 허용하고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다.
 
       - id: balance
         lane: trading
@@ -511,8 +536,8 @@ flows:
         lane: trading
         title: 첫 매매 시점
         desc: >-
-          등록만으로 주문은 나가지 않는다. 배치가 "거래일 > 시작예정일"인 전략만 매매하므로, 시작예정일 D 밤 미국장(D 22:30 개장 배치 · D+1 04:30 마감 배치)부터 매매한다.
-          시작예정일이 오늘인데 그날 22:30 개장 배치가 이미 대상을 확정한 뒤 등록하면 그날 밤 장 시작 주문(INFINITE 매도·VR 사다리)은 자동으로 생기지 않는다.
+          등록만으로 주문은 나가지 않는다. 배치가 "거래일 > 시작예정일"인 전략만 매매하므로, 시작예정일 D 밤 미국장(D 22:00 개장 배치 · D+1 04:30 마감 배치)부터 매매한다.
+          시작예정일이 오늘인데 그날 22:00 개장 배치가 이미 대상을 확정한 뒤 등록하면 그날 밤 장 시작 주문(INFINITE 매도·VR 사다리)은 자동으로 생기지 않는다.
           동작은 그대로 두고 등록 응답(todayOpenBatchMissed)과 화면 안내로 알리며, 개장 뒤 "바로 주문"(수동 실행)으로 접수할 수 있다. 장 마감 주문은 다음 날 04:30 배치가 정상 처리한다.
         code: [TradingService#filterScheduledStart, DstInfo#openBatchMissedFor, TradingCycleResponse#forRegistration, ManualTradingService#execute]
 
@@ -753,7 +778,7 @@ flows:
         desc: >-
           성과 화면(StatsOverview)은 서버에서 요약(GET /api/stats/summary)과 최근 3개월 누적 자산 곡선(GET /api/stats/equity-curve)을 미리 채우고,
           사이클 성과 목록(GET /api/stats/cycles)은 진행 상태(진행중/종료) 필터와 번호 페이지로 불러온다. 요약·곡선은 모의계좌(MOCK)를 뺀 실제 투자 성과이고, 사이클 목록만 모의계좌도 포함한다.
-          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다.
+          전략 유형 필터를 바꾸면 곡선과 목록이 같이 바뀐다. 결과는 사용자별 5분 캐시를 쓴다. DCA 전략은 브로커 실잔고 기반이라 요약·곡선·목록 집계에서 모두 제외된다.
         code: [TradingStatsController#getSummary, TradingStatsController#getEquityCurve, TradingStatsController#getCycles, TradingStatsService#getSummary, TradingStatsService#getEquityCurve, TradingStatsService#getCyclePerformances]
         fail: 한 쪽 조회가 실패해도 다른 쪽은 보인다(서버 prefetch를 각각 무시). 곡선이 실패하면 필터 토글만 남는다.
 

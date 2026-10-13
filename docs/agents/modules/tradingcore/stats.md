@@ -15,3 +15,6 @@ com.kista.tradingcore.stats/ ← Spring Modulith 모듈(CLOSED) — 계좌·증�
   adapter/in/web/     ← internal — DashboardController/StatisticsController(KIS live)/TossStatisticsController(외부 HTTP API 불변 — 경로·DTO 필드가 kista-ui 소비, `@Tag` "통계 (Toss 전용)"·DTO 클래스명 `Toss*Response`도 openapi.json 스키마명이라 유지)/BacktestController/TradingStatsController(summary/equity-curve/cycles)/TradingStatsInternalController(`/api/internal/trading/stats/investment-points`·`/exchange-rate` — 각각 `InvestmentPointsQuery`·`BrokerStatisticsUseCase.currentExchangeRate()` 유스케이스만 주입, root `InvestmentPointsHttpAdapter`/`CurrentExchangeRateHttpAdapter`가 소비)/PortfolioQueryInternalController + dto/(TossCandleResponse는 market 사본과 별개 응답 계약(b))
 
 웹 슬라이스 테스트(`@WebMvcTest`)는 `@SpringBootConfiguration` 상향 탐색이 루트 `com.kista.tradingcore.TradingApplication`을 찾아 `@ContextConfiguration` 없이 동작한다. 예외 매핑은 앱셸 `tradingcore.web.TradingExceptionHandler`(프로세스 전역 advice)가 담당한다.
+
+### DCA 제외
+계좌 통계·포트폴리오·summary/equity-curve 집계는 DCA 전략을 포함하지 않는다(`TradingStatsService`/`InvestmentPointsQueryService`의 사이클 로드와 네이티브 포지션 쿼리에서 제외) — DCA는 브로커 실잔고 기반이라 사이클 포지션 이력이 없다.

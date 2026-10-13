@@ -57,9 +57,9 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 ### 주문 API (KisOrderApi)
 - 미국 매수 TR ID: `TTTT1002U`, 미국 매도: `TTTT1006U` (일본은 TTTS0308U/0307U — 혼동 주의)
-- `ORD_DVSN` 코드(`KisOrderApi.resolveOrderDvsn`): LOC(장마감지정가)=`34`, MOC(장마감시장가)=`33`, 지정가=`00`
-- MOC(장마감시장가) 주문 시 `OVRS_ORD_UNPR="0"`, **LOC(장마감지정가)는 실제 limit price 필수**
-- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류)
+- `ORD_DVSN` 코드(`KisOrderApi.resolveOrderDvsn(type, direction)`): LOC=`34`, MOC=매도 `33`/매수 `34`(LOC 캡), MOO=매도 `31`/매수 `32`(LOO 캡), 지정가=`00` — 미국 매수는 MOO/MOC 불가
+- 매도 MOO/MOC(시장가) 주문 시 `OVRS_ORD_UNPR="0"`, **LOC(장마감지정가)는 실제 limit price 필수**
+- **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — 매도 MOO/MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류)
 - **주문 body는 반드시 raw JSON String**: `String.format("""...""", ...)` 방식으로 직접 구성 — `Map<String, String>` + RestClient Jackson 직렬화 방식으로 보내면 KIS GW가 EGW00202 반환 (필드 순서·포맷 민감성)
 - **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 전 구간에서 LOC/MOC 모두 지원하므로 불필요 (코드에 없음)
 

@@ -15,3 +15,7 @@ com.kista.tradingcore.matching/  ← Spring Modulith 모듈(CLOSED) — 주문�
 - **신규 전략 타입 추가 시**: `StrategyType` enum case + `CycleOrderStrategy` 구현체 1개만 추가하면 메타 capability·최소시드·UI 자동 반영
 
 매매 공식(변경 금지 SSOT)은 이 모듈이 소비하지만 `docs/agents/modules/tradingcore/trading-formulas.md`에 별도 보관한다(matching/trading 양쪽 shim에서 import).
+
+### DCA 전략 (무조건 적립식, 단계 ①)
+- `DcaCycleOrderStrategy`(`matching.domain.strategy`): `decide(...)` 진입으로 `DcaDecision`(`Planned`/`Skipped`)을 돌려준다 — 공통 `plan` 경로는 쓰지 않는다. `snapshotsBrokerBalance()=true`(보유·평단 SSOT가 브로커 실잔고), `needsCapCheck=false`.
+- `DcaSchedule`: 빈도(`DcaFrequency`)별 실행일 판정. `DcaConfig`: 전략 버전의 DCA 설정 값 객체(티커 UPRO/QLD, 방향·금액·빈도·조건 지표 `DcaIndicator`/`DcaOperator`). `DcaDecision.Skipped`는 `DcaSkipReason`을 담는다.

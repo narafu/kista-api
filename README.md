@@ -10,7 +10,7 @@ KISTA(Key Investment Strategy & Trading Automation) — 한국투자증권(KIS)�
 
 ## 주요 기능
 
-- **매매 전략**: INFINITE(무한매수) · PRIVACY(FIDA 기준 매매표) · VR(밸류 리밸런싱)
+- **매매 전략**: INFINITE(무한매수) · PRIVACY(FIDA 기준 매매표) · VR(밸류 리밸런싱) · DCA(무조건 적립식, UPRO/QLD)
 - **증권사**: KIS · 토스증권 · MOCK(모의 계좌)
 - **매매 배치**: 개장(월~금 22:00 KST) · 마감(화~토 04:30 KST) 스케쥴러가 활성 전략을 일괄 실행
 - **알림**: 사용자 텔레그램 봇 · FCM 푸시 · SSE 실시간 거래 알림

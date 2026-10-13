@@ -21,3 +21,8 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 - 신규 브로커 추가: `BrokerCapabilitiesPort` 구현체 1개만 추가 — Router/switch 수정 불필요
 - 브로커 분기 필요 시 `account.broker() == Broker.TOSS` 직접 비교(`Account.isToss()` 없음)
 - "application" NamedInterface는 `BrokerConnectionTesters`/`BrokerCallGuard` 공개용으로 유지
+
+### DCA 지원 (단계 ①)
+- `CandlePort.getDailyCandlesBefore(symbol, beforeUsSession, count)`: DCA 전일 종가 판정용 일봉 조회(Toss `TossCandleApi` 구현).
+- `OrderType.MOO` 매핑: KIS 매도 `31`/매수 `32`(LOO 캡), 미국 매수는 MOO/MOC 불가 → `docs/agents/kis-api.md`. `Broker.supportsOpenAuctionOrders()`가 개장 전 접수 대상 브로커를 가른다.
+- Toss: 매수는 캡가(지정가) 기준으로 보정하고, 매도는 0.01 규칙을 적용한다.

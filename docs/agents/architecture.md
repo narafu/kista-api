@@ -45,7 +45,7 @@ com.kista.tradingcore.matching/      :trading-core · CLOSED · "kernel"        
 com.kista.tradingcore.broker/        :trading-core · CLOSED · "domain"/"port"/"application" · KIS/Toss/Mock 연동, Account를 전혀 참조하지 않음(Account.toBrokerRef() 1곳 전담) → modules/tradingcore/broker.md
 com.kista.tradingcore.trading/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"schedule"/"event" · 주문·사이클 실행·전략 설정 (통계·알림은 아래 두 모듈로 분리) → modules/tradingcore/trading.md
 com.kista.tradingcore.stats/  :trading-core · CLOSED · "domain"/"usecase"/"port"  · 계좌·증권사 통계·백테스트·포트폴리오·summary 조회. trading 공개 계약만 읽는 단방향 소비자 → modules/tradingcore/stats.md
-com.kista.tradingcore.notify/ :trading-core · CLOSED · (NamedInterface 0개, 리스너 sink) · 매매 알림 6종+게이트웨이. trading 이벤트 11종·privacy 이벤트 구독, EPR 재발행 소유 → modules/tradingcore/notify.md
+com.kista.tradingcore.notify/ :trading-core · CLOSED · (NamedInterface 0개, 리스너 sink) · 매매 알림 6종+게이트웨이. trading 이벤트 12종·privacy 이벤트 구독, EPR 재발행 소유 → modules/tradingcore/notify.md
 com.kista.tradingcore.marketcalendar/ :trading-core · CLOSED · "domain"/"port"        · 미국 시장 휴장일 캘린더                        → modules/tradingcore/marketcalendar.md
 com.kista.tradingcore.privacy/       :trading-core · CLOSED · "domain"/"port"/"usecase"/"event" · FIDA 기준 매매표 전역 SSOT                   → modules/tradingcore/privacy.md
 com.kista.tradingcore.account/       :trading-core · CLOSED · "domain"/"usecase"/"port"/"event" · 계좌 자격증명·브로커 연결. Strategy와 별도 aggregate → modules/tradingcore/account.md

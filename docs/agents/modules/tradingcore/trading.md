@@ -67,3 +67,10 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - `brokers.<broker>.enabled=false`이면 해당 증권사의 신규 계좌 등록과 연결 테스트를 외부 API 호출 전에 400으로 차단. 기존 계좌의 조회·수정·매매는 영향받지 않음
 - `StrategyService.register()`(정책 조회는 `StrategyCreationService`가 `StrategyCreationPolicyPort`로)는 신규 전략에만 `strategies.<type>` 생성 정책을 적용: `enabled=false`면 400으로 차단하고, ticker·INFINITE divisionCount·VR recurringMode/bandWidth/intervalWeeks의 생략 기본값과 허용/고정값을 검증. 기존 전략 수정·실행에는 소급 적용하지 않음
 - `RegisterStrategyCommand.divisionCount=0`은 INFINITE 신규 등록의 미입력 sentinel이며 런타임 기본값으로 치환. VR `recurringMode`는 `recurringAmount` 부호(DEPOSIT/HOLD/WITHDRAW)로만 검증하고 금액 크기는 기존 VR 자산 규칙에 맡김. `recurringMode.customizable=false` 설정은 기본값과 유일한 허용값이 모두 `HOLD`여야 함
+
+### DCA 회차 실행 (단계 ①)
+- `DcaRoundPlanner`(마감·개장 배치): 기존 주문 복구 → timing·실행일·이력 판정 → 캔들(`CandlePort.getDailyCandlesBefore`)·잔고 조회 → `DcaCycleOrderStrategy.decide`. skip이면 `DcaExecutionRecorder`가 이력을 쓰고 `DcaRoundSkippedEvent`를 발행한다(→ `TradingAlertNotifier`가 사용자 알림).
+- `DcaExecutionRecorder` + `dca_execution` UNIQUE(strategy, tradeDate): 삽입 성공 시에만 알림을 발행해 재개·중복 진입의 알림 중복을 막는다. 이력 조회 API는 `GET /api/trading-cycles/{id}/dca-executions`(`DcaExecutionQueryService`), 등록·설정은 `DcaConfigService`.
+- 계좌+티커 중복 규칙 예외: DCA는 방향이 다르면 같은 종목에 매수 1 + 매도 1 공존.
+- 보유·평단 SSOT는 브로커 실잔고(`CycleOrderStrategy.snapshotsBrokerBalance()`) — 자체 포지션 누적을 쓰지 않는다. 계좌 통계·포트폴리오 집계에서는 DCA를 제외한다(→ stats.md).
+- 개장 배치는 22:00 KST. KIS DCA MOO는 개장 전 접수(`TradingService.placePreOpenDcaOrders`, `Broker.supportsOpenAuctionOrders()` 필터), 접수 후 체크포인트를 STARTED로 되돌리고 이 단계 실패는 격리한다.
