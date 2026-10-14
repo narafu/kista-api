@@ -332,6 +332,7 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 
 - 포트 `trading.application.port.output.FearGreedIndexPort`: `Optional<BigDecimal> latest()`
   - 2026-10-14 변경: 직전 US 개장일 일별 점(`closeOn(usSessionDate)`) 대신 배치 시점 최신값으로 판정한다(사용자 요청).
+  - 운영 실측(2026-10-14): 일별 점은 세션 마감 후에도 값이 바뀐다. `2026-10-13T00:00Z` 점은 06:28 KST(마감 1.5시간 뒤)에 44.74였고 22:03 KST에는 45.09였다. 22:03 KST에는 `2026-10-14T00:00Z` 점도 생겨 있었고 최신 live 점과 같은 값(45.09)이었다. 날짜 점은 그날의 최신값을 덮어쓰는 방식이라 "직전 개장일 확정값"으로 믿을 수 없다. 최신값 판정으로 바꾼 것을 뒷받침한다.
 - 어댑터 `trading.adapter.out.feargreed.CnnFearGreedIndexAdapter`
   - root `CnnFearGreedAdapter`와 같은 엔드포인트(`production.dataviz.cnn.io/index/fearandgreed/graphdata`)를 쓴다.
   - 응답 최상위 `fear_and_greed.score`(조회 시점 현재값, 장중엔 실시간 값)를 쓴다. `fear_and_greed_historical`은 읽지 않는다.
