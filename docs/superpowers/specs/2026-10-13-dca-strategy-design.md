@@ -216,7 +216,7 @@ DCA는 별도 배치를 만들지 않는다. `CycleOrderStrategy` 구현체 `Dca
    - 일봉: 4.3의 US 세션일 `s`를 기준으로 `date < s`인 확정 봉만 쓴다. 전일 종가 = 그중 마지막 봉의 close.
    - 봉은 항상 250봉을 확보한다(SMA 최대 200, RSI 안정화 250). 마지막 봉이 직전 US 개장일이 아니면 실패로 본다(6.1 신선도 검증).
    - 평단가 조건이 있으면 브로커 실잔고(holdings, avgPrice)를 조회한다. SELL이면 판매가능수량을 조회한다(6단계).
-   - FEAR_GREED 조건이 있으면 직전 US 개장일의 CNN 값을 조회한다(6.2, 세션 메모 캐시). `DcaInputs.fearGreed`(BigDecimal)로 넘기고, 조회에 실패하면 null이다.
+   - FEAR_GREED 조건이 있으면 배치 시점 최신 CNN 값을 조회한다(6.2, 10분 TTL 메모). `DcaInputs.fearGreed`(BigDecimal)로 넘기고, 조회에 실패하면 null이다.
    - 하나라도 실패하면 `SKIPPED(DATA_UNAVAILABLE)`.
 4. **조건 평가**(AND)
    - 모든 조건의 지표값을 먼저 계산한다. 하나라도 계산할 수 없으면(봉 수 부족 등) 다른 조건의 참·거짓과 관계없이 `SKIPPED(DATA_UNAVAILABLE)`.
@@ -330,26 +330,17 @@ DCA의 보유수량과 평단은 **브로커 실잔고(계좌+티커 합산)**�
 
 ### 6.2 CNN 공포탐욕지수 (trading-core 직접 조회)
 
-- 포트 `trading.application.port.output.FearGreedIndexPort`: `Optional<BigDecimal> closeOn(LocalDate usSessionDate)`
-  - 인자는 판정 세션 `s`의 직전 US 개장일이다. `DcaRoundPlanner`가 일봉 신선도 검증용으로 이미 구하는 값을 그대로 넘긴다.
+- 포트 `trading.application.port.output.FearGreedIndexPort`: `Optional<BigDecimal> latest()`
+  - 2026-10-14 변경: 직전 US 개장일 일별 점(`closeOn(usSessionDate)`) 대신 배치 시점 최신값으로 판정한다(사용자 요청).
 - 어댑터 `trading.adapter.out.feargreed.CnnFearGreedIndexAdapter`
   - root `CnnFearGreedAdapter`와 같은 엔드포인트(`production.dataviz.cnn.io/index/fearandgreed/graphdata`)를 쓴다.
-  - 응답 구조(2026-10-14 실측): `fear_and_greed_historical.data[]`는 약 252개의 `{x: epoch ms(double), y: score(double), rating}`이고 오름차순이다.
-    - 일별 점의 `x`는 세션일의 **00:00 UTC 정각**이다. 예: `1791849600000` = 2026-10-13 세션. 휴장일 점은 없다.
-    - 배열 끝에 장중 실시간 점이 하나 더 붙는다. 00:00 UTC가 아닌 시각이다(예: `1791920042000` = 2026-10-13 19:34 UTC).
-  - 다음 두 조건을 모두 만족하는 점의 `y`를 고른다.
-    - `x`가 00:00 UTC 정각이다. 장중 실시간 점은 제외한다.
-    - UTC 날짜가 `usSessionDate`와 같다.
-  - `America/New_York` 변환은 쓰지 않는다. 00:00 UTC를 동부 시각으로 바꾸면 전날이 되어 하루씩 밀린다. `UsTradeDates` allowlist에도 추가하지 않는다. `ZoneOffset.UTC` 사용은 외부 피드의 날짜 표기를 해석하는 용도라 거래일 경계 규칙(constraints)과 무관하다.
+  - 응답 최상위 `fear_and_greed.score`(조회 시점 현재값, 장중엔 실시간 값)를 쓴다. `fear_and_greed_historical`은 읽지 않는다.
   - 값은 `BigDecimal` scale 2 HALF_UP으로 반환한다.
-- 그 날짜의 점이 없으면 empty를 반환한다. 피드가 지연된 것으로 보고, 오래된 값으로 판정하지 않는다. 일봉 신선도 검증(6.1)과 같은 규칙이다.
-- HTTP 오류, 파싱 실패, 해당 점 없음이면 empty를 반환하고, 판정은 `DATA_UNAVAILABLE`이 된다.
+- HTTP 오류, 파싱 실패, `score` 없음이면 empty를 반환하고, 판정은 `DATA_UNAVAILABLE`이 된다.
 - 설정 `trading.adapter.out.feargreed.TradingFearGreedConfig`
   - RestClient 빈 이름은 `fearGreedRestClient`이고, 연결 3초·읽기 5초다.
   - 브라우저 헤더 인터셉터(Cloudflare 봇 감지 우회)는 `shared.platform.http.CnnRestClients`가 제공하고, root `FearGreedConfig`와 함께 쓴다.
-- **캐시**: `DcaRoundPlanner`가 프로세스 메모리에 `usSessionDate → 값`을 하나만 둔다. 규칙은 일봉 캐시(6.1)와 같다.
-  - 실패는 캐시하지 않는다.
-  - 새 세션 키가 들어오면 기존 키를 교체한다.
+- **캐시**: `DcaRoundPlanner`가 프로세스 메모리에 최신값 하나를 10분 TTL로 둔다. 같은 배치의 전략들이 값을 공유한다. 10분 안에 다시 계획하면(수동 실행 포함) 같은 값을 쓰고, 10분이 지났거나 재기동 후 재개면 메모가 없어 새로 조회한다. 실패는 캐시하지 않는다.
   - FEAR_GREED 조건이 있는 전략에서만 조회한다.
 - root `FearGreedScheduler`와는 별개로 동작한다. 두 프로세스가 각자 하루 몇 번 호출하는 정도라 부하는 무시할 수 있다.
 - 아키텍처 원장: 서로 다른 프로세스에 같은 외부 피드 어댑터가 하나씩 있는 구조다. 포트 반환이 JDK 타입(`Optional<BigDecimal>`)이라 값 타입 복제가 아니며, own-type 게이트 대상이 아니다.
@@ -551,7 +542,7 @@ DCA는 기존 전략과 같은 런타임 정책 맵에 들어간다. UI 등록 �
    - Toss 캔들 `adjusted` 파라미터와 CNN historical 응답 구조를 실측한다.
 1. **무조건 DCA**: enum, 티커, capability 명시화, 스키마, 등록·수정, 중복 규칙 완화, DcaSchedule, 계획·배정·접수, 이력, skip 알림, 브로커 매핑, 개장 배치 22:00 이동, API·메타
 2. **지표 조건**: AVG_PRICE, SMA, RSI, CandlePort 페이징·adjusted·신선도 검증, 조건 테이블(V7). FEAR_GREED는 계속 400이고 메타 `conditionIndicators`에서도 뺀다(7.4)
-3. **공포탐욕지수**: CNN 어댑터(6.2, 직전 개장일 00:00 UTC 점, 세션 메모 캐시), FEAR_GREED 판정(5.2), 등록 400 해제와 메타 `conditionIndicators` 추가(7.4). CNN 응답 구조는 2026-10-14에 실측을 마쳤다(6.2).
+3. **공포탐욕지수**: CNN 어댑터(6.2, 배치 시점 최신값 — 2026-10-14 직전 개장일 일별 점에서 변경), FEAR_GREED 판정(5.2), 등록 400 해제와 메타 `conditionIndicators` 추가(7.4). CNN 응답 구조는 2026-10-14에 실측을 마쳤다(6.2).
 
 각 단계는 독립적으로 배포할 수 있다. 1단계만 배포된 상태에서 조건이 포함된 등록 요청이 오면, 미지원 indicator로 400을 반환한다.
 

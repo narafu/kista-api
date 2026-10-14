@@ -26,12 +26,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 // DCA 배치 회차 계획 — 기존 주문 복구·timing·실행일·이력 판정 후 250봉 종가(신선도 검증·세션 캐시)·잔고·CNN 지수 조회 → DcaCycleOrderStrategy.decide → skip이면 이력·알림 기록
 @Slf4j
@@ -41,6 +44,7 @@ class DcaRoundPlanner {
 
     private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화 (spec 6.1)
     private static final int PREVIOUS_SESSION_SCAN_DAYS = 10; // 직전 개장일 역탐색 상한 (연휴 여유)
+    private static final Duration FEAR_GREED_TTL = Duration.ofMinutes(10); // 배치 1회를 덮는 길이 — 10분 안의 재계획(수동 실행 포함)은 같은 값
 
     private final MarketCalendarPort marketCalendarPort;
     private final CandlePort candlePort;
@@ -54,12 +58,14 @@ class DcaRoundPlanner {
     private final DcaCycleOrderStrategy dcaStrategy;
     // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
-    // US 세션 → 직전 개장일 CNN 지수 — 세션당 1개, 실패는 캐시하지 않음 (spec 6.2)
-    private final Map<LocalDate, BigDecimal> fearGreedCache = new ConcurrentHashMap<>();
-    // 직전 US 개장일 세션 메모 — 일봉 신선도·공포탐욕 조회와 같은 세션의 전략들이 캘린더 스캔을 공유
+    // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회 (spec 6.2)
+    private final AtomicReference<FearGreedMemo> fearGreedMemo = new AtomicReference<>();
+    // 직전 US 개장일 세션 메모 — 일봉 신선도 검증에서 같은 세션의 전략들이 캘린더 스캔을 공유
     private final Map<LocalDate, LocalDate> previousOpenCache = new ConcurrentHashMap<>();
 
     private record CandleKey(StrategyTicker ticker, LocalDate usSession) {}
+
+    private record FearGreedMemo(BigDecimal value, Instant fetchedAt) {}
 
     // empty = 이번 배치에서 DCA 신규 주문 없음 (비실행일·다른 timing·이미 판정·skip)
     // currentPrice: 배치 시작 시점 현재가(null 허용) — BUY 기준가 max(전일 종가, 현재가) 산정용
@@ -92,7 +98,7 @@ class DcaRoundPlanner {
 
         DcaDecision decision = dcaStrategy.decide(new DcaCycleOrderStrategy.DcaInputs(config, strategy.ticker(), tradeDate,
                 loadCloses(strategy.ticker(), usSession), loadSellable(ctx, config, tradeDate), loadHolding(ctx, config),
-                loadFearGreed(config, usSession), currentPrice));
+                loadFearGreed(config), currentPrice));
         return switch (decision) {
             case DcaDecision.Planned p -> {
                 log.info("[DCA] 회차 계획: strategy={}, 현재가={}, 기준가={}, 수량={}, 지정가={}",
@@ -143,14 +149,16 @@ class DcaRoundPlanner {
         return null;
     }
 
-    // FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수 — 세션 메모 캐시, 실패·직전 개장일 미확인이면 null(DATA_UNAVAILABLE)
-    private BigDecimal loadFearGreed(DcaConfig config, LocalDate usSession) {
+    // FEAR_GREED 조건이 있을 때만 배치 시점 최신 CNN 지수 — TTL 메모, 실패면 null(DATA_UNAVAILABLE)·캐시 안 함
+    // ponytail: 병렬 그룹이 동시에 만료를 보면 CNN을 중복 호출할 수 있다 — 호출 수가 문제되면 락으로 감쌀 것
+    private BigDecimal loadFearGreed(DcaConfig config) {
         if (!config.hasIndicator(DcaIndicator.FEAR_GREED)) return null;
-        fearGreedCache.keySet().removeIf(k -> !k.equals(usSession)); // 지난 세션 제거 — 맵 크기 ≤ 1
-        return fearGreedCache.computeIfAbsent(usSession, s -> {
-            LocalDate previousOpen = previousOpenSession(s);
-            return previousOpen == null ? null : fearGreedIndexPort.closeOn(previousOpen).orElse(null);
-        });
+        FearGreedMemo memo = fearGreedMemo.get();
+        Instant now = Instant.now();
+        if (memo != null && memo.fetchedAt().plus(FEAR_GREED_TTL).isAfter(now)) return memo.value();
+        BigDecimal value = fearGreedIndexPort.latest().orElse(null);
+        if (value != null) fearGreedMemo.set(new FearGreedMemo(value, now));
+        return value;
     }
 
     // AVG_PRICE 조건이 있을 때만 브로커 실잔고(계좌+티커 합산) — 실패 시 null(DATA_UNAVAILABLE)

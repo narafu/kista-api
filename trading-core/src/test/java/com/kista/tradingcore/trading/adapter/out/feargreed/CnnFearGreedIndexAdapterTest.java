@@ -8,7 +8,6 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
@@ -21,7 +20,7 @@ class CnnFearGreedIndexAdapterTest {
 
     private static final String URL = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata";
 
-    // 2026-10-14 실측 응답 축약 — 일별 점은 세션일 00:00 UTC, 마지막은 장중 실시간 점(19:34 UTC)
+    // 2026-10-14 실측 응답 축약 — 최상위 fear_and_greed.score가 조회 시점 현재값
     private static final String BODY = """
             {
               "fear_and_greed": {"score": 45.0857142857143, "rating": "neutral"},
@@ -42,48 +41,33 @@ class CnnFearGreedIndexAdapterTest {
     private final CnnFearGreedIndexAdapter adapter = new CnnFearGreedIndexAdapter(builder.build());
 
     @Test
-    void returns_daily_point_of_requested_utc_date_scaled_to_two_decimals() {
+    void returns_latest_score_scaled_to_two_decimals() {
         server.expect(requestTo(URL)).andExpect(method(HttpMethod.GET))
                 .andExpect(header("Referer", "https://edition.cnn.com/markets/fear-and-greed"))
                 .andRespond(withSuccess(BODY, MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.closeOn(LocalDate.of(2026, 10, 12))).contains(new BigDecimal("46.34"));
+        assertThat(adapter.latest()).contains(new BigDecimal("45.09"));
         server.verify();
-    }
-
-    @Test
-    void ignores_intraday_live_point_on_same_utc_date() {
-        // 10-13 일별 점(45.17)을 써야 하고 같은 UTC 날짜의 장중 점(45.09)은 무시
-        server.expect(requestTo(URL)).andRespond(withSuccess(BODY, MediaType.APPLICATION_JSON));
-
-        assertThat(adapter.closeOn(LocalDate.of(2026, 10, 13))).contains(new BigDecimal("45.17"));
-    }
-
-    @Test
-    void returns_empty_when_requested_date_missing() {
-        server.expect(requestTo(URL)).andRespond(withSuccess(BODY, MediaType.APPLICATION_JSON));
-
-        assertThat(adapter.closeOn(LocalDate.of(2026, 10, 14))).isEmpty();
     }
 
     @Test
     void returns_empty_on_http_error() {
         server.expect(requestTo(URL)).andRespond(withServerError());
 
-        assertThat(adapter.closeOn(LocalDate.of(2026, 10, 13))).isEmpty();
+        assertThat(adapter.latest()).isEmpty();
     }
 
     @Test
-    void returns_empty_on_missing_historical() {
-        server.expect(requestTo(URL)).andRespond(withSuccess("{\"fear_and_greed\":{\"score\":45.0}}", MediaType.APPLICATION_JSON));
+    void returns_empty_on_missing_score() {
+        server.expect(requestTo(URL)).andRespond(withSuccess("{\"fear_and_greed_historical\":{\"data\":[]}}", MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.closeOn(LocalDate.of(2026, 10, 13))).isEmpty();
+        assertThat(adapter.latest()).isEmpty();
     }
 
     @Test
     void returns_empty_on_malformed_json() {
         server.expect(requestTo(URL)).andRespond(withSuccess("<html>blocked</html>", MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.closeOn(LocalDate.of(2026, 10, 13))).isEmpty();
+        assertThat(adapter.latest()).isEmpty();
     }
 }

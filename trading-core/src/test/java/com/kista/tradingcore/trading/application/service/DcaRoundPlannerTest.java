@@ -222,11 +222,10 @@ class DcaRoundPlannerTest {
 
     @Test
     void previous_open_session_looked_up_once_per_session() {
-        fearGreedDca("25");
-        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.of(new BigDecimal("20.00")));
+        dca(OrderDirection.BUY, OrderType.MOC);
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
-        verify(calendar, times(1)).isUsSessionOpen(PREV_OPEN); // 일봉·공포탐욕·같은 세션 재계획이 직전 개장일 메모를 공유
+        verify(calendar, times(1)).isUsSessionOpen(PREV_OPEN); // 같은 세션 재계획이 직전 개장일 메모를 공유
     }
 
     @Test
@@ -264,26 +263,30 @@ class DcaRoundPlannerTest {
     }
 
     private void fearGreedDca(String threshold) {
+        fearGreedDca(threshold, OrderType.MOC);
+    }
+
+    private void fearGreedDca(String threshold, OrderType type) {
         when(dcaDetailPort.findActiveByStrategyId(ctx.strategy().id())).thenReturn(Optional.of(
-                new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null,
+                new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), type, DcaFrequency.DAILY, null, null,
                         List.of(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal(threshold))))));
     }
 
     @Test
-    void fear_greed_condition_queries_previous_open_session() {
+    void fear_greed_condition_uses_latest_value() {
         fearGreedDca("25");
-        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.of(new BigDecimal("20.00")));
+        when(fearGreedPort.latest()).thenReturn(Optional.of(new BigDecimal("20.00")));
 
         Optional<DcaDecision.Planned> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null);
 
         assertThat(plan).isPresent();
-        verify(fearGreedPort).closeOn(PREV_OPEN);
+        verify(fearGreedPort).latest();
     }
 
     @Test
     void fear_greed_unavailable_records_data_unavailable() {
         fearGreedDca("25");
-        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.empty());
+        when(fearGreedPort.latest()).thenReturn(Optional.empty());
 
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
         verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(DcaSkipReason.DATA_UNAVAILABLE), eq("공포탐욕지수 조회 실패"), any());
@@ -299,15 +302,15 @@ class DcaRoundPlannerTest {
     }
 
     @Test
-    void fear_greed_cached_per_session_and_failure_not_cached() {
+    void fear_greed_memoized_within_ttl_and_failure_not_cached() {
         fearGreedDca("25");
-        when(fearGreedPort.closeOn(PREV_OPEN)).thenReturn(Optional.empty(), Optional.of(new BigDecimal("20.00")));
+        when(fearGreedPort.latest()).thenReturn(Optional.empty(), Optional.of(new BigDecimal("20.00")));
 
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 실패 — 캐시 안 됨
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 재조회 성공 — 캐시
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 캐시 적중
 
-        verify(fearGreedPort, times(2)).closeOn(PREV_OPEN);
+        verify(fearGreedPort, times(2)).latest();
     }
 
     private Order existingOrder(OrderTiming timing, OrderType type) {

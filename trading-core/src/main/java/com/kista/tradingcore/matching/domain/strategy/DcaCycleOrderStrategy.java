@@ -25,7 +25,7 @@ import java.util.Optional;
 public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     // DCA 판정 입력 — closes: 조회 US 세션 이전 확정 종가 오름차순(null=조회 실패), sellableQuantity: SELL만(예약분 차감 후),
-    // holding: AVG_PRICE 조건이 있을 때만 브로커 실잔고(null=조회 실패·미조회), fearGreed: FEAR_GREED 조건이 있을 때만 직전 개장일 CNN 지수(null=조회 실패·미조회),
+    // holding: AVG_PRICE 조건이 있을 때만 브로커 실잔고(null=조회 실패·미조회), fearGreed: FEAR_GREED 조건이 있을 때만 배치 시점 최신 CNN 지수(null=조회 실패·미조회),
     // currentPrice: 배치 시작 시점 현재가(개장 배치=프리마켓, 마감 배치=장중, null=조회 실패) — BUY 기준가 산정용
     public record DcaInputs(DcaConfig config, StrategyTicker ticker, LocalDate tradeDate,
                             List<BigDecimal> closes, Integer sellableQuantity, Holding holding, BigDecimal fearGreed,
