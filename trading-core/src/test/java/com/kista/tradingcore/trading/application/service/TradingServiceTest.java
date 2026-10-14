@@ -84,7 +84,7 @@ class TradingServiceTest {
     @Mock OrderPort orderPort;
     @Mock CyclePositionPort cycleHistoryPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
-    @Mock StrategyPort cyclePort; // CycleRotationService 전용 — 시스템 자동 일시정지
+    @Mock StrategyPort cyclePort; // CycleRotationService 전용 — 시스템 자동 일시중지
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;

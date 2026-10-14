@@ -75,7 +75,7 @@ class StrategyServiceTest {
     @Mock StrategyDcaDetailPort dcaDetailPort;                   // DCA 버전 설정 포트
     @Mock DcaExecutionPort dcaExecutionPort;                     // DCA 회차 이력 포트
     @Mock MarketCalendarPort marketCalendarPort;                 // DCA 다음 실행일 계산용 캘린더
-    @Mock OrderCancelService orderCancelService;                 // 일시정지·삭제 전 미체결 주문 정리
+    @Mock OrderCancelService orderCancelService;                 // 일시중지·삭제 전 미체결 주문 정리
 
     private StrategyService strategyService;
 
@@ -284,7 +284,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("pause() 호출 시 PAUSED 기록 후 미체결 주문을 정리하고, 취소 실패가 있어도 중지는 유지된다")
+    @DisplayName("pause() 호출 시 PAUSED 기록 후 미체결 주문을 정리하고, 취소 실패가 있어도 일시중지는 유지된다")
     void pause_cancels_open_orders_and_pauses_even_when_cancel_fails() {
         Account account = ownerAccount();
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
@@ -300,7 +300,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("pause() 호출 시 이미 중지된 전략이면 주문을 건드리지 않고 IllegalStateException")
+    @DisplayName("pause() 호출 시 이미 일시중지된 전략이면 주문을 건드리지 않고 IllegalStateException")
     void pause_already_paused_does_not_cancel_orders() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -442,7 +442,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("pause() 호출 시 비소유자가 이미 중지된 전략을 요청해도 소유권 오류가 상태 오류보다 먼저 발생한다 (→ 403, 400 아님)")
+    @DisplayName("pause() 호출 시 비소유자가 이미 일시중지된 전략을 요청해도 소유권 오류가 상태 오류보다 먼저 발생한다 (→ 403, 400 아님)")
     void pause_by_non_owner_on_already_paused_strategy_throws_security_exception_not_state_exception() {
         UUID otherUserId = UUID.randomUUID();
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);

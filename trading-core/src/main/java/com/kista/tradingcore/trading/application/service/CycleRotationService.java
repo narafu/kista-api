@@ -33,7 +33,7 @@ import com.kista.shared.kernel.StrategyDefaults;
 class CycleRotationService {
 
     private final MarginPort marginPort; // USD 매수가능금액 조회 (MAX 재등록)
-    private final StrategyPort strategyPort;                   // 시스템 자동 일시정지(사이클 재등록 실패)에도 사용
+    private final StrategyPort strategyPort;                   // 시스템 자동 일시중지(사이클 재등록 실패)에도 사용
     private final StrategyVersionPort strategyVersionPort;     // 활성 전략 버전 조회/종료
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     private final CyclePositionPort cyclePositionPort;         // MAX 시드 계산용 최신 포지션 조회 (읽기 전용)

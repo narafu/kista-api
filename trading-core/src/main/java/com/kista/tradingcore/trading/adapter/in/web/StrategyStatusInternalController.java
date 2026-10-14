@@ -25,7 +25,7 @@ public class StrategyStatusInternalController {
     private final StrategyPort strategyPort;
     private final StrategyUseCase strategyUseCase; // 사용자 재개와 동일 경로 — 종료된(좀비) 사이클 재오픈 포함
 
-    @Operation(summary = "전략 상태 변경(일시정지/재개)", description = "관리자 일시정지/재개 전용. 소유권 불일치 시 400. X-Internal-Token 필수.")
+    @Operation(summary = "전략 상태 변경(일시중지/재개)", description = "관리자 일시중지/재개 전용. 소유권 불일치 시 400. X-Internal-Token 필수.")
     @PatchMapping("/status")
     public void updateStatus(@PathVariable UUID accountId, @PathVariable UUID strategyId,
                               @RequestParam StrategyStatus status) {

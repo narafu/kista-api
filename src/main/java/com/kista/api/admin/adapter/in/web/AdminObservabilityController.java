@@ -76,8 +76,8 @@ public class AdminObservabilityController {
         adminQuery.deleteErrorLog(id);
     }
 
-    // 이상 징후 — 일시정지·비활성 계좌
-    @Operation(summary = "이상 징후 조회", description = "일시정지·비활성 계좌 목록을 반환합니다.")
+    // 이상 징후 — 일시중지·비활성 계좌
+    @Operation(summary = "이상 징후 조회", description = "일시중지·비활성 계좌 목록을 반환합니다.")
     @GetMapping("/anomalies")
     public AnomaliesResponse getAnomalies(
             @RequestParam(defaultValue = "7") int inactiveDays,

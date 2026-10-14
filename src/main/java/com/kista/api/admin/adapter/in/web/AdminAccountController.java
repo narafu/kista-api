@@ -64,7 +64,7 @@ public class AdminAccountController {
                 .toList();
     }
 
-    @Operation(summary = "전략 상태 변경", description = "status: ACTIVE(재개), PAUSED(일시정지)")
+    @Operation(summary = "전략 상태 변경", description = "status: ACTIVE(재개), PAUSED(일시중지)")
     @PatchMapping("/{accountId}/strategies/{strategyId}/status")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateStrategyStatus(

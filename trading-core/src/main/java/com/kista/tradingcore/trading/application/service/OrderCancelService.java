@@ -49,7 +49,7 @@ class OrderCancelService {
         return cancelOpenOrders(strategy.id(), account);
     }
 
-    // 전략의 현재 사이클 미체결 주문 정리 — 호출자가 소유권을 이미 검증한 경우(일시정지·삭제·계좌 삭제) 직접 사용
+    // 전략의 현재 사이클 미체결 주문 정리 — 호출자가 소유권을 이미 검증한 경우(일시중지·삭제·계좌 삭제) 직접 사용
     CancelResult cancelOpenOrders(UUID strategyId, Account account) {
         // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리, 사이클이 없으면 정리할 주문도 없다
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategyId);

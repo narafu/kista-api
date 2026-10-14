@@ -45,11 +45,11 @@ class StrategyService implements StrategyUseCase {
     private final StrategyCreationService creationService;         // 신규 전략 등록 전용
     private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
-    private final OrderCancelService orderCancelService;           // 일시정지·삭제 전 미체결 주문 정리
+    private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
     private final StrategyDcaDetailPort dcaDetailPort;             // DCA 활성 설정 조회
     private final DcaExecutionPort dcaExecutionPort;               // DCA 최근 회차 조회
     private final DcaSummaryAssembler dcaSummaryAssembler;         // DCA 조회 요약 조립
-    private final StrategyStateWriter stateWriter;                 // 일시정지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
+    private final StrategyStateWriter stateWriter;                 // 일시중지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -79,15 +79,15 @@ class StrategyService implements StrategyUseCase {
     public void pause(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        // 중복 상태 guard — 이미 중지된 전략은 재중지 불가 (소유권 검증 이후 수행)
+        // 중복 상태 guard — 이미 일시중지된 전략은 다시 일시중지 불가 (소유권 검증 이후 수행)
         if (strategy.isPaused()) {
-            throw new IllegalStateException("이미 중지된 전략입니다: " + strategyId);
+            throw new IllegalStateException("이미 일시중지된 전략입니다: " + strategyId);
         }
         // 먼저 PAUSED로 기록해 이후 배치가 새 주문을 만들지 않게 하고, 배치가 정지 뒤 체결을 기록하지 않으므로 오늘 미체결 주문을 정리한다
         // 취소 실패분은 관리자 알림 후 PLACED로 남는다
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
-        log.info("전략 중지: strategyId={}, cancelledOrders={}, failedOrders={}",
+        log.info("전략 일시중지: strategyId={}, cancelledOrders={}, failedOrders={}",
                 strategyId, cancelled.cancelledCount(), cancelled.failedCount());
     }
 

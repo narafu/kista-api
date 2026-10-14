@@ -41,7 +41,7 @@ public interface StrategyUseCase {
     // --- 삭제 ---
     void delete(UUID strategyId, UUID requesterId);
 
-    // --- 일시정지 / 재개 ---
+    // --- 일시중지 / 재개 ---
     void pause(UUID strategyId, UUID requesterId);
     void resume(UUID strategyId, UUID requesterId);
 }

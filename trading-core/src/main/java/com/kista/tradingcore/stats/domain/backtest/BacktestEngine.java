@@ -436,7 +436,7 @@ public class BacktestEngine {
         }
 
         // 청산 후 사이클 재시작 — 운영 CycleRotationService의 잔고검증 ON 의미론(백테스트 현금은 실제 돈이라 원장만 믿는 OFF는 없는 돈을 만든다)
-        // false면 매매 중단: NONE은 운영처럼 전략 일시정지, MAINTAIN은 가용 현금이 시작 금액에 못 미치면 일시정지
+        // false면 매매 중단: NONE은 운영처럼 전략 일시중지, MAINTAIN은 가용 현금이 시작 금액에 못 미치면 일시중지
         boolean restartCycle(StrategyCycleSeedType seedType, LocalDate date, List<String> warnings) {
             switch (seedType) {
                 case NONE -> {

@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 
-@Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·중지·재개")
+@Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·일시중지·재개")
 @RestController
 @RequiredArgsConstructor
 @Slf4j
@@ -115,8 +115,8 @@ public class TradingCycleController {
         tradingCycle.delete(id, userId);
     }
 
-    // 거래 사이클 중지 (ACTIVE → PAUSED)
-    @Operation(summary = "거래 사이클 중지", description = "오늘 미체결 주문을 정리(PLANNED 삭제·PLACED 증권사 취소)한 뒤 PAUSED로 바꾼다. 취소 실패분은 관리자에게 알리고 중지는 진행.")
+    // 거래 사이클 일시중지 (ACTIVE → PAUSED)
+    @Operation(summary = "거래 사이클 일시중지", description = "오늘 미체결 주문을 정리(PLANNED 삭제·PLACED 증권사 취소)한 뒤 PAUSED로 바꾼다. 취소 실패분은 관리자에게 알리고 일시중지는 진행.")
     @PatchMapping("/api/trading-cycles/{id}/pause")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void pause(

@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-// 이상 징후 응답 DTO — 일시정지·비활성 계좌 목록
+// 이상 징후 응답 DTO — 일시중지·비활성 계좌 목록
 public record AnomaliesResponse(
         @Schema(description = "전략이 PAUSED 상태인 계좌 목록")
         List<AdminAccountItem> pausedAccounts,

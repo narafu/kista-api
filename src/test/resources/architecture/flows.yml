@@ -843,7 +843,7 @@ flows:
           증권사 취소에 실패한 주문이 있어도 정지는 유지하고 관리자에게 알린다(그 주문은 PLACED로 남는다).
         code: [StrategyService#pause, OrderCancelService#cancelOpenOrders, StrategyStateWriter#pause, StrategyPort#findAllActive]
         state: "orders PLANNED 삭제·PLACED → CANCELLED · strategy → PAUSED"
-        fail: 이미 중지된 전략이면 400, 내 전략이 아니면 403, 없으면 404.
+        fail: 이미 일시중지된 전략이면 400, 내 전략이 아니면 403, 없으면 404.
 
       - id: resume
         lane: trading
@@ -874,7 +874,7 @@ flows:
         lane: ui
         to: [api]
         title: 관리자 상태 변경 요청
-        desc: 관리자 계좌 화면이 PATCH /api/admin/accounts/{accountId}/strategies/{strategyId}/status에 ACTIVE(재개) 또는 PAUSED(일시정지)를 보낸다. 이 경로는 kista-api가 받는다. 삭제는 관리자 화면에 없다.
+        desc: 관리자 계좌 화면이 PATCH /api/admin/accounts/{accountId}/strategies/{strategyId}/status에 ACTIVE(재개) 또는 PAUSED(일시중지)를 보낸다. 이 경로는 kista-api가 받는다. 삭제는 관리자 화면에 없다.
         code: [AdminAccountController#updateStrategyStatus]
         fail: ACTIVE·PAUSED 외 값이면 400.
 
