@@ -232,6 +232,36 @@ class TossHttpClientTest {
     }
 
     @Test
+    @DisplayName("공통 API 429는 백오프 후 재시도해 성공한다")
+    void getCommon_retriesAfter429_thenSucceeds() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).body("{\"error\":{\"code\":\"rate-limit-exceeded\"}}"));
+        expectGet("admin-token-0", HttpStatus.OK, "OK");
+
+        String result = client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {});
+
+        assertThat(result).isEqualTo("OK");
+        verify(tossAuthApi, never()).recoverAdminToken(anyString(), anyBoolean());
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("공통 API 429가 재시도 한도(2회)를 넘기면 TossApiException")
+    void getCommon_throwsTossApiException_when429Persists() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
+        for (int i = 0; i < 3; i++) {
+            server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        }
+
+        assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}))
+                .isInstanceOf(TossApiException.class)
+                .hasMessageContaining("429");
+        server.verify();
+    }
+
+    @Test
     @DisplayName("공통 API 401이 재시도 한도(MAX=3) 내내 발생하면 TossApiException")
     void getCommon_throwsTossApiException_when401Persists() {
         TossHttpClient client = newClient();

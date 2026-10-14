@@ -64,12 +64,29 @@ class TossHttpClient {
     public <T> T getCommon(String path, MultiValueMap<String, String> params,
                            ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
-        return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                tossAuthApi::recoverAdminToken,
-                token -> {
-                    HttpHeaders headers = buildHeaders(null, token);
-                    return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
-                });
+        // 429(rate-limit-exceeded) 재시도 — 관리자 토큰 공용 시세 조회(멱등 GET)만 대상, 주문 등 계좌 API는 재시도하지 않는다
+        for (int rateLimitRetry = 0; ; rateLimitRetry++) {
+            try {
+                return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
+                        tossAuthApi::recoverAdminToken,
+                        token -> {
+                            HttpHeaders headers = buildHeaders(null, token);
+                            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
+                        });
+            } catch (TossApiException e) {
+                if (!(e.getCause() instanceof HttpClientErrorException.TooManyRequests)
+                        || rateLimitRetry >= MAX_RATE_LIMIT_RETRIES) {
+                    throw e;
+                }
+                log.warn("Toss 429 — 공통 API 재시도 {}/{}: path={}", rateLimitRetry + 1, MAX_RATE_LIMIT_RETRIES, path);
+                try {
+                    Thread.sleep(RATE_LIMIT_BACKOFF_MILLIS * (rateLimitRetry + 1));
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                    throw e; // 종료 중 — 재시도하지 않고 원래 429 실패를 전파
+                }
+            }
+        }
     }
 
     // POST 요청 (ParameterizedTypeReference 버전)
@@ -90,6 +107,9 @@ class TossHttpClient {
     // TTL(TossRedisTokenStore.RECENT_FINGERPRINT_TTL=2s)에 가깝게 맞춰, forceReissue로 강제 재발급된
     // 토큰도 자기 나이 최대 ~1500ms까지 재시도 기회를 받도록 한다(2로는 600ms뿐이라 부족했음 — 2026-08-11 사례)
     private static final int MAX_RETRY_ATTEMPTS = 3;
+    // 공통 API 429 재시도 — 횟수·백오프 간격(ms, 시도마다 배수 증가: 500→1000). 페이징 캔들 조회처럼 연속 호출이 순간 한도를 넘는 경우 대응
+    private static final int MAX_RATE_LIMIT_RETRIES = 2;
+    private static final long RATE_LIMIT_BACKOFF_MILLIS = 500;
 
     // 계좌 토큰 재시도 — 공통 헬퍼에 계좌별 토큰 조회/원자적 401 복구만 주입
     private <T> T executeWithRetry(BrokerAccountRef account, String path, Function<String, T> call) {

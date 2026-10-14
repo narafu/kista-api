@@ -3,6 +3,7 @@ package com.kista.api.web;
 import com.kista.api.admin.domain.model.AdminBrokerCredentialException;
 import com.kista.api.admin.domain.model.AdminBrokerRateLimitException;
 import com.kista.api.admin.domain.model.AdminPrivacyTradeConflictException;
+import com.kista.api.market.domain.model.CandleUnavailableException;
 import com.kista.api.admin.domain.model.TradingPolicyUnavailableException;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceBudget;
@@ -56,6 +57,8 @@ public class GlobalExceptionHandler {
         Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "KIS Rate Limit", ErrorCode.BROKER_RATE_LIMITED)),
         // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
         Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable", ErrorCode.TRADING_CORE_UNAVAILABLE)),
+        // trading-core 캔들 내부 API 503 복원 — 원 장애는 trading-core가 이미 보고했으므로 매핑만(재보고 없음)
+        Map.entry(CandleUnavailableException.class,                 new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Broker API Error", ErrorCode.BROKER_UNAVAILABLE)),
         // Account.DuplicateAccountException/ManualTradingException/OrderCancelException/
         // PrivacyTradeConflictException(trading-core 소유 원본)은 TradingExceptionHandler로 이관됨 —
         // 아래는 admin이 PrivacyQueryHttpAdapter(내부 API 409 응답 복원)에서 던지는 own-type만 남는다

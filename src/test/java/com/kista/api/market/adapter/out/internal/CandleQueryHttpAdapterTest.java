@@ -1,5 +1,6 @@
 package com.kista.api.market.adapter.out.internal;
 
+import com.kista.api.market.domain.model.CandleUnavailableException;
 import com.kista.shared.contract.broker.DailyCandleResponse;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
@@ -15,6 +16,7 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CandleQueryHttpAdapterTest {
 
@@ -70,5 +72,17 @@ class CandleQueryHttpAdapterTest {
         assertThat(recorded.getTarget()).contains("symbol=SOXL");
         assertThat(recorded.getTarget()).contains("from=2025-01-01");
         assertThat(recorded.getTarget()).contains("to=2026-10-14");
+    }
+
+    @Test
+    void trading_core_503은_CandleUnavailableException으로_detail을_옮긴다() {
+        server.enqueue(new MockResponse.Builder()
+                .code(503).addHeader("Content-Type", "application/problem+json")
+                .body("{\"detail\":\"증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요.\",\"status\":503,\"code\":\"BROKER_UNAVAILABLE\"}")
+                .build());
+
+        assertThatThrownBy(() -> adapter.latestDailyCandles("QQQ", 1))
+                .isInstanceOf(CandleUnavailableException.class)
+                .hasMessage("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
     }
 }
