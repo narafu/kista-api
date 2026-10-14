@@ -38,11 +38,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -263,12 +266,8 @@ class DcaRoundPlannerTest {
     }
 
     private void fearGreedDca(String threshold) {
-        fearGreedDca(threshold, OrderType.MOC);
-    }
-
-    private void fearGreedDca(String threshold, OrderType type) {
         when(dcaDetailPort.findActiveByStrategyId(ctx.strategy().id())).thenReturn(Optional.of(
-                new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), type, DcaFrequency.DAILY, null, null,
+                new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null,
                         List.of(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal(threshold))))));
     }
 
@@ -309,6 +308,23 @@ class DcaRoundPlannerTest {
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 실패 — 캐시 안 됨
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 재조회 성공 — 캐시
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 캐시 적중
+
+        verify(fearGreedPort, times(2)).latest();
+    }
+
+    @Test
+    void fear_greed_refetched_after_ttl_expires() {
+        fearGreedDca("25");
+        when(fearGreedPort.latest()).thenReturn(Optional.of(new BigDecimal("20.00")));
+        Instant start = Instant.parse("2026-10-13T19:30:00Z");
+        AtomicReference<Instant> now = new AtomicReference<>(start);
+        planner.clock = now::get;
+
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // 조회 — 메모
+        now.set(start.plus(Duration.ofMinutes(9)));
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // TTL 안 — 메모 적중
+        now.set(start.plus(Duration.ofMinutes(10)));
+        planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null); // TTL 경과 — 재조회
 
         verify(fearGreedPort, times(2)).latest();
     }

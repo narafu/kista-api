@@ -28,6 +28,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.InstantSource;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ class DcaRoundPlanner {
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
     // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회 (spec 6.2)
     private final AtomicReference<FearGreedMemo> fearGreedMemo = new AtomicReference<>();
+    InstantSource clock = InstantSource.system(); // TTL 판정용 시계 — 테스트에서 고정 시계로 교체
     // 직전 US 개장일 세션 메모 — 일봉 신선도 검증에서 같은 세션의 전략들이 캘린더 스캔을 공유
     private final Map<LocalDate, LocalDate> previousOpenCache = new ConcurrentHashMap<>();
 
@@ -154,7 +156,7 @@ class DcaRoundPlanner {
     private BigDecimal loadFearGreed(DcaConfig config) {
         if (!config.hasIndicator(DcaIndicator.FEAR_GREED)) return null;
         FearGreedMemo memo = fearGreedMemo.get();
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         if (memo != null && memo.fetchedAt().plus(FEAR_GREED_TTL).isAfter(now)) return memo.value();
         BigDecimal value = fearGreedIndexPort.latest().orElse(null);
         if (value != null) fearGreedMemo.set(new FearGreedMemo(value, now));
