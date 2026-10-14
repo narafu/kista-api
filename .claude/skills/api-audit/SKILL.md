@@ -1,13 +1,17 @@
 ---
 name: api-audit
-description: 엔드포인트·모듈·클래스 또는 현재 diff 단위로 API 미흡점을 고정 체크리스트로 점검하고 file:line 표로 보고한다. 기본은 조사만(수정 없음). 예: /api-audit "POST /api/accounts/{id}/strategies", /api-audit tradingcore.trading --focus 주문안전,조용한실패, /api-audit --diff
+description: 엔드포인트·모듈·클래스 또는 diff(미push 커밋·지정 커밋 범위) 단위로 API 미흡점을 고정 체크리스트로 점검하고 file:line 표로 보고한다. 기본은 조사만(수정 없음). 예: /api-audit "POST /api/accounts/{id}/strategies", /api-audit tradingcore.trading --focus 주문안전,조용한실패, /api-audit --diff, /api-audit --diff b930fb66
 user-invocable: true
 ---
 
-인자: `<대상> [--focus <관점,...>] [--fix]` 또는 `--diff [--focus ...] [--fix]`
+인자: `<대상> [--focus <관점,...>] [--fix]` 또는 `--diff [<커밋범위>] [--focus ...] [--fix]`
 
 - `<대상>`: 엔드포인트(`POST /api/accounts/{id}/strategies`), 모듈 ID(`tradingcore.trading`, `api.finance`), 패키지·클래스·파일 중 하나. 생략 시 사용자에게 물어본다.
-- `--diff`: 현재 브랜치 변경분(`git diff main...HEAD` + 미커밋 변경)만 대상으로 한다. 커밋 전 검수용.
+- `--diff`: 변경분만 대상으로 한다. 커밋 전 검수용. 비교 기준:
+  - `<커밋범위>` 지정 시 그 범위만(`b930fb66`처럼 커밋 하나면 `<커밋>^..<커밋>`, `HEAD~3..HEAD` 같은 범위는 그대로)
+  - 미지정 + `main` 아닌 브랜치: `git diff main...HEAD` + 미커밋 변경
+  - 미지정 + `main` 브랜치: `git diff origin/main...HEAD`(push 안 한 커밋) + 미커밋 변경
+  - 결과가 비거나 문서(`*.md`·`.claude/**`)만 바뀌었으면 점검 없이 그 사실만 알리고 끝낸다
 - `--focus`: 아래 관점 번호 또는 이름(예: `보안,시간기준`). 생략 시 기본 관점 전부.
 - `--fix`: 지정 시에만 보고 후 수정까지 진행. 기본은 **조사만 하고 코드는 수정하지 않는다**.
 
