@@ -60,7 +60,7 @@ public class MarketHolidayController {
     }
 
     @Operation(summary = "종목 일봉 캔들 조회 (계좌 무관 공용 시세)",
-            description = "from·to를 함께 주면 기간(양끝 포함) 조회 — 200개 한도 없음. 없으면 최신 count개(최대 200)")
+            description = "from·to를 함께 주면 기간(양끝 포함, 최대 5년) 조회 — 200개 한도 없음. 없으면 최신 count개(최대 200)")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/candles")
     public List<TossCandleResponse> getCandles(

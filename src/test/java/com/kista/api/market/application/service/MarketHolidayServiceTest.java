@@ -45,4 +45,17 @@ class MarketHolidayServiceTest {
         assertThat(result).containsExactly(candle);
         verify(candleQueryPort).latestDailyCandles("QQQ", 200);
     }
+
+    @Test
+    void getDailyCandles_기간이_5년을_넘거나_역전이면_거절한다() {
+        MarketHolidayService target = new MarketHolidayService(marketCalendarQueryPort, candleQueryPort);
+        LocalDate to = LocalDate.of(2026, 10, 14);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> target.getDailyCandles("SOXL", to.minusYears(5).minusDays(1), to))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> target.getDailyCandles("SOXL", to.plusDays(1), to))
+                .isInstanceOf(IllegalArgumentException.class);
+        target.getDailyCandles("SOXL", to.minusYears(5), to);
+        verify(candleQueryPort).dailyCandles("SOXL", to.minusYears(5), to);
+    }
 }
