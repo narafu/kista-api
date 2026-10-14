@@ -55,4 +55,20 @@ class CandleQueryHttpAdapterTest {
         assertThat(recorded.getTarget()).contains("interval=1d");
         assertThat(recorded.getTarget()).contains("count=1");
     }
+
+    @Test
+    void dailyCandles_기간_조회는_range_경로에_from_to를_보낸다() throws InterruptedException {
+        server.enqueue(new MockResponse.Builder()
+                .code(200).addHeader("Content-Type", "application/json")
+                .body("[]")
+                .build());
+
+        adapter.dailyCandles("SOXL", java.time.LocalDate.of(2025, 1, 1), java.time.LocalDate.of(2026, 10, 14));
+
+        RecordedRequest recorded = server.takeRequest();
+        assertThat(recorded.getTarget()).contains("/api/internal/broker/candles/range");
+        assertThat(recorded.getTarget()).contains("symbol=SOXL");
+        assertThat(recorded.getTarget()).contains("from=2025-01-01");
+        assertThat(recorded.getTarget()).contains("to=2026-10-14");
+    }
 }

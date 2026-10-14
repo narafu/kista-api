@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -58,13 +59,19 @@ public class MarketHolidayController {
         return new MarketSessionResponse(session.session().name(), session.isDst());
     }
 
-    @Operation(summary = "종목 일봉 캔들 조회 (최대 200개, 계좌 무관 공용 시세)")
+    @Operation(summary = "종목 일봉 캔들 조회 (계좌 무관 공용 시세)",
+            description = "from·to를 함께 주면 기간(양끝 포함) 조회 — 200개 한도 없음. 없으면 최신 count개(최대 200)")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/candles")
     public List<TossCandleResponse> getCandles(
             @Parameter(description = "종목코드", example = "QQQ") @RequestParam String ticker,
-            @Parameter(description = "캔들 개수 (최대 200)", example = "200") @RequestParam(defaultValue = "200") int count) {
-        return TossCandleResponse.fromList(marketUseCase.getDailyCandles(ticker, count));
+            @Parameter(description = "캔들 개수 (최대 200, from/to 지정 시 무시)", example = "200") @RequestParam(defaultValue = "200") int count,
+            @Parameter(description = "시작일 (to와 함께 지정)", example = "2025-01-01") @RequestParam(required = false) LocalDate from,
+            @Parameter(description = "종료일 (from과 함께 지정)", example = "2026-10-14") @RequestParam(required = false) LocalDate to) {
+        if ((from == null) != (to == null)) throw new IllegalArgumentException("from과 to는 함께 지정해야 합니다.");
+        return TossCandleResponse.fromList(from != null
+                ? marketUseCase.getDailyCandles(ticker, from, to)
+                : marketUseCase.getDailyCandles(ticker, count));
     }
 
 }

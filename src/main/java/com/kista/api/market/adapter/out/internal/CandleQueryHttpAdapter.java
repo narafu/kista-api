@@ -7,6 +7,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Component
@@ -22,6 +23,19 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
                         .queryParam("symbol", symbol)
                         .queryParam("interval", "1d")
                         .queryParam("count", count)
+                        .build())
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<DailyCandleResponse>>() {});
+    }
+
+    @Override
+    public List<DailyCandleResponse> dailyCandles(String symbol, LocalDate from, LocalDate to) {
+        return internalApiRestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/internal/broker/candles/range")
+                        .queryParam("symbol", symbol)
+                        .queryParam("interval", "1d")
+                        .queryParam("from", from)
+                        .queryParam("to", to)
                         .build())
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<DailyCandleResponse>>() {});

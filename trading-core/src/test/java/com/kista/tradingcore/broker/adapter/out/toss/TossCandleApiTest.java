@@ -141,4 +141,30 @@ class TossCandleApiTest {
         verify(tossHttpClient).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
         assertThat(captor.getValue().containsKey("adjusted")).isFalse();
     }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("기간 조회는 200봉을 넘으면 가장 오래된 봉 이전으로 이어서 페이징하고 from 미만을 버린다")
+    void getCandles_longRange_pagesBeyond200() {
+        // 1페이지: 200봉(10-14부터 역순 날짜) — 2페이지: from 이전 봉 1개 포함
+        LocalDate to = LocalDate.of(2026, 10, 14);
+        String[] firstPage = java.util.stream.IntStream.range(0, 200)
+                .mapToObj(i -> to.minusDays(i).toString()).toArray(String[]::new);
+        LocalDate oldestFirst = to.minusDays(199);
+        LocalDate from = oldestFirst.minusDays(2);
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(page(firstPage),
+                        page(oldestFirst.minusDays(1).toString(), from.toString(), from.minusDays(1).toString()));
+
+        var result = tossCandleApi.getCandles("SOXL", "1d", from, to);
+
+        assertThat(result).hasSize(202);
+        assertThat(result.getFirst().date()).isEqualTo(from);
+        assertThat(result.getLast().date()).isEqualTo(to);
+        ArgumentCaptor<MultiValueMap<String, String>> paramsCaptor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient, times(2)).getCommon(eq("/api/v1/candles"), paramsCaptor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(paramsCaptor.getAllValues().get(0).getFirst("count")).isEqualTo("200");
+        assertThat(paramsCaptor.getAllValues().get(1).getFirst("before")).isEqualTo(oldestFirst + "T00:00Z");
+        assertThat(paramsCaptor.getAllValues().get(1).getFirst("adjusted")).isNull();
+    }
 }

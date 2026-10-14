@@ -11,4 +11,7 @@ public interface MarketUseCase {
 
     // 일봉만 지원 — count는 1~200으로 clamp
     List<DailyCandleResponse> getDailyCandles(String symbol, int count);
+
+    // from~to(양끝 포함) 일봉 — 200봉 한도 없음
+    List<DailyCandleResponse> getDailyCandles(String symbol, LocalDate from, LocalDate to);
 }

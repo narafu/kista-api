@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 // root market 모듈이 broker.CandlePort를 직접 참조하지 않도록 하는 내부 전용 엔드포인트 —
@@ -25,6 +26,15 @@ public class CandleInternalController {
     @GetMapping("/latest")
     public List<DailyCandleResponse> latest(@RequestParam String symbol, @RequestParam String interval, @RequestParam int count) {
         return candlePort.getLatestCandles(symbol, interval, count).stream()
+                .map(CandleInternalController::toResponse)
+                .toList();
+    }
+
+    // from~to(양끝 포함) 기간 조회 — 200봉 초과 기간은 어댑터가 내부 페이징
+    @GetMapping("/range")
+    public List<DailyCandleResponse> range(@RequestParam String symbol, @RequestParam String interval,
+                                           @RequestParam LocalDate from, @RequestParam LocalDate to) {
+        return candlePort.getCandles(symbol, interval, from, to).stream()
                 .map(CandleInternalController::toResponse)
                 .toList();
     }

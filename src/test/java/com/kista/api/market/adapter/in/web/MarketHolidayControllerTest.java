@@ -69,6 +69,28 @@ class MarketHolidayControllerTest {
     }
 
     @Test
+    void candles_from_to_지정시_기간_조회로_위임한다() throws Exception {
+        when(marketUseCase.getDailyCandles("SOXL", LocalDate.of(2025, 1, 1), LocalDate.of(2026, 10, 14)))
+                .thenReturn(List.of(new com.kista.shared.contract.broker.DailyCandleResponse(LocalDate.of(2025, 1, 2),
+                        java.math.BigDecimal.ONE, java.math.BigDecimal.ONE, java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, 1L)));
+
+        mockMvc.perform(get("/api/market/candles")
+                        .param("ticker", "SOXL").param("from", "2025-01-01").param("to", "2026-10-14")
+                        .with(authentication(userTokenWithRole(USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].date").value("2025-01-02"))
+                .andExpect(jsonPath("$[0].close").value(10));
+    }
+
+    @Test
+    void candles_from만_지정하면_400() throws Exception {
+        mockMvc.perform(get("/api/market/candles")
+                        .param("ticker", "SOXL").param("from", "2025-01-01")
+                        .with(authentication(userTokenWithRole(USER_UUID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void session_returns_200_without_auth() throws Exception {
         when(marketCalendarQueryPort.currentSession())
                 .thenReturn(new com.kista.shared.contract.marketcalendar.MarketSessionResponse(MarketSession.DIRECT, true));

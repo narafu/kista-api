@@ -2,10 +2,13 @@ package com.kista.api.market.application.port.output;
 
 import com.kista.shared.contract.broker.DailyCandleResponse;
 
+import java.time.LocalDate;
 import java.util.List;
 
 // broker 모듈 내부API(CandleInternalController) 호출 포트 — market이 broker.CandlePort/TossCandle을
 // 직접 참조하지 않기 위함. 일봉만 지원 — interval은 어댑터 내부에서 "1d" 고정
 public interface CandleQueryPort {
     List<DailyCandleResponse> latestDailyCandles(String symbol, int count);
+    // from~to(양끝 포함) 일봉 — 200봉 한도 없음(trading-core가 페이징)
+    List<DailyCandleResponse> dailyCandles(String symbol, LocalDate from, LocalDate to);
 }

@@ -22,7 +22,7 @@ import java.util.Optional;
 // Toss 캔들 API 스펙 (openapi.json 검증):
 // - params: symbol(required), interval(1m|1d), count(1~200, default 100), before(ISO8601), adjusted(boolean)
 // - response item: timestamp(ISO8601), openPrice, highPrice, lowPrice, closePrice, volume, currency
-// from/to 범위 조회: before=to+1일(UTC) + count=범위내 최대 봉 수(여유있게)로 1회 호출 후 from 미만 필터링
+// from/to 범위 조회: before=to+1일(UTC)부터 200봉 단위 페이징(다음 before=직전 페이지 가장 오래된 봉일) 후 from 미만 필터링
 // getDailyCandlesBefore: 200봉 단위 페이징 + adjusted=true(분할·배당 조정, 이 경로만)
 @Slf4j
 @Component
@@ -36,15 +36,25 @@ class TossCandleApi {
     private final TossHttpClient tossHttpClient;
 
     public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
-        // before = to 다음날 00:00 UTC (to 당일 봉 포함)
-        String beforeParam = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toString();
-        // count = from~to 달력 일수 × 1.5 (주말·공휴일 여유분), 최대 200
-        long calendarDays = ChronoUnit.DAYS.between(from, to) + 1;
-        int count = (int) Math.min(calendarDays * 3 / 2 + 5, MAX_COUNT);
-
-        List<TossCandle> candles = fetchCandles(symbol, interval, count, beforeParam, false);
-        // before 방식이므로 from 이전 봉이 포함될 수 있음 — 필터링
-        return candles.stream().filter(c -> !c.date().isBefore(from)).toList();
+        List<TossCandle> all = new ArrayList<>(); // 오름차순 유지 — 더 오래된 페이지는 앞에 붙인다
+        // 첫 before = to 다음날 00:00 UTC (to 당일 봉 포함)
+        LocalDate before = to.plusDays(1);
+        while (true) {
+            // count = 남은 달력 일수 × 1.5 (주말·공휴일 여유분), 페이지당 최대 200
+            long calendarDays = ChronoUnit.DAYS.between(from, before);
+            int count = (int) Math.min(calendarDays * 3 / 2 + 5, MAX_COUNT);
+            LocalDate pageBefore = before;
+            // before 방식이므로 from 이전 봉이 포함될 수 있음 — 필터링
+            List<TossCandle> fetched = fetchCandles(symbol, interval, count,
+                    pageBefore.atStartOfDay(ZoneOffset.UTC).toString(), false).stream()
+                    .filter(c -> !c.date().isBefore(from) && c.date().isBefore(pageBefore))
+                    .toList();
+            all.addAll(0, fetched);
+            // 200 미만 요청이면 남은 범위를 1회에 덮었다 — 200이면 가장 오래된 봉 이전을 이어서 조회
+            if (count < MAX_COUNT || fetched.isEmpty()) break;
+            before = fetched.getFirst().date();
+        }
+        return List.copyOf(all);
     }
 
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {

@@ -26,4 +26,11 @@ class MarketHolidayService implements MarketUseCase {
     public List<DailyCandleResponse> getDailyCandles(String symbol, int count) {
         return candleQueryPort.latestDailyCandles(symbol, count);
     }
+
+    @Override
+    public List<DailyCandleResponse> getDailyCandles(String symbol, LocalDate from, LocalDate to) {
+        // 역전 기간은 400 (GlobalExceptionHandler의 IllegalArgumentException 매핑)
+        if (from.isAfter(to)) throw new IllegalArgumentException("시작일은 종료일보다 늦을 수 없습니다.");
+        return candleQueryPort.dailyCandles(symbol, from, to);
+    }
 }
