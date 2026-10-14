@@ -14,14 +14,22 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class TelegramHttpClient {
 
+    static final String LOCAL_PREFIX = "[LOCAL] "; // local 프로파일 발송 메시지 접두사 — 운영 알림과 구분
+
     private static final String API_BASE = "https://api.telegram.org";
     private static final Pattern BOT_TOKEN_PATTERN = Pattern.compile("/bot[^/\\s\"']+"); // URL 경로의 봇 토큰 구간
 
     private final RestClient telegramRestClient;
+    private final String messagePrefix; // 모든 발송 메시지 앞에 붙는 문구 — 운영은 빈 문자열
+
+    // 접두사 없는 클라이언트 (운영·테스트)
+    public TelegramHttpClient(RestClient telegramRestClient) {
+        this(telegramRestClient, "");
+    }
 
     // 일반 텍스트 메시지 전송
     public void sendMessage(String chatId, String text, String botToken) {
-        post(botToken, "sendMessage", Map.of("chat_id", chatId, "text", text, "parse_mode", "HTML"),
+        post(botToken, "sendMessage", Map.of("chat_id", chatId, "text", messagePrefix + text, "parse_mode", "HTML"),
                 "Telegram 메시지 전송 실패");
     }
 
@@ -30,7 +38,7 @@ public class TelegramHttpClient {
                                        List<Map<String, String>> buttons) {
         Map<String, Object> body = Map.of(
                 "chat_id", chatId,
-                "text", text,
+                "text", messagePrefix + text,
                 "parse_mode", "HTML",
                 "reply_markup", Map.of("inline_keyboard", List.of(buttons))
         );

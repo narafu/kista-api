@@ -32,9 +32,28 @@ class TelegramHttpClientTest {
     void sendMessage_텔레그램_sendMessage_엔드포인트로_전송한다() {
         server.expect(requestTo("https://api.telegram.org/bottok/sendMessage"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"chat_id\":\"c1\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"text\":\"hi\"")))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         client.sendMessage("c1", "hi", "tok");
+
+        server.verify();
+    }
+
+    @Test
+    void 접두사가_있으면_sendMessage와_인라인_메시지_본문_앞에_붙인다() {
+        RestClient.Builder builder = RestClient.builder();
+        server = MockRestServiceServer.bindTo(builder).build();
+        TelegramHttpClient local = new TelegramHttpClient(builder.build(), TelegramHttpClient.LOCAL_PREFIX);
+        server.expect(requestTo("https://api.telegram.org/bottok/sendMessage"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"text\":\"[LOCAL] hi\"")))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.telegram.org/bottok/sendMessage"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"text\":\"[LOCAL] yo\"")))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        local.sendMessage("c1", "hi", "tok");
+        local.sendWithInlineKeyboard("c1", "yo", "tok", List.of(Map.of("text", "ok", "callback_data", "a:b")));
 
         server.verify();
     }
