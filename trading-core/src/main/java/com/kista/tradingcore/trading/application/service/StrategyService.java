@@ -81,7 +81,7 @@ class StrategyService implements StrategyUseCase {
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 중복 상태 guard — 이미 일시중지된 전략은 다시 일시중지 불가 (소유권 검증 이후 수행)
         if (strategy.isPaused()) {
-            throw new IllegalStateException("이미 일시중지된 전략입니다: " + strategyId);
+            throw new IllegalStateException("이미 일시중지된 전략입니다.");
         }
         // 먼저 PAUSED로 기록해 이후 배치가 새 주문을 만들지 않게 하고, 배치가 정지 뒤 체결을 기록하지 않으므로 오늘 미체결 주문을 정리한다
         // 취소 실패분은 관리자 알림 후 PLACED로 남는다
