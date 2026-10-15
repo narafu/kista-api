@@ -9,6 +9,8 @@ import com.kista.shared.kernel.StrategyType;
 public record StrategyTypeMeta(
         @Schema(description = "enum name() 값", example = "INFINITE")
         String code,                   // enum name() 값
+        @Schema(description = "한국어 표시 이름", example = "무한매수법")
+        String label,                  // 한국어 표시 이름 — StrategyType.description이 SSOT
         @Schema(description = "전략 설명")
         String description,            // 전략 설명
         @Schema(description = "사용 가능한 티커 name() 목록 (정렬됨)")
@@ -34,7 +36,7 @@ public record StrategyTypeMeta(
         StrategyCapability capability = t.capability();
         List<String> tickers = capability.availableTickers().stream().map(Enum::name).toList();
         return new StrategyTypeMeta(
-                t.name(), t.getDescription(), tickers,
+                t.name(), t.getDescription(), t.getDescription(), tickers,
                 capability.requiresPrivacyBase(),
                 capability.tickerFixed(),
                 capability.supportsReverseMode(),

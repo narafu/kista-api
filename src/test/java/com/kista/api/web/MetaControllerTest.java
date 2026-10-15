@@ -55,6 +55,7 @@ class MetaControllerTest {
                         .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.strategyTypes[0].code").value("INFINITE"))
+                .andExpect(jsonPath("$.strategyTypes[0].label").value("무한매수법"))
                 .andExpect(jsonPath("$.strategyTypes[0].requiresPrivacyBase").value(false))
                 .andExpect(jsonPath("$.strategyTypes[0].supportsReverseMode").value(true))
                 .andExpect(jsonPath("$.strategyTypes[0].tickerFixed").value(false))

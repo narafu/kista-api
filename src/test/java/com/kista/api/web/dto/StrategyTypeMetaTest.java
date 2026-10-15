@@ -10,6 +10,7 @@ class StrategyTypeMetaTest {
     @Test
     void infinite_meta_has_capabilities() {
         var meta = StrategyTypeMeta.from(StrategyType.INFINITE);
+        assertThat(meta.label()).isEqualTo("무한매수법");
         assertThat(meta.requiresPrivacyBase()).isFalse();
         assertThat(meta.tickerFixed()).isFalse();        // INFINITE: availableTickers > 1
         assertThat(meta.supportsReverseMode()).isTrue();
