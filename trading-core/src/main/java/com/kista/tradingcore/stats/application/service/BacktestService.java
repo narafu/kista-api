@@ -47,7 +47,7 @@ class BacktestService implements BacktestUseCase {
             "수수료·세금·환전 비용과 배당금은 반영하지 않아 실제 수익보다 높거나 낮게 보일 수 있습니다.";
     private static final int MIN_CAGR_DAYS = 365; // 이보다 짧은 구간은 연환산하면 과대·과소 표시되므로 CAGR을 내지 않는다
     private static final String VR_CASH_FLOW_WARNING =
-            "적립식/인출식 설정 시 누적 수익률·CAGR·MDD가 외부 입출금을 반영하지 않아 "
+            "적립식/인출식 설정 시 누적 수익률·연평균 수익률·최대 낙폭이 외부 입출금을 반영하지 않아 "
                     + "실제보다 낙관적이거나 비관적으로 보일 수 있습니다.";
 
     private final HistoricalCandlePort candlePort;         // 과거 일봉 조달 (Alpaca)
