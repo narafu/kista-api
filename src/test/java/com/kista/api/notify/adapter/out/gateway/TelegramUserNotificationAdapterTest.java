@@ -40,6 +40,18 @@ class TelegramUserNotificationAdapterTest {
     }
 
     @Test
+    void notifyRejected_reasonWithHtmlChars_isEscaped() {
+        // parse_mode=HTML — 미이스케이프 '<'·'&'는 텔레그램 400으로 알림 유실
+        User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
+                .withRejection("<b>서류</b> & 미비");
+
+        adapter.notifyRejected(DomainFixtures.recipientOf(user));
+
+        verify(telegramHttpClient).sendMessage("user-chat-789",
+                "❌ 가입 신청이 거절되었습니다.\n사유: &lt;b&gt;서류&lt;/b&gt; &amp; 미비", "user-bot-token");
+    }
+
+    @Test
     void notifyRejected_withNullReason_sendsUnchangedMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
                 .withRejection(null);

@@ -27,7 +27,7 @@ public class TelegramAdapter implements NotifyPort {
         } catch (Exception reportEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", reportEx.getMessage());
         }
-        send("<b>⚠️ 관리자 알림</b>%n%s".formatted(e.getMessage()));
+        send("<b>⚠️ 관리자 알림</b>%n%s".formatted(TelegramHttpClient.escapeHtml(e.getMessage())));
     }
 
     @Override
