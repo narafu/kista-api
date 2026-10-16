@@ -22,8 +22,11 @@ public interface OrderPort {
     // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
     List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 증권사 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록
+    // 증권사 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록 — PLANNED에서만 전이, 그 사이 취소·삭제됐으면 OrderStateConflictException
     void markPlaced(UUID orderId, String externalOrderId);
+
+    // 증권사 미접수(PLANNED) 주문 취소 — PLANNED에서만 전이, 배치가 먼저 접수했거나 삭제됐으면 OrderStateConflictException
+    void cancelPlanned(UUID orderId);
 
     // 사용자 스코프 기간+종목 조회 (대시보드 — 본인 데이터만)
     List<Order> findByUser(UUID userId, LocalDate from, LocalDate to, StrategyTicker ticker);
@@ -37,8 +40,8 @@ public interface OrderPort {
     // 단건 조회 (취소 전 상태 확인용)
     Optional<Order> findById(UUID orderId);
 
-    // 증권사 접수 실패 시 누적된 PLANNED 주문 일괄 삭제 (재시도 시 중복 접수 방지)
-    void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
+    // 사이클·거래일의 PLANNED 주문 일괄 삭제 — 접수 중 PLACED로 바뀐 행은 지우지 않음, 실제 삭제 건수 반환
+    int deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 오늘 PLANNED 또는 PLACED 주문 조회 (스케쥴러 재계산 skip 판정용)
     List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
@@ -49,7 +52,7 @@ public interface OrderPort {
     // 취소 완료 또는 미체결 → CANCELLED 상태로 변경
     void markCancelled(UUID orderId);
 
-    // 증권사 접수 실패 → FAILED 상태로 변경
+    // 증권사 접수 실패 → FAILED 상태로 변경 — PLANNED에서만 전이, 그 사이 취소·삭제됐으면 OrderStateConflictException
     void markFailed(UUID orderId);
 
     // 체결 완료 → FILLED 또는 PARTIALLY_FILLED 상태 + 체결 수량·가중평균가 기록

@@ -569,6 +569,23 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("update() VR의 연속 사이클 정책을 NONE 외 값으로 바꾸면 저장 전에 거절한다")
+    void update_vrCycleSeedType_nonNone_throws() {
+        Strategy vrStrategy = new Strategy(
+                STRATEGY_ID, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(vrStrategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.update(
+                STRATEGY_ID, USER_ID, new UpdateStrategyCommand(StrategyCycleSeedType.MAINTAIN, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("연속 사이클 정책");
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("update() 호출 시 소유자가 아니면 SecurityException이 발생한다 (→ 403)")
     void update_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();

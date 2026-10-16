@@ -2,9 +2,13 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.LockModeType;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -25,6 +29,7 @@ import java.util.stream.Collectors;
 public class OrderPersistenceAdapter implements OrderPort {
 
     private final OrderJpaRepository repository;
+    private final EntityManager entityManager; // 상태 전이 시 행 잠금 + 최신 상태 refresh
 
     @Override
     public void saveAll(List<Order> orders) {
@@ -48,12 +53,51 @@ public class OrderPersistenceAdapter implements OrderPort {
 
 
     @Override
+    @Transactional
     public void markPlaced(UUID orderId, String externalOrderId) {
-        // 명시적 save로 dirty checking 의존 없이 PLACED + externalOrderId 기록
-        mutate(orderId, e -> {
-            e.setStatus(OrderStatus.PLACED);
-            e.setExternalOrderId(externalOrderId);
-        });
+        // 행 잠금 후 PLANNED에서만 PLACED 전이 — 접수 사이 사용자 취소·일시중지 정리가 끼어들었으면 경합으로 알린다
+        OrderEntity e = lockOrConflict(orderId);
+        // 1차 시도가 커밋된 뒤 예외로 재시도된 경우 — 같은 접수번호면 멱등 성공
+        if (e.getStatus() == OrderStatus.PLACED && externalOrderId.equals(e.getExternalOrderId())) return;
+        requireStatus(e, OrderStatus.PLANNED);
+        e.setStatus(OrderStatus.PLACED);
+        e.setExternalOrderId(externalOrderId);
+        repository.save(e);
+    }
+
+    @Override
+    @Transactional
+    public void cancelPlanned(UUID orderId) {
+        // 행 잠금 후 PLANNED에서만 CANCELLED 전이 — 배치가 먼저 접수(PLACED)했으면 경합으로 알린다
+        OrderEntity e = lockOrConflict(orderId);
+        requireStatus(e, OrderStatus.PLANNED);
+        e.setStatus(OrderStatus.CANCELLED);
+        repository.save(e);
+    }
+
+    // 행 잠금 + DB 최신 상태 재조회 — 같은 트랜잭션에서 먼저 읽어 둔 스냅샷(예: 재캡의 BUY 조회)은
+    // 잠금 쿼리로도 갱신되지 않으므로 refresh로 그 사이 커밋된 취소·삭제를 반영한다
+    private OrderEntity lockOrConflict(UUID orderId) {
+        OrderEntity e = repository.findById(orderId)
+                .orElseThrow(() -> deletedConflict(orderId));
+        try {
+            entityManager.flush(); // 같은 트랜잭션의 미반영 변경을 먼저 내려 refresh가 덮어쓰지 않게 한다
+            entityManager.refresh(e, LockModeType.PESSIMISTIC_WRITE);
+        } catch (EntityNotFoundException deleted) {
+            throw deletedConflict(orderId);
+        }
+        return e;
+    }
+
+    private static OrderStateConflictException deletedConflict(UUID orderId) {
+        return new OrderStateConflictException("주문이 삭제됨: orderId=" + orderId);
+    }
+
+    private static void requireStatus(OrderEntity e, OrderStatus expected) {
+        if (e.getStatus() != expected) {
+            throw new OrderStateConflictException("주문 상태 경합: orderId=" + e.getId()
+                    + ", expected=" + expected + ", actual=" + e.getStatus());
+        }
     }
 
     @Override
@@ -85,9 +129,9 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     @Transactional
-    public void deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
-        // 증권사 접수 실패 시 저장된 PLANNED 주문 정리 — PLACED는 건드리지 않음
-        repository.deleteAllByStrategyCycleIdAndTradeDateAndStatus(
+    public int deletePlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // PLANNED 주문만 정리 — 접수 중 PLACED로 바뀐 행은 건드리지 않음, 실제 삭제 건수 반환
+        return repository.deleteAllByStrategyCycleIdAndTradeDateAndStatus(
                 strategyCycleId, tradeDate, OrderStatus.PLANNED);
     }
 
@@ -176,9 +220,13 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    @Transactional
     public void markFailed(UUID orderId) {
-        // 증권사 접수 실패 — FAILED 상태 기록
-        mutate(orderId, e -> e.setStatus(OrderStatus.FAILED));
+        // 증권사 접수 실패 — PLANNED에서만 FAILED 전이 (그 사이 사용자 취소·정리됐으면 경합으로 알린다)
+        OrderEntity e = lockOrConflict(orderId);
+        requireStatus(e, OrderStatus.PLANNED);
+        e.setStatus(OrderStatus.FAILED);
+        repository.save(e);
     }
 
     @Override

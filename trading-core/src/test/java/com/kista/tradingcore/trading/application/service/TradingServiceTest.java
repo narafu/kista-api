@@ -808,7 +808,7 @@ class TradingServiceTest {
         // 총액 증가라 live 예산 요청(1차)·반영(2차)으로 2회 재산정
         verify(vrStrategy, times(2)).buildCappedBuyOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00")));
         // stale 주문은 CANCELLED
-        verify(orderPort).markCancelled(staleBuyId);
+        verify(orderPort).cancelPlanned(staleBuyId);
         // 최초 계획 저장(saveAll #1) + 보정 재저장(saveAll #2) — 총 2회
         verify(orderPort, times(2)).saveAll(anyList());
         // 최종 접수는 반드시 보정된(84.00) 주문으로 수행 — stale 90.00 주문은 접수되지 않음

@@ -18,9 +18,15 @@ class OrderCancelStateWriter {
     private final OrderPort orderPort;
 
     @Transactional
-    public void deletePlanned(UUID strategyCycleId, LocalDate tradeDate) {
-        // PLANNED 주문 삭제 — 증권사 미접수분이므로 DB만 짧은 트랜잭션으로 처리
-        orderPort.deletePlannedByCycleAndDate(strategyCycleId, tradeDate);
+    public int deletePlanned(UUID strategyCycleId, LocalDate tradeDate) {
+        // PLANNED 주문 삭제 — 증권사 미접수분이므로 DB만 짧은 트랜잭션으로 처리, 실제 삭제 건수 반환
+        return orderPort.deletePlannedByCycleAndDate(strategyCycleId, tradeDate);
+    }
+
+    @Transactional
+    public void cancelPlanned(UUID orderId) {
+        // 증권사 미접수 주문 취소 — PLANNED일 때만, 아니면 OrderStateConflictException(호출자가 최신 상태로 재판정)
+        orderPort.cancelPlanned(orderId);
     }
 
     @Transactional

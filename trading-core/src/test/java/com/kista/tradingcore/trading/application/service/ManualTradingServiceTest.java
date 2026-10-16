@@ -23,6 +23,7 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.tradingcore.trading.domain.strategy.*;
@@ -73,6 +74,7 @@ class ManualTradingServiceTest {
     @Mock StrategyVrDetailPort strategyVrDetailPort; // CycleOrderComputer VR 분기용
     @Mock VrStrategy vrStrategy; // VrCycleOrderStrategy 조립용
     @Mock PrivacyBaseGuard privacyBaseGuard; // PRIVACY 기준표 장전 점검
+    @Mock MarketCalendarPort marketCalendarPort; // 휴장일 수동 실행 차단
     @Mock ApplicationEventPublisher eventPublisher; // 4xx 예외라 GlobalExceptionHandler가 저장 안 하는 외부 API 실패를 직접 기록
 
     ManualTradingService service;
@@ -124,7 +126,8 @@ class ManualTradingServiceTest {
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 priceFetcher, planBuilder, priceCapper, budgetAllocator,
-                orderPlanner, orderExecutor, budgetLock, eventPublisher);
+                orderPlanner, orderExecutor, budgetLock, eventPublisher, marketCalendarPort);
+        lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 100));
 
@@ -184,6 +187,19 @@ class ManualTradingServiceTest {
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isSameAs(brokerFailure);
 
         verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    @Test
+    void execute_marketClosedTradeDate_rejectedBeforeAnyOrder() {
+        // 휴장 거래일 — 배치가 접수하지 않는 PLANNED를 남기거나 휴장일 밤에 AT_OPEN을 즉시 접수하지 않는다
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessageContaining("휴장일");
+
+        verify(orderPort, never()).saveAll(any());
+        verifyNoInteractions(orderExecutor);
     }
 
     @Test

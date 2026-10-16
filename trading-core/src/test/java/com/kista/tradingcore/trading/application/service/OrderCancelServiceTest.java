@@ -12,6 +12,7 @@ import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -86,7 +87,7 @@ class OrderCancelServiceTest {
                 eventPublisher, new OrderCancelStateWriter(orderPort));
         // 취소 범위는 오늘(KST)·다음 거래일 둘 다 — 기본은 오늘 주문 없음, 각 테스트가 다음 거래일(또는 오늘)을 따로 stub
         LocalDate today = LocalDate.now(TimeZones.KST);
-        lenient().when(orderPort.findPlannedByCycleAndDate(any(), eq(today))).thenReturn(List.of());
+        lenient().when(orderPort.deletePlannedByCycleAndDate(any(), eq(today))).thenReturn(0);
         lenient().when(orderPort.findPlacedByCycleAndDate(any(), eq(today))).thenReturn(List.of());
     }
 
@@ -99,15 +100,14 @@ class OrderCancelServiceTest {
     @Test
     @DisplayName("cancelByCycle: 오늘 PLANNED 삭제 + PLACED 취소 성공 → CancelResult(n, 0)")
     void cancelByCycle_allSuccess() {
-        Order plannedOrder = plannedOrder(UUID.randomUUID());
         Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
         Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
 
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
-                .thenReturn(List.of(plannedOrder));
+        when(orderPort.deletePlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+                .thenReturn(1); // 실제 삭제 건수로 집계
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order1, order2));
 
@@ -115,7 +115,7 @@ class OrderCancelServiceTest {
 
         assertThat(result.cancelledCount()).isEqualTo(3);
         assertThat(result.failedCount()).isEqualTo(0);
-        verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), any(LocalDate.class));
+        verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate()));
         verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount.toBrokerRef()));
         verify(orderPort, times(2)).markCancelled(any());
         verifyNoInteractions(eventPublisher);
@@ -229,8 +229,6 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
-                .thenReturn(List.of());
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of());
 
@@ -277,7 +275,34 @@ class OrderCancelServiceTest {
 
         service.cancelOrder(orderId, requesterId);
 
+        verify(orderPort).cancelPlanned(orderId); // PLANNED일 때만 조건부 전이
+        verify(orderPort, never()).markCancelled(any());
+        verifyNoInteractions(brokerPort);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: PLANNED로 읽었는데 그 사이 배치가 접수했으면 증권사 취소로 이어간다")
+    void cancelOrder_planned_placedMeanwhile_cancelsAtBroker() {
+        Order placed = placedOrder(orderId, "ORD_RACE");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(plannedOrder(orderId)), Optional.of(placed));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).cancelPlanned(orderId);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(brokerPort).cancel(cancelOf(placed), ownedAccount.toBrokerRef());
         verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: PLANNED로 읽었는데 그 사이 행이 정리됐으면 409")
+    void cancelOrder_planned_deletedMeanwhile_conflict() {
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(plannedOrder(orderId)), Optional.empty());
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).cancelPlanned(orderId);
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(OrderCancelException.class);
         verifyNoInteractions(brokerPort);
     }
 

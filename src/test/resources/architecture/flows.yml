@@ -923,8 +923,9 @@ flows:
         desc: >-
           "바로 주문"을 누르면 내 계좌의 전략인지, ACTIVE 상태인지, 오늘 거래일(KST 04:00 이후면 다음 날)에 이 사이클의 PLANNED/PLACED 주문이
           이미 있는지 확인한다. 이미 있으면 중복 주문을 막는다. 같은 검사를 예산 배정 직전에 락 안에서 한 번 더 한다(배치·다른 수동 실행과의 경합 방지).
-        code: [TradingCycleController#executeManually, ManualTradingService#execute]
-        fail: 남의 전략은 403, 일시정지 등 ACTIVE가 아니면 400, 오늘 이미 주문이 있으면 409(ALREADY_ORDERED_TODAY). 화면은 "이미 접수된 주문이 있어 실행할 수 없습니다"로 안내한다.
+          그 거래일이 미국 휴장(주말·공휴일)이면 배치가 접수하지 않는 주문이 남으므로 실행하지 않는다.
+        code: [TradingCycleController#executeManually, ManualTradingService#execute, MarketCalendarPort#isMarketOpen]
+        fail: 남의 전략은 403, 일시정지 등 ACTIVE가 아니면 400, 휴장 거래일이면 409 "휴장일에는 수동 실행할 수 없습니다.", 오늘 이미 주문이 있으면 409(ALREADY_ORDERED_TODAY). 화면은 "이미 접수된 주문이 있어 실행할 수 없습니다"로 안내한다.
 
       - id: plan
         lane: trading
@@ -980,6 +981,7 @@ flows:
         title: 주문 1건 취소
         desc: >-
           주문 목록의 개별 취소 버튼. PLANNED 주문은 증권사에 간 적이 없으므로 DB에서만 CANCELLED로 바꾸고, PLACED 주문은 증권사 취소가 성공한 뒤 CANCELLED로 기록한다.
+          PLANNED 취소는 행을 잠그고 아직 PLANNED일 때만 바꾼다 — 그 사이 배치가 접수했으면 최신 상태로 다시 판단해 증권사 취소로 이어간다.
           이미 체결됐거나 취소·실패한 주문은 취소할 수 없다.
         code: [OrderCancelController#cancelOrder, OrderCancelService#cancelOrder]
         state: "orders → CANCELLED"
@@ -1042,7 +1044,9 @@ flows:
           시점 검증을 통과한 뒤에만 원본을 취소한다. 원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾼다.
         code: [ReorderService#reorder]
         state: "원본 orders → CANCELLED"
-        fail: 증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다(원본은 PLACED로 남는다).
+        fail: >-
+          증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다(원본은 PLACED로 남는다).
+          PLANNED로 읽은 원본을 그 사이 배치가 접수했으면 400 "원본 주문 상태가 바뀌었습니다"로 중단한다(새 주문을 얹지 않는다).
 
       - id: reorder-place
         lane: trading
@@ -1053,7 +1057,9 @@ flows:
           IMMEDIATE는 곧바로 증권사에 접수해 PLACED로 저장하고, 접수가 실패하면 FAILED 주문으로 남기며 오류를 던지지 않는다. 예산(예수금) 부족은 서버가 막지 않는다 — 화면의 BUY 예산 조회는 경고용이다.
         code: [Order#reorder, ReorderService#reorder]
         state: "새 orders → PLANNED(AT_OPEN·AT_CLOSE) / PLACED·FAILED(IMMEDIATE)"
-        fail: 즉시 접수 실패는 응답 자체는 200이고 resultingStatus가 FAILED로 돌아온다(화면에는 재주문 처리 결과로 표시).
+        fail: >-
+          즉시 접수 실패는 응답 자체는 200이고 resultingStatus가 FAILED로 돌아온다(화면에는 재주문 처리 결과로 표시).
+          증권사 접수는 됐는데 DB 저장이 실패하면 FAILED로 쓰지 않고 PLACED로 응답하며 관리자에게 [DB 불일치] 알림을 보낸다(재시도로 중복 주문이 나가지 않도록).
 
       - id: audit
         lane: api
@@ -1634,7 +1640,7 @@ lifecycles:
       - {to: PLANNED, title: 수동 실행, code: [ManualTradingService#execute], tag: 사용자, flow: manual-run/allocate}
       - {to: PLANNED, title: 관리자 재주문 (예약), desc: AT_OPEN/AT_CLOSE 재주문은 PLANNED로 저장한다., code: [ReorderService#reorder], tag: 관리자, flow: admin-orders/reorder-place}
       - {to: FILLED, title: 관리자 수동 체결 보정, desc: 증권사 밖에서 체결된 거래를 바로 FILLED로 기록한다., code: [ManualTradeCorrectionService#correctManualFills, Order#filledManual], tag: 관리자, flow: admin-orders/correction}
-      - {from: PLANNED, to: PLACED, title: 증권사 접수, code: [TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
+      - {from: PLANNED, to: PLACED, title: 증권사 접수, desc: "PLANNED일 때만 기록한다. 접수 사이 사용자 취소·일시정지 정리로 행이 취소·삭제됐으면 증권사 주문을 바로 취소한다(실패 시 관리자 알림).", code: [TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
       - {from: PLANNED, to: FAILED, title: 접수 실패, code: [TradingOrderExecutor#placeOrders], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: BUY cap 재보정, desc: 접수 직전 가격 cap이 바뀐 BUY는 취소하고 보정 주문을 새 PLANNED로 저장한다., code: [BuyOrderPriceCapper#capIfNeeded], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder], flow: manual-run/cancel-one}

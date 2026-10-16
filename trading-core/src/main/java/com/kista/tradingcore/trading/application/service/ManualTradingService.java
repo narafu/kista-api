@@ -9,6 +9,7 @@ import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ class ManualTradingService {
     private final TradingOrderExecutor orderExecutor;
     private final AccountBudgetLock budgetLock;              // 승인+저장 구간 계좌 직렬화 — 배치 allocator·재캡과 같은 락
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
+    private final MarketCalendarPort marketCalendarPort;   // 휴장일 수동 실행 차단 — 배치가 접수하지 않는 죽은 PLANNED·휴장일 즉시 접수 방지
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
         return execute(strategyId, requesterId, DstInfo.calculate());
@@ -59,6 +61,10 @@ class ManualTradingService {
 
         // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
         LocalDate today = DstInfo.nextTradeDate();
+
+        // 휴장 거래일 차단 — 배치(TradingService)와 같은 기준으로 판정
+        if (!marketCalendarPort.isMarketOpen(today))
+            throw new ManualTradingException("휴장일에는 수동 실행할 수 없습니다.");
 
         // 이중 실행 방지 — PLANNED 또는 PLACED 중 하나라도 있으면 거부
         if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())

@@ -1,6 +1,8 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderDirection;
@@ -20,6 +22,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 // sumFilledBuyAmountByCycleId SQL 필터(direction/status/cycle) 실효성 검증 — 실 DB 왕복 테스트
 @Import(OrderPersistenceAdapter.class)
@@ -77,6 +80,48 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
                     // PK는 JPA가 시간순 UUID v7로 생성한다
                     assertThat(saved.id().version()).isEqualTo(7);
                 });
+    }
+
+    @Test
+    void cancelPlanned_thenMarkPlaced_conflictsInsteadOfReviving() {
+        // 행 잠금 조회(FOR UPDATE) 경로 — 사용자 취소 뒤 늦은 접수 기록이 CANCELLED를 PLACED로 되돌리지 않는다
+        PlannedOrder order = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                        OrderDirection.BUY, 1, new BigDecimal("22.00"))
+                .withLeg("INFINITE_EARLY_AVG_BUY");
+        adapter.saveAll(List.of(Order.fromPlanned(order, accountId, cycleId)));
+        UUID orderId = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now()).getFirst().id();
+
+        adapter.cancelPlanned(orderId);
+
+        assertThatThrownBy(() -> adapter.markPlaced(orderId, "ORD-LATE"))
+                .isInstanceOf(OrderStateConflictException.class);
+        assertThat(adapter.findById(orderId)).get()
+                .satisfies(o -> assertThat(o.status()).isEqualTo(OrderStatus.CANCELLED));
+    }
+
+    @Test
+    void cancelPlanned_seesCommittedChangeEvenIfEntityAlreadyLoadedInSameTransaction() {
+        // 재캡처럼 같은 트랜잭션에서 주문을 먼저 읽어 둔 뒤 다른 경로가 취소한 경우 — 영속성 컨텍스트 스냅샷(PLANNED)이 아니라 DB 상태로 판정
+        insertOrder(cycleId, "BUY", "PLANNED", null, null);
+        UUID orderId = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now()).getFirst().id(); // 엔티티가 컨텍스트에 올라감
+        jdbcTemplate.update("UPDATE orders SET status = 'CANCELLED' WHERE id = ?", orderId);
+
+        assertThatThrownBy(() -> adapter.cancelPlanned(orderId))
+                .isInstanceOf(OrderStateConflictException.class);
+    }
+
+    @Test
+    void deletePlannedByCycleAndDate_deletesOnlyPlannedAndReturnsCount() {
+        // 단일 DELETE문 — PLACED(접수 완료) 행은 남고 실제 삭제 건수를 돌려준다
+        insertOrder(cycleId, "BUY", "PLANNED", null, null);
+        insertOrder(cycleId, "SELL", "PLANNED", null, null);
+        insertOrder(cycleId, "BUY", "PLACED", null, null);
+
+        int deleted = adapter.deletePlannedByCycleAndDate(cycleId, LocalDate.now());
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now())).isEmpty();
+        assertThat(adapter.findPlacedByCycleAndDate(cycleId, LocalDate.now())).hasSize(1);
     }
 
     // 주문 1건 직접 삽입 헬퍼

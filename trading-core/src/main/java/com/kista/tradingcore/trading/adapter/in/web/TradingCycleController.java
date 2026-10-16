@@ -14,9 +14,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -61,14 +63,23 @@ public class TradingCycleController {
     // 거래 사이클 등록
     @Operation(summary = "거래 사이클 등록")
     @PostMapping("/api/accounts/{accountId}/trading-cycles")
-    @ResponseStatus(HttpStatus.CREATED)
-    public TradingCycleResponse register(
+    public ResponseEntity<TradingCycleResponse> register(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody TradingCycleRequest request) {
-        return TradingCycleResponse.forRegistration(
-                tradingCycle.register(userId, accountId, request.toRegisterCommand())
-        );
+        TradingCycleResponse body = TradingCycleResponse.forRegistration(
+                tradingCycle.register(userId, accountId, request.toRegisterCommand()));
+        // 201 + 신규 리소스 URI
+        return ResponseEntity.created(URI.create("/api/trading-cycles/" + body.id())).body(body);
+    }
+
+    // 거래 사이클 단건 조회 — 등록 201 Location 대상
+    @Operation(summary = "거래 사이클 단건 조회")
+    @GetMapping("/api/trading-cycles/{id}")
+    public TradingCycleResponse get(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 
     // 거래 사이클 수정 (cycleSeedType 등 메타 변경)
@@ -89,7 +100,7 @@ public class TradingCycleController {
     public TradingCycleResponse reconfigureVr(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
-            @RequestBody VrConfigRequest request) {
+            @Valid @RequestBody VrConfigRequest request) {
         vrReconfigure.reconfigure(id, userId, request.toCommand());
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
@@ -198,7 +209,7 @@ public class TradingCycleController {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
                 tradingCycle.getByStrategy(
-                        strategyId, userId, from, to, cursorInstant, Math.min(size, 200)));
+                        strategyId, userId, from, to, cursorInstant, Math.clamp(size, 1, 200)));
     }
 
     // 전략(사이클) 기준 주문 내역 조회 — 사용자 전략 상세 화면용

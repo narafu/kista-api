@@ -47,10 +47,12 @@ import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.kista.shared.kernel.StrategyType;
@@ -317,8 +319,9 @@ class TradingCycleControllerTest {
     @Test
     void register_vr_returns201_withVrField() throws Exception {
         // VR 전략 등록 201 응답 + vr 필드 포함 검증
+        UUID newId = UUID.randomUUID();
         Strategy vrStrategy = new Strategy(
-                UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
+                newId, ACCOUNT_ID, StrategyType.VR, StrategyStatus.ACTIVE,
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         VrSummary vrSummary = new VrSummary(
                 new BigDecimal("3000"), new BigDecimal("15.00"), 4, 0,
@@ -341,6 +344,7 @@ class TradingCycleControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())         // 201
+                .andExpect(header().string("Location", "/api/trading-cycles/" + newId))
                 .andExpect(jsonPath("$.type").value("VR"))
                 .andExpect(jsonPath("$.divisionCount").value((Integer) null))  // VR은 divisionCount=null
                 .andExpect(jsonPath("$.vr").exists())
@@ -408,6 +412,17 @@ class TradingCycleControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void reconfigureVr_negativeInjectShares_returns400() throws Exception {
+        // @Valid — 음수 주입 수량은 서비스 도달 전 거부
+        mockMvc.perform(put("/api/trading-cycles/{id}/vr-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"injectShares\": -1}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(vrReconfigure);
+    }
+
     private static final DcaConfig DCA_CONFIG =
             new DcaConfig(OrderDirection.BUY,
                     new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY, null, null);
@@ -418,6 +433,17 @@ class TradingCycleControllerTest {
         return new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.of(2026, 10, 20), null, false, null, 0, null,
                 new DcaSummary(DCA_CONFIG,
                         LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null));
+    }
+
+    @Test
+    void get_returnsSingleCycle() throws Exception {
+        // 등록 201 Location(/api/trading-cycles/{id})이 가리키는 단건 조회
+        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
+
+        mockMvc.perform(get("/api/trading-cycles/{id}", CYCLE_ID).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(CYCLE_ID.toString()))
+                .andExpect(jsonPath("$.type").value("DCA"));
     }
 
     @Test

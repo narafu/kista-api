@@ -20,6 +20,9 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +38,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,6 +57,7 @@ class ReorderServiceTest {
     @Mock OrderPort orderPort;
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     @Mock MarketCalendarPort marketCalendarPort;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     ReorderService service;
 
@@ -59,7 +65,7 @@ class ReorderServiceTest {
     void setUp() {
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
-                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort));
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), eventPublisher);
     }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
@@ -94,7 +100,8 @@ class ReorderServiceTest {
 
         ReorderResult result = reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
-        verify(orderPort).markCancelled(ORDER_ID);
+        verify(orderPort).cancelPlanned(ORDER_ID); // PLANNED 원본은 조건부 전이
+        verify(orderPort, never()).markCancelled(any());
         verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
         assertThat(result.originalStatus()).isEqualTo(OrderStatus.PLANNED);
         assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLANNED);
@@ -109,6 +116,30 @@ class ReorderServiceTest {
         verify(brokerOrderCorrectionPort).cancel(new CancelInstruction(placedOrder().ticker(), placedOrder().externalOrderId()), account().toBrokerRef()); // 증권사 취소
         verify(orderPort).markCancelled(ORDER_ID);
         verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
+    }
+
+    @Test
+    void reorder_fromPlanned_whenBatchPlacedMeanwhile_abortsWithoutNewOrder() {
+        // 읽은 뒤 배치가 원본을 접수(PLACED)함 — 새 주문을 얹으면 중복이므로 중단
+        stubCommon(plannedOrder());
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).cancelPlanned(ORDER_ID);
+
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("상태가 바뀌었습니다");
+
+        verify(orderPort, never()).saveAll(any());
+        verify(brokerOrderCorrectionPort, never()).place(any(), any());
+    }
+
+    @Test
+    void reorder_checksMarketCalendarWithTradeDateOfDecisionTime() {
+        // 19:00 KST July 1 → 거래일 July 2(04:30 경계) — 오늘 KST 일자(July 1)를 넘기면 직전 세션을 검사하게 된다
+        stubCommon(plannedOrder());
+
+        reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
+
+        verify(marketCalendarPort).isMarketOpen(LocalDate.of(2026, 7, 2));
     }
 
     @Test
@@ -157,6 +188,21 @@ class ReorderServiceTest {
 
         verify(orderPort).saveAll(argOrdersMatch(OrderStatus.FAILED, OrderTiming.IMMEDIATE));
         assertThat(result.resultingStatus()).isEqualTo(OrderStatus.FAILED);
+    }
+
+    @Test
+    void reorder_immediate_saveFailsAfterBrokerAccepted_reportsPlacedAndAlerts() {
+        // 증권사엔 접수됐는데 DB 저장 실패 — FAILED로 기록하면 재시도가 중복 주문을 낸다
+        stubCommon(plannedOrder());
+        when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-2"));
+        doThrow(new RuntimeException("DB down")).when(orderPort).saveAll(any());
+
+        ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
+
+        assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLACED);
+        assertThat(result.newOrderExternalId()).isEqualTo("NEW-EXT-2");
+        verify(orderPort, never()).saveAll(argOrdersMatch(OrderStatus.FAILED, OrderTiming.IMMEDIATE));
+        verify(eventPublisher).publishEvent(isA(TradingErrorEvent.class));
     }
 
     // --- 시점 가용성 검증 ---

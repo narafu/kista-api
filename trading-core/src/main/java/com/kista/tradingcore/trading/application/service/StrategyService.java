@@ -96,7 +96,7 @@ class StrategyService implements StrategyUseCase {
         Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
         // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가 (소유권 검증 이후 수행)
         if (strategy.isActive()) {
-            throw new IllegalStateException("이미 활성화된 전략입니다: " + strategyId);
+            throw new IllegalStateException("이미 활성화된 전략입니다.");
         }
         reopenCycleIfEnded(strategy);
         strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
@@ -160,6 +160,10 @@ class StrategyService implements StrategyUseCase {
         Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
         if (strategy.isVr() && cmd.newSeed() != null) {
             throw new IllegalArgumentException("VR 전략의 시드/시작금액은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
+        }
+        // VR은 롤오버가 사이클 교체를 맡아 연속 사이클 정책이 NONE으로 고정된다
+        if (strategy.isVr() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
+            throw new IllegalArgumentException("VR 전략의 연속 사이클 정책은 변경할 수 없습니다.");
         }
 
         StrategyCycleSeedType seedType = cmd.cycleSeedType() != null

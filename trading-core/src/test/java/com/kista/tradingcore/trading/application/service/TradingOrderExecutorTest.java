@@ -6,6 +6,8 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
+import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
@@ -39,6 +41,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
@@ -105,6 +108,22 @@ class TradingOrderExecutorTest {
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
         return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price());
+    }
+
+    @Test
+    @DisplayName("재캡 중 주문 상태 경합(사용자 취소)이면 재캡만 생략하고 남은 PLANNED를 접수")
+    void placeOrders_capConflict_skipsCapAndStillPlaces() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "50.00", 10);
+        when(buyOrderPriceCapper.capIfNeeded(any(), anyBoolean(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new OrderStateConflictException("경합"));
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-501"));
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).hasSize(1);
+        verify(orderPort).markPlaced(orderId, "KIS-501");
     }
 
     @Test
@@ -324,6 +343,58 @@ class TradingOrderExecutorTest {
         verify(orderPort, times(2)).markPlaced(orderId, "KIS-201");
         assertThat(result).hasSize(1); // 재시도 성공 → placed 목록 포함
         verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    @Test
+    @DisplayName("접수 사이 DB 주문이 취소·삭제됐으면(상태 경합) 재시도 없이 증권사 주문을 즉시 취소")
+    void placeOrders_orderCancelledWhilePlacing_cancelsAtBroker() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "50.00", 10);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-301"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markPlaced(orderId, "KIS-301");
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        verify(orderPort, times(1)).markPlaced(orderId, "KIS-301"); // 경합은 재시도로 안 풀린다
+        verify(brokerPort).cancel(new CancelInstruction(plannedOrder.ticker(), "KIS-301"), ACCOUNT_REF);
+        assertThat(result).isEmpty();
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    @Test
+    @DisplayName("접수 실패 주문이 그 사이 취소·정리됐어도(FAILED 기록 경합) 남은 주문 접수를 계속한다")
+    void placeOrders_markFailedConflict_continuesWithRemainingOrders() {
+        UUID failedId = UUID.randomUUID();
+        UUID okId = UUID.randomUUID();
+        Order failing = planned(failedId, OrderDirection.BUY, "50.00", 10);
+        Order ok = planned(okId, OrderDirection.SELL, "60.00", 5);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(failing, ok));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF)))
+                .thenThrow(new RuntimeException("증권사 거절"))
+                .thenReturn(brokerResult("KIS-401"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markFailed(failedId);
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).extracting(Order::id).containsExactly(okId);
+        verify(orderPort).markPlaced(okId, "KIS-401");
+    }
+
+    @Test
+    @DisplayName("상태 경합 후 증권사 취소도 실패하면 수동 취소 알림")
+    void placeOrders_orderCancelledWhilePlacing_brokerCancelFails_alerts() {
+        UUID orderId = UUID.randomUUID();
+        Order plannedOrder = planned(orderId, OrderDirection.BUY, "50.00", 10);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-302"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markPlaced(orderId, "KIS-302");
+        doThrow(new RuntimeException("증권사 오류")).when(brokerPort).cancel(any(), any());
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
+                && tee.message() != null && tee.message().contains("취소 경합")));
     }
 
     @Test

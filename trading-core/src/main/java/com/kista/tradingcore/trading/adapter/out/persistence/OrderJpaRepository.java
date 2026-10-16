@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,9 +18,13 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, OrderStatus status);
 
-    // 증권사 접수 실패 시 누적 PLANNED 주문 정리
-    void deleteAllByStrategyCycleIdAndTradeDateAndStatus(
-            UUID strategyCycleId, LocalDate tradeDate, OrderStatus status);
+    // 사이클·거래일의 PLANNED 주문 일괄 삭제 — 단일 DELETE문이라 행 잠금 대기 후 status를 재평가한다
+    // (파생 delete는 잠금 없는 SELECT 후 id별 DELETE라 그 사이 PLACED로 바뀐 행까지 지워 증권사 주문을 고아로 만든다)
+    @Modifying
+    @Query("DELETE FROM OrderEntity o WHERE o.strategyCycleId = :strategyCycleId AND o.tradeDate = :tradeDate AND o.status = :status")
+    int deleteAllByStrategyCycleIdAndTradeDateAndStatus(
+            @Param("strategyCycleId") UUID strategyCycleId, @Param("tradeDate") LocalDate tradeDate,
+            @Param("status") OrderStatus status);
 
     // PLANNED 또는 PLACED 조회 (스케쥴러 재계산 skip 판정)
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatusIn(

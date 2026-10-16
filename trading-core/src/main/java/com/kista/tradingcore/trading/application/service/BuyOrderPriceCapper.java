@@ -120,7 +120,7 @@ class BuyOrderPriceCapper {
         List<PlannedOrder> changed = new ArrayList<>();
         for (int i = 0; i < buyOrders.size(); i++) {
             if (!plannedBuyOrders.get(i).equals(corrected.get(i))) {
-                orderPort.markCancelled(buyOrders.get(i).id());
+                orderPort.cancelPlanned(buyOrders.get(i).id()); // PLANNED일 때만 — 사용자가 취소한 주문을 보정분으로 되살리지 않는다
                 changed.add(corrected.get(i));
             }
         }
@@ -135,7 +135,7 @@ class BuyOrderPriceCapper {
                                List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected) {
         if (plannedBuyOrders.equals(corrected)) return; // 예: VR bootstrap — 캡 재산정 대상 아님
         log.info("[{}] BUY 가격 보정 필요 — 원래 주문: {}", account.nickname(), describePlannedOrders(plannedBuyOrders));
-        buyOrders.forEach(o -> orderPort.markCancelled(o.id()));
+        buyOrders.forEach(o -> orderPort.cancelPlanned(o.id())); // 하나라도 그 사이 취소됐으면 경합 예외로 재캡 전체 롤백
         if (corrected.isEmpty()) {
             log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
             return;

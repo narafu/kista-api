@@ -71,7 +71,8 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 
 ### 미체결 주문 정리 · 재주문
 - 전략 일시정지·삭제(`StrategyService`)와 계좌 삭제(`AccountOpenOrderCanceller` — 계좌의 전략마다 `StrategyStateWriter.pause` 후 정리)는 현재 사이클의 미체결 주문을 `OrderCancelService.cancelOpenOrders`로 먼저 취소한다(증권사 취소 HTTP는 트랜잭션 밖). 재시도로 풀릴 수 있는 취소 실패(`retryableFailedCount`)가 있으면 삭제를 막고, 자격증명 오류(키 만료·철회)로 못 취소한 건은 삭제를 막지 않는다.
-- 재주문(`ReorderService`): 현재 사이클의 미체결(PLANNED·PLACED) 원본만 허용(체결분은 수동 체결 보정 대상). 휴장일·시점 가용성 검증을 원본 취소보다 먼저 수행해 검증 실패 시 원본이 취소된 채 남지 않게 하고, 증권사 호출은 트랜잭션 밖·DB 기록은 건별 짧은 트랜잭션으로 처리한다.
+- 재주문(`ReorderService`): 현재 사이클의 미체결(PLANNED·PLACED) 원본만 허용(체결분은 수동 체결 보정 대상). 휴장일(판정 시각의 `DstInfo.nextTradeDate(now)` 거래일 기준)·시점 가용성 검증을 원본 취소보다 먼저 수행해 검증 실패 시 원본이 취소된 채 남지 않게 하고, 증권사 호출은 트랜잭션 밖·DB 기록은 건별 짧은 트랜잭션으로 처리한다. IMMEDIATE 접수 성공 뒤 DB 저장이 실패하면 FAILED로 쓰지 않고 PLACED 응답 + 관리자 알림.
+- **PLANNED 상태 전이 경합**: `OrderPort.markPlaced`·`markFailed`·`cancelPlanned`는 행 잠금 + 최신 상태 재조회(`flush` 후 `refresh(PESSIMISTIC_WRITE)` — 같은 트랜잭션에서 먼저 읽은 스냅샷을 믿지 않는다) 후 PLANNED일 때만 전이하고, 아니면(취소·삭제·이미 접수) `OrderStateConflictException`을 던진다. `deletePlannedByCycleAndDate`는 단일 `DELETE ... WHERE status='PLANNED'`문(잠금 대기 후 재평가 — 파생 delete의 SELECT→id별 DELETE는 그 사이 PLACED가 된 행까지 지운다)이고 실제 삭제 건수를 반환한다. 배치 접수(`TradingOrderExecutor.placeEach`)는 `markPlaced` 경합 시 증권사 주문을 즉시 취소(실패 시 `[취소 경합]` 관리자 알림)하고 `markFailed` 경합은 무시하고 계속하며, BUY 재캡(`BuyOrderPriceCapper`)은 `cancelPlanned`로 원본을 취소해 경합이면 재캡 트랜잭션 전체를 롤백·생략한다. 개별 취소는 최신 상태로 재판정(PLACED면 증권사 취소), 재주문은 400으로 중단한다. 남은 창: 접수 HTTP 호출 도중의 취소는 접수 뒤 즉시 취소로만 보정된다(장중 지정가는 그 사이 체결 가능) — 사용자 PLANNED 취소·일시중지·삭제가 접수 중인 주문을 놓쳐 증권사에 고아 주문이 남지 않게 한다. 수동 실행은 거래일이 휴장이면 409로 거부한다.
 
 ### TradingService 기록 테이블 구분
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)

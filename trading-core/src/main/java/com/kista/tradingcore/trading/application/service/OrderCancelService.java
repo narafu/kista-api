@@ -7,6 +7,7 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
@@ -65,9 +66,9 @@ class OrderCancelService {
         int cancelledCount = 0;
         List<Order> placedOrders = new ArrayList<>();
         for (LocalDate tradeDate : tradeDates) {
-            int plannedCount = orderPort.findPlannedByCycleAndDate(currentCycle.id(), tradeDate).size();
+            // 실제 삭제 건수로 집계 — 그 사이 배치가 접수(PLACED)한 행은 삭제되지 않고 아래 PLACED 조회에 잡힌다
+            int plannedCount = stateWriter.deletePlanned(currentCycle.id(), tradeDate);
             if (plannedCount > 0) {
-                stateWriter.deletePlanned(currentCycle.id(), tradeDate);
                 log.info("PLANNED 주문 {}건 삭제 — cycleId={}, tradeDate={}", plannedCount, currentCycle.id(), tradeDate);
                 cancelledCount += plannedCount;
             }
@@ -114,15 +115,22 @@ class OrderCancelService {
 
     void cancelOrder(UUID orderId, UUID requesterId) {
         Order order = orderPort.findById(orderId)
-                .orElseThrow(() -> new NoSuchElementException("Order not found: " + orderId));
+                .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
 
         // 소유권 검증: 주문의 계좌가 요청자 소유인지 확인
         Account account = accountPort.requireOwnedAccount(order.accountId(), requesterId);
 
         if (order.status() == OrderStatus.PLANNED) {
-            // 증권사 미접수 — DB에서만 취소 처리
-            stateWriter.markCancelled(orderId);
-            return;
+            // 증권사 미접수 — DB에서만 취소 처리 (PLANNED일 때만 전이)
+            try {
+                stateWriter.cancelPlanned(orderId);
+                return;
+            } catch (OrderStateConflictException e) {
+                // 읽은 뒤 배치가 접수(PLACED)했거나 정리됨 — 최신 상태로 다시 판정해 PLACED면 증권사 취소로 이어간다
+                log.info("PLANNED 취소 경합 — 최신 상태로 재판정: orderId={}", orderId);
+                order = orderPort.findById(orderId)
+                        .orElseThrow(() -> new OrderCancelException("취소 가능한 상태가 아닙니다."));
+            }
         }
 
         // PLACED 상태: 증권사 취소 후 DB 상태 변경

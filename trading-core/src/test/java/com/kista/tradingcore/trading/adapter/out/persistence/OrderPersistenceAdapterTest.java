@@ -2,10 +2,12 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,6 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 class OrderPersistenceAdapterTest {
 
     @Mock OrderJpaRepository repository;
+    @Mock EntityManager entityManager; // refresh는 no-op — 엔티티 상태는 테스트가 직접 세팅
     OrderPersistenceAdapter adapter;
 
     static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -39,7 +43,7 @@ class OrderPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new OrderPersistenceAdapter(repository);
+        adapter = new OrderPersistenceAdapter(repository, entityManager);
     }
 
     @Test
@@ -105,13 +109,68 @@ class OrderPersistenceAdapterTest {
     }
 
     @Test
-    void markPlaced_throwsIfNotFound() {
+    void markPlaced_conflictIfDeleted() {
+        // 접수 사이 일시중지·삭제 정리가 PLANNED 행을 지움
         UUID orderId = UUID.randomUUID();
         when(repository.findById(orderId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> adapter.markPlaced(orderId, "ORD-001"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(OrderStateConflictException.class)
                 .hasMessageContaining(orderId.toString());
+    }
+
+    @Test
+    void markPlaced_conflictIfCancelledMeanwhile() {
+        // 접수 사이 사용자가 PLANNED를 취소 — PLACED로 되돌리지 않는다
+        UUID orderId = UUID.randomUUID();
+        OrderEntity entity = new OrderEntity();
+        entity.setStatus(OrderStatus.CANCELLED);
+        when(repository.findById(orderId)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> adapter.markPlaced(orderId, "ORD-001"))
+                .isInstanceOf(OrderStateConflictException.class);
+        assertThat(entity.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void markPlaced_idempotentForSameExternalOrderId() {
+        // 1차 시도가 커밋된 뒤 예외로 재시도된 경우 — 같은 접수번호면 성공
+        UUID orderId = UUID.randomUUID();
+        OrderEntity entity = new OrderEntity();
+        entity.setStatus(OrderStatus.PLACED);
+        entity.setExternalOrderId("ORD-001");
+        when(repository.findById(orderId)).thenReturn(Optional.of(entity));
+
+        adapter.markPlaced(orderId, "ORD-001");
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void cancelPlanned_cancelsOnlyPlanned() {
+        UUID orderId = UUID.randomUUID();
+        OrderEntity entity = new OrderEntity();
+        entity.setStatus(OrderStatus.PLANNED);
+        when(repository.findById(orderId)).thenReturn(Optional.of(entity));
+
+        adapter.cancelPlanned(orderId);
+
+        assertThat(entity.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        verify(repository).save(entity);
+    }
+
+    @Test
+    void cancelPlanned_conflictIfAlreadyPlaced() {
+        // 배치가 먼저 접수 — DB만 CANCELLED로 덮으면 증권사 주문이 고아가 된다
+        UUID orderId = UUID.randomUUID();
+        OrderEntity entity = new OrderEntity();
+        entity.setStatus(OrderStatus.PLACED);
+        when(repository.findById(orderId)).thenReturn(Optional.of(entity));
+
+        assertThatThrownBy(() -> adapter.cancelPlanned(orderId))
+                .isInstanceOf(OrderStateConflictException.class);
+        assertThat(entity.getStatus()).isEqualTo(OrderStatus.PLACED);
     }
 
     @Test

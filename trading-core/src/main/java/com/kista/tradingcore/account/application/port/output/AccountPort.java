@@ -14,7 +14,7 @@ public interface AccountPort {
     // 없으면 NoSuchElementException — findById + orElseThrow 반복 제거용
     default Account findByIdOrThrow(UUID accountId) {
         return findById(accountId).orElseThrow(
-                () -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
+                () -> new NoSuchElementException("계좌를 찾을 수 없습니다."));
     }
 
     // 계좌 조회 + 소유권 검증 — 불일치 시 SecurityException (컨트롤러에서 403 변환)

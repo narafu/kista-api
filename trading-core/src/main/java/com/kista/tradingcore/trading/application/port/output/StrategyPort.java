@@ -19,7 +19,7 @@ public interface StrategyPort {
     // 없으면 NoSuchElementException
     default Strategy findByIdOrThrow(UUID strategyId) {
         return findById(strategyId).orElseThrow(
-                () -> new NoSuchElementException("전략을 찾을 수 없습니다: " + strategyId));
+                () -> new NoSuchElementException("전략을 찾을 수 없습니다."));
     }
 
     // 사용자 ACTIVE + 전략 ACTIVE 전체 조회 (스케쥴러용)

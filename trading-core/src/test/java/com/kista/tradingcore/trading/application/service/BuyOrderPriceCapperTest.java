@@ -187,7 +187,7 @@ class BuyOrderPriceCapperTest {
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteType, never()).capBuyOrders(any(), any(), any(), any(), any(), any());
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -202,7 +202,7 @@ class BuyOrderPriceCapperTest {
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(infiniteType, never()).capBuyOrders(any(), any(), any(), any(), any(), any());
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -219,7 +219,7 @@ class BuyOrderPriceCapperTest {
                 new BigDecimal("90.00"), null, VR_POSITION, StrategyTicker.TQQQ, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -241,7 +241,7 @@ class BuyOrderPriceCapperTest {
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
         inOrder.verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         inOrder.verify(orderPort).findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
-        inOrder.verify(orderPort, times(2)).markCancelled(isNull()); // 테스트 buy()의 id=null
+        inOrder.verify(orderPort, times(2)).cancelPlanned(isNull()); // 테스트 buy()의 id=null
         inOrder.verify(orderPlanner).savePlannedOrders(any(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
 
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
@@ -260,7 +260,7 @@ class BuyOrderPriceCapperTest {
                 new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
-        verify(orderPort).markCancelled(isNull());
+        verify(orderPort).cancelPlanned(isNull());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -282,7 +282,7 @@ class BuyOrderPriceCapperTest {
         InOrder inOrder = inOrder(strategyCyclePort, orderPort, orderPlanner);
         inOrder.verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         inOrder.verify(orderPort).findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
-        inOrder.verify(orderPort, times(1)).markCancelled(isNull()); // 40.00짜리 1건만 취소
+        inOrder.verify(orderPort, times(1)).cancelPlanned(isNull()); // 40.00짜리 1건만 취소
         inOrder.verify(orderPlanner).savePlannedOrders(any(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
 
         verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
@@ -302,7 +302,7 @@ class BuyOrderPriceCapperTest {
 
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(privacyType, never()).capBuyOrders(any(), any(), any(), any(), any(), any());
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -320,7 +320,7 @@ class BuyOrderPriceCapperTest {
                 new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, null);
 
         assertThat(budgetRequired).isTrue();
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
@@ -354,7 +354,7 @@ class BuyOrderPriceCapperTest {
         capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
                 new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, new BigDecimal("40.00"));
 
-        verify(orderPort).markCancelled(isNull());
+        verify(orderPort).cancelPlanned(isNull());
         verify(orderPlanner).savePlannedOrders(List.of(base), ACCOUNT, STRATEGY_CYCLE_ID);
     }
 
@@ -371,7 +371,7 @@ class BuyOrderPriceCapperTest {
         capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
                 new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, BigDecimal.ZERO);
 
-        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
 
