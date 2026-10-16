@@ -130,7 +130,7 @@ class TossOrderApiTest {
             .thenReturn(new TossResult<>(new TossOrderApi.OrderResponse(null)));
 
         assertThatThrownBy(() -> tossOrderApi.place(instruction, ACCOUNT))
-            .isInstanceOf(TossApiException.class);
+            .isInstanceOfSatisfying(TossApiException.class, e -> assertThat(e.isRejected()).isTrue());
     }
 
     @Test
@@ -263,5 +263,36 @@ class TossOrderApiTest {
 
     private OrderInstruction limitBuyInstruction() {
         return new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LIMIT, 1, new BigDecimal("25.00"));
+    }
+
+    @Test
+    @DisplayName("clientOrderId가 있으면 요청 body에 싣는다(Toss 멱등키)")
+    void place_sendsClientOrderId() {
+        String key = "0199e8a2-1111-7222-8333-444455556666";
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LOC,
+                3, new BigDecimal("20.00"), key);
+        when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap("toss-order-id"));
+
+        tossOrderApi.place(instruction, ACCOUNT);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getValue()).containsEntry("clientOrderId", key);
+    }
+
+    @Test
+    @DisplayName("clientOrderId가 없으면 body에 키를 넣지 않는다")
+    void place_nullClientOrderId_omitsField() {
+        when(tossHttpClient.post(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrap("toss-order-id"));
+
+        tossOrderApi.place(locBuyInstruction(), ACCOUNT);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(tossHttpClient).post(anyString(), any(), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getValue()).doesNotContainKey("clientOrderId");
     }
 }

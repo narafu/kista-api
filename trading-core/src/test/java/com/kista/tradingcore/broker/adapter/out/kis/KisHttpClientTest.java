@@ -242,11 +242,89 @@ class KisHttpClientTest {
 
         assertThatThrownBy(() -> client.tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {}))
                 .isInstanceOf(KisApiException.class)
-                .hasMessageContaining("대기열 과다");
+                .hasMessageContaining("대기열 과다")
+                .satisfies(e -> assertThat(((KisApiException) e).isRejected()).isTrue()); // 송신 전 거부 — 확정 거절
 
         // 대기하지 않고 즉시 실패해야 하므로 브로커 호출 자체가 발생하지 않음 — 등록된 expectation이 없어 요청 발생 시 서버가 즉시 실패
         server.verify();
         // 회귀 방지: 거부된 호출이 슬롯을 커밋해 대기열을 더 미래로 밀어버리면 안 됨(반복 거부 시 무한 누적 버그 재발 감지)
         assertThat(slot.get()).isEqualTo(slotBefore);
+    }
+
+    // ── 주문 접수 결과 분류(확정 거절 vs 결과 불명) — spec 2026-10-16 §3.3 ──
+
+    private void expectPost(org.springframework.test.web.client.ResponseCreator response) {
+        server.expect(requestTo(BASE_URL + PATH)).andExpect(method(HttpMethod.POST)).andRespond(response);
+    }
+
+    private KisApiException postFailure() {
+        try {
+            newClient().post(TR_ID, PATH, ACCOUNT, "{}", String.class);
+        } catch (KisApiException e) {
+            return e;
+        }
+        throw new AssertionError("KisApiException 기대");
+    }
+
+    @Test
+    @DisplayName("POST I/O 오류 → 결과 불명(rejected=false)")
+    void post_ioError_isNotRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        expectPost(request -> { throw new IOException("read timed out"); });
+        assertThat(postFailure().isRejected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("POST 5xx + KIS 본문 아님 → 결과 불명")
+    void post_5xxWithoutKisBody_isNotRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        expectPost(withServerError().body(""));
+        assertThat(postFailure().isRejected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("POST 오류 응답에 KIS msg_cd 존재 → 확정 거절")
+    void post_errorWithKisMsgCd_isRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        expectPost(withServerError().body(RATE_LIMIT_BODY));
+        assertThat(postFailure().isRejected()).isTrue();
+    }
+
+    @Test
+    @DisplayName("POST 4xx → 확정 거절")
+    void post_4xx_isRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        expectPost(withBadRequest().body(""));
+        assertThat(postFailure().isRejected()).isTrue();
+    }
+
+    @Test
+    @DisplayName("토큰 확보 실패(송신 전) → 확정 거절")
+    void post_tokenAcquisitionFails_isRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenThrow(new KisApiException("tok", null));
+        assertThat(postFailure().isRejected()).isTrue();
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("401 후 재시도 응답도 I/O 오류 → 결과 불명")
+    void post_401ThenIoError_isNotRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisAuthApi.recoverToken(ACCOUNT.id(), ACCOUNT.appKey(), ACCOUNT.secretKey(), "token"))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token2", true));
+        expectPost(withUnauthorizedRequest());
+        expectPost(request -> { throw new IOException("reset"); });
+        assertThat(postFailure().isRejected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("401 후 재시도도 401 → 확정 거절")
+    void post_401Twice_isRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        when(kisAuthApi.recoverToken(ACCOUNT.id(), ACCOUNT.appKey(), ACCOUNT.secretKey(), "token"))
+                .thenReturn(new TokenCoordinator.RecoveredToken("token2", true));
+        expectPost(withUnauthorizedRequest());
+        expectPost(withUnauthorizedRequest());
+        assertThat(postFailure().isRejected()).isTrue();
     }
 }

@@ -12,11 +12,28 @@ public abstract class BrokerApiException extends RuntimeException {
 
     private final String vendorLabel; // 응답 title·로그용 벤더 표기("KIS"/"Toss")
     private final Conflict conflict;  // 409 세부 사유(없으면 NONE)
+    private final boolean rejected;   // 증권사가 요청을 접수하지 않았음이 확실(송신 전 실패·명시 거부) — false면 결과 불명
 
     protected BrokerApiException(String vendorLabel, String message, Throwable cause, Conflict conflict) {
+        this(vendorLabel, message, cause, conflict, false);
+    }
+
+    protected BrokerApiException(String vendorLabel, String message, Throwable cause, Conflict conflict, boolean rejected) {
         super(message, cause);
         this.vendorLabel = vendorLabel;
         this.conflict = conflict;
+        this.rejected = rejected;
+    }
+
+    // 주문 접수 실패의 확정 거절 판정 SSOT — 자격증명·토큰 한도 예외는 토큰 발급 단계(송신 전)라 타입으로 확정 거절
+    public static boolean isRejection(Throwable e) {
+        return (e instanceof BrokerApiException b && b.rejected)
+                || e instanceof BrokerCredentialException
+                || e instanceof BrokerRateLimitException;
+    }
+
+    public boolean isRejected() {
+        return rejected;
     }
 
     public String vendorLabel() {

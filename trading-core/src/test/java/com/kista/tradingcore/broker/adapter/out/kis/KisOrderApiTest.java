@@ -136,7 +136,8 @@ class KisOrderApiTest {
 
         assertThatThrownBy(() -> api.place(instruction, ACCOUNT))
                 .isInstanceOf(KisApiException.class)
-                .hasMessageContaining("EGW00202");
+                .hasMessageContaining("EGW00202")
+                .satisfies(e -> assertThat(((KisApiException) e).isRejected()).isTrue()); // 응답 수신 후 거부 — 확정 거절
     }
 
     @Test

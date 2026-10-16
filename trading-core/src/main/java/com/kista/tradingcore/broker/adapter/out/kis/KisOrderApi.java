@@ -61,7 +61,7 @@ class KisOrderApi {
         if (response == null || !"0".equals(response.rtCd())) {
             String code = response != null ? response.msgCd() : "N/A";
             String msg  = response != null ? response.msg1()  : "응답 없음";
-            throw new KisApiException("KIS 주문 실패 [" + code + "]: " + msg, null);
+            throw KisApiException.rejected("KIS 주문 실패 [" + code + "]: " + msg, null); // 응답 수신 후 거부 — 확정 거절
         }
 
         String odno = response.output() != null ? response.output().odno() : null;

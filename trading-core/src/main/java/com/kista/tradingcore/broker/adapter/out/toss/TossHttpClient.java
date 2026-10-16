@@ -142,7 +142,12 @@ class TossHttpClient {
     private <T> T executeWithBackoffRetry(String tokenKind, String path, Supplier<String> tokenFetcher,
                                            BiFunction<String, Boolean, TossDistributedTokenCoordinator.RecoveredToken> tokenRecoverer,
                                            Function<String, T> call) {
-        String token = tokenFetcher.get();
+        String token;
+        try {
+            token = tokenFetcher.get();
+        } catch (TossApiException e) {
+            throw TossApiException.rejected("Toss 토큰 확보 실패(송신 전): " + e.getMessage(), e); // 자격증명 예외는 타입으로 확정 거절
+        }
         String previousRecoveryInput = null; // 직전 복구 시도에 넘긴 거절 토큰 — 같은 토큰이 또 거절되면 대기가 무의미
         for (int attempt = 0; ; attempt++) {
             try {
@@ -155,27 +160,34 @@ class TossHttpClient {
                     // Toss error.code 필드 값으로 정확히 매칭 — 무관한 오류 메시지에 문자열이 우연히 섞여
                     // 실제 취소되지 않은 주문이 DB에 CANCELLED로 오기록되는 것을 방지 (알림도 함께 억제되므로 오판정 위험 큼)
                     BrokerApiException.Conflict conflict = BrokerApiException.Conflict.NONE;
-                    if (e.getStatusCode().value() == 409) {
-                        conflict = ErrorBodyDecoder.decode(objectMapper, body, TossErrorBody.class)
-                                .map(TossErrorBody::error)
-                                .map(TossErrorBody.ErrorDetail::code)
-                                .map(code -> switch (code) {
-                                    case "already-filled" -> BrokerApiException.Conflict.ALREADY_FILLED;
-                                    case "already-canceled" -> BrokerApiException.Conflict.ALREADY_CANCELED;
-                                    default -> BrokerApiException.Conflict.NONE;
-                                })
-                                .orElse(BrokerApiException.Conflict.NONE);
+                    String errorCode = ErrorBodyDecoder.decode(objectMapper, body, TossErrorBody.class)
+                            .map(TossErrorBody::error)
+                            .map(TossErrorBody.ErrorDetail::code)
+                            .orElse(null);
+                    if (e.getStatusCode().value() == 409 && errorCode != null) {
+                        conflict = switch (errorCode) {
+                            case "already-filled" -> BrokerApiException.Conflict.ALREADY_FILLED;
+                            case "already-canceled" -> BrokerApiException.Conflict.ALREADY_CANCELED;
+                            default -> BrokerApiException.Conflict.NONE;
+                        };
                     }
-                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, conflict);
+                    // 4xx는 증권사가 처리 후 거부한 것(확정 거절) — 단 멱등키 원 요청이 아직 처리 중(409 request-in-progress)이면 결과 불명
+                    boolean inProgress = e.getStatusCode().value() == 409 && "request-in-progress".equals(errorCode);
+                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, conflict, !inProgress);
                 }
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
-                    throw new TossApiException("Toss API 토큰 재시도 실패: " + e.getMessage(), e);
+                    throw TossApiException.rejected("Toss API 토큰 재시도 실패: " + e.getMessage(), e); // 매 시도 401 거부 — 확정 거절
                 }
                 boolean forceReissue = Objects.equals(token, previousRecoveryInput);
                 log.warn("Toss 401 — {} 토큰 복구 재시도 {}/{}: path={}, forceReissue={}",
                         tokenKind, attempt + 1, MAX_RETRY_ATTEMPTS, path, forceReissue);
                 previousRecoveryInput = token;
-                TossDistributedTokenCoordinator.RecoveredToken recovered = tokenRecoverer.apply(token, forceReissue);
+                TossDistributedTokenCoordinator.RecoveredToken recovered;
+                try {
+                    recovered = tokenRecoverer.apply(token, forceReissue);
+                } catch (TossApiException recoverEx) {
+                    throw TossApiException.rejected("Toss 토큰 복구 실패(401 후 재송신 전): " + recoverEx.getMessage(), recoverEx);
+                }
                 token = recovered.accessToken();
                 // 이미 다른 인스턴스가 저장해 둔 canonical 토큰을 Redis 읽기만으로 재사용한 경우
                 // (freshlyIssued=false)에는 전파 지연 위험이 없으므로 백오프 대기를 생략한다.

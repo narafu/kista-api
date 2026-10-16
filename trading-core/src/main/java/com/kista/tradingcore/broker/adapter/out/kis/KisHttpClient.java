@@ -105,8 +105,14 @@ class KisHttpClient {
     // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
     // retryOnRateLimit=true: 조회(GET) 전용 — EGW00201 감지 시 추가 백오프 재시도까지 안전. false: 주문 접수/취소(POST) — 재시도 안 함(중복 위험 배제, 사전 게이트로만 방어)
     // RestClientException은 KisApiException으로 래핑 → GlobalExceptionHandler 503
+    // 확정 거절(rejected) 분류: 송신 전 실패(토큰 확보·게이트)와 증권사가 응답으로 거부한 경우만 — I/O·본문 없는 5xx는 결과 불명
     private <T> T executeWithRetry(String trId, BrokerAccountRef account, boolean retryOnRateLimit, Function<HttpHeaders, T> call) {
-        String token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+        String token;
+        try {
+            token = kisAuthApi.getToken(account.id(), account.appKey(), account.secretKey());
+        } catch (KisApiException e) {
+            throw KisApiException.rejected("KIS 토큰 확보 실패(송신 전): " + e.getMessage(), e); // 자격증명·한도 예외는 타입으로 확정 거절
+        }
         for (int attempt = 0; ; attempt++) {
             awaitAccountSlot(account); // 매 시도(최초 호출 + EGW00201 재시도) 전에 간격 확보
             try {
@@ -114,13 +120,20 @@ class KisHttpClient {
             } catch (HttpStatusCodeException e) {
                 if (e.getStatusCode().value() == 401) {
                     log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
-                    String recoveredToken = kisAuthApi.recoverToken(
-                            account.id(), account.appKey(), account.secretKey(), token).accessToken();
+                    String recoveredToken;
+                    try {
+                        recoveredToken = kisAuthApi.recoverToken(
+                                account.id(), account.appKey(), account.secretKey(), token).accessToken();
+                    } catch (KisApiException recoverEx) {
+                        throw KisApiException.rejected("KIS 토큰 복구 실패(401 후 재송신 전): " + recoverEx.getMessage(), recoverEx);
+                    }
                     // 토큰 재발급이 다른 스레드의 캐시 적중으로 즉시(HTTP 왕복 없이) 끝날 수 있어
                     // 이 재시도도 간격 게이트를 반드시 거쳐야 직전 호출과 밀착 발사되지 않는다
                     awaitAccountSlot(account);
                     try {
                         return call.apply(buildHeaders(recoveredToken, account.appKey(), account.secretKey(), trId));
+                    } catch (HttpStatusCodeException retryEx) {
+                        throw httpFailure("KIS API 토큰 재시도 실패: ", retryEx);
                     } catch (RestClientException retryEx) {
                         throw new KisApiException("KIS API 토큰 재시도 실패: " + retryEx.getMessage(), retryEx);
                     }
@@ -130,16 +143,26 @@ class KisHttpClient {
                             attempt + 1, MAX_RATE_LIMIT_RETRIES, account.id());
                     if (!sleepRateLimitBackoff(attempt)) {
                         // 대기 중 인터럽트(배포·강제종료) — 백오프 없이 즉시 재시도하면 재발 위험만 커지므로 포기
-                        throw new KisApiException("KIS API 오류(재시도 대기 중 인터럽트): "
+                        throw KisApiException.rejected("KIS API 오류(재시도 대기 중 인터럽트): "
                                 + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
                     }
                     continue; // 토큰 문제가 아니므로 같은 토큰으로 재시도
                 }
-                throw new KisApiException("KIS API 오류: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+                throw httpFailure("KIS API 오류: ", e);
             } catch (RestClientException e) {
                 throw new KisApiException("KIS API 요청 실패: " + e.getMessage(), e);
             }
         }
+    }
+
+    // HTTP 오류 응답 → 4xx이거나 본문이 KIS 오류 형식(msg_cd)이면 증권사가 처리 후 거부한 것(확정 거절), 그 외(게이트웨이 5xx)는 결과 불명
+    private KisApiException httpFailure(String prefix, HttpStatusCodeException e) {
+        String message = prefix + e.getStatusCode() + " " + e.getResponseBodyAsString();
+        boolean kisBody = ErrorBodyDecoder.decode(objectMapper, e.getResponseBodyAsString(), KisErrorBody.class)
+                .map(KisErrorBody::msgCd).filter(code -> !code.isBlank()).isPresent();
+        return e.getStatusCode().is4xxClientError() || kisBody
+                ? KisApiException.rejected(message, e)
+                : new KisApiException(message, e);
     }
 
     // 같은 앱키로의 연속 호출 사이 최소 간격을 보장 — 락 없는 슬롯 예약(CAS 루프로 슬롯만 확정하고 대기는 락 밖에서
@@ -157,7 +180,7 @@ class KisHttpClient {
             long myTurn = Math.max(currentSlot, now);
             long waitNanos = myTurn - now;
             if (waitNanos > maxWaitNanos) {
-                throw new KisApiException("KIS 계좌 호출 대기열 과다(" + (waitNanos / 1_000_000L)
+                throw KisApiException.rejected("KIS 계좌 호출 대기열 과다(" + (waitNanos / 1_000_000L)
                         + "ms 대기 필요) — 요청 거부: accountId=" + account.id(), null);
             }
             if (!nextSlot.compareAndSet(currentSlot, myTurn + intervalNanos)) {
@@ -169,7 +192,7 @@ class KisHttpClient {
                 return;
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
-                throw new KisApiException("KIS 호출 대기 중 인터럽트: accountId=" + account.id(), ie);
+                throw KisApiException.rejected("KIS 호출 대기 중 인터럽트: accountId=" + account.id(), ie);
             }
         }
     }

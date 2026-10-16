@@ -544,4 +544,74 @@ class TossHttpClientTest {
         });
         return coordinator;
     }
+
+    // ── 주문 접수 결과 분류(확정 거절 vs 결과 불명) — spec 2026-10-16 §3.3 ──
+
+    private TossApiException postFailure(TossHttpClient client) {
+        try {
+            client.post(PATH, ACCOUNT, java.util.Map.of(), String.class);
+        } catch (TossApiException e) {
+            return e;
+        }
+        throw new AssertionError("TossApiException 기대");
+    }
+
+    private void expectPost(org.springframework.test.web.client.ResponseCreator response) {
+        server.expect(requestTo(URL)).andExpect(method(HttpMethod.POST)).andRespond(response);
+    }
+
+    @Test
+    @DisplayName("POST 409 request-in-progress → 결과 불명")
+    void post_409RequestInProgress_isNotRejected() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        expectPost(withStatus(HttpStatus.CONFLICT).body("{\"error\":{\"code\":\"request-in-progress\"}}"));
+        assertThat(postFailure(client).isRejected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("POST 4xx → 확정 거절")
+    void post_4xx_isRejected() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        expectPost(withStatus(HttpStatus.BAD_REQUEST).body("{\"error\":{\"code\":\"invalid-request\"}}"));
+        assertThat(postFailure(client).isRejected()).isTrue();
+    }
+
+    @Test
+    @DisplayName("POST 401 재시도 소진 → 확정 거절")
+    void post_401Exhausted_isRejected() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        when(tossAuthApi.recoverToken(any(), anyString(), anyString(), anyString(), anyBoolean()))
+                .thenReturn(new TossDistributedTokenCoordinator.RecoveredToken("token-x", false));
+        for (int i = 0; i < 4; i++) expectPost(withUnauthorizedRequest());
+        assertThat(postFailure(client).isRejected()).isTrue();
+    }
+
+    @Test
+    @DisplayName("POST I/O 오류 → 결과 불명")
+    void post_ioError_isNotRejected() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        expectPost(request -> { throw new java.io.IOException("read timed out"); });
+        assertThat(postFailure(client).isRejected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("POST 5xx → 결과 불명")
+    void post_5xx_isNotRejected() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        expectPost(withStatus(HttpStatus.BAD_GATEWAY));
+        assertThat(postFailure(client).isRejected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("토큰 확보 실패(송신 전) → 확정 거절")
+    void post_tokenAcquisitionFails_isRejected() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenThrow(new TossApiException("redis down", null));
+        assertThat(postFailure(client).isRejected()).isTrue();
+    }
 }

@@ -43,6 +43,9 @@ class TossOrderApi {
         body.put("timeInForce", resolveTimeInForce(instruction.orderType())); // CLS(장마감) or DAY(정규장)
         body.put("quantity", instruction.quantity());
         body.put("price", resolvePrice(instruction.orderType(), instruction.direction(), instruction.price()));
+        if (instruction.clientOrderId() != null) {
+            body.put("clientOrderId", instruction.clientOrderId()); // 멱등키 — 10분 내 같은 키 재요청은 원 주문 결과 재반환
+        }
 
         // Toss API 응답: {"result": {"orderId": "...", "clientOrderId": "..."}} — TossResult 언랩
         OrderResponse resp = TossResponseParser.unwrap(
@@ -51,7 +54,7 @@ class TossOrderApi {
 
         // orderId 없으면 비즈니스 실패 처리
         if (resp.orderId() == null) {
-            throw new TossApiException("Toss 주문 실패: 응답에 orderId 없음", null);
+            throw TossApiException.rejected("Toss 주문 실패: 응답에 orderId 없음", null);
         }
 
         // broker는 결과만 반환 — id=null, DB PLACED 기록은 trading 호출부(order.withPlaced())가 담당
