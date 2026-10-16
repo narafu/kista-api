@@ -118,7 +118,7 @@ class KisAdminTokenCoordinatorTest {
     @Test
     @DisplayName("recover: Redis 장애 중 거절된 토큰이 메모리 값이면 메모리를 비우고 재발급한다")
     void recoverClearsRejectedMemoryToken() {
-        when(ops.get(KEY)).thenReturn(null, null).thenThrow(new RuntimeException("redis down"));
+        when(ops.get(KEY)).thenReturn(null).thenReturn(null).thenThrow(new RuntimeException("redis down"));
         coordinator.obtain(APP_KEY, issuer); // 메모리에 new-token (get 2회: 사전·double-check)
 
         var result = coordinator.recover(APP_KEY, "new-token", issuer);
