@@ -28,7 +28,7 @@ jobs:
   # 수동 실행은 state SHA를 0으로 바꿔 "히스토리에 없음 → target"으로 config·전 role을 이 커밋으로 판정
   plan:
     name: Plan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # 명시 고정 — ubuntu-latest는 2026-10-19부터 Ubuntu 26
     outputs:
       verify: ${{ steps.plan.outputs.verify }}
       build: ${{ steps.plan.outputs.build }}
@@ -36,7 +36,7 @@ jobs:
       config: ${{ steps.plan.outputs.config }}
       roles: ${{ steps.plan.outputs.roles }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       # kista-infra 전용 GitHub App의 1시간짜리 설치 토큰 — 장기 PAT 대신(유출돼도 곧 무효, 갱신 불필요)
@@ -67,9 +67,9 @@ jobs:
   # 배포 판정 스크립트·hook 정적 분석·단위 테스트 + 마이그레이션 안전 검사 — 통과해야 이미지를 만들고 배포 요청을 보낸다
   deploy-checks:
     name: Deploy Scripts & Migrations
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # 명시 고정 — ubuntu-latest는 2026-10-19부터 Ubuntu 26
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: shellcheck
@@ -87,7 +87,7 @@ jobs:
     name: Full Test Suite
     needs: plan
     if: needs.plan.outputs.verify == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # 명시 고정 — ubuntu-latest는 2026-10-19부터 Ubuntu 26
     services:
       postgres:
         image: postgres:17
@@ -114,8 +114,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-java@d7793b545071e98d581d3bf084a51c3213318a07 # v4.9.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '25'
           distribution: 'temurin'
@@ -142,7 +142,7 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.image }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set image name
         id: image
@@ -150,17 +150,17 @@ jobs:
           # SHA 태그만 — 배포·변경감지·롤백 모두 SHA로 식별하고 :latest는 어디서도 쓰지 않는다
           echo "image=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: true
@@ -180,7 +180,7 @@ jobs:
       && needs.deploy-checks.result == 'success'
       && contains(fromJSON('["success","skipped"]'), needs.verify.result)
       && contains(fromJSON('["success","skipped"]'), needs.build.result)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # 명시 고정 — ubuntu-latest는 2026-10-19부터 Ubuntu 26
     timeout-minutes: 75   # infra reconcile 대기열(앞선 run 최대 30분) + 자기 run 30분 + 여유
     environment:
       name: production
@@ -190,7 +190,7 @@ jobs:
       FORCE: ${{ github.event.inputs.force || 'false' }}
       REQUEST_ID: kista-api-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # kista-infra 전용 GitHub App의 1시간짜리 설치 토큰 — 장기 PAT 대신(유출돼도 곧 무효, 갱신 불필요)
       - name: kista-infra 앱 토큰
         id: infra-token
