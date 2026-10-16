@@ -27,7 +27,8 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)
 public class UserEventResubmitScheduler {
 
-    private static final Duration MIN_AGE = Duration.ofMinutes(5); // 방금 실패한 건은 다음 회차로 — 기동 직후 재기동 재발행과 겹치지 않게
+    private static final Duration MIN_AGE = Duration.ofMinutes(5); // 상태 NULL 레거시 행만 거른다 — Modulith 2.1.1 SQL은 OR 우선순위상 FAILED 행엔 적용되지 않는다
+    private static final int BATCH_SIZE = 10_000; // Modulith가 FAILED 행을 오래된 순으로 이만큼 읽은 뒤 필터를 적용한다 — 작으면 다른 이벤트 실패분에 막혀 사용자 이벤트에 닿지 못한다
 
     private final FailedEventPublications failedEventPublications; // Modulith 실패 publication 재발행 API
     private final NotifyPort notifyPort;                            // 관리자 텔레그램 알림
@@ -37,6 +38,7 @@ public class UserEventResubmitScheduler {
     void resubmitFailedUserEvents() {
         failedEventPublications.resubmit(ResubmissionOptions.defaults()
                 .withMinAge(MIN_AGE)
+                .withBatchSize(BATCH_SIZE)
                 .withFilter(this::isUserSyncEventAndAlertOnFirstFailure));
     }
 
