@@ -11,6 +11,8 @@ import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,6 +50,7 @@ class TradingCloseSchedulerTest {
     @Mock BatchContextFactory contextFactory;
     @Mock ApplicationEventPublisher events;
     @Mock HeartbeatPort heartbeatPort;
+    @Mock TradingErrorReportPort errorReportPort;
 
     TradingCloseScheduler scheduler;
 
@@ -76,7 +80,7 @@ class TradingCloseSchedulerTest {
     void setUp() throws InterruptedException {
         // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
         SchedulerJobRunner jobRunner = new SchedulerJobRunner(events);
-        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort);
+        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort, errorReportPort);
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);
@@ -164,7 +168,52 @@ class TradingCloseSchedulerTest {
         verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
         assertThat(captor.getAllValues().get(1).phase()).isEqualTo(SchedulerLifecycleEvent.Phase.FAILED);
         assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("KIS API 호출 실패");
-        verify(heartbeatPort).pingClose(); // jobRunner가 RuntimeException을 삼키므로 runLocked는 정상 종료 — 핑 도달
+        verify(heartbeatPort, never()).pingClose(); // 실패한 배치는 완료 신호를 보내지 않는다 — dead-man's switch가 감지
+    }
+
+    @Test
+    void runNow_insidePlacementWindow_runsImmediateBatch() throws InterruptedException {
+        // DST 2026-10-07(수) 04:40 KST — 장마감 05:00, 접수 마감 04:50 전
+        when(strategyPort.findAllActive()).thenReturn(List.of());
+        when(contextFactory.buildAll(any())).thenReturn(List.of());
+
+        scheduler.runNow(ZonedDateTime.of(2026, 10, 7, 4, 40, 0, 0, TimeZones.KST));
+
+        verify(useCase).executeBatchNow(List.of());
+        verifyNoInteractions(errorReportPort);
+    }
+
+    @Test
+    void runNow_afterPlacementCutoff_rejectsWithAdminAlert() throws InterruptedException {
+        // DST 04:55 KST — 접수 마감(04:50) 경과: LOC가 다음 세션으로 넘어가므로 거부
+        scheduler.runNow(ZonedDateTime.of(2026, 10, 7, 4, 55, 0, 0, TimeZones.KST));
+
+        verify(errorReportPort).reportError(any(IllegalStateException.class));
+        verifyNoInteractions(schedulerLockService, useCase);
+    }
+
+    @Test
+    void runNow_windowBoundaries_dstAndNonDst() throws InterruptedException {
+        lenient().when(strategyPort.findAllActive()).thenReturn(List.of());
+        lenient().when(contextFactory.buildAll(any())).thenReturn(List.of());
+        // 경계 포함 판정: 시작(04:30) 포함, 접수 마감(장마감-10분) 미포함 — DST 장마감 05:00, 비DST 06:00
+        scheduler.runNow(ZonedDateTime.of(2026, 10, 7, 4, 30, 0, 0, TimeZones.KST));  // DST 시작 — 수락
+        scheduler.runNow(ZonedDateTime.of(2026, 12, 2, 5, 49, 0, 0, TimeZones.KST));  // 비DST 마감 직전 — 수락
+        scheduler.runNow(ZonedDateTime.of(2026, 10, 7, 4, 50, 0, 0, TimeZones.KST));  // DST 마감 — 거부
+        scheduler.runNow(ZonedDateTime.of(2026, 12, 2, 5, 50, 0, 0, TimeZones.KST));  // 비DST 마감 — 거부
+
+        verify(useCase, times(2)).executeBatchNow(List.of());
+        verify(errorReportPort, times(2)).reportError(any(IllegalStateException.class));
+    }
+
+    @Test
+    void runNow_eveningBeforeCron_rejects() throws InterruptedException {
+        // 23:00 KST — 다음 거래일 세션이라 당일 KST 거래일 기준 마감 배치와 어긋난다
+        scheduler.runNow(ZonedDateTime.of(2026, 10, 7, 23, 0, 0, 0, TimeZones.KST));
+        scheduler.runNow(ZonedDateTime.of(2026, 10, 7, 4, 0, 0, 0, TimeZones.KST)); // cron 이전
+
+        verify(errorReportPort, times(2)).reportError(any(IllegalStateException.class));
+        verifyNoInteractions(schedulerLockService, useCase);
     }
 
     @Test

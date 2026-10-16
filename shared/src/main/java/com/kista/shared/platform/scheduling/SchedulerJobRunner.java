@@ -34,7 +34,8 @@ public class SchedulerJobRunner {
 
     // name: 스케쥴러 표시명 (e.g., "장 개시 스케쥴러", "마감 매매 스케쥴러 수동")
     // contexts 타입은 호출 모듈 소유 — 골격은 size()만 로그에 쓰고 그대로 Action에 넘긴다 (모듈 경계상 제네릭)
-    public <T> void run(String name, Supplier<List<T>> contextSupplier, Action<T> action) throws InterruptedException {
+    // 반환: 정상 완료 여부 — 예외로 FAILED 처리됐으면 false (heartbeat 등 완료 신호를 성공 시에만 보내기 위함)
+    public <T> boolean run(String name, Supplier<List<T>> contextSupplier, Action<T> action) throws InterruptedException {
         events.publishEvent(SchedulerLifecycleEvent.started(name));
         try {
             List<T> contexts = contextSupplier.get(); // try 안 — 조회 실패도 FAILED로 잡히도록
@@ -42,6 +43,7 @@ public class SchedulerJobRunner {
             action.accept(contexts);
             log.info("{} 완료", name);
             events.publishEvent(SchedulerLifecycleEvent.completed(name));
+            return true;
         } catch (InterruptedException e) {
             // 배포·재기동 강제 종료 — 이벤트 발행(동기) 후 rethrow해 SchedulerLockService가 락을 즉시 해제하도록 함
             log.warn("{} 인터럽트: {}", name, e.getMessage());
@@ -50,6 +52,7 @@ public class SchedulerJobRunner {
         } catch (Exception e) {
             log.error("{} 오류: {}", name, e.getMessage(), e);
             events.publishEvent(SchedulerLifecycleEvent.failed(name, e));
+            return false;
         }
     }
 

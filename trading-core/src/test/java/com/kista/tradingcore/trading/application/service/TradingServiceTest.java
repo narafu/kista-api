@@ -236,7 +236,7 @@ class TradingServiceTest {
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader, dcaDetailPort,
-                new PrivacyBaseGuard(privacyValidation, errorReportPort));
+                new PrivacyBaseGuard(privacyValidation, errorReportPort), cycleStrategies);
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
@@ -2335,10 +2335,11 @@ class TradingServiceTest {
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(pendingStrategy.id())).thenReturn(Optional.of(new CyclePosition(
                 null, pendingCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null)));
-        when(orderPort.findPlacedByCycleAndDate(pendingCycle.id(), today)).thenReturn(List.of());
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
 
         service.resumeCloseReport(List.of(reported, pending, idle), PAST_DST);
+
+        verify(orderPort).markCancelled(pendingOrder.id()); // 당일 접수 주문이 리포트 입력으로 재구성됨
 
         verify(kisExecutionPort, times(1)).getExecutions(any(), any(), any(), eq(ACCOUNT_REF)); // pending 1건만
         verify(cycleHistoryPort).save(argThat(p -> p.strategyCycleId().equals(pendingCycle.id())));
@@ -2346,6 +2347,49 @@ class TradingServiceTest {
         verify(cycleHistoryPort, never()).findLatestOneByStrategyId(STRATEGY.id());
         verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(idleCycle.id())));
         verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    @Test
+    void resumeCloseReport_includesAlreadyFilledOrders_soFillsAreNotLost() throws InterruptedException {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        // 체결 상태 기록 후 포지션 저장 전에 중단 — 주문은 이미 FILLED라 PLACED 조회로는 빠진다
+        Order filled = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 2, PRICE, OrderStatus.FILLED, "ORD-F", null, null);
+        Order failed = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, PRICE, OrderStatus.FAILED, null, null, null);
+        when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(false);
+        when(orderPort.findByStrategyId(STRATEGY.id(), today, today)).thenReturn(List.of(filled, failed));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(new CyclePosition(
+                null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, 10, null, null)));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of(
+                new Execution(today, StrategyTicker.SOXL, OrderDirection.BUY, 2, PRICE, PRICE.multiply(BigDecimal.TWO), "ORD-F")));
+
+        service.resumeCloseReport(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(orderPort).markFilled(filled.id(), 2, PRICE.setScale(2), OrderStatus.FILLED);
+        verify(orderPort, never()).markCancelled(failed.id()); // 접수 안 된(externalOrderId 없음) 주문은 제외
+    }
+
+    @Test
+    void resumeCloseReport_includesVrWithoutOrders_soRolloverIsChecked() throws InterruptedException {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        // VR 전략 — 당일 주문 0건이어도 일반 마감 경로(planAll)처럼 리포트까지 흘러 rollIfDue가 매일 판정돼야 한다
+        Strategy vr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        when(batchRunPort.isReported(today, vr.id())).thenReturn(false);
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.TQQQ, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(new CyclePosition(
+                null, vrCycle.id(), new BigDecimal("1000.00"), PRICE, PRICE, 10, null, null)));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+
+        service.resumeCloseReport(List.of(new BatchContext(vr, vrCycle, ACCOUNT, USER)), PAST_DST);
+
+        verify(vrRolloverService).rollIfDue(any(), any(), any(), eq(today));
     }
 
     // 계좌 예산 락 구간 안에서만 true — 승인분 PLANNED 저장이 락 안에서 커밋되는지 검증용

@@ -255,7 +255,7 @@ flows:
         lane: trading
         to: [db]
         title: 배치 완료
-        desc: 체크포인트를 DONE으로 기록하고, 외부 감시 서비스 URL로 heartbeat를 보낸다(dead-man's switch). heartbeat가 오지 않으면 배치가 끝까지 돌지 않았다는 뜻이다.
+        desc: 체크포인트를 DONE으로 기록하고, 외부 감시 서비스 URL로 heartbeat를 보낸다(dead-man's switch). heartbeat가 오지 않으면 배치가 끝까지 돌지 않았거나 예외로 실패했다는 뜻이다(실패 시에는 보내지 않는다).
         code: [HeartbeatPort#pingClose]
         state: "trading_batch_run → DONE"
 
@@ -1428,10 +1428,13 @@ flows:
         title: kista-trading이 매매 배치 실행
         desc: >-
           kista-trading이 백그라운드 스레드에서 개장·마감 스케쥴러를 즉시 실행하고 바로 202를 돌려준다. 수동 실행은 개장·주문 시각 대기 없이 곧바로 주문을 계산·접수한다.
+          마감 수동 실행은 당일 마감 접수 창(04:30~장마감 10분 전 KST)에서만 받고, 체결 리포트는 실제 장마감 후 시각까지 기다린다.
           예약 cron과 같은 분산 락 이름(trading-open·trading-close)을 쓴다.
         code: [TradingSchedulerInternalController#triggerOpen, TradingOpenScheduler#runNow, TradingCloseScheduler#runNow, TradingExecutionFacade#placeOpenOrdersNow, TradingExecutionFacade#executeBatchNow]
         state: "trading_batch_run → STARTED 이후 진행"
-        fail: 같은 락을 다른 실행이 쥐고 있으면(cron 배치 진행 중 등) 아무 일 없이 건너뛰고, 요청자는 202만 받는다. 실행 중 오류는 로그와 관리자 알림으로만 남는다.
+        fail: >-
+          같은 락을 다른 실행이 쥐고 있으면(cron 배치 진행 중 등) 아무 일 없이 건너뛰고, 요청자는 202만 받는다. 마감 수동 실행이 접수 창 밖이면
+          배치를 돌리지 않고 관리자 알림만 보낸다(LOC가 다음 세션으로 넘어가 거래일·리포트가 어긋나므로). 실행 중 오류는 로그와 관리자 알림으로만 남는다.
 
       - id: lock
         lane: trading

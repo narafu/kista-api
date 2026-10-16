@@ -6,6 +6,8 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.domain.model.DstInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,6 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
 
 @Slf4j
 @Component
@@ -26,14 +30,35 @@ public class TradingCloseScheduler {
     private final BatchContextFactory contextFactory;
     private final SchedulerJobRunner jobRunner;
     private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
+    private final TradingErrorReportPort errorReportPort; // 수동 트리거 거부 관리자 알림
+
+    static final LocalTime CRON_TIME = LocalTime.of(4, 30);                // cron 발화 시각 — 당일 마감 접수 창 시작
+    static final Duration PLACEMENT_MARGIN = Duration.ofMinutes(10);       // 장마감 10분 전까지만 마감 접수
+
+    // 장마감 10분 전 이전인지 — 수동 트리거·재기동 재개 공용 접수 마감 판정
+    static boolean beforePlacementCutoff(ZonedDateTime nowKst) {
+        return nowKst.toInstant().isBefore(DstInfo.calculate(nowKst).marketCloseAt().minus(PLACEMENT_MARGIN));
+    }
 
     @Scheduled(cron = "0 30 4 * * TUE-SAT", zone = TimeZones.KST_ID) // 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 waitUntilOrderTime 60분 대기)
     public void run() throws InterruptedException {
         schedulerLockService.tryRun("trading-close", Duration.ofHours(3), this::runLocked);
     }
 
-    // 수동 트리거 — 주문 대기 없이 즉시 실행
+    // 수동 트리거 — 주문 대기 없이 즉시 접수, 리포트는 장마감 후
     public void runNow() throws InterruptedException {
+        runNow(ZonedDateTime.now(TimeZones.KST));
+    }
+
+    // package-private: 시각 주입으로 접수 창 판정 테스트
+    void runNow(ZonedDateTime nowKst) throws InterruptedException {
+        // 당일 마감 접수 창(04:30~장마감 10분 전) 밖이면 거부 — LOC가 다음 세션으로 넘어가 거래일(KST 당일)·리포트가 어긋난다
+        if (nowKst.toLocalTime().isBefore(CRON_TIME) || !beforePlacementCutoff(nowKst)) {
+            String message = "[수동 마감 거부] 마감 접수 창(04:30~장마감 10분 전 KST) 밖 — 요청 시각 " + nowKst.toLocalTime().withNano(0);
+            log.warn(message);
+            errorReportPort.reportError(new IllegalStateException(message));
+            return;
+        }
         schedulerLockService.tryRun("trading-close", Duration.ofHours(3), () ->
                 jobRunner.run("마감 매매 스케쥴러 수동",
                         () -> contextFactory.buildAll(strategyPort.findAllActive()),
@@ -48,18 +73,18 @@ public class TradingCloseScheduler {
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 리포트 미완료 전략만 리포트
     public void resumeReport() throws InterruptedException {
         schedulerLockService.takeOver("trading-close", Duration.ofHours(3), () -> {
-            jobRunner.run("마감 리포트 재개",
+            boolean completed = jobRunner.run("마감 리포트 재개",
                     () -> contextFactory.buildAll(strategyPort.findAllActive()),
                     useCase::resumeCloseReport);
-            heartbeatPort.pingClose(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
+            if (completed) heartbeatPort.pingClose(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
         });
     }
 
     private void runLocked() throws InterruptedException {
         // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
-        jobRunner.run("마감 매매 스케쥴러",
+        boolean completed = jobRunner.run("마감 매매 스케쥴러",
                 () -> contextFactory.buildAll(strategyPort.findAllActive()),
                 useCase::executeBatch);
-        heartbeatPort.pingClose(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
+        if (completed) heartbeatPort.pingClose(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
     }
 }

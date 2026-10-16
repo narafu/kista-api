@@ -114,6 +114,11 @@ public record DstInfo(
         return nextTradeDateAt(LocalDate.now(KST), LocalTime.now(KST));
     }
 
+    // 주어진 KST 시각 기준 거래일 — 재기동 재개 등 시각을 이미 들고 있는 호출부용
+    public static LocalDate nextTradeDate(ZonedDateTime nowKst) {
+        return nextTradeDateAt(nowKst.toLocalDate(), nowKst.toLocalTime());
+    }
+
     // 시각 주입식 판단 — 테스트 및 nextTradeDate 공용
     static LocalDate nextTradeDateAt(LocalDate today, LocalTime now) {
         return now.isBefore(SCHEDULER_RUN_TIME) ? today : today.plusDays(1);
@@ -158,12 +163,14 @@ public record DstInfo(
                 Instant.now().minusMillis(1));
     }
 
-    // 마감 스케쥴러 수동 트리거용: orderAt·postClose를 과거로 설정해 모든 대기 스킵
+    // 마감 스케쥴러 수동 트리거용: 주문 시각 대기만 스킵하고 체결 확인은 실제 마감 후 시각까지 기다린다
+    // (postClose를 과거로 두면 접수 직후 리포트가 돌아 살아 있는 LOC가 CANCELLED로 기록되고 체결 없는 포지션이 저장된다)
     public static DstInfo immediateClose() {
         ZonedDateTime now = ZonedDateTime.now(KST);
         boolean isDst = resolveDst(now.toInstant());
-        Instant past = Instant.now().minusMillis(1);
-        return new DstInfo(isDst, past, past, atKst(now.toLocalDate(), marketOpenTime(isDst)));
+        LocalDate date = now.toLocalDate();
+        return new DstInfo(isDst, Instant.now().minusMillis(1),
+                atKst(date, postCloseTime(isDst)), atKst(date, marketOpenTime(isDst)));
     }
 
     // 재주문 시점 가용성 (현재 시각 기준) — 주문시점 셀렉터 disable 판단 SSOT

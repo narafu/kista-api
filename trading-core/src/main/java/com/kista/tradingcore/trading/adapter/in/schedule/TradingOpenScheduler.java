@@ -48,9 +48,9 @@ public class TradingOpenScheduler {
 
     private void runLocked() throws InterruptedException {
         // PRIVACY 기준표 장전 점검은 TradingService가 계획 직전에 공용 가드(PrivacyBaseGuard)로 수행한다
-        jobRunner.run("장 개시 스케쥴러",
+        boolean completed = jobRunner.run("장 개시 스케쥴러",
                 () -> contextFactory.buildAll(strategyPort.findAllActive()),
                 useCase::placeOpenOrders);
-        heartbeatPort.pingOpen(); // 인터럽트 시 도달 안 함 — 실행 완료 신호만 발송
+        if (completed) heartbeatPort.pingOpen(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
     }
 }

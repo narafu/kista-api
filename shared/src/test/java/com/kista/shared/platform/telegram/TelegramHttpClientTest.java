@@ -137,4 +137,10 @@ class TelegramHttpClientTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("봇 username을 가져올 수 없습니다");
     }
+
+    @Test
+    void escapeHtml_HTML_특수문자만_엔티티로_바꾼다() {
+        assertThat(TelegramHttpClient.escapeHtml("502 <html> a&b · 한글")).isEqualTo("502 &lt;html&gt; a&amp;b · 한글");
+        assertThat(TelegramHttpClient.escapeHtml(null)).isEmpty();
+    }
 }

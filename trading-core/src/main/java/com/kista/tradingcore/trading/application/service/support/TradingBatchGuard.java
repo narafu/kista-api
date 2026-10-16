@@ -31,19 +31,22 @@ public class TradingBatchGuard {
             throw e; // InterruptedException은 삼키지 않음
         } catch (Exception e) {
             log.error("[strategyId={}] {} 오류: {}", ctx.strategy().id(), phase, e.getMessage(), e);
-            notifyErrorSafely(ctx, e);
+            notifyErrorSafely(phase, ctx, e);
             return Optional.empty();
         }
     }
 
-    void notifyErrorSafely(BatchContext ctx, Exception e) {
+    // 관리자에겐 원문, 사용자에겐 고정 문구 — 원문엔 증권사 응답 바디·요청 URL 등 내부 정보가 실린다
+    void notifyErrorSafely(String phase, BatchContext ctx, Exception e) {
         try {
             eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
         } catch (Exception notifyEx) {
             log.warn("[strategyId={}] 관리자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
         }
         try {
-            eventPublisher.publishEvent(new TradingErrorEvent(ctx.userProfile().userId(), e.getMessage()));
+            eventPublisher.publishEvent(new TradingErrorEvent(ctx.userProfile().userId(),
+                    "[%s %s] %s 단계에서 오류가 발생했습니다. 관리자가 확인 중입니다.".formatted(
+                            ctx.account().nickname(), ctx.strategy().ticker(), phase)));
         } catch (Exception notifyEx) {
             log.warn("[strategyId={}] 사용자 오류 알림 실패: {}", ctx.strategy().id(), notifyEx.getMessage());
         }

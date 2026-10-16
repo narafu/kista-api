@@ -27,6 +27,12 @@ public class TelegramHttpClient {
         this(telegramRestClient, "");
     }
 
+    // parse_mode=HTML 본문에 넣을 동적 문자열(예외 메시지 등) 이스케이프 — 미이스케이프 '<'·'&'는 텔레그램 400(파싱 실패)으로 알림 유실
+    public static String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     // 일반 텍스트 메시지 전송
     public void sendMessage(String chatId, String text, String botToken) {
         post(botToken, "sendMessage", Map.of("chat_id", chatId, "text", messagePrefix + text, "parse_mode", "HTML"),

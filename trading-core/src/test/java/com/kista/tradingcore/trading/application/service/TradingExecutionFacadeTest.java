@@ -78,8 +78,8 @@ class TradingExecutionFacadeTest {
         verify(tradingService).executeBatch(eq(contexts), dstCaptor.capture());
         verify(tradingService, never()).placeOpenOrders(any(), any());
         DstInfo captured = dstCaptor.getValue();
-        // immediateClose()는 orderAt/postClose를 동일한 과거 Instant(past)로 설정 — immediateOpen()에서는 발생하지 않는 패턴
-        assertThat(captured.orderAt()).isEqualTo(captured.postClose());
+        // immediateClose()는 주문 시각 대기만 스킵(orderAt=과거) — 체결 확인은 실제 마감 후 시각(postClose)까지 기다린다
+        assertThat(captured.postClose()).isEqualTo(DstInfo.calculate().postClose());
         assertThat(captured.orderAt()).isBeforeOrEqualTo(Instant.now());
         assertThat(captured.orderAt()).isAfter(Instant.now().minusSeconds(10));
     }

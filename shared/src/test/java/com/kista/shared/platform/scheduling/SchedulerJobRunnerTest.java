@@ -28,7 +28,7 @@ class SchedulerJobRunnerTest {
 
     @Test
     void 정상_완료_시_STARTED와_COMPLETED_이벤트를_발행한다() throws InterruptedException {
-        runner.run("장 개시 스케쥴러", List::of, contexts -> {});
+        assertThat(runner.run("장 개시 스케쥴러", List::of, contexts -> {})).isTrue();
 
         ArgumentCaptor<SchedulerLifecycleEvent> captor = ArgumentCaptor.forClass(SchedulerLifecycleEvent.class);
         verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
@@ -39,8 +39,8 @@ class SchedulerJobRunnerTest {
 
     @Test
     void 일반_예외_시_FAILED_이벤트만_발행하고_COMPLETED는_발행하지_않는다() throws InterruptedException {
-        runner.run("마감 매매 스케쥴러", List::of,
-                contexts -> { throw new IllegalStateException("boom"); });
+        assertThat(runner.run("마감 매매 스케쥴러", List::of,
+                contexts -> { throw new IllegalStateException("boom"); })).isFalse();
 
         ArgumentCaptor<SchedulerLifecycleEvent> captor = ArgumentCaptor.forClass(SchedulerLifecycleEvent.class);
         verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());

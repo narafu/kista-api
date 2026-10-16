@@ -34,7 +34,7 @@ class TradingNotifyAdapter implements TradingNotifyPort {
         } catch (Exception publishEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", publishEx.getMessage());
         }
-        send("<b>⚠️ 관리자 알림</b>%n%s".formatted(e.getMessage()));
+        send("<b>⚠️ 관리자 알림</b>%n%s".formatted(TelegramHttpClient.escapeHtml(e.getMessage())));
     }
 
     @Override

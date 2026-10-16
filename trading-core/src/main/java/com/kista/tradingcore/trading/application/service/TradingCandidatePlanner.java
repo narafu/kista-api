@@ -79,7 +79,7 @@ class TradingCandidatePlanner {
                               PrivacyTradeBase privacyBase, LocalDate today) throws InterruptedException {
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            batchGuard.runSafely("plan 후보 생성", ctx,
+            batchGuard.runSafely("주문 계획", ctx,
                     () -> collectCycleCandidate(ctx, startPriceSnapshots, privacyBase, today,
                             EnumSet.of(OrderTiming.AT_CLOSE)))
                     .ifPresent(candidates::add);
@@ -101,7 +101,7 @@ class TradingCandidatePlanner {
             LocalDate tradeDate) throws InterruptedException {
         List<CyclePlanCandidate> candidates = new ArrayList<>();
         for (BatchContext ctx : contexts) {
-            batchGuard.runSafely("개장 order 후보 생성", ctx,
+            batchGuard.runSafely("개장 주문 계획", ctx,
                     () -> collectCycleCandidate(ctx, startPriceSnapshots, privacyBase, tradeDate,
                             EnumSet.of(OrderTiming.AT_OPEN)))
                     .ifPresent(candidates::add);

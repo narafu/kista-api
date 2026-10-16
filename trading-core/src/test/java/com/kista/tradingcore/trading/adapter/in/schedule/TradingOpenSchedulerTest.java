@@ -167,7 +167,7 @@ class TradingOpenSchedulerTest {
         verify(events, org.mockito.Mockito.times(2)).publishEvent(captor.capture());
         assertThat(captor.getAllValues().get(1).phase()).isEqualTo(SchedulerLifecycleEvent.Phase.FAILED);
         assertThat(captor.getAllValues().get(1).errorMessage()).isEqualTo("KIS API 오류");
-        verify(heartbeatPort).pingOpen(); // jobRunner가 RuntimeException을 삼키므로 runLocked는 정상 종료 — 핑 도달
+        verify(heartbeatPort, never()).pingOpen(); // 실패한 배치는 완료 신호를 보내지 않는다 — dead-man's switch가 감지
     }
 
     @Test

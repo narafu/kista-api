@@ -14,8 +14,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.time.DayOfWeek;
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
@@ -27,9 +25,8 @@ import java.time.ZonedDateTime;
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // 스케쥴러 비활성(local)이면 재개도 비활성
 public class TradingBatchResumer {
 
-    private static final LocalTime CLOSE_CRON = LocalTime.of(4, 30);  // TradingCloseScheduler cron 시각
+    private static final LocalTime CLOSE_CRON = TradingCloseScheduler.CRON_TIME;  // TradingCloseScheduler cron 시각
     private static final LocalTime OPEN_CRON = LocalTime.of(22, 0);  // TradingOpenScheduler cron 시각
-    private static final Duration CLOSE_PLACEMENT_MARGIN = Duration.ofMinutes(10); // 장마감 10분 전까지만 마감 접수 재개
 
     private final TradingBatchRunPort batchRunPort;
     private final TradingCloseScheduler closeScheduler;
@@ -74,8 +71,7 @@ public class TradingBatchResumer {
         if (phase == TradingBatchPhase.PLACING) {
             alert("[재개 경고] trading-close 접수 도중 중단 — 이중 접수 여부 확인 필요 (거래일 " + tradeDate + ")");
         }
-        Instant cutoff = DstInfo.calculate(nowKst).marketCloseAt().minus(CLOSE_PLACEMENT_MARGIN);
-        if (!nowKst.toInstant().isBefore(cutoff)) {
+        if (!TradingCloseScheduler.beforePlacementCutoff(nowKst)) {
             alert("[재개 불가] trading-close 접수 마감 경과 (phase=" + phase + ", 거래일 " + tradeDate + ") — 마감 매매 미접수, 수동 확인 필요");
             return;
         }
@@ -92,7 +88,7 @@ public class TradingBatchResumer {
                 && time.isBefore(CLOSE_CRON);
         if (!evening && !afterMidnight) return;
 
-        LocalDate tradeDate = evening ? nowKst.toLocalDate().plusDays(1) : nowKst.toLocalDate();
+        LocalDate tradeDate = DstInfo.nextTradeDate(nowKst); // 저녁=익일, 자정 이후=당일
         TradingBatchPhase phase = batchRunPort.findPhase(TradingBatchJob.OPEN, tradeDate).orElse(null);
         if (phase == TradingBatchPhase.DONE) return;
         if (phase == TradingBatchPhase.PLACING) {

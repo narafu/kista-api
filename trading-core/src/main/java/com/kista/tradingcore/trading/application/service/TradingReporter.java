@@ -79,10 +79,11 @@ class TradingReporter {
         AccountBalance postBalance = snapshots
                 ? liveSnapshot(ctx).orElseGet(() -> balance.applyExecutions(fills).withUsdDeposit(BigDecimal.ZERO))
                 : balance.applyExecutions(fills);
-        cyclePositionPersistor.saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
-
-        // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED)
+        // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED) — 포지션 저장(rotation 포함)보다 먼저:
+        // rotation 실패가 예외로 끝나도 주문이 PLACED로 남지 않게 한다 (리포트 마커가 이미 찍혀 재개로도 복구되지 않음)
         markFilledOrders(mainOrders, executions);
+
+        cyclePositionPersistor.saveCyclePosition(today, postBalance, ctx, closingPrice, privacyBase);
 
         // TRADING_ALERT 알림 활성 여부 확인(기본값 true) 후 리포트/SSE 알림 이벤트 발행 — 실제 발송은 TradingReportNotifier에 위임
         TradingReport report = buildReport(today, strategy.type(), strategy.ticker(), executions);
@@ -122,7 +123,8 @@ class TradingReporter {
                     log.info("[orderId={}] 취소 시점 이미 체결 완료 — 취소 생략", order.id());
                 } else {
                     log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
-                    eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
+                    eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s 잔여 주문 취소 실패] orderId=%s — %s"
+                            .formatted(account.nickname(), order.ticker(), order.id(), e.getMessage())));
                 }
             }
         }

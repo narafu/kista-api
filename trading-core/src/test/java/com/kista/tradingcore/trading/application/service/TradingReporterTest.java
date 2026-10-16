@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
@@ -138,6 +139,22 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, orders, null);
 
         verify(orderPort).markCancelled(unfilledId);
+        verify(orderPort).markFilled(filledId, 3, new BigDecimal("20.00"), OrderStatus.FILLED);
+    }
+
+    @Test
+    void 포지션_저장_rotation이_실패해도_체결_상태는_먼저_기록된다() {
+        UUID filledId = UUID.randomUUID();
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("E-FILLED", 3, "20.00")));
+        doThrow(new IllegalStateException("rotation 실패")).when(cyclePositionPersistor)
+                .saveCyclePosition(any(), any(), any(), any(), any());
+
+        assertThatThrownBy(() -> reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE,
+                List.of(placedOrder(filledId, "E-FILLED", 3)), null))
+                .isInstanceOf(IllegalStateException.class);
+
+        // 리포트 마커가 이미 찍혀 재개로도 복구되지 않으므로 PLACED로 남지 않아야 한다
         verify(orderPort).markFilled(filledId, 3, new BigDecimal("20.00"), OrderStatus.FILLED);
     }
 

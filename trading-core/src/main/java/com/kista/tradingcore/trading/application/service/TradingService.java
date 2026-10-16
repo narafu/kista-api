@@ -61,6 +61,7 @@ class TradingService {
     private final TradingBalanceLoader balanceLoader;          // 리포트 재개 시 사전 잔고(최신 cycle_position) 재구성
     private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(KIS DCA MOO) 판별용 DCA 설정 조회
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
+    private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
@@ -108,7 +109,7 @@ class TradingService {
         // 슬롯별 후보 수집·예산 배정 — 누락된 AT_CLOSE 슬롯만 PLANNED로 저장
         List<TradingCandidatePlanner.CycleState> states = candidatePlanner.planAll(started, priceCtx.startPriceSnapshots(), priceCtx.privacyBase(), today);
         if (states.isEmpty()) {
-            log.warn("매매 배치 중단 — 전략 계산 결과 0건 (대상 {}건 전량 skip, 원인은 위 'plan 후보 생성 오류'/'전략 계산 skip' 로그 참고)",
+            log.warn("매매 배치 중단 — 전략 계산 결과 0건 (대상 {}건 전량 skip, 원인은 위 '주문 계획 오류'/'전략 계산 skip' 로그 참고)",
                     started.size());
             checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
             return;
@@ -151,14 +152,16 @@ class TradingService {
     }
 
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 남은 마감 대기 후 리포트 마커 없는 전략만 리포트
-    // 사전 잔고는 최신 cycle_position(리포트 전이므로 계획 시점과 동일), 리포트 대상 주문은 DB의 PLACED 주문
+    // 사전 잔고는 최신 cycle_position(리포트 전이므로 계획 시점과 동일), 리포트 대상 주문은 당일 접수된 적 있는 주문(externalOrderId 보유)
     void resumeCloseReport(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         runState.track(() -> {
             LocalDate today = LocalDate.now(TimeZones.KST);
-            // 원래 배치의 리포트 대상(당일 주문이 있는 전략)만 — PRIVACY 기준 미수신·장중 신규 전략은 원래도 리포트하지 않는다
+            // 원래 배치의 리포트 대상(당일 주문이 있거나 롤오버 판정이 필요한 전략 — planAll과 같은 기준)만
+            // PRIVACY 기준 미수신·장중 신규 전략은 원래도 리포트하지 않는다
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
                     .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
-                    .filter(ctx -> !orderPort.findByStrategyId(ctx.strategy().id(), today, today).isEmpty())
+                    .filter(ctx -> cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
+                            || !orderPort.findByStrategyId(ctx.strategy().id(), today, today).isEmpty())
                     .toList();
             log.info("마감 리포트 재개 — 대상 {}건 (전체 {}건)", targets.size(), contexts.size());
 
@@ -184,7 +187,10 @@ class TradingService {
                                     balanceLoader.loadBalanceOrThrow(ctx.strategy()).balance(),
                                     null, null, null,
                                     ctx.strategy().isPrivacy() ? priceCtx.privacyBase() : null),
-                            orderPort.findPlacedByCycleAndDate(ctx.currentCycle().id(), today))));
+                            // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
+                            // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
+                            orderPort.findByStrategyId(ctx.strategy().id(), today, today).stream()
+                                    .filter(order -> order.externalOrderId() != null).toList())));
                 }
                 reportAll(placedStates, closingPrices, today);
                 checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
@@ -231,7 +237,7 @@ class TradingService {
         List<TradingParallelRunner.Task<Void>> tasks = placedStates.stream()
                 .map(ps -> new TradingParallelRunner.Task<Void>(
                         ps.state().ctx().account().id(),
-                        () -> batchGuard.runSafely("recordAndNotify", ps.state().ctx(), () -> {
+                        () -> batchGuard.runSafely("체결 리포트", ps.state().ctx(), () -> {
                             reporter.recordAndNotify(today, ps.state().ctx(), ps.state().balance(),
                                     closingPrices.get(ps.state().ctx().strategy().ticker()),
                                     ps.mainOrders(), ps.state().privacyBase());
@@ -353,7 +359,7 @@ class TradingService {
         // AT_CLOSE 접수(placeAll)의 reloadPlacementPrices와 동일한 staleness 우려 — ticker당 1회 조회
         Map<StrategyTicker, BigDecimal> placementPrices = priceFetcher.reloadPlacementPrices(placeableStates);
         for (TradingCandidatePlanner.CycleState state : placeableStates) {
-            batchGuard.runSafely("개장 AT_OPEN 접수", state.ctx(), () -> {
+            batchGuard.runSafely("개장 주문 접수", state.ctx(), () -> {
                 BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
                         .orElse(state.startPrice());
                 placeAtOpenPlannedOrders(state, placementPrice, tradeDate);
