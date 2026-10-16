@@ -36,10 +36,15 @@
 - KIS(US 거래일 기준, `UsTradeDates` 변환 필요)와 반대 방향 — 혼용 금지
 - **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙).
 
+### 판매 가능 수량 — 보유 수량 사용
+- `SellableQuantityPort` 계약은 "미체결 매도를 빼지 않은 보유 수량"(KIS `ovrs_cblc_qty`·Mock 최신 포지션과 동일)이고, 소비처(`TradingOrderBudgetAllocator`·`DcaRoundPlanner`·수동 SELL 검증)가 DB PLANNED/SUBMITTING/PLACED SELL 예약을 직접 뺀다
+- Toss `/api/v1/sellable-quantity`는 미체결 매도를 이미 뺀 순수량이다 — 2026-10-17 실계좌 실측: SOXL 보유 30·미체결 매도 1주 → 29(취소 후 30). 그대로 쓰면 PLACED SELL을 이중 차감해 매도 배정이 줄어든다. 그래서 `TossHoldingsApi.getSellableQuantity`는 `/api/v1/holdings`의 `quantity`를 쓴다. 같은 날 KIS 실측: 보유 12·PLACED SELL 12 → `ovrs_cblc_qty`=12, `ord_psbl_qty`=0(코드는 `ovrs_cblc_qty` 사용 — 정합)
+- 한계: kista 밖에서 낸 미체결 매도는 총량 기준에서 빠지지 않아 배정이 과다할 수 있고, 그 경우 증권사가 접수를 거절한다(KIS와 동일)
+
 ### 주문 멱등키 (clientOrderId)
 - `TossOrderApi.place`는 `OrderInstruction.clientOrderId`(= `orders.id` UUID 문자열, 36자 — 허용 패턴 `^[a-zA-Z0-9\-_]+$`·최대 36자 안)를 body에 싣는다. 공식 스펙(`OrderCreateRequest.clientOrderId`·FAQ): 10분 내 같은 키·같은 내용 재요청은 원 주문 결과를 재반환, 원 요청 처리 중이면 409 `request-in-progress`(결과 불명으로 분류), 내용이 다르면 422 `idempotency-key-conflict`. 10분이 지나면 같은 키도 새 주문이다
 - 주문 목록·상세 응답(`Order` 스키마)에는 `clientOrderId`가 없어 사후 조회가 안 된다 — 잔류 SUBMITTING 대사(`OrderSubmissionReconciler`)는 선점 후 2~9분 창에서만 같은 키 재요청으로 원 주문번호를 회수한다(workflow.md "PLANNED 상태 전이 경합")
-- 409 코드값 `request-in-progress`·`idempotency-key-conflict`는 공식 openapi.json 응답 예시의 `error.code`로 확인(`TossHttpClient`가 같은 필드를 파싱). 실계좌 미검증: 같은 키 재요청의 실제 원 결과 재반환 동작
+- 2026-10-17 실계좌 실측: 같은 키·같은 내용 재요청 → 같은 `orderId` 재반환(200), 같은 키·다른 내용 → 422 `idempotency-key-conflict`(본문 gzip). 409 `request-in-progress`는 공식 openapi.json 응답 예시로 확인
 
 ### 주의사항
 

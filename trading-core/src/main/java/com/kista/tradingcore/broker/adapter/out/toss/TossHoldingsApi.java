@@ -39,8 +39,6 @@ class TossHoldingsApi {
     private static final String BUYING_POWER_PATH = "/api/v1/buying-power";
     // Toss 환율 API 경로 (GET /api/v1/exchange-rate?baseCurrency=USD&quoteCurrency=KRW)
     private static final String EXCHANGE_RATE_PATH = "/api/v1/exchange-rate";
-    // Toss 판매 가능 수량 API 경로
-    private static final String SELLABLE_QUANTITY_PATH = "/api/v1/sellable-quantity";
 
     private final TossHttpClient tossHttpClient;
     // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개
@@ -192,24 +190,19 @@ class TossHoldingsApi {
 
     // ── TossSellableQuantityPort ───────────────────────────────────────────────
 
+    // 미체결 매도를 빼지 않은 보유 수량(포트 계약 — KIS ovrs_cblc_qty·Mock과 동일). /sellable-quantity는 미체결 매도를 이미 뺀
+    // 순수량이라(2026-10-17 실측: 보유 30·미체결 매도 1 → 29) 배정이 DB PLACED SELL 예약을 한 번 더 빼는 이중 차감이 된다
     public SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
-        return fetchSellableQuantity(ticker, account);
-    }
-
-    // 내부 헬퍼: Toss 판매 가능 수량 조회
-    private SellableQuantity fetchSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
-        var params = new LinkedMultiValueMap<String, String>();
-        params.add("symbol", ticker.name());
-        TossResult<SellableQuantityResult> wrapper = tossHttpClient.get(
-                SELLABLE_QUANTITY_PATH, account, params,
-                new ParameterizedTypeReference<TossResult<SellableQuantityResult>>() {});
-        if (wrapper == null || wrapper.result() == null) {
-            log.warn("Toss 판매 가능 수량 응답 없음: ticker={}, wrapper={}", ticker, wrapper);
-            return new SellableQuantity(ticker.name(), 0);
-        }
-        SellableQuantityResult result = wrapper.result();
-        int quantity = TossResponseParser.parseIntOrZero(result.sellableQuantity());
-        log.info("Toss 판매 가능 수량: ticker={}, sellableQuantity={}", ticker, quantity);
+        TossResult<HoldingsResponse> wrapper = tossHttpClient.get(
+                HOLDINGS_PATH, account, new LinkedMultiValueMap<>(),
+                new ParameterizedTypeReference<TossResult<HoldingsResponse>>() {});
+        HoldingsResponse holdings = wrapper != null ? wrapper.result() : null;
+        int quantity = holdings == null || holdings.items() == null ? 0 : holdings.items().stream()
+                .filter(i -> ticker.name().equals(i.symbol()))
+                .findFirst()
+                .map(i -> TossResponseParser.parseIntOrZero(i.quantity()))
+                .orElse(0);
+        log.info("Toss 판매 가능 수량(보유 기준): ticker={}, quantity={}", ticker, quantity);
         return new SellableQuantity(ticker.name(), quantity);
     }
 
@@ -246,7 +239,4 @@ class TossHoldingsApi {
         @JsonProperty("midRate") String midRate  // 매매기준율
     ) {}
 
-    record SellableQuantityResult(
-        @JsonProperty("sellableQuantity") String sellableQuantity  // 판매 가능 수량
-    ) {}
 }
