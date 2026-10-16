@@ -97,4 +97,36 @@ class TradingUserNotificationAdapterTest {
         assertThat(text).contains("DCA 미주문").contains("내계좌").contains("UPRO")
                 .contains("2026-10-14").contains("보유 수량 없음").contains("판매가능수량 0주");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyDcaRoundSkipped_nicknameAndDetailWithHtmlChars_areEscaped() {
+        // parse_mode=HTML — 미이스케이프 '<'·'&'는 텔레그램 400으로 알림 유실, 닉네임은 마크업 주입 경로
+        var event = new com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent(
+                UUID.randomUUID(), UUID.randomUUID(), "<b>A&B</b>", StrategyTicker.UPRO,
+                com.kista.shared.kernel.OrderDirection.BUY, java.time.LocalDate.of(2026, 10, 14),
+                com.kista.shared.kernel.DcaSkipReason.INSUFFICIENT_BALANCE, "예수금 부족(주문가능금액 < 1주 캡가)");
+
+        adapter.notifyDcaRoundSkipped(LINKED_PROFILE, event);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("&lt;b&gt;A&amp;B&lt;/b&gt;").contains("주문가능금액 &lt; 1주 캡가")
+                .doesNotContain("<b>A&B");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyTradingReport_nicknameWithHtmlChars_isEscaped() {
+        var report = new com.kista.tradingcore.trading.domain.model.TradingReport(java.time.LocalDate.of(2026, 10, 14),
+                StrategyType.INFINITE, StrategyTicker.SOXL, java.math.BigDecimal.ONE, java.math.BigDecimal.ZERO);
+
+        adapter.notifyTradingReport(LINKED_PROFILE, "<i>내계좌</i>", report);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("&lt;i&gt;내계좌&lt;/i&gt;").doesNotContain("<i>");
+    }
 }
