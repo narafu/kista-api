@@ -39,7 +39,7 @@
 ### 주문 멱등키 (clientOrderId)
 - `TossOrderApi.place`는 `OrderInstruction.clientOrderId`(= `orders.id` UUID 문자열, 36자 — 허용 패턴 `^[a-zA-Z0-9\-_]+$`·최대 36자 안)를 body에 싣는다. 공식 스펙(`OrderCreateRequest.clientOrderId`·FAQ): 10분 내 같은 키·같은 내용 재요청은 원 주문 결과를 재반환, 원 요청 처리 중이면 409 `request-in-progress`(결과 불명으로 분류), 내용이 다르면 422 `idempotency-key-conflict`. 10분이 지나면 같은 키도 새 주문이다
 - 주문 목록·상세 응답(`Order` 스키마)에는 `clientOrderId`가 없어 사후 조회가 안 된다 — 잔류 SUBMITTING 대사(`OrderSubmissionReconciler`)는 선점 후 2~9분 창에서만 같은 키 재요청으로 원 주문번호를 회수한다(workflow.md "PLANNED 상태 전이 경합")
-- 실계좌 미검증: 실제 재반환 동작·409 코드값은 실주문 없이 확인하지 못했다
+- 409 코드값 `request-in-progress`·`idempotency-key-conflict`는 공식 openapi.json 응답 예시의 `error.code`로 확인(`TossHttpClient`가 같은 필드를 파싱). 실계좌 미검증: 같은 키 재요청의 실제 원 결과 재반환 동작
 
 ### 주의사항
 
