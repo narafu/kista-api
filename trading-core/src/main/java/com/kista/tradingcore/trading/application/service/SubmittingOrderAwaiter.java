@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
@@ -8,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -34,23 +34,25 @@ class SubmittingOrderAwaiter {
         this.pollInterval = pollInterval;
     }
 
-    // 사이클·거래일의 접수 중 주문이 사라질 때까지 대기 — 타임아웃 시 남은 주문 반환(없으면 빈 목록)
+    // 사이클·거래일의 접수 중 주문이 정리될 때까지 대기 — 타임아웃 시 남은 주문 반환(없으면 빈 목록)
     List<Order> awaitCycle(UUID strategyCycleId, LocalDate tradeDate) {
-        return poll(() -> orderPort.findSubmittingByCycleAndDate(strategyCycleId, tradeDate).stream()
-                .map(SubmittingOrder::order).toList(), List::isEmpty);
+        return awaitLeftovers(() -> orderPort.findSubmittingByCycleAndDate(strategyCycleId, tradeDate))
+                .stream().map(SubmittingOrder::order).toList();
     }
 
-    // 단건 주문이 접수 중을 벗어날 때까지 대기 — 최신 주문 반환(타임아웃이면 SUBMITTING 그대로)
-    Order awaitOrder(UUID orderId) {
-        return poll(() -> orderPort.findById(orderId)
-                        .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다.")),
-                o -> o.status() != OrderStatus.SUBMITTING);
+    // 단건 주문이 접수 중을 벗어날 때까지 대기 — 최신 주문 반환(타임아웃·오래된 잔류면 SUBMITTING 그대로)
+    Order awaitOrder(Order order) {
+        awaitLeftovers(() -> orderPort.findSubmittingByCycleAndDate(order.strategyCycleId(), order.tradeDate())
+                .stream().filter(s -> s.order().id().equals(order.id())).toList());
+        return orderPort.findById(order.id()).orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
     }
 
-    private <T> T poll(Supplier<T> read, java.util.function.Predicate<T> settled) {
+    // 접수 진행 중일 수 있는(선점 후 대기 상한 이내) 잔류가 있는 동안만 폴링 — 상한보다 오래된 잔류는 결과 불명 확정이라
+    // 기다려도 바뀌지 않으므로 즉시 반환한다(런북 정정 전까지 일시정지·삭제가 매번 묶이지 않게)
+    private List<SubmittingOrder> awaitLeftovers(Supplier<List<SubmittingOrder>> read) {
         long deadline = System.nanoTime() + timeout.toNanos();
-        T current = read.get();
-        while (!settled.test(current) && System.nanoTime() < deadline) {
+        List<SubmittingOrder> current = read.get();
+        while (current.stream().anyMatch(this::mayStillBeInFlight) && System.nanoTime() < deadline) {
             try {
                 Thread.sleep(pollInterval);
             } catch (InterruptedException _) {
@@ -60,5 +62,9 @@ class SubmittingOrderAwaiter {
             current = read.get();
         }
         return current;
+    }
+
+    private boolean mayStillBeInFlight(SubmittingOrder leftover) {
+        return leftover.submittedAt().plus(timeout).isAfter(Instant.now());
     }
 }

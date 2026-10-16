@@ -144,7 +144,7 @@ class OrderCancelService {
 
         // 접수 중: 결과가 정해질 때까지 대기 — PLACED가 되면 아래 증권사 취소로 이어간다
         if (order.status() == OrderStatus.SUBMITTING) {
-            order = awaiter.awaitOrder(orderId);
+            order = awaiter.awaitOrder(order);
             if (order.status() == OrderStatus.SUBMITTING) {
                 throw new OrderCancelException("주문 접수를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.");
             }

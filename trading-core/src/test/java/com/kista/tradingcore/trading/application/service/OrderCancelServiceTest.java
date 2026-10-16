@@ -475,7 +475,7 @@ class OrderCancelServiceTest {
         Order placed = submitting.withPlaced("ORD_LATE");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(submitting));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(awaiter.awaitOrder(orderId)).thenReturn(placed);
+        when(awaiter.awaitOrder(submitting)).thenReturn(placed);
 
         service.cancelOrder(orderId, requesterId);
 
@@ -489,7 +489,7 @@ class OrderCancelServiceTest {
         Order submitting = submittingOrder(orderId);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(submitting));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        when(awaiter.awaitOrder(orderId)).thenReturn(submitting);
+        when(awaiter.awaitOrder(submitting)).thenReturn(submitting);
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
                 .isInstanceOf(OrderCancelException.class)
