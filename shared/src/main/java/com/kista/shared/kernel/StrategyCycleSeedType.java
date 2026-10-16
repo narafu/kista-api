@@ -13,8 +13,4 @@ public enum StrategyCycleSeedType {
     MAX("ON(MAX)");     // 종료 후 마지막 usdDeposit을 initialUsdDeposit으로 재등록
 
     private final String label; // 한국어 표시 이름
-
-    public boolean isConsecutive() {
-        return this != NONE;
-    }
 }

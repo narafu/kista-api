@@ -58,13 +58,8 @@ public record ReverseModePosition(
                 && calcLocBuyQuantity() == 0;
     }
 
-    // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate)
-    // 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
-    public boolean shouldExitReverseMode(BigDecimal closingPrice, BigDecimal targetProfitRate) {
-        return shouldExit(avgPrice, closingPrice, targetProfitRate);
-    }
-
-    // static 헬퍼: 포지션 객체 없이 종료 조건만 판단 — InfinitePosition.nextReverseMode에서 재사용
+    // 리버스모드 종료 조건: 종가 ≥ 평단 × (1 - targetProfitRate) — 종가가 평단 근처 이상으로 회복되면 일반모드로 복귀
+    // 포지션 객체 없이 판단하는 static 헬퍼 — InfinitePosition.nextReverseMode가 사용
     public static boolean shouldExit(BigDecimal avgPrice, BigDecimal closingPrice, BigDecimal targetProfitRate) {
         if (closingPrice == null || avgPrice == null) return false;
         BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))

@@ -129,7 +129,7 @@ class InfinitePositionTest {
     @DisplayName("nextReverseMode: 리버스모드 + 종가 회복 → 일반모드 복귀")
     void nextReverseMode_exits_when_priceRecovered() {
         // SOXL targetProfitRate=0.20 → threshold = avgPrice × (1 - 0.20) = 22 × 0.80 = 17.60
-        // closingPrice=18.00 ≥ threshold(17.60) → shouldExitReverseMode=true → 일반모드 복귀
+        // closingPrice=18.00 ≥ threshold(17.60) → shouldExit=true → 일반모드 복귀
         AccountBalance balance = new AccountBalance(10, new BigDecimal("22"), new BigDecimal("100"));
         InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("18.00"), 20);
 
@@ -140,7 +140,7 @@ class InfinitePositionTest {
     @DisplayName("nextReverseMode: 리버스모드 + 종가 미회복 → 리버스모드 유지")
     void nextReverseMode_stays_when_priceNotRecovered() {
         // SOXL targetProfitRate=0.20 → threshold = 22 × 0.80 = 17.60
-        // closingPrice=15.00 < threshold(17.60) → shouldExitReverseMode=false → 리버스모드 유지
+        // closingPrice=15.00 < threshold(17.60) → shouldExit=false → 리버스모드 유지
         AccountBalance balance = new AccountBalance(10, new BigDecimal("22"), new BigDecimal("100"));
         InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("15.00"), 20);
 

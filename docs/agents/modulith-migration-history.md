@@ -27,7 +27,7 @@ adapter/in/         ← (레거시 최상위 com.kista.adapter 패키지 자체�
 
 adapter/out/
   (broker/kis/toss/mock/persistence/kistoken은 com.kista.broker.adapter.out.{internal,kis,toss,mock,persistence}로 이전됨)
-  (marketdata/ 폐지됨 — CommonMarketPriceFeed는 com.kista.broker.adapter.out.marketdata로 이전됨 — broker 모듈 내부라 NamedInterface 미공개)
+  (marketdata/ 폐지됨 — CommonMarketPriceFeed는 com.kista.broker.adapter.out.marketdata로 이전됨 — broker 모듈 내부라 NamedInterface 미공개. 이후 2026-10-16 구현체 1개뿐이라 삭제, MockBrokerAdapter가 TossPriceApi를 직접 주입)
   (feargreed/·persistence/calendar/·persistence/feargreed/ 폐지됨 — com.kista.market.adapter.out.{feargreed,persistence.calendar,persistence.feargreed}로 이전됨)
   (persistence/privacy/ 폐지됨 — com.kista.privacy.adapter.out.persistence로 이전됨)
   (kbland/·alpaca/·persistence/housingbenchmark/·persistence/marketindex/ 폐지됨 — com.kista.stats.adapter.out.{kbland,alpaca,persistence.housingbenchmark,persistence.marketindex}로 이전됨. AlpacaIndexPriceAdapter가 stats로 옮겨가며 레거시 adapter/out/alpaca 디렉토리 소멸 — market판 AlpacaCalendarAdapter만 남고 빈 이름 충돌은 계속 marketAlpacaConfig로 회피)

@@ -1,7 +1,5 @@
 package com.kista.tradingcore.broker.domain.model;
 
-import com.kista.shared.kernel.Broker;
-
 // 증권사 외부 API 호출 실패의 벤더 중립 상위 타입 — 소비자(trading 등)는 KIS/Toss 구체 예외를 몰라도 이 타입 하나로 catch한다(503 매핑)
 public abstract class BrokerApiException extends RuntimeException {
 
@@ -12,19 +10,13 @@ public abstract class BrokerApiException extends RuntimeException {
         ALREADY_CANCELED, // 이미 취소 처리된 주문에 중복 취소 요청이 도착한 경우
     }
 
-    private final Broker vendor;      // 예외를 낸 증권사
     private final String vendorLabel; // 응답 title·로그용 벤더 표기("KIS"/"Toss")
     private final Conflict conflict;  // 409 세부 사유(없으면 NONE)
 
-    protected BrokerApiException(Broker vendor, String vendorLabel, String message, Throwable cause, Conflict conflict) {
+    protected BrokerApiException(String vendorLabel, String message, Throwable cause, Conflict conflict) {
         super(message, cause);
-        this.vendor = vendor;
         this.vendorLabel = vendorLabel;
         this.conflict = conflict;
-    }
-
-    public Broker vendor() {
-        return vendor;
     }
 
     public String vendorLabel() {

@@ -1,7 +1,6 @@
 package com.kista.tradingcore.support;
 
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
-import com.kista.shared.kernel.Broker;
 
 // broker 밖 테스트용 벤더 중립 BrokerApiException — KisApiException/TossApiException 등 벤더 타입을 테스트에 들이지 않기 위한 최소 서브클래스
 public class StubBrokerApiException extends BrokerApiException {
@@ -18,6 +17,6 @@ public class StubBrokerApiException extends BrokerApiException {
 
     // 벤더 표기 지정 — 예외 핸들러 title("<vendorLabel> API Error") 검증용
     public StubBrokerApiException(String vendorLabel, String message, Conflict conflict) {
-        super(Broker.MOCK, vendorLabel, message, null, conflict);
+        super(vendorLabel, message, null, conflict);
     }
 }

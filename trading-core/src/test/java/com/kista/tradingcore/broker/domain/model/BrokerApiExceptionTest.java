@@ -2,7 +2,6 @@ package com.kista.tradingcore.broker.domain.model;
 
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
-import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -11,14 +10,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class BrokerApiExceptionTest {
 
     @Test
-    @DisplayName("KIS/Toss 예외는 벤더와 표기를 BrokerApiException으로 노출한다")
+    @DisplayName("KIS/Toss 예외는 벤더 표기를 BrokerApiException으로 노출한다")
     void vendorExposedThroughBaseType() {
         BrokerApiException kis = new KisApiException("KIS 오류", null);
         BrokerApiException toss = new TossApiException("Toss 오류", null);
 
-        assertThat(kis.vendor()).isEqualTo(Broker.KIS);
         assertThat(kis.vendorLabel()).isEqualTo("KIS");
-        assertThat(toss.vendor()).isEqualTo(Broker.TOSS);
         assertThat(toss.vendorLabel()).isEqualTo("Toss");
     }
 

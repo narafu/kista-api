@@ -96,7 +96,7 @@ public record InfinitePosition(
 
     // 체결 후 리버스모드 상태 전이 — prevReverseMode: 이전 상태
     // 진입: 일반모드 + holdings>0 + isFinalRound (소진 발동)
-    // 종료: 리버스모드 + holdings>0 + 종가가 회복 임계선 이상 (shouldExitReverseMode)
+    // 종료: 리버스모드 + holdings>0 + 종가가 회복 임계선 이상 (ReverseModePosition.shouldExit)
     public boolean nextReverseMode(boolean prevReverseMode) {
         if (prevReverseMode) {
             // 종료 조건: 종가 ≥ avgPrice × (1 - targetProfitRate)

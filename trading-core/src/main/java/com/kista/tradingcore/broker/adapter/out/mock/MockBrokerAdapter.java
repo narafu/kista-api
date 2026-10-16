@@ -1,6 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
-import com.kista.tradingcore.broker.adapter.out.marketdata.CommonMarketPriceFeed;
+import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
@@ -25,7 +25,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MockBrokerAdapter implements BrokerCapabilitiesPort {
 
-    private final CommonMarketPriceFeed priceFeed;               // 시세 재사용 — Spring이 TossPriceApi 빈을 이 인터페이스로 주입 (이미 broker 소유 PriceSnapshot 반환)
+    private final TossPriceApi priceFeed;                        // 시세 재사용 — 계좌 자격증명 없는 Toss 관리자 공통 시세 (broker 소유 PriceSnapshot 반환)
     private final MockSimulationDataPort mockSimulationDataPort; // trading 소유 주문·사이클·포지션 조회 (포트 역전 — 클래스 주석 참고)
 
     @Override
@@ -94,7 +94,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
         return priceFeed.getPrevCloses(tickers); // 공통 API — account 불필요
     }
 
-    // tradeDate 일봉 확정 종가 — 시세는 Toss 공용 피드 재사용(CommonMarketPriceFeed.getClosingPrice)
+    // tradeDate 일봉 확정 종가 — 시세는 Toss 공용 피드 재사용(TossPriceApi.getClosingPrice)
     @Override
     public BigDecimal getClosingPrice(StrategyTicker ticker, LocalDate tradeDate, BrokerAccountRef account) {
         return priceFeed.getClosingPrice(ticker, tradeDate);

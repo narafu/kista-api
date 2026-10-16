@@ -1,7 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.tradingcore.broker.adapter.out.marketdata.CommonMarketPriceFeed;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
@@ -36,7 +35,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class TossPriceApi implements CommonMarketPriceFeed {
+public class TossPriceApi {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";

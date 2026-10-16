@@ -1,6 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
-import com.kista.tradingcore.broker.adapter.out.marketdata.CommonMarketPriceFeed;
+import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.broker.domain.model.BrokerBalance;
@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
 class MockBrokerAdapterTest {
 
     @Mock
-    private CommonMarketPriceFeed priceFeed;
+    private TossPriceApi priceFeed;
 
     @Mock
     private MockSimulationDataPort mockSimulationDataPort;
@@ -354,7 +354,7 @@ class MockBrokerAdapterTest {
     // --- BrokerPricePort 위임 ---
 
     @Test
-    @DisplayName("getPrice는 account와 무관하게 CommonMarketPriceFeed로 위임한다")
+    @DisplayName("getPrice는 account와 무관하게 TossPriceApi 공통 시세로 위임한다")
     void getPriceDelegatesToPriceFeed() {
         when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("123.45"));
 
@@ -364,7 +364,7 @@ class MockBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("getPrevClose는 account와 무관하게 CommonMarketPriceFeed로 위임한다")
+    @DisplayName("getPrevClose는 account와 무관하게 TossPriceApi 공통 시세로 위임한다")
     void getPrevCloseDelegatesToPriceFeed() {
         when(priceFeed.getPrevClose(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("120.00"));
 
