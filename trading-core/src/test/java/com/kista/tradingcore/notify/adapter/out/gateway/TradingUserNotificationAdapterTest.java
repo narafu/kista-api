@@ -128,5 +128,8 @@ class TradingUserNotificationAdapterTest {
         verify(restClient.post().uri(anyString())).body(captor.capture());
         String text = ((Map<String, String>) captor.getValue()).get("text");
         assertThat(text).contains("&lt;i&gt;내계좌&lt;/i&gt;").doesNotContain("<i>");
+        // FCM은 HTML을 렌더링하지 않아 태그를 지우고 엔티티를 되돌린 평문으로 위임한다
+        verify(pushNotificationPublisher).publish(new UserPushNotificationRequestedEvent(USER_ID, "매매 결산",
+                "매매 결산[2026-10-14] — <i>내계좌</i>%n[INFINITE] SOXL 매수: $1.00 | 매도: $0.00".formatted()));
     }
 }

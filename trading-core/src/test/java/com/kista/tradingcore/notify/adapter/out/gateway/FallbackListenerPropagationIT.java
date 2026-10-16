@@ -1,0 +1,57 @@
+package com.kista.tradingcore.notify.adapter.out.gateway;
+
+import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
+import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.Mockito.doThrow;
+
+// fallbackExecution 알림 리스너가 트랜잭션 밖 발행 지점(CyclePositionPersistor 등)에서 인라인 실행될 때
+// 알림 경로 실패(FCM 위임 XADD)가 발행자에게 전파되지 않는지 실 컨텍스트로 잠근다
+@Tag("integration")
+@SpringBootTest(properties = "spring.data.redis.url=redis://localhost:6379")
+@ActiveProfiles("test")
+@Execution(ExecutionMode.SAME_THREAD) // 실 DB
+class FallbackListenerPropagationIT {
+
+    @Autowired ApplicationEventPublisher eventPublisher;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @MockitoSpyBean StringRedisTemplate redisTemplate; // XADD 실패 주입용
+
+    private final UUID userId = UUID.randomUUID();
+
+    @AfterEach
+    void tearDown() {
+        jdbcTemplate.update("DELETE FROM event_publication WHERE serialized_event LIKE ?", "%" + userId + "%");
+        jdbcTemplate.update("DELETE FROM user_notify_profile WHERE user_id = ?", userId);
+    }
+
+    @Test
+    void 트랜잭션_밖_사이클_종료_알림_실패가_발행자로_전파되지_않는다() {
+        // 텔레그램 미연결 프로필 — 알림은 FCM 위임(Redis XADD)만 탄다
+        jdbcTemplate.update("INSERT INTO user_notify_profile (user_id, notification_prefs, balance_check_enabled, is_active, updated_at) "
+                + "VALUES (?, '{}', true, true, now())", userId);
+        doThrow(new RedisConnectionFailureException("redis down")).when(redisTemplate).opsForStream();
+
+        assertThatCode(() -> eventPublisher.publishEvent(new CycleCompletedEvent(userId, UUID.randomUUID(), "IT",
+                StrategyType.INFINITE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE)))
+                .doesNotThrowAnyException();
+    }
+}

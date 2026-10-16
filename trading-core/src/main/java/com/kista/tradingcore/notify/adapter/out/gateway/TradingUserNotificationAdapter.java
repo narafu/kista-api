@@ -106,7 +106,12 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     // 텔레그램 직접 발송 + FCM은 root PushNotificationStreamConsumer(Redis Stream 구독)에 위임
     private void notify(TradingUserProfile profile, String title, String text) {
         sendIfLinked(profile, text);
-        pushNotificationPublisher.publish(new UserPushNotificationRequestedEvent(profile.userId(), title, text));
+        pushNotificationPublisher.publish(new UserPushNotificationRequestedEvent(profile.userId(), title, toPlainText(text)));
+    }
+
+    // FCM은 HTML을 렌더링하지 않는다 — 텔레그램용 태그를 지우고 엔티티를 되돌린다(&amp;는 마지막에 — 이중 해제 방지)
+    static String toPlainText(String html) {
+        return html.replaceAll("<[^>]+>", "").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
     }
 
     private void sendIfLinked(TradingUserProfile profile, String text) {
