@@ -1,0 +1,178 @@
+package com.kista.tradingcore.trading.application.service;
+
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
+import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.OrderInstruction;
+import com.kista.tradingcore.broker.domain.model.OrderResult;
+import com.kista.tradingcore.support.StubBrokerApiException;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.service.OrderSubmitter.Outcome;
+import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+// 선점 → 접수 → 기록 단일 경로와 확정 거절/결과 불명 분류 검증 (spec 2026-10-16 §3.2·§3.3)
+@ExtendWith(MockitoExtension.class)
+@DisplayName("OrderSubmitter 단위 테스트")
+class OrderSubmitterTest {
+
+    @Mock OrderPort orderPort;
+    @Mock BrokerOrderCorrectionPort brokerPort;
+    @Mock ApplicationEventPublisher eventPublisher;
+
+    static final BrokerAccountRef ACCOUNT_REF = new BrokerAccountRef(
+            UUID.randomUUID(), "key", "secret", "74420614", null, Broker.KIS);
+    static final UUID ORDER_ID = UUID.randomUUID();
+    static final Order ORDER = new Order(ORDER_ID, ACCOUNT_REF.id(), UUID.randomUUID(), LocalDate.now(),
+            StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 3,
+            new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null);
+
+    private OrderSubmitter submitter() {
+        return new OrderSubmitter(orderPort, brokerPort, eventPublisher);
+    }
+
+    private void expectAlert(String fragment) {
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
+                && tee.message() != null && tee.message().contains(fragment)));
+    }
+
+    @Test
+    @DisplayName("HTTP 전에 선점하고 접수 성공 시 PLACED 기록")
+    void submit_claimsBeforeSending() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+
+        OrderSubmitter.Submission result = submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+        InOrder inOrder = inOrder(orderPort, brokerPort);
+        inOrder.verify(orderPort).markSubmitting(ORDER_ID);
+        inOrder.verify(brokerPort).place(any(), eq(ACCOUNT_REF));
+        inOrder.verify(orderPort).markPlaced(ORDER_ID, "EXT");
+        assertThat(result.outcome()).isEqualTo(Outcome.PLACED);
+        assertThat(result.externalOrderId()).isEqualTo("EXT");
+    }
+
+    @Test
+    @DisplayName("선점 경합(그 사이 취소·삭제)이면 HTTP를 보내지 않는다")
+    void submit_claimConflict_skipsWithoutHttp() {
+        doThrow(new OrderStateConflictException("삭제됨")).when(orderPort).markSubmitting(ORDER_ID);
+
+        OrderSubmitter.Submission result = submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+        assertThat(result.outcome()).isEqualTo(Outcome.SKIPPED);
+        verify(brokerPort, never()).place(any(), any());
+    }
+
+    @Test
+    @DisplayName("주문 id를 증권사 멱등키(clientOrderId)로 전달")
+    void submit_passesOrderIdAsClientOrderId() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+
+        submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+        ArgumentCaptor<OrderInstruction> captor = ArgumentCaptor.forClass(OrderInstruction.class);
+        verify(brokerPort).place(captor.capture(), eq(ACCOUNT_REF));
+        assertThat(captor.getValue().clientOrderId()).isEqualTo(ORDER_ID.toString());
+    }
+
+    @Test
+    @DisplayName("확정 거절이면 FAILED 기록")
+    void submit_rejected_marksFailed() {
+        when(brokerPort.place(any(), any())).thenThrow(StubBrokerApiException.rejected("주문가능금액 초과"));
+
+        OrderSubmitter.Submission result = submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+        assertThat(result.outcome()).isEqualTo(Outcome.REJECTED);
+        verify(orderPort).markFailed(ORDER_ID);
+        expectAlert("접수 실패");
+    }
+
+    @Test
+    @DisplayName("자격증명 실패(키 만료)는 확정 거절 — 매 배치 SUBMITTING을 쌓지 않는다")
+    void submit_credentialFailure_marksFailed() {
+        when(brokerPort.place(any(), any())).thenThrow(new BrokerCredentialException());
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.REJECTED);
+        verify(orderPort).markFailed(ORDER_ID);
+    }
+
+    @Test
+    @DisplayName("결과 불명(I/O 등)이면 SUBMITTING 유지 + 알림")
+    void submit_ambiguous_keepsSubmitting() {
+        when(brokerPort.place(any(), any())).thenThrow(new StubBrokerApiException("read timed out"));
+
+        OrderSubmitter.Submission result = submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+        assertThat(result.outcome()).isEqualTo(Outcome.UNKNOWN);
+        verify(orderPort, never()).markFailed(any());
+        expectAlert("[접수 결과 불명]");
+    }
+
+    @Test
+    @DisplayName("확정 거절 FAILED 기록이 경합이어도 예외 없이 REJECTED")
+    void submit_rejected_markFailedConflict_isIgnored() {
+        when(brokerPort.place(any(), any())).thenThrow(StubBrokerApiException.rejected("거절"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markFailed(ORDER_ID);
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.REJECTED);
+    }
+
+    @Test
+    @DisplayName("PLACED 기록 1차 실패는 1회 재시도로 흡수")
+    void submit_markPlacedFailsOnce_retries() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+        doThrow(new RuntimeException("일시적 DB 오류")).doNothing().when(orderPort).markPlaced(ORDER_ID, "EXT");
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.PLACED);
+        verify(orderPort, times(2)).markPlaced(ORDER_ID, "EXT");
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    @Test
+    @DisplayName("PLACED 기록이 재시도까지 실패하면 SUBMITTING 유지 + 자동 재접수 안 됨 알림")
+    void submit_markPlacedFails_keepsSubmitting() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+        doThrow(new RuntimeException("DB down")).when(orderPort).markPlaced(ORDER_ID, "EXT");
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.UNKNOWN);
+        expectAlert("자동 재접수되지 않음");
+    }
+
+    @Test
+    @DisplayName("PLACED 기록 경합이면 증권사 주문 즉시 취소, 실패 시 취소 경합 알림")
+    void submit_markPlacedConflict_cancelsAtBroker() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markPlaced(ORDER_ID, "EXT");
+        doThrow(new RuntimeException("증권사 오류")).when(brokerPort).cancel(any(), any());
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.SKIPPED);
+        verify(brokerPort).cancel(new CancelInstruction(ORDER.ticker(), "EXT"), ACCOUNT_REF);
+        verify(orderPort, times(1)).markPlaced(ORDER_ID, "EXT");
+        expectAlert("취소 경합");
+    }
+}

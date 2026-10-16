@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -57,6 +58,7 @@ class TradingReporter {
         Strategy strategy = ctx.strategy();
         TradingAccount account = ctx.account();
         TradingUserProfile userProfile = ctx.userProfile();
+        warnLeftoverSubmitting(today, ctx);
         // 장마감 후에도 체결 가능한 잔여 PLACED 주문을 취소 — 애프터마켓 체결이 CANCELLED로 오기록되는 것을 방지
         cancelUnresolvedOrders(mainOrders, account);
 
@@ -179,6 +181,17 @@ class TradingReporter {
                 .map(Execution::amountUsd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new TradingReport(today, strategyType, ticker, totalBought, totalSold);
+    }
+
+    // 접수 결과 불명(SUBMITTING) 잔류 — 체결 매칭(PLACED만)에서 빠져 실제 체결 시 포지션이 어긋나므로 런북 정정·수동 체결 보정을 알린다
+    private void warnLeftoverSubmitting(LocalDate today, BatchContext ctx) {
+        List<UUID> leftoverIds = orderPort.findSubmittingByCycleAndDate(ctx.currentCycle().id(), today).stream()
+                .map(s -> s.order().id()).toList();
+        if (leftoverIds.isEmpty()) return;
+        log.error("[{}] 리포트 시점 SUBMITTING 잔류 — 리포트 제외: {}", ctx.account().nickname(), leftoverIds);
+        eventPublisher.publishEvent(new TradingErrorEvent(null,
+                "[접수 결과 불명 — 리포트 제외] %s %s 거래일 %s orderId=%s — 증권사 확인 후 런북 정정, 체결분은 수동 체결 보정"
+                        .formatted(ctx.account().nickname(), ctx.strategy().ticker(), today, leftoverIds)));
     }
 }
 

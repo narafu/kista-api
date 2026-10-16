@@ -1648,9 +1648,10 @@ lifecycles:
       - {to: PLANNED, title: 수동 실행, code: [ManualTradingService#execute], tag: 사용자, flow: manual-run/allocate}
       - {to: PLANNED, title: 관리자 재주문 (예약), desc: AT_OPEN/AT_CLOSE 재주문은 PLANNED로 저장한다., code: [ReorderService#reorder], tag: 관리자, flow: admin-orders/reorder-place}
       - {to: FILLED, title: 관리자 수동 체결 보정, desc: 증권사 밖에서 체결된 거래를 바로 FILLED로 기록한다., code: [ManualTradeCorrectionService#correctManualFills, Order#filledManual], tag: 관리자, flow: admin-orders/correction}
-      - {from: PLANNED, to: SUBMITTING, title: 접수 직전 선점, desc: "행을 잠그고 PLANNED일 때만 바꾼 뒤 증권사에 보낸다. 그 사이 취소·삭제·재캡됐으면 보내지 않는다.", code: [OrderPort#markSubmitting, TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
-      - {from: SUBMITTING, to: PLACED, title: 증권사 접수, desc: "SUBMITTING일 때만 기록한다. 기록이 실패하면 SUBMITTING으로 남아 자동 재접수되지 않는다(관리자 알림·런북 정정).", code: [OrderPort#markPlaced, TradingOrderExecutor#placeOrders], flow: close-batch/place}
-      - {from: SUBMITTING, to: FAILED, title: 접수 확정 거절, desc: "송신 전 실패나 증권사 응답 거부만 FAILED. 연결 끊김·타임아웃·게이트웨이 5xx는 결과 불명으로 SUBMITTING 유지.", code: [OrderPort#markFailed, TradingOrderExecutor#placeOrders], flow: close-batch/place}
+      - {from: PLANNED, to: SUBMITTING, title: 접수 직전 선점, desc: "행을 잠그고 PLANNED일 때만 바꾼 뒤 증권사에 보낸다. 그 사이 취소·삭제·재캡됐으면 보내지 않는다.", code: [OrderSubmitter#submit, TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
+      - {from: SUBMITTING, to: PLACED, title: 증권사 접수, desc: "SUBMITTING일 때만 기록한다. 기록이 실패하면 SUBMITTING으로 남아 자동 재접수되지 않는다(관리자 알림·런북 정정).", code: [OrderSubmitter#submit], flow: close-batch/place}
+      - {from: SUBMITTING, to: PLACED, title: Toss 잔류 대사, desc: "다음 접수 경로 진입 시 선점 후 2~9분 지난 Toss 주문만 같은 멱등키(clientOrderId)로 재요청해 원 주문번호를 회수한다. KIS·창 밖은 관리자 알림 후 런북 정정.", code: [OrderSubmissionReconciler#reconcile], flow: close-batch/place}
+      - {from: SUBMITTING, to: FAILED, title: 접수 확정 거절, desc: "송신 전 실패나 증권사 응답 거부만 FAILED. 연결 끊김·타임아웃·게이트웨이 5xx는 결과 불명으로 SUBMITTING 유지.", code: [OrderSubmitter#submit], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: BUY cap 재보정, desc: 접수 직전 가격 cap이 바뀐 BUY는 취소하고 보정 주문을 새 PLANNED로 저장한다., code: [BuyOrderPriceCapper#capIfNeeded], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder], flow: manual-run/cancel-one}
       - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: "전체 취소·일시정지·전략/계좌 삭제가 같은 규칙을 쓴다. 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다.", code: [OrderCancelService#cancelByCycle, OrderCancelService#cancelOpenOrders, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}

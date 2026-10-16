@@ -69,7 +69,7 @@ public class TradingBatchResumer {
             return;
         }
         if (phase == TradingBatchPhase.PLACING) {
-            alert("[재개 경고] trading-close 접수 도중 중단 — 이중 접수 여부 확인 필요 (거래일 " + tradeDate + ")");
+            alert("[재개 경고] trading-close 접수 도중 중단 — 이중 접수 여부 확인 필요 (거래일 " + tradeDate + ") — SUBMITTING 잔류 주문은 재접수되지 않음");
         }
         if (!TradingCloseScheduler.beforePlacementCutoff(nowKst)) {
             alert("[재개 불가] trading-close 접수 마감 경과 (phase=" + phase + ", 거래일 " + tradeDate + ") — 마감 매매 미접수, 수동 확인 필요");
@@ -92,7 +92,7 @@ public class TradingBatchResumer {
         TradingBatchPhase phase = batchRunPort.findPhase(TradingBatchJob.OPEN, tradeDate).orElse(null);
         if (phase == TradingBatchPhase.DONE) return;
         if (phase == TradingBatchPhase.PLACING) {
-            alert("[재개 경고] trading-open 접수 도중 중단 — 이중 접수 여부 확인 필요 (거래일 " + tradeDate + ")");
+            alert("[재개 경고] trading-open 접수 도중 중단 — 이중 접수 여부 확인 필요 (거래일 " + tradeDate + ") — SUBMITTING 잔류 주문은 재접수되지 않음");
         }
         alert("[재개] trading-open 개장 배치 재실행 (phase=" + phase + ", 거래일 " + tradeDate + ")");
         openScheduler.resume();

@@ -3,21 +3,15 @@ package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
-import com.kista.tradingcore.broker.domain.model.CancelInstruction;
-import com.kista.tradingcore.broker.domain.model.OrderInstruction;
-import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
-import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
@@ -27,19 +21,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-// 증권사 접수: BUY 가격 보정 → PLANNED 개별 접수 → PLACED 마킹 (접수 실패 주문은 로그 후 skip)
+// 증권사 접수: 잔류 SUBMITTING 대사 → BUY 가격 보정 → PLANNED 건별 선점·접수(OrderSubmitter) — 결과 불명 주문은 SUBMITTING으로 남아 재접수되지 않는다
 @Component
 @RequiredArgsConstructor
 @Slf4j
 class TradingOrderExecutor {
 
     private final OrderPort orderPort;
-    private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
-    private final ApplicationEventPublisher eventPublisher;
     private final CycleOrderStrategies cycleOrderStrategies;
     private final LiveBalancePort liveBalancePort;              // 재캡이 BUY 총액을 늘릴 때만 live 주문가능금액 조회
     private final AccountBudgetLock accountBudgetLock;          // 계좌별 재캡 예산 산정 직렬화 — allocator 승인+저장과 같은 락
+    private final OrderSubmitter orderSubmitter;                // 건별 선점 → 접수 → PLACED/FAILED 기록
+    private final OrderSubmissionReconciler reconciler;         // 접수 전 잔류 SUBMITTING 대사(Toss 멱등 재요청·알림)
 
     // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수 + 개장 후 수동실행 공용
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
@@ -47,6 +41,7 @@ class TradingOrderExecutor {
     // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)
     List<Order> placeAtOpenOrders(LocalDate tradeDate, TradingAccount account, UUID strategyCycleId,
                                   BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+        reconciler.reconcile(strategyCycleId, tradeDate, account);
         applyCap(true, tradeDate, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(strategyCycleId, tradeDate);
         if (atOpenOrders.isEmpty()) {
@@ -62,6 +57,7 @@ class TradingOrderExecutor {
     // null 가드는 applyCap에 있다 (capIfNeeded는 @Transactional이라 내부에 두면 skip 케이스마다 빈 트랜잭션이 열림)
     List<Order> placeOrders(LocalDate today, TradingAccount account, UUID strategyCycleId,
                             BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
+        reconciler.reconcile(strategyCycleId, today, account);
         applyCap(false, today, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
         List<Order> placed = placeEach(planned, account);
@@ -114,92 +110,29 @@ class TradingOrderExecutor {
         }
     }
 
-    // 주문 목록을 개별 접수 — 실패한 주문은 로그 후 건너뜀 (다음 주문 계속 진행)
+    // 주문 목록을 개별 접수 — 건별로 선점(SUBMITTING) 후 접수, 실패·선점 경합 주문은 건너뛰고 다음 주문 계속
     // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
     private List<Order> placeEach(List<Order> orders, TradingAccount account) {
         List<Order> placed = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {
             // 주문 간격이 이미 충분히 벌어져(정상적인 왕복 지연) 게이트가 대기 없이 즉시 반환하는 경우
-            // catch 블록의 인터럽트 체크만으로는 놓친다 — 매 주문 시도 전에 별도로 확인한다
+            // 아래 체크만으로는 놓친다 — 매 주문 시도 전에 별도로 확인한다
             if (Thread.currentThread().isInterrupted()) {
                 log.warn("[{}] 인터럽트 감지 — 남은 주문 {}건 접수 중단", account.nickname(), orders.size() - i);
                 break;
             }
             Order p = orders.get(i);
-            OrderInstruction instruction = new OrderInstruction(p.ticker(), p.direction(),
-                    p.orderType(), p.quantity(), p.price());
-            OrderResult result;
-            try {
-                result = brokerOrderCorrectionPort.place(instruction, account.brokerRef());
-            } catch (Exception e) {
-                // BUY 실패 시 SELL 포함 나머지 주문 계속 진행 — 잔고 부족은 브로커가 판단
-                log.warn("[{}] {} {} 주문 접수 실패: {}", account.nickname(), p.direction(), p.ticker(), e.getMessage());
-                eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 접수 실패] orderId=%s — %s"
-                        .formatted(account.nickname(), p.ticker(), p.direction(), p.id(), e.getMessage())));
-                markFailedUnlessRaced(p, account); // 접수 실패 → FAILED
-                // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 예외로 전파한다 — 이 경우 이 주문만
-                // FAILED로 남기고 나머지 주문은 다음 반복 상단의 체크에서 중단된다
-                if (Thread.currentThread().isInterrupted()) {
-                    log.warn("[{}] 인터럽트 감지 — 남은 주문 접수 중단", account.nickname());
-                    break;
-                }
-                continue;
+            OrderSubmitter.Submission submission = orderSubmitter.submit(p, account.brokerRef(), account.nickname());
+            if (submission.outcome() == OrderSubmitter.Outcome.PLACED) {
+                placed.add(p.withPlaced(submission.externalOrderId()));
             }
-            // 증권사 접수 성공 후 DB 동기화 실패 — 브로커에 주문이 남아있는 불일치 상태 (1회 재시도로 창 축소)
-            try {
-                markPlacedWithRetry(p.id(), result.externalOrderId());
-                placed.add(p.withPlaced(result.externalOrderId()));
-            } catch (OrderStateConflictException e) {
-                cancelRacedOrder(p, result.externalOrderId(), account);
-            } catch (Exception e) {
-                log.error("[{}] {} {} 증권사 접수 완료됐으나 DB PLACED 기록 실패 — 수동 확인 필요 (externalOrderId={}): {}",
-                        account.nickname(), p.direction(), p.ticker(), result.externalOrderId(), e.getMessage());
-                eventPublisher.publishEvent(new TradingErrorEvent(null,
-                        "[DB 불일치] %s %s %s 증권사 접수 완료 후 PLACED 기록 실패 — orderId=%s, externalOrderId=%s. DB는 PLANNED라 같은 거래일 재실행(재개·수동)이 재접수하므로 수동 정정 전 재실행 금지"
-                                .formatted(account.nickname(), p.ticker(), p.direction(), p.id(), result.externalOrderId())));
+            // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 확정 거절로 전파한다 — 이 주문만
+            // FAILED로 남기고 나머지 주문은 중단한다
+            if (Thread.currentThread().isInterrupted()) {
+                log.warn("[{}] 인터럽트 감지 — 남은 주문 접수 중단", account.nickname());
+                break;
             }
         }
         return placed;
-    }
-
-    // 접수 실패 기록 — 그 사이 사용자 취소·정리됐으면 그 상태(CANCELLED·삭제)를 존중하고 남은 주문 접수는 계속한다
-    private void markFailedUnlessRaced(Order p, TradingAccount account) {
-        try {
-            orderPort.markFailed(p.id());
-        } catch (OrderStateConflictException e) {
-            log.info("[{}] 접수 실패 주문이 그 사이 취소·정리됨 — FAILED 기록 생략 (orderId={})", account.nickname(), p.id());
-        }
-    }
-
-    // 접수 사이 사용자 취소·일시중지 정리로 DB 주문이 PLANNED가 아니게 됨 — 증권사 주문을 즉시 취소해 사용자의 취소 의도를 지킨다
-    private void cancelRacedOrder(Order p, String externalOrderId, TradingAccount account) {
-        try {
-            brokerOrderCorrectionPort.cancel(new CancelInstruction(p.ticker(), externalOrderId), account.brokerRef());
-            log.warn("[{}] {} {} 접수 중 DB 주문이 취소·삭제됨 — 증권사 주문 즉시 취소 (orderId={}, externalOrderId={})",
-                    account.nickname(), p.direction(), p.ticker(), p.id(), externalOrderId);
-        } catch (Exception e) {
-            log.error("[{}] {} {} 접수 중 취소된 주문의 증권사 취소 실패 — 수동 취소 필요 (externalOrderId={}): {}",
-                    account.nickname(), p.direction(), p.ticker(), externalOrderId, e.getMessage());
-            eventPublisher.publishEvent(new TradingErrorEvent(null,
-                    "[취소 경합] %s %s %s 접수 직후 DB 주문이 취소·삭제돼 증권사 취소를 시도했으나 실패 — orderId=%s, externalOrderId=%s. 증권사에서 수동 취소 필요"
-                            .formatted(account.nickname(), p.ticker(), p.direction(), p.id(), externalOrderId)));
-        }
-    }
-
-    // 일시적 DB 오류 흡수 — 1초 후 1회 재시도, 2차 실패는 호출측으로 전파 (상태 경합은 재시도로 풀리지 않아 즉시 전파)
-    private void markPlacedWithRetry(UUID orderId, String externalOrderId) {
-        try {
-            orderPort.markPlaced(orderId, externalOrderId);
-        } catch (OrderStateConflictException conflict) {
-            throw conflict;
-        } catch (Exception first) {
-            log.warn("markPlaced 1차 실패 — 1초 후 재시도: {}", first.getMessage());
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException _) {
-                Thread.currentThread().interrupt();
-            }
-            orderPort.markPlaced(orderId, externalOrderId);
-        }
     }
 }

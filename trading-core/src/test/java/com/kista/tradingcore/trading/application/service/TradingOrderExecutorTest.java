@@ -17,6 +17,8 @@ import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
+import com.kista.tradingcore.support.StubBrokerApiException;
+import org.mockito.InOrder;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
@@ -57,6 +59,7 @@ class TradingOrderExecutorTest {
     @Mock BuyOrderPriceCapper buyOrderPriceCapper;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock LiveBalancePort liveBalancePort;
+    @Mock OrderSubmissionReconciler reconciler;
 
     static final LocalDate TODAY = LocalDate.now();
 
@@ -93,7 +96,9 @@ class TradingOrderExecutorTest {
             new VrCycleOrderStrategy(null)));
 
     private TradingOrderExecutor executor() {
-        return new TradingOrderExecutor(orderPort, brokerPort, buyOrderPriceCapper, eventPublisher, CYCLE_STRATEGIES, liveBalancePort, new AccountBudgetLock());
+        // 실제 OrderSubmitter로 선점→접수→기록 경로까지 끝까지 검증
+        return new TradingOrderExecutor(orderPort, buyOrderPriceCapper, CYCLE_STRATEGIES, liveBalancePort,
+                new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerPort, eventPublisher), reconciler);
     }
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {
@@ -107,7 +112,8 @@ class TradingOrderExecutorTest {
 
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
-        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price());
+        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price(),
+                order.id().toString());
     }
 
     @Test
@@ -371,7 +377,7 @@ class TradingOrderExecutorTest {
         Order ok = planned(okId, OrderDirection.SELL, "60.00", 5);
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(failing, ok));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF)))
-                .thenThrow(new RuntimeException("증권사 거절"))
+                .thenThrow(StubBrokerApiException.rejected("증권사 거절"))
                 .thenReturn(brokerResult("KIS-401"));
         doThrow(new OrderStateConflictException("경합")).when(orderPort).markFailed(failedId);
 
@@ -461,5 +467,63 @@ class TradingOrderExecutorTest {
 
         verifyNoInteractions(liveBalancePort);
         verify(orderPort, never()).sumPlannedBuyByAccountAndDate(any(), any());
+    }
+
+    @Test
+    @DisplayName("접수 전에 잔류 SUBMITTING 대사를 먼저 수행")
+    void placeOrders_reconcilesBeforePlacing() {
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        InOrder inOrder = inOrder(reconciler, orderPort);
+        inOrder.verify(reconciler).reconcile(STRATEGY_CYCLE_ID, TODAY, ACCOUNT);
+        inOrder.verify(orderPort).findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+    }
+
+    @Test
+    @DisplayName("개장 접수도 잔류 SUBMITTING 대사를 먼저 수행")
+    void placeAtOpenOrders_reconcilesBeforePlacing() {
+        when(orderPort.findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
+
+        executor().placeAtOpenOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        InOrder inOrder = inOrder(reconciler, orderPort);
+        inOrder.verify(reconciler).reconcile(STRATEGY_CYCLE_ID, TODAY, ACCOUNT);
+        inOrder.verify(orderPort).findAtOpenPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY);
+    }
+
+    @Test
+    @DisplayName("루프 도중 취소로 지워진 주문(선점 경합)에는 HTTP를 보내지 않는다")
+    void placeEach_orderDeletedMidLoop_notSent() {
+        UUID id1 = UUID.randomUUID(), id2 = UUID.randomUUID();
+        Order order1 = planned(id1, OrderDirection.BUY, "50.00", 10);
+        Order order2 = planned(id2, OrderDirection.SELL, "60.00", 5);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(order1, order2));
+        when(brokerPort.place(eq(instructionOf(order1)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-601"));
+        lenient().doThrow(new OrderStateConflictException("삭제됨")).when(orderPort).markSubmitting(id2);
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).extracting(Order::id).containsExactly(id1);
+        verify(brokerPort, times(1)).place(any(OrderInstruction.class), any());
+    }
+
+    @Test
+    @DisplayName("결과 불명 접수는 FAILED로 쓰지 않고 다음 주문을 계속 접수")
+    void placeEach_ambiguousFailure_keepsSubmittingAndContinues() {
+        UUID unknownId = UUID.randomUUID(), okId = UUID.randomUUID();
+        Order unknown = planned(unknownId, OrderDirection.BUY, "50.00", 10);
+        Order ok = planned(okId, OrderDirection.SELL, "60.00", 5);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(unknown, ok));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF)))
+                .thenThrow(new StubBrokerApiException("read timed out"))
+                .thenReturn(brokerResult("KIS-701"));
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).extracting(Order::id).containsExactly(okId);
+        verify(orderPort, never()).markFailed(unknownId);
+        verify(orderPort).markPlaced(okId, "KIS-701");
     }
 }

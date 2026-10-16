@@ -145,7 +145,8 @@ class TradingServiceTest {
 
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
-        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price());
+        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price(),
+                order.id() == null ? null : order.id().toString()); // 프로덕션과 같이 주문 id를 멱등키로
     }
 
     // 배치 시작 스냅샷 스텁 — fetcher가 현재가(getPrices)와 전일종가(getPrevCloses)를 따로 조회해 조립한다
@@ -183,7 +184,9 @@ class TradingServiceTest {
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, brokerOrderPort, priceCapper, eventPublisher, cycleStrategies, liveBalancePort, new AccountBudgetLock());
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, liveBalancePort,
+                new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerOrderPort, eventPublisher),
+                new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher));
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,

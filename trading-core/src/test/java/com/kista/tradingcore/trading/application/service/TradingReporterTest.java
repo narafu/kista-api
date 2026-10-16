@@ -49,6 +49,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
@@ -310,6 +311,20 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
 
         verify(brokerOrderPort, never()).cancel(any(), any());
+    }
+
+    @Test
+    void 리포트_시점_SUBMITTING_잔류는_관리자에게_리포트_제외를_알린다() {
+        // 접수 결과 불명 주문은 체결 매칭에서 빠져 포지션이 어긋날 수 있다 — 런북 정정 대상임을 알린다
+        Order leftover = placedOrder(UUID.randomUUID(), null, 2);
+        when(orderPort.findSubmittingByCycleAndDate(CTX.currentCycle().id(), TODAY))
+                .thenReturn(List.of(new com.kista.tradingcore.trading.domain.model.SubmittingOrder(leftover, java.time.Instant.now())));
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
+
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
+                && tee.message().contains("리포트 제외") && tee.message().contains(leftover.id().toString())));
     }
 }
 

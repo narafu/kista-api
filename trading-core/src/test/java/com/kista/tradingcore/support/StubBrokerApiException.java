@@ -19,4 +19,13 @@ public class StubBrokerApiException extends BrokerApiException {
     public StubBrokerApiException(String vendorLabel, String message, Conflict conflict) {
         super(vendorLabel, message, null, conflict);
     }
+
+    private StubBrokerApiException(String message, boolean rejected) {
+        super("Stub", message, null, Conflict.NONE, rejected);
+    }
+
+    // 증권사가 접수하지 않았음이 확실한 실패(확정 거절) — 주문 접수 분류 시나리오용
+    public static StubBrokerApiException rejected(String message) {
+        return new StubBrokerApiException(message, true);
+    }
 }
