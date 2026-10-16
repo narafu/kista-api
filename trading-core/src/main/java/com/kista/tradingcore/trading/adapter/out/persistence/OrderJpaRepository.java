@@ -56,14 +56,14 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    // 계좌·날짜 기준 PLANNED BUY 합계 (수동 실행 예수금 체크용)
+    // 계좌·날짜 기준 PLANNED·SUBMITTING BUY 합계 (예수금 체크용 — SUBMITTING은 증권사 차감 여부 불명이라 보수적으로 포함)
     // 주의: 'PLANNED'/'BUY'는 OrderStatus/OrderDirection enum name() 값 — enum 이름 변경 시 이 쿼리도 수정 필요
     @Query(value = """
             SELECT COALESCE(SUM(price * quantity), 0)
             FROM orders
             WHERE account_id = :accountId
               AND trade_date = :tradeDate
-              AND status = 'PLANNED'
+              AND status IN ('PLANNED', 'SUBMITTING')
               AND direction = 'BUY'
             """, nativeQuery = true)
     BigDecimal sumPlannedBuyAmountByAccountIdAndTradeDate(
@@ -79,7 +79,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
               AND trade_date = :tradeDate
               AND ticker = :ticker
               AND direction = 'SELL'
-              AND status IN ('PLANNED', 'PLACED')
+              AND status IN ('PLANNED', 'SUBMITTING', 'PLACED')
             """, nativeQuery = true)
     Long sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
             @Param("accountId") UUID accountId,

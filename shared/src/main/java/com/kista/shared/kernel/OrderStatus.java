@@ -3,6 +3,7 @@ package com.kista.shared.kernel;
 // 주문 상태 — admin·trading 양쪽이 공유하는 순수 값(outbound-zero), OrderDirection/OrderType과 동일 패턴으로 승격
 public enum OrderStatus {
     PLANNED,           // DB 저장, 증권사 접수 대기
+    SUBMITTING,        // 증권사 접수 진행 중(결과 미확정) — 재접수·재캡 대상 아님
     PLACED,            // 증권사 접수 완료
     FILLED,            // 전량 체결
     PARTIALLY_FILLED,  // 부분 체결 (filledQuantity < quantity)

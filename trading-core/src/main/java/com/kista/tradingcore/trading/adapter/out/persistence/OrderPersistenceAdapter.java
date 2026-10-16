@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
@@ -28,6 +29,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
 public class OrderPersistenceAdapter implements OrderPort {
 
+    // 열린 주문 — 슬롯 점유·재계산 skip·수동 실행 이중 실행 판정 (SUBMITTING은 접수 결과 미확정이라 점유로 본다)
+    private static final List<OrderStatus> OPEN_STATUSES =
+            List.of(OrderStatus.PLANNED, OrderStatus.SUBMITTING, OrderStatus.PLACED);
+
     private final OrderJpaRepository repository;
     private final EntityManager entityManager; // 상태 전이 시 행 잠금 + 최신 상태 refresh
 
@@ -35,6 +40,29 @@ public class OrderPersistenceAdapter implements OrderPort {
     public void saveAll(List<Order> orders) {
         // Order → Entity 변환 후 일괄 저장 (id=null → Hibernate UUID 자동 생성)
         repository.saveAll(orders.stream().map(this::toEntity).toList());
+    }
+
+    @Override
+    public Order save(Order order) {
+        // 단건 저장 — id=null이면 Hibernate가 UUID v7 생성, 채워진 id로 도메인 반환
+        return toDomain(repository.save(toEntity(order)));
+    }
+
+    @Override
+    @Transactional
+    public void markSubmitting(UUID orderId) {
+        // 행 잠금 후 PLANNED에서만 SUBMITTING 전이 — 그 사이 취소·삭제·재캡 취소됐으면 경합(호출자는 HTTP를 보내지 않는다)
+        OrderEntity e = lockOrConflict(orderId);
+        requireStatus(e, OrderStatus.PLANNED);
+        e.setStatus(OrderStatus.SUBMITTING); // updated_at 갱신 = 선점 시각
+        repository.save(e);
+    }
+
+    @Override
+    public List<SubmittingOrder> findSubmittingByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        // 선점 시각은 updated_at — SUBMITTING 동안 다른 갱신 경로가 없다
+        return repository.findByStrategyCycleIdAndTradeDateAndStatus(strategyCycleId, tradeDate, OrderStatus.SUBMITTING)
+                .stream().map(e -> new SubmittingOrder(toDomain(e), e.getUpdatedAt())).toList();
     }
 
     @Override
@@ -55,11 +83,11 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     @Transactional
     public void markPlaced(UUID orderId, String externalOrderId) {
-        // 행 잠금 후 PLANNED에서만 PLACED 전이 — 접수 사이 사용자 취소·일시중지 정리가 끼어들었으면 경합으로 알린다
+        // 행 잠금 후 SUBMITTING에서만 PLACED 전이 — 선점 뒤 다른 경로가 상태를 바꿨으면 경합으로 알린다
         OrderEntity e = lockOrConflict(orderId);
         // 1차 시도가 커밋된 뒤 예외로 재시도된 경우 — 같은 접수번호면 멱등 성공
         if (e.getStatus() == OrderStatus.PLACED && externalOrderId.equals(e.getExternalOrderId())) return;
-        requireStatus(e, OrderStatus.PLANNED);
+        requireStatus(e, OrderStatus.SUBMITTING);
         e.setStatus(OrderStatus.PLACED);
         e.setExternalOrderId(externalOrderId);
         repository.save(e);
@@ -145,7 +173,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
                 strategyCycleId, tradeDate,
-                List.of(OrderStatus.PLANNED, OrderStatus.PLACED)));
+                OPEN_STATUSES));
     }
 
     @Override
@@ -155,7 +183,7 @@ public class OrderPersistenceAdapter implements OrderPort {
         if (strategyCycleIds.isEmpty()) return Map.of();
         return toDomainList(repository.findByStrategyCycleIdInAndTradeDateAndStatusIn(
                 strategyCycleIds, tradeDate,
-                List.of(OrderStatus.PLANNED, OrderStatus.PLACED)))
+                OPEN_STATUSES))
                 .stream()
                 .collect(Collectors.groupingBy(Order::strategyCycleId));
     }
@@ -227,9 +255,9 @@ public class OrderPersistenceAdapter implements OrderPort {
     @Override
     @Transactional
     public void markFailed(UUID orderId) {
-        // 증권사 접수 실패 — PLANNED에서만 FAILED 전이 (그 사이 사용자 취소·정리됐으면 경합으로 알린다)
+        // 증권사 확정 거절 — SUBMITTING에서만 FAILED 전이 (결과 불명은 SUBMITTING 유지 — 호출자가 판정)
         OrderEntity e = lockOrConflict(orderId);
-        requireStatus(e, OrderStatus.PLANNED);
+        requireStatus(e, OrderStatus.SUBMITTING);
         e.setStatus(OrderStatus.FAILED);
         repository.save(e);
     }

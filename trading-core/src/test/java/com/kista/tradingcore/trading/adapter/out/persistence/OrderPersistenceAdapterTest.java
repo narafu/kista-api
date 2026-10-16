@@ -98,7 +98,7 @@ class OrderPersistenceAdapterTest {
     void markPlaced_updatesStatusAndExternalOrderId() {
         UUID orderId = UUID.randomUUID();
         OrderEntity entity = new OrderEntity();
-        entity.setStatus(OrderStatus.PLANNED);
+        entity.setStatus(OrderStatus.SUBMITTING); // 접수 직전 선점된 상태에서만 PLACED
         when(repository.findById(orderId)).thenReturn(Optional.of(entity));
 
         adapter.markPlaced(orderId, "ORD-001");

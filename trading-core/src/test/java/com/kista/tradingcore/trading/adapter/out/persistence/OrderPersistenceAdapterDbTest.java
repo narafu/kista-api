@@ -227,4 +227,129 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(result).hasSize(2);
         assertThat(result).extracting(o -> o.accountId()).containsExactlyInAnyOrder(accountId, secondAccountId);
     }
+
+    // ── 접수 선점(SUBMITTING) — spec 2026-10-16 §3.1·§3.4 ──
+
+    // 지정 상태 주문 1건을 id와 함께 삽입
+    private UUID insertWithId(String direction, String status) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO orders (id, account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                id, accountId, cycleId, LocalDate.now(), "SOXL", "LOC", "AT_CLOSE",
+                direction, Order.UNKNOWN_LEG, new BigDecimal("22.00"), 5, status);
+        return id;
+    }
+
+    private OrderStatus statusOf(UUID id) {
+        return adapter.findById(id).orElseThrow().status();
+    }
+
+    @Test
+    void markSubmitting_plannedToSubmitting() {
+        UUID id = insertWithId("BUY", "PLANNED");
+
+        adapter.markSubmitting(id);
+
+        assertThat(statusOf(id)).isEqualTo(OrderStatus.SUBMITTING);
+    }
+
+    @Test
+    void markSubmitting_nonPlanned_conflicts() {
+        UUID placed = insertWithId("BUY", "PLACED");
+
+        assertThatThrownBy(() -> adapter.markSubmitting(placed)).isInstanceOf(OrderStateConflictException.class);
+        assertThatThrownBy(() -> adapter.markSubmitting(UUID.randomUUID())).isInstanceOf(OrderStateConflictException.class);
+    }
+
+    @Test
+    void markPlaced_requiresSubmitting() {
+        UUID planned = insertWithId("BUY", "PLANNED");
+        assertThatThrownBy(() -> adapter.markPlaced(planned, "ORD-1")).isInstanceOf(OrderStateConflictException.class);
+
+        UUID submitting = insertWithId("BUY", "SUBMITTING");
+        adapter.markPlaced(submitting, "ORD-2");
+        adapter.markPlaced(submitting, "ORD-2"); // 같은 접수번호 재기록은 멱등 성공
+
+        assertThat(adapter.findById(submitting)).get().satisfies(o -> {
+            assertThat(o.status()).isEqualTo(OrderStatus.PLACED);
+            assertThat(o.externalOrderId()).isEqualTo("ORD-2");
+        });
+    }
+
+    @Test
+    void markFailed_requiresSubmitting() {
+        UUID planned = insertWithId("BUY", "PLANNED");
+        assertThatThrownBy(() -> adapter.markFailed(planned)).isInstanceOf(OrderStateConflictException.class);
+
+        UUID submitting = insertWithId("BUY", "SUBMITTING");
+        adapter.markFailed(submitting);
+
+        assertThat(statusOf(submitting)).isEqualTo(OrderStatus.FAILED);
+    }
+
+    @Test
+    void findSubmitting_returnsSubmittedAt() {
+        UUID submitting = insertWithId("BUY", "SUBMITTING");
+        insertWithId("BUY", "PLANNED");
+
+        var result = adapter.findSubmittingByCycleAndDate(cycleId, LocalDate.now());
+
+        assertThat(result).singleElement().satisfies(s -> {
+            assertThat(s.order().id()).isEqualTo(submitting);
+            assertThat(s.submittedAt()).isNotNull();
+        });
+    }
+
+    @Test
+    void findPlannedOrPlaced_includesSubmitting() {
+        insertWithId("BUY", "PLANNED");
+        insertWithId("BUY", "SUBMITTING");
+        insertWithId("BUY", "PLACED");
+        insertWithId("BUY", "FAILED");
+
+        assertThat(adapter.findPlannedOrPlacedByCycleAndDate(cycleId, LocalDate.now())).hasSize(3);
+        assertThat(adapter.findPlannedOrPlacedByCycleIdsAndDate(List.of(cycleId), LocalDate.now()).get(cycleId)).hasSize(3);
+    }
+
+    @Test
+    void sumPlannedBuy_includesSubmitting() {
+        insertWithId("BUY", "PLANNED");    // 110.00
+        insertWithId("BUY", "SUBMITTING"); // 110.00 — 증권사가 이미 차감했을 수 있어도 보수적으로 포함
+        insertWithId("BUY", "PLACED");     // 제외 — 증권사 주문가능금액에서 이미 차감됨
+
+        assertThat(adapter.sumPlannedBuyByAccountAndDate(accountId, LocalDate.now()))
+                .isEqualByComparingTo(new BigDecimal("220.00"));
+    }
+
+    @Test
+    void sumSell_includesSubmitting() {
+        insertWithId("SELL", "PLANNED");
+        insertWithId("SELL", "SUBMITTING");
+        insertWithId("SELL", "PLACED");
+        insertWithId("SELL", "FAILED");
+
+        assertThat(adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                accountId, LocalDate.now(), StrategyTicker.SOXL)).isEqualTo(15);
+    }
+
+    @Test
+    void deletePlanned_keepsSubmitting() {
+        insertWithId("BUY", "PLANNED");
+        UUID submitting = insertWithId("BUY", "SUBMITTING");
+
+        assertThat(adapter.deletePlannedByCycleAndDate(cycleId, LocalDate.now())).isEqualTo(1);
+        assertThat(statusOf(submitting)).isEqualTo(OrderStatus.SUBMITTING);
+    }
+
+    @Test
+    void save_returnsId() {
+        PlannedOrder planned = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.BUY, 1, new BigDecimal("22.00"));
+
+        Order saved = adapter.save(Order.fromPlanned(planned, accountId, cycleId));
+
+        assertThat(saved.id()).isNotNull();
+        assertThat(saved.status()).isEqualTo(OrderStatus.PLANNED);
+    }
 }
