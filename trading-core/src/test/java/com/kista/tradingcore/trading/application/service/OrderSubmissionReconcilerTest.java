@@ -95,7 +95,7 @@ class OrderSubmissionReconcilerTest {
         verify(brokerPort).place(captor.capture(), eq(TOSS.brokerRef()));
         assertThat(captor.getValue().clientOrderId()).isEqualTo(order.id().toString());
         verify(orderPort).markPlaced(order.id(), "EXT");
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -106,7 +106,7 @@ class OrderSubmissionReconcilerTest {
         reconciler().reconcile(CYCLE_ID, TRADE_DATE, TOSS);
 
         verify(brokerPort, never()).place(any(), any());
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -176,5 +176,18 @@ class OrderSubmissionReconcilerTest {
         reconciler().reconcile(CYCLE_ID, TRADE_DATE, TOSS);
 
         verifyNoInteractions(brokerPort, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("같은 잔류 주문은 접수 경로를 여러 번 타도 알림 1회")
+    void kis_sameLeftover_alertsOnce() {
+        Order order = stubLeftover(Duration.ofMinutes(5));
+        OrderSubmissionReconciler reconciler = reconciler();
+
+        reconciler.reconcile(CYCLE_ID, TRADE_DATE, KIS);
+        reconciler.reconcile(CYCLE_ID, TRADE_DATE, KIS);
+
+        verify(eventPublisher, times(1)).publishEvent(any(Object.class));
+        expectUnresolvedAlert(order);
     }
 }

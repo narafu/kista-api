@@ -155,12 +155,11 @@ class KisHttpClient {
         }
     }
 
-    // HTTP 오류 응답 → 4xx이거나 본문이 KIS 오류 형식(msg_cd)이면 증권사가 처리 후 거부한 것(확정 거절), 그 외(게이트웨이 5xx)는 결과 불명
+    // HTTP 오류 응답 → 4xx이거나 접수 전 거부가 확인된 코드(EGW00201 초당 거래건수 초과)면 확정 거절, 그 외 5xx는 결과 불명
+    // (게이트웨이 타임아웃 계열 msg_cd는 접수 여부를 알 수 없어 확정 거절로 보지 않는다 — 실계좌 표본 확보 시 목록 확장)
     private KisApiException httpFailure(String prefix, HttpStatusCodeException e) {
         String message = prefix + e.getStatusCode() + " " + e.getResponseBodyAsString();
-        boolean kisBody = ErrorBodyDecoder.decode(objectMapper, e.getResponseBodyAsString(), KisErrorBody.class)
-                .map(KisErrorBody::msgCd).filter(code -> !code.isBlank()).isPresent();
-        return e.getStatusCode().is4xxClientError() || kisBody
+        return e.getStatusCode().is4xxClientError() || isRateLimited(e)
                 ? KisApiException.rejected(message, e)
                 : new KisApiException(message, e);
     }

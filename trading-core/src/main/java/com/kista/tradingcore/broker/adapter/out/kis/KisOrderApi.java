@@ -56,11 +56,14 @@ class KisOrderApi {
                 kisSllType(instruction.direction()));
 
         OrderResponse response = kisHttpClient.post(trId, PATH, account, body, OrderResponse.class);
+        if (response == null) {
+            throw new KisApiException("KIS 주문 응답 본문 없음 — 접수 여부 불명", null); // 처리 여부를 모르므로 결과 불명
+        }
 
         // rt_cd != "0" = KIS 비즈니스 오류 (HTTP 200이어도 실패) — msg_cd/msg1 포함해 예외 발생
-        if (response == null || !"0".equals(response.rtCd())) {
-            String code = response != null ? response.msgCd() : "N/A";
-            String msg  = response != null ? response.msg1()  : "응답 없음";
+        if (!"0".equals(response.rtCd())) {
+            String code = response.msgCd();
+            String msg  = response.msg1();
             throw KisApiException.rejected("KIS 주문 실패 [" + code + "]: " + msg, null); // 응답 수신 후 거부 — 확정 거절
         }
 

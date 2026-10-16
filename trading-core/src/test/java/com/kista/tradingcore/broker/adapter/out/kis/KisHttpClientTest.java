@@ -327,4 +327,12 @@ class KisHttpClientTest {
         expectPost(withUnauthorizedRequest());
         assertThat(postFailure().isRejected()).isTrue();
     }
+
+    @Test
+    @DisplayName("POST 5xx + EGW00201 외 msg_cd(게이트웨이 계열) → 결과 불명 — 접수 여부를 모르는 코드는 보수적으로")
+    void post_5xxWithOtherMsgCd_isNotRejected() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        expectPost(withServerError().body("{\"rt_cd\":\"1\",\"msg_cd\":\"EGW00999\",\"msg1\":\"x\"}"));
+        assertThat(postFailure().isRejected()).isFalse();
+    }
 }

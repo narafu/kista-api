@@ -170,4 +170,14 @@ class KisOrderApiTest {
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
                 () -> api.cancel(instruction, ACCOUNT));
     }
+
+    @Test
+    @DisplayName("2xx인데 응답 본문 없음 → 결과 불명(처리 여부 모름)")
+    void place_nullResponse_isNotRejected() {
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LOC, 10, BigDecimal.ONE);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(null);
+
+        assertThatThrownBy(() -> api.place(instruction, ACCOUNT))
+                .isInstanceOfSatisfying(KisApiException.class, e -> assertThat(e.isRejected()).isFalse());
+    }
 }

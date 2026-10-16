@@ -141,10 +141,28 @@ class ReorderService implements ReorderUseCase {
             case PLACED -> new PlacementResult(OrderStatus.PLACED, submission.externalOrderId());
             case REJECTED -> new PlacementResult(OrderStatus.FAILED, null);
             case UNKNOWN -> new PlacementResult(OrderStatus.SUBMITTING, null); // 결과 불명 — 재시도 금지, 런북 정정
-            case SKIPPED -> orderPort.findById(saved.id())                    // 저장 직후 배치가 먼저 선점 — 현재 상태 그대로
+            case SKIPPED -> resolveSkipped(saved);
+        };
+    }
+
+    // 선점 못 함 — 배치가 먼저 선점했으면 그 상태 그대로, 선점 오류로 PLANNED(IMMEDIATE)가 남았으면 마감 배치가 나중에 접수하지 않게 취소
+    private PlacementResult resolveSkipped(Order saved) {
+        Order latest = orderPort.findById(saved.id()).orElse(null);
+        if (latest == null) return new PlacementResult(OrderStatus.CANCELLED, null);
+        if (latest.status() != OrderStatus.PLANNED) return new PlacementResult(latest.status(), latest.externalOrderId());
+        try {
+            stateWriter.cancelPlanned(saved.id());
+            return new PlacementResult(OrderStatus.CANCELLED, null);
+        } catch (OrderStateConflictException e) {
+            // 그 사이 배치가 선점 — 최신 상태로 응답
+            return orderPort.findById(saved.id())
                     .map(o -> new PlacementResult(o.status(), o.externalOrderId()))
                     .orElse(new PlacementResult(OrderStatus.CANCELLED, null));
-        };
+        } catch (Exception e) {
+            // 정리 취소도 실패 — 원본은 이미 취소됐으므로 예외로 끊지 않고 사실대로 PLANNED 응답(마감 배치가 접수할 수 있음)
+            log.error("재주문 IMMEDIATE 선점·정리 모두 실패 — PLANNED 잔류, 마감 배치 접수 가능 (orderId={}): {}", saved.id(), e.getMessage());
+            return new PlacementResult(OrderStatus.PLANNED, null);
+        }
     }
 
     private record PlacementResult(OrderStatus status, String externalOrderId) {}

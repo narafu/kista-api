@@ -40,6 +40,22 @@ class OrderSubmitter {
         } catch (OrderStateConflictException e) {
             log.info("[{}] 접수 직전 주문이 취소·정리됨 — 접수 생략 (orderId={})", accountLabel, order.id());
             return new Submission(Outcome.SKIPPED, null);
+        } catch (Exception e) {
+            // 일시적 DB 오류 — HTTP 없이 이 주문만 건너뛴다(남은 주문 접수는 계속). 커밋 응답 단계 오류면 이미 SUBMITTING일 수 있다
+            log.error("[{}] {} {} 접수 선점 실패 — 이 주문 접수 생략 (orderId={}): {}",
+                    accountLabel, order.direction(), order.ticker(), order.id(), e.getMessage());
+            eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 선점 실패] orderId=%s — 미접수(DB 상태 PLANNED 또는 SUBMITTING 확인 필요): %s"
+                    .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));
+            return new Submission(Outcome.SKIPPED, null);
+        }
+        // 선점 직후 종료 요청 — 아직 보내지 않았으므로 확정 실패(Toss는 호출 간격 게이트가 없어 송신 전 인터럽트를 놓친다)
+        if (Thread.interrupted()) {
+            // FAILED 기록 동안만 플래그를 내린다 — 가상 스레드는 인터럽트 상태로 소켓·커넥션 대기에 들어가면 즉시 끊긴다
+            try {
+                return rejected(order, accountLabel, new InterruptedException("접수 직전 인터럽트(종료 요청) — 미송신"));
+            } finally {
+                Thread.currentThread().interrupt(); // 호출자 루프가 남은 주문 접수를 중단하도록 복원
+            }
         }
 
         OrderResult result;
@@ -81,6 +97,9 @@ class OrderSubmitter {
             orderPort.markFailed(order.id());
         } catch (OrderStateConflictException conflict) {
             log.info("[{}] 접수 실패 주문이 그 사이 정리됨 — FAILED 기록 생략 (orderId={})", accountLabel, order.id());
+        } catch (Exception dbError) {
+            // FAILED를 못 써 SUBMITTING 잔류 — 재접수되지 않으므로 결과 불명과 같은 정정 대상
+            return unknown(order, accountLabel, dbError);
         }
         return new Submission(Outcome.REJECTED, null);
     }

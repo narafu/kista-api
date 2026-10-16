@@ -175,4 +175,58 @@ class OrderSubmitterTest {
         verify(orderPort, times(1)).markPlaced(ORDER_ID, "EXT");
         expectAlert("취소 경합");
     }
+
+    @Test
+    @DisplayName("선점 직후 인터럽트(종료 요청)면 HTTP 없이 FAILED — 송신 전이라 확정")
+    void submit_interruptedAfterClaim_marksFailedWithoutHttp() {
+        Thread.currentThread().interrupt();
+        try {
+            OrderSubmitter.Submission result = submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+            assertThat(result.outcome()).isEqualTo(Outcome.REJECTED);
+            verify(brokerPort, never()).place(any(), any());
+            verify(orderPort).markFailed(ORDER_ID);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue(); // 호출자 루프가 남은 주문을 중단하도록 플래그 유지
+        } finally {
+            Thread.interrupted(); // 다른 테스트에 플래그가 새지 않게 정리
+        }
+    }
+
+    @Test
+    @DisplayName("선점이 경합 아닌 DB 오류로 실패하면 그 주문만 건너뛰고(HTTP 없음) 알림 — 루프를 끊지 않는다")
+    void submit_claimDbError_skipsWithAlert() {
+        doThrow(new RuntimeException("lock timeout")).when(orderPort).markSubmitting(ORDER_ID);
+
+        OrderSubmitter.Submission result = submitter().submit(ORDER, ACCOUNT_REF, "계좌");
+
+        assertThat(result.outcome()).isEqualTo(Outcome.SKIPPED);
+        verify(brokerPort, never()).place(any(), any());
+        expectAlert("선점 실패");
+    }
+
+    @Test
+    @DisplayName("확정 거절 FAILED 기록이 DB 오류면 SUBMITTING 잔류 — 결과 불명으로 알림")
+    void submit_rejected_markFailedDbError_reportsUnknown() {
+        when(brokerPort.place(any(), any())).thenThrow(StubBrokerApiException.rejected("거절"));
+        doThrow(new RuntimeException("DB down")).when(orderPort).markFailed(ORDER_ID);
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.UNKNOWN);
+        expectAlert("[접수 결과 불명]");
+    }
+
+    @Test
+    @DisplayName("선점 직후 인터럽트 — FAILED 기록은 인터럽트 플래그를 내린 상태로 수행(가상 스레드 소켓·커넥션 획득이 끊기지 않게)")
+    void submit_interruptedAfterClaim_writesFailedWithFlagCleared() {
+        doAnswer(inv -> {
+            assertThat(Thread.currentThread().isInterrupted()).isFalse();
+            return null;
+        }).when(orderPort).markFailed(ORDER_ID);
+        Thread.currentThread().interrupt();
+        try {
+            assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.REJECTED);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            Thread.interrupted();
+        }
+    }
 }

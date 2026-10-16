@@ -22,7 +22,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 // 잔류 SUBMITTING 대사 — 접수 경로(배치·재개·수동 실행) 진입 시 호출. 취소 경로에서는 호출하지 않는다(취소할 주문을 새로 접수할 수 있어서)
 // Toss만 선점 후 2~9분 창에서 같은 멱등키(clientOrderId)로 재요청해 원 결과를 회수한다 — KIS·창 밖은 관리자 알림 후 런북 정정
@@ -37,6 +39,8 @@ class OrderSubmissionReconciler {
     private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock; // 선점 경과 판정용 — 테스트에서 고정 Clock 주입
+    // 이미 알린 잔류 주문 — 접수 경로를 탈 때마다 같은 알림이 반복되지 않게 (ponytail: 프로세스 메모리라 재기동 시 1회 재알림, 잔류는 희귀해 무한 증가 없음)
+    private final Set<UUID> alerted = ConcurrentHashMap.newKeySet();
 
     @Autowired
     OrderSubmissionReconciler(OrderPort orderPort, BrokerOrderCorrectionPort brokerOrderCorrectionPort,
@@ -66,6 +70,7 @@ class OrderSubmissionReconciler {
                 unresolved.add(leftover.order().id());
             }
         }
+        unresolved.removeIf(id -> !alerted.add(id)); // 이미 알린 주문은 제외
         if (!unresolved.isEmpty()) {
             log.error("[{}] 접수 결과 불명 주문 잔류 — 재접수하지 않음: {}", account.nickname(), unresolved);
             eventPublisher.publishEvent(new TradingErrorEvent(null,

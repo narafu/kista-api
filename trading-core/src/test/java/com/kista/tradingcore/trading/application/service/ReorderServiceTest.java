@@ -409,5 +409,34 @@ class ReorderServiceTest {
                 "reorder memo"
         );
     }
+
+    @Test
+    void immediate_claimFailedLeavingPlanned_cancelsSoBatchDoesNotPlaceLater() {
+        // 선점이 경합 아닌 오류로 실패해 PLANNED(IMMEDIATE)가 남으면 마감 배치가 나중에 접수한다 — 정리하고 CANCELLED로 응답
+        stubCommon(plannedOrder());
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.SKIPPED, null));
+        when(orderPort.findById(saved.id())).thenReturn(Optional.of(saved));
+
+        ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
+
+        verify(orderPort).cancelPlanned(saved.id());
+        assertThat(result.resultingStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void immediate_claimFailed_cancelAlsoFails_reportsPlannedWithoutThrowing() {
+        // 정리 취소까지 DB 오류면 예외 대신 사실대로 PLANNED 응답(원본은 이미 취소됨 — 예외로 끊으면 응답이 사라진다)
+        stubCommon(plannedOrder());
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.SKIPPED, null));
+        when(orderPort.findById(saved.id())).thenReturn(Optional.of(saved));
+        org.mockito.Mockito.lenient().doThrow(new RuntimeException("DB down")).when(orderPort).cancelPlanned(saved.id()); // 원본 취소(ORDER_ID)와 인자가 달라 lenient
+
+        assertThat(reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.PLANNED);
+    }
 }
 
