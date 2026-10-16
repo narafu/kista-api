@@ -6,7 +6,6 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
-import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.ReorderCommand;
 import com.kista.tradingcore.trading.domain.model.ReorderResult;
@@ -20,12 +19,9 @@ import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.tradingcore.broker.domain.model.OrderInstruction;
-import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -46,7 +42,7 @@ class ReorderService implements ReorderUseCase {
     private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final MarketCalendarPort marketCalendarPort;
     private final OrderCancelStateWriter stateWriter; // 원본 취소 DB 기록 — 짧은 트랜잭션
-    private final ApplicationEventPublisher eventPublisher; // 접수 후 DB 저장 실패 관리자 알림
+    private final OrderSubmitter orderSubmitter;      // IMMEDIATE 재주문 선점 → 접수 → 기록 (배치와 같은 경로)
 
     @Override
     public ReorderResult reorder(ReorderCommand command) {
@@ -132,34 +128,23 @@ class ReorderService implements ReorderUseCase {
         }
     }
 
-    // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: 즉시 증권사 접수 (실패 시 FAILED 기록)
+    // AT_OPEN/AT_CLOSE: PLANNED 저장 / IMMEDIATE: PLANNED로 먼저 저장(id 확보) 후 배치와 같은 선점→접수 경로(OrderSubmitter)
     private PlacementResult placeOrSave(Order newOrder, Account account, com.kista.shared.kernel.OrderTiming timing) {
-        if (timing == com.kista.shared.kernel.OrderTiming.IMMEDIATE) {
-            OrderInstruction instruction = new OrderInstruction(newOrder.ticker(), newOrder.direction(),
-                    newOrder.orderType(), newOrder.quantity(), newOrder.price());
-            OrderResult result;
-            try {
-                result = brokerOrderCorrectionPort.place(instruction, account.toBrokerRef());
-            } catch (Exception e) {
-                log.warn("재주문 즉시 접수 실패 — FAILED 기록: error={}", e.getMessage());
-                orderPort.saveAll(List.of(newOrder.withFailed()));
-                return new PlacementResult(OrderStatus.FAILED, null);
-            }
-            Order placed = newOrder.withPlaced(result.externalOrderId());
-            try {
-                orderPort.saveAll(List.of(placed));
-            } catch (Exception e) {
-                // 증권사엔 접수됐는데 DB 저장 실패 — FAILED로 쓰면 재시도가 중복 주문을 내므로 PLACED로 응답하고 관리자에게 알린다
-                log.error("재주문 증권사 접수 완료 후 DB 저장 실패 — 수동 확인 필요 (externalOrderId={}): {}",
-                        placed.externalOrderId(), e.getMessage());
-                eventPublisher.publishEvent(new TradingErrorEvent(null,
-                        "[DB 불일치] 재주문 %s %s 증권사 접수 완료 후 DB 저장 실패 — accountId=%s, externalOrderId=%s. 수동 정정 전 재시도 금지"
-                                .formatted(placed.ticker(), placed.direction(), placed.accountId(), placed.externalOrderId())));
-            }
-            return new PlacementResult(OrderStatus.PLACED, placed.externalOrderId());
+        if (timing != com.kista.shared.kernel.OrderTiming.IMMEDIATE) {
+            orderPort.saveAll(List.of(newOrder));
+            return new PlacementResult(OrderStatus.PLANNED, null);
         }
-        orderPort.saveAll(List.of(newOrder));
-        return new PlacementResult(OrderStatus.PLANNED, null);
+        // 저장 실패면 증권사에 보내지 않는다 — 접수 후 저장 실패로 DB↔증권사가 갈라지는 경로 제거
+        Order saved = orderPort.save(newOrder);
+        OrderSubmitter.Submission submission = orderSubmitter.submit(saved, account.toBrokerRef(), account.nickname());
+        return switch (submission.outcome()) {
+            case PLACED -> new PlacementResult(OrderStatus.PLACED, submission.externalOrderId());
+            case REJECTED -> new PlacementResult(OrderStatus.FAILED, null);
+            case UNKNOWN -> new PlacementResult(OrderStatus.SUBMITTING, null); // 결과 불명 — 재시도 금지, 런북 정정
+            case SKIPPED -> orderPort.findById(saved.id())                    // 저장 직후 배치가 먼저 선점 — 현재 상태 그대로
+                    .map(o -> new PlacementResult(o.status(), o.externalOrderId()))
+                    .orElse(new PlacementResult(OrderStatus.CANCELLED, null));
+        };
     }
 
     private record PlacementResult(OrderStatus status, String externalOrderId) {}

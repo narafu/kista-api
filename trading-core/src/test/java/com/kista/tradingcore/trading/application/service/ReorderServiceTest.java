@@ -20,12 +20,11 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
-import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -38,11 +37,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
@@ -57,7 +59,7 @@ class ReorderServiceTest {
     @Mock OrderPort orderPort;
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     @Mock MarketCalendarPort marketCalendarPort;
-    @Mock ApplicationEventPublisher eventPublisher;
+    @Mock OrderSubmitter orderSubmitter;
 
     ReorderService service;
 
@@ -65,7 +67,7 @@ class ReorderServiceTest {
     void setUp() {
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
-                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), eventPublisher);
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter);
     }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
@@ -182,42 +184,90 @@ class ReorderServiceTest {
 
     // --- IMMEDIATE 접수 ---
 
+    // 저장 후 id가 채워진 PLANNED 재주문 — 선점 전 id 확보(멱등키) 흐름 검증용
+    private Order stubSaved() {
+        Order saved = new Order(UUID.randomUUID(), ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
+                OrderType.LIMIT, OrderTiming.IMMEDIATE, OrderDirection.SELL, 1,
+                new BigDecimal("236.54"), OrderStatus.PLANNED, null, null, null);
+        when(orderPort.save(any())).thenReturn(saved);
+        return saved;
+    }
+
     @Test
-    void reorder_immediate_success_savesPlaced() {
+    void immediate_savesBeforeSubmitting() {
         stubCommon(plannedOrder());
-        when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-1"));
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.PLACED, "NEW-EXT-1"));
+
+        reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
+
+        InOrder inOrder = inOrder(orderPort, orderSubmitter);
+        inOrder.verify(orderPort).save(argThat(o -> o.status() == OrderStatus.PLANNED && o.timing() == OrderTiming.IMMEDIATE));
+        inOrder.verify(orderSubmitter).submit(eq(saved), eq(account().toBrokerRef()), any());
+        verify(brokerOrderCorrectionPort, never()).place(any(), any());
+    }
+
+    @Test
+    void immediate_placed_returnsPlacedWithExternalId() {
+        stubCommon(plannedOrder());
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.PLACED, "NEW-EXT-1"));
 
         ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
 
-        verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLACED, OrderTiming.IMMEDIATE));
         assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLACED);
         assertThat(result.newOrderExternalId()).isEqualTo("NEW-EXT-1");
     }
 
     @Test
-    void reorder_immediate_brokerError_savesFailed() {
+    void immediate_rejected_returnsFailed() {
         stubCommon(plannedOrder());
-        when(brokerOrderCorrectionPort.place(any(), any())).thenThrow(new RuntimeException("증권사 오류"));
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.REJECTED, null));
 
-        ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
-
-        verify(orderPort).saveAll(argOrdersMatch(OrderStatus.FAILED, OrderTiming.IMMEDIATE));
-        assertThat(result.resultingStatus()).isEqualTo(OrderStatus.FAILED);
+        assertThat(reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.FAILED);
     }
 
     @Test
-    void reorder_immediate_saveFailsAfterBrokerAccepted_reportsPlacedAndAlerts() {
-        // 증권사엔 접수됐는데 DB 저장 실패 — FAILED로 기록하면 재시도가 중복 주문을 낸다
+    void immediate_unknown_returnsSubmitting() {
+        // 결과 불명 — 재시도가 중복 주문을 내지 않도록 SUBMITTING으로 응답(런북 정정 대상)
         stubCommon(plannedOrder());
-        when(brokerOrderCorrectionPort.place(any(), any())).thenReturn(new OrderResult("NEW-EXT-2"));
-        doThrow(new RuntimeException("DB down")).when(orderPort).saveAll(any());
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.UNKNOWN, null));
+
+        assertThat(reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.SUBMITTING);
+    }
+
+    @Test
+    void immediate_skipped_returnsCurrentDbStatus() {
+        // 저장 직후 배치가 먼저 선점·접수함 — 현재 DB 상태를 그대로 응답
+        stubCommon(plannedOrder());
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.SKIPPED, null));
+        when(orderPort.findById(saved.id())).thenReturn(Optional.of(saved.withPlaced("BATCH-EXT")));
 
         ReorderResult result = reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET);
 
         assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLACED);
-        assertThat(result.newOrderExternalId()).isEqualTo("NEW-EXT-2");
-        verify(orderPort, never()).saveAll(argOrdersMatch(OrderStatus.FAILED, OrderTiming.IMMEDIATE));
-        verify(eventPublisher).publishEvent(isA(TradingErrorEvent.class));
+        assertThat(result.newOrderExternalId()).isEqualTo("BATCH-EXT");
+    }
+
+    @Test
+    void immediate_saveFails_noBrokerCall() {
+        stubCommon(plannedOrder());
+        when(orderPort.save(any())).thenThrow(new RuntimeException("DB down"));
+
+        assertThatThrownBy(() -> reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
+                .isInstanceOf(RuntimeException.class).hasMessage("DB down");
+        verifyNoInteractions(orderSubmitter);
+        verify(brokerOrderCorrectionPort, never()).place(any(), any());
     }
 
     // --- 시점 가용성 검증 ---
