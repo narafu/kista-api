@@ -32,7 +32,7 @@ public class StrategyStatusInternalController {
         Account account = accountPort.findByIdOrThrow(accountId);
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         if (!strategy.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("strategy가 account에 속하지 않습니다");
+            throw new IllegalArgumentException("전략이 해당 계좌에 속하지 않습니다.");
         }
         if (strategy.status() == status) return; // 이미 같은 상태 — 기존 동작대로 no-op
         // status만 저장하면 resume 시 종료된 사이클이 재오픈되지 않아 좀비 상태가 유지된다

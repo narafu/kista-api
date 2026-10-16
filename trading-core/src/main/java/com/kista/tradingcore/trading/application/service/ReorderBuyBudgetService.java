@@ -39,7 +39,7 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
         }
         List<Order> sources = orderIds.stream().distinct()
                 .map(id -> orderPort.findById(id)
-                        .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + id)))
+                        .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다.")))
                 .toList();
         // 계좌 공통 값(합계·live)을 한 번만 조회하므로 원본은 모두 같은 계좌여야 한다
         UUID accountId = sources.getFirst().accountId();

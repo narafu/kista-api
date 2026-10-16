@@ -38,6 +38,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
     }
 
     @Override
+    @Transactional // settings + prefs 다건 저장을 원자적으로 — 호출자 트랜잭션이 있으면 합류
     public void save(UserSettings settings) {
         // user_settings 행 저장 (없으면 INSERT, 있으면 UPDATE)
         settingsRepo.save(new UserSettingsJpaEntity(settings.userId(), settings.balanceCheckEnabled(),

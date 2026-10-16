@@ -75,6 +75,11 @@ public class OrderPersistenceAdapter implements OrderPort {
         repository.save(e);
     }
 
+    @Override
+    public boolean existsByStrategyCycleIdAndTradeDateAndExternalOrderId(UUID strategyCycleId, LocalDate tradeDate, String externalOrderId) {
+        return repository.existsByStrategyCycleIdAndTradeDateAndExternalOrderId(strategyCycleId, tradeDate, externalOrderId);
+    }
+
     // 행 잠금 + DB 최신 상태 재조회 — 같은 트랜잭션에서 먼저 읽어 둔 스냅샷(예: 재캡의 BUY 조회)은
     // 잠금 쿼리로도 갱신되지 않으므로 refresh로 그 사이 커밋된 취소·삭제를 반영한다
     private OrderEntity lockOrConflict(UUID orderId) {

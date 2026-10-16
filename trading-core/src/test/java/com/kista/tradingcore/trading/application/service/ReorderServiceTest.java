@@ -133,6 +133,21 @@ class ReorderServiceTest {
     }
 
     @Test
+    void reorder_tradeDateOtherThanCurrent_rejectedBeforeCancellingSource() {
+        // 19:00 KST July 1 → 현재 거래일 July 2 — 지난 거래일(July 1)로는 배치가 접수하지 않는 죽은 주문이 된다
+        stubCommon(plannedOrder());
+        ReorderCommand stale = new ReorderCommand(USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID, OrderTiming.AT_CLOSE,
+                LocalDate.of(2026, 7, 1), null, 2, new BigDecimal("250.00"), "memo");
+
+        assertThatThrownBy(() -> service.reorder(stale, DST_FOR_TEST, NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("현재 거래일");
+
+        verify(orderPort, never()).cancelPlanned(any());
+        verify(orderPort, never()).saveAll(any());
+    }
+
+    @Test
     void reorder_checksMarketCalendarWithTradeDateOfDecisionTime() {
         // 19:00 KST July 1 → 거래일 July 2(04:30 경계) — 오늘 KST 일자(July 1)를 넘기면 직전 세션을 검사하게 된다
         stubCommon(plannedOrder());
@@ -310,25 +325,25 @@ class ReorderServiceTest {
     }
 
     private Order plannedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), OrderStatus.PLANNED, null, null, null);
     }
 
     private Order placedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), OrderStatus.PLACED, "PLACED-1", null, null);
     }
 
     private Order filledOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 2,
                 new BigDecimal("236.54"), OrderStatus.FILLED, "FILLED-1", 2, new BigDecimal("236.54"));
     }
 
     private Order failedOrder() {
-        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 1), StrategyTicker.SOXL,
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
                 new BigDecimal("236.54"), OrderStatus.FAILED, null, null, null);
     }
@@ -337,7 +352,7 @@ class ReorderServiceTest {
         return new ReorderCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID,
                 timing,
-                LocalDate.of(2026, 7, 1),
+                LocalDate.of(2026, 7, 2),
                 null,
                 2,
                 new BigDecimal("250.00"),

@@ -11,6 +11,7 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -42,6 +43,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final ApplicationEventPublisher eventPublisher; // 사이클 종료 시 사용자 알림 — 커밋 후 이벤트로 위임
+    private final CycleOrderStrategies cycleOrderStrategies; // 청산 시 사이클 종료 여부(endsCycleOnLiquidation) SSOT
 
     @Override
     public ManualTradeCorrectionResult correctManualFills(ManualTradeCorrectionCommand command) {
@@ -49,7 +51,14 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                 accountPort, strategyPort, command.accountId(), command.strategyId(), command.userId());
         Account account = sel.account();
         Strategy strategy = sel.strategy();
+        // DCA는 보유·평단 SSOT가 증권사 실잔고라 자체 포지션 보정이 의미 없다(사이클도 영구)
+        if (strategy.isDca()) {
+            throw new IllegalArgumentException("DCA 전략은 증권사 잔고 기준이라 수동 체결 보정을 지원하지 않습니다");
+        }
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
+        // 사이클 행 잠금 — 동시에 들어온 같은 보정(원 요청 + 재시도)이 중복 검사를 함께 통과하지 않도록 직렬화
+        strategyCyclePort.lockForUpdate(currentCycle.id());
+        rejectDuplicateFills(command, currentCycle);
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
         if (currentCycle.endDate() != null) {
@@ -57,6 +66,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         }
 
         AccountBalance balance = latest.toBalance();
+        boolean endsCycleOnLiquidation = cycleOrderStrategies.of(strategy.type()).endsCycleOnLiquidation();
         Strategy updatedStrategy = strategy;
         boolean cycleEnded = false;
         List<Order> manualOrders = new ArrayList<>();
@@ -70,8 +80,9 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
             manualOrders.add(toManualOrder(fill, account, currentCycle, strategy));
             balance = applyFillAndSnapshot(fill, strategy, balance, currentCycle);
 
-            // 청산이 발생하면 즉시 사이클 종료 + 안전하게 PAUSED 고정
-            if (balance.holdings() == 0) {
+            // 청산이 발생하면 즉시 사이클 종료 + 안전하게 PAUSED 고정 — VR처럼 청산에도 사이클을 유지하는 전략은 제외
+            // (VR 사이클을 닫으면 재개가 재오픈하지 않아 좀비 사이클로 영구 정지된다)
+            if (balance.holdings() == 0 && endsCycleOnLiquidation) {
                 if (!isLastFill) {
                     throw new IllegalArgumentException("청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다");
                 }
@@ -93,6 +104,22 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                 command.userId(), account.id(), strategy.id(), command.fills().size(), balance.holdings(), cycleEnded);
 
         return buildResult(account, strategy, command, balance, updatedStrategy, cycleEnded);
+    }
+
+    // 같은 체결 재반영 방지 — 타임아웃 후 재요청 등으로 cycle_position·orders가 이중 반영되지 않게 한다
+    // 증권사 주문번호는 일자별 채번이라 (거래일, 주문번호)로 판정, externalOrderId가 없는 fill은 식별 수단이 없어 검사하지 않는다
+    private void rejectDuplicateFills(ManualTradeCorrectionCommand command, StrategyCycle currentCycle) {
+        List<ManualTradeCorrectionCommand.Fill> identified = command.fills().stream()
+                .filter(f -> f.externalOrderId() != null && !f.externalOrderId().isBlank())
+                .toList();
+        long distinctKeys = identified.stream().map(f -> f.tradeDate() + "|" + f.externalOrderId()).distinct().count();
+        if (distinctKeys != identified.size()) {
+            throw new IllegalArgumentException("같은 요청에 중복된 증권사 주문번호가 있습니다");
+        }
+        if (identified.stream().anyMatch(f -> orderPort.existsByStrategyCycleIdAndTradeDateAndExternalOrderId(
+                currentCycle.id(), f.tradeDate(), f.externalOrderId()))) {
+            throw new IllegalArgumentException("이미 반영된 증권사 주문번호가 포함돼 있습니다");
+        }
     }
 
     // SELL 수량이 현재 holdings를 초과하는지 검증

@@ -18,6 +18,9 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, OrderStatus status);
 
+    // 사이클·거래일 내 증권사 주문번호 존재 여부 (수동 체결 보정 중복 반영 방지 — 주문번호는 일자별 채번이라 거래일 포함)
+    boolean existsByStrategyCycleIdAndTradeDateAndExternalOrderId(UUID strategyCycleId, LocalDate tradeDate, String externalOrderId);
+
     // 사이클·거래일의 PLANNED 주문 일괄 삭제 — 단일 DELETE문이라 행 잠금 대기 후 status를 재평가한다
     // (파생 delete는 잠금 없는 SELECT 후 id별 DELETE라 그 사이 PLACED로 바뀐 행까지 지워 증권사 주문을 고아로 만든다)
     @Modifying

@@ -61,7 +61,7 @@ class ReorderService implements ReorderUseCase {
         Strategy strategy = sel.strategy();
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         Order sourceOrder = orderPort.findById(command.orderId())
-                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + command.orderId()));
+                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
 
         SelectionChain.validate(command.userId(), account, strategy, sourceOrder);
         if (!sourceOrder.strategyCycleId().equals(currentCycle.id())) {
@@ -79,7 +79,8 @@ class ReorderService implements ReorderUseCase {
 
         // 1. 주문시점 가용성 서버 측 재검증 (UI disable 우회 방지) — 증권사 취소보다 먼저: 검증 실패 시 원본이 취소된 채 남지 않도록
         // 판정 시각 기준 거래일(04:30 KST 경계) — 오늘 KST 일자를 넘기면 포트가 직전 세션을 검사한다
-        if (!marketCalendarPort.isMarketOpen(DstInfo.nextTradeDate(now.atZone(TimeZones.KST)))) {
+        LocalDate currentTradeDate = DstInfo.nextTradeDate(now.atZone(TimeZones.KST));
+        if (!marketCalendarPort.isMarketOpen(currentTradeDate)) {
             throw new IllegalArgumentException("휴장일에는 재주문할 수 없습니다");
         }
         DstInfo.ReorderTimingAvailability avail = dst.reorderTimingAvailabilityAt(now);
@@ -90,6 +91,11 @@ class ReorderService implements ReorderUseCase {
         };
         if (!timingOk) {
             throw new IllegalArgumentException("현재 시장 단계에서 " + command.timing() + " 접수가 불가합니다");
+        }
+        // 시점 가용성은 현재 세션 기준이라 재주문도 현재 거래일만 — 다른 날짜면 배치가 접수하지 않거나(과거)
+        // 체결 리포트가 짝을 못 찾아 PLACED로 남는다(IMMEDIATE)
+        if (!tradeDate.equals(currentTradeDate)) {
+            throw new IllegalArgumentException("현재 거래일(" + currentTradeDate + ") 주문으로만 재주문할 수 있습니다");
         }
 
         // 2. 원본 상태별 취소 처리

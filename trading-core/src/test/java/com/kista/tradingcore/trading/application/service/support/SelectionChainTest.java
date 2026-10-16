@@ -75,7 +75,7 @@ class SelectionChainTest {
         assertThatThrownBy(() ->
                 SelectionChain.resolveAndValidate(accountPort, strategyPort, accountId, strategyId, userId))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("account가 user에 속하지 않습니다");
+                .hasMessageContaining("계좌가 해당 사용자에 속하지 않습니다");
     }
 
     @Test
@@ -106,7 +106,7 @@ class SelectionChainTest {
         assertThatThrownBy(() -> SelectionChain.resolveAndValidate(
                 accountPort, strategyPort, accountId, strategyId, userId))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("strategy가 account에 속하지 않습니다");
+                .hasMessageContaining("전략이 해당 계좌에 속하지 않습니다");
     }
 
     @Test
@@ -118,7 +118,7 @@ class SelectionChainTest {
 
         assertThatThrownBy(() -> SelectionChain.validate(userId, account, strategy, order))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("order가 account에 속하지 않습니다");
+                .hasMessageContaining("주문이 해당 계좌에 속하지 않습니다");
     }
 
     @Test

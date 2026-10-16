@@ -52,7 +52,8 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
     }
 
     @Override
-    @Transactional
+    // 트랜잭션 없음 — 아래 경고용 활성 전략 수가 trading-core 내부 HTTP 호출이라 트랜잭션 밖에 둔다.
+    // 쓰기는 save 1건(포트 자체 트랜잭션)이고 복제본 이벤트는 fallbackExecution 리스너가 즉시 발행한다
     public void updateBalanceCheck(UUID userId, boolean enabled) {
         UserSettings current = getByUserId(userId);
         boolean previous = current.balanceCheckEnabled();
@@ -61,13 +62,25 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", userId, previous, enabled);
         userNotifyProfilePublisher.publishSettingsChanged(updated);
 
-        // 활성 전략 수 계산 — 잔고검증 전환 시 경고 로그 출력
-        long activeCount = activeStrategyCountPort.countActiveByUserId(userId);
-        if (!previous && enabled && activeCount > 0) {
+        if (previous != enabled) {
+            warnActiveStrategies(userId, enabled);
+        }
+    }
+
+    // 잔고검증 전환 시 활성 전략 경고 로그 — 조회 실패는 설정 변경을 막지 않는다(경고 전용)
+    private void warnActiveStrategies(UUID userId, boolean enabled) {
+        long activeCount;
+        try {
+            activeCount = activeStrategyCountPort.countActiveByUserId(userId);
+        } catch (RuntimeException e) {
+            log.warn("잔고검증 전환 경고용 활성 전략 수 조회 실패 — 경고 생략: userId={}, error={}", userId, e.getMessage());
+            return;
+        }
+        if (enabled && activeCount > 0) {
             // OFF→ON 전환: 활성 전략 존재 시 시드 초과 가능성 경고
             log.warn("[잔고검증 OFF→ON] userId={} — 활성 전략 {}개. 시드가 실잔고 초과 시 다음 사이클에서 PAUSED됩니다.", userId, activeCount);
         }
-        if (previous && !enabled) {
+        if (!enabled) {
             // ON→OFF 전환: KIS 주문 거부 가능성 경고 (APBK0988)
             log.warn("[잔고검증 ON→OFF] userId={} — 활성 전략 {}개. 실잔고 초과 시드로 재등록 시 KIS 주문 거부 가능.", userId, activeCount);
         }

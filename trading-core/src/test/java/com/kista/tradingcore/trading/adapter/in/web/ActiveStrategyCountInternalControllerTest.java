@@ -56,10 +56,9 @@ class ActiveStrategyCountInternalControllerTest {
         Account account1 = mockAccount(accountId1);
         Account account2 = mockAccount(accountId2);
         given(accountPort.findByUserId(userId)).willReturn(List.of(account1, account2));
-        given(strategyPort.findByAccountId(accountId1)).willReturn(List.of(
-                strategy(accountId1, StrategyStatus.ACTIVE), strategy(accountId1, StrategyStatus.PAUSED)));
-        given(strategyPort.findByAccountId(accountId2)).willReturn(List.of(
-                strategy(accountId2, StrategyStatus.ACTIVE)));
+        given(strategyPort.findByAccountIds(List.of(accountId1, accountId2))).willReturn(java.util.Map.of(
+                accountId1, List.of(strategy(accountId1, StrategyStatus.ACTIVE), strategy(accountId1, StrategyStatus.PAUSED)),
+                accountId2, List.of(strategy(accountId2, StrategyStatus.ACTIVE))));
 
         mockMvc.perform(get("/api/internal/trading/active-strategy-count")
                         .param("userId", userId.toString())

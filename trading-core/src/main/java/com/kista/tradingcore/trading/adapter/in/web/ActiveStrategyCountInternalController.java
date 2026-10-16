@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.domain.model.Strategy;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 // user.ActiveStrategyCountPort 구현체(user.adapter.out.internal.ActiveStrategyCountAdapter)가 소비하는
@@ -25,10 +27,12 @@ public class ActiveStrategyCountInternalController {
 
     @GetMapping("/active-strategy-count")
     public long activeStrategyCount(@RequestParam UUID userId) {
-        return accountPort.findByUserId(userId).stream()
-                .map(Account::id)
-                .flatMap(accountId -> strategyPort.findByAccountId(accountId).stream())
-                .filter(strategy -> strategy.isActive())
+        // 계좌별 조회 대신 배치 1회 (N+1 방지)
+        List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
+        if (accountIds.isEmpty()) return 0;
+        return strategyPort.findByAccountIds(accountIds).values().stream()
+                .flatMap(List::stream)
+                .filter(Strategy::isActive)
                 .count();
     }
 }

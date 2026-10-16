@@ -71,6 +71,29 @@ class UserSettingsServiceTest {
     }
 
     @Test
+    void updateBalanceCheck_활성전략_조회가_실패해도_설정_변경은_완료된다() {
+        // 경고 로그 전용 trading-core 호출 — 장애가 사용자 설정 변경을 막지 않는다
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+        when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenThrow(new RuntimeException("trading-core down"));
+
+        service.updateBalanceCheck(USER_ID, false);
+
+        verify(userSettingsPort).save(argThat(s -> !s.balanceCheckEnabled()));
+        verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s -> !s.balanceCheckEnabled()));
+    }
+
+    @Test
+    void updateBalanceCheck_값이_같으면_활성전략을_조회하지_않는다() {
+        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
+
+        service.updateBalanceCheck(USER_ID, true);
+
+        verifyNoInteractions(activeStrategyCountPort);
+    }
+
+    @Test
     void updateStrategySuggestions_saves_updated_list() {
         UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);

@@ -27,17 +27,17 @@ public final class SelectionChain {
 
     public static void validate(UUID userId, Account account, Strategy strategy) {
         if (!account.userId().equals(userId)) {
-            throw new IllegalArgumentException("account가 user에 속하지 않습니다");
+            throw new IllegalArgumentException("계좌가 해당 사용자에 속하지 않습니다.");
         }
         if (!strategy.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("strategy가 account에 속하지 않습니다");
+            throw new IllegalArgumentException("전략이 해당 계좌에 속하지 않습니다.");
         }
     }
 
     public static void validate(UUID userId, Account account, Strategy strategy, Order order) {
         validate(userId, account, strategy);
         if (!order.accountId().equals(account.id())) {
-            throw new IllegalArgumentException("order가 account에 속하지 않습니다");
+            throw new IllegalArgumentException("주문이 해당 계좌에 속하지 않습니다.");
         }
     }
 }

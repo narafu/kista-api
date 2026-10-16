@@ -25,6 +25,9 @@ public interface OrderPort {
     // 증권사 주문 접수 완료 후 PLACED 상태 + externalOrderId 기록 — PLANNED에서만 전이, 그 사이 취소·삭제됐으면 OrderStateConflictException
     void markPlaced(UUID orderId, String externalOrderId);
 
+    // 사이클·거래일 내 같은 증권사 주문번호 주문 존재 여부 (수동 체결 보정 중복 반영 방지 — 주문번호는 일자별 채번)
+    boolean existsByStrategyCycleIdAndTradeDateAndExternalOrderId(UUID strategyCycleId, LocalDate tradeDate, String externalOrderId);
+
     // 증권사 미접수(PLANNED) 주문 취소 — PLANNED에서만 전이, 배치가 먼저 접수했거나 삭제됐으면 OrderStateConflictException
     void cancelPlanned(UUID orderId);
 

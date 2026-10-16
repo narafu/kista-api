@@ -7,7 +7,6 @@ import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.application.usecase.ManualTradeCorrectionUseCase;
 import com.kista.tradingcore.trading.application.usecase.ReorderBuyBudgetQuery;
@@ -50,7 +49,8 @@ public class TradingInternalCommandController {
     @Operation(summary = "재주문 시점 가용성 조회", description = "비개장일엔 3개 boolean 전부 false를 반환합니다.")
     @GetMapping("/reorder-timing-availability")
     public ReorderTimingAvailabilityResponse reorderTimingAvailability() {
-        if (!marketCalendarPort.isMarketOpen(LocalDate.now(TimeZones.KST))) {
+        // 현재 거래일(04:30 KST 경계) 기준 — ReorderService 서버 재검증과 같은 판정
+        if (!marketCalendarPort.isMarketOpen(DstInfo.nextTradeDate())) {
             return new ReorderTimingAvailabilityResponse(false, false, false);
         }
         return TradingContractMapper.toResponse(DstInfo.calculate().reorderTimingAvailability());
