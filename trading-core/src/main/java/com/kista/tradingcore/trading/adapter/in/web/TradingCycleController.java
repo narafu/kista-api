@@ -63,6 +63,7 @@ public class TradingCycleController {
     // 거래 사이클 등록
     @Operation(summary = "거래 사이클 등록")
     @PostMapping("/api/accounts/{accountId}/trading-cycles")
+    @ResponseStatus(HttpStatus.CREATED) // OpenAPI 문서용 — springdoc은 ResponseEntity.created()에서 201을 추론하지 못해 200으로 적는다(kista-ui api-types 계약)
     public ResponseEntity<TradingCycleResponse> register(
             @PathVariable UUID accountId,
             @AuthenticationPrincipal UUID userId,
