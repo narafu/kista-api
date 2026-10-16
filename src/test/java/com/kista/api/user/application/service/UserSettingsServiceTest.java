@@ -8,7 +8,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -17,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -28,6 +32,7 @@ class UserSettingsServiceTest {
     @Mock UserSettingsPort userSettingsPort;
     @Mock ActiveStrategyCountPort activeStrategyCountPort;
     @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
+    @Spy TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class)); // 콜백을 실제로 실행
     @InjectMocks UserSettingsService service;
 
     private final UUID USER_ID = UUID.randomUUID();
@@ -68,6 +73,8 @@ class UserSettingsServiceTest {
         service.updateBalanceCheck(USER_ID, false);
 
         verify(userSettingsPort).save(argThat(s -> !s.balanceCheckEnabled()));
+        // 저장·발행은 트랜잭션 안 — 발행 실패가 EPR FAILED로 남아 재발행되도록(트랜잭션 밖 발행은 요청 500)
+        verify(transactionTemplate).executeWithoutResult(any());
     }
 
     @Test

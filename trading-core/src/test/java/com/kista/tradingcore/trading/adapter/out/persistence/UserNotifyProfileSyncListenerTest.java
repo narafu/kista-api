@@ -18,6 +18,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,6 +87,55 @@ class UserNotifyProfileSyncListenerTest {
         String legacy = json.replace(",\"notificationChannel\":\"ALL\"", "");
         assertThat(legacy).doesNotContain("notificationChannel");
         assertThat(objectMapper.readValue(legacy, UserNotifyProfileChangedEvent.class).notificationChannel()).isNull();
+    }
+
+    @Test
+    @DisplayName("복제본보다 옛 스냅샷(재시도·재발행)은 덮어쓰지 않는다")
+    void onProfileChanged_skipsOlderSnapshot() {
+        Instant stored = Instant.parse("2026-10-16T10:00:00Z");
+        when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
+                USER_ID, "{}", true, false, null, null, stored, NotificationChannel.NONE)));
+
+        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+                USER_ID, Map.of(), true, true, null, null, NotificationChannel.NONE, stored.minusSeconds(1)));
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("더 새로운 스냅샷은 적용하고 updated_at에 스냅샷 시각을 버전으로 기록한다")
+    void onProfileChanged_appliesNewerSnapshotWithVersion() {
+        Instant stored = Instant.parse("2026-10-16T10:00:00Z");
+        Instant occurredAt = stored.plusSeconds(1);
+        when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
+                USER_ID, "{}", true, true, null, null, stored, NotificationChannel.NONE)));
+
+        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+                USER_ID, Map.of(), true, false, null, null, NotificationChannel.NONE, occurredAt));
+
+        ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().isActive()).isFalse();
+        assertThat(captor.getValue().getUpdatedAt()).isEqualTo(occurredAt);
+    }
+
+    @Test
+    @DisplayName("occurredAt 없는 구버전 스냅샷은 비교 없이 적용한다")
+    void onProfileChanged_legacySnapshotWithoutVersionIsApplied() {
+        when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
+                USER_ID, "{}", true, true, null, null, Instant.now().plusSeconds(3600), NotificationChannel.NONE)));
+
+        listener().onProfileChanged(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, false, null, null));
+
+        verify(repository).save(any());
+    }
+
+    @Test
+    @DisplayName("스트림 payload의 occurredAt이 역직렬화된다")
+    void event_deserializesOccurredAt() {
+        var event = new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, true, null, null,
+                NotificationChannel.ALL, Instant.parse("2026-10-16T10:00:00Z"));
+        assertThat(objectMapper.readValue(objectMapper.writeValueAsString(event), UserNotifyProfileChangedEvent.class)).isEqualTo(event);
     }
 
     @Test

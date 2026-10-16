@@ -12,8 +12,7 @@ import tools.jackson.databind.ObjectMapper;
 // 로컬 cascade/동기화 리스너(탈퇴 정리 UserCascadeListener·프로필 동기화 UserNotifyProfileSyncListener)를
 // 원격 전달과 무관하게 재사용하기 위해, 원격 전달 문제를 여기서만 해소한다. 구독·ack·재기동·XCLAIM 복구는 platform
 // RedisStreamSubscriber 서브클래스(UserDeletedStreamConsumer/UserNotifyProfileStreamConsumer)가 맡고,
-// 이 클래스는 역직렬화 + 재발행 위임만 한다. 역직렬화 실패(poison)만 ack로 버리고,
-// 재발행 실패는 pending으로 남겨 XCLAIM 재시도(최대 24회) 후 포기한다.
+// 이 클래스는 역직렬화 + 재발행 위임만 한다. 실패 정책은 UserEventStreamConsumer 참고.
 // 실제 트랜잭션 배선(@Transactional)은 별도 빈 UserEventRepublisher가 담당 — 같은 클래스 안에서
 // this.republish...()로 호출하면 Spring 프록시를 우회해(self-invocation) @Transactional이 무력화되므로,
 // 반드시 다른 빈을 거쳐 호출해야 AFTER_COMMIT phase 리스너가

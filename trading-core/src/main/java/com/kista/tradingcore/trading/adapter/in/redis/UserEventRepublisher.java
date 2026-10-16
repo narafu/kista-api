@@ -10,8 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 // UserEventStreamBridge에서 분리된 별도 빈 — @Transactional 메서드를 self-invocation으로
 // 호출하면 Spring 프록시가 우회돼 트랜잭션이 전혀 열리지 않는다(같은 클래스 안에서
 // this.method() 호출은 프록시를 거치지 않음). 호출자(UserEventStreamBridge)와 다른 빈으로
-// 분리해 프록시를 정상적으로 경유하게 한다 — AFTER_COMMIT phase 리스너(UserCascadeListener 등,
-// fallbackExecution 없음)가 실제로 발화하려면 여기서 실제 트랜잭션이 열려야 한다.
+// 분리해 프록시를 정상적으로 경유하게 한다 — AFTER_COMMIT phase 리스너(UserNotifyProfileSyncListener 등)가
+// 실제로 커밋 후 발화하고 EPR publication이 남으려면 여기서 실제 트랜잭션이 열려야 한다.
 @Component
 @RequiredArgsConstructor
 class UserEventRepublisher {
@@ -19,12 +19,12 @@ class UserEventRepublisher {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    void republishUserDeleted(UserDeletedEvent event) {
+    public void republishUserDeleted(UserDeletedEvent event) {
         eventPublisher.publishEvent(event);
     }
 
     @Transactional
-    void republishProfileChanged(UserNotifyProfileChangedEvent event) {
+    public void republishProfileChanged(UserNotifyProfileChangedEvent event) {
         eventPublisher.publishEvent(event);
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
+import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer;
@@ -59,6 +60,11 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     // pending 재시도 최대 전달 횟수 훅 — 기본 무제한. 초과한 메시지는 reclaimPending이 포기(ack)한다
     protected int maxDeliveries() {
         return Integer.MAX_VALUE;
+    }
+
+    // 재시도 한도 초과로 포기(ack)한 메시지 후속 처리 훅 — 기본은 아무것도 안 함(RedisStreams가 error 로그를 남긴다).
+    // 정합성 이벤트 소비자는 override해 관리자 알림을 보낸다(platform은 모듈 포트를 참조할 수 없어 훅으로 연다)
+    protected void onGiveUp(RecordId recordId) {
     }
 
     // 구독 시작 — 이미 살아 있으면 no-op, 기동 실패는 삼키고 다음 recoverPending()이 처음부터 재시도한다
@@ -129,7 +135,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     // idleThreshold 이상 ack 없는 pending을 복구 컨슈머로 claim해 handle로 재처리 — 처리 건수 반환
     public int reclaimPending(Duration idleThreshold) {
         return RedisStreams.reclaimPending(redisTemplate, streamKey, group,
-                consumerPrefix + RECOVERY_CONSUMER, idleThreshold, CLAIM_BATCH_SIZE, maxDeliveries(), this::handle);
+                consumerPrefix + RECOVERY_CONSUMER, idleThreshold, CLAIM_BATCH_SIZE, maxDeliveries(), this::handle, this::onGiveUp);
     }
 
     // 구독 컨테이너 정지 — 정지 중 오류는 무시하고 상태를 초기화해 재기동 가능하게 한다

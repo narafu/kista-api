@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.redis;
 
+import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.shared.platform.redis.RedisStreamConfig;
 import com.kista.shared.kernel.UserDeletedEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -48,7 +49,7 @@ class UserEventStreamBridgeIT {
     void handle_republishesLocallyAndAcks() {
         ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
         UserEventStreamBridge bridge = new UserEventStreamBridge(new ObjectMapper(), new UserEventRepublisher(eventPublisher));
-        UserDeletedStreamConsumer consumer = new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge);
+        UserDeletedStreamConsumer consumer = new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge, Mockito.mock(TradingErrorReportPort.class));
         UUID userId = UUID.randomUUID();
         redisTemplate.<String, String>opsForStream().createGroup(RedisStreamConfig.USER_DELETED_STREAM,
                 org.springframework.data.redis.connection.stream.ReadOffset.from("0"), RedisStreamConfig.TRADING_CONSUMER_GROUP);

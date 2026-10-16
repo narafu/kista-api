@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.redis;
 
+import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.shared.platform.redis.RedisStreamConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +18,7 @@ import tools.jackson.core.exc.StreamReadException;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -30,11 +32,12 @@ class UserDeletedStreamConsumerTest {
     @Mock StringRedisTemplate redisTemplate;
     @Mock StreamOperations<String, Object, Object> streamOperations;
     @Mock UserEventStreamBridge bridge;
+    @Mock TradingErrorReportPort errorReportPort;
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private UserDeletedStreamConsumer consumer() {
         lenient().when(redisTemplate.opsForStream()).thenReturn((StreamOperations) streamOperations);
-        return new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge);
+        return new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge, errorReportPort);
     }
 
     private static MapRecord<String, String, String> record() {
@@ -77,6 +80,14 @@ class UserDeletedStreamConsumerTest {
         consumer.handle(record);
 
         verify(streamOperations).acknowledge(RedisStreamConfig.USER_DELETED_STREAM, RedisStreamConfig.TRADING_CONSUMER_GROUP, record.getId());
+    }
+
+    // 재시도 한도 초과로 포기하면 복제본이 낡은 채 남으므로 관리자에게 알린다
+    @Test
+    void 재시도_포기_시_관리자에게_알린다() {
+        consumer().onGiveUp(RecordId.of("1-0"));
+
+        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("1-0")));
     }
 
     // 재발행·DB 일시 오류는 ack하지 않고 pending으로 남겨 XCLAIM 재시도에 맡긴다

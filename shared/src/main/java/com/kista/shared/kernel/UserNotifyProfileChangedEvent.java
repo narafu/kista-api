@@ -1,5 +1,6 @@
 package com.kista.shared.kernel;
 
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -14,11 +15,18 @@ public record UserNotifyProfileChangedEvent(
         boolean active,                                   // UserStatus.ACTIVE 여부 — findAllActive() 브로드캐스트 대상 판정용
         String telegramBotToken,                          // AES 평문(User.telegramBotToken()은 persistence 경계에서 이미 복호화됨) — trading-core가 자체 DB 저장 시 암호화
         String chatId,                                     // 텔레그램 chat ID — 비밀값 아니라 평문 그대로 저장
-        NotificationChannel notificationChannel            // 알림 수단 — 매매 알림 텔레그램 발송 여부 판정, null이면 판정 없이 봇 연결 여부만 본다(구버전 발행분)
+        NotificationChannel notificationChannel,           // 알림 수단 — 매매 알림 텔레그램 발송 여부 판정, null이면 판정 없이 봇 연결 여부만 본다(구버전 발행분)
+        Instant occurredAt                                 // 스냅샷 생성 시각 — 재시도·재발행된 옛 스냅샷이 더 새로운 복제본을 덮지 않게 하는 버전, null이면 구버전 발행분(무조건 적용)
 ) {
     public UserNotifyProfileChangedEvent(UUID userId, Map<NotificationType, Boolean> notificationPrefs,
                                          boolean balanceCheckEnabled, boolean active,
+                                         String telegramBotToken, String chatId, NotificationChannel notificationChannel) {
+        this(userId, notificationPrefs, balanceCheckEnabled, active, telegramBotToken, chatId, notificationChannel, null);
+    }
+
+    public UserNotifyProfileChangedEvent(UUID userId, Map<NotificationType, Boolean> notificationPrefs,
+                                         boolean balanceCheckEnabled, boolean active,
                                          String telegramBotToken, String chatId) {
-        this(userId, notificationPrefs, balanceCheckEnabled, active, telegramBotToken, chatId, null);
+        this(userId, notificationPrefs, balanceCheckEnabled, active, telegramBotToken, chatId, null, null);
     }
 }

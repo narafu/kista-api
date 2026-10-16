@@ -1,11 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out;
 
-import com.kista.tradingcore.account.application.usecase.AccountUseCase;
 import com.kista.shared.kernel.UserDeletedEvent;
-import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
-import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
-import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -15,31 +10,33 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 
 @ExtendWith(MockitoExtension.class)
 class UserCascadeListenerTest {
 
-    @Mock CyclePositionPort cyclePositionPort;
-    @Mock StrategyCyclePort strategyCyclePort;
-    @Mock StrategyPort strategyPort;
-    @Mock AccountUseCase accountUseCase;
-    @Mock TradingUserProfilePort tradingUserProfilePort;
-
+    @Mock UserTradingDataEraser eraser;
     @InjectMocks UserCascadeListener listener;
 
-    @Test
-    void onUserDeleted_cleansUpInDependencyOrder() {
-        UUID userId = UUID.randomUUID();
+    private final UUID userId = UUID.randomUUID();
 
+    @Test
+    void 미체결_취소_후_데이터를_정리한다() {
         listener.onUserDeleted(new UserDeletedEvent(userId));
 
-        // 소프트 삭제 쿼리가 accounts를 조인하므로 계좌는 하위 데이터 뒤에, 복제본 프로필은 마지막
-        InOrder inOrder = inOrder(cyclePositionPort, strategyCyclePort, strategyPort, accountUseCase, tradingUserProfilePort);
-        inOrder.verify(cyclePositionPort).deleteByUserId(userId);
-        inOrder.verify(strategyCyclePort).deleteByUserId(userId);
-        inOrder.verify(strategyPort).deleteByUserId(userId);
-        inOrder.verify(accountUseCase).deleteAllByUserId(userId);
-        inOrder.verify(tradingUserProfilePort).deleteByUserId(userId);
+        // 계좌가 soft-delete되면 취소 대상을 찾을 수 없으므로 취소(전략 PAUSED 포함)가 먼저
+        InOrder inOrder = inOrder(eraser);
+        inOrder.verify(eraser).cancelOpenOrders(userId);
+        inOrder.verify(eraser).erase(userId);
+    }
+
+    @Test
+    void 정리_실패는_다시_던져_publication을_FAILED로_남긴다() {
+        doThrow(new IllegalStateException("db down")).when(eraser).erase(userId);
+
+        assertThatThrownBy(() -> listener.onUserDeleted(new UserDeletedEvent(userId)))
+                .isInstanceOf(IllegalStateException.class).hasMessage("db down");
     }
 }

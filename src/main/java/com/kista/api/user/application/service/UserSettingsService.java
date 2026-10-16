@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +25,7 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
     private final UserSettingsPort userSettingsPort;
     private final ActiveStrategyCountPort activeStrategyCountPort;
     private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core 캐시 동기화 이벤트 발행
+    private final TransactionTemplate transactionTemplate; // updateBalanceCheck 저장·발행만 트랜잭션으로 묶는다(경고용 HTTP는 밖)
 
     @Override
     public UserSettings getByUserId(UUID userId) {
@@ -52,15 +54,18 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
     }
 
     @Override
-    // 트랜잭션 없음 — 아래 경고용 활성 전략 수가 trading-core 내부 HTTP 호출이라 트랜잭션 밖에 둔다.
-    // 쓰기는 save 1건(포트 자체 트랜잭션)이고 복제본 이벤트는 fallbackExecution 리스너가 즉시 발행한다
+    // 메서드 트랜잭션 없음 — 아래 경고용 활성 전략 수가 trading-core 내부 HTTP 호출이라 트랜잭션 밖에 둔다.
+    // 저장·복제본 이벤트 발행은 짧은 트랜잭션으로 묶는다 — 트랜잭션 밖에서 발행하면 Redis 발행 실패가 이미 저장된
+    // 요청을 500으로 만들고, 안에서 발행해야 실패가 EPR FAILED로 남아 재발행 잡이 바로잡는다
     public void updateBalanceCheck(UUID userId, boolean enabled) {
         UserSettings current = getByUserId(userId);
         boolean previous = current.balanceCheckEnabled();
         UserSettings updated = current.withBalanceCheckEnabled(enabled);
-        userSettingsPort.save(updated);
+        transactionTemplate.executeWithoutResult(status -> {
+            userSettingsPort.save(updated);
+            userNotifyProfilePublisher.publishSettingsChanged(updated);
+        });
         log.info("잔고 검증 설정 변경: userId={}, {}→{}", userId, previous, enabled);
-        userNotifyProfilePublisher.publishSettingsChanged(updated);
 
         if (previous != enabled) {
             warnActiveStrategies(userId, enabled);

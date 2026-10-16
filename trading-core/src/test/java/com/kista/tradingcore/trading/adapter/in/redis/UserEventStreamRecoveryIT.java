@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.redis;
 
+import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.shared.platform.redis.RedisStreamConfig;
 import com.kista.shared.kernel.UserDeletedEvent;
 import org.junit.jupiter.api.AfterEach;
@@ -62,7 +63,7 @@ class UserEventStreamRecoveryIT {
         ApplicationEventPublisher eventPublisher = Mockito.mock(ApplicationEventPublisher.class);
         UserEventRepublisher republisher = new UserEventRepublisher(eventPublisher);
         UserEventStreamBridge bridge = new UserEventStreamBridge(new ObjectMapper(), republisher);
-        UserDeletedStreamConsumer consumer = new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge);
+        UserDeletedStreamConsumer consumer = new UserDeletedStreamConsumer(connectionFactory, redisTemplate, bridge, Mockito.mock(TradingErrorReportPort.class));
 
         int recovered = consumer.reclaimPending(Duration.ZERO); // 유휴시간 0으로 즉시 claim 대상 처리
 

@@ -8,6 +8,7 @@ import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -108,5 +110,23 @@ class UserNotifyProfilePersistenceAdapterTest {
         TradingUserProfile profile = adapter().findByUserId(USER_ID).orElseThrow();
 
         assertThat(profile.telegramBotToken()).isNull();
+    }
+
+    @Test
+    void markDeleted_비활성_tombstone으로_토큰과_chatId를_지운다() {
+        UUID userId = UUID.randomUUID();
+        when(repository.findById(userId)).thenReturn(Optional.of(new UserNotifyProfileEntity(
+                userId, "{}", true, true, "cipher", "chat", Instant.EPOCH, NotificationChannel.ALL)));
+
+        adapter().markDeleted(userId);
+
+        var captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
+        verify(repository).save(captor.capture());
+        UserNotifyProfileEntity saved = captor.getValue();
+        assertThat(saved.isActive()).isFalse();
+        assertThat(saved.getTelegramBotToken()).isNull();
+        assertThat(saved.getChatId()).isNull();
+        // 늦게 도착한 탈퇴 전 스냅샷을 버전 가드가 거르도록 updated_at은 탈퇴 처리 시각
+        assertThat(saved.getUpdatedAt()).isAfter(Instant.EPOCH);
     }
 }

@@ -582,7 +582,9 @@ flows:
         to: [redis]
         title: 매매 서버로 전달
         desc: 같은 이벤트를 Redis Stream(stream:user.deleted)에 넣는다. 매매 데이터는 kista-trading 소유라 kista-api가 직접 지울 수 없다.
-        code: [UserEventStreamPublisher#onUserDeleted]
+        code: [UserEventStreamPublisher#onUserDeleted, com.kista.api.web.UserEventResubmitScheduler#resubmitFailedUserEvents]
+        fail: >-
+          XADD가 실패하면 예외로 public.event_publication이 FAILED로 남고, kista-scheduler가 10분마다 재발행한다(처음 발견한 회차에 관리자 알림).
 
       - id: consume
         lane: trading
@@ -590,19 +592,22 @@ flows:
         title: 스트림 수신
         desc: UserDeletedStreamConsumer가 받아 kista-trading 안에서 UserDeletedEvent로 다시 발행한다.
         code: [UserDeletedStreamConsumer#onRecord, UserEventStreamBridge#handleUserDeletedRecord, UserEventRepublisher#republishUserDeleted]
-        fail: 형식 오류는 버린다(ack). DB 일시 오류는 pending으로 남겨 5분마다 재시도하고 약 2시간 뒤 포기한다.
+        fail: 형식 오류는 버린다(ack). 재발행 단계의 DB 일시 오류는 pending으로 남겨 5분마다 재시도하고 약 2시간 뒤 포기하며 관리자에게 알린다.
 
       - id: trading-cleanup
         lane: trading
         to: [db]
-        title: 사이클·전략·계좌 정리
+        title: 미체결 취소·사이클·전략·계좌 정리
         desc: >-
-          리스너 하나가 한 트랜잭션에서 순서대로 정리한다 — cycle_position → strategy_cycle → strategy 소프트 삭제, 계좌의 증권사 토큰 삭제 후 계좌 소프트 삭제,
-          마지막으로 알림 프로필 복제본 행 삭제. 주문(orders)은 보존한다(계좌 소프트 삭제로 조회에서 빠진다).
-        code: [com.kista.tradingcore.trading.adapter.out.UserCascadeListener#onUserDeleted, AccountService#deleteAllByUserId, BrokerTokenCachePort#deleteByAccountIds,
-               TradingUserProfilePort#deleteByUserId]
-        fail: 중간에 실패하면 트랜잭션 전체가 롤백되고 EPR이 재기동 때 이벤트를 다시 처리한다(각 단계는 이미 지운 행을 건너뛰어 멱등).
-        state: "cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · broker_tokens·user_notify_profile 삭제"
+          리스너가 먼저 계좌마다 전략을 PAUSED로 기록하고 증권사 미체결 주문을 취소한다(트랜잭션 밖, 실패는 관리자 알림 후 계속).
+          이어 한 트랜잭션에서 순서대로 정리한다 — cycle_position → strategy_cycle → strategy 소프트 삭제, 계좌의 증권사 토큰 삭제 후 계좌 소프트 삭제,
+          마지막으로 알림 프로필 복제본을 비활성 tombstone으로 바꾼다(늦게 도착한 프로필 스냅샷이 행을 되살리지 않게). 주문(orders)은 보존한다.
+        code: [com.kista.tradingcore.trading.adapter.out.UserCascadeListener#onUserDeleted, AccountOpenOrderCancelPort#cancelOpenOrders,
+               UserTradingDataEraser#erase, AccountService#deleteAllByUserId, BrokerTokenCachePort#deleteByAccountIds, TradingUserProfilePort#markDeleted]
+        fail: >-
+          정리 중 실패하면 트랜잭션 전체가 롤백되고(전략은 이미 PAUSED) trading.event_publication이 FAILED로 남아
+          kista-trading이 10분마다 재발행한다(처음 발견 회차에 관리자 알림, 각 단계는 이미 지운 행을 건너뛰어 멱등).
+        state: "strategy PAUSED · cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · broker_tokens 삭제 · user_notify_profile 비활성 tombstone"
 
   fida-receive:
     title: FIDA 기준표 수신
@@ -1158,7 +1163,9 @@ flows:
         code: [UserNotifyProfilePublisher#publishStatusChanged, UserNotifyProfilePublisher#publishSettingsChanged, UserEventStreamPublisher#onProfileChanged, UserNotifyProfileStreamConsumer, UserEventStreamBridge#handleProfileChangedRecord, UserNotifyProfileSyncListener#onProfileChanged]
         cond: 텔레그램 연결·해제, 알림 채널, 알림 종류·잔고검증 설정이 바뀐 때(닉네임 변경은 제외)
         state: "trading.user_notify_profile upsert (알림 종류·알림 채널·텔레그램 토큰·chatId)"
-        fail: 전달이 실패하면 경고 로그만 남기고 넘어간다(옛 변경을 나중에 재적용하면 새 값을 덮어쓰므로). 복제본이 낡았다면 사용자의 다음 설정 변경이 바로잡는다.
+        fail: >-
+          전달·반영이 실패하면 양쪽 event_publication이 FAILED로 남아 각 프로세스가 10분마다 재발행하고(처음 발견 회차에 관리자 알림),
+          스트림 수신 일시 오류도 pending 재시도한다. 스냅샷마다 생성 시각(occurredAt)을 실어 복제본보다 옛 스냅샷은 건너뛰므로 재시도가 새 값을 덮지 않는다.
 
       - id: deliver
         lane: trading

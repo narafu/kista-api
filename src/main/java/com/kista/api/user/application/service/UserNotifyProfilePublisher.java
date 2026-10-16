@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.UUID;
 
 // trading-core의 user_notify_profile 캐시 동기화 이벤트 발행 SSOT.
@@ -44,6 +45,6 @@ class UserNotifyProfilePublisher {
                          NotificationChannel channel) {
         eventPublisher.publishEvent(new UserNotifyProfileChangedEvent(
                 userId, settings.notificationPrefs(), settings.balanceCheckEnabled(), active,
-                telegramBotToken, chatId, channel));
+                telegramBotToken, chatId, channel, Instant.now())); // 스냅샷 시각 — trading-core가 재시도된 옛 스냅샷을 거르는 버전
     }
 }

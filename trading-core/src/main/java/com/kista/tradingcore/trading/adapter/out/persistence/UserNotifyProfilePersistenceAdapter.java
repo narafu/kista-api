@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.platform.crypto.AesCryptoService;
+import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,8 +70,11 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
     }
 
     @Override
-    @Transactional // 클래스 기본 readOnly 해제 — 탈퇴 정리 트랜잭션(UserCascadeListener)에 합류
-    public void deleteByUserId(UUID userId) {
-        repository.deleteById(userId); // 행이 없으면 no-op
+    @Transactional // 클래스 기본 readOnly 해제 — 탈퇴 정리 트랜잭션(UserTradingDataEraser)에 합류
+    public void markDeleted(UUID userId) {
+        // 행이 없어도 tombstone을 남긴다 — updated_at(trading 시각)이 탈퇴 전 root에서 만든 프로필 스냅샷(occurredAt)보다 늦어
+        // UserNotifyProfileSyncListener 버전 가드가 늦게 도착한 스냅샷을 거른다
+        NotificationChannel channel = repository.findById(userId).map(UserNotifyProfileEntity::getNotificationChannel).orElse(null);
+        repository.save(new UserNotifyProfileEntity(userId, "{}", true, false, null, null, Instant.now(), channel));
     }
 }

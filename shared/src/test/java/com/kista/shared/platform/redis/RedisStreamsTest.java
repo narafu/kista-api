@@ -110,4 +110,26 @@ class RedisStreamsTest {
         verify(ops).acknowledge(STREAM, GROUP, poison);
         verify(ops, never()).claim(anyString(), anyString(), anyString(), any(Duration.class), any(RecordId[].class));
     }
+
+    // 한도 초과로 포기한 메시지 ID를 onGiveUp으로 넘긴다 — 후속 처리 예외는 삼킨다
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test
+    void reclaimPending_포기한_메시지를_onGiveUp으로_넘긴다() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        StreamOperations ops = mock(StreamOperations.class);
+        when(redisTemplate.opsForStream()).thenReturn(ops);
+        RecordId poison = RecordId.of("1-0");
+        PendingMessages pending = new PendingMessages(GROUP, List.of(
+                new PendingMessage(poison, Consumer.from(GROUP, "c1"), Duration.ofMinutes(5), 99)));
+        when(ops.pending(eq(STREAM), eq(GROUP), any(), anyLong(), any(Duration.class))).thenReturn(pending);
+        List<RecordId> givenUp = new ArrayList<>();
+
+        RedisStreams.reclaimPending(redisTemplate, STREAM, GROUP, "rc", Duration.ofSeconds(60), 100, 24, r -> { }, id -> {
+            givenUp.add(id);
+            throw new IllegalStateException("alert down");
+        });
+
+        assertThat(givenUp).containsExactly(poison);
+        verify(ops).acknowledge(STREAM, GROUP, poison);
+    }
 }

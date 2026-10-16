@@ -12,7 +12,7 @@ com.kista.api.user/     ← Spring Modulith 모듈(CLOSED) — 가입·승인·�
   adapter/in/schedule/ ← RefreshTokenCleanupScheduler(platform `SchedulerJobRunner` 재사용)
   adapter/out/kakao/  ← KakaoOAuthAdapter/KakaoConfig/KakaoProperties
   adapter/out/internal/ ← ActiveStrategyCountAdapter(`ActiveStrategyCountPort` 구현 — trading-core 내부 API `GET /api/internal/trading/active-strategy-count`를 호출하는 순수 HTTP 어댑터, 타입 의존 없음. 인바운드 패키지(`adapter.in`·`web`)는 RestClient 의존 금지라 HTTP 호출은 이 out 어댑터에 둔다)
-  adapter/out/redis/  ← RedisBlacklistAdapter(platform `RedisTokenBlacklistReader` 상속 — 읽기 3종은 베이스, 쓰기 3종만 이 클래스) + UserEventStreamPublisher(trading-core 복제본 동기화용 Redis Stream 발행)
+  adapter/out/redis/  ← RedisBlacklistAdapter(platform `RedisTokenBlacklistReader` 상속 — 읽기 3종은 베이스, 쓰기 3종만 이 클래스) + UserEventStreamPublisher(trading-core 복제본 동기화용 Redis Stream 발행 — XADD 실패를 삼키지 않는다: 예외가 나야 publication이 FAILED로 남아 `web.UserEventResubmitScheduler`가 10분마다 재발행한다. 삼키면 완료로 기록돼 user.deleted가 영구 유실된다. 그래서 발행 지점은 전부 트랜잭션 안이어야 한다 — `UserSettingsService.updateBalanceCheck`는 저장·발행만 `TransactionTemplate`으로 묶는다. 스냅샷 생성 시각 `occurredAt`은 `UserNotifyProfilePublisher`가 찍는다(trading-core 버전 가드))
   adapter/out/persistence/user/    ← UserEntity + UserJpaRepository + UserPersistenceAdapter, UserSummaryAdapter(`UserSummaryPort` 구현)
   adapter/out/persistence/auth/    ← RefreshTokenEntity + JpaRepository + PersistenceAdapter
   adapter/out/persistence/settings/ ← UserSettingsJpaEntity/UserNotificationPrefJpaEntity/UserNotificationPrefId + JpaRepository + UserSettingsPersistenceAdapter
