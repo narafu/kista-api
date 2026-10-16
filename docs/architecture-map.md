@@ -277,7 +277,7 @@ sequenceDiagram
     Svc->>B: 접수 대상 현재가 재조회
     Svc->>Exec: BuyOrderPriceCapper 재캡 후 접수
     Exec->>B: AT_CLOSE 주문 접수
-    Exec->>DB: PLACED / FAILED
+    Exec->>DB: SUBMITTING 선점 → PLACED / FAILED (결과 불명은 SUBMITTING 유지)
     Svc->>R: 체결 리포트
     R-->>N: TradingReportReadyEvent (AFTER_COMMIT, EPR)
     N->>N: 사용자 봇 Telegram · Redis 푸시
