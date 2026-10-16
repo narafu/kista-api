@@ -42,6 +42,7 @@ class OrderCancelService {
     private final StrategyCyclePort strategyCyclePort;
     private final ApplicationEventPublisher eventPublisher; // 취소 실패 관리자 알림 — 트랜잭션 내부에서 텔레그램 직접 호출 금지, 커밋 후 이벤트로 위임
     private final OrderCancelStateWriter stateWriter; // self-invocation 프록시 미경유 문제 회피 — DB 쓰기 전용 별도 빈
+    private final SubmittingOrderAwaiter awaiter;     // 접수 중(SUBMITTING) 주문의 결과 확정 대기
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
@@ -65,13 +66,16 @@ class OrderCancelService {
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
         int cancelledCount = 0;
         List<Order> placedOrders = new ArrayList<>();
+        List<Order> stuckOrders = new ArrayList<>(); // 대기 후에도 접수 결과 미확정 — 증권사에 살아 있을 수 있어 재시도 가능한 실패
         for (LocalDate tradeDate : tradeDates) {
-            // 실제 삭제 건수로 집계 — 그 사이 배치가 접수(PLACED)한 행은 삭제되지 않고 아래 PLACED 조회에 잡힌다
+            // 실제 삭제 건수로 집계 — 그 사이 배치가 선점(SUBMITTING)·접수(PLACED)한 행은 삭제되지 않는다
             int plannedCount = stateWriter.deletePlanned(currentCycle.id(), tradeDate);
             if (plannedCount > 0) {
                 log.info("PLANNED 주문 {}건 삭제 — cycleId={}, tradeDate={}", plannedCount, currentCycle.id(), tradeDate);
                 cancelledCount += plannedCount;
             }
+            // 접수 중 주문은 결과가 정해질 때까지 기다린다 — PLACED가 된 건은 바로 아래 조회에 합류한다
+            stuckOrders.addAll(awaiter.awaitCycle(currentCycle.id(), tradeDate));
             placedOrders.addAll(orderPort.findPlacedByCycleAndDate(currentCycle.id(), tradeDate));
         }
 
@@ -79,6 +83,11 @@ class OrderCancelService {
         int failedCount = 0;
         int credentialFailedCount = 0; // 자격증명 오류 실패 — 재시도로 풀리지 않아 삭제를 막지 않는다
         List<String> failures = new ArrayList<>(); // 취소 실패 건 요약 — 커밋 후 알림 1건으로 통지
+        for (Order stuck : stuckOrders) {
+            log.warn("접수 결과 미확정 주문 — 취소 판정 보류: orderId={}", stuck.id());
+            failures.add("orderId=" + stuck.id() + ": 접수 결과 미확정(SUBMITTING)");
+            failedCount++;
+        }
 
         for (Order order : placedOrders) {
             try {
@@ -130,6 +139,14 @@ class OrderCancelService {
                 log.info("PLANNED 취소 경합 — 최신 상태로 재판정: orderId={}", orderId);
                 order = orderPort.findById(orderId)
                         .orElseThrow(() -> new OrderCancelException("취소 가능한 상태가 아닙니다."));
+            }
+        }
+
+        // 접수 중: 결과가 정해질 때까지 대기 — PLACED가 되면 아래 증권사 취소로 이어간다
+        if (order.status() == OrderStatus.SUBMITTING) {
+            order = awaiter.awaitOrder(orderId);
+            if (order.status() == OrderStatus.SUBMITTING) {
+                throw new OrderCancelException("주문 접수를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.");
             }
         }
 

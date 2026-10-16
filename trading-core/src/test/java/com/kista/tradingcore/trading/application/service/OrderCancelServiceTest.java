@@ -63,6 +63,7 @@ class OrderCancelServiceTest {
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock SubmittingOrderAwaiter awaiter; // 기본 mock은 잔류 없음(빈 목록)
     OrderCancelService service;
 
     private final UUID requesterId = UUID.randomUUID();
@@ -84,11 +85,12 @@ class OrderCancelServiceTest {
                 null, LocalDate.now(), null, null, null);
         // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
         service = new OrderCancelService(orderPort, brokerPort, accountPort, cyclePort, strategyCyclePort,
-                eventPublisher, new OrderCancelStateWriter(orderPort));
+                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter);
         // 취소 범위는 오늘(KST)·다음 거래일 둘 다 — 기본은 오늘 주문 없음, 각 테스트가 다음 거래일(또는 오늘)을 따로 stub
         LocalDate today = LocalDate.now(TimeZones.KST);
         lenient().when(orderPort.deletePlannedByCycleAndDate(any(), eq(today))).thenReturn(0);
         lenient().when(orderPort.findPlacedByCycleAndDate(any(), eq(today))).thenReturn(List.of());
+        lenient().when(awaiter.awaitCycle(any(), eq(today))).thenReturn(List.of());
     }
 
     private static CancelInstruction cancelOf(Order order) {
@@ -417,6 +419,82 @@ class OrderCancelServiceTest {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
                 OrderStatus.PLANNED, null, null, null);
+    }
+
+    // --- 접수 중(SUBMITTING) 주문 — spec 2026-10-16 §3.6 ---
+
+    private Order submittingOrder(UUID id) {
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderStatus.SUBMITTING, null, null, null);
+    }
+
+    @Test
+    @DisplayName("cancelOpenOrders: 접수 중 주문은 PLANNED 삭제 후 대기 → PLACED가 되면 PLACED 조회에 합류해 증권사 취소")
+    void cancelOpenOrders_submittingSettlesToPlaced_cancelsAtBroker() {
+        Order settled = placedOrder(UUID.randomUUID(), "ORD_SETTLED");
+        LocalDate next = DstInfo.nextTradeDate();
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.deletePlannedByCycleAndDate(strategyCycleId, next)).thenReturn(0);
+        when(awaiter.awaitCycle(strategyCycleId, next)).thenReturn(List.of());
+        when(orderPort.findPlacedByCycleAndDate(strategyCycleId, next)).thenReturn(List.of(settled));
+
+        CancelResult result = service.cancelOpenOrders(cycleId, ownedAccount);
+
+        InOrder inOrder = inOrder(orderPort, awaiter);
+        inOrder.verify(orderPort).deletePlannedByCycleAndDate(strategyCycleId, next);
+        inOrder.verify(awaiter).awaitCycle(strategyCycleId, next);
+        inOrder.verify(orderPort).findPlacedByCycleAndDate(strategyCycleId, next);
+        verify(brokerPort).cancel(cancelOf(settled), ownedAccount.toBrokerRef());
+        assertThat(result.cancelledCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("cancelOpenOrders: 대기 후에도 접수 중이면 재시도 가능한 실패로 집계 + 관리자 알림")
+    void cancelOpenOrders_stillSubmitting_countsRetryableFailure() {
+        Order stuck = submittingOrder(UUID.randomUUID());
+        LocalDate next = DstInfo.nextTradeDate();
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.deletePlannedByCycleAndDate(strategyCycleId, next)).thenReturn(0);
+        when(awaiter.awaitCycle(strategyCycleId, next)).thenReturn(List.of(stuck));
+        when(orderPort.findPlacedByCycleAndDate(strategyCycleId, next)).thenReturn(List.of());
+
+        CancelResult result = service.cancelOpenOrders(cycleId, ownedAccount);
+
+        assertThat(result.failedCount()).isEqualTo(1);
+        assertThat(result.retryableFailedCount()).isEqualTo(1);
+        ArgumentCaptor<OrderCancelFailedEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelFailedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().summary()).contains(stuck.id().toString()).contains("접수 결과 미확정");
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 접수 중이면 기다렸다가 PLACED가 되면 증권사 취소")
+    void cancelOrder_submitting_waitsThenCancels() {
+        Order submitting = submittingOrder(orderId);
+        Order placed = submitting.withPlaced("ORD_LATE");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(submitting));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(awaiter.awaitOrder(orderId)).thenReturn(placed);
+
+        service.cancelOrder(orderId, requesterId);
+
+        verify(brokerPort).cancel(cancelOf(placed), ownedAccount.toBrokerRef());
+        verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 대기 후에도 접수 중이면 다시 시도 안내")
+    void cancelOrder_stillSubmitting_throws() {
+        Order submitting = submittingOrder(orderId);
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(submitting));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        when(awaiter.awaitOrder(orderId)).thenReturn(submitting);
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(OrderCancelException.class)
+                .hasMessage("주문 접수를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.");
+        verify(brokerPort, never()).cancel(any(), any());
     }
 }
 
