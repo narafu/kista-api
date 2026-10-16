@@ -4,6 +4,8 @@ import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.api.notify.application.port.output.FcmDeviceTokenPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -15,7 +17,9 @@ class UserFcmCleanupListener {
 
     private final FcmDeviceTokenPort fcmDeviceTokenPort;
 
+    // AFTER_COMMIT 시점엔 발행 트랜잭션이 이미 커밋돼 REQUIRED 삭제가 합류만 하고 반영되지 않는다 — 새 트랜잭션으로 연다
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onUserDeleted(UserDeletedEvent event) {
         fcmDeviceTokenPort.deleteAllByUserId(event.userId());
     }

@@ -5,6 +5,7 @@ import com.kista.shared.platform.persistence.UuidV7;
 import lombok.RequiredArgsConstructor;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -23,7 +24,8 @@ public class FcmDeviceTokenPersistenceAdapter implements FcmDeviceTokenPort {
     }
 
     @Override
-    @Transactional
+    // REQUIRES_NEW — 가입 승인·거절 알림(AFTER_COMMIT 리스너) 발송 중 만료 토큰을 지우므로 커밋된 트랜잭션에 합류하면 삭제가 유실된다
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void delete(UUID userId, String token) {
         // 동일 무효 토큰을 여러 전략 리포트 스레드가 동시에 삭제 시도할 수 있음 — 이미 삭제됐으면 목적 달성으로 간주
         try {
