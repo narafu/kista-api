@@ -85,11 +85,13 @@ class ProblemDetailMappingsTest {
     void catchAll_mappedException_returnsMappedStatusAndSkipsReport() {
         var reported = new java.util.ArrayList<Exception>();
 
-        var p = ProblemDetailMappings.catchAll(new NoSuchElementException("없음"), ProblemDetailMappings.GENERIC, reported::add);
+        var p = ProblemDetailMappings.catchAll(new NoSuchElementException("계좌를 찾을 수 없습니다: 0198f0c2-0000-7000-8000-000000000001"),
+                ProblemDetailMappings.GENERIC, reported::add);
 
         assertThat(p.getStatus()).isEqualTo(404);
         assertThat(p.getTitle()).isEqualTo("Resource Not Found");
-        assertThat(p.getDetail()).isEqualTo("없음");
+        // 원본 메시지의 id(UUID 등)가 응답에 실리지 않도록 고정 문구
+        assertThat(p.getDetail()).isEqualTo("요청한 정보를 찾을 수 없습니다.");
         assertThat(reported).isEmpty();
     }
 

@@ -32,7 +32,7 @@ public final class ProblemDetailMappings {
     public static final Map<Class<? extends Exception>, Mapping> GENERIC = Map.of(
             SecurityException.class,                       new Mapping(HttpStatus.FORBIDDEN,   "Access Denied", ErrorCode.ACCESS_DENIED),
             IllegalStateException.class,                   new Mapping(HttpStatus.BAD_REQUEST, "Invalid State"),
-            NoSuchElementException.class,                  new Mapping(HttpStatus.NOT_FOUND,   "Resource Not Found"),
+            NoSuchElementException.class,                  new Mapping(HttpStatus.NOT_FOUND,   "Resource Not Found", null, "요청한 정보를 찾을 수 없습니다."), // 메시지에 id(UUID 등)가 실려 고정 문구 — 원문은 debug 로그
             IllegalArgumentException.class,                new Mapping(HttpStatus.BAD_REQUEST, "Invalid Request"),
             // 아래 프레임워크 예외는 원본 메시지가 영어 내부 정보(타입명·파서 오류)라 고정 한국어 detail로 교체 — 원문은 debug 로그
             MissingServletRequestParameterException.class, new Mapping(HttpStatus.BAD_REQUEST, "Bad Request", null, "필수 요청 값이 누락되었습니다."),
