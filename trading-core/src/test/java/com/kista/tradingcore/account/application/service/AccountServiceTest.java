@@ -181,7 +181,7 @@ class AccountServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verify(accountPort, never()).delete(any());
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class)); // any()는 ApplicationEvent 오버로드로 해석돼 record 이벤트를 놓친다
     }
 
     @Test

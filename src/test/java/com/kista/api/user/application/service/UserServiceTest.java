@@ -127,7 +127,7 @@ class UserServiceTest {
 
         assertThat(result).isEqualTo(existing);
         verify(userPort, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class)); // any()는 ApplicationEvent 오버로드로 해석돼 record 이벤트를 놓친다
     }
 
     @Test
@@ -331,7 +331,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.approve(userId)).isInstanceOf(User.AlreadyActiveException.class);
 
         verify(userPort, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class)); // any()는 ApplicationEvent 오버로드로 해석돼 record 이벤트를 놓친다
     }
 
     @Test
@@ -488,7 +488,7 @@ class UserServiceTest {
         // then
         assertThat(result).isEqualTo(existingUser);
         verify(userPort, never()).save(any()); // 기존 사용자 → 저장 없음
-        verify(eventPublisher, never()).publishEvent(any()); // 이벤트 발행 없음
+        verify(eventPublisher, never()).publishEvent(any(Object.class)); // any()는 ApplicationEvent 오버로드로 해석돼 record 이벤트를 놓친다 // 이벤트 발행 없음
     }
 
     @Test
