@@ -31,6 +31,7 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 공통 작업 방식(서브에이전트 병렬/모델 라우팅, 커밋 전 검토, 자동 커밋, 모호하면 질문, 기존 오류 즉시 수정, 의심 사항 제보, 범위 밖 개선 제안)은 전역 `~/.claude/CLAUDE.md` 참고 — 여기는 이 프로젝트 고유 규칙만 기재.
 
+- **직접 확인 우선**: 직접 확인할 수 있는 것은 추정·"미검증"으로 남기지 말고 확인한다 — 라이브러리 동작은 gradle 캐시의 sources jar로, 트랜잭션·이벤트(EPR)·Redis 경로는 실 컨텍스트·실 DB/Redis 통합 테스트(`*IT`)로, 고친 테스트가 회귀를 잡는지는 변이 확인(수정을 잠시 되돌려 실패하는지)으로, 운영 상태는 읽기 전용 조회(`ssh kista-server` 후 SELECT·`docker logs`)로. "미검증"은 쓰기·실계좌 주문·배포가 필요한 것만, 이유와 함께 보고
 - **시간 기준 정책**: 거래일은 전 구간 KST 단일 기준(변환 없음), `release_date`는 FIDA 발행일 원본, US 기준 외부 데이터만 어댑터 내부 `UsTradeDates` 변환 (`docs/agents/constraints.md` 참고)
 - **kista-ui 연계 작업 감지 시**: API 응답 형식 변경·인증/토큰 흐름 등이면 즉시 `../kista-ui/CLAUDE.md`를 Read로 확인 (자동 로드 안 됨)
 - **README.md 드리프트 감지**: 코드 변경으로 `README.md`(기술 스택 배지 버전, 아키텍처 다이어그램 속 클래스/패키지명, 스케쥴러 실행 시각, 배포 파이프라인 방식 등)의 내용이 실제와 달라지면 같은 작업에서 `README.md`도 함께 수정. kista-ui 쪽 README도 영향받으면 `../kista-ui/README.md`까지 확인
