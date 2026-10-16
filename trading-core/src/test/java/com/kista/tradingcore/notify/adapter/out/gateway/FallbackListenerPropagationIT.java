@@ -11,6 +11,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,6 +28,8 @@ import static org.mockito.Mockito.doThrow;
 // 알림 경로 실패(FCM 위임 XADD)가 발행자에게 전파되지 않는지 실 컨텍스트로 잠근다
 @Tag("integration")
 @SpringBootTest(properties = "spring.data.redis.url=redis://localhost:6379")
+// 실 Redis 스트림 구독자(user.* 컨슈머 그룹)가 살아 있는 컨텍스트 — 캐시로 남으면 같은 그룹을 쓰는 UserEventStreamBridgeIT의 메시지를 먼저 가져간다
+@DirtiesContext
 @ActiveProfiles("test")
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB
 class FallbackListenerPropagationIT {

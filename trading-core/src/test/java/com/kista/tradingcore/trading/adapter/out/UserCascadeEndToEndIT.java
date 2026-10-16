@@ -14,6 +14,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,6 +43,8 @@ import static org.mockito.Mockito.verify;
 // (3) tombstone이 늦게 도착한 탈퇴 전 프로필 스냅샷을 막는지. 재발행은 UserEventRepublisher와 같은 "트랜잭션 안 publishEvent"로 재현한다
 @Tag("integration")
 @SpringBootTest(properties = "spring.data.redis.url=redis://localhost:6379")
+// 실 Redis 스트림 구독자(user.* 컨슈머 그룹)가 살아 있는 컨텍스트 — 캐시로 남으면 같은 그룹을 쓰는 UserEventStreamBridgeIT의 메시지를 먼저 가져간다
+@DirtiesContext
 @ActiveProfiles("test")
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB 커밋
 class UserCascadeEndToEndIT {
