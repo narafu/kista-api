@@ -20,7 +20,7 @@
     - 배경: Boot 기본 스케쥴러(VT `SimpleAsyncTaskScheduler`, `await-termination` 미설정)는 종료 시 배치를 인터럽트하지 않아, 코디네이터가 없으면 배치가 JVM 종료와 함께 조용히 사라진다.
   - 체크포인트: 단계는 `trading.trading_batch_run`(job·KST 거래일)에 남는다. 마감은 `STARTED → PLANNED → PLACING → PLACED → DONE`, 개장은 `STARTED → PLACING → DONE`이다. 조기 반환도 `DONE`으로 기록하고, 시작 시 `STARTED`가 같은 날짜 수동 실행의 `DONE`을 덮어쓴다. 종료 요청 이후에는 배치 시작·임계구역 신규 진입이 거부된다(`requestStop`과 같은 락에서 판정).
   - 리포트 마커: 전략별 리포트 완료는 `trading.trading_batch_report`에 남는다. `CyclePositionPersistor`가 포지션 저장 직후 기록하며, 키가 전략인 이유는 rotation 후에도 유효해야 하기 때문이다.
-  - 기동 시 재개: `TradingBatchResumer`(ApplicationReadyEvent)가 처리한다.
+  - 기동 시 재개: `TradingBatchResumer`(ApplicationReadyEvent)가 처리한다. `local` 프로파일에선 비활성이다 — 로컬은 상시 기동이 아니라 기동마다 "[재개 불가]"가 운영과 같은 관리자 봇(`TELEGRAM_CHAT_ID`)으로 나갔다.
     - 마감 배치(화~토 04:30~22:00): 행 없음·`PLANNED`·`PLACING`이고 장마감 10분 전 이전이면 전체 재실행한다(`PLACING`은 이중 접수 경고). `PLACED`면 리포트만 재개한다(`resumeCloseReport` — 대상은 당일 주문이 있거나 롤오버 판정이 필요한(VR) 전략 중 마커가 없는 것, 사전 잔고는 최신 `cycle_position`, 대상 주문은 DB PLACED). 접수 마감을 지났으면 관리자 알림만 보낸다.
     - 개장 배치(월~금 22:00~ / 화~토 ~04:30): 행 없음·`PLACING`이면 재실행한다(`DstInfo.forOpenBatch` — 자정 이후 재개도 지난 개장을 기다리지 않음). 개장 배치(22:00 KST)는 KIS DCA AT_OPEN 주문을 `waitUntilMarketOpen()` 전에 계획·접수한 뒤, 나머지 AT_OPEN을 개장 후 접수한다.
     - 락: 재개는 `SchedulerLockService.takeOver`로 이전 프로세스 락을 인수한다. 자기 프로세스 락(기동 직후 cron 선발화)은 인수하지 않는다.

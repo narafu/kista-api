@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +23,8 @@ import java.time.ZonedDateTime;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // 스케쥴러 비활성(local)이면 재개도 비활성
+@ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true) // 스케쥴러 비활성이면 재개도 비활성
+@Profile("!local") // local은 상시 기동이 아니라 기동마다 "재개 불가"를 운영과 같은 관리자 봇에 보낸다 — 재개 비활성
 public class TradingBatchResumer {
 
     private static final LocalTime CLOSE_CRON = TradingCloseScheduler.CRON_TIME;  // TradingCloseScheduler cron 시각
