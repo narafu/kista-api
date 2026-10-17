@@ -60,7 +60,7 @@
 - 새 루트 설정 파일 추가 시 동일하게 COPY 라인에 포함할 것
 
 ### docker-compose 서비스
-- 로컬 `docker-compose.yml`: `postgres:17`(운영은 2026-10-13부터 `postgres:18.6` — kista-infra 소유)(kistadb/kista/kista, 포트 5432)·`redis:7-alpine`·`prometheus`·`grafana` — 앱 서비스는 없다(IntelliJ/bootRun으로 실행)
+- 로컬 `docker-compose.yml`: `postgres:18.6`(운영 kista-postgres와 동일 — 운영은 kista-infra 소유)(kistadb/kista/kista, 포트 5432)·`redis:7-alpine`·`prometheus`·`grafana` — 앱 서비스는 없다(IntelliJ/bootRun으로 실행)
 
 ### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
 - PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패
