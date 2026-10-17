@@ -44,7 +44,7 @@ curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  
 ```bash
 scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태에서 실행, 재실행 가능
 ```
-- dev 유저(`...0001`)에만 적용: `[시드] 모의계좌`(MOCK) + ACTIVE INFINITE SOXL·VR TQQQ(API 등록), 가계부, KIS `[시드]` 전략(PAUSED) 일별 포지션(equity-curve — MOCK은 집계 제외)·종결 주문(관리자 주문 관리), MOCK 계좌 INFINITE MAGX·USD(PAUSED, SQL) 사이클 25건(진행 중 2·종료 23 — 사이클 성과 목록 필터·페이징)
+- dev 유저(`...0001`)에만 적용: `[시드] 모의계좌`(MOCK) + ACTIVE INFINITE SOXL·VR TQQQ(API 등록), 가계부, KIS `[시드]` 계좌(MOCK 시드 계좌의 가짜 암호문 복사 — KIS 등록 API는 실연결 검증이라 SQL)·INFINITE SOXL 전략(PAUSED) 일별 포지션(equity-curve — MOCK은 집계 제외)·종결 주문(관리자 주문 관리), MOCK 계좌 INFINITE MAGX·USD(PAUSED, SQL) 사이클 25건(진행 중 2·종료 23 — 사이클 성과 목록 필터·페이징)
 - `jq` 필요(Windows: `winget install jqlang.jq`). `dev-token`·`dev-admin-token`은 호출마다 trading-core 사용자 복제본(`trading.user_notify_profile`)을 재동기화한다 — 로컬에서 Redis 초기화·trading 스키마 재생성으로 복제본이 유실되면 전략 등록이 404가 나기 때문이며, 시드는 복제본 반영을 최대 10초 기다린다
 - Toss가 로컬 IP를 허용하지 않으면(로그 `IP address not allowed`) MOCK 전략 API 등록이 422로 실패한다 — SQL 시드(MAGX·USD 사이클 포함)는 그대로 적용된다
 - MOCK 시세는 Toss 공용 피드라 trading-core `application-local.yml`에 `toss.admin-client-id`/`admin-client-secret` 필요 — 없으면 MOCK 전략 등록·preview가 422/503

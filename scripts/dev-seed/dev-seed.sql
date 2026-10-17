@@ -62,7 +62,49 @@ ON CONFLICT (id) DO NOTHING;
 -- ── 누적자산추이(equity-curve)용: KIS [시드] 전략(PAUSED)의 진행 중 사이클에 평일 일별 포지션 스냅샷 ──
 -- equity-curve는 MOCK 계좌를 제외하므로 KIS 시드 사이클에 쌓는다. PAUSED라 스케쥴러가 건드리지 않는다
 -- 스냅샷 시각은 04:30 KST 마감 배치와 동일, 보유 100주·평단 30 고정, 종가만 완만한 사인파로 변동
--- 전제: KIS [시드] 계좌·전략은 기존 로컬 DB에 있어야 한다(이 스크립트가 만들지 않음 — 자격증명이 가짜라 재개(resume) 금지)
+-- 전제: KIS [시드] 계좌·전략은 바로 아래 블록이 만든다(자격증명이 가짜라 재개(resume) 금지)
+-- KIS [시드] 계좌: API 등록은 KIS 실연결 검증(verifyAccount)이라 불가 — MOCK [시드] 계좌의 AES 암호문(로컬 키로 암호화된 가짜 값)을 복사한다
+-- account_no_hash는 NULL(부분 UNIQUE 인덱스 대상 밖). MOCK 계좌가 없으면(API 등록 실패) 생략된다
+INSERT INTO trading.accounts (id, user_id, nickname, broker, account_no, app_key, secret_key)
+SELECT md5('dev-seed:kis:account')::uuid, a.user_id, '[시드] KIS 계좌', 'KIS', a.account_no, a.app_key, a.secret_key
+FROM trading.accounts a
+WHERE a.user_id = '00000000-0000-0000-0000-000000000001' AND a.broker = 'MOCK'
+  AND a.nickname LIKE '[시드]%' AND a.deleted_at IS NULL
+ORDER BY a.created_at LIMIT 1
+ON CONFLICT (id) DO NOTHING;
+
+-- KIS [시드] 전략: INFINITE SOXL PAUSED, 60일 전 시작한 진행 중 사이클 + 개장 포지션(equity-curve 기준 예수금)
+INSERT INTO trading.strategy (id, account_id, type, ticker, status, cycle_seed_type)
+SELECT md5('dev-seed:kis:strategy')::uuid, a.id, 'INFINITE', 'SOXL', 'PAUSED', 'NONE'
+FROM trading.accounts a WHERE a.id = md5('dev-seed:kis:account')::uuid
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.strategy_version (id, strategy_id, version_no)
+SELECT md5('dev-seed:kis:version')::uuid, s.id, 1
+FROM trading.strategy s WHERE s.id = md5('dev-seed:kis:strategy')::uuid
+ON CONFLICT DO NOTHING;
+
+INSERT INTO trading.strategy_infinite_version (strategy_version_id, division_count)
+SELECT v.id, 20
+FROM trading.strategy_version v WHERE v.id = md5('dev-seed:kis:version')::uuid
+ON CONFLICT DO NOTHING;
+
+INSERT INTO trading.strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at)
+SELECT md5('dev-seed:kis:cycle')::uuid, v.strategy_id, v.id, 6000, d.start_date, d.start_date::timestamp AT TIME ZONE 'Asia/Seoul'
+FROM trading.strategy_version v
+CROSS JOIN LATERAL (SELECT (now() AT TIME ZONE 'Asia/Seoul')::date - 60 AS start_date) d
+WHERE v.id = md5('dev-seed:kis:version')::uuid
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.cycle_position (id, strategy_cycle_id, usd_deposit, closing_price, avg_price, holdings, created_at)
+SELECT md5('dev-seed:kis:pos:open')::uuid, c.id, 3000, 30.00, NULL, 0, c.created_at
+FROM trading.strategy_cycle c WHERE c.id = md5('dev-seed:kis:cycle')::uuid
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO trading.cycle_position_infinite (cycle_position_id, is_reverse_mode)
+SELECT p.id, false FROM trading.cycle_position p WHERE p.id = md5('dev-seed:kis:pos:open')::uuid
+ON CONFLICT (cycle_position_id) DO NOTHING;
+
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM trading.accounts WHERE user_id = '00000000-0000-0000-0000-000000000001'
                    AND broker = 'KIS' AND nickname LIKE '[시드]%' AND deleted_at IS NULL) THEN

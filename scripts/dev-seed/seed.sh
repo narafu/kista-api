@@ -3,7 +3,7 @@
 # 전제: root(8080)·trading-core(8081) local 프로파일 기동, docker compose postgres 기동,
 #       trading-core application-local.yml에 toss.admin-client-id/secret 설정(MOCK 시세 피드용)
 # 1) MOCK 계좌·ACTIVE 전략은 API로 등록(계좌 컬럼 AES 암호화 때문에 SQL 직접 삽입 불가)
-# 2) 가계부·equity-curve 스냅샷·관리자 주문 이력·사이클 성과 목록용 사이클은 dev-seed.sql
+# 2) KIS [시드] 계좌(MOCK 암호문 복사)·가계부·equity-curve 스냅샷·관리자 주문 이력·사이클 성과 목록용 사이클은 dev-seed.sql
 # 3) 벤치마크(kista_ref) 전역 데이터는 실제 수집기 트리거(가짜 행 미삽입 — kbland 2종 + ETF 지수 종가)
 set -euo pipefail
 
