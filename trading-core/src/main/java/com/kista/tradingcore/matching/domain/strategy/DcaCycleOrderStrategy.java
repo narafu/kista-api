@@ -74,10 +74,10 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         if (sell && in.sellableQuantity() <= 0) {
             return new DcaDecision.Skipped(DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", basis);
         }
-        int quantity = c.amountUsd().divide(basis, 0, RoundingMode.FLOOR).intValueExact();
+        int quantity = c.amount().divide(basis, 0, RoundingMode.FLOOR).intValueExact();
         if (quantity == 0) {
             return new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE,
-                    "회차 금액 " + plain(c.amountUsd()) + " < 기준가 " + money(basis), basis);
+                    "회차 금액 " + plain(c.amount()) + " < 기준가 " + money(basis), basis);
         }
         if (sell) quantity = Math.min(quantity, in.sellableQuantity()); // 보유 부족 → 보유 전량
         // BUY는 캡 지정가(LOO/LOC로 접수), SELL은 시장가라 가격은 기준가 기록용

@@ -80,7 +80,7 @@ flows:
         lane: trading
         to: [db]
         title: 대상 전략 수집
-        desc: ACTIVE 전략마다 현재 사이클·계좌·사용자 알림 프로필(복제본)을 묶어 배치 컨텍스트를 만든다.
+        desc: ACTIVE 전략마다 현재 사이클·계좌·사용자 알림 프로필(복제본)을 묶어 배치 컨텍스트를 만든다. 코인 계좌 전략은 제외한다.
         code: [BatchContextFactory#buildAll]
         state: "수집 직후 trading_batch_run → STARTED"
         fail: 전략 하나의 구성이 실패하면 그 전략만 빼고 관리자에게 알린다. 대상이 0건이면 DONE으로 끝낸다.
@@ -280,7 +280,7 @@ flows:
         to: [db]
         title: 대상 전략 수집
         desc: >-
-          ACTIVE 전략마다 배치 컨텍스트를 만든다. 거래일은 다음 거래일(22:00이면 내일 KST 날짜)이고, 이 날짜로 체크포인트를 남긴다.
+          ACTIVE 전략마다 배치 컨텍스트를 만든다(코인 계좌 전략은 제외). 거래일은 다음 거래일(22:00이면 내일 KST 날짜)이고, 이 날짜로 체크포인트를 남긴다.
           AT_OPEN 주문이 있는 전략만 고르지 않는다 — 걸러지는 건 뒤의 주문 계획 단계다.
         code: [BatchContextFactory#buildAll, TradingService#runOpenBatch]
         state: "trading_batch_run(OPEN) → STARTED"
@@ -504,8 +504,9 @@ flows:
         desc: >-
           계좌 소유권을 확인하고, 유형별 생성 정책이 켜져 있는지 보고 종목·분할수 기본값을 정한다. 중간부터 시작이면 평단이 필수다.
           시작예정일은 오늘 이후만 허용한다. 같은 계좌에 같은 종목 전략이 이미 있으면 거부한다.
+          계좌 증권사 시장(US_STOCK/CRYPTO_KRW)과 종목 시장이 다르면, 코인 계좌에 DCA 외 전략이면, DCA 주문유형·금액이 시장 규칙(코인 MARKET·5,000원 이상 정수, 주식 MOO|MOC)에 어긋나면 400.
         code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
-               StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker]
+               StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker, DcaConfig#requireCompatible]
         fail: 위반이면 400(중복은 409 성격의 상태 오류). DCA(UPRO/QLD)는 방향이 다르면 같은 종목에 매수 1 + 매도 1을 허용하고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다.
 
       - id: balance

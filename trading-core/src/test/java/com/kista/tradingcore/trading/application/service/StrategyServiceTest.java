@@ -2089,10 +2089,10 @@ class StrategyServiceTest {
     // DCA 등록 성공 경로 공통 stub — 잔고·시세 검증을 건너뛰므로 사용자 프로필·마진·시세 stub은 없다(strict stubs)
     private void stubDcaRegistration(StrategyTicker ticker) {
         UUID cycleId = UUID.randomUUID();
-when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
                 new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
                 null, null, null, null)));
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        lenient().when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.save(any())).thenReturn(dcaStrategy(UUID.randomUUID(), ticker));
         when(strategyCyclePort.save(any())).thenAnswer(inv -> {
             StrategyCycle arg = inv.getArgument(0);
@@ -2104,6 +2104,65 @@ when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(n
         when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
         when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+    }
+
+    private static DcaConfig cryptoDcaConfig() {
+        return new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET, DcaFrequency.DAILY,
+                null, null, List.of(), 9);
+    }
+
+    private void stubDcaPolicyWithCrypto() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH),
+                        StrategyTicker.UPRO), null, null, null, null)));
+    }
+
+    @Test
+    @DisplayName("주식 계좌에 코인 종목 DCA는 시장 불일치로 거부한다")
+    void register_dca_rejectsTickerMarketMismatch() {
+        stubDcaPolicyWithCrypto();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, cryptoDcaConfig())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("시장");
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("코인 계좌는 DCA 외 전략을 등록할 수 없다")
+    void register_cryptoAccount_rejectsNonDca() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+
+        // 정책 조회보다 먼저 거부하므로 정책 stub 없이도 코인 전용 규칙 메시지에 도달한다
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("코인 계좌는 DCA 전략만 등록할 수 있습니다.");
+        verify(strategyPort, never()).save(any());
+        verifyNoInteractions(strategyCreationPolicyPort);
+    }
+
+    @Test
+    @DisplayName("코인 계좌 DCA는 MARKET·원 단위 정수 금액만 허용한다")
+    void register_cryptoDca_rejectsStockOrderType() {
+        stubDcaPolicyWithCrypto();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, dcaConfig(OrderDirection.BUY))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("MARKET");
+    }
+
+    @Test
+    @DisplayName("코인 계좌 BTC DCA는 실행 시각과 함께 저장된다")
+    void register_cryptoDca_succeeds() {
+        stubDcaRegistration(StrategyTicker.BTC);
+        stubDcaPolicyWithCrypto();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
+
+        strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, cryptoDcaConfig()));
+
+        verify(dcaDetailPort).save(STRATEGY_VERSION_ID, cryptoDcaConfig());
+        verifyNoInteractions(marginPort, brokerPricePort);
     }
 
     @Test

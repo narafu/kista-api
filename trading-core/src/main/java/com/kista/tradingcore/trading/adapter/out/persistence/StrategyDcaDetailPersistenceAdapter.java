@@ -30,7 +30,8 @@ class StrategyDcaDetailPersistenceAdapter implements StrategyDcaDetailPort {
                 strategyVersionId, jpaRepository, StrategyDcaVersionEntity::new);
         entity.setStrategyVersionId(strategyVersionId);
         entity.setDirection(config.direction());
-        entity.setAmountUsd(config.amountUsd());
+        entity.setAmount(config.amount());
+        entity.setExecutionHour(config.executionHour() == null ? null : config.executionHour().shortValue());
         entity.setOrderType(config.orderType());
         entity.setFrequency(config.frequency());
         entity.setDayOfWeek(config.dayOfWeek());
@@ -71,8 +72,9 @@ class StrategyDcaDetailPersistenceAdapter implements StrategyDcaDetailPort {
     }
 
     private DcaConfig toDomain(StrategyDcaVersionEntity e, List<StrategyDcaConditionEntity> conditions) {
-        return new DcaConfig(e.getDirection(), e.getAmountUsd(), e.getOrderType(),
+        return new DcaConfig(e.getDirection(), e.getAmount(), e.getOrderType(),
                 e.getFrequency(), e.getDayOfWeek(), e.getDayOfMonth(),
-                conditions.stream().map(StrategyDcaConditionEntity::toDomain).toList());
+                conditions.stream().map(StrategyDcaConditionEntity::toDomain).toList(),
+                e.getExecutionHour() == null ? null : e.getExecutionHour().intValue());
     }
 }

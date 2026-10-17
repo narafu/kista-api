@@ -132,4 +132,22 @@ class BatchContextFactoryTest {
         assertThat(result).isEmpty();
         verify(errorReportPort).reportError(argThat(e -> e instanceof IllegalStateException));
     }
+
+    @Test
+    void buildAll_skipsCryptoAccountStrategies() {
+        UUID upbitAccountId = UUID.randomUUID();
+        Strategy stock = mockStrategy(ACCOUNT_ID);
+        Strategy crypto = new Strategy(UUID.randomUUID(), upbitAccountId, StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+        when(accountPort.findAll()).thenReturn(List.of(mockAccount(ACCOUNT_ID), TradingFixtures.upbitAccount(upbitAccountId, USER_ID)));
+        when(tradingUserProfilePort.findAllByUserIds(any())).thenReturn(Map.of(USER_ID, mockUserProfile()));
+        when(strategyCyclePort.findLatestByStrategyIds(any()))
+                .thenReturn(Map.of(stock.id(), mockCycle(stock.id()), crypto.id(), mockCycle(crypto.id())));
+
+        List<BatchContext> contexts = factory.buildAll(List.of(stock, crypto));
+
+        // 코인 전략은 주식 배치에서 조용히 빠진다 — 관리자 오류 알림 없음
+        assertThat(contexts).extracting(c -> c.strategy().id()).containsExactly(stock.id());
+        verifyNoInteractions(errorReportPort);
+    }
 }

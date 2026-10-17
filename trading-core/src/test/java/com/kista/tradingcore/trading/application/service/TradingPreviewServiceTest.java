@@ -600,4 +600,17 @@ class TradingPreviewServiceTest {
         assertThat(service.previewBatch(ACCOUNT.id(), ACCOUNT.userId())).isEmpty();
         verifyNoInteractions(planBuilder);
     }
+
+    @Test
+    void previewBatch_cryptoAccount_returnsEmptyWithoutBrokerCalls() {
+        // 코인 계좌 전략은 전부 DCA — 미리보기 대상이 아니라 브로커 라우터(시세 조회)를 타지 않는다
+        Account upbit = TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID());
+        Strategy btc = new Strategy(UUID.randomUUID(), upbit.id(), StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+        when(accountPort.requireOwnedAccount(upbit.id(), upbit.userId())).thenReturn(upbit);
+        when(strategyPort.findByAccountId(upbit.id())).thenReturn(List.of(btc));
+
+        assertThat(service.previewBatch(upbit.id(), upbit.userId())).isEmpty();
+        verifyNoInteractions(priceFetcher, planBuilder);
+    }
 }

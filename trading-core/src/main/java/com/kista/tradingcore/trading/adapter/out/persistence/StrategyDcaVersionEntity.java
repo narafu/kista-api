@@ -34,12 +34,12 @@ class StrategyDcaVersionEntity extends BaseAuditEntity {
     @Column(name = "direction", nullable = false, length = 20)
     private OrderDirection direction; // 매수/매도
 
-    @Column(name = "amount_usd", nullable = false, precision = 20, scale = 2)
-    private BigDecimal amountUsd; // 회차당 고정 금액 (USD)
+    @Column(name = "amount", nullable = false, precision = 20, scale = 2)
+    private BigDecimal amount; // 회차당 고정 금액 (계좌 통화 — 주식 USD, 코인 KRW)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", nullable = false, length = 20)
-    private OrderType orderType; // MOO | MOC
+    private OrderType orderType; // MOO | MOC | MARKET
 
     @Enumerated(EnumType.STRING)
     @Column(name = "frequency", nullable = false, length = 20)
@@ -51,4 +51,7 @@ class StrategyDcaVersionEntity extends BaseAuditEntity {
 
     @Column(name = "day_of_month")
     private Integer dayOfMonth; // MONTHLY 전용 (null이면 말일)
+
+    @Column(name = "execution_hour")
+    private Short executionHour; // 코인 실행 시각 (KST 0~23) — smallint라 Short로 매핑(Integer면 validate 불일치)
 }

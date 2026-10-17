@@ -141,4 +141,20 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         dcaDetail.save(versionId, configWith(List.of()));
         assertThat(dcaDetail.findActiveByStrategyId(strategyId).orElseThrow().conditions()).isEmpty();
     }
+
+    @Test
+    void saveAndLoad_cryptoConfigWithExecutionHour() {
+        DcaConfig crypto = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET,
+                DcaFrequency.WEEKLY, java.time.DayOfWeek.SUNDAY, null, List.of(), 23);
+
+        DcaConfig saved = dcaDetail.save(versionId, crypto);
+        em.flush();
+        em.clear();
+
+        DcaConfig loaded = dcaDetail.findActiveByStrategyId(strategyId).orElseThrow();
+        assertThat(saved.executionHour()).isEqualTo(23);
+        assertThat(loaded.executionHour()).isEqualTo(23);
+        assertThat(loaded.amount()).isEqualByComparingTo("10000");
+        assertThat(loaded.dayOfWeek()).isEqualTo(java.time.DayOfWeek.SUNDAY);
+    }
 }
