@@ -60,10 +60,11 @@
 - 새 루트 설정 파일 추가 시 동일하게 COPY 라인에 포함할 것
 
 ### docker-compose 서비스
-- 로컬 `docker-compose.yml`: `postgres:17`(kistadb/kista/kista, 포트 5432)·`redis:7-alpine`·`prometheus`·`grafana` — 앱 서비스는 없다(IntelliJ/bootRun으로 실행)
+- 로컬 `docker-compose.yml`: `postgres:17`(운영은 2026-10-13부터 `postgres:18.6` — kista-infra 소유)(kistadb/kista/kista, 포트 5432)·`redis:7-alpine`·`prometheus`·`grafana` — 앱 서비스는 없다(IntelliJ/bootRun으로 실행)
 
 ### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
 - PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패
+- 18+ 이미지는 `PGDATA=/var/lib/postgresql/18/docker` — 볼륨 마운트 대상을 `/var/lib/postgresql/data`에서 `/var/lib/postgresql`로 함께 바꿔야 한다(옛 경로 마운트가 있으면 기동 거부). 운영 절차는 kista-infra `docs/superpowers/plans/2026-10-13-postgres-18-upgrade.md`
 - 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop postgres && docker compose rm -f postgres` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ 앱 기동(bootRun, Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
 - 복원 시 이력 테이블(`flyway_schema_history_api`/`flyway_schema_history_trading`) duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
 - `POSTGRES_DB`가 비어 있으면 kistadb가 자동 생성되지 않는다(기본 DB는 POSTGRES_USER값 "kista") — 새 볼륨 후 `CREATE DATABASE kistadb OWNER kista;` 수동 실행

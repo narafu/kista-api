@@ -18,7 +18,7 @@ KISTA(Key Investment Strategy & Trading Automation) — 한국투자증권(KIS)�
 
 ## 기술 스택
 
-Java 25 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith · PostgreSQL 17 · Redis · Flyway · Docker Compose · OCI
+Java 25 · Spring Boot 4 · Hexagonal Architecture · Spring Modulith · PostgreSQL 18 · Redis · Flyway · Docker Compose · OCI
 
 ## 구조
 
