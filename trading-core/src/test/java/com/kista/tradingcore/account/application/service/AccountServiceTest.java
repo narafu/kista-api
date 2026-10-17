@@ -7,6 +7,7 @@ import com.kista.tradingcore.broker.application.service.BrokerConnectionTesters;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.RegisterAccountCommand;
 import com.kista.tradingcore.account.domain.model.UpdateAccountCommand;
+import com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
@@ -447,5 +448,87 @@ class AccountServiceTest {
         inOrder.verify(accountPort).findByUserId(userId);
         inOrder.verify(brokerTokenCachePort).deleteByAccountIds(List.of(a1.id(), a2.id()));
         inOrder.verify(accountPort).deleteByUserId(userId);
+    }
+
+    @Test
+    @DisplayName("키 수정: 연결 테스트 통과 시 저장하고 만료일을 갱신하며 KIS 토큰 캐시를 지운다")
+    void updateCredentials_upbit_savesAndEvictsTokenCache() {
+        Account upbit = TradingFixtures.upbitAccount(accountId, userId);
+        Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(upbit);
+        when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk"));
+
+        assertThat(saved.appKey()).isEqualTo("new-ak");
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
+        InOrder order = inOrder(accountPort, brokerTokenCachePort);
+        order.verify(accountPort).save(any());
+        order.verify(brokerTokenCachePort).deleteByAccountIds(List.of(accountId));
+        verifyNoInteractions(brokerEnabledPort); // 키 교체는 신규 등록 정책 대상이 아니다
+    }
+
+    @Test
+    @DisplayName("키 수정: 업비트 같은 access key 재입력은 중복 검사를 건너뛰고 저장한다")
+    void updateCredentials_upbit_sameAccessKey_skipsDuplicateCheck() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("access-key", "rotated-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("access-key", "rotated-sk"));
+
+        verify(accountPort, never()).existsByDedupeKey(any());
+        verify(accountPort).save(any());
+    }
+
+    @Test
+    @DisplayName("키 수정: 연결 테스트 실패면 저장하지 않는다")
+    void updateCredentials_verificationFails_doesNotSave() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(activeAccount(userId));
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("bad", "bad", "74420614"))
+                .thenThrow(new com.kista.tradingcore.broker.domain.model.BrokerCredentialException());
+
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("bad", "bad")))
+                .isInstanceOf(com.kista.tradingcore.broker.domain.model.BrokerCredentialException.class);
+        verify(accountPort, never()).save(any());
+        verifyNoInteractions(brokerTokenCachePort);
+    }
+
+    @Test
+    @DisplayName("키 수정: Toss 새 키가 다른 계좌를 가리키면 거부한다")
+    void updateCredentials_toss_differentAccountSeq_rejected() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.tossAccount(accountId, userId)); // brokerAccountCode "1"
+        when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("2", null));
+
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("다른 계좌");
+        verify(accountPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("키 수정: 업비트 새 access key가 다른 계좌에 있으면 409, MOCK은 400, 남의 계좌는 403")
+    void updateCredentials_guards() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(accountPort.existsByDedupeKey("taken")).thenReturn(true);
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk")))
+                .isInstanceOf(Account.DuplicateAccountException.class);
+
+        UUID mockId = UUID.randomUUID();
+        when(accountPort.requireOwnedAccount(mockId, userId)).thenReturn(
+                new Account(mockId, userId, "모의", "12345678-01", "MOCK", "MOCK", null, Broker.MOCK, null));
+        assertThatThrownBy(() -> accountService.updateCredentials(mockId, userId, new UpdateCredentialsCommand("a", "b")))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        UUID foreignId = UUID.randomUUID();
+        when(accountPort.requireOwnedAccount(foreignId, userId)).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
+        assertThatThrownBy(() -> accountService.updateCredentials(foreignId, userId, new UpdateCredentialsCommand("a", "b")))
+                .isInstanceOf(SecurityException.class);
+        verify(accountPort, never()).save(any());
     }
 }

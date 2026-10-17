@@ -746,9 +746,21 @@ flows:
         lane: ui
         to: [trading, db]
         title: 별명 수정
-        desc: 계좌 수정 화면(EditAccountForm)에서 별명만 바꿀 수 있다. 계좌번호와 자격증명은 수정할 수 없다. PUT /api/accounts/{id}가 소유권을 확인한 뒤 별명만 저장한다(앞뒤 공백 제거).
+        desc: 계좌 수정 화면(EditAccountForm)에서 별명만 바꿀 수 있다. 계좌번호는 수정할 수 없고, 자격증명은 아래 키 교체로 바꾼다. PUT /api/accounts/{id}가 소유권을 확인한 뒤 별명만 저장한다(앞뒤 공백 제거).
         code: [AccountController#update, AccountService#update]
         fail: 별명이 비어 있으면 400, 내 계좌가 아니면 403, 없으면 404.
+
+      - id: rotate-credentials
+        lane: ui
+        to: [trading, broker, db]
+        title: API 키 교체
+        desc: >-
+          계좌 화면에서 새 키·시크릿을 입력하면 PUT /api/accounts/{id}/credentials가 소유권을 확인하고, 증권사 연결 테스트를 통과해야 저장한다.
+          KIS는 저장된 계좌번호 소유까지, Toss는 같은 계좌(accountSeq)인지까지 확인하고, 업비트는 새 access key가 다른 계좌에 이미 있으면 거부하며 키 만료일을 갱신한다.
+          저장 후 옛 키로 발급된 KIS 토큰 캐시를 지운다. 신규 등록이 꺼진 증권사도 키 교체는 할 수 있다. 모의계좌는 키가 없어 불가.
+        code: [AccountController#updateCredentials, AccountService#updateCredentials, BrokerConnectionTesters#of, BrokerTokenCachePort#deleteByAccountIds]
+        state: "accounts.app_key·secret_key·api_key_expires_at 갱신 · broker_tokens 삭제"
+        fail: 키 오류 422(BROKER_CREDENTIAL_INVALID·BROKER_IP_NOT_ALLOWED·BROKER_PERMISSION_DENIED), 다른 계좌 키는 400(Toss)·409(업비트 DUPLICATE_ACCOUNT), 모의계좌 400, 남의 계좌 403.
 
       - id: delete
         lane: trading

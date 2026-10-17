@@ -27,6 +27,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -211,6 +212,33 @@ class AccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nickname\":\"계좌\",\"accountNo\":\"123456789\"," +
                                 "\"appKey\":\"key\",\"secretKey\":\"secret\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateCredentials_returns200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(accountUseCase.updateCredentials(eq(id), eq(UUID.fromString(USER_ID)), any()))
+                .thenReturn(new Account(id, UUID.fromString(USER_ID), "업비트", null, "new-ak", "new-sk", null, Broker.UPBIT, null,
+                        java.time.Instant.parse("2027-10-17T00:00:00Z")));
+
+        mockMvc.perform(put("/api/accounts/{id}/credentials", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appKey\":\"new-ak\",\"secretKey\":\"new-sk\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.apiKeyExpiresAt").value("2027-10-17T00:00:00Z"))
+                .andExpect(jsonPath("$.appKey").doesNotExist());
+        verify(accountUseCase).updateCredentials(id, UUID.fromString(USER_ID),
+                new com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand("new-ak", "new-sk"));
+    }
+
+    @Test
+    void updateCredentials_blankKey_returns400() throws Exception {
+        mockMvc.perform(put("/api/accounts/{id}/credentials", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"appKey\":\" \",\"secretKey\":\"sk\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isBadRequest());
     }

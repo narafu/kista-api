@@ -7,6 +7,7 @@ import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.RegisterAccountCommand;
 import com.kista.tradingcore.account.domain.model.UpdateAccountCommand;
+import com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand;
 import com.kista.tradingcore.account.application.usecase.AccountUseCase;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -102,6 +104,31 @@ class AccountService implements AccountUseCase {
             throw new IllegalArgumentException("계좌 별명을 입력해 주세요.");
         }
         return accountPort.save(account.withNickname(cmd.nickname().strip()));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 검증 HTTP 포함 — 트랜잭션 없이 실행(단건 저장은 JPA auto-commit)
+    public Account updateCredentials(UUID accountId, UUID requesterId, UpdateCredentialsCommand cmd) {
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        if (account.broker() == Broker.MOCK) {
+            throw new IllegalArgumentException("모의계좌는 API 키를 바꿀 수 없습니다.");
+        }
+        // 업비트는 access key가 곧 중복 판정 키 — 다른 계좌가 이미 쓰는 키면 거부(같은 키 재입력은 허용)
+        if (account.broker() == Broker.UPBIT && !cmd.appKey().equals(account.appKey())
+                && accountPort.existsByDedupeKey(cmd.appKey())) {
+            throw new Account.DuplicateAccountException(cmd.appKey());
+        }
+        // 키 교체는 신규 등록이 아니라 requireBrokerEnabled를 적용하지 않는다 — KIS는 저장된 계좌번호 소유까지 검증
+        BrokerAccountVerification verified = connectionTesters.of(account.broker())
+                .verifyAccount(cmd.appKey(), cmd.secretKey(), account.accountNo());
+        if (account.broker() == Broker.TOSS && !Objects.equals(verified.brokerAccountCode(), account.brokerAccountCode())) {
+            throw new IllegalArgumentException("등록된 계좌와 다른 계좌의 API 키입니다.");
+        }
+        Account saved = accountPort.save(account.withCredentials(
+                cmd.appKey(), cmd.secretKey(), account.brokerAccountCode(), verified.apiKeyExpiresAt()));
+        brokerTokenCachePort.deleteByAccountIds(List.of(accountId)); // 옛 키로 발급된 KIS 토큰 캐시 제거
+        log.info("계좌 키 교체: accountId={}, broker={}", accountId, account.broker());
+        return saved;
     }
 
     @Override

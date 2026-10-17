@@ -2,6 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.upbit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.Broker;
+import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
@@ -29,6 +30,8 @@ class UpbitAuthApi implements BrokerConnectionTestPort {
 
     @Override
     public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
+        // 등록 계좌 id만으로 호출돼 키가 비면 서명 전에 거부 — null 서명 방지
+        if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) throw new BrokerCredentialException();
         fetchAccounts(auth(appKey, secretKey)); // 실패는 UpbitHttpClient가 422(IP/권한/키)·429·503으로 매핑
     }
 
