@@ -181,4 +181,50 @@ class UpbitExchangeAdapterTest {
 
         assertThat(adapter.findOrderByIdentifier(ACCOUNT, "id-1")).isPresent();
     }
+
+    private void expectOrder(String json, String state) {
+        server.expect(requestTo(BASE_URL + "/v1/orders")).andExpect(content().json(json, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"uuid\":\"u\",\"identifier\":\"i\"" + (state == null ? "" : ",\"state\":\"" + state + "\"") + "}"));
+    }
+
+    @Test
+    void buyAmountStripsTrailingZeros() {
+        expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"10000\",\"identifier\":\"i\"}", "wait");
+        adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("10000.00000000"), "i");
+    }
+
+    @Test
+    void sellVolumeRoundsDownToEightDecimals() {
+        expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"ask\",\"ord_type\":\"market\",\"volume\":\"0.12345678\",\"identifier\":\"i\"}", "wait");
+        adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.BTC, new BigDecimal("0.123456789999"), "i");
+    }
+
+    @Test
+    void nonPositiveAmountsAreRejected() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, BigDecimal.ZERO, "i"))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.BTC, new BigDecimal("0.000000001"), "i"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void unknownOrMissingStateThrowsUpbitApiException() {
+        expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", "weird");
+        expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", null);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
+                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
+                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+    }
+
+    @Test
+    void balanceSkipsNonKrwUnitCurrencyRows() {
+        server.expect(requestTo(BASE_URL + "/v1/accounts")).andRespond(withSuccess("""
+                [{"currency":"KRW","balance":"1","locked":"0","avg_buy_price":"0","unit_currency":"KRW"},
+                 {"currency":"BTC","balance":"1","locked":"0","avg_buy_price":"100","unit_currency":"USDT"}]
+                """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getBalance(ACCOUNT).holdings()).isEmpty();
+    }
 }

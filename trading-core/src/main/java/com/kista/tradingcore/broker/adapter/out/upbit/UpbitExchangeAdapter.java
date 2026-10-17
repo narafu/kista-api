@@ -97,22 +97,26 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
 
     @Override
     public CryptoOrderResult buyMarketByAmount(BrokerAccountRef account, StrategyTicker ticker, BigDecimal krwAmount, String identifier) {
+        if (krwAmount.signum() <= 0) throw new IllegalArgumentException("매수 금액은 0보다 커야 합니다: " + krwAmount);
         LinkedHashMap<String, String> body = new LinkedHashMap<>();
         body.put("market", registry.marketOf(ticker));
         body.put("side", "bid");
         body.put("ord_type", "price"); // 시장가 매수 — price=총액, volume 생략
-        body.put("price", krwAmount.toPlainString());
+        body.put("price", krwAmount.stripTrailingZeros().toPlainString());
         body.put("identifier", identifier);
         return toResult(http.post("/v1/orders", body, account, new ParameterizedTypeReference<OrderRow>() {}));
     }
 
     @Override
     public CryptoOrderResult sellMarketByVolume(BrokerAccountRef account, StrategyTicker ticker, BigDecimal volume, String identifier) {
+        // 소수 8자리 내림 — 보유 수량 초과 방지
+        BigDecimal floored = volume.setScale(8, RoundingMode.DOWN);
+        if (floored.signum() <= 0) throw new IllegalArgumentException("매도 수량은 0보다 커야 합니다: " + volume);
         LinkedHashMap<String, String> body = new LinkedHashMap<>();
         body.put("market", registry.marketOf(ticker));
         body.put("side", "ask");
         body.put("ord_type", "market"); // 시장가 매도 — volume 필수, price 생략
-        body.put("volume", volume.toPlainString());
+        body.put("volume", floored.stripTrailingZeros().toPlainString());
         body.put("identifier", identifier);
         return toResult(http.post("/v1/orders", body, account, new ParameterizedTypeReference<OrderRow>() {}));
     }
@@ -144,9 +148,18 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
         BigDecimal volume = trades.stream().map(TradeRow::volume).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal funds = trades.stream().map(TradeRow::funds).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal avg = volume.signum() > 0 ? funds.divide(volume, 8, RoundingMode.HALF_UP).stripTrailingZeros() : null;
-        return new CryptoOrderResult(o.uuid(), o.identifier(), CryptoOrderResult.State.valueOf(o.state().toUpperCase(Locale.ROOT)),
+        return new CryptoOrderResult(o.uuid(), o.identifier(), parseState(o),
                 o.executedVolume() == null ? BigDecimal.ZERO : o.executedVolume(), avg,
                 o.paidFee() == null ? BigDecimal.ZERO : o.paidFee());
+    }
+
+    // 알 수 없는 state는 접수 여부 불명이라 rejected=false 예외로 올린다
+    private static CryptoOrderResult.State parseState(OrderRow o) {
+        try {
+            return CryptoOrderResult.State.valueOf(o.state().toUpperCase(Locale.ROOT));
+        } catch (RuntimeException e) {
+            throw new UpbitApiException(0, null, "Upbit 주문 state 해석 실패: uuid=" + o.uuid() + ", state=" + o.state(), e, false);
+        }
     }
 
     // ── 업비트 응답 (숫자는 문자열 decimal — Jackson이 BigDecimal로 변환) ──
