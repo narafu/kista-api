@@ -116,43 +116,77 @@ A 커밋 후 openapi 커밋 해시를 kista-ui-22에 전달한다.
 
 ## 섹션 3 — 코인 DCA 실행 (묶음 C)
 
+> 2026-10-18 개정: 묶음 C 착수 시 코드 탐색으로 전제를 정정했다(커널 진입점·일봉 개수·복구 순서·주문 혼입). 사용자 결정 3건(일시 오류 정책·체결 알림 계약·이월 Minor) 반영.
+
 ### 트리거
 - trading-core `CryptoDcaScheduler`: cron `0 */10 * * * *`(KST), 락 `crypto-dca`, `scheduler.enabled` 게이트.
-- 매 틱: `executionHour == 현재 KST 시`이고 오늘(KST) `dca_execution`이 없는 ACTIVE 코인 DCA 전략만 실행한다. 정각 1회가 아니라 10분 주기인 이유: kista-trading 재배포(stop-first, 최대 약 200초) 중 정각을 놓쳐도 같은 시간대 안에서 따라잡는다.
+- 매 틱 처리 순서(계좌별 순차, 계좌 단위 실패 격리):
+  1. **복구·동기화 — executionHour와 무관하게 매 틱**: 그 계좌의 PLANNED 코인 주문은 `findOrderByIdentifier`로 복구, PLACED 코인 주문은 `findOrderByUuid`로 체결 확인(아래 "중복 주문 방지").
+  2. **신규 실행**: `executionHour == 현재 KST 시`이고 오늘(KST) `dca_execution`이 없으며 오늘 PLANNED/PLACED 주문도 없는 ACTIVE 코인 DCA 전략만.
+- 10분 주기인 이유: kista-trading 재배포(stop-first, 최대 약 200초) 중 정각을 놓쳐도 같은 시간대 안에서 따라잡는다. 같은 이유로 일시 오류도 시간대 안에서 재시도한다(아래 "오류").
 - `trade_date` = 실행 시점 KST 날짜.
-- 실행일 판정: `DcaSchedule`의 말일 보정을 재사용하고 모든 날을 개장일로 본다(24/7, 휴장 보정 없음).
+- 실행일 판정: `DcaSchedule.isExecutionDay(kstDate, config, d -> true)` — 말일 보정만 적용되고 휴장 보정은 없다(24/7).
 
 ### 처리 순서 (계좌별 순차 — KRW 잔고 공유)
-1. 계좌 잔고 1회 조회.
+1. 계좌 잔고 1회 조회(`CryptoExchanges.of(broker).getBalance`).
 2. 전략별: 실행일 → 오늘 실행 여부 → 조건 평가.
-3. 금액 산정 — 매수 `min(amount, KRW 가용액 − 수수료)`, 매도 수량 `amount ÷ 현재가`(8자리 FLOOR) 후 `min(보유량)`.
-4. 산정 금액 < 5,000원 → `BELOW_MIN_ORDER_AMOUNT` skip + 알림.
+3. 금액 산정 — 매수 `min(amount, floor(KRW 가용액 ÷ (1 + 수수료율)))`(정수 KRW), 매도 수량 `amount ÷ 현재가`(8자리 FLOOR) 후 `min(보유 가용량)`. 수수료율은 상수(업비트 KRW 0.05%) — `ponytail:` 주석으로 거래소별 수수료 조회가 필요해지면 확장한다고 표시.
+4. 산정 금액 < 5,000원(매도는 `수량 × 현재가` 기준) → `BELOW_MIN_ORDER_AMOUNT` skip + 알림. 매도인데 보유량 0 → `NO_HOLDINGS`.
 5. 주문, 계좌 잔고 로컬 차감 후 다음 전략.
 
 ### 조건 평가
-- 판정 커널 `DcaCycleOrderStrategy.evaluate`/`DcaIndicators` 재사용.
-- 일봉은 `CryptoExchangePort`에서 받고 진행 중인 봉은 제외, 직전 완성 일봉(KST 09:00 마감)까지 사용. "전일 종가" = 직전 완성 일봉 종가.
-- AVG_PRICE = 업비트 `avg_buy_price` 기준.
-- FEAR_GREED: `FearGreedIndexPort`에 market 인자 추가. CRYPTO_KRW는 trading-core `CryptoFearGreedIndexAdapter`가 alternative.me를 직접 호출(CNN 어댑터와 같은 패턴). 라벨 출처 표시는 UI 담당.
+- 커널 `DcaCycleOrderStrategy.decide(DcaInputs)`는 정수 수량·가격 캡·`BELOW_ONE_SHARE`가 섞여 있어 코인에 그대로 쓰지 않는다. **조건 판정만 순수 함수로 추출**(matching 커널, 예: `DcaConditions.evaluate`)해 주식 `decide`와 코인 러너가 공유한다. 코인 금액 산정은 코인 러너 쪽(위 3·4).
+  - 회귀 기준: 기존 `DcaCycleOrderStrategy` 단위 테스트가 수정 없이 통과.
+  - 지표 계산은 `DcaIndicators`(SMA·RSI Wilder) 그대로.
+- 일봉: 주식과 같은 **250봉**. 업비트 어댑터 `getCompletedDailyCandles`에 `to` 파라미터 페이징을 추가해 200봉 초과를 지원한다(RSI Wilder는 이력 길이에 따라 값이 달라지므로 주식과 같은 길이를 맞춘다).
+- 신선도: 업비트 일봉은 KST 09:00에 시작한다. 마지막 완성 봉의 `kstDate` 기대값 = 실행 시각이 09시 이후면 `오늘 − 1일`, 09시 이전이면 `오늘 − 2일`. 다르면 `DATA_UNAVAILABLE`. "전일 종가" = 마지막 완성 봉 종가.
+- AVG_PRICE = 업비트 `avg_buy_price` 기준(보유 없으면 조건 불충족 규칙은 주식과 동일).
+- FEAR_GREED: `FearGreedIndexPort`에 market 인자 추가. CRYPTO_KRW는 trading-core `CryptoFearGreedIndexAdapter`가 alternative.me를 직접 호출(CNN 어댑터와 같은 패턴, 실패 시 empty). 라벨 출처 표시는 UI 담당.
 
 ### 중복 주문 방지
-1. 주문 행을 PLANNED로 저장.
+1. 주문 행을 PLANNED로 저장(`orderType=MARKET`, `quantity`=추정 수량, `price`=기준가 — 핵심 결정 2). `orders.price numeric(12,2)`는 BTC 원화 가격을 담는다.
 2. 업비트 주문 시 `identifier` = 주문 UUID.
-3. PLACED 갱신.
+3. PLACED 갱신(`markPlaced(id, uuid)`).
 4. `dca_execution` 기록(`DcaExecutionRecorder`, `DcaRoundSkippedEvent` 재사용).
-- 재실행 시 PLANNED 주문은 `identifier`로 업비트를 조회해 이미 접수됐으면 재접수하지 않고 복구한다.
-- 체결 확정: 같은 스케줄러가 매 틱 PLACED 코인 주문을 조회해 `markFilled`.
+- 결과 불명 실패(`BrokerApiException.isRejection == false` — I/O·5xx): skip을 기록하지 않고 PLANNED로 남긴다.
+- 복구(매 틱 1단계): PLANNED 주문을 `findOrderByIdentifier`로 조회한다.
+  - 있음 → PLACED 갱신 + `dca_execution` 기록(재접수 없음).
+  - 없음 → `markFailed`. 실행 시간대 안이면 다음 틱에 새 주문(새 identifier)으로 재시도, 시간대를 넘겼으면 `EXCHANGE_API_ERROR` skip.
+- 체결 확정(매 틱 1단계): PLACED 코인 주문을 `findOrderByUuid`로 조회해 `executedVolume > 0`이면 `markFilled(실측 수량, 평균가)`(업비트 시장가 매수 완료가 `done`/`cancel` 중 무엇인지 미확인 — state 대신 체결량으로 판정). `executedVolume == 0`이고 `cancel`이면 `markCancelled`.
+- 코인 주문은 정수 경로(`OrderSubmitter`·`TradingReporter`·`Order.toPlanned()`)를 타지 않는다.
+
+### 코인 주문 혼입 감사 (필수)
+코인 주문이 `orders`에 생기면 사이클·계좌로 좁혀지지 않은 기존 조회가 코인 주문을 집어 `BrokerRouter(UPBIT)` IAE나 `intValueExact` 예외를 낼 수 있다. 다음 경로를 전수 확인해 코인 제외 또는 코인 분기를 넣는다(계획 태스크로 명시).
+- `OrderPort.findAll(from,to)`·`findDistinctAccountIdsByTradeDateBetween` 소비처(`TradingInternalQueryController` → root 관리자/리포트).
+- 계좌 미체결 취소(`OrderCancelService`·`AccountOpenOrderCanceller`) — 코인 계좌 삭제·키 교체 시.
+- `TradingBatchResumer`·`OrderSubmissionReconciler`·`SubmittingOrderAwaiter` — 코인 주문은 SUBMITTING을 쓰지 않음을 확인.
+- `findByUser`/`findFilledByUser`/`findByStrategyId` 소비처(포트폴리오·통계·전략 주문 이력) — 정수 변환 지점 확인.
+
+### 체결 알림
+- `TradeEventMessage.quantity`를 `Integer` → `BigDecimal`로 넓힌다(사용자 결정). JSON number라 와이어 호환이지만 root·trading-core를 같은 커밋으로 배포하고, 타입 변경을 "업비트 ui" 세션에 전달한다.
+- 코인 체결(`markFilled` 시점)에 BUY/SELL 알림(Telegram/FCM/SSE)을 발행한다 — 주식 `TradingReporter` 경로가 아닌 코인 전용 이벤트.
 
 ### 오류
-- 업비트 API 오류 → `EXCHANGE_API_ERROR` skip + 사용자·관리자 알림.
-- 인증 실패(키 만료) → `API_KEY_EXPIRED` skip + 알림.
+- 일시 오류(rate limit·5xx·I/O, 잔고·시세·일봉 조회 포함): 그 시간대 안에서는 기록 없이 다음 틱 재시도. **시간대 마지막 틱(분 ≥ 50)** 에서도 실패하면 `EXCHANGE_API_ERROR` skip + 사용자·관리자 알림(사용자 결정).
+- 인증 실패(`BrokerCredentialException` — 키 만료·무효): 즉시 `API_KEY_EXPIRED` skip + 알림.
+- 그 밖의 확정 거부(4xx `rejected`): 즉시 `EXCHANGE_API_ERROR` skip + 알림.
 - 계좌 단위 실패 격리.
 
+### 다음 실행일
+- `DcaSummaryAssembler`는 CRYPTO_KRW일 때 미국 캘린더 변환·`DstInfo.nextTradeDate()` 대신 KST 날짜와 `d -> true`로 `nextExecutionDay`를 계산한다(오늘 실행 시각 전이면 오늘 포함).
+
 ### 키 만료 알림
-- 매일 10:00 KST 작업이 `api_key_expires_at` D-30·D-7·당일 계좌에 이벤트를 발행하고 `tradingcore.notify`가 발송한다.
+- 매일 10:00 KST trading-core 작업(락)이 `api_key_expires_at`이 D-30·D-7·당일인 계좌에 이벤트를 발행하고 `tradingcore.notify`가 발송한다.
+
+### A·B 이월 Minor (사용자 결정으로 포함)
+- 관리자 계좌 목록 UPBIT 계좌번호 `****` 표시(`AdminAccountResponse`/`AdminAccountItem`) — 계좌번호 없음을 그대로 표시.
+- crypto-portfolio 현재가 누락 시 `evalAmountKrw`를 null로 두고 총자산 집계에서 제외(응답 계약 변경 → "업비트 ui" 전달).
+- 업비트 키 교체 중복 경합의 unique 위반을 500이 아닌 409로.
+- root `GlobalExceptionHandler`의 `AdminBrokerRateLimitException` 제목 "KIS Rate Limit" → 브로커 중립 문구.
+- 제외: Toss 키 교체 시 Redis 토큰 무효화(코인 무관, 별도 작업).
 
 ### 문서 동기화
-`flows.yml`(코인 DCA 흐름·업비트 통신·스케줄러), `docs/agents/scheduler-time-table.md`, 모듈 문서(`modules/tradingcore/broker.md`·`trading.md`·`account.md`), README 드리프트 확인.
+`flows.yml`(코인 DCA 흐름·업비트 통신·스케줄러), `docs/agents/scheduler-time-table.md`, 모듈 문서(`modules/tradingcore/broker.md`·`trading.md`·`account.md`·`matching.md`), README 드리프트 확인.
 
 ## 섹션 4 — 테스트·검증
 
