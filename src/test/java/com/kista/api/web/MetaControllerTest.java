@@ -85,7 +85,7 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes[0]").value(org.hamcrest.Matchers.contains("MOO")))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].divisionCounts").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='INFINITE')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())))
-                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("MOO", "MOC"))))
+                .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].orderTypes").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("MOO", "MOC", "MARKET"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].directions").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("BUY", "SELL"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].frequencies").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("DAILY", "WEEKLY", "MONTHLY"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].conditionIndicators").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("AVG_PRICE", "SMA", "RSI", "FEAR_GREED"))))
@@ -99,5 +99,18 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.dcaIndicators[?(@.code=='FEAR_GREED')]").isNotEmpty())
                 .andExpect(jsonPath("$.dcaIndicators[?(@.code=='SMA')].smaPeriods[0]").value(org.hamcrest.Matchers.contains(20)))
                 .andExpect(jsonPath("$.dcaIndicators[?(@.code=='RSI')].smaPeriods").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.empty())));
+    }
+
+    @Test
+    void getBundle_exposesMarketAndCurrency() throws Exception {
+        mockMvc.perform(get("/api/meta").with(authentication(userToken(DEV_USER_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].market").value(org.hamcrest.Matchers.contains("CRYPTO_KRW")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].currency").value(org.hamcrest.Matchers.contains("KRW")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].description").value(org.hamcrest.Matchers.contains("한투")))
+                .andExpect(jsonPath("$.tickers[?(@.code=='BTC')].market").value(org.hamcrest.Matchers.contains("CRYPTO_KRW")))
+                .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
+                .andExpect(jsonPath("$.dcaSkipReasons[?(@.code=='API_KEY_EXPIRED')].label").value(org.hamcrest.Matchers.contains("API 키 만료")));
     }
 }

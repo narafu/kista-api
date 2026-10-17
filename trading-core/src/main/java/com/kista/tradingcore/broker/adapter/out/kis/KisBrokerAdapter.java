@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;

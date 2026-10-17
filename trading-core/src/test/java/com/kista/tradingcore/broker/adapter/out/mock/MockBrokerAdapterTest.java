@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
@@ -394,6 +395,6 @@ class MockBrokerAdapterTest {
         List<MarginItem> margin = adapter().getMargin(ACCOUNT);
 
         assertThat(margin).isNotEmpty();
-        assertThat(margin.getFirst().currency()).isEqualTo(com.kista.tradingcore.broker.domain.model.Currency.USD);
+        assertThat(margin.getFirst().currency()).isEqualTo(Currency.USD);
     }
 }

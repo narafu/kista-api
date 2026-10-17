@@ -1,6 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
-import com.kista.tradingcore.broker.domain.model.Currency;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.MarginItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 

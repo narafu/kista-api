@@ -16,7 +16,9 @@ public record AccountResponse(
         @Schema(description = "전체 계좌번호 (본인 계좌, 토글 표시용)", example = "74420614")
         String accountNo,
         @Schema(description = "증권사", example = "KIS")
-        String broker
+        String broker,
+        @Schema(description = "계좌 기준 통화(증권사 파생)", example = "USD")
+        String currency
 ) {
     public static AccountResponse from(Account a) {
         // accountNo가 이미 전체 표시 형식 — KIS: "74420614-01", TOSS: "131-01-001931"
@@ -25,7 +27,8 @@ public record AccountResponse(
                 a.nickname(),
                 AccountNumberMasker.mask(a.accountNo()),
                 a.accountNo(),
-                a.broker() != null ? a.broker().name() : null
+                a.broker() != null ? a.broker().name() : null,
+                a.broker() != null ? a.broker().getCurrency().name() : null
         );
     }
 }

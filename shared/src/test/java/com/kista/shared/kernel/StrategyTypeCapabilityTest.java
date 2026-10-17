@@ -66,10 +66,10 @@ class StrategyTypeCapabilityTest {
     @Test
     void dca_capability_exposes_dca_choices() {
         StrategyCapability dca = StrategyType.DCA.capability();
-        assertThat(dca.availableTickers()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD);
+        assertThat(dca.availableTickers()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH);
         assertThat(dca.tickerFixed()).isFalse();
         assertThat(dca.divisionCounts()).isEmpty();
-        assertThat(dca.orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC);
+        assertThat(dca.orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC, OrderType.MARKET);
         assertThat(dca.directions()).containsExactly(OrderDirection.BUY, OrderDirection.SELL);
         assertThat(dca.frequencies()).containsExactly(DcaFrequency.values());
         assertThat(dca.conditionIndicators()).containsExactly(DcaIndicator.AVG_PRICE, DcaIndicator.SMA, DcaIndicator.RSI, DcaIndicator.FEAR_GREED);

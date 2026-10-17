@@ -1,5 +1,6 @@
 package com.kista.api.web;
 
+import com.kista.api.web.dto.BrokerMeta;
 import com.kista.api.web.dto.DcaIndicatorMeta;
 import com.kista.api.web.dto.EnumMeta;
 import com.kista.api.web.dto.MetaBundle;
@@ -74,9 +75,9 @@ public class MetaController {
                 .toList();
     }
 
-    private List<EnumMeta> getBrokerList() {
+    private List<BrokerMeta> getBrokerList() {
         return Arrays.stream(Broker.values())
-                .map(b -> new EnumMeta(b.name(), b.getLabel(), b.getShortLabel()))
+                .map(BrokerMeta::from)
                 .toList();
     }
 

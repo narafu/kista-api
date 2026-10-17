@@ -11,7 +11,10 @@ public enum DcaSkipReason {
     CONDITION_NOT_MET("조건 미충족"),
     NO_HOLDINGS("보유 수량 없음"),
     INSUFFICIENT_BALANCE("예수금 부족"),
-    BELOW_ONE_SHARE("1주 미만 금액");
+    BELOW_ONE_SHARE("1주 미만 금액"),
+    BELOW_MIN_ORDER_AMOUNT("최소 주문 금액 미달"), // 코인 — 산정 금액이 거래소 최소 주문 금액(5,000원) 미만
+    EXCHANGE_API_ERROR("거래소 API 오류"),        // 코인 — 업비트 API 실패
+    API_KEY_EXPIRED("API 키 만료");               // 코인 — 인증 실패(키 만료·폐기)
 
     private final String label; // 한국어 표시 이름
 }

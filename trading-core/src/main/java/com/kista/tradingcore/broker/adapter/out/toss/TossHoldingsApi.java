@@ -3,7 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
-import com.kista.tradingcore.broker.domain.model.Currency;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.tradingcore.broker.domain.model.BrokerBalance;
