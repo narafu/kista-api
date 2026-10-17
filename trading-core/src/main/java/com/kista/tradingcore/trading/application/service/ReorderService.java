@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
 import com.kista.shared.kernel.OrderStatus;
@@ -60,6 +61,10 @@ class ReorderService implements ReorderUseCase {
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
 
         SelectionChain.validate(command.userId(), account, strategy, sourceOrder);
+        // 재주문은 주식 정수 수량 전용 — 코인 주문(소수 수량)은 관리자 재주문 대상이 아니다
+        if (sourceOrder.ticker().getMarket() != Market.US_STOCK) {
+            throw new IllegalArgumentException("코인 주문은 재주문할 수 없습니다.");
+        }
         if (!sourceOrder.strategyCycleId().equals(currentCycle.id())) {
             throw new IllegalArgumentException("현재 전략 사이클 주문만 재주문할 수 있습니다");
         }
@@ -109,7 +114,7 @@ class ReorderService implements ReorderUseCase {
 
         return new ReorderResult(command.userId(), command.accountId(), command.strategyId(),
                 sourceOrder.id(), sourceOrder.status(), placement.status(), placement.externalOrderId(),
-                sourceOrder.price(), sourceOrder.quantity(), direction);
+                sourceOrder.price(), sourceOrder.quantity().intValueExact(), direction);
     }
 
     // 원본 취소 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED (그 밖의 상태는 앞에서 거부됨)

@@ -68,7 +68,7 @@ class PortfolioQueryInternalControllerTest {
     void 거래_내역을_조회한다() throws Exception {
         Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 LocalDate.of(2026, 1, 5), StrategyTicker.TQQQ, OrderType.LOC, null, OrderDirection.BUY,
-                "leg", 3, new BigDecimal("100.00"), null, null, null, null);
+                "leg", BigDecimal.valueOf(3), new BigDecimal("100.00"), null, null, null, null);
         given(portfolioUseCase.getHistory(USER_ID, LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 31), StrategyTicker.TQQQ))
                 .willReturn(List.of(order));
 

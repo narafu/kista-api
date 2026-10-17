@@ -352,4 +352,42 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(saved.id()).isNotNull();
         assertThat(saved.status()).isEqualTo(OrderStatus.PLANNED);
     }
+
+    @Test
+    void quantityRoundTripsAsPlainInteger() {
+        PlannedOrder planned = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.BUY, 10, new BigDecimal("22.00"));
+        adapter.saveAll(List.of(Order.fromPlanned(planned, accountId, cycleId)));
+
+        Order saved = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now()).getFirst();
+
+        // DB는 numeric(20,8) — 읽은 뒤에도 scale 0 정수여야 한다
+        assertThat(saved.quantity()).isEqualTo(BigDecimal.TEN);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT numeric_precision || ',' || numeric_scale FROM information_schema.columns
+                WHERE table_schema = 'trading' AND table_name = 'orders' AND column_name = 'quantity'
+                """, String.class)).isEqualTo("20,8");
+    }
+
+    @Test
+    void fractionalCryptoQuantityIsStored() {
+        Order fractional = new Order(null, accountId, cycleId, LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY,
+                new BigDecimal("0.00012345"), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
+        adapter.saveAll(List.of(fractional));
+
+        assertThat(adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now()).getFirst().quantity())
+                .isEqualByComparingTo("0.00012345");
+    }
+
+    @Test
+    void sellReservationSumReadsNumericColumn() {
+        PlannedOrder sell = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.SELL, 7, new BigDecimal("22.00"));
+        adapter.saveAll(List.of(Order.fromPlanned(sell, accountId, cycleId)));
+
+        // SUM(numeric)은 BigDecimal — Long 수신이면 런타임 변환 실패
+        assertThat(adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(accountId, LocalDate.now(), StrategyTicker.SOXL))
+                .isEqualTo(7);
+    }
 }

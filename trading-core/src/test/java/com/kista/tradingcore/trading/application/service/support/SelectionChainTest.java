@@ -56,7 +56,7 @@ class SelectionChainTest {
     private Order order(UUID orderAccountId) {
         return new Order(UUID.randomUUID(), orderAccountId, UUID.randomUUID(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
-                10, BigDecimal.TEN, OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(10), BigDecimal.TEN, OrderStatus.PLANNED, null, null, null);
     }
 
     @Test

@@ -66,7 +66,7 @@ class DcaSummaryAssemblerTest {
     @Test
     void firstEligibleDate_moves_to_next_day_when_today_already_decided() {
         LocalDate today = DstInfo.nextTradeDate();
-        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), 1, BigDecimal.ONE);
+        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday)).isEqualTo(today.plusDays(1));
     }
 }

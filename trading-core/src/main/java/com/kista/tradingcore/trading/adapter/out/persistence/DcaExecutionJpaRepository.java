@@ -38,6 +38,6 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
             """, nativeQuery = true)
     int insertIgnoringConflict(@Param("id") UUID id, @Param("strategyId") UUID strategyId, @Param("tradeDate") LocalDate tradeDate,
                                @Param("status") String status, @Param("skipReason") String skipReason, @Param("orderId") UUID orderId,
-                               @Param("quantity") Integer quantity, @Param("referencePrice") BigDecimal referencePrice,
+                               @Param("quantity") BigDecimal quantity, @Param("referencePrice") BigDecimal referencePrice,
                                @Param("detail") String detail);
 }

@@ -161,12 +161,12 @@ class TradingReporter {
                     ? totalAmt.divide(BigDecimal.valueOf(filledQuantity), 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            int orderedQuantity = order.quantity() != null ? order.quantity() : 0;
+            int orderedQuantity = order.quantity() != null ? order.quantity().intValueExact() : 0;
             OrderStatus newStatus = filledQuantity >= orderedQuantity
                     ? OrderStatus.FILLED
                     : OrderStatus.PARTIALLY_FILLED;
 
-            orderPort.markFilled(order.id(), filledQuantity, avgFilledPrice, newStatus);
+            orderPort.markFilled(order.id(), BigDecimal.valueOf(filledQuantity), avgFilledPrice, newStatus);
             log.info("[orderId={}] {} → {}, 체결수량={}/{}", order.id(), order.status(), newStatus, filledQuantity, orderedQuantity);
         }
     }

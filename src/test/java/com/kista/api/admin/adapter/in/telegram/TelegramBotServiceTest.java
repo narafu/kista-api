@@ -1,6 +1,9 @@
 package com.kista.api.admin.adapter.in.telegram;
 
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
+import com.kista.shared.contract.stats.PortfolioOrderResponse;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.api.admin.application.port.output.PortfolioQueryPort;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
@@ -102,6 +105,19 @@ class TelegramBotServiceTest {
 
         verify(portfolioQueryPort).getHistory(
                 eq(USER_ID), eq(LocalDate.now().minusDays(14)), eq(LocalDate.now()), eq(StrategyTicker.SOXL));
+    }
+
+    @Test
+    void history_command_formats_decimal_quantity() {
+        when(portfolioQueryPort.getHistory(any(), any(), any(), eq(StrategyTicker.SOXL))).thenReturn(List.of(
+                new PortfolioOrderResponse(LocalDate.of(2026, 10, 16), StrategyTicker.SOXL, OrderDirection.BUY,
+                        OrderType.LOC, new BigDecimal("12"), new BigDecimal("22.5000"))));
+
+        sut.handle(update("/history 14"));
+
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(telegramHttpClient, atLeastOnce()).sendMessage(any(), captor.capture(), any());
+        assertThat(captor.getValue()).contains("12주");
     }
 
     @Test

@@ -362,7 +362,7 @@ class OrderCancelServiceTest {
     @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
     void cancelOrder_notPlaced_throwsIllegalStateException() {
         Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.FILLED, "ORD_99", null, null);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
@@ -411,13 +411,13 @@ class OrderCancelServiceTest {
 
     private Order placedOrder(UUID id, String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     private Order plannedOrder(UUID id) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.PLANNED, null, null, null);
     }
 
@@ -425,7 +425,7 @@ class OrderCancelServiceTest {
 
     private Order submittingOrder(UUID id) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.SUBMITTING, null, null, null);
     }
 

@@ -35,7 +35,7 @@ class SubmittingOrderAwaiterTest {
     static final UUID CYCLE_ID = UUID.randomUUID();
     static final LocalDate TRADE_DATE = LocalDate.of(2026, 10, 17);
     static final Order ORDER = new Order(UUID.randomUUID(), UUID.randomUUID(), CYCLE_ID, TRADE_DATE,
-            StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 3,
+            StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(3),
             new BigDecimal("20.00"), OrderStatus.SUBMITTING, null, null, null);
     SubmittingOrder LEFTOVER = new SubmittingOrder(ORDER, Instant.now()); // 테스트마다 갓 선점된 잔류(대기 상한 이내)
 

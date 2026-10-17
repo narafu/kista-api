@@ -13,10 +13,10 @@ import java.util.UUID;
 public record DcaExecutionPageResponse(List<Item> content, int page, int size, long totalElements) {
 
     public record Item(LocalDate kstTradeDate, LocalDate usSessionDate, String status, String skipReason, String detail,
-                       BigDecimal referencePrice, Integer quantity,
+                       BigDecimal referencePrice, BigDecimal quantity,
                        OrderSummary order) {}
 
-    public record OrderSummary(UUID id, String status, Integer filledQuantity, BigDecimal filledPrice) {}
+    public record OrderSummary(UUID id, String status, BigDecimal filledQuantity, BigDecimal filledPrice) {}
 
     public static DcaExecutionPageResponse from(DcaExecutionPage p) {
         return new DcaExecutionPageResponse(p.content().stream().map(DcaExecutionPageResponse::item).toList(),

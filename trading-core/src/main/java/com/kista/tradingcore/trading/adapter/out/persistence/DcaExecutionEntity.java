@@ -48,8 +48,8 @@ class DcaExecutionEntity extends BaseCreatedAtEntity {
     @Column(name = "order_id", columnDefinition = "UUID")
     private UUID orderId; // ORDERED일 때 orders.id
 
-    @Column(name = "quantity")
-    private Integer quantity; // 계획 수량
+    @Column(name = "quantity", precision = 20, scale = 8)
+    private BigDecimal quantity; // 계획 수량
 
     @Column(name = "reference_price", precision = 12, scale = 2)
     private BigDecimal referencePrice; // 판정에 쓴 전일 종가

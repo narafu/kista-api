@@ -21,10 +21,10 @@ public record OrderResponse(
         OrderTiming timing,         // 접수 시점
         OrderDirection direction,   // 매수/매도 방향
         String orderLeg,            // 전략 주문 다리 식별자
-        Integer quantity,           // 주문 수량 (nullable)
+        BigDecimal quantity,        // 주문 수량 (주식 정수 값·코인 소수)
         BigDecimal price,           // 주문 가격
         OrderStatus status,         // 주문 상태
         String externalOrderId,     // 증권사 부여 주문 번호
-        Integer filledQuantity,     // 체결 수량 (null=미확인)
+        BigDecimal filledQuantity,  // 체결 수량 (null=미확인)
         BigDecimal filledPrice      // 체결 가중평균가 (null=미체결)
 ) {}

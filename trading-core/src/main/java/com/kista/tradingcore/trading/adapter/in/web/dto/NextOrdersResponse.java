@@ -104,7 +104,7 @@ public record NextOrdersResponse(
             @Schema(description = "주문 유형", example = "LOC")
             String orderType,
             @Schema(description = "주문 수량")
-            int quantity,
+            BigDecimal quantity,
             @Schema(description = "주문 가격")
             BigDecimal price,
             @Schema(description = "주문 상태 (취소 가능 여부 판단용)", example = "PLANNED")

@@ -21,7 +21,7 @@ public record ExecuteOrdersResponse(
             @Schema(description = "주문 유형", example = "LOC")
             String orderType,
             @Schema(description = "주문 수량")
-            int quantity,
+            BigDecimal quantity,
             @Schema(description = "주문 가격")
             BigDecimal price
     ) {}

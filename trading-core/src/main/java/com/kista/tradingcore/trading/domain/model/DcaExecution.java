@@ -15,14 +15,18 @@ public record DcaExecution(
         Status status,              // ORDERED | SKIPPED
         DcaSkipReason skipReason,   // SKIPPED일 때만
         UUID orderId,               // ORDERED일 때 orders.id
-        Integer quantity,           // 계획 수량 (축소 반영)
+        BigDecimal quantity,        // 계획 수량 (축소 반영 — 코인은 소수)
         BigDecimal referencePrice,  // 판정에 쓴 전일 종가 (데이터 실패 시 null)
         String detail,              // 사람용 사유 상세
         Instant createdAt           // 생성 시각
 ) {
     public enum Status { ORDERED, SKIPPED }
 
-    public static DcaExecution ordered(UUID strategyId, LocalDate tradeDate, UUID orderId, Integer quantity, BigDecimal referencePrice) {
+    public DcaExecution {
+        quantity = Quantities.normalize(quantity); // DB scale 8 → 정수 주식 수량 형태 유지
+    }
+
+    public static DcaExecution ordered(UUID strategyId, LocalDate tradeDate, UUID orderId, BigDecimal quantity, BigDecimal referencePrice) {
         return new DcaExecution(null, strategyId, tradeDate, Status.ORDERED, null, orderId, quantity, referencePrice, null, null);
     }
 

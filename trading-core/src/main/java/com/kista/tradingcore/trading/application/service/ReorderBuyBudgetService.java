@@ -70,6 +70,6 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
         boolean cancellable = source.direction() == OrderDirection.BUY
                 && (source.status() == OrderStatus.PLANNED || source.status() == OrderStatus.PLACED)
                 && source.tradeDate().equals(date);
-        return cancellable ? source.price().multiply(BigDecimal.valueOf(source.quantity())) : BigDecimal.ZERO;
+        return cancellable ? source.price().multiply(source.quantity()) : BigDecimal.ZERO;
     }
 }

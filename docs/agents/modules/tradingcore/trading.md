@@ -76,3 +76,4 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - 계좌+티커 중복 규칙 예외: DCA는 방향이 다르면 같은 종목에 매수 1 + 매도 1 공존.
 - 보유·평단 SSOT는 브로커 실잔고(`CycleOrderStrategy.snapshotsBrokerBalance()`) — 자체 포지션 누적을 쓰지 않는다. 계좌 통계·포트폴리오 집계에서는 DCA를 제외한다(→ stats.md).
 - 개장 배치는 22:00 KST. KIS DCA MOO는 개장 전 접수(`TradingService.placePreOpenDcaOrders`, `Broker.supportsOpenAuctionOrders()` 필터), 접수 후 체크포인트를 STARTED로 되돌리고 이 단계 실패는 격리한다.
+- 주문 수량: orders.quantity/filled_quantity·dca_execution.quantity는 numeric(20,8), Order/DcaExecution은 BigDecimal(compact 생성자에서 Quantities.normalize — 꼬리 0 제거). PlannedOrder·매칭 공식·CyclePosition.holdings·privacy 표는 int이고 주식 경로(브로커 wire·커널 재입력)는 intValueExact()로 변환한다. 재주문(ReorderService)과 일별 체결 요약(AccountStatisticsService)은 주식 주문만 다룬다.
