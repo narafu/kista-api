@@ -24,8 +24,8 @@ public interface AccountPort {
         return account;
     }
     int countByUserId(UUID userId);
-    // 전역 계좌번호 중복 체크 — 플레인텍스트 전달, 해시 계산은 adapter 내부에서 처리
-    boolean existsByAccountNo(String accountNo);
+    // 전역 중복 체크 — Account.dedupeKey() 값(업비트 access key / 그 외 계좌번호)의 해시로 조회, 해시 계산은 adapter 내부
+    boolean existsByDedupeKey(String dedupeKey);
     Account save(Account account);
     void delete(UUID id);
     void deleteByUserId(UUID userId); // 사용자 탈퇴 시 계좌 일괄 소프트 삭제

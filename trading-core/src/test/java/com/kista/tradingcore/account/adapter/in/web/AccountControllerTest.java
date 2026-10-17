@@ -128,7 +128,36 @@ class AccountControllerTest {
                                 "\"appKey\":\"appKey\",\"secretKey\":\"appSecret\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.broker").value("KIS"));
+                .andExpect(jsonPath("$.broker").value("KIS"))
+                .andExpect(jsonPath("$.currency").value("USD"));
+    }
+
+    @Test
+    void register_upbit_responseHasNullAccountNoAndKrwCurrency() throws Exception {
+        java.time.Instant expiresAt = java.time.Instant.parse("2027-10-17T00:00:00Z");
+        when(accountUseCase.register(any(), any())).thenReturn(new Account(UUID.randomUUID(), UUID.fromString(USER_ID),
+                "업비트", null, "ak", "sk", null, Broker.UPBIT, null, expiresAt));
+
+        mockMvc.perform(post("/api/accounts")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"업비트\",\"appKey\":\"ak\",\"secretKey\":\"sk\",\"broker\":\"UPBIT\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.broker").value("UPBIT"))
+                .andExpect(jsonPath("$.currency").value("KRW"))
+                .andExpect(jsonPath("$.accountNo").doesNotExist())
+                .andExpect(jsonPath("$.accountNoMasked").doesNotExist())
+                .andExpect(jsonPath("$.apiKeyExpiresAt").value("2027-10-17T00:00:00Z"));
+    }
+
+    @Test
+    void testConnection_upbit_passesBrokerToUseCase() throws Exception {
+        mockMvc.perform(post("/api/accounts/connection-tests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"broker\":\"UPBIT\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
+                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
+                .andExpect(status().isNoContent());
+        verify(accountUseCase).test(eq(Broker.UPBIT), eq("testkey1234"), eq("testsecret1234"), any());
     }
 
     @Test
@@ -143,7 +172,7 @@ class AccountControllerTest {
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DUPLICATE_ACCOUNT"))
-                .andExpect(jsonPath("$.detail").value("이미 등록된 계좌번호입니다."));
+                .andExpect(jsonPath("$.detail").value("이미 등록된 계좌입니다."));
     }
 
     @Test

@@ -36,8 +36,8 @@ class AccountEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 20)
     private Broker broker;       // 증권사
 
-    @Column(name = "account_no", nullable = false, length = 512)
-    private String accountNo;            // AES-256 암호화 저장
+    @Column(name = "account_no", length = 512)
+    private String accountNo;            // AES-256 암호화 저장 — 업비트는 null
 
     @Column(name = "broker_account_code", length = 10)
     private String brokerAccountCode;    // 증권사 API 보조 식별자 — KIS: null, TOSS: accountSeq
@@ -53,4 +53,7 @@ class AccountEntity extends BaseAuditEntity {
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
+
+    @Column(name = "api_key_expires_at")
+    private Instant apiKeyExpiresAt; // 거래소 API 키 만료 시각 — 업비트만 값 (V10 ADD COLUMN이라 물리 순서상 마지막)
 }

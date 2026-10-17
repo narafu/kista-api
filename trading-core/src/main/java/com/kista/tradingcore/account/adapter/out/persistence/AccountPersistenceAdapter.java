@@ -69,9 +69,9 @@ public class AccountPersistenceAdapter implements AccountPort {
     }
 
     @Override
-    public boolean existsByAccountNo(String accountNo) {
+    public boolean existsByDedupeKey(String dedupeKey) {
         // 플레인텍스트 해시 후 DB 조회 — AES-GCM은 비결정론적이므로 해시 경유 필수
-        return jpaRepository.existsByAccountNoHashAndDeletedAtIsNull(hasher.hash(accountNo));
+        return jpaRepository.existsByAccountNoHashAndDeletedAtIsNull(hasher.hash(dedupeKey));
     }
 
     // Account 도메인 모델 → 암호화 후 Entity 변환
@@ -80,11 +80,12 @@ public class AccountPersistenceAdapter implements AccountPort {
         e.setId(a.id()); // null이면 @UuidGenerator가 UUID v7 생성
         e.setUserId(a.userId());
         e.setNickname(a.nickname());
-        e.setAccountNo(crypto.encrypt(a.accountNo()));
-        e.setAccountNoHash(hasher.hash(a.accountNo())); // 전역 중복 체크용 HMAC-SHA256 해시
+        e.setAccountNo(a.accountNo() != null ? crypto.encrypt(a.accountNo()) : null); // 업비트는 계좌번호 없음
+        e.setAccountNoHash(hasher.hash(a.dedupeKey())); // 전역 중복 체크용 HMAC-SHA256 해시 — 업비트는 access key
         e.setAppKey(crypto.encrypt(a.appKey()));
         e.setSecretKey(crypto.encrypt(a.secretKey()));
         e.setBrokerAccountCode(a.brokerAccountCode());
+        e.setApiKeyExpiresAt(a.apiKeyExpiresAt());
         e.setBroker(a.broker() != null ? a.broker() : Broker.KIS); // null 방어 — persistence 경계에서 보장
         return e;
     }
@@ -93,12 +94,13 @@ public class AccountPersistenceAdapter implements AccountPort {
     private Account toDomain(AccountEntity e) {
         return new Account(
                 e.getId(), e.getUserId(), e.getNickname(),
-                crypto.decrypt(e.getAccountNo()),
+                e.getAccountNo() != null ? crypto.decrypt(e.getAccountNo()) : null,
                 crypto.decrypt(e.getAppKey()),
                 crypto.decrypt(e.getSecretKey()),
                 e.getBrokerAccountCode(),
                 e.getBroker(),
-                e.getCreatedAt()
+                e.getCreatedAt(),
+                e.getApiKeyExpiresAt()
         );
     }
 }

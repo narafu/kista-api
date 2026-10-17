@@ -2,6 +2,7 @@ package com.kista.tradingcore.account.application.service;
 
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.tradingcore.broker.application.service.BrokerConnectionTesters;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.RegisterAccountCommand;
@@ -42,7 +43,7 @@ class AccountService implements AccountUseCase {
         Broker broker = cmd.broker() != null ? cmd.broker() : Broker.KIS;
         requireBrokerEnabled(broker);
 
-        // MOCK은 서버가 합성 자격증명 생성, 그 외 브로커는 필수 입력 검증
+        // MOCK은 서버가 합성 자격증명 생성, UPBIT는 계좌번호 없이 키만, 그 외 브로커는 계좌번호 필수
         String accountNo = cmd.accountNo();
         String appKey = cmd.appKey();
         String secretKey = cmd.secretKey();
@@ -50,6 +51,11 @@ class AccountService implements AccountUseCase {
             if (accountNo == null || accountNo.isBlank()) accountNo = generateMockAccountNo();
             if (appKey == null || appKey.isBlank()) appKey = "MOCK";
             if (secretKey == null || secretKey.isBlank()) secretKey = "MOCK";
+        } else if (broker == Broker.UPBIT) {
+            accountNo = null; // 업비트는 계좌번호 개념이 없다 — 요청에 와도 무시(저장 안 함)
+            if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) {
+                throw new IllegalArgumentException("API 키와 시크릿은 필수입니다");
+            }
         } else if (accountNo == null || accountNo.isBlank()) {
             throw new IllegalArgumentException("계좌번호는 필수입니다");
         }
@@ -59,25 +65,29 @@ class AccountService implements AccountUseCase {
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
             throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
         }
-        // 전역 계좌번호 중복 체크 (크로스-유저, 해시 기반 — V11 이후 신규 등록에만 적용)
-        if (accountPort.existsByAccountNo(resolvedAccountNo)) {
-            throw new Account.DuplicateAccountException(resolvedAccountNo);
+        // 전역 중복 체크 (크로스-유저, 해시 기반) — 업비트는 access key, 그 외 계좌번호
+        String dedupeKey = Account.dedupeKeyOf(broker, resolvedAccountNo, appKey);
+        if (accountPort.existsByDedupeKey(dedupeKey)) {
+            throw new Account.DuplicateAccountException(dedupeKey);
         }
-        // 동일 사용자 중복 체크 (V11 이전 NULL-hash 기존 레코드 대비 fallback)
-        accountPort.findByUserId(userId).stream()
-                .filter(a -> a.accountNo().equals(resolvedAccountNo))
-                .findAny()
-                .ifPresent(a -> { throw new Account.DuplicateAccountException(resolvedAccountNo); });
-        // 증권사별 자격증명+계좌 검증 — KIS는 accountNo 소유 검증 후 null, Toss는 accountSeq 반환
-        String brokerAccountCode = connectionTesters.of(broker)
+        // 동일 사용자 중복 체크 (V11 이전 NULL-hash 기존 레코드 대비 fallback) — 업비트 기존 계좌는 accountNo null이라 null-safe 비교
+        if (resolvedAccountNo != null) {
+            accountPort.findByUserId(userId).stream()
+                    .filter(a -> resolvedAccountNo.equals(a.accountNo()))
+                    .findAny()
+                    .ifPresent(a -> { throw new Account.DuplicateAccountException(resolvedAccountNo); });
+        }
+        // 증권사별 자격증명+계좌 검증 — KIS: 계좌번호 소유, Toss: accountSeq, 업비트: 키 만료일
+        BrokerAccountVerification verified = connectionTesters.of(broker)
                 .verifyAccount(appKey, secretKey, accountNo);
 
         Account account = new Account(
                 null, userId, cmd.nickname(),
                 accountNo, appKey, secretKey,
-                brokerAccountCode,
+                verified.brokerAccountCode(),
                 broker,
-                null    // createdAt — DB에서 자동 설정
+                null,    // createdAt — DB에서 자동 설정
+                verified.apiKeyExpiresAt()
         );
         Account saved = accountPort.save(account);
         log.info("계좌 등록: userId={}, accountId={}, broker={}", userId, saved.id(), broker);
@@ -141,7 +151,7 @@ class AccountService implements AccountUseCase {
             int digits = ThreadLocalRandom.current().nextInt(100_000_000);
             int suffix = ThreadLocalRandom.current().nextInt(100);
             String candidate = "%08d-%02d".formatted(digits, suffix);
-            if (!accountPort.existsByAccountNo(candidate)) return candidate;
+            if (!accountPort.existsByDedupeKey(candidate)) return candidate;
         }
         throw new IllegalStateException("모의계좌 번호 생성 재시도 초과");
     }

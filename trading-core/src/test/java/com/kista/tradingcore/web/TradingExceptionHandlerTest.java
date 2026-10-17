@@ -85,7 +85,7 @@ class TradingExceptionHandlerTest {
     void duplicateAccountException_hasCodeAndHidesAccountNo() {
         var detail = handler.handleTradingCoreExceptions(new Account.DuplicateAccountException("74420614-01"));
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.DUPLICATE_ACCOUNT.name());
-        assertThat(detail.getDetail()).isEqualTo("이미 등록된 계좌번호입니다.");
+        assertThat(detail.getDetail()).isEqualTo("이미 등록된 계좌입니다.");
     }
 
     @Test

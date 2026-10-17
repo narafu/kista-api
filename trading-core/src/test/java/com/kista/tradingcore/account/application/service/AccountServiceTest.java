@@ -11,6 +11,7 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -67,11 +69,78 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("업비트 등록: 계좌번호를 무시하고 access key 해시로 중복 판정, 만료일 저장")
+    void register_upbit_ignoresAccountNoAndStoresExpiry() {
+        Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
+        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, expiresAt));
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.register(userId,
+                new RegisterAccountCommand("업비트", "74420614-01", "ak", "sk", Broker.UPBIT));
+
+        assertThat(saved.accountNo()).isNull();
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
+        verify(accountPort).existsByDedupeKey("ak");
+    }
+
+    @Test
+    @DisplayName("업비트 등록: 같은 access key가 이미 등록돼 있으면 409")
+    void register_upbit_duplicateAccessKey() {
+        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.existsByDedupeKey("ak")).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.register(userId,
+                new RegisterAccountCommand("업비트", null, "ak", "sk", Broker.UPBIT)))
+                .isInstanceOf(Account.DuplicateAccountException.class);
+        verifyNoInteractions(connectionTesters);
+    }
+
+    @Test
+    @DisplayName("업비트 등록: access key가 비면 400")
+    void register_upbit_requiresKeys() {
+        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.register(userId,
+                new RegisterAccountCommand("업비트", null, " ", "sk", Broker.UPBIT)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("업비트 계좌(계좌번호 null)를 가진 사용자가 KIS 계좌를 등록해도 NPE가 나지 않는다")
+    void register_kis_whenUserAlreadyHasUpbitAccount_doesNotNpe() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(connectionTesters.of(any())).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.countByUserId(userId)).thenReturn(1);
+        when(accountPort.findByUserId(userId)).thenReturn(List.of(TradingFixtures.upbitAccount(UUID.randomUUID(), userId)));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.register(userId, registerCmd());
+
+        assertThat(saved.accountNo()).isEqualTo("74420614");
+    }
+
+    @Test
+    @DisplayName("업비트 연결 테스트: UPBIT 라우터로 위임")
+    void test_upbit_routesToUpbitTester() {
+        when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+
+        accountService.test(Broker.UPBIT, "ak", "sk", null);
+
+        verify(connectionTester).verifyCredentials("ak", "sk", null);
+    }
+
+    @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(null);
+        when(connectionTester.verifyAccount("appKey", "appSecret", "74420614")).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> {
             Account a = inv.getArgument(0);
@@ -104,11 +173,11 @@ class AccountServiceTest {
     void register_duplicateAccountNo_crossUser_throws() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
         when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.existsByAccountNo("74420614")).thenReturn(true);
+        when(accountPort.existsByDedupeKey("74420614")).thenReturn(true);
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
                 .isInstanceOf(Account.DuplicateAccountException.class)
-                .hasMessage("이미 등록된 계좌번호입니다.");
+                .hasMessage("이미 등록된 계좌입니다.");
     }
 
     @Test
@@ -201,7 +270,7 @@ class AccountServiceTest {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
         // Toss API 연결 성공 → accountSeq "42" 반환
-        when(connectionTester.verifyAccount("cid", "csecret", "12345678901")).thenReturn("42");
+        when(connectionTester.verifyAccount("cid", "csecret", "12345678901")).thenReturn(new BrokerAccountVerification("42", null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -222,7 +291,7 @@ class AccountServiceTest {
     void register_nullBroker_defaultsToKis() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
         when(connectionTesters.of(any())).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(null);
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -335,9 +404,9 @@ class AccountServiceTest {
     void register_mockBroker_synthesizesMissingCredentials() {
         when(brokerEnabledPort.enabled(Broker.MOCK)).thenReturn(true);
         when(connectionTesters.of(Broker.MOCK)).thenReturn(connectionTester);
-        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(null);
+        when(connectionTester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
         when(accountPort.countByUserId(userId)).thenReturn(0);
-        when(accountPort.existsByAccountNo(any())).thenReturn(false);
+        when(accountPort.existsByDedupeKey(any())).thenReturn(false);
         when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         RegisterAccountCommand cmd = new RegisterAccountCommand(
