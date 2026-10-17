@@ -2,6 +2,7 @@ package com.kista.tradingcore.account.adapter.in.web.dto;
 
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.AccountNumberMasker;
+import com.kista.shared.kernel.Broker;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
@@ -22,13 +23,14 @@ public record AccountResponse(
 ) {
     public static AccountResponse from(Account a) {
         // accountNo가 이미 전체 표시 형식 — KIS: "74420614-01", TOSS: "131-01-001931"
+        Broker broker = a.broker();
         return new AccountResponse(
                 a.id(),
                 a.nickname(),
                 AccountNumberMasker.mask(a.accountNo()),
                 a.accountNo(),
-                a.broker() != null ? a.broker().name() : null,
-                a.broker() != null ? a.broker().getCurrency().name() : null
+                broker != null ? broker.name() : null,
+                broker != null ? broker.getCurrency().name() : null
         );
     }
 }
