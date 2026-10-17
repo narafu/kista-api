@@ -65,9 +65,10 @@
 ### PostgreSQL 메이저 버전 업그레이드 (볼륨 재생성 필요)
 - PG 메이저 버전 간 데이터 포맷 불호환 — 이미지만 바꾸면 기동 실패
 - 18+ 이미지는 `PGDATA=/var/lib/postgresql/18/docker` — 볼륨 마운트 대상을 `/var/lib/postgresql/data`에서 `/var/lib/postgresql`로 함께 바꿔야 한다(옛 경로 마운트가 있으면 기동 거부). 운영 절차는 kista-infra `docs/superpowers/plans/2026-10-13-postgres-18-upgrade.md`
-- 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop postgres && docker compose rm -f postgres` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb OWNER kista;` 수동 실행 ⑦ 앱 기동(bootRun, Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
+- 절차: ① `pg_dump --data-only --disable-triggers -f /tmp/backup.sql` → `docker cp` 로 호스트 보관 ② `docker compose stop postgres && docker compose rm -f postgres` ③ `docker volume rm kista-api_postgres_data` ④ `docker-compose.yml` 이미지 버전 변경 ⑤ `docker compose up -d postgres` ⑥ `CREATE DATABASE kistadb_test OWNER kista;` 실행(테스트 DB — 새 볼륨엔 없다) ⑦ 앱 기동(bootRun, Flyway 실행) ⑧ 앱 healthy 확인 후 `psql -f backup.sql` 복원
 - 복원 시 이력 테이블(`flyway_schema_history_api`/`flyway_schema_history_trading`) duplicate key 오류는 정상 (Flyway가 이미 채움) — 무시
-- `POSTGRES_DB`가 비어 있으면 kistadb가 자동 생성되지 않는다(기본 DB는 POSTGRES_USER값 "kista") — 새 볼륨 후 `CREATE DATABASE kistadb OWNER kista;` 수동 실행
+- `kistadb`는 `.env`의 `POSTGRES_DB=kistadb`로 자동 생성된다 — `POSTGRES_DB`가 비어 있을 때만(기본 DB는 POSTGRES_USER값 "kista") 새 볼륨 후 `CREATE DATABASE kistadb OWNER kista;` 수동 실행
+- 백업할 로컬 데이터가 없으면 ①⑧을 건너뛰고 `scripts/dev-seed/seed.sh`로 재시드해도 된다(KIS `[시드]` 계좌는 시드가 만들지 않으므로 사라진다)
 
 ## 배포/인프라/외부 연동 런북
 
