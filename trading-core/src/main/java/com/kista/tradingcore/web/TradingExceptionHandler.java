@@ -3,6 +3,8 @@ package com.kista.tradingcore.web;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
+import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
+import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.shared.platform.web.ErrorCode;
 import com.kista.shared.platform.web.ProblemDetailMappings;
@@ -55,17 +57,19 @@ public class TradingExceptionHandler {
     // trading-core 고유 예외 매핑 — 서브클래스(AlreadyOrderedToday/ManualTradingFailed)는 resolve()의 계층 탐색이 상위 ManualTradingException보다 먼저 찾는다
     private static final String BROKER_UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요."; // 503 응답 detail
 
-    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.of(
-            BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID),
-            BrokerRateLimitException.class,          new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "KIS Rate Limit", ErrorCode.BROKER_RATE_LIMITED),
-            AlreadyOrderedTodayException.class,      new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ALREADY_ORDERED_TODAY),
-            DcaManualExecutionUnsupportedException.class, new Mapping(HttpStatus.CONFLICT,         "Conflict", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED),
-            ManualTradingFailedException.class,      new Mapping(HttpStatus.INTERNAL_SERVER_ERROR, "Manual Trading Failed", null,
-                                                             "주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
-            ManualTradingException.class,            new Mapping(HttpStatus.CONFLICT,              "Conflict"),
-            OrderCancelException.class,              new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ORDER_NOT_CANCELLABLE),
-            PrivacyTradeConflictException.class,     new Mapping(HttpStatus.CONFLICT,              "Conflict"),
-            Account.DuplicateAccountException.class, new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.DUPLICATE_ACCOUNT)
+    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
+            Map.entry(BrokerIpNotAllowedException.class,      new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker IP Not Allowed", ErrorCode.BROKER_IP_NOT_ALLOWED)),
+            Map.entry(BrokerPermissionDeniedException.class,  new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker Permission Denied", ErrorCode.BROKER_PERMISSION_DENIED)),
+            Map.entry(BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
+            Map.entry(BrokerRateLimitException.class,         new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "Broker Rate Limit", ErrorCode.BROKER_RATE_LIMITED)),
+            Map.entry(AlreadyOrderedTodayException.class,     new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ALREADY_ORDERED_TODAY)),
+            Map.entry(DcaManualExecutionUnsupportedException.class, new Mapping(HttpStatus.CONFLICT,        "Conflict", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED)),
+            Map.entry(ManualTradingFailedException.class,     new Mapping(HttpStatus.INTERNAL_SERVER_ERROR, "Manual Trading Failed", null,
+                                                             "주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")),
+            Map.entry(ManualTradingException.class,           new Mapping(HttpStatus.CONFLICT,              "Conflict")),
+            Map.entry(OrderCancelException.class,             new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ORDER_NOT_CANCELLABLE)),
+            Map.entry(PrivacyTradeConflictException.class,    new Mapping(HttpStatus.CONFLICT,              "Conflict")),
+            Map.entry(Account.DuplicateAccountException.class, new Mapping(HttpStatus.CONFLICT,             "Conflict", ErrorCode.DUPLICATE_ACCOUNT))
     );
 
     @ExceptionHandler({

@@ -6,4 +6,9 @@ public class BrokerCredentialException extends RuntimeException {
     public BrokerCredentialException() {
         super("증권사 API 키가 유효하지 않습니다.");
     }
+
+    // 세부 사유 서브클래스용 — detail은 사용자 노출 한국어 문구
+    protected BrokerCredentialException(String message) {
+        super(message);
+    }
 }

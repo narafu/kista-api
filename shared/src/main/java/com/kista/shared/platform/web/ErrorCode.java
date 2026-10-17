@@ -5,6 +5,8 @@ package com.kista.shared.platform.web;
 public enum ErrorCode {
     BROKER_UNAVAILABLE,          // 503 증권사 API 장애
     BROKER_CREDENTIAL_INVALID,   // 422 증권사 API 키 오류
+    BROKER_IP_NOT_ALLOWED,       // 422 거래소 API 키에 서버 IP 미허용 (업비트 no_authorization_ip)
+    BROKER_PERMISSION_DENIED,    // 422 거래소 API 키 권한 부족 (업비트 out_of_scope)
     BROKER_RATE_LIMITED,         // 429 증권사 API 호출 한도 초과
     DUPLICATE_ACCOUNT,           // 409 이미 등록된 증권 계좌
     ALREADY_ORDERED_TODAY,       // 409 바로주문 — 오늘 이미 주문이 등록된 전략
