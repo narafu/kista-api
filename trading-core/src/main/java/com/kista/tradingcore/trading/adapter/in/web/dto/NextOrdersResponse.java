@@ -76,6 +76,7 @@ public record NextOrdersResponse(
     }
 
     // tradeDate·status·orderId는 preview에서 의미 없으므로 제외
+    @Schema(name = "NextOrderItem")
     public record OrderItem(
             @Schema(description = "거래 종목")
             StrategyTicker ticker,              // 거래 종목

@@ -44,6 +44,7 @@ public record DailyTransactionResponse(
         }
     }
 
+    @Schema(name = "DailyTransactionSummaryDto")
     public record SummaryDto(
             @Schema(description = "외화매수금액합계")
             BigDecimal buyAmountFcr,

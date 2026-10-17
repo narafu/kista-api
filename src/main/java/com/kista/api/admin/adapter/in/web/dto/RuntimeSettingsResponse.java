@@ -52,6 +52,7 @@ public record RuntimeSettingsResponse(
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(name = "RuntimeStrategySettings")
     public record StrategyResponse(
             @Schema(description = "신규 전략 생성 허용 여부")
             boolean enabled,

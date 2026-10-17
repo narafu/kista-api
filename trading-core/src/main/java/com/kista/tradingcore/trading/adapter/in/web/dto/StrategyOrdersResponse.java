@@ -12,6 +12,7 @@ public record StrategyOrdersResponse(
         @Schema(description = "전략의 주문 목록")
         List<Item> orders) {
 
+    @Schema(name = "StrategyOrderItem")
     public record Item(
             @Schema(description = "주문 고유 ID")
             UUID id,
