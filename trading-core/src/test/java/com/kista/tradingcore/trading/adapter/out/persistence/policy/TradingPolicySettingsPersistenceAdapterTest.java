@@ -78,4 +78,22 @@ class TradingPolicySettingsPersistenceAdapterTest {
         assertThat(loaded.brokers()).containsKey(Broker.MOCK);
         assertThat(loaded.brokerEnabled(Broker.MOCK)).isTrue();
     }
+
+    @Test
+    @DisplayName("UPBIT 키가 없는 기존 행은 defaults(UPBIT 비활성·허용 IP)로 보충되고 기존 브로커 allowedIp는 null로 로드된다")
+    void loadBackfillsUpbitAsDisabled() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.valueToTree(TradingPolicySettings.defaults());
+        ObjectNode brokers = (ObjectNode) root.get("brokers");
+        brokers.remove("UPBIT");
+        brokers.properties().forEach(e -> ((ObjectNode) e.getValue()).remove("allowedIp"));
+        when(repository.findById(TradingPolicySettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(
+                new TradingPolicySettingsEntity(TradingPolicySettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root))));
+
+        TradingPolicySettings loaded = adapter.load();
+
+        assertThat(loaded.brokerEnabled(Broker.UPBIT)).isFalse();
+        assertThat(loaded.brokers().get(Broker.UPBIT).allowedIp()).isEqualTo("168.107.63.152");
+        assertThat(loaded.brokers().get(Broker.KIS).allowedIp()).isNull();
+        assertThat(loaded.brokerEnabled(Broker.KIS)).isTrue();
+    }
 }

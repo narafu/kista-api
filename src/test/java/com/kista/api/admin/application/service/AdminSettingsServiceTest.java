@@ -105,7 +105,7 @@ class AdminSettingsServiceTest {
     private static TradingPolicySettings withBroker(Broker broker, boolean enabled) {
         TradingPolicySettings defaults = TradingPolicySettings.defaults();
         Map<Broker, BrokerSettings> brokers = new EnumMap<>(defaults.brokers());
-        brokers.put(broker, new BrokerSettings(enabled));
+        brokers.put(broker, new BrokerSettings(enabled, null));
         return new TradingPolicySettings(brokers, defaults.strategies());
     }
 }

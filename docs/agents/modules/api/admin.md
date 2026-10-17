@@ -18,5 +18,7 @@ com.kista.api.admin/    ← Spring Modulith 모듈(CLOSED) — 관리자 조회�
 - `GET /api/runtime-config` → 로그인 전 UI가 가입·계좌·전략 생성 정책을 조회하는 공개 엔드포인트. 동적 설정이므로 `Cache-Control: no-store` 유지
 - `GET|PUT /api/admin/settings` → ADMIN 전용. PUT은 auth/brokers/strategies 전체 설정을 검증한 뒤 한 번에 교체하며 부분 갱신 API로 취급하지 않음. 조회·갱신 응답 모두 `Cache-Control: no-store` 유지
 - 증권사 활성화·전략 생성 정책의 **적용 규칙**은 정책 소유자인 trading-core가 집행한다 → `modules/tradingcore/trading.md` "런타임 매매 정책 적용". admin은 `TradingPolicyHttpAdapter`로 조회·교체만 중계
+- 관리자 설정 PUT의 brokers는 부분 맵을 허용한다 — 생략한 증권사 키는 현재 값을 유지(AdminSettingsController가 getSettings()로 현재 정책을 읽어 AdminSettingsRequest.toDomain(currentBrokers)에 넘김), allowedIp는 PUT으로 바꾸지 않는다(기본값 TradingPolicySettings.UPBIT_ALLOWED_IP). UPBIT·DCA는 기본 비활성.
+- 기존 운영 행의 DCA 티커 허용값에는 BTC/ETH가 없다(키 단위 백필이라 값 내부는 보충되지 않음) — 코인 DCA를 열 때 관리자 화면에서 DCA 티커에 BTC/ETH를 추가해야 한다.
 - 런타임 설정 응답은 `NON_NULL` 직렬화 사용. 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 `null`로 내리지 않고 JSON에서 생략
 - `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
