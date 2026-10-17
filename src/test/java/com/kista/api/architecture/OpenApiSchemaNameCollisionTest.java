@@ -29,7 +29,7 @@ class OpenApiSchemaNameCollisionTest {
         // 응답에 실리는 contract record도 스캔 대상에 포함한다
         for (JavaClass jc : new ClassFileImporter().importPackages("com.kista.api", "com.kista.shared.contract")) {
             String pkg = jc.getPackageName();
-            if (!pkg.contains(".adapter.in.web") && !pkg.startsWith("com.kista.shared.contract")) continue;
+            if (!pkg.contains(".adapter.in.web") && !pkg.contains(".web.") && !pkg.endsWith(".dto") && !pkg.startsWith("com.kista.shared.contract")) continue;
             Class<?> c = jc.reflect();
             String name = effectiveName(c);
             Class<?> other = seen.putIfAbsent(name, c);
@@ -45,9 +45,14 @@ class OpenApiSchemaNameCollisionTest {
         return s != null && !s.name().isEmpty() ? s.name() : c.getSimpleName();
     }
 
+    // 패키지를 떼고 단순 이름으로 비교한다 (구조가 같은 중복 DTO는 허용)
+    private static String simple(String typeName) {
+        return typeName.replaceAll("[\\w.]+\\.", "");
+    }
+
     // record는 컴포넌트, 그 외는 non-static 선언 필드 이름 목록
     private static List<String> components(Class<?> c) {
-        if (c.isRecord()) return Arrays.stream(c.getRecordComponents()).map(RecordComponent::getName).toList();
-        return Arrays.stream(c.getDeclaredFields()).filter(f -> !Modifier.isStatic(f.getModifiers())).map(Field::getName).toList();
+        if (c.isRecord()) return Arrays.stream(c.getRecordComponents()).map(rc -> rc.getName() + ":" + simple(rc.getGenericType().getTypeName())).toList();
+        return Arrays.stream(c.getDeclaredFields()).filter(f -> !Modifier.isStatic(f.getModifiers())).map(fl -> fl.getName() + ":" + simple(fl.getGenericType().getTypeName())).toList();
     }
 }
