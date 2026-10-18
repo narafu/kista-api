@@ -496,5 +496,39 @@ class OrderCancelServiceTest {
                 .hasMessage("주문 접수를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.");
         verify(brokerPort, never()).cancel(any(), any());
     }
+
+    // --- 코인(UPBIT) 계좌: 시장가 주문은 즉시 체결되므로 주식 브로커 취소를 호출하지 않는다 ---
+
+    private Order cryptoOrder(OrderStatus status) {
+        return new Order(UUID.randomUUID(), accountId, strategyCycleId, LocalDate.now(), StrategyTicker.BTC,
+                OrderType.MARKET, OrderTiming.AT_CLOSE, OrderDirection.BUY, new BigDecimal("0.00012345"),
+                BigDecimal.valueOf(100_000_000), status, "upbit-uuid", null, null);
+    }
+
+    @Test
+    @DisplayName("accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel: 코인 계좌 정리는 PLANNED만 삭제하고 브로커 취소·대기를 건너뛴다")
+    void accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel() {
+        Account upbit = TradingFixtures.upbitAccount(accountId, requesterId);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        lenient().when(orderPort.findPlacedByCycleAndDate(any(), any())).thenReturn(List.of(cryptoOrder(OrderStatus.PLACED)));
+        when(orderPort.deletePlannedByCycleAndDate(eq(strategyCycleId), any())).thenReturn(1);
+
+        CancelResult result = service.cancelOpenOrders(cycleId, upbit);
+
+        assertThat(result.failedCount()).isZero();
+        verifyNoInteractions(brokerPort, awaiter, eventPublisher);
+        verify(orderPort, never()).markCancelled(any());
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 코인 PLACED 주문 단건 취소는 브로커 취소 없이 OrderCancelException")
+    void cancelOrder_cryptoPlaced_rejectedWithoutBrokerCall() {
+        Order order = cryptoOrder(OrderStatus.PLACED);
+        when(orderPort.findById(order.id())).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(TradingFixtures.upbitAccount(accountId, requesterId));
+
+        assertThatThrownBy(() -> service.cancelOrder(order.id(), requesterId)).isInstanceOf(OrderCancelException.class);
+        verifyNoInteractions(brokerPort, awaiter);
+    }
 }
 
