@@ -20,12 +20,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -45,9 +47,13 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
     private final CryptoOrderSynchronizer synchronizer;
     private final CryptoDcaRoundExecutor roundExecutor;
     private final TradingErrorReportPort errorReportPort; // 조립·계좌 실행 실패 관리자 알림
+    // ponytail: in-memory, resets on restart — persist if restart floods matter
+    private final Map<String, LocalDate> lastReported = new ConcurrentHashMap<>(); // (대상|메시지) → 마지막 알림 KST 일자
 
     @Override
     public void runTick(LocalDateTime nowKst) {
+        LocalDate today = nowKst.toLocalDate();
+        lastReported.values().removeIf(d -> !d.equals(today)); // 지난 날짜 항목 정리
         // 코인 DCA 전략만 — 계좌 판정은 account 조회 후
         List<Strategy> dcaStrategies = strategyPort.findAllActive().stream()
                 .filter(s -> s.type() == StrategyType.DCA).toList();
@@ -72,8 +78,8 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
                 BatchContext ctx = buildContext(strategy, accountsById, cyclesById, configsById, profiles);
                 if (ctx != null) byAccount.computeIfAbsent(strategy.accountId(), k -> new ArrayList<>()).add(ctx);
             } catch (RuntimeException e) {
-                log.error("[strategyId={}] 코인 DCA 컨텍스트 조립 오류: {}", strategy.id(), e.getMessage(), e);
-                errorReportPort.reportError(e);
+                log.error("[strategyId={}] 코인 DCA 컨텍스트 조립 오류", strategy.id(), e);
+                reportOncePerDay(strategy.id(), e, today);
             }
         }
 
@@ -87,13 +93,19 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
                 synchronizer.sync(exchange, contexts, accountConfigs, nowKst); // 신규 실행 전 미확정 주문 복구
                 roundExecutor.executeAccount(exchange, contexts, accountConfigs, nowKst);
             } catch (RuntimeException e) {
-                log.error("[accountId={}] 코인 DCA 실행 오류: {}", entry.getKey(), e.getMessage(), e);
-                errorReportPort.reportError(e);
+                log.error("[accountId={}] 코인 DCA 실행 오류", entry.getKey(), e);
+                reportOncePerDay(entry.getKey(), e, today);
             }
         }
     }
 
-    // 종료 사이클(좀비)은 null — 호출부가 제외, 조회 불가는 예외
+    // 같은 (대상, 메시지)는 KST 하루 1회만 관리자 알림 — 10분 틱마다 반복 발송 방지
+    private void reportOncePerDay(UUID target, RuntimeException e, LocalDate today) {
+        String key = target + "|" + (e.getMessage() != null ? e.getMessage() : e.getClass().getName());
+        if (!today.equals(lastReported.put(key, today))) errorReportPort.reportError(e);
+    }
+
+    // 조립 불가(사이클·설정·프로필 없음, 종료 사이클)는 예외 — 호출부가 알림 후 제외
     private BatchContext buildContext(Strategy strategy, Map<UUID, TradingAccount> accountsById,
                                       Map<UUID, StrategyCycle> cyclesById, Map<UUID, DcaConfig> configsById,
                                       Map<UUID, TradingUserProfile> profiles) {

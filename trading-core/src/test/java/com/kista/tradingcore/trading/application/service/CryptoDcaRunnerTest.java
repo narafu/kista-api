@@ -120,6 +120,39 @@ class CryptoDcaRunnerTest {
                 argThat((List<BatchContext> l) -> l.get(0).strategy().id().equals(sb.id())), any(), eq(NOW));
         verify(executor, never()).executeAccount(any(),
                 argThat((List<BatchContext> l) -> l.get(0).account().id().equals(a.id())), any(), any());
+        verify(synchronizer).sync(any(),
+                argThat((List<BatchContext> l) -> l.get(0).account().id().equals(b.id())), any(), eq(NOW));
+    }
+
+    @Test
+    void endedCycleIsReportedAndExcluded() {
+        Strategy s = add(TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID()), StrategyType.DCA, true);
+        cycles.put(s.id(), new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
+                BigDecimal.ZERO, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 10), null, null));
+        tick();
+        verify(errorReport).reportError(any());
+        verify(executor, never()).executeAccount(any(), any(), any(), any());
+    }
+
+    @Test
+    void persistentAssembleErrorReportedOncePerDay() {
+        add(TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID()), StrategyType.DCA, false);
+        tick();
+        runner.runTick(NOW.plusMinutes(10));
+        verify(errorReport, times(1)).reportError(any());
+        runner.runTick(NOW.plusDays(1));
+        verify(errorReport, times(2)).reportError(any());
+    }
+
+    @Test
+    void persistentAccountFailureReportedOncePerDay() {
+        add(TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID()), StrategyType.DCA, true);
+        doThrow(new IllegalStateException("boom")).when(synchronizer).sync(any(), anyList(), any(), any());
+        tick();
+        runner.runTick(NOW.plusMinutes(10));
+        verify(errorReport, times(1)).reportError(any());
+        runner.runTick(NOW.plusDays(1));
+        verify(errorReport, times(2)).reportError(any());
     }
 
     @Test
