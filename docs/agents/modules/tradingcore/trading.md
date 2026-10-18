@@ -79,3 +79,11 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - 보유·평단 SSOT는 브로커 실잔고(`CycleOrderStrategy.snapshotsBrokerBalance()`) — 자체 포지션 누적을 쓰지 않는다. 계좌 통계·포트폴리오 집계에서는 DCA를 제외한다(→ stats.md).
 - 개장 배치는 22:00 KST. KIS DCA MOO는 개장 전 접수(`TradingService.placePreOpenDcaOrders`, `Broker.supportsOpenAuctionOrders()` 필터), 접수 후 체크포인트를 STARTED로 되돌리고 이 단계 실패는 격리한다.
 - 주문 수량: orders.quantity/filled_quantity·dca_execution.quantity는 numeric(20,8), Order/DcaExecution은 BigDecimal(compact 생성자에서 Quantities.normalize — 꼬리 0 제거). PlannedOrder·매칭 공식·CyclePosition.holdings·privacy 표는 int이고 주식 경로(브로커 wire·커널 재입력)는 intValueExact()로 변환한다. 재주문(ReorderService)과 일별 체결 요약(AccountStatisticsService)은 주식 주문만 다룬다.
+
+### 코인 DCA 실행 (업비트, 묶음 C)
+- 진입: `CryptoDcaScheduler`(`trading/adapter/in/schedule`, cron `0 */10 * * * *` KST, 락 `crypto-dca` 9분, `scheduler.enabled`) → `CryptoDcaExecutionUseCase.runTick(nowKst)` → `CryptoDcaRunner`. 대상은 CRYPTO_KRW 계좌의 ACTIVE DCA 전략이고, 계좌별로 `CryptoOrderSynchronizer.sync`(기존 주문 상태 동기화) 뒤 `CryptoDcaRoundExecutor.executeAccount`(회차 판정·주문)를 실행한다. 관리자 오류 알림은 대상별 KST 하루 1회로 중복 제거한다(`reportOncePerDay`). 주식 마감·개장 배치(`BatchContextFactory`)는 코인 계좌 전략을 제외한다.
+- 주문 상태: PLANNED → SUBMITTING → PLACED → FILLED/FAILED/CANCELLED. 업비트 identifier = 주문 UUID(재시도 멱등). 체결 판정은 state와 무관하게 `executedVolume > 0`. 일시 오류는 실행 시(hour) 안에서 재시도하고 분 ≥ 50이면 EXCHANGE_API_ERROR로 확정한다. KEY_EXPIRED 응답은 API_KEY_EXPIRED로 기록한다.
+- 수량·금액: 매수 = min(설정 금액, floor(KRW 잔고 / 1.0005)) — 업비트 수수료율 0.05% 상수, 최소 주문 5,000원(`DcaConfig.CRYPTO_MIN_AMOUNT`). 매도 수량은 소수 8자리 FLOOR 후 보유량 이하. 일봉은 250봉(업비트 `to` 페이징), 신선도는 오늘−1일(KST 09시 이후) / 오늘−2일(그 전) 최신 봉.
+- 조건 판정은 `matching.DcaConditions.check`를 주식 `DcaCycleOrderStrategy.decide`와 공유한다. FEAR_GREED는 코인 전용 `CryptoFearGreedIndexPort`(`trading/application/port/output`) + `CryptoFearGreedIndexAdapter`(`trading/adapter/out/feargreed`, alternative.me, 실패 시 empty)가 공급한다 — 주식 CNN `FearGreedIndexPort`에 market 인자를 넣지 않고 포트를 분리했다.
+- 체결 시 `CryptoOrderFilledEvent` 발행 → `tradingcore.notify.CryptoTradeNotifier`(→ notify.md). `DcaSummaryAssembler` 코인 분기는 24/7이라 다음 실행을 KST 기준 다음 실행 시각(executionHour)으로 계산한다.
+- `OrderCancelService`: 코인 계좌는 PLANNED 주문만 삭제하고, SUBMITTING/PLACED(거래소 전송 중·접수)가 있으면 일시정지·전략 삭제·계좌 삭제를 409 `ORDER_NOT_CANCELLABLE`로 거부한다.

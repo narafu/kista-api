@@ -29,3 +29,6 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 - `CandlePort.getDailyCandlesBefore(symbol, beforeUsSession, count)`: DCA 지표용 일봉 조회(Toss `TossCandleApi` 구현). 200봉 단위로 페이징하며 다음 페이지 `before`는 직전 페이지 가장 오래된 봉 날짜 00:00 UTC이고, 날짜 기준으로 중복을 제거한다. 이 경로만 `adjusted=true`(분할·배당 조정)를 보낸다.
 - `OrderType.MOO` 매핑: KIS 매도 `31`/매수 `32`(LOO 캡), 미국 매수는 MOO/MOC 불가 → `docs/agents/kis-api.md`. `Broker.supportsOpenAuctionOrders()`가 개장 전 접수 대상 브로커를 가른다.
 - Toss: 매수는 캡가(지정가) 기준으로 보정하고, 매도는 0.01 규칙을 적용한다.
+
+### 업비트 코인 DCA 지원
+- `UpbitExchangeAdapter.getCompletedDailyCandles(ticker, count)`: count 1~400, 한 번에 최대 200봉이라 `to` 파라미터로 페이징하며 미완성(오늘) 봉은 제외한다. 주문은 identifier=주문 UUID로 멱등 전송하고 체결 조회는 `executedVolume`을 기준으로 삼는다(→ trading.md "코인 DCA 실행").

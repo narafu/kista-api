@@ -141,7 +141,7 @@ A 커밋 후 openapi 커밋 해시를 kista-ui-22에 전달한다.
 - 일봉: 주식과 같은 **250봉**. 업비트 어댑터 `getCompletedDailyCandles`에 `to` 파라미터 페이징을 추가해 200봉 초과를 지원한다(RSI Wilder는 이력 길이에 따라 값이 달라지므로 주식과 같은 길이를 맞춘다).
 - 신선도: 업비트 일봉은 KST 09:00에 시작한다. 마지막 완성 봉의 `kstDate` 기대값 = 실행 시각이 09시 이후면 `오늘 − 1일`, 09시 이전이면 `오늘 − 2일`. 다르면 `DATA_UNAVAILABLE`. "전일 종가" = 마지막 완성 봉 종가.
 - AVG_PRICE = 업비트 `avg_buy_price` 기준(보유 없으면 조건 불충족 규칙은 주식과 동일).
-- FEAR_GREED: `FearGreedIndexPort`에 market 인자 추가. CRYPTO_KRW는 trading-core `CryptoFearGreedIndexAdapter`가 alternative.me를 직접 호출(CNN 어댑터와 같은 패턴, 실패 시 empty). 라벨 출처 표시는 UI 담당.
+- FEAR_GREED: 코인 전용 `CryptoFearGreedIndexPort`(주식 `FearGreedIndexPort`는 변경 없음). CRYPTO_KRW는 trading-core `CryptoFearGreedIndexAdapter`가 alternative.me를 직접 호출(CNN 어댑터와 같은 패턴, 실패 시 empty). 라벨 출처 표시는 UI 담당.
 
 ### 중복 주문 방지
 1. 주문 행을 PLANNED로 저장(`orderType=MARKET`, `quantity`=추정 수량, `price`=기준가 — 핵심 결정 2). `orders.price numeric(12,2)`는 BTC 원화 가격을 담는다.

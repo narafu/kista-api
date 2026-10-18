@@ -11,3 +11,6 @@ com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-co
 
 ### Account ↔ Strategy 분리
 `Account`(이 모듈)와 `Strategy`(trading 소유)는 별도 aggregate — `Account`엔 type/status/ticker/multiple/updatedAt이 없다(전략 속성은 전부 Strategy로 분리). 계좌·전략 이력 계층 상세 규칙은 `docs/agents/modules/tradingcore/trading.md` "Account ↔ Strategy 분리" 참고.
+
+### 업비트 API 키 만료 점검
+`adapter/in/schedule/ApiKeyExpiryScheduler`(매일 10:00 KST, 락 `api-key-expiry` 30분, `scheduler.enabled`)가 `broker == UPBIT && apiKeyExpiresAt != null` 계좌만 훑어 만료까지 30·7·0일 남은 날에만 `ApiKeyExpiringEvent`(application/event, userId·accountId·nickname·broker·expiresOn·daysLeft)를 발행한다 — 알림은 notify `ApiKeyExpiryNotifier`가 소유. 키 교체(`updateCredentials`) 저장 시 사전 중복 검사와 저장 사이의 경합으로 unique 위반이 나면 `DataIntegrityViolationException`을 `Account.DuplicateAccountException`(409)으로 변환한다. 관리자 계좌 응답의 `accountNoMasked`·`accountNo`는 업비트(계좌번호 없음)에서 null이다.

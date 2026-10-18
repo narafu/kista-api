@@ -22,3 +22,5 @@ com.kista.tradingcore.matching/  ← Spring Modulith 모듈(CLOSED) — 주문�
 - `DcaIndicators`(순수 계산): SMA는 마지막 N개 종가 평균, RSI는 기간 14 고정 Wilder 평활. 결과는 소수 둘째 자리 HALF_UP으로 반올림하며 데이터가 부족하면 빈 값을 돌려준다.
 - `DcaCondition` 검증: 지표는 `AVG_PRICE`·`SMA`·`RSI`·`FEAR_GREED`(0~100, 값은 `DcaInputs.fearGreed` — 플래너가 배치 시점 최신 CNN 값을 넣는다). SMA는 `smaPeriod` ∈ 20/50/120/200이고 threshold를 두지 않는다. RSI는 0~100, AVG_PRICE는 -100 초과, threshold는 소수 둘째 자리까지 허용한다.
 - 판정 순서(`decide`): ① 데이터(종가·판매가능수량·모든 지표 계산 가능 여부) → ② 조건 AND 평가(입력 순서대로, 처음 실패한 조건이 `CONDITION_NOT_MET`와 뒤집힌 연산자 detail을 남긴다) → ③ `NO_HOLDINGS`(SELL) → ④ `BELOW_ONE_SHARE`. AVG_PRICE는 보유 0주일 때 BUY는 통과하고 SELL은 통과 후 `NO_HOLDINGS`로 막힌다.
+
+- 코인 DCA 공유: `DcaConditions.check`(public static — 데이터 충족·조건 AND 평가·실패 detail)는 주식 `DcaCycleOrderStrategy.decide`와 trading의 `CryptoDcaRoundExecutor`가 함께 쓴다. 코인 FEAR_GREED 값은 `CryptoFearGreedIndexPort`(alternative.me)에서 오고 주식은 CNN 값을 쓴다.
