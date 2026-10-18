@@ -24,7 +24,7 @@ public interface CryptoExchangePort {
     // 현재가 (KRW) — 공개 시세, 계좌 불필요
     Map<StrategyTicker, BigDecimal> getCurrentPrices(Collection<StrategyTicker> tickers);
 
-    // 완성 일봉 최근 count개(1~199), 오래된 순 — 진행 중인 오늘 봉(KST 09:00 시작)은 제외
+    // 완성 일봉 최근 count개(1~400, 이력 부족 시 적게), 오래된 순 — 진행 중인 오늘 봉(KST 09:00 시작)은 제외
     List<CryptoCandle> getCompletedDailyCandles(StrategyTicker ticker, int count);
 
     // 금액 기준 시장가 매수 — identifier는 계정 내 영구 고유(재사용 불가)

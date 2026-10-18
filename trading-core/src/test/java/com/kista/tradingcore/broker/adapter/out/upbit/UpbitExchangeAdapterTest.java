@@ -96,6 +96,50 @@ class UpbitExchangeAdapterTest {
         assertThat(candles.getLast().close()).isEqualByComparingTo("151000000");
     }
 
+    // startKst = firstDay(KST 09:00)에서 하루씩 과거로 n개 — utc는 -9h
+    private static String candleRows(LocalDate firstDay, int n) {
+        return "[" + java.util.stream.IntStream.range(0, n).mapToObj(i -> {
+            LocalDateTime kst = firstDay.minusDays(i).atTime(9, 0);
+            return "{\"candle_date_time_kst\":\"%s\",\"candle_date_time_utc\":\"%s\",\"trade_price\":%d}"
+                    .formatted(kst, kst.minusHours(9), 100 + i);
+        }).collect(java.util.stream.Collectors.joining(",")) + "]";
+    }
+
+    @Test
+    void pagesWithToWhenCountExceeds200() {
+        // 1차: 10-17(진행 중)부터 200행 → 가장 오래된 봉의 utc = 그날 00:00:00 (KST 09:00)
+        LocalDate first = LocalDate.of(2026, 10, 17);
+        LocalDate oldest = first.minusDays(199);
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200"))
+                .andRespond(withSuccess(candleRows(first, 200), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200&to=" + oldest + "T00:00:00"))
+                .andRespond(withSuccess(candleRows(oldest.minusDays(1), 200), MediaType.APPLICATION_JSON));
+
+        List<CryptoCandle> candles = adapter.getCompletedDailyCandles(StrategyTicker.BTC, 250);
+
+        assertThat(candles).hasSize(250);
+        assertThat(candles.getLast().kstDate()).isEqualTo(LocalDate.of(2026, 10, 16));
+        assertThat(candles).extracting(CryptoCandle::kstDate).doesNotHaveDuplicates().isSorted();
+        server.verify();
+    }
+
+    @Test
+    void stopsWhenHistoryRunsOut() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200")))
+                .andRespond(withSuccess(candleRows(LocalDate.of(2026, 10, 17), 200), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.containsString("&to=")))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getCompletedDailyCandles(StrategyTicker.BTC, 250)).hasSize(199);
+        server.verify();
+    }
+
+    @Test
+    void rejectsCountOver400() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.getCompletedDailyCandles(StrategyTicker.BTC, 401))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void marketBuyPostsPriceOrderWithIdentifier() {
         server.expect(requestTo(BASE_URL + "/v1/orders"))

@@ -17,7 +17,9 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -26,6 +28,8 @@ import java.util.stream.Collectors;
 class UpbitExchangeAdapter implements CryptoExchangePort {
 
     private static final int MAX_CANDLES = 200; // 업비트 일봉 1회 최대 개수
+    private static final int MAX_COUNT = 400;   // 페이징으로 지원하는 최대 일봉 개수
+    private static final int MAX_PAGES = 3;     // 400봉 + 진행 중 봉을 덮는 최대 요청 수
 
     private final UpbitHttpClient http;          // JWT 서명·오류 매핑 공통
     private final UpbitMarketRegistry registry;  // StrategyTicker ↔ KRW-XXX
@@ -80,19 +84,28 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
 
     @Override
     public List<CryptoCandle> getCompletedDailyCandles(StrategyTicker ticker, int count) {
-        if (count < 1 || count >= MAX_CANDLES) throw new IllegalArgumentException("일봉 개수는 1~199입니다: " + count);
-        LinkedHashMap<String, String> query = new LinkedHashMap<>();
-        query.put("market", registry.marketOf(ticker));
-        query.put("count", String.valueOf(count + 1)); // 진행 중 봉 1개를 버릴 여유
-        List<CandleRow> rows = http.getPublic("/v1/candles/days", query, new ParameterizedTypeReference<>() {});
+        if (count < 1 || count > MAX_COUNT) throw new IllegalArgumentException("일봉 개수는 1~" + MAX_COUNT + "입니다: " + count);
         LocalDateTime now = LocalDateTime.now(clock.withZone(TimeZones.KST));
-        // 정렬·진행 중 봉 포함 여부가 문서에 없어 직접 보장 — 시작+1일(다음날 09:00)이 지나야 완성
-        List<CryptoCandle> completed = rows.stream()
-                .filter(r -> !r.startKst().plusDays(1).isAfter(now))
-                .sorted(Comparator.comparing(CandleRow::startKst))
-                .map(r -> new CryptoCandle(r.startKst().toLocalDate(), r.tradePrice()))
-                .toList();
-        return completed.subList(Math.max(0, completed.size() - count), completed.size());
+        // kstDate 기준 중복 제거 + 오래된 순 정렬 — 페이지 경계 중복·정렬 미보장 방어
+        TreeMap<LocalDate, CryptoCandle> completed = new TreeMap<>();
+        String to = null; // 직전 응답 중 가장 오래된 봉의 UTC 시작 — 업비트 to는 exclusive
+        for (int page = 0; page < MAX_PAGES && completed.size() < count; page++) {
+            LinkedHashMap<String, String> query = new LinkedHashMap<>();
+            query.put("market", registry.marketOf(ticker));
+            // 첫 페이지는 진행 중 봉 1개를 버릴 여유(count+1), 이후 페이지는 최대치
+            query.put("count", String.valueOf(page == 0 ? Math.min(count + 1, MAX_CANDLES) : MAX_CANDLES));
+            if (to != null) query.put("to", to);
+            List<CandleRow> rows = http.getPublic("/v1/candles/days", query, new ParameterizedTypeReference<>() {});
+            if (rows == null || rows.isEmpty()) break; // 상장 이력 소진
+            // 진행 중 봉 포함 여부가 문서에 없어 직접 보장 — 시작+1일(다음날 09:00)이 지나야 완성
+            rows.stream().filter(r -> !r.startKst().plusDays(1).isAfter(now))
+                    .forEach(r -> completed.putIfAbsent(r.startKst().toLocalDate(), new CryptoCandle(r.startKst().toLocalDate(), r.tradePrice())));
+            to = rows.stream().map(CandleRow::startUtc).filter(Objects::nonNull).min(Comparator.naturalOrder())
+                    .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format).orElse(null);
+            if (to == null) break;
+        }
+        List<CryptoCandle> list = List.copyOf(completed.values());
+        return list.subList(Math.max(0, list.size() - count), list.size());
     }
 
     @Override
@@ -170,6 +183,7 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     record TickerRow(String market, @JsonProperty("trade_price") BigDecimal tradePrice) {}
 
     record CandleRow(@JsonProperty("candle_date_time_kst") LocalDateTime startKst,
+                     @JsonProperty("candle_date_time_utc") LocalDateTime startUtc,
                      @JsonProperty("trade_price") BigDecimal tradePrice) {}
 
     record OrderRow(String uuid, String identifier, String state,
