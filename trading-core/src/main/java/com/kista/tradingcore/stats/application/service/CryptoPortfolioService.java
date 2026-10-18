@@ -47,8 +47,8 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
 
     private static CryptoPortfolio.Holding toHolding(StrategyTicker ticker, CryptoBalance.Holding h, BigDecimal price) {
         BigDecimal quantity = h.total();
-        // 평가액은 원 단위(scale 0) HALF_UP 반올림
-        BigDecimal eval = price == null ? BigDecimal.ZERO : quantity.multiply(price).setScale(0, RoundingMode.HALF_UP);
+        // 시세 없으면 평가액 null, 있으면 원 단위(scale 0) HALF_UP 반올림
+        BigDecimal eval = price == null ? null : quantity.multiply(price).setScale(0, RoundingMode.HALF_UP);
         return new CryptoPortfolio.Holding(ticker, quantity, h.avgBuyPrice(), price, eval);
     }
 }

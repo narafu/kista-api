@@ -53,6 +53,17 @@ class ApiKeyExpirySchedulerTest {
     }
 
     @Test
+    void nonUpbitAccountIgnored() {
+        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
+        Account kis = new Account(UUID.randomUUID(), UUID.randomUUID(), "KIS", "n", "a", "s", null, Broker.KIS, now, now);
+        when(accountPort.findAll()).thenReturn(List.of(kis));
+
+        scheduler.publishDue();
+
+        verify(publisher, org.mockito.Mockito.never()).publishEvent(any(Object.class));
+    }
+
+    @Test
     void lockNameAndDuration() throws Exception {
         scheduler.run();
         verify(lock).tryRun(eq("api-key-expiry"), eq(Duration.ofMinutes(30)), any());

@@ -27,7 +27,7 @@ public record AdminAccountResponse(
     public static AdminAccountResponse from(AccountSummaryResponse a, UserSummary user, List<StrategyResponse> strategies) {
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
         return new AdminAccountResponse(
-                a.id(), a.userId(), nickname, AccountNumberMasker.mask(a.accountNo()),
+                a.id(), a.userId(), nickname, a.accountNo() == null ? null : AccountNumberMasker.mask(a.accountNo()), // UPBIT은 계좌번호 없음
                 a.broker() != null ? a.broker().name() : null,
                 strategies.stream().map(AdminStrategyResponse::from).toList());
     }

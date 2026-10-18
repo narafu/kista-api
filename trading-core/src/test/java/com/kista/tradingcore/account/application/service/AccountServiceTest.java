@@ -472,6 +472,20 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("키 수정: 저장 시 unique 위반(경합)은 DuplicateAccountException으로 변환한다")
+    void rotationUniqueViolationIsDuplicate() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("uk"));
+
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
+                .isInstanceOf(Account.DuplicateAccountException.class);
+        verifyNoInteractions(brokerTokenCachePort);
+    }
+
+    @Test
     @DisplayName("키 수정: 업비트 같은 access key 재입력은 중복 검사를 건너뛰고 저장한다")
     void updateCredentials_upbit_sameAccessKey_skipsDuplicateCheck() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));

@@ -58,6 +58,23 @@ class CryptoPortfolioServiceTest {
     }
 
     @Test
+    void missingPriceExcludedFromTotal() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+        when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
+        when(upbit.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal("1000"), BigDecimal.ZERO,
+                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(new BigDecimal("0.001"), BigDecimal.ZERO, new BigDecimal("140000000")))));
+        when(upbit.getCurrentPrices(Set.of(StrategyTicker.BTC))).thenReturn(Map.of());
+
+        CryptoPortfolio p = service.getCryptoPortfolio(ACCOUNT_ID, USER_ID);
+
+        assertThat(p.holdings()).singleElement().satisfies(h -> {
+            assertThat(h.currentPrice()).isNull();
+            assertThat(h.evalAmountKrw()).isNull();
+        });
+        assertThat(p.totalAssetKrw()).isEqualByComparingTo("1000");
+    }
+
+    @Test
     void emptyHoldingsSkipPriceCall() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
         when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);

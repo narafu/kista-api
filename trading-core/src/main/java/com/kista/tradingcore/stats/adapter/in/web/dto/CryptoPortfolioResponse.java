@@ -22,8 +22,8 @@ public record CryptoPortfolioResponse(
             @Schema(description = "종목", example = "BTC") String ticker,
             @Schema(description = "보유 수량 (소수 8자리)") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal quantity,
             @Schema(description = "평균 매수가 (KRW)") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal avgBuyPrice,
-            @Schema(description = "현재가 (KRW, 시세 없으면 null)") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal currentPrice,
-            @Schema(description = "평가액 (KRW, 원 단위 HALF_UP)") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal evalAmountKrw
+            @Schema(description = "현재가 (KRW, 시세 없으면 null)", nullable = true) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal currentPrice,
+            @Schema(description = "평가액 (KRW, 원 단위 HALF_UP, 시세 없으면 null)", nullable = true) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal evalAmountKrw
     ) {
         static CryptoHoldingResponse from(CryptoPortfolio.Holding h) {
             return new CryptoHoldingResponse(h.ticker().name(), h.quantity(), h.avgBuyPrice(), h.currentPrice(), h.evalAmountKrw());

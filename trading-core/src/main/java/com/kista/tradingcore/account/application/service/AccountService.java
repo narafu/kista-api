@@ -14,6 +14,7 @@ import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCan
 import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -124,8 +125,14 @@ class AccountService implements AccountUseCase {
         if (account.broker() == Broker.TOSS && !Objects.equals(verified.brokerAccountCode(), account.brokerAccountCode())) {
             throw new IllegalArgumentException("등록된 계좌와 다른 계좌의 API 키입니다.");
         }
-        Account saved = accountPort.save(account.withCredentials(
-                cmd.appKey(), cmd.secretKey(), account.brokerAccountCode(), verified.apiKeyExpiresAt()));
+        Account saved;
+        try {
+            saved = accountPort.save(account.withCredentials(
+                    cmd.appKey(), cmd.secretKey(), account.brokerAccountCode(), verified.apiKeyExpiresAt()));
+        } catch (DataIntegrityViolationException e) {
+            // 사전 중복 검사와 저장 사이 다른 계좌가 같은 키를 등록한 경합 — unique 위반을 409로
+            throw new Account.DuplicateAccountException(cmd.appKey());
+        }
         brokerTokenCachePort.deleteByAccountIds(List.of(accountId)); // 옛 키로 발급된 KIS 토큰 캐시 제거
         log.info("계좌 키 교체: accountId={}, broker={}", accountId, account.broker());
         return saved;
