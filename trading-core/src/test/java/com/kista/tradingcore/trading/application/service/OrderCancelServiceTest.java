@@ -506,18 +506,53 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel: 코인 계좌 정리는 PLANNED만 삭제하고 브로커 취소·대기를 건너뛴다")
+    @DisplayName("accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel: 체결 확인 중 코인 주문이 있으면 아무것도 지우지 않고 거부한다")
     void accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel() {
         Account upbit = TradingFixtures.upbitAccount(accountId, requesterId);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        lenient().when(orderPort.findPlacedByCycleAndDate(any(), any())).thenReturn(List.of(cryptoOrder(OrderStatus.PLACED)));
+        when(orderPort.findOpenByAccountId(accountId)).thenReturn(List.of(cryptoOrder(OrderStatus.PLACED)));
+
+        assertThatThrownBy(() -> service.cancelOpenOrders(cycleId, upbit))
+                .isInstanceOf(OrderCancelException.class).hasMessageContaining("체결 확인 중");
+        verify(orderPort, never()).deletePlannedByCycleAndDate(any(), any());
+        verify(orderPort, never()).findPlacedByCycleAndDate(any(), any());
+        verifyNoInteractions(brokerPort, awaiter);
+    }
+
+    @Test
+    @DisplayName("코인 계좌에 PLANNED만 있으면 삭제하고 진행 — 브로커 취소·대기 없음")
+    void cryptoOnlyPlanned_deletesAndProceeds() {
+        Account upbit = TradingFixtures.upbitAccount(accountId, requesterId);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findOpenByAccountId(accountId)).thenReturn(List.of(cryptoOrder(OrderStatus.PLANNED)));
         when(orderPort.deletePlannedByCycleAndDate(eq(strategyCycleId), any())).thenReturn(1);
 
         CancelResult result = service.cancelOpenOrders(cycleId, upbit);
 
         assertThat(result.failedCount()).isZero();
+        assertThat(result.cancelledCount()).isPositive();
+        verify(orderPort, never()).findPlacedByCycleAndDate(any(), any());
         verifyNoInteractions(brokerPort, awaiter, eventPublisher);
-        verify(orderPort, never()).markCancelled(any());
+    }
+
+    @Test
+    @DisplayName("requireNoCryptoInFlight: 주식 계좌는 조회 없이 통과")
+    void requireNoCryptoInFlight_stockAccount_noop() {
+        service.requireNoCryptoInFlight(cycleId, ownedAccount);
+        verifyNoInteractions(orderPort);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 코인 PLANNED 단건 취소는 cancelPlanned로 처리")
+    void cancelOrder_cryptoPlanned_cancelPlanned() {
+        Order order = cryptoOrder(OrderStatus.PLANNED);
+        when(orderPort.findById(order.id())).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(TradingFixtures.upbitAccount(accountId, requesterId));
+
+        service.cancelOrder(order.id(), requesterId);
+
+        verify(orderPort).cancelPlanned(order.id());
+        verifyNoInteractions(brokerPort);
     }
 
     @Test

@@ -284,6 +284,22 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("pauseWithPlacedCryptoOrderIsRefused: 코인 체결 확인 중이면 PAUSED 기록 전에 거부")
+    void pauseWithPlacedCryptoOrderIsRefused() {
+        Account account = ownerAccount();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        doThrow(new com.kista.tradingcore.trading.domain.model.OrderCancelException("체결 확인 중인 코인 주문이 있어 잠시 후 다시 시도해 주세요."))
+                .when(orderCancelService).requireNoCryptoInFlight(STRATEGY_ID, account);
+
+        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, USER_ID))
+                .isInstanceOf(com.kista.tradingcore.trading.domain.model.OrderCancelException.class);
+
+        verify(strategyPort, never()).save(any());
+        verify(orderCancelService, never()).cancelOpenOrders(any(), any());
+    }
+
+    @Test
     @DisplayName("pause() 호출 시 PAUSED 기록 후 미체결 주문을 정리하고, 취소 실패가 있어도 일시중지는 유지된다")
     void pause_cancels_open_orders_and_pauses_even_when_cancel_fails() {
         Account account = ownerAccount();
