@@ -150,8 +150,8 @@ class TelegramBotService {
                     List<PortfolioOrderResponse> list = portfolioQueryPort.getHistory(userId, from, to, StrategyTicker.SOXL);
                     if (list.isEmpty()) return "최근 " + days + "일 거래 내역이 없습니다.";
                     StringBuilder sb = new StringBuilder("<b>최근 " + days + "일 거래 내역</b>\n");
-                    list.forEach(h -> sb.append("%s %s %s %d주 $%.4f%n".formatted(
-                            h.tradeDate(), h.direction(), h.orderType(), h.quantity(), h.price())));
+                    list.forEach(h -> sb.append("%s %s %s %s주 $%.4f%n".formatted(
+                            h.tradeDate(), h.direction(), h.orderType(), h.quantity().toPlainString(), h.price())));
                     return sb.toString().trim();
                 })
                 .orElse(NOT_LINKED_MSG);

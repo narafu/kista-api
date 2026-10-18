@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.kista.tradingcore.stats.domain.model.CyclePerformance;
 import com.kista.tradingcore.stats.domain.model.CyclePerformancePage;
 
@@ -14,6 +15,7 @@ public record CyclePerformancePageResponse(
         long totalElements,
         int totalPages
 ) {
+    @Schema(name = "CyclePerformanceItem")
     public record Item(
             UUID cycleId, UUID accountId, String strategyType, String ticker,
             LocalDate startDate, LocalDate endDate,

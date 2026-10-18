@@ -1,5 +1,8 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.TimeZones;
+
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
@@ -26,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -36,6 +40,15 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 class StrategyCreationService {
+
+    // 계좌 시장(증권사)과 종목 시장 일치 + DCA 설정의 시장별 규칙(주문유형·금액·요일)
+    private void validateMarket(Account account, RegisterStrategyCommand cmd, StrategyTicker ticker) {
+        Market market = account.broker().getMarket();
+        if (ticker.getMarket() != market) {
+            throw new IllegalArgumentException("계좌와 종목의 시장이 다릅니다: " + ticker);
+        }
+        if (cmd.dca() != null) cmd.dca().requireCompatible(market);
+    }
 
     private final StrategyPort strategyPort;
     private final VrStrategyDetailUseCase vrStrategyLifecycle;
@@ -53,6 +66,10 @@ class StrategyCreationService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
+        // 코인 계좌는 DCA 전용 — 정책 조회보다 먼저 거부한다
+        if (account.broker().getMarket() == Market.CRYPTO_KRW && cmd.type() != StrategyType.DCA) {
+            throw new IllegalArgumentException("코인 계좌는 DCA 전략만 등록할 수 있습니다.");
+        }
         ResolvedCreation resolved = resolveCreationSettings(cmd);
         boolean dca = cmd.type() == StrategyType.DCA;
         // DCA는 설정 필수, 보유·평단은 브로커 실잔고가 SSOT라 bootstrap 입력을 받지 않는다
@@ -65,6 +82,7 @@ class StrategyCreationService {
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
         StrategyTicker resolvedTicker = resolved.ticker();
+        validateMarket(account, cmd, resolvedTicker);
 
         // 종목 중복 + 잔고 검증
         validateUniqueTicker(accountId, resolvedTicker, cmd);
@@ -115,7 +133,9 @@ class StrategyCreationService {
         }
         if (dca) {
             DcaSummary summary = dcaSummaryAssembler.assemble(cmd.dca(), null,
-                    DcaSummaryAssembler.firstEligibleDate(persisted.cycle().startDate(), null));
+                    DcaSummaryAssembler.firstEligibleDate(persisted.cycle().startDate(), null, cmd.dca(),
+                            persisted.strategy().ticker().getMarket(), LocalDateTime.now(TimeZones.KST)),
+                    persisted.strategy().ticker().getMarket());
             return new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, 0, null, summary);
         }
         return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null, null);

@@ -117,6 +117,7 @@ class KisOrderApi {
             case MOC   -> buy ? "34" : "33"; // 장마감시장가(MOC) — 매수는 LOC
             case MOO   -> buy ? "32" : "31"; // 장개시시장가(MOO) — 매수는 LOO
             case LIMIT -> "00";             // 지정가
+            case MARKET -> throw new IllegalArgumentException("MARKET 주문은 코인 거래소 전용입니다"); // 주식 경로 도달 불가 방어
         };
     }
 

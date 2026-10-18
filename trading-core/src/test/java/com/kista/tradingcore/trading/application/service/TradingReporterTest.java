@@ -110,7 +110,7 @@ class TradingReporterTest {
     private static Order placedOrder(UUID id, String externalOrderId, int quantity) {
         return new Order(id, ACCOUNT.id(), CYCLE.id(), TODAY, StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
-                quantity, new BigDecimal("20.00"), OrderStatus.PLACED,
+                BigDecimal.valueOf(quantity), new BigDecimal("20.00"), OrderStatus.PLACED,
                 externalOrderId, null, null);
     }
 
@@ -118,7 +118,7 @@ class TradingReporterTest {
     private static Order tossPlacedOrder(UUID id, String externalOrderId, int quantity) {
         return new Order(id, TOSS_ACCOUNT.id(), TOSS_CYCLE.id(), TODAY, StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
-                quantity, new BigDecimal("20.00"), OrderStatus.PLACED,
+                BigDecimal.valueOf(quantity), new BigDecimal("20.00"), OrderStatus.PLACED,
                 externalOrderId, null, null);
     }
 
@@ -140,7 +140,7 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, orders, null);
 
         verify(orderPort).markCancelled(unfilledId);
-        verify(orderPort).markFilled(filledId, 3, new BigDecimal("20.00"), OrderStatus.FILLED);
+        verify(orderPort).markFilled(filledId, BigDecimal.valueOf(3), new BigDecimal("20.00"), OrderStatus.FILLED);
     }
 
     @Test
@@ -156,7 +156,7 @@ class TradingReporterTest {
                 .isInstanceOf(IllegalStateException.class);
 
         // 리포트 마커가 이미 찍혀 재개로도 복구되지 않으므로 PLACED로 남지 않아야 한다
-        verify(orderPort).markFilled(filledId, 3, new BigDecimal("20.00"), OrderStatus.FILLED);
+        verify(orderPort).markFilled(filledId, BigDecimal.valueOf(3), new BigDecimal("20.00"), OrderStatus.FILLED);
     }
 
     @Test
@@ -169,7 +169,7 @@ class TradingReporterTest {
 
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, orders, null);
 
-        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.40"), OrderStatus.PARTIALLY_FILLED);
+        verify(orderPort).markFilled(orderId, BigDecimal.valueOf(5), new BigDecimal("20.40"), OrderStatus.PARTIALLY_FILLED);
     }
 
     @Test
@@ -182,7 +182,7 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, orders, null);
 
         verify(orderPort).markCancelled(orderId);
-        verify(orderPort, never()).markFilled(any(), anyInt(), any(), any());
+        verify(orderPort, never()).markFilled(any(), any(BigDecimal.class), any(), any());
     }
 
     @Test
@@ -283,7 +283,7 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, TOSS_CTX, BALANCE, CLOSE, List.of(order), null);
 
         verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
-        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), OrderStatus.FILLED);
+        verify(orderPort).markFilled(orderId, BigDecimal.valueOf(5), new BigDecimal("20.00"), OrderStatus.FILLED);
     }
 
     @Test
@@ -299,7 +299,7 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, TOSS_CTX, BALANCE, CLOSE, List.of(order), null);
 
         verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
-        verify(orderPort).markFilled(orderId, 5, new BigDecimal("20.00"), OrderStatus.FILLED);
+        verify(orderPort).markFilled(orderId, BigDecimal.valueOf(5), new BigDecimal("20.00"), OrderStatus.FILLED);
     }
 
     @Test

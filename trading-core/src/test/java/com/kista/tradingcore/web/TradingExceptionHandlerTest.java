@@ -3,6 +3,8 @@ package com.kista.tradingcore.web;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
+import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
+import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.platform.web.ErrorCode;
@@ -83,7 +85,7 @@ class TradingExceptionHandlerTest {
     void duplicateAccountException_hasCodeAndHidesAccountNo() {
         var detail = handler.handleTradingCoreExceptions(new Account.DuplicateAccountException("74420614-01"));
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.DUPLICATE_ACCOUNT.name());
-        assertThat(detail.getDetail()).isEqualTo("이미 등록된 계좌번호입니다.");
+        assertThat(detail.getDetail()).isEqualTo("이미 등록된 계좌입니다.");
     }
 
     @Test
@@ -177,5 +179,27 @@ class TradingExceptionHandlerTest {
         assertThat(detail.getStatus()).isEqualTo(409);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED.name());
         assertThat(detail.getDetail()).isEqualTo("DCA 전략은 바로 주문과 미리보기를 지원하지 않습니다.");
+    }
+
+    @Test
+    void brokerIpNotAllowedException_is422WithOwnCode() {
+        var detail = handler.handleTradingCoreExceptions(new BrokerIpNotAllowedException());
+        assertThat(detail.getStatus()).isEqualTo(422);
+        assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_IP_NOT_ALLOWED.name());
+        assertThat(detail.getDetail()).isEqualTo("거래소 API 키에 서버 IP가 허용되어 있지 않습니다.");
+    }
+
+    @Test
+    void brokerPermissionDeniedException_is422WithOwnCode() {
+        var detail = handler.handleTradingCoreExceptions(new BrokerPermissionDeniedException());
+        assertThat(detail.getStatus()).isEqualTo(422);
+        assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_PERMISSION_DENIED.name());
+        assertThat(detail.getDetail()).isEqualTo("거래소 API 키에 필요한 권한이 없습니다.");
+    }
+
+    @Test
+    void brokerRateLimitException_titleIsBrokerNeutral() {
+        var detail = handler.handleTradingCoreExceptions(new BrokerRateLimitException());
+        assertThat(detail.getTitle()).isEqualTo("Broker Rate Limit");
     }
 }

@@ -1,5 +1,8 @@
 package com.kista.shared.contract.notify;
 
+import tools.jackson.databind.annotation.JsonSerialize;
+
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -8,7 +11,8 @@ import java.util.UUID;
 public record TradeEventMessage(
         Kind kind,              // 알림 종류
         String ticker,          // 거래 종목
-        Integer quantity,       // 체결 수량
+        @JsonSerialize(using = PlainDecimalSerializer.class)
+        BigDecimal quantity,    // 체결 수량 (코인은 소수 가능, 구버전 정수 JSON도 수용)
         Double price,           // 체결 가격
         Double amount,          // 체결 금액
         Instant time,           // 발생 시각
@@ -21,13 +25,13 @@ public record TradeEventMessage(
     public enum Kind { BUY, SELL, INFO, FAIL }
 
     // BUY 체결 이벤트 팩토리 메서드
-    public static TradeEventMessage buy(String ticker, int quantity, double price, double amount, String nickname,
+    public static TradeEventMessage buy(String ticker, BigDecimal quantity, double price, double amount, String nickname,
                                         UUID accountId, UUID strategyId) {
         return new TradeEventMessage(Kind.BUY, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId);
     }
 
     // SELL 체결 이벤트 팩토리 메서드
-    public static TradeEventMessage sell(String ticker, int quantity, double price, double amount, String nickname,
+    public static TradeEventMessage sell(String ticker, BigDecimal quantity, double price, double amount, String nickname,
                                          UUID accountId, UUID strategyId) {
         return new TradeEventMessage(Kind.SELL, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId);
     }

@@ -85,12 +85,12 @@ class BuyOrderPriceCapperTest {
 
     private Order buy(String price, int quantity) {
         return new Order(null, null, null, TODAY, StrategyTicker.SOXL, OrderType.LOC,
-                OrderTiming.AT_CLOSE, OrderDirection.BUY, quantity, new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(quantity), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
     private Order sell(String price, int quantity) {
         return new Order(null, null, null, TODAY, StrategyTicker.SOXL, OrderType.LOC,
-                OrderTiming.AT_CLOSE, OrderDirection.SELL, quantity, new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
+                OrderTiming.AT_CLOSE, OrderDirection.SELL, BigDecimal.valueOf(quantity), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
     // ─── prepareForAllocation ─────────────────────────────────────────────
@@ -401,6 +401,6 @@ class BuyOrderPriceCapperTest {
 
     private Order ladderBuy(String price) {
         return new Order(null, null, null, TODAY, StrategyTicker.TQQQ, OrderType.LIMIT,
-                OrderTiming.AT_OPEN, OrderDirection.BUY, 1, new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
+                OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 }

@@ -20,6 +20,9 @@ interface TossTokenStore {
     // owner id가 일치할 때만 lease 해제(compare-delete)
     void release(Lease lease);
 
+    // 키 교체·삭제 시 canonical·최근 지문 삭제 + generation 증가 — 진행 중 owner의 옛 키 토큰 write를 STALE로 fence
+    void invalidate(String scope);
+
     // Redis에 저장된 발급 완료 토큰 스냅샷 — access token, fencing 세대, canonical 만료 시각
     record CanonicalToken(String accessToken, long generation, long expiresAtEpochMillis) {}
 

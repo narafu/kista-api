@@ -40,6 +40,9 @@ class DcaConfigServiceTest {
     @BeforeEach
     void setUp() {
         service = new DcaConfigService(strategyPort, accountPort, strategyVersionPort, dcaDetailPort);
+        // 시장 규칙 검증용 계좌 — 기존 테스트는 주식(KIS) 계좌
+        lenient().when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID))
+                .thenReturn(com.kista.tradingcore.support.TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
     }
 
     private static DcaConfig config(OrderDirection direction, String amount) {
@@ -84,5 +87,16 @@ class DcaConfigServiceTest {
         assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID, config(OrderDirection.BUY, "300")))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(dcaDetailPort);
+    }
+
+    @Test
+    void updateConfig_stockAccount_rejectsMarketOrderType() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy(StrategyType.DCA));
+        DcaConfig crypto = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET,
+                DcaFrequency.DAILY, null, null, java.util.List.of(), 9);
+
+        assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID, crypto))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("MOO 또는 MOC");
+        verify(strategyVersionPort, never()).save(any());
     }
 }

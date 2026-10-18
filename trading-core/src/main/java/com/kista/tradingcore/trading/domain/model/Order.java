@@ -21,37 +21,39 @@ public record Order(
         OrderTiming timing,              // 접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)
         OrderDirection direction,        // 매수/매도 방향
         String orderLeg,                 // 전략 주문 다리 식별자
-        Integer quantity,                // 주문 수량(nullable)
+        BigDecimal quantity,             // 주문 수량 — 주식은 정수 값, 코인은 소수 8자리
         BigDecimal price,                // 주문 가격 (LOC/MOC는 참고용, 실제 체결가 아님)
         OrderStatus status,              // 주문 상태
         String externalOrderId,          // 증권사 부여 주문 번호 (KIS: ODNO, Toss: orderId), PLACED 이후 설정
-        Integer filledQuantity,          // 체결 수량 (null=미확인, 0=미체결)
+        BigDecimal filledQuantity,       // 체결 수량 (null=미확인, 0=미체결)
         BigDecimal filledPrice           // 체결 가중평균가 (null=미체결)
 ) {
     public static final String UNKNOWN_LEG = "UNKNOWN";
 
     public Order(UUID id, UUID accountId, UUID strategyCycleId, LocalDate tradeDate, StrategyTicker ticker,
                  OrderType orderType, OrderTiming timing, OrderDirection direction,
-                 Integer quantity, BigDecimal price, OrderStatus status, String externalOrderId,
-                 Integer filledQuantity, BigDecimal filledPrice) {
+                 BigDecimal quantity, BigDecimal price, OrderStatus status, String externalOrderId,
+                 BigDecimal filledQuantity, BigDecimal filledPrice) {
         this(id, accountId, strategyCycleId, tradeDate, ticker, orderType, timing, direction,
                 UNKNOWN_LEG, quantity, price, status, externalOrderId, filledQuantity, filledPrice);
     }
 
     public Order {
         if (orderLeg == null || orderLeg.isBlank()) orderLeg = UNKNOWN_LEG;
+        quantity = Quantities.normalize(quantity); // DB scale 8 → 정수 주식 수량 형태 유지
+        filledQuantity = Quantities.normalize(filledQuantity);
     }
 
     // 커널 계획 주문(PlannedOrder) → 특정 계좌·사이클 PLANNED Order 승격 — 유일한 승격 지점(TradingOrderPlanner.savePlannedOrders)
     public static Order fromPlanned(PlannedOrder p, UUID accountId, UUID strategyCycleId) {
         return new Order(null, accountId, strategyCycleId, p.tradeDate(), p.ticker(), p.orderType(),
-                p.timing(), p.direction(), p.orderLeg(), p.quantity(), p.price(),
+                p.timing(), p.direction(), p.orderLeg(), BigDecimal.valueOf(p.quantity()), p.price(),
                 OrderStatus.PLANNED, null, null, null);
     }
 
     // 영속 Order → 계획 주문 강등 (사후 가격 캡 재산정·canSkipOrderComputation 판정 시 커널에 재입력)
     public PlannedOrder toPlanned() {
-        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, quantity, price);
+        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, quantity.intValueExact(), price);
     }
 
     // 관리자 수동 보정용 FILLED 주문 — LIMIT 고정, 체결 수량·가격 즉시 기록
@@ -59,8 +61,16 @@ public record Order(
                                      StrategyTicker ticker, OrderTiming timing, OrderDirection direction,
                                      int quantity, BigDecimal price, String externalOrderId) {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.LIMIT,
-                timing, direction, UNKNOWN_LEG, quantity, price, OrderStatus.FILLED, externalOrderId,
-                quantity, price);
+                timing, direction, UNKNOWN_LEG, BigDecimal.valueOf(quantity), price, OrderStatus.FILLED, externalOrderId,
+                BigDecimal.valueOf(quantity), price);
+    }
+
+    // 코인 시장가 주문 — MARKET·PLANNED 고정, 수량은 소수 8자리 (매수는 price=주문 금액 기준 참고가)
+    public static Order cryptoMarket(UUID accountId, UUID strategyCycleId, LocalDate tradeDate, StrategyTicker ticker,
+                                     OrderDirection direction, String orderLeg, OrderTiming timing,
+                                     BigDecimal quantity, BigDecimal price) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.MARKET, timing, direction,
+                orderLeg, quantity, price, OrderStatus.PLANNED, null, null, null);
     }
 
     // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
@@ -80,7 +90,7 @@ public record Order(
     // 수량만 교체한 새 PLANNED 주문 — 보유수량 캡 보정 재계산 시 기존 id·체결 정보 초기화
     public Order withQuantity(int newQuantity) {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
-                orderType, timing, direction, orderLeg, newQuantity, price,
+                orderType, timing, direction, orderLeg, BigDecimal.valueOf(newQuantity), price,
                 OrderStatus.PLANNED, null, null, null);
     }
 
@@ -88,7 +98,7 @@ public record Order(
     public static Order reorder(Order source, LocalDate tradeDate, OrderDirection direction,
                                 int quantity, BigDecimal price, OrderTiming timing) {
         return new Order(null, source.accountId(), source.strategyCycleId(), tradeDate,
-                source.ticker(), source.orderType(), timing, direction, source.orderLeg(), quantity, price,
+                source.ticker(), source.orderType(), timing, direction, source.orderLeg(), BigDecimal.valueOf(quantity), price,
                 OrderStatus.PLANNED, null, null, null);
     }
 

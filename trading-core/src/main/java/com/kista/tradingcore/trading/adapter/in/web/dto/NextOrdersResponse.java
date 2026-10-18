@@ -76,6 +76,7 @@ public record NextOrdersResponse(
     }
 
     // tradeDate·status·orderId는 preview에서 의미 없으므로 제외
+    @Schema(name = "NextOrderItem")
     public record OrderItem(
             @Schema(description = "거래 종목")
             StrategyTicker ticker,              // 거래 종목
@@ -104,7 +105,7 @@ public record NextOrdersResponse(
             @Schema(description = "주문 유형", example = "LOC")
             String orderType,
             @Schema(description = "주문 수량")
-            int quantity,
+            BigDecimal quantity,
             @Schema(description = "주문 가격")
             BigDecimal price,
             @Schema(description = "주문 상태 (취소 가능 여부 판단용)", example = "PLANNED")

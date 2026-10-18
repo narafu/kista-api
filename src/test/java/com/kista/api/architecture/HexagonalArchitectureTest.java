@@ -148,14 +148,14 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.kis/toss)을 참조하지 않는다 — 벤더 타입 침투 차단")
+    @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.kis/toss/upbit)을 참조하지 않는다 — 벤더 타입 침투 차단")
     void vendor_models_must_not_leak_outside_broker() {
         // KIS/Toss 전용 타입(KisApiException/TossCandle 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
         // (BrokerApiException/BrokerCandle 등)만 안다. 신규 브로커 추가가 "구현체 1개 추가"로 끝나도록 잠근다.
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("com.kista.tradingcore.broker..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..");
+                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..");
         rule.check(classes);
     }
 
@@ -207,7 +207,8 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.StrategyService",             // 계좌 소유권 검증
                 "com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService", // 소유권 검증
-                "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller"    // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
+                "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller",   // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
+                "com.kista.tradingcore.trading.application.service.DcaConfigService"             // 소유권 검증 + 계좌 브로커 시장 규칙 검증
         );
         // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다
         Set<String> existing = new java.util.HashSet<>();

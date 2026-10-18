@@ -66,7 +66,7 @@ class OrderSubmissionReconcilerTest {
 
     private Order submitting(UUID id) {
         return new Order(id, TOSS.id(), CYCLE_ID, TRADE_DATE, StrategyTicker.SOXL, OrderType.LOC,
-                OrderTiming.AT_CLOSE, OrderDirection.BUY, 3, new BigDecimal("20.00"), OrderStatus.SUBMITTING, null, null, null);
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(3), new BigDecimal("20.00"), OrderStatus.SUBMITTING, null, null, null);
     }
 
     // 선점 후 age만큼 지난 잔류 주문 1건을 조회 결과로 stub

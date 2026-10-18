@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.kis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.shared.kernel.TimeZones;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
@@ -126,7 +127,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public String verifyAccount(String appKey, String secretKey, String accountNo) {
+    public BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo) {
         // 1단계: 토큰 확보 — 연결 테스트 단기 캐시 우선, 없으면 신규 발급 (EGW00133 방지)
         String token;
         Instant now = Instant.now();
@@ -171,7 +172,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
             log.debug("계좌번호 검증 실패: {}", e.getMessage());
             throw new BrokerCredentialException();
         }
-        return null; // KIS: brokerAccountCode 없음 (accountNo에 통합)
+        return new BrokerAccountVerification(null, null); // KIS: brokerAccountCode 없음 (accountNo에 통합)
     }
 
     // EGW00133: KIS 1분당 1회 발급 제한 초과 → BrokerRateLimitException, 그 외 → BrokerCredentialException

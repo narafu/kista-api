@@ -45,6 +45,7 @@ import java.util.UUID;
 
 import static com.kista.shared.support.WebMvcTestSupport.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -635,5 +636,33 @@ class TradingCycleControllerTest {
         when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), anyInt(), anyInt())).thenThrow(new SecurityException("소유권 불일치"));
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void reconfigureDca_conflictingAmounts_returns400() throws Exception {
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"direction":"BUY","amount":300,"amountUsd":301,"orderType":"MOC","frequency":"MONTHLY"}
+                                """))
+                .andExpect(status().isBadRequest());
+        verify(dcaConfig, never()).updateConfig(any(), any(), any());
+    }
+
+    @Test
+    void reconfigureDca_responseCarriesAmountAndAmountUsd() throws Exception {
+        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
+
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY","conditions":[]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dca.amount").value(300))
+                .andExpect(jsonPath("$.dca.amountUsd").value(300));
+        verify(dcaConfig).updateConfig(CYCLE_ID, USER_ID, DCA_CONFIG);
     }
 }

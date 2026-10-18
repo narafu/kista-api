@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.event.OrderCancelFailedEvent;
@@ -51,6 +52,19 @@ class OrderCancelService {
         return cancelOpenOrders(strategy.id(), account);
     }
 
+    // 코인(UPBIT) 시장가는 접수 즉시 체결돼 취소할 증권사 주문이 없다 — SUBMITTING·PLACED는 다음 10분 틱의 CryptoOrderSynchronizer가 확정한다.
+    // 일시중지·삭제된 전략은 동기화 대상(활성 전략)에서 빠지므로, 확정 전에는 정리를 거부해 주문이 고아가 되지 않게 한다 — 호출자는 PAUSED 기록 전에 부른다
+    void requireNoCryptoInFlight(UUID strategyId, Account account) {
+        if (account.broker() != Broker.UPBIT) return;
+        strategyCyclePort.findLatestByStrategyId(strategyId).ifPresent(cycle -> {
+            boolean inFlight = orderPort.findOpenByAccountId(account.id()).stream()
+                    .anyMatch(o -> cycle.id().equals(o.strategyCycleId()) && o.status() != OrderStatus.PLANNED);
+            if (inFlight) {
+                throw new OrderCancelException("체결 확인 중인 코인 주문이 있어 잠시 후 다시 시도해 주세요.");
+            }
+        });
+    }
+
     // 전략의 현재 사이클 미체결 주문 정리 — 호출자가 소유권을 이미 검증한 경우(일시중지·삭제·계좌 삭제) 직접 사용
     CancelResult cancelOpenOrders(UUID strategyId, Account account) {
         // 현재 StrategyCycle 조회 — 사이클 단위로 취소 범위 격리, 사이클이 없으면 정리할 주문도 없다
@@ -59,6 +73,8 @@ class OrderCancelService {
             return new CancelResult(0, 0);
         }
         var currentCycle = latestCycle.get();
+        // 코인 계좌는 아무것도 지우기 전에 체결 확인 중 주문을 거부한다
+        requireNoCryptoInFlight(strategyId, account);
 
         // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
         List<LocalDate> tradeDates = Stream.of(LocalDate.now(TimeZones.KST), DstInfo.nextTradeDate()).distinct().toList();
@@ -73,6 +89,10 @@ class OrderCancelService {
             if (plannedCount > 0) {
                 log.info("PLANNED 주문 {}건 삭제 — cycleId={}, tradeDate={}", plannedCount, currentCycle.id(), tradeDate);
                 cancelledCount += plannedCount;
+            }
+            // 코인(UPBIT)은 증권사 취소 대상이 없다 — 체결 확인 중 주문은 위에서 이미 거부했으므로 PLANNED 삭제만 하고 넘어간다
+            if (account.broker() == Broker.UPBIT) {
+                continue;
             }
             // 접수 중 주문은 결과가 정해질 때까지 기다린다 — PLACED가 된 건은 바로 아래 조회에 합류한다
             stuckOrders.addAll(awaiter.awaitCycle(currentCycle.id(), tradeDate));
@@ -129,6 +149,10 @@ class OrderCancelService {
         // 소유권 검증: 주문의 계좌가 요청자 소유인지 확인
         Account account = accountPort.requireOwnedAccount(order.accountId(), requesterId);
 
+        if (order.status() != OrderStatus.PLANNED && account.broker() == Broker.UPBIT) {
+            // 코인 시장가는 즉시 체결돼 취소 대상이 아니다 — 주식 브로커 취소 경로로 보내지 않는다
+            throw new OrderCancelException("코인 시장가 주문은 취소할 수 없습니다.");
+        }
         if (order.status() == OrderStatus.PLANNED) {
             // 증권사 미접수 — DB에서만 취소 처리 (PLANNED일 때만 전이)
             try {

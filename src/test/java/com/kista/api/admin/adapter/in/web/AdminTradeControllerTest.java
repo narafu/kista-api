@@ -130,7 +130,7 @@ class AdminTradeControllerTest {
                         OrderTiming.AT_OPEN,
                         OrderDirection.SELL,
                         "SELL_01",
-                        2,
+                        BigDecimal.valueOf(2),
                         new BigDecimal("267.37"),
                         OrderStatus.PLACED,
                         "BROKER-1",

@@ -201,6 +201,30 @@ class TossDistributedTokenCoordinatorTest {
         assertThat(store.find("account:" + ACCOUNT_ID)).isEmpty();
     }
 
+    @Test
+    @DisplayName("발급 중 invalidate로 STALE을 받은 owner는 lease를 먼저 놓아 follower의 새 키 발급을 막지 않는다")
+    void invalidatedOwner_releasesLeaseBeforeAwaitingNewerCanonical() {
+        FakeTokenStore store = new FakeTokenStore();
+        String scope = "account:" + ACCOUNT_ID;
+        TossDistributedTokenCoordinator follower = coordinator(store, "follower");
+        AtomicReference<String> followerResult = new AtomicReference<>();
+        // owner의 첫 대기 시점에 follower가 새 키로 발급을 시도한다
+        TossDistributedTokenCoordinator owner = new TossDistributedTokenCoordinator(store, ignored -> {
+            if (followerResult.get() == null) {
+                followerResult.set(follower.obtain(ACCOUNT_ID, () -> new TokenCoordinator.IssuedToken("new-key-token", 3_600)));
+            }
+        }, () -> "owner", 3);
+
+        String ownerResult = owner.obtain(ACCOUNT_ID, () -> {
+            store.invalidate(scope); // 옛 키로 발급하는 도중 키 교체
+            return new TokenCoordinator.IssuedToken("old-key-token", 3_600);
+        });
+
+        assertThat(followerResult.get()).isEqualTo("new-key-token");
+        assertThat(ownerResult).isEqualTo("new-key-token");
+        assertThat(store.find(scope).orElseThrow().accessToken()).isEqualTo("new-key-token");
+    }
+
     private TossDistributedTokenCoordinator coordinator(FakeTokenStore store, String ownerId) {
         return new TossDistributedTokenCoordinator(store, ignored -> {}, () -> ownerId, 3);
     }
@@ -279,6 +303,13 @@ class TossDistributedTokenCoordinatorTest {
             if (current != null && Objects.equals(current.ownerId(), lease.ownerId())) {
                 leases.remove(lease.scope());
             }
+        }
+
+        @Override
+        public synchronized void invalidate(String scope) {
+            generations.computeIfPresent(scope, (ignored, generation) -> generation + 1);
+            canonical.remove(scope);
+            fingerprints.remove(scope);
         }
 
         synchronized void advance(Duration duration) {

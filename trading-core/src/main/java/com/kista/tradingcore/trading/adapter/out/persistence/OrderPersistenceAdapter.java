@@ -156,6 +156,12 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findOpenByAccountId(UUID accountId) {
+        return repository.findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(
+                accountId, List.of(OrderStatus.PLANNED, OrderStatus.SUBMITTING, OrderStatus.PLACED)).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<Order> findAllByIds(Collection<UUID> ids) {
         return repository.findAllById(ids).stream().map(this::toDomain).toList();
     }
@@ -198,9 +204,9 @@ public class OrderPersistenceAdapter implements OrderPort {
     public int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
             UUID accountId, LocalDate tradeDate, StrategyTicker ticker) {
         // 같은 계좌·거래일(KST)·ticker의 미체결 SELL 예약 수량을 합산한다
-        Long quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
+        BigDecimal quantity = repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
                 accountId, tradeDate, ticker.name());
-        return quantity != null ? Math.toIntExact(quantity) : 0;
+        return quantity != null ? quantity.intValueExact() : 0; // 주식 SELL 예약 전용 — 종목 필터라 코인 소수 수량은 섞이지 않는다
     }
 
     @Override
@@ -263,7 +269,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
-    public void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, OrderStatus status) {
+    public void markFilled(UUID orderId, BigDecimal filledQuantity, BigDecimal filledPrice, OrderStatus status) {
         // 체결 완료: 상태 + 체결 수량/가중평균가 기록
         mutate(orderId, e -> {
             e.setStatus(status);

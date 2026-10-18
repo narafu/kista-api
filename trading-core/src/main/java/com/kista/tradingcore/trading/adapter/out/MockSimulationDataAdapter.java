@@ -56,7 +56,7 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
 
     private static PlacedOrderView toPlacedOrderView(Order order) {
         return new PlacedOrderView(order.direction(), order.orderType(),
-                order.quantity(), order.price(), order.externalOrderId());
+                order.quantity().intValueExact(), order.price(), order.externalOrderId());
     }
 
     private static PositionView toPositionView(CyclePosition position) {

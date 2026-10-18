@@ -50,7 +50,7 @@ class ReorderBuyBudgetServiceTest {
 
     private Order order(OrderDirection dir, OrderStatus status, LocalDate date) {
         return new Order(UUID.randomUUID(), accountId, UUID.randomUUID(), date, StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, dir, 10, new BigDecimal("20"), status, null, null, null);
+                OrderType.LOC, OrderTiming.AT_CLOSE, dir, BigDecimal.valueOf(10), new BigDecimal("20"), status, null, null, null);
     }
 
     private void stub(String planned, String live, Order... sources) {
@@ -121,7 +121,7 @@ class ReorderBuyBudgetServiceTest {
     void 다른_계좌_주문이_섞이면_예외() {
         Order mine = order(OrderDirection.BUY, OrderStatus.PLANNED, DATE);
         Order foreign = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), DATE, StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 1, BigDecimal.ONE, OrderStatus.PLANNED, null, null, null);
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), BigDecimal.ONE, OrderStatus.PLANNED, null, null, null);
         when(orderPort.findById(mine.id())).thenReturn(Optional.of(mine));
         when(orderPort.findById(foreign.id())).thenReturn(Optional.of(foreign));
 

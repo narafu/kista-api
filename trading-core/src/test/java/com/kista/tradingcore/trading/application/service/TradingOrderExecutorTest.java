@@ -103,7 +103,7 @@ class TradingOrderExecutorTest {
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {
         return new Order(id, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, OrderType.LOC,
-                OrderTiming.AT_CLOSE, direction, quantity, new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
+                OrderTiming.AT_CLOSE, direction, BigDecimal.valueOf(quantity), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
     private OrderResult brokerResult(String externalOrderId) {
@@ -112,7 +112,7 @@ class TradingOrderExecutorTest {
 
     // 프로덕션 매핑과 동일한 규칙으로 기대 OrderInstruction 구성 — place() stub 매칭용
     private static OrderInstruction instructionOf(Order order) {
-        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price(),
+        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity().intValueExact(), order.price(),
                 order.id().toString());
     }
 

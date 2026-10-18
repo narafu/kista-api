@@ -24,6 +24,11 @@ class HeartbeatAdapter implements HeartbeatPort {
         ping(properties.closeUrl(), "close");
     }
 
+    @Override
+    public void pingCrypto() {
+        ping(properties.cryptoUrl(), "crypto");
+    }
+
     // 핑 실패는 매매에 영향 없어야 함 — 로그만 남기고 삼킴
     private void ping(String url, String name) {
         if (url == null || url.isBlank()) return;

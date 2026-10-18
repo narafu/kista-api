@@ -49,7 +49,7 @@ class OrderPersistenceAdapterTest {
     @Test
     void saveAll_delegatesToRepository() {
         Order order = new Order(null, ACCOUNT_ID, STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, PRICE,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), PRICE,
                 OrderStatus.PLANNED, null, null, null);
 
         adapter.saveAll(List.of(order));
@@ -67,7 +67,7 @@ class OrderPersistenceAdapterTest {
         entity.setTicker(StrategyTicker.SOXL);
         entity.setOrderType(OrderType.LOC);
         entity.setDirection(OrderDirection.BUY);
-        entity.setQuantity(5);
+        entity.setQuantity(BigDecimal.valueOf(5));
         entity.setPrice(PRICE);
         entity.setStatus(OrderStatus.PLANNED);
 
@@ -79,7 +79,7 @@ class OrderPersistenceAdapterTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().ticker()).isEqualTo(StrategyTicker.SOXL);
-        assertThat(result.getFirst().quantity()).isEqualTo(5);
+        assertThat(result.getFirst().quantity()).isEqualByComparingTo("5");
         assertThat(result.getFirst().status()).isEqualTo(OrderStatus.PLANNED);
         assertThat(result.getFirst().tradeDate()).isEqualTo(TODAY); // toDomain: 변환 없이 그대로 복원
     }
@@ -209,7 +209,7 @@ class OrderPersistenceAdapterTest {
     void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_delegatesWithTradeDate() {
         // 변환 없이 KST 거래일 그대로 PLANNED/PLACED SELL 예약 수량을 합산한다
         when(repository.sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
-                ACCOUNT_ID, TODAY, StrategyTicker.SOXL.name())).thenReturn(8L);
+                ACCOUNT_ID, TODAY, StrategyTicker.SOXL.name())).thenReturn(BigDecimal.valueOf(8));
 
         int result = adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
                 ACCOUNT_ID, TODAY, StrategyTicker.SOXL);

@@ -69,7 +69,7 @@ public interface OrderPort {
     void markFailed(UUID orderId);
 
     // 체결 완료 → FILLED 또는 PARTIALLY_FILLED 상태 + 체결 수량·가중평균가 기록
-    void markFilled(UUID orderId, int filledQuantity, BigDecimal filledPrice, OrderStatus status);
+    void markFilled(UUID orderId, BigDecimal filledQuantity, BigDecimal filledPrice, OrderStatus status);
 
     // 계좌 기준 당일 PLANNED·SUBMITTING BUY 주문 합계 (예수금 체크 — 타 전략 점유분 차감용, SUBMITTING은 보수적 이중 차감)
     BigDecimal sumPlannedBuyByAccountAndDate(UUID accountId, LocalDate tradeDate);
@@ -97,4 +97,7 @@ public interface OrderPort {
 
     // id 목록 일괄 조회 (DCA 회차 이력의 주문 조인용)
     List<Order> findAllByIds(Collection<UUID> ids);
+
+    // 계좌의 미완료(PLANNED·SUBMITTING·PLACED) 주문 — 날짜 무관(자정 넘김 대비), 거래일·생성 시각 오름차순 (코인 주문 동기화용)
+    List<Order> findOpenByAccountId(UUID accountId);
 }

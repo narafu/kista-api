@@ -61,8 +61,8 @@ class OrderEntity extends BaseAuditEntity {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
 
-    @Column(nullable = false)
-    private int quantity;
+    @Column(nullable = false, precision = 20, scale = 8)
+    private BigDecimal quantity; // 주문 수량 (주식 정수·코인 소수 8자리)
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -71,8 +71,8 @@ class OrderEntity extends BaseAuditEntity {
     @Column(name = "external_order_id", length = 255)
     private String externalOrderId; // PLACED 이후 설정
 
-    @Column(name = "filled_quantity")
-    private Integer filledQuantity; // 체결 수량 (null=미확인, 0=미체결)
+    @Column(name = "filled_quantity", precision = 20, scale = 8)
+    private BigDecimal filledQuantity; // 체결 수량 (null=미확인, 0=미체결)
 
     @Column(name = "filled_price", precision = 12, scale = 2)
     private BigDecimal filledPrice; // 체결 가중평균가 (null=미체결)

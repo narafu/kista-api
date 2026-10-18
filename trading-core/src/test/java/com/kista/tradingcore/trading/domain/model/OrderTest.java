@@ -36,5 +36,17 @@ class OrderTest {
         // 강등 결과가 원본과 동일 — 8개 필드 매핑 전부 고정
         assertThat(o.toPlanned()).isEqualTo(p);
     }
-}
 
+    @Test
+    void cryptoMarketKeepsFractionalQuantity() {
+        Order o = Order.cryptoMarket(UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 10, 18),
+                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
+                new BigDecimal("0.00012345"), new BigDecimal("150000000"));
+
+        assertThat(o.quantity()).isEqualByComparingTo("0.00012345");
+        assertThat(o.status()).isEqualTo(OrderStatus.PLANNED);
+        assertThat(o.orderType()).isEqualTo(OrderType.MARKET);
+        assertThat(o.id()).isNull();
+        assertThat(o.externalOrderId()).isNull();
+    }
+}

@@ -130,10 +130,12 @@ class TossDistributedTokenCoordinator implements TokenCoordinator {
                 // 방금 OAuth로 새로 발급한 토큰 — 리소스 서버 전파 지연 가능성이 있어 대기 필요
                 return new RecoveredToken(issued.accessToken(), true);
             }
-            return awaitNewerCanonical(lease.scope(), lease.generation());
         } finally {
             tokenStore.release(lease);
         }
+        // STALE — lease를 먼저 놓고 대기한다. invalidate(키 교체·삭제)로 생긴 STALE은 새 발급자가 따로 없어,
+        // lease를 쥔 채 기다리면 같은 계좌 follower가 lease TTL 동안 발급하지 못하고 막힌다
+        return awaitNewerCanonical(lease.scope(), lease.generation());
     }
 
     private RecoveredToken awaitNewerCanonical(String scope, long staleGeneration) {

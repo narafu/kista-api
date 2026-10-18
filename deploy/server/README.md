@@ -98,6 +98,7 @@ GRAFANA_CLOUD_OTLP_AUTH_HEADER=    # Grafana Cloud 발급 "Basic xxxx" 인증 �
 
 HEARTBEAT_OPEN_URL=          # healthchecks.io 개장 스케쥴러 dead-man's switch (미설정 시 핑 생략)
 HEARTBEAT_CLOSE_URL=         # healthchecks.io 마감 스케쥴러 dead-man's switch (미설정 시 핑 생략)
+HEARTBEAT_CRYPTO_URL=        # healthchecks.io 코인 DCA 10분 틱 dead-man's switch (미설정 시 핑 생략, 체크 period 10분·grace 20~30분)
 ```
 
 Optional JVM override (기본값은 `docker-compose.yml`에 이미 OCI 12GB 인스턴스 기준으로 반영돼 있다 — 다른 값이 필요할 때만 `.env`에 명시):
@@ -151,7 +152,7 @@ nohup bash /opt/kista-infra/bin/reconcile.sh kista-api "$(basename "$(readlink /
 - **메트릭**: 앱이 `micrometer-registry-otlp`로 Grafana Cloud에 60초 간격 직접 OTLP push (`management.otlp.metrics.export`, `GRAFANA_CLOUD_OTLP_*` 환경변수) — 별도 사이드카 불필요
 - **Redis 영속성**: kista-infra 레포 소유 — 상세 설정(AOF 등)은 kista-infra README 참고. `kista-api`에 `depends_on: redis`는 의도적으로 미사용(Spring Data Redis lazy connection이라 앱 부팅을 막지 않음)
 - **헬스체크**: UptimeRobot → `https://{API_DOMAIN}/actuator/health` 5분 간격 (full health — DB·Redis 포함)
-- **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유)를 등록해야 실제로 미실행이 감지됨
+- **스케줄러 감시**: Healthchecks.io dead-man's-switch — `TradingOpenScheduler`/`TradingCloseScheduler` 실행 완료 시 `HeartbeatPort.pingOpen()`/`pingClose()` GET 핑, `CryptoDcaScheduler` 틱 완료 시 `pingCrypto()`. `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL`/`HEARTBEAT_CRYPTO_URL` 미설정 시 핑 생략(배포 안전). healthchecks.io 콘솔에서 각 체크의 예상 주기(개장 ~22:30 KST, 마감 ~04:30 KST + DST 여유, 코인 틱 10분 + grace 20~30분)를 등록해야 실제로 미실행이 감지됨
 - **로그**: `docker logs -f $(docker ps -qlf label=com.docker.compose.service=kista-api)` (서버 SSH — kista-api는 blue/green이라 컨테이너 이름 미고정, kista-scheduler·kista-trading은 `docker logs -f <이름>` — 서버 루트엔 compose 파일이 없어 `docker compose logs`는 쓰지 않는다)
 
 ## fida

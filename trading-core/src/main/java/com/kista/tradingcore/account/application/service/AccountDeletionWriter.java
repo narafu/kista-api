@@ -2,7 +2,7 @@ package com.kista.tradingcore.account.application.service;
 
 import com.kista.tradingcore.account.application.event.AccountDeletedEvent;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
+import com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -18,12 +18,12 @@ import java.util.UUID;
 class AccountDeletionWriter {
 
     private final AccountPort accountPort;
-    private final BrokerTokenCachePort brokerTokenCachePort;
+    private final AccountTokenEvictionPort accountTokenEvictionPort;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void delete(UUID accountId) {
-        brokerTokenCachePort.deleteByAccountIds(List.of(accountId));
+        accountTokenEvictionPort.evict(List.of(accountId));
         accountPort.delete(accountId);
         // 커밋 후 발행 — trading 리스너가 전략·사이클·포지션을 독립적으로 정리(EPR 재시도 보장)
         eventPublisher.publishEvent(new AccountDeletedEvent(accountId));

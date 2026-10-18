@@ -168,7 +168,7 @@ class DcaRoundPlanner {
         if (!config.hasIndicator(DcaIndicator.AVG_PRICE)) return null;
         try {
             BrokerBalance b = liveBalancePort.getLiveBalance(ctx.account().brokerRef(), ctx.strategy().ticker());
-            return new DcaCycleOrderStrategy.DcaInputs.Holding(b.holdings(), b.avgPrice());
+            return new DcaCycleOrderStrategy.DcaInputs.Holding(BigDecimal.valueOf(b.holdings()), b.avgPrice());
         } catch (RuntimeException e) {
             log.warn("[DCA] 실잔고 조회 실패: strategy={}", ctx.strategy().id(), e);
             return null;

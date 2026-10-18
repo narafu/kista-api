@@ -3,6 +3,7 @@ package com.kista.api.admin.adapter.in.web;
 import com.kista.api.admin.adapter.in.web.dto.AdminSettingsRequest;
 import com.kista.api.admin.adapter.in.web.dto.RuntimeSettingsResponse;
 import com.kista.api.admin.application.usecase.AdminSettingsUseCase;
+import com.kista.api.admin.domain.model.RuntimeSettingsBundle;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -37,10 +38,12 @@ public class AdminSettingsController {
     public ResponseEntity<RuntimeSettingsResponse> updateSettings(
             @AuthenticationPrincipal UUID adminId,
             @RequestBody @Valid AdminSettingsRequest request) {
+        // 요청에 빠진 증권사 키는 현재 정책 값을 유지한다 — 신규 증권사(UPBIT)를 모르는 구 관리자 화면 호환
         // 요청 전체를 도메인 설정으로 검증한 뒤 단일 갱신 유스케이스를 호출한다.
         // benchmarks 생략 여부는 DTO 단계에서만 판별 가능 — toDomain() 변환 시 null이 기본값으로 치환되기 전에 확인한다.
+        RuntimeSettingsBundle requested = request.toDomain(adminSettingsUseCase.getSettings().tradingPolicy().brokers());
         return noStore(RuntimeSettingsResponse.from(
-                adminSettingsUseCase.updateSettings(adminId, request.toDomain(), request.benchmarks() != null)));
+                adminSettingsUseCase.updateSettings(adminId, requested, request.benchmarks() != null)));
     }
 
     private ResponseEntity<RuntimeSettingsResponse> noStore(RuntimeSettingsResponse response) {

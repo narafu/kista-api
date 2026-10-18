@@ -93,6 +93,9 @@ toss:
   admin-client-id: ${TOSS_ADMIN_CLIENT_ID:}
   admin-client-secret: ${TOSS_ADMIN_CLIENT_SECRET:}
 
+upbit: # 사용자별 키라 서버 공용 시크릿 없음 — 요청마다 계좌 자격증명으로 JWT 서명
+  base-url: https://api.upbit.com
+
 telegram: # root와 동일 관리자 봇 공유(TelegramProperties 클래스 주석 참고) — 누락·빈값이면 @NotBlank로 기동 실패
   bot-token: ${TELEGRAM_BOT_TOKEN:}
   chat-id: ${TELEGRAM_CHAT_ID:}
@@ -100,6 +103,7 @@ telegram: # root와 동일 관리자 봇 공유(TelegramProperties 클래스 주
 heartbeat: # 스케쥴러별 healthchecks.io 핑 — 미설정 시 핑 생략
   open-url: ${HEARTBEAT_OPEN_URL:}
   close-url: ${HEARTBEAT_CLOSE_URL:}
+  crypto-url: ${HEARTBEAT_CRYPTO_URL:} # 코인 DCA 10분 틱
 
 alpaca: # marketcalendar(휴장일)와 stats(백테스트 과거 일봉) 공용 — root와 동일 API 키 재사용
   base-url: https://paper-api.alpaca.markets

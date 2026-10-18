@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
+import java.math.BigDecimal;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort;
@@ -41,9 +42,9 @@ class TradingReportNotifier {
         // 체결 건별 SSE 실시간 알림 — 알림 설정과 무관하게 항상 발송
         for (TradeLegSummary e : event.executions()) {
             TradeEventMessage tradeEvent = e.direction() == OrderDirection.SELL
-                    ? TradeEventMessage.sell(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(),
+                    ? TradeEventMessage.sell(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
                             event.accountNickname(), event.accountId(), event.strategyId())
-                    : TradeEventMessage.buy(e.ticker().name(), e.quantity(), e.price().doubleValue(), e.amountUsd().doubleValue(),
+                    : TradeEventMessage.buy(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
                             event.accountNickname(), event.accountId(), event.strategyId());
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }

@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.support.DataJpaTestBase;
@@ -122,6 +123,57 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(deleted).isEqualTo(2);
         assertThat(adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now())).isEmpty();
         assertThat(adapter.findPlacedByCycleAndDate(cycleId, LocalDate.now())).hasSize(1);
+    }
+
+    @Test
+    void findOpenByAccountIdReturnsPlannedSubmittingAndPlacedAcrossDates() {
+        LocalDate today = LocalDate.of(2026, 10, 18);
+        UUID otherAccountId = UUID.randomUUID();
+        insertAccount(otherAccountId, userId, false);
+
+        insertOrderForAccount(accountId, cycleId, today, "SOXL", "BUY", "PLANNED", null, null);
+        insertOrderForAccount(accountId, cycleId, today.minusDays(1), "SOXL", "BUY", "PLACED", null, null);
+        insertOrderForAccount(accountId, cycleId, today, "SOXL", "SELL", "SUBMITTING", null, null);
+        insertOrderForAccount(accountId, cycleId, today, "SOXL", "BUY", "FILLED", 5, new BigDecimal("22.00"));
+        insertOrderForAccount(otherAccountId, cycleId, today, "SOXL", "BUY", "PLANNED", null, null);
+
+        List<Order> open = adapter.findOpenByAccountId(accountId);
+
+        assertThat(open).extracting(Order::status).containsExactlyInAnyOrder(OrderStatus.PLACED, OrderStatus.PLANNED, OrderStatus.SUBMITTING);
+        assertThat(open.get(0).tradeDate()).isEqualTo(today.minusDays(1)); // 거래일 오름차순
+    }
+
+    @Test
+    void findOpenByAccountIdOrdersSameTradeDateByCreatedAtAscending() {
+        LocalDate day = LocalDate.of(2026, 10, 18);
+        // created_at을 명시해 삽입 순서와 정렬 기준이 어긋나게 한다(가장 늦게 만든 행을 먼저 삽입)
+        insertOrderCreatedAt(day, "LATE", "2026-10-18 03:00:00+00");
+        insertOrderCreatedAt(day, "EARLY", "2026-10-18 01:00:00+00");
+        insertOrderCreatedAt(day, "MID", "2026-10-18 02:00:00+00");
+
+        List<Order> open = adapter.findOpenByAccountId(accountId);
+
+        assertThat(open).extracting(Order::orderLeg).containsExactly("EARLY", "MID", "LATE");
+    }
+
+    // created_at 지정 주문 삽입(order_leg로 행 식별)
+    private void insertOrderCreatedAt(LocalDate tradeDate, String leg, String createdAt) {
+        jdbcTemplate.update(
+                "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', ?, 22.00, 5, 'PLANNED', ?::timestamptz, now())",
+                accountId, cycleId, tradeDate, leg, createdAt);
+    }
+
+    @Test
+    void savesAndReloadsFractionalQuantity() {
+        Order saved = adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),
+                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
+                new BigDecimal("0.00012345"), new BigDecimal("150000000")));
+
+        Order reloaded = adapter.findById(saved.id()).orElseThrow();
+
+        assertThat(reloaded.quantity()).isEqualByComparingTo("0.00012345");
+        assertThat(reloaded.price()).isEqualByComparingTo("150000000");
     }
 
     // 주문 1건 직접 삽입 헬퍼
@@ -245,6 +297,32 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         return adapter.findById(id).orElseThrow().status();
     }
 
+    Order saveCrypto() {
+        return adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),
+                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
+                new BigDecimal("0.0001"), new BigDecimal("10000")));
+    }
+
+    @Test
+    void submittingCryptoOrderCanBePlacedOrFailed() {
+        UUID a = saveCrypto().id();
+        adapter.markSubmitting(a);
+        adapter.markPlaced(a, "upbit-uuid");
+        assertThat(statusOf(a)).isEqualTo(OrderStatus.PLACED);
+
+        UUID b = saveCrypto().id();
+        adapter.markSubmitting(b);
+        adapter.markFailed(b);
+        assertThat(statusOf(b)).isEqualTo(OrderStatus.FAILED);
+    }
+
+    @Test
+    void plannedCryptoOrderCanBeCancelled() {
+        UUID id = saveCrypto().id();
+        adapter.cancelPlanned(id);
+        assertThat(statusOf(id)).isEqualTo(OrderStatus.CANCELLED);
+    }
+
     @Test
     void markSubmitting_plannedToSubmitting() {
         UUID id = insertWithId("BUY", "PLANNED");
@@ -351,5 +429,43 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
         assertThat(saved.id()).isNotNull();
         assertThat(saved.status()).isEqualTo(OrderStatus.PLANNED);
+    }
+
+    @Test
+    void quantityRoundTripsAsPlainInteger() {
+        PlannedOrder planned = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.BUY, 10, new BigDecimal("22.00"));
+        adapter.saveAll(List.of(Order.fromPlanned(planned, accountId, cycleId)));
+
+        Order saved = adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now()).getFirst();
+
+        // DB는 numeric(20,8) — 읽은 뒤에도 scale 0 정수여야 한다
+        assertThat(saved.quantity()).isEqualTo(BigDecimal.TEN);
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT numeric_precision || ',' || numeric_scale FROM information_schema.columns
+                WHERE table_schema = 'trading' AND table_name = 'orders' AND column_name = 'quantity'
+                """, String.class)).isEqualTo("20,8");
+    }
+
+    @Test
+    void fractionalCryptoQuantityIsStored() {
+        Order fractional = new Order(null, accountId, cycleId, LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY,
+                new BigDecimal("0.00012345"), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
+        adapter.saveAll(List.of(fractional));
+
+        assertThat(adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now()).getFirst().quantity())
+                .isEqualByComparingTo("0.00012345");
+    }
+
+    @Test
+    void sellReservationSumReadsNumericColumn() {
+        PlannedOrder sell = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+                OrderDirection.SELL, 7, new BigDecimal("22.00"));
+        adapter.saveAll(List.of(Order.fromPlanned(sell, accountId, cycleId)));
+
+        // SUM(numeric)은 BigDecimal — Long 수신이면 런타임 변환 실패
+        assertThat(adapter.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(accountId, LocalDate.now(), StrategyTicker.SOXL))
+                .isEqualTo(7);
     }
 }

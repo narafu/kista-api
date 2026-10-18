@@ -224,7 +224,7 @@ class TossAuthApiTest {
                     {"result":[{"accountSeq":42,"accountNo":"1234567890"}]}
                     """);
 
-            String result = api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null);
+            String result = api.verifyAccount(CLIENT_ID, CLIENT_SECRET, null).brokerAccountCode();
 
             assertThat(result).isEqualTo("42");
             server.verify();

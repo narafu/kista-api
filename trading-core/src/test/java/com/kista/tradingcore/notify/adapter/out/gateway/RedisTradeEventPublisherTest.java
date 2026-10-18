@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
+import java.math.BigDecimal;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import org.junit.jupiter.api.AfterAll;
@@ -53,23 +54,25 @@ class RedisTradeEventPublisherTest {
 
     @Test
     void notifyTrade_publishesJsonPayloadToTradeEventChannel() throws InterruptedException {
+        UUID userId = UUID.randomUUID();
         BlockingQueue<String> received = new ArrayBlockingQueue<>(1);
+        // Pub/Sub 채널은 DB 구분이 없다 — 로컬 trading-core가 같은 채널에 실제 매매 이벤트를 발행할 수 있어 이 테스트 userId만 받는다
         MessageListenerAdapter adapter = new MessageListenerAdapter(
-                (org.springframework.data.redis.connection.MessageListener) (message, pattern) ->
-                        received.offer(new String(message.getBody())));
+                (org.springframework.data.redis.connection.MessageListener) (message, pattern) -> {
+                    String body = new String(message.getBody());
+                    if (body.contains(userId.toString())) received.offer(body);
+                });
         listenerContainer.addMessageListener(adapter, new ChannelTopic("trade.event"));
 
         RedisTradeEventPublisher publisher = new RedisTradeEventPublisher(redisTemplate, new ObjectMapper());
-        UUID userId = UUID.randomUUID();
-        TradeEventMessage event = TradeEventMessage.buy("SOXL", 5, 22.5, 112.5, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
+        TradeEventMessage event = TradeEventMessage.buy("SOXL", BigDecimal.valueOf(5), 22.5, 112.5, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
 
         // 리스너 등록이 비동기라 발행 전 잠깐의 여유가 필요 — 실패 시 sleep 연장 대신 원인 재확인
         Thread.sleep(200);
         publisher.notifyTrade(userId, event);
 
         String payload = received.poll(3, TimeUnit.SECONDS);
-        assertThat(payload).isNotNull();
-        assertThat(payload).contains(userId.toString());
+        assertThat(payload).isNotNull(); // 리스너가 이 userId만 받으므로 수신 자체가 userId 포함 검증
         assertThat(payload).contains("\"ticker\":\"SOXL\"");
         assertThat(payload).contains("\"kind\":\"BUY\"");
 

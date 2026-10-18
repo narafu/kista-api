@@ -187,7 +187,7 @@ class ReorderServiceTest {
     // 저장 후 id가 채워진 PLANNED 재주문 — 선점 전 id 확보(멱등키) 흐름 검증용
     private Order stubSaved() {
         Order saved = new Order(UUID.randomUUID(), ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.IMMEDIATE, OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.IMMEDIATE, OrderDirection.SELL, BigDecimal.valueOf(1),
                 new BigDecimal("236.54"), OrderStatus.PLANNED, null, null, null);
         when(orderPort.save(any())).thenReturn(saved);
         return saved;
@@ -376,25 +376,25 @@ class ReorderServiceTest {
 
     private Order plannedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1),
                 new BigDecimal("236.54"), OrderStatus.PLANNED, null, null, null);
     }
 
     private Order placedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1),
                 new BigDecimal("236.54"), OrderStatus.PLACED, "PLACED-1", null, null);
     }
 
     private Order filledOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 2,
-                new BigDecimal("236.54"), OrderStatus.FILLED, "FILLED-1", 2, new BigDecimal("236.54"));
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(2),
+                new BigDecimal("236.54"), OrderStatus.FILLED, "FILLED-1", BigDecimal.valueOf(2), new BigDecimal("236.54"));
     }
 
     private Order failedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
-                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, 1,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1),
                 new BigDecimal("236.54"), OrderStatus.FAILED, null, null, null);
     }
 

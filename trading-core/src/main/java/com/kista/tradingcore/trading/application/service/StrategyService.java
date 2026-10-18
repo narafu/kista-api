@@ -1,4 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
+
+import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +69,7 @@ class StrategyService implements StrategyUseCase {
         // 먼저 PAUSED로 기록해 이후 배치가 이 전략으로 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다
         // 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
         // 자격증명 오류(키 만료·철회)는 재시도로 풀리지 않아 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다
+        orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         if (cancelled.retryableFailedCount() > 0) {
@@ -85,6 +90,7 @@ class StrategyService implements StrategyUseCase {
         }
         // 먼저 PAUSED로 기록해 이후 배치가 새 주문을 만들지 않게 하고, 배치가 정지 뒤 체결을 기록하지 않으므로 오늘 미체결 주문을 정리한다
         // 취소 실패분은 관리자 알림 후 PLACED로 남는다
+        orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         log.info("전략 일시중지: strategyId={}, cancelledOrders={}, failedOrders={}",
@@ -229,15 +235,16 @@ class StrategyService implements StrategyUseCase {
         if (strategy.isDca()) {
             DcaExecution last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id())).get(strategy.id());
             dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
-                    .map(config -> buildDcaSummary(config, last, c))).orElse(null);
+                    .map(config -> buildDcaSummary(config, last, c, strategy.ticker().getMarket()))).orElse(null);
         }
 
         return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
     }
 
     // DCA 요약 — 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산
-    private DcaSummary buildDcaSummary(DcaConfig config, DcaExecution last, StrategyCycle cycle) {
-        return dcaSummaryAssembler.assemble(config, last, DcaSummaryAssembler.firstEligibleDate(cycle.startDate(), last));
+    private DcaSummary buildDcaSummary(DcaConfig config, DcaExecution last, StrategyCycle cycle, Market market) {
+        LocalDateTime nowKst = LocalDateTime.now(TimeZones.KST);
+        return dcaSummaryAssembler.assemble(config, last, DcaSummaryAssembler.firstEligibleDate(cycle.startDate(), last, config, market, nowKst), market);
     }
 
     // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
@@ -308,7 +315,7 @@ class StrategyService implements StrategyUseCase {
 
             DcaSummary dcaSummary = null;
             if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
-                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.get(strategy.id()), latestCycle.get());
+                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.get(strategy.id()), latestCycle.get(), strategy.ticker().getMarket());
             }
 
             return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);

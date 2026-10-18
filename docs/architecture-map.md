@@ -103,7 +103,7 @@ flowchart LR
     end
     subgraph OPS["운영 관측·백업"]
         GRAF["Grafana Cloud<br/>OTLP 메트릭 push"]
-        HC["healthchecks.io<br/>개장·마감 heartbeat"]
+        HC["healthchecks.io<br/>개장·마감·코인 틱 heartbeat"]
         OBJ["OCI Object Storage<br/>kista-infra-backups"]
     end
 

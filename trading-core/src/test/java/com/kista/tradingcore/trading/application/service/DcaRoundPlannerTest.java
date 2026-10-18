@@ -148,7 +148,7 @@ class DcaRoundPlannerTest {
     void existing_dca_order_with_execution_row_does_nothing() {
         dca(OrderDirection.BUY, OrderType.MOC);
         when(executionPort.find(ctx.strategy().id(), TRADE_DATE)).thenReturn(Optional.of(
-                DcaExecution.ordered(ctx.strategy().id(), TRADE_DATE, UUID.randomUUID(), 3, null)));
+                DcaExecution.ordered(ctx.strategy().id(), TRADE_DATE, UUID.randomUUID(), BigDecimal.valueOf(3), null)));
         Order existing = existingOrder(OrderTiming.AT_CLOSE, OrderType.MOC);
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing), null)).isEmpty();
         verify(recorder, never()).recordOrdered(any(), any(), any(), any());
@@ -159,8 +159,8 @@ class DcaRoundPlannerTest {
         // PLANNED/PLACED 조회에는 안 잡히는 종결 상태(FILLED) 주문 — 이력 누락 재진입에서 2번째 주문을 만들면 안 된다
         dca(OrderDirection.BUY, OrderType.MOC);
         Order filled = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
-                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", 3, new BigDecimal("91.48"),
-                OrderStatus.FILLED, "E1", 3, new BigDecimal("88.00"));
+                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", BigDecimal.valueOf(3), new BigDecimal("91.48"),
+                OrderStatus.FILLED, "E1", BigDecimal.valueOf(3), new BigDecimal("88.00"));
         when(orderPort.findByStrategyId(ctx.strategy().id(), TRADE_DATE, TRADE_DATE)).thenReturn(List.of(filled));
 
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null)).isEmpty();
@@ -331,7 +331,7 @@ class DcaRoundPlannerTest {
 
     private Order existingOrder(OrderTiming timing, OrderType type) {
         return new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
-                type, timing, OrderDirection.BUY, "DCA_BUY", 3, new BigDecimal("91.48"), OrderStatus.PLANNED, null, null, null);
+                type, timing, OrderDirection.BUY, "DCA_BUY", BigDecimal.valueOf(3), new BigDecimal("91.48"), OrderStatus.PLANNED, null, null, null);
     }
 
     private void dca(OrderDirection dir, OrderType type) {

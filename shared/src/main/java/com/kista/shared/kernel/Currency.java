@@ -1,7 +1,8 @@
-package com.kista.tradingcore.broker.domain.model;
+package com.kista.shared.kernel;
 
 import java.util.Optional;
 
+// 통화 — broker(KIS crcy_cd 파싱)와 계좌 응답(broker 파생 통화)이 공유하는 어휘. broker.domain.model에서 승격(복제 금지)
 public enum Currency {
     KRW, // 원화
     USD, // 미국 달러

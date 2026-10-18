@@ -130,7 +130,7 @@ class DcaCycleOrderStrategyTest {
     void avg_price_condition_compares_rounded_threshold() {
         // 평단 85 × (1 − 5%) = 80.75, 종가 90 > 80.75 → LTE 미충족
         DcaDecision d = decide(withConditions(OrderDirection.BUY, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")), null,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(10, new BigDecimal("85.00")));
+                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("10"), new BigDecimal("85.00")));
         assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET,
                 "전일 종가 90.00 > 평단 85.00 × (1 − 5%) = 80.75", new BigDecimal("90.00")));
     }
@@ -138,21 +138,21 @@ class DcaCycleOrderStrategyTest {
     @Test
     void avg_price_positive_threshold_detail() {
         DcaDecision d = decide(withConditions(OrderDirection.SELL, avg(DcaOperator.GTE, "10")), List.of(new BigDecimal("90.00")), 5,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(10, new BigDecimal("85.00")));
+                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("10"), new BigDecimal("85.00")));
         assertThat(((DcaDecision.Skipped) d).detail()).isEqualTo("전일 종가 90.00 < 평단 85.00 × (1 + 10%) = 93.50");
     }
 
     @Test
     void avg_price_buy_with_zero_holdings_passes() {
         DcaDecision d = decide(withConditions(OrderDirection.BUY, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")), null,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(0, null));
+                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("0"), null));
         assertThat(d).isInstanceOf(DcaDecision.Planned.class);
     }
 
     @Test
     void avg_price_sell_with_zero_holdings_reports_no_holdings() {
         DcaDecision d = decide(withConditions(OrderDirection.SELL, avg(DcaOperator.GTE, "10")), List.of(new BigDecimal("90.00")), 0,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(0, null));
+                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("0"), null));
         assertThat(((DcaDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.NO_HOLDINGS);
     }
 

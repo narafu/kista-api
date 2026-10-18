@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,6 +53,21 @@ class AccountPersistenceAdapterTest {
         e.setBrokerAccountCode("01");
         e.setBroker(Broker.KIS);
         return e;
+    }
+
+    @Test
+    void save_upbitWithoutAccountNo_hashesAccessKeyAndSkipsEncryptingNull() {
+        Account upbit = new Account(null, UUID.randomUUID(), "업비트", null, "ak", "sk", null, Broker.UPBIT, null,
+                Instant.parse("2027-01-01T00:00:00Z"));
+        when(accountJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = adapter.save(upbit);
+
+        verify(crypto, never()).encrypt(null);
+        verify(accountJpaRepository).save(argThat(e -> e.getAccountNo() == null && "hash:ak".equals(e.getAccountNoHash())
+                && Instant.parse("2027-01-01T00:00:00Z").equals(e.getApiKeyExpiresAt())));
+        assertThat(saved.accountNo()).isNull();
+        assertThat(saved.apiKeyExpiresAt()).isEqualTo(Instant.parse("2027-01-01T00:00:00Z"));
     }
 
     @Test

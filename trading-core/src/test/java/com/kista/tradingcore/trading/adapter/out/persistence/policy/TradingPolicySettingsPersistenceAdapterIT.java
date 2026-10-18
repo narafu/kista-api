@@ -31,7 +31,7 @@ class TradingPolicySettingsPersistenceAdapterIT extends DataJpaTestBase {
 
         // 증권사 한 곳을 비활성화한 정책을 저장한 뒤 다시 조회한다.
         Map<Broker, BrokerSettings> brokers = new EnumMap<>(TradingPolicySettings.defaults().brokers());
-        brokers.put(Broker.TOSS, new BrokerSettings(false));
+        brokers.put(Broker.TOSS, new BrokerSettings(false, null));
         TradingPolicySettings changed = new TradingPolicySettings(brokers, TradingPolicySettings.defaults().strategies());
 
         adapter.save(changed);

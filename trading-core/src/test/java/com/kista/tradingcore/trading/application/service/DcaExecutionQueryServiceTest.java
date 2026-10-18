@@ -42,13 +42,13 @@ class DcaExecutionQueryServiceTest {
                 StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(dca);
         UUID orderId = UUID.randomUUID();
-        DcaExecution ordered = DcaExecution.ordered(strategyId, LocalDate.of(2026, 9, 30), orderId, 3, null);
+        DcaExecution ordered = DcaExecution.ordered(strategyId, LocalDate.of(2026, 9, 30), orderId, BigDecimal.valueOf(3), null);
         DcaExecution skipped = DcaExecution.skipped(strategyId, LocalDate.of(2026, 8, 31), DcaSkipReason.CONDITION_NOT_MET, "x", null);
         when(executionPort.findPage(strategyId, 0, 20)).thenReturn(List.of(ordered, skipped));
         when(executionPort.count(strategyId)).thenReturn(2L);
         when(calendar.usSessionDateOf(any())).thenAnswer(inv -> inv.<LocalDate>getArgument(0).minusDays(1));
         Order order = new Order(orderId, dca.accountId(), UUID.randomUUID(), LocalDate.of(2026, 9, 30), StrategyTicker.UPRO,
-                OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, 3, null, OrderStatus.FILLED, "E1", 3, new BigDecimal("80"));
+                OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(3), null, OrderStatus.FILLED, "E1", BigDecimal.valueOf(3), new BigDecimal("80"));
         when(orderPort.findAllByIds(List.of(orderId))).thenReturn(List.of(order));
 
         DcaExecutionPage page = service.list(strategyId, UUID.randomUUID(), 0, 20);

@@ -2,6 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.shared.kernel.Broker;
@@ -77,10 +78,10 @@ class TossAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public String verifyAccount(String appKey, String secretKey, String accountNo) {
+    public BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo) {
         // Toss는 계좌번호(accountNo) 대신 clientId/secret으로 accountSeq를 조회해 검증
         String token = issueOAuthToken(appKey, secretKey).accessToken();
-        return fetchAccountSeq(token);
+        return new BrokerAccountVerification(fetchAccountSeq(token), null);
     }
 
     @Override

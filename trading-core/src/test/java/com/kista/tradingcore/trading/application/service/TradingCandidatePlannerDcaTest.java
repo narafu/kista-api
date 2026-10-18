@@ -108,7 +108,7 @@ class TradingCandidatePlannerDcaTest {
         when(allocator.allocate(any(), eq(DAY))).thenReturn(new TradingOrderBudgetAllocator.Allocation(
                 List.of(new TradingOrderBudgetAllocator.Candidate(ctx, List.of(planned))), List.of(), List.of()));
         Order saved = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO,
-                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", 3, new BigDecimal("91.48"),
+                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", BigDecimal.valueOf(3), new BigDecimal("91.48"),
                 OrderStatus.PLANNED, null, null, null);
         // 저장 전 재확인은 빈 목록, 저장 후 조회는 저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of(), List.of(saved));

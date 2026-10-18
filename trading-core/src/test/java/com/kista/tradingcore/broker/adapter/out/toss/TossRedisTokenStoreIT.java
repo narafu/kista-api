@@ -103,6 +103,32 @@ class TossRedisTokenStoreIT {
         return lease.orElseThrow(() -> new AssertionError("successor lease acquisition timed out"));
     }
 
+    @Test
+    @DisplayName("무효화는 canonical을 지우고 진행 중 lease의 옛 토큰 write를 STALE로 fence한다")
+    void invalidateDeletesCanonicalAndFencesInFlightOwner() {
+        TossTokenStore.Lease issued = store.tryAcquire(scope, "owner-1", Duration.ofSeconds(10)).orElseThrow();
+        store.storeIfCurrent(issued, new TossTokenStore.TokenValue("old-key-token", 3_600), Duration.ofMinutes(55));
+        store.release(issued);
+        TossTokenStore.Lease inFlight = store.tryAcquire(scope, "owner-2", Duration.ofSeconds(10)).orElseThrow();
+
+        store.invalidate(scope);
+
+        assertThat(store.find(scope)).isEmpty();
+        assertThat(store.matchesRecentFingerprint(scope, "old-key-token")).isFalse();
+        assertThat(store.storeIfCurrent(inFlight,
+                new TossTokenStore.TokenValue("old-key-token-2", 3_600), Duration.ofMinutes(55)))
+                .isEqualTo(TossTokenStore.StoreResult.STALE);
+        assertThat(store.find(scope)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("발급 이력 없는 scope 무효화는 Redis key를 만들지 않는다")
+    void invalidateNeverIssuedScopeCreatesNoKey() {
+        store.invalidate(scope);
+
+        assertThat(redisTemplate.countExistingKeys(keys())).isZero();
+    }
+
     private List<String> keys() {
         return List.of(
                 TossRedisTokenStore.canonicalKey(scope),

@@ -36,7 +36,7 @@ public record AdminTradeResponse(
         @Schema(description = "접수 시점", example = "AT_OPEN")
         String timing,           // AT_OPEN | AT_CLOSE
         @Schema(description = "주문 수량")
-        int quantity,
+        BigDecimal quantity,
         @Schema(description = "주문 가격")
         BigDecimal price,
         @Schema(description = "주문 상태", example = "FILLED")
@@ -44,7 +44,7 @@ public record AdminTradeResponse(
         @Schema(description = "브로커 측 주문 ID")
         String externalOrderId,
         @Schema(description = "체결 수량 (미체결 시 null)")
-        Integer filledQuantity,
+        BigDecimal filledQuantity,
         @Schema(description = "체결 가격 (미체결 시 null)")
         BigDecimal filledPrice
 ) {

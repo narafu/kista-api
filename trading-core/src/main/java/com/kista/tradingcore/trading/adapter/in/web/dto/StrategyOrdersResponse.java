@@ -12,6 +12,7 @@ public record StrategyOrdersResponse(
         @Schema(description = "전략의 주문 목록")
         List<Item> orders) {
 
+    @Schema(name = "StrategyOrderItem")
     public record Item(
             @Schema(description = "주문 고유 ID")
             UUID id,
@@ -22,13 +23,13 @@ public record StrategyOrdersResponse(
             @Schema(description = "주문 유형", example = "LOC")
             String orderType,
             @Schema(description = "주문 수량")
-            int quantity,
+            BigDecimal quantity,
             @Schema(description = "주문 가격")
             BigDecimal price,
             @Schema(description = "주문 상태", example = "PLACED")
             String status,
             @Schema(description = "체결 수량 (미체결이면 null)")
-            Integer filledQuantity,
+            BigDecimal filledQuantity,
             @Schema(description = "체결 가격 (미체결이면 null)")
             BigDecimal filledPrice
     ) {

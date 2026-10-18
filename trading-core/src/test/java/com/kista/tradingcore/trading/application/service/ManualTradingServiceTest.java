@@ -156,7 +156,7 @@ class ManualTradingServiceTest {
         // SELL 15주 계획, live holdings=10 → 보유수량 부족 → ManualTradingException
         Order sellOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.SELL, 15, new BigDecimal("22.00"),
+                OrderDirection.SELL, BigDecimal.valueOf(15), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder.toPlanned()));
@@ -176,7 +176,7 @@ class ManualTradingServiceTest {
         // 증권사 타입 예외는 409로 감싸지 않고 그대로 전파 — TradingExceptionHandler가 503 매핑·에러 로그 기록
         Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyOrder.toPlanned()));
@@ -206,7 +206,7 @@ class ManualTradingServiceTest {
     void execute_existingOrderToday_throwsAlreadyOrderedToday() {
         Order existing = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of(existing));
 
@@ -219,7 +219,7 @@ class ManualTradingServiceTest {
         // 증권사 타입이 아닌 예상 밖 예외는 500(ManualTradingFailedException)으로 승격 — 핸들러는 보고하지 않으므로 서비스가 TradingErrorEvent를 발행
         Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.BUY, 1, new BigDecimal("22.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyOrder.toPlanned()));
@@ -236,7 +236,7 @@ class ManualTradingServiceTest {
     void execute_existingReservedSellExceedsAvailable_rejects() {
         Order sellOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.SELL, 3, new BigDecimal("22.00"),
+                OrderDirection.SELL, BigDecimal.valueOf(3), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(sellOrder.toPlanned()));
@@ -260,11 +260,11 @@ class ManualTradingServiceTest {
         // BUY 1주, live 충분(usdDeposit=$10,000, holdings=10) → saveAll 호출, 주문 반환
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
         Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
@@ -288,11 +288,11 @@ class ManualTradingServiceTest {
     void execute_cycleOrderedWhileWaitingForLock_throwsAlreadyOrderedToday() {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
         Order batchSaved = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
         lenient().when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
@@ -310,7 +310,7 @@ class ManualTradingServiceTest {
     void execute_allocationAndSave_runInsideAccountBudgetLock() throws InterruptedException {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("20.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
@@ -343,7 +343,7 @@ class ManualTradingServiceTest {
         // 현재가 50.00 기준 캡(52.50)으로 보정된 뒤 금액(52.50)은 예산 안에 든다
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("100.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
@@ -362,7 +362,7 @@ class ManualTradingServiceTest {
         when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
         Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("52.50"), OrderStatus.PLANNED, null, null, null);
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("52.50"), OrderStatus.PLANNED, null, null, null);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
                 .thenReturn(List.of(), List.of(), List.of(savedOrder));
@@ -379,7 +379,7 @@ class ManualTradingServiceTest {
     void execute_cappedAmountStillExceedsBudget_throwsManualTradingException() {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
-                OrderDirection.BUY, 1, new BigDecimal("100.00"),
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
@@ -466,18 +466,18 @@ class ManualTradingServiceTest {
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문 (BUY 1주 + SELL 1주)
         Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
-                1, new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
         Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
-                1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
         UUID vrBuyId = UUID.randomUUID();
         UUID vrSellId = UUID.randomUUID();
         Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
-                1, new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
         Order vrSellPlanned = new Order(vrSellId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
-                1, new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
 
         when(strategyPort.findByIdOrThrow(vrStrat.id())).thenReturn(vrStrat);
         when(strategyCyclePort.requireLatestByStrategyId(vrStrat.id())).thenReturn(vrCycle);

@@ -19,12 +19,15 @@ public record TradingPolicySettings(
         validateTickersWithinCapability(strategies);
     }
 
+    public static final String UPBIT_ALLOWED_IP = "168.107.63.152"; // OCI Reserved IPv4 — 업비트 API 키 허용 IP 안내값
+
     // 현재 운영 동작을 보존하는 기본값 — 저장 행이 없을 때와 신규 enum 상수 백필에 쓰인다
     public static TradingPolicySettings defaults() {
         Map<Broker, BrokerSettings> brokers = new EnumMap<>(Broker.class);
         for (Broker broker : Broker.values()) {
-            brokers.put(broker, new BrokerSettings(true));
+            brokers.put(broker, new BrokerSettings(true, null));
         }
+        brokers.put(Broker.UPBIT, new BrokerSettings(false, UPBIT_ALLOWED_IP)); // 단계 배포 — 운영자가 관리자 설정에서 켠다
         Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
         strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
                 field(true, List.copyOf(StrategyType.INFINITE.capability().availableTickers()), StrategyTicker.SOXL),
@@ -37,7 +40,8 @@ public record TradingPolicySettings(
                 field(true, List.of(BigDecimal.valueOf(10), BigDecimal.valueOf(15), BigDecimal.valueOf(20)), BigDecimal.valueOf(15)),
                 field(true, List.of(1, 2, 4), 2)));
         strategies.put(StrategyType.DCA, new StrategyCreationSettings(false, // 단계 배포 — 운영자가 관리자 설정에서 켠다
-                field(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO), null, null, null, null));
+                field(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH),
+                        StrategyTicker.UPRO), null, null, null, null));
         return new TradingPolicySettings(brokers, strategies);
     }
 

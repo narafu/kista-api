@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.mock;
 
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.shared.kernel.Broker;
 import org.springframework.stereotype.Component;
 
@@ -21,8 +22,8 @@ class MockAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public String verifyAccount(String appKey, String secretKey, String accountNo) {
+    public BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo) {
         // KIS와 동일하게 brokerAccountCode 없음
-        return null;
+        return new BrokerAccountVerification(null, null);
     }
 }

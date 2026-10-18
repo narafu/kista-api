@@ -50,7 +50,7 @@ class OrderSubmitterTest {
             UUID.randomUUID(), "key", "secret", "74420614", null, Broker.KIS);
     static final UUID ORDER_ID = UUID.randomUUID();
     static final Order ORDER = new Order(ORDER_ID, ACCOUNT_REF.id(), UUID.randomUUID(), LocalDate.now(),
-            StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 3,
+            StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(3),
             new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null);
 
     private OrderSubmitter submitter() {

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionPage;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -12,11 +13,12 @@ import java.util.UUID;
 // DCA 회차 이력 페이지 응답 (spec 7.3)
 public record DcaExecutionPageResponse(List<Item> content, int page, int size, long totalElements) {
 
+    @Schema(name = "DcaExecutionItem")
     public record Item(LocalDate kstTradeDate, LocalDate usSessionDate, String status, String skipReason, String detail,
-                       BigDecimal referencePrice, Integer quantity,
+                       BigDecimal referencePrice, BigDecimal quantity,
                        OrderSummary order) {}
 
-    public record OrderSummary(UUID id, String status, Integer filledQuantity, BigDecimal filledPrice) {}
+    public record OrderSummary(UUID id, String status, BigDecimal filledQuantity, BigDecimal filledPrice) {}
 
     public static DcaExecutionPageResponse from(DcaExecutionPage p) {
         return new DcaExecutionPageResponse(p.content().stream().map(DcaExecutionPageResponse::item).toList(),

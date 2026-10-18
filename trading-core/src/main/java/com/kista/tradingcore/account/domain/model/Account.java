@@ -10,17 +10,39 @@ public record Account(
         UUID id,               // PK
         UUID userId,           // FK → users.id
         String nickname,       // 계좌 별칭
-        String accountNo,      // 계좌번호 (복호화된 값)
-        String appKey,      // API 앱 키 — KIS App Key / Toss Client ID (복호화된 값)
-        String secretKey,   // API 앱 시크릿 — KIS Secret Key / Toss Client Secret (복호화된 값)
+        String accountNo,      // 계좌번호 (복호화된 값) — 업비트는 null
+        String appKey,      // API 앱 키 — KIS App Key / Toss Client ID / 업비트 Access Key (복호화된 값)
+        String secretKey,   // API 앱 시크릿 — KIS Secret Key / Toss Client Secret / 업비트 Secret Key (복호화된 값)
         String brokerAccountCode, // 증권사 API 보조 식별자 — KIS: null(accountNo에 통합), TOSS: accountSeq
         Broker broker,            // 증권사 (기본: KIS)
-        Instant createdAt         // DB created_at, 신규 등록 시 null
+        Instant createdAt,        // DB created_at, 신규 등록 시 null
+        Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 업비트만 값
 ) {
+    // 만료일 없는 기존 생성 지점 호환(KIS/Toss/MOCK)
+    public Account(UUID id, UUID userId, String nickname, String accountNo, String appKey, String secretKey,
+                   String brokerAccountCode, Broker broker, Instant createdAt) {
+        this(id, userId, nickname, accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, null);
+    }
+
+    // 전역 중복 판정 키 SSOT — 업비트는 계좌번호가 없어 access key, 그 외는 계좌번호
+    public static String dedupeKeyOf(Broker broker, String accountNo, String appKey) {
+        return broker == Broker.UPBIT ? appKey : accountNo;
+    }
+
+    public String dedupeKey() {
+        return dedupeKeyOf(broker, accountNo, appKey);
+    }
+
     // nickname만 교체 — AccountService.update 전용
     public Account withNickname(String newNickname) {
         return new Account(id, userId, newNickname != null ? newNickname : nickname,
-                accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt);
+                accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, apiKeyExpiresAt);
+    }
+
+    // 자격증명 교체 — 검증 결과의 보조 식별자·만료일 반영
+    public Account withCredentials(String newAppKey, String newSecretKey, String newBrokerAccountCode, Instant newApiKeyExpiresAt) {
+        return new Account(id, userId, nickname, accountNo, newAppKey, newSecretKey,
+                newBrokerAccountCode, broker, createdAt, newApiKeyExpiresAt);
     }
 
     // broker 포트 시그니처용 자격증명 투영 — broker 모듈이 account.Account를 참조하지 않도록 Account가 스스로 변환한다
@@ -36,11 +58,11 @@ public record Account(
         }
     }
 
-    // 동일 사용자가 같은 계좌번호를 중복 등록 시도한 경우
+    // 같은 계좌(번호, 업비트는 access key)를 중복 등록 시도한 경우
     public static class DuplicateAccountException extends RuntimeException {
         public DuplicateAccountException(String accountNo) {
-            // accountNo는 메시지에 싣지 않는다 — detail이 사용자 응답으로 나가므로 계좌번호 원문 노출 방지
-            super("이미 등록된 계좌번호입니다.");
+            // 계좌 식별값은 메시지에 싣지 않는다 — detail이 사용자 응답으로 나가므로 계좌번호 원문 노출 방지
+            super("이미 등록된 계좌입니다.");
         }
     }
 }

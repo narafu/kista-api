@@ -1,5 +1,7 @@
 package com.kista.tradingcore.broker.domain.model;
 
+import com.kista.shared.kernel.Currency;
+
 import java.math.BigDecimal;
 
 public record MarginItem(

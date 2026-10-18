@@ -27,7 +27,8 @@ import static org.mockito.Mockito.doThrow;
 // fallbackExecution 알림 리스너가 트랜잭션 밖 발행 지점(CyclePositionPersistor 등)에서 인라인 실행될 때
 // 알림 경로 실패(FCM 위임 XADD)가 발행자에게 전파되지 않는지 실 컨텍스트로 잠근다
 @Tag("integration")
-@SpringBootTest(properties = "spring.data.redis.url=redis://localhost:6379")
+// DB 15 — 로컬 trading-core(DB 0)의 user.* 스트림 컨슈머 그룹과 경쟁하지 않도록 테스트 전용 DB(UserEventStreamBridgeIT와 동일)
+@SpringBootTest(properties = "spring.data.redis.url=redis://localhost:6379/15")
 // 실 Redis 스트림 구독자(user.* 컨슈머 그룹)가 살아 있는 컨텍스트 — 캐시로 남으면 같은 그룹을 쓰는 UserEventStreamBridgeIT의 메시지를 먼저 가져간다
 @DirtiesContext
 @ActiveProfiles("test")

@@ -27,7 +27,7 @@ public record AdminAccountItem(
         UserSummary user = a.userId() != null ? userMap.get(a.userId()) : null;
         String nickname = user != null ? user.nickname() : "(알 수 없음)";
         return new AdminAccountItem(
-                a.id(), a.userId(), nickname, AccountNumberMasker.mask(a.accountNo()), a.accountNo(),
+                a.id(), a.userId(), nickname, a.accountNo() == null ? null : AccountNumberMasker.mask(a.accountNo()), a.accountNo(), // UPBIT은 계좌번호 없음
                 a.broker() != null ? a.broker().name() : null);
     }
 }

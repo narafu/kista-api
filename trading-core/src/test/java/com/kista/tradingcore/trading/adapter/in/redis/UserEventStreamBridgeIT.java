@@ -33,7 +33,9 @@ class UserEventStreamBridgeIT {
 
     @BeforeEach
     void setUp() {
-        connectionFactory = new LettuceConnectionFactory(new RedisStandaloneConfiguration("localhost", 6379));
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration("localhost", 6379);
+        config.setDatabase(15); // 로컬 trading-core(DB 0)가 같은 스트림·그룹을 구독 중이면 레코드를 먼저 가져가므로 테스트 전용 DB로 분리
+        connectionFactory = new LettuceConnectionFactory(config);
         connectionFactory.afterPropertiesSet();
         redisTemplate = new StringRedisTemplate(connectionFactory);
         redisTemplate.afterPropertiesSet();

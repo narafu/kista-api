@@ -83,7 +83,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void page_and_latest_are_trade_date_desc() {
         executions.insertIfAbsent(DcaExecution.skipped(strategyId, LocalDate.of(2026, 10, 1), DcaSkipReason.NO_HOLDINGS, null, null));
-        executions.insertIfAbsent(DcaExecution.ordered(strategyId, LocalDate.of(2026, 10, 2), null, 3, new BigDecimal("87.12")));
+        executions.insertIfAbsent(DcaExecution.ordered(strategyId, LocalDate.of(2026, 10, 2), null, BigDecimal.valueOf(3), new BigDecimal("87.12")));
         assertThat(executions.findPage(strategyId, 0, 10)).extracting(DcaExecution::tradeDate)
                 .containsExactly(LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 1));
         assertThat(executions.findLatestByStrategyIds(List.of(strategyId)).get(strategyId).tradeDate())
@@ -140,5 +140,21 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     void config_without_conditions_loads_empty_list() {
         dcaDetail.save(versionId, configWith(List.of()));
         assertThat(dcaDetail.findActiveByStrategyId(strategyId).orElseThrow().conditions()).isEmpty();
+    }
+
+    @Test
+    void saveAndLoad_cryptoConfigWithExecutionHour() {
+        DcaConfig crypto = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET,
+                DcaFrequency.WEEKLY, java.time.DayOfWeek.SUNDAY, null, List.of(), 23);
+
+        DcaConfig saved = dcaDetail.save(versionId, crypto);
+        em.flush();
+        em.clear();
+
+        DcaConfig loaded = dcaDetail.findActiveByStrategyId(strategyId).orElseThrow();
+        assertThat(saved.executionHour()).isEqualTo(23);
+        assertThat(loaded.executionHour()).isEqualTo(23);
+        assertThat(loaded.amount()).isEqualByComparingTo("10000");
+        assertThat(loaded.dayOfWeek()).isEqualTo(java.time.DayOfWeek.SUNDAY);
     }
 }

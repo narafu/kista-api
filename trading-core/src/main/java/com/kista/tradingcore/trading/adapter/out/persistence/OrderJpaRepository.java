@@ -18,6 +18,9 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, OrderStatus status);
 
+    // 계좌의 지정 상태 주문 — 거래일·생성 시각 오름차순
+    List<OrderEntity> findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(UUID accountId, List<OrderStatus> statuses);
+
     // 사이클·거래일 내 증권사 주문번호 존재 여부 (수동 체결 보정 중복 반영 방지 — 주문번호는 일자별 채번이라 거래일 포함)
     boolean existsByStrategyCycleIdAndTradeDateAndExternalOrderId(UUID strategyCycleId, LocalDate tradeDate, String externalOrderId);
 
@@ -71,7 +74,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("tradeDate") LocalDate tradeDate);
 
     // 계좌·거래일·종목 기준 미접수/접수 완료 SELL 예약 수량 합계 (판매가능수량 중복 배정 방지용)
-    // PostgreSQL SUM(integer)는 bigint를 반환하므로 Long으로 수신한다
+    // PostgreSQL SUM(numeric)은 numeric을 반환하므로 BigDecimal로 수신한다
     @Query(value = """
             SELECT COALESCE(SUM(quantity), 0)
             FROM orders
@@ -81,7 +84,7 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
               AND direction = 'SELL'
               AND status IN ('PLANNED', 'SUBMITTING', 'PLACED')
             """, nativeQuery = true)
-    Long sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
+    BigDecimal sumPlannedOrPlacedSellQuantityByAccountIdAndTradeDateAndTicker(
             @Param("accountId") UUID accountId,
             @Param("tradeDate") LocalDate tradeDate,
             @Param("ticker") String ticker);

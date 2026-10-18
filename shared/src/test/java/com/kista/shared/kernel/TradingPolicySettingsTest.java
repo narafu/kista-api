@@ -16,7 +16,7 @@ class TradingPolicySettingsTest {
         TradingPolicySettings settings = TradingPolicySettings.defaults();
 
         assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
-        assertThat(settings.brokers().values()).allMatch(BrokerSettings::enabled);
+        assertThat(settings.brokers().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != Broker.UPBIT)); // UPBIT만 기본 비활성
         assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
         assertThat(settings.strategies().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != StrategyType.DCA)); // DCA만 기본 비활성
         assertThat(settings.strategy(StrategyType.INFINITE).divisionCount())
@@ -28,11 +28,25 @@ class TradingPolicySettingsTest {
     }
 
     @Test
+    void upbitDefaultsToDisabledWithServerIp() {
+        BrokerSettings upbit = TradingPolicySettings.defaults().brokers().get(Broker.UPBIT);
+        assertThat(upbit.enabled()).isFalse();
+        assertThat(upbit.allowedIp()).isEqualTo("168.107.63.152");
+        assertThat(TradingPolicySettings.defaults().brokers().get(Broker.KIS).allowedIp()).isNull();
+    }
+
+    @Test
+    void dcaDefaultsAllowCryptoTickers() {
+        assertThat(TradingPolicySettings.defaults().strategy(StrategyType.DCA).ticker().allowedValues())
+                .containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH);
+    }
+
+    @Test
     void rejectsMissingKnownBrokerOrStrategyKeys() {
         TradingPolicySettings defaults = TradingPolicySettings.defaults();
 
         assertThatThrownBy(() -> new TradingPolicySettings(
-                Map.of(Broker.KIS, new BrokerSettings(true)), defaults.strategies()))
+                Map.of(Broker.KIS, new BrokerSettings(true, null)), defaults.strategies()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("broker");
         assertThatThrownBy(() -> new TradingPolicySettings(defaults.brokers(),
@@ -81,7 +95,7 @@ class TradingPolicySettingsTest {
     void defaults_keep_dca_disabled_with_dca_tickers() {
         StrategyCreationSettings dca = TradingPolicySettings.defaults().strategy(StrategyType.DCA);
         assertThat(dca.enabled()).isFalse();
-        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD);
+        assertThat(dca.ticker().allowedValues()).containsExactly(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH);
         assertThat(dca.ticker().defaultValue()).isEqualTo(StrategyTicker.UPRO);
         assertThat(dca.divisionCount()).isNull();
     }

@@ -175,7 +175,7 @@ class TradingPreviewService {
                                             BigDecimal totalAccountPlannedBuy) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
-                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .map(o -> o.price().multiply(o.quantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
 

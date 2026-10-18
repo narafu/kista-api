@@ -2,6 +2,7 @@ package com.kista.tradingcore.account.adapter.in.web;
 
 import com.kista.tradingcore.account.adapter.in.web.dto.AccountRequest;
 import com.kista.tradingcore.account.adapter.in.web.dto.AccountResponse;
+import com.kista.tradingcore.account.adapter.in.web.dto.CredentialsRequest;
 import com.kista.tradingcore.account.adapter.in.web.dto.TestConnectionRequest;
 import com.kista.tradingcore.account.application.usecase.AccountUseCase;
 import com.kista.shared.kernel.Broker;
@@ -68,6 +69,25 @@ public class AccountController {
         return AccountResponse.from(
                 accountUseCase.update(id, userId, request.toUpdateCommand())
         );
+    }
+
+    // 계좌 API 키 교체 (소유권 검증 → 연결 테스트 통과 시 저장)
+    @Operation(summary = "계좌 API 키 수정", description = "새 앱 키·시크릿으로 증권사 연결을 검증한 뒤 저장하고 키 만료일(업비트)을 갱신. 모의계좌는 불가.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수정 성공"),
+            @ApiResponse(responseCode = "400", description = "모의계좌이거나 다른 계좌의 키"),
+            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
+            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
+            @ApiResponse(responseCode = "409", description = "다른 계좌에 이미 등록된 키(업비트)"),
+            @ApiResponse(responseCode = "422", description = "키가 유효하지 않거나 IP 미허용·권한 부족")
+    })
+    @PutMapping("/{id}/credentials")
+    public AccountResponse updateCredentials(
+            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody CredentialsRequest request) {
+        return AccountResponse.from(accountUseCase.updateCredentials(id, userId, request.toCommand()));
     }
 
     // 계좌 삭제 (소유권 검증)

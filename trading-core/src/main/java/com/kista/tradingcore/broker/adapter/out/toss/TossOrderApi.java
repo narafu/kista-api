@@ -162,6 +162,7 @@ class TossOrderApi {
         return switch (type) {
             case LOC, MOC -> "CLS"; // MOC 미지원 → LIMIT+CLS로 장마감 경매 참여
             case LIMIT, MOO -> "DAY";
+            case MARKET -> throw new IllegalArgumentException("MARKET 주문은 코인 거래소 전용입니다"); // 주식 경로 도달 불가 방어
         };
     }
 

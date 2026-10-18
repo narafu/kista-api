@@ -40,6 +40,7 @@ public record PortfolioSummaryResponse(
     ) {}
 
     // 계좌 전체 요약 — PresentBalanceResult output3 필드
+    @Schema(name = "PortfolioSummaryDto")
     public record SummaryDto(
             @Schema(description = "총자산 (KRW — 필드명은 usd지만 KRW 값을 담고 있는 KIS 응답 원본 quirk 유지)")
             BigDecimal totalAssetUsd,           // tot_asst_amt: 총자산 (KRW — 필드명 quirk 유지)

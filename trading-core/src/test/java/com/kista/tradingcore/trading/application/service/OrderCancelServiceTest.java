@@ -362,7 +362,7 @@ class OrderCancelServiceTest {
     @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
     void cancelOrder_notPlaced_throwsIllegalStateException() {
         Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.FILLED, "ORD_99", null, null);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
@@ -411,13 +411,13 @@ class OrderCancelServiceTest {
 
     private Order placedOrder(UUID id, String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     private Order plannedOrder(UUID id) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.PLANNED, null, null, null);
     }
 
@@ -425,7 +425,7 @@ class OrderCancelServiceTest {
 
     private Order submittingOrder(UUID id) {
         return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, 5, BigDecimal.valueOf(25),
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.SUBMITTING, null, null, null);
     }
 
@@ -495,6 +495,75 @@ class OrderCancelServiceTest {
                 .isInstanceOf(OrderCancelException.class)
                 .hasMessage("주문 접수를 처리하는 중입니다. 잠시 후 다시 시도해 주세요.");
         verify(brokerPort, never()).cancel(any(), any());
+    }
+
+    // --- 코인(UPBIT) 계좌: 시장가 주문은 즉시 체결되므로 주식 브로커 취소를 호출하지 않는다 ---
+
+    private Order cryptoOrder(OrderStatus status) {
+        return new Order(UUID.randomUUID(), accountId, strategyCycleId, LocalDate.now(), StrategyTicker.BTC,
+                OrderType.MARKET, OrderTiming.AT_CLOSE, OrderDirection.BUY, new BigDecimal("0.00012345"),
+                BigDecimal.valueOf(100_000_000), status, "upbit-uuid", null, null);
+    }
+
+    @Test
+    @DisplayName("accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel: 체결 확인 중 코인 주문이 있으면 아무것도 지우지 않고 거부한다")
+    void accountDeletionWithPlacedCryptoOrderDoesNotCallBrokerCancel() {
+        Account upbit = TradingFixtures.upbitAccount(accountId, requesterId);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findOpenByAccountId(accountId)).thenReturn(List.of(cryptoOrder(OrderStatus.PLACED)));
+
+        assertThatThrownBy(() -> service.cancelOpenOrders(cycleId, upbit))
+                .isInstanceOf(OrderCancelException.class).hasMessageContaining("체결 확인 중");
+        verify(orderPort, never()).deletePlannedByCycleAndDate(any(), any());
+        verify(orderPort, never()).findPlacedByCycleAndDate(any(), any());
+        verifyNoInteractions(brokerPort, awaiter);
+    }
+
+    @Test
+    @DisplayName("코인 계좌에 PLANNED만 있으면 삭제하고 진행 — 브로커 취소·대기 없음")
+    void cryptoOnlyPlanned_deletesAndProceeds() {
+        Account upbit = TradingFixtures.upbitAccount(accountId, requesterId);
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findOpenByAccountId(accountId)).thenReturn(List.of(cryptoOrder(OrderStatus.PLANNED)));
+        when(orderPort.deletePlannedByCycleAndDate(eq(strategyCycleId), any())).thenReturn(1);
+
+        CancelResult result = service.cancelOpenOrders(cycleId, upbit);
+
+        assertThat(result.failedCount()).isZero();
+        assertThat(result.cancelledCount()).isPositive();
+        verify(orderPort, never()).findPlacedByCycleAndDate(any(), any());
+        verifyNoInteractions(brokerPort, awaiter, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("requireNoCryptoInFlight: 주식 계좌는 조회 없이 통과")
+    void requireNoCryptoInFlight_stockAccount_noop() {
+        service.requireNoCryptoInFlight(cycleId, ownedAccount);
+        verifyNoInteractions(orderPort);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 코인 PLANNED 단건 취소는 cancelPlanned로 처리")
+    void cancelOrder_cryptoPlanned_cancelPlanned() {
+        Order order = cryptoOrder(OrderStatus.PLANNED);
+        when(orderPort.findById(order.id())).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(TradingFixtures.upbitAccount(accountId, requesterId));
+
+        service.cancelOrder(order.id(), requesterId);
+
+        verify(orderPort).cancelPlanned(order.id());
+        verifyNoInteractions(brokerPort);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 코인 PLACED 주문 단건 취소는 브로커 취소 없이 OrderCancelException")
+    void cancelOrder_cryptoPlaced_rejectedWithoutBrokerCall() {
+        Order order = cryptoOrder(OrderStatus.PLACED);
+        when(orderPort.findById(order.id())).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(TradingFixtures.upbitAccount(accountId, requesterId));
+
+        assertThatThrownBy(() -> service.cancelOrder(order.id(), requesterId)).isInstanceOf(OrderCancelException.class);
+        verifyNoInteractions(brokerPort, awaiter);
     }
 }
 

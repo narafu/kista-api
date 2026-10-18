@@ -69,13 +69,13 @@ class TradingOrderPlannerTest {
         assertThat(savedBuy.externalOrderId()).isNull();
         assertThat(savedBuy.direction()).isEqualTo(OrderDirection.BUY);
         assertThat(savedBuy.orderLeg()).isEqualTo("INFINITE_BUY_01");
-        assertThat(savedBuy.quantity()).isEqualTo(10);
+        assertThat(savedBuy.quantity()).isEqualByComparingTo("10");
         assertThat(savedBuy.price()).isEqualByComparingTo("50.00");
 
         Order savedSell = saved.get(1);
         assertThat(savedSell.accountId()).isEqualTo(ACCOUNT.id());
         assertThat(savedSell.direction()).isEqualTo(OrderDirection.SELL);
-        assertThat(savedSell.quantity()).isEqualTo(5);
+        assertThat(savedSell.quantity()).isEqualByComparingTo("5");
     }
 
     @Test

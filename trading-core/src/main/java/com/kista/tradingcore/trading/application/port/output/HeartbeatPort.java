@@ -4,4 +4,5 @@ package com.kista.tradingcore.trading.application.port.output;
 public interface HeartbeatPort {
     void pingOpen();  // 개장 스케쥴러 실행 완료 신호
     void pingClose(); // 마감 스케쥴러 실행 완료 신호
+    void pingCrypto(); // 코인 DCA 틱 실행 완료 신호(10분 주기)
 }

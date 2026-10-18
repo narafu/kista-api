@@ -6,6 +6,8 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.domain.model.TradingReport;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 
+import com.kista.tradingcore.account.application.event.ApiKeyExpiringEvent;
+import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
 
 import java.math.BigDecimal;
@@ -26,4 +28,8 @@ public interface TradingUserNotificationPort {
     void notifyMarketClose(TradingUserProfile profile);
     // DCA 회차 미주문 사용자 알림
     void notifyDcaRoundSkipped(TradingUserProfile profile, DcaRoundSkippedEvent event);
+    // 코인 주문 체결 사용자 알림
+    void notifyCryptoTrade(TradingUserProfile profile, CryptoOrderFilledEvent event);
+    // 업비트 API 키 만료 임박·당일 알림
+    void notifyApiKeyExpiring(TradingUserProfile profile, ApiKeyExpiringEvent event);
 }

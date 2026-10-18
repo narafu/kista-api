@@ -1,0 +1,20 @@
+package com.kista.tradingcore.trading.application.event;
+
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.StrategyTicker;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+// 코인 주문 체결 확인 — 체결 동기화가 markFilled 직후 발행
+public record CryptoOrderFilledEvent(
+        UUID userId,              // 알림 수신자
+        UUID accountId,           // 대상 계좌
+        UUID strategyId,          // 대상 전략
+        String accountNickname,   // 알림 표기
+        StrategyTicker ticker,    // 종목
+        OrderDirection direction, // 매수/매도
+        BigDecimal filledQuantity, // 체결 수량
+        BigDecimal avgPrice,      // 체결 평균가 (KRW)
+        BigDecimal amountKrw      // 체결 금액 = 수량 × 평균가, 원 단위 HALF_UP
+) {}

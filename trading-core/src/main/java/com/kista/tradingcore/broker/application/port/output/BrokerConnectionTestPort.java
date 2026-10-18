@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.application.port.output;
 
 import com.kista.shared.kernel.Broker;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 
 import java.util.UUID;
 
@@ -14,6 +15,6 @@ public interface BrokerConnectionTestPort {
     // 실패 시 BrokerCredentialException
     void verifyCredentials(String appKey, String secretKey, UUID accountId);
 
-    // 자격증명+계좌 검증 후 brokerAccountCode 반환 (KIS: null, Toss: accountSeq). 실패 시 BrokerCredentialException
-    String verifyAccount(String appKey, String secretKey, String accountNo);
+    // 자격증명+계좌 검증 후 보조 식별자·키 만료일 반환 (KIS: 둘 다 null, Toss: accountSeq, 업비트: accountNo 무시·만료일). 실패 시 BrokerCredentialException
+    BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo);
 }

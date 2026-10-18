@@ -93,12 +93,12 @@ class TradingQueryHttpAdapterTest {
         assertThat(order.timing()).isEqualTo(OrderTiming.AT_CLOSE);
         assertThat(order.direction()).isEqualTo(OrderDirection.BUY);
         assertThat(order.orderLeg()).isEqualTo("BUY_01");
-        assertThat(order.quantity()).isEqualTo(10);
+        assertThat(order.quantity()).isEqualByComparingTo("10");
         assertThat(order.price()).isEqualByComparingTo(new BigDecimal("123.45"));
         assertThat(order.price().scale()).isEqualTo(2); // 금액 scale 보존 확인 — 소수점 드리프트 방지
         assertThat(order.status()).isEqualTo(OrderStatus.PARTIALLY_FILLED);
         assertThat(order.externalOrderId()).isEqualTo("EXT-0001");
-        assertThat(order.filledQuantity()).isEqualTo(5);
+        assertThat(order.filledQuantity()).isEqualByComparingTo("5");
         assertThat(order.filledPrice()).isEqualByComparingTo(new BigDecimal("123.40"));
         assertThat(order.filledPrice().scale()).isEqualTo(2);
     }

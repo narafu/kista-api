@@ -31,7 +31,7 @@ public record RuntimeSettingsResponse(
         // 도메인 enum 키를 유지하면서 웹 응답 타입으로 변환한다 — root 설정과 trading-core 정책을 한 응답으로 합친다.
         RuntimeSettings settings = bundle.runtime();
         Map<Broker, BrokerResponse> brokers = new EnumMap<>(Broker.class);
-        bundle.tradingPolicy().brokers().forEach((key, value) -> brokers.put(key, new BrokerResponse(value.enabled())));
+        bundle.tradingPolicy().brokers().forEach((key, value) -> brokers.put(key, new BrokerResponse(value.enabled(), value.allowedIp())));
         Map<StrategyType, StrategyResponse> strategies = new EnumMap<>(StrategyType.class);
         bundle.tradingPolicy().strategies().forEach((key, value) -> strategies.put(key, StrategyResponse.from(value)));
         return new RuntimeSettingsResponse(new AuthResponse(settings.approvalRequired()),
@@ -43,12 +43,16 @@ public record RuntimeSettingsResponse(
             boolean approvalRequired) { // 가입 승인 공개 설정
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record BrokerResponse(
             @Schema(description = "증권사 신규 계좌 등록 허용 여부")
-            boolean enabled) { // 증권사 신규 등록 공개 설정
+            boolean enabled,
+            @Schema(description = "거래소 API 키에 등록할 서버 공인 IP (업비트만, 그 외 생략)", example = "168.107.63.152")
+            String allowedIp) { // 증권사 신규 등록 공개 설정
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(name = "RuntimeStrategySettings")
     public record StrategyResponse(
             @Schema(description = "신규 전략 생성 허용 여부")
             boolean enabled,

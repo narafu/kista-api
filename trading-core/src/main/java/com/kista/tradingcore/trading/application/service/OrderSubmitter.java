@@ -84,7 +84,7 @@ class OrderSubmitter {
 
     // 증권사 접수 지시 — 주문 id를 멱등키로 실어 같은 주문의 재요청을 안전하게 한다(Toss만 사용)
     static OrderInstruction instructionOf(Order order) {
-        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity(), order.price(),
+        return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity().intValueExact(), order.price(),
                 order.id().toString());
     }
 

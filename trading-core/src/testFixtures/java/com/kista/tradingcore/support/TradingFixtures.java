@@ -28,6 +28,11 @@ public final class TradingFixtures {
         return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Broker.TOSS, null);
     }
 
+    // 기본 업비트 계좌 — 계좌번호 없음(access key가 중복 판정 키)
+    public static Account upbitAccount(UUID id, UUID userId) {
+        return new Account(id, userId, "업비트", null, "access-key", "secret-key", null, Broker.UPBIT, null);
+    }
+
     // 배치 경로용 KIS 계좌 투영 — kisAccount와 동일 값
     public static TradingAccount tradingAccount(UUID id, UUID userId) {
         return TradingAccount.from(kisAccount(id, userId));
