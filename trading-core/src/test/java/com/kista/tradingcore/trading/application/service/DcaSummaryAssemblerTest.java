@@ -41,18 +41,25 @@ class DcaSummaryAssemblerTest {
     }
 
     @Test
-    void cryptoNextExecutionMovesToTomorrowFromExecutionHour() {
+    void cryptoNextExecutionStaysTodayWithinExecutionHourUntilDecided() {
         LocalDate today = LocalDate.of(2026, 10, 14);
-        // 코인 스케줄러는 실행 시각 00분에 돌므로 HH:00 이후엔 오늘 회차가 이미 진행·완료
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 30))).isEqualTo(today.plusDays(1));
+        // 실행 시각대 안에서 판정 전이면 남은 틱(재시도·시각대 중 신규 등록)이 오늘 실행 — 오늘
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 30))).isEqualTo(today);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(12, 59))).isEqualTo(today);
+        // 마지막 틱(13:50) 시작 뒤엔 남은 틱이 없어 내일
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 50))).isEqualTo(today);
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 55))).isEqualTo(today.plusDays(1));
+        // 시각대가 지나면 내일
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
     }
 
     @Test
-    void cryptoExactExecutionHourMovesToTomorrow() {
+    void cryptoExactExecutionHourIsTodayUntilDecided() {
         LocalDate today = LocalDate.of(2026, 10, 14);
-        // 13:00 정각은 hour >= executionHour 이므로 이미 실행 시각 — 내일부터
-        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today.plusDays(1));
+        // 13:00 정각 판정 전은 오늘, 같은 시각대에 이미 판정했으면 내일
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today);
+        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 10))).isEqualTo(today.plusDays(1));
     }
 
     @Test

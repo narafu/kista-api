@@ -46,7 +46,7 @@ class CryptoDcaRoundExecutor {
     private static final int CANDLE_COUNT = 250;                  // 일봉 조회 봉 수 (주식 DcaRoundPlanner와 동일)
     // ponytail: 업비트 KRW 수수료율 고정 — 거래소별 수수료 조회가 필요해지면 확장
     private static final BigDecimal FEE_FACTOR = new BigDecimal("1.0005"); // 1 + 수수료율 0.05%
-    private static final int LAST_TICK_MINUTE = 50;               // 이 분 이후 틱은 마지막 시도 — 일시 장애도 미주문 기록
+    static final int LAST_TICK_MINUTE = 50;               // 이 분 이후 틱은 마지막 시도 — 일시 장애도 미주문 기록
     // 접수 확정 상태 — 신규 주문을 막고 이력만 복구 (FAILED·CANCELLED는 재시도 허용)
     private static final Set<OrderStatus> CONFIRMED = Set.of(OrderStatus.PLACED, OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED);
     // 접수 미확정 상태 — 동기화기(CryptoOrderSynchronizer) 소관이라 이력 없이 신규 주문만 막는다
