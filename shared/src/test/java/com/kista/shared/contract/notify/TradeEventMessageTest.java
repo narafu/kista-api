@@ -19,6 +19,16 @@ class TradeEventMessageTest {
     }
 
     @Test
+    void serializesSmallAndExponentQuantitiesWithoutScientificNotation() {
+        assertThat(json(new BigDecimal("0.00000012"))).contains("\"quantity\":0.00000012");
+        assertThat(json(new BigDecimal("1E+2"))).contains("\"quantity\":100");
+    }
+
+    private String json(BigDecimal q) {
+        return mapper.writeValueAsString(TradeEventMessage.buy("BTC", q, 1.0, 1.0, "n", UUID.randomUUID(), null));
+    }
+
+    @Test
     void deserializesIntegerQuantity() {
         String json = "{\"kind\":\"BUY\",\"ticker\":\"SOXL\",\"quantity\":3,\"price\":1.0,\"amount\":3.0}";
         TradeEventMessage e = mapper.readValue(json, TradeEventMessage.class);
