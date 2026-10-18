@@ -10,7 +10,7 @@ import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
+import com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort;
 import com.kista.tradingcore.broker.application.service.BrokerConnectionTesters;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import org.junit.jupiter.api.Test;
@@ -55,7 +55,7 @@ class AccountServiceKeyRotationDbTest extends DataJpaTestBase {
             when(testers.of(Broker.UPBIT)).thenReturn(tester);
             when(tester.verifyAccount(any(), any(), any())).thenReturn(new BrokerAccountVerification(null, null));
             AccountService service = new AccountService(racing, testers, mock(BrokerEnabledPort.class),
-                    mock(BrokerTokenCachePort.class), mock(AccountOpenOrderCancelPort.class), mock(AccountDeletionWriter.class));
+                    mock(AccountTokenEvictionPort.class), mock(AccountOpenOrderCancelPort.class), mock(AccountDeletionWriter.class));
 
             assertThatThrownBy(() -> service.updateCredentials(b.id(), userId, new UpdateCredentialsCommand(keyA, "sk2")))
                     .isInstanceOf(Account.DuplicateAccountException.class);

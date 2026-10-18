@@ -11,7 +11,7 @@ import com.kista.tradingcore.account.domain.model.UpdateCredentialsCommand;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.application.port.output.BrokerEnabledPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
+import com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.shared.kernel.Broker;
@@ -42,15 +42,15 @@ class AccountServiceTest {
     @Mock BrokerConnectionTestPort connectionTester;  // 라우터가 반환하는 실제 포트 mock
     @Mock BrokerEnabledPort brokerEnabledPort;
     @Mock ApplicationEventPublisher eventPublisher;
-    @Mock BrokerTokenCachePort brokerTokenCachePort;
+    @Mock AccountTokenEvictionPort accountTokenEvictionPort;
     @Mock AccountOpenOrderCancelPort openOrderCancelPort; // 삭제 전 미체결 주문 취소 (trading 구현)
     AccountService accountService;
 
     @BeforeEach
     void setUpService() {
         // deletionWriter는 실제 인스턴스에 mock 포트를 위임 — 삭제 DB 쓰기·이벤트 발행을 그대로 검증
-        accountService = new AccountService(accountPort, connectionTesters, brokerEnabledPort, brokerTokenCachePort,
-                openOrderCancelPort, new AccountDeletionWriter(accountPort, brokerTokenCachePort, eventPublisher));
+        accountService = new AccountService(accountPort, connectionTesters, brokerEnabledPort, accountTokenEvictionPort,
+                openOrderCancelPort, new AccountDeletionWriter(accountPort, accountTokenEvictionPort, eventPublisher));
     }
 
     private final UUID userId = UUID.randomUUID();
@@ -236,7 +236,7 @@ class AccountServiceTest {
         accountService.delete(accountId, userId);
 
         verify(accountPort).delete(accountId);
-        verify(brokerTokenCachePort).deleteByAccountIds(List.of(accountId));
+        verify(accountTokenEvictionPort).evict(List.of(accountId));
         verify(eventPublisher).publishEvent(new AccountDeletedEvent(accountId));
     }
 
@@ -444,14 +444,14 @@ class AccountServiceTest {
 
         accountService.deleteAllByUserId(userId);
 
-        InOrder inOrder = inOrder(accountPort, brokerTokenCachePort);
+        InOrder inOrder = inOrder(accountPort, accountTokenEvictionPort);
         inOrder.verify(accountPort).findByUserId(userId);
-        inOrder.verify(brokerTokenCachePort).deleteByAccountIds(List.of(a1.id(), a2.id()));
+        inOrder.verify(accountTokenEvictionPort).evict(List.of(a1.id(), a2.id()));
         inOrder.verify(accountPort).deleteByUserId(userId);
     }
 
     @Test
-    @DisplayName("키 수정: 연결 테스트 통과 시 저장하고 만료일을 갱신하며 KIS 토큰 캐시를 지운다")
+    @DisplayName("키 수정: 연결 테스트 통과 시 저장하고 만료일을 갱신하며 토큰 캐시를 지운다")
     void updateCredentials_upbit_savesAndEvictsTokenCache() {
         Account upbit = TradingFixtures.upbitAccount(accountId, userId);
         Instant expiresAt = Instant.parse("2027-10-17T00:00:00Z");
@@ -465,9 +465,9 @@ class AccountServiceTest {
 
         assertThat(saved.appKey()).isEqualTo("new-ak");
         assertThat(saved.apiKeyExpiresAt()).isEqualTo(expiresAt);
-        InOrder order = inOrder(accountPort, brokerTokenCachePort);
+        InOrder order = inOrder(accountPort, accountTokenEvictionPort);
         order.verify(accountPort).save(any());
-        order.verify(brokerTokenCachePort).deleteByAccountIds(List.of(accountId));
+        order.verify(accountTokenEvictionPort).evict(List.of(accountId));
         verifyNoInteractions(brokerEnabledPort); // 키 교체는 신규 등록 정책 대상이 아니다
     }
 
@@ -482,7 +482,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-        verifyNoInteractions(brokerTokenCachePort);
+        verifyNoInteractions(accountTokenEvictionPort);
     }
 
     @Test
@@ -496,7 +496,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
                 .isInstanceOf(Account.DuplicateAccountException.class);
-        verifyNoInteractions(brokerTokenCachePort);
+        verifyNoInteractions(accountTokenEvictionPort);
     }
 
     @Test
@@ -524,7 +524,22 @@ class AccountServiceTest {
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("bad", "bad")))
                 .isInstanceOf(com.kista.tradingcore.broker.domain.model.BrokerCredentialException.class);
         verify(accountPort, never()).save(any());
-        verifyNoInteractions(brokerTokenCachePort);
+        verifyNoInteractions(accountTokenEvictionPort);
+    }
+
+    @Test
+    @DisplayName("키 수정: Toss 계좌도 저장 뒤 토큰 캐시(Redis 포함)를 지운다")
+    void updateCredentials_toss_savesAndEvictsTokenCache() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.tossAccount(accountId, userId)); // brokerAccountCode "1"
+        when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("cid", "cs", "123-45-678901")).thenReturn(new BrokerAccountVerification("1", null));
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("cid", "cs"));
+
+        InOrder order = inOrder(accountPort, accountTokenEvictionPort);
+        order.verify(accountPort).save(any());
+        order.verify(accountTokenEvictionPort).evict(List.of(accountId));
     }
 
     @Test

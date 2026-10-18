@@ -56,6 +56,13 @@ class TossRedisTokenStore implements TossTokenStore {
                     + "then return redis.call('del', KEYS[1]) else return 0 end",
             Long.class);
 
+    // 무효화: generation이 있을 때만(발급 이력·진행 중 lease가 있을 때만) 증가시켜 진행 중 owner의 storeIfCurrent를 STALE로 만들고
+    // canonical·최근 지문을 삭제 — generation이 없으면 발급된 적 없는 scope라 키를 새로 만들지 않는다
+    private static final DefaultRedisScript<Long> INVALIDATE_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('exists', KEYS[3]) == 1 then redis.call('incr', KEYS[3]) end "
+                    + "return redis.call('del', KEYS[1], KEYS[2])",
+            Long.class);
+
     private final StringRedisTemplate redisTemplate; // Redis 문자열/해시/스크립트 연산 클라이언트
     private final Clock clock; // canonical 만료 판정용 시계 — 테스트에서 고정 Clock 주입
 
@@ -165,6 +172,17 @@ class TossRedisTokenStore implements TossTokenStore {
                     lease.ownerId());
         } catch (RuntimeException exception) {
             throw redisFailure("lease 해제", exception);
+        }
+    }
+
+    @Override
+    public void invalidate(String scope) {
+        try {
+            redisTemplate.execute(
+                    INVALIDATE_SCRIPT,
+                    List.of(canonicalKey(scope), fingerprintKey(scope), generationKey(scope)));
+        } catch (RuntimeException exception) {
+            throw redisFailure("무효화", exception);
         }
     }
 

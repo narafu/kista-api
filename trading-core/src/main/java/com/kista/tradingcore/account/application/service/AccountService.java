@@ -1,6 +1,6 @@
 package com.kista.tradingcore.account.application.service;
 
-import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
+import com.kista.tradingcore.broker.application.port.output.AccountTokenEvictionPort;
 import com.kista.tradingcore.broker.application.service.BrokerConnectionTesters;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.shared.kernel.Broker;
@@ -35,7 +35,7 @@ class AccountService implements AccountUseCase {
     private final AccountPort accountPort;
     private final BrokerConnectionTesters connectionTesters; // 증권사별 연결테스트 라우터
     private final BrokerEnabledPort brokerEnabledPort; // 증권사 신규 등록 허용 여부 (trading TradingPolicyService가 구현 — 정책 소유자)
-    private final BrokerTokenCachePort brokerTokenCachePort; // 탈퇴 시 증권사 토큰 삭제
+    private final AccountTokenEvictionPort accountTokenEvictionPort; // 키 교체·탈퇴 시 증권사 토큰 캐시(KIS DB·Toss Redis) 제거
     private final AccountOpenOrderCancelPort openOrderCancelPort; // 계좌 삭제 전 미체결 주문 취소 (trading이 구현)
     private final AccountDeletionWriter deletionWriter; // 계좌 삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
@@ -137,7 +137,7 @@ class AccountService implements AccountUseCase {
             if (cause == null || !cause.contains(DEDUPE_UNIQUE_INDEX)) throw e;
             throw new Account.DuplicateAccountException(cmd.appKey());
         }
-        brokerTokenCachePort.deleteByAccountIds(List.of(accountId)); // 옛 키로 발급된 KIS 토큰 캐시 제거
+        accountTokenEvictionPort.evict(List.of(accountId)); // 옛 키로 발급된 KIS·Toss 토큰 캐시 제거
         log.info("계좌 키 교체: accountId={}, broker={}", accountId, account.broker());
         return saved;
     }
@@ -158,7 +158,7 @@ class AccountService implements AccountUseCase {
     public void deleteAllByUserId(UUID userId) {
         // 소프트 삭제 후엔 @SQLRestriction이 계좌를 숨기므로 토큰 대상 ID를 먼저 확보한다
         List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
-        brokerTokenCachePort.deleteByAccountIds(accountIds);
+        accountTokenEvictionPort.evict(accountIds);
         accountPort.deleteByUserId(userId);
     }
 

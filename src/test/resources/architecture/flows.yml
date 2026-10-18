@@ -607,11 +607,11 @@ flows:
           이어 한 트랜잭션에서 순서대로 정리한다 — cycle_position → strategy_cycle → strategy 소프트 삭제, 계좌의 증권사 토큰 삭제 후 계좌 소프트 삭제,
           마지막으로 알림 프로필 복제본을 비활성 tombstone으로 바꾼다(늦게 도착한 프로필 스냅샷이 행을 되살리지 않게). 주문(orders)은 보존한다.
         code: [com.kista.tradingcore.trading.adapter.out.UserCascadeListener#onUserDeleted, AccountOpenOrderCancelPort#cancelOpenOrders,
-               UserTradingDataEraser#erase, AccountService#deleteAllByUserId, BrokerTokenCachePort#deleteByAccountIds, TradingUserProfilePort#markDeleted]
+               UserTradingDataEraser#erase, AccountService#deleteAllByUserId, AccountTokenEvictionPort#evict, TradingUserProfilePort#markDeleted]
         fail: >-
           정리 중 실패하면 트랜잭션 전체가 롤백되고(전략은 이미 PAUSED) trading.event_publication이 FAILED로 남아
           kista-trading이 10분마다 재발행한다(처음 발견 회차에 관리자 알림, 각 단계는 이미 지운 행을 건너뛰어 멱등).
-        state: "strategy PAUSED · cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · broker_tokens 삭제 · user_notify_profile 비활성 tombstone"
+        state: "strategy PAUSED · cycle_position·strategy_cycle·strategy·accounts deleted_at 설정 · broker_tokens·Toss Redis 토큰 삭제 · user_notify_profile 비활성 tombstone"
 
   fida-receive:
     title: FIDA 기준표 수신
@@ -759,9 +759,9 @@ flows:
         desc: >-
           계좌 화면에서 새 키·시크릿을 입력하면 PUT /api/accounts/{id}/credentials가 소유권을 확인하고, 증권사 연결 테스트를 통과해야 저장한다.
           KIS는 저장된 계좌번호 소유까지, Toss는 같은 계좌(accountSeq)인지까지 확인하고, 업비트는 새 access key가 다른 계좌에 이미 있으면 거부하며 키 만료일을 갱신한다.
-          저장 후 옛 키로 발급된 KIS 토큰 캐시를 지운다. 신규 등록이 꺼진 증권사도 키 교체는 할 수 있다. 모의계좌는 키가 없어 불가.
-        code: [AccountController#updateCredentials, AccountService#updateCredentials, BrokerConnectionTesters#of, BrokerTokenCachePort#deleteByAccountIds]
-        state: "accounts.app_key·secret_key·api_key_expires_at 갱신 · broker_tokens 삭제"
+          저장 후 옛 키로 발급된 토큰 캐시(KIS broker_tokens·Toss Redis canonical — 진행 중 발급은 generation 증가로 fence)를 지운다(Redis 실패는 로그만 남기고 TTL 만료에 맡긴다). 신규 등록이 꺼진 증권사도 키 교체는 할 수 있다. 모의계좌는 키가 없어 불가.
+        code: [AccountController#updateCredentials, AccountService#updateCredentials, BrokerConnectionTesters#of, AccountTokenEvictionPort#evict]
+        state: "accounts.app_key·secret_key·api_key_expires_at 갱신 · broker_tokens·Toss Redis 토큰 삭제"
         fail: 키 오류 422(BROKER_CREDENTIAL_INVALID·BROKER_IP_NOT_ALLOWED·BROKER_PERMISSION_DENIED), 다른 계좌 키는 400(Toss)·409(업비트 DUPLICATE_ACCOUNT), 모의계좌 400, 남의 계좌 403.
 
       - id: delete
@@ -774,7 +774,7 @@ flows:
           이어서 증권사 토큰을 지우고 계좌를 삭제 처리(소프트 삭제)한 뒤, 커밋 후 이벤트를 받아 별도 트랜잭션에서 포지션 → 사이클 → 전략 순으로 삭제 처리한다
           (실패하면 재시도 대상으로 남는다). 주문 이력(orders)은 보존한다.
         code: [AccountController#delete, AccountService#delete, AccountOpenOrderCanceller#cancelOpenOrders, AccountDeletionWriter#delete, AccountCascadeListener#onAccountDeleted]
-        state: "orders PLANNED 삭제·PLACED → CANCELLED · broker_tokens 삭제 · accounts → 삭제됨 · 뒤이어 cycle_position·strategy_cycle·strategy → 삭제됨"
+        state: "orders PLANNED 삭제·PLACED → CANCELLED · broker_tokens·Toss Redis 토큰 삭제 · accounts → 삭제됨 · 뒤이어 cycle_position·strategy_cycle·strategy → 삭제됨"
         fail: 증권사 취소에 실패한 주문이 있으면 400(삭제 안 됨·전략은 PAUSED 유지, 관리자 알림). 내 계좌가 아니면 403, 없으면 404.
 
   result:
