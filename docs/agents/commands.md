@@ -54,7 +54,7 @@ scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태�
   - 트리거 후 반드시 `SCHEDULER_ENABLED` 없이 재기동하고 `/api/admin/scheduler/*` 404로 꺼졌는지 확인할 것 — 켜둔 채 두면 로컬 cron이 운영과 같이 돈다(락은 DB별이라 못 막고, 로컬이 운영 봇을 쓰면 시작 알림이 운영 관리자 chat에 중복 발송).
 
 ### 로컬 2-프로세스 부팅 (root + trading-core)
-2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`com.kista.tradingcore.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 최소 필요 환경변수는 CLAUDE.md의 필수 목록보다 많다 — 실측 결과:
+2-role 배포와 별개로, root(`app.jar`)와 `trading-core`(`com.kista.tradingcore.TradingApplication`)를 로컬에서 **각자 다른 포트로 동시에** 띄워 내부 API 크로스콜(인증·Redis Stream 등)을 검증할 때 사용. 비밀값(JWT·AES·카카오·텔레그램·`internal.api.token`)은 양쪽 `application-local.yml`(.gitignored)이 공급하므로 환경변수는 프로세스 배선용만 준다 — 실측 결과:
 ```bash
 # 두 jar 빌드
 ./gradlew bootJar                       # root -> build/libs/app.jar
@@ -62,20 +62,18 @@ scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태�
 
 docker compose up -d postgres redis
 
-# root (8080) — INTERNAL_API_BASE_URL은 trading-core(8081)를 가리킴
-JWT_SIGNING_KEY='...' AES_ENCRYPTION_KEY='...' KAKAO_CLIENT_ID='...' \
-TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' \
-INTERNAL_API_TOKEN='local-token' INTERNAL_API_BASE_URL=http://localhost:8081 \
-SPRING_PROFILES_ACTIVE=local java -jar build/libs/app.jar &
+# 빌드 타깃이 Java 25라 기본 java가 21 이하면 UnsupportedClassVersionError — Java 25 JDK의 java로 실행
+J=/path/to/jdk-25/bin/java
 
-# trading-core (8081) — root를 호출하지 않으므로 INTERNAL_API_BASE_URL 불필요(토큰은 수신 검증용으로만 필요)
-JWT_SIGNING_KEY='...' AES_ENCRYPTION_KEY='...' \
-TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' \
-INTERNAL_API_TOKEN='local-token' SERVER_PORT=8081 \
-SPRING_PROFILES_ACTIVE=local java -jar trading-core/build/libs/trading-core.jar &
+# trading-core (8081) — root를 호출하지 않으므로 INTERNAL_API_BASE_URL 불필요
+SERVER_PORT=8081 SPRING_PROFILES_ACTIVE=local nohup $J -jar trading-core/build/libs/trading-core.jar > logs/local-trading-stdout.log 2>&1 &
+
+# root (8080) — INTERNAL_API_BASE_URL은 trading-core(8081)를 가리킴(기본값과 같아 생략 가능)
+INTERNAL_API_BASE_URL=http://localhost:8081 SPRING_PROFILES_ACTIVE=local nohup $J -jar build/libs/app.jar > logs/local-api-stdout.log 2>&1 &
 ```
 - `SPRING_PROFILES_ACTIVE=local` 누락 시 `DevAuthController`(`/api/auth/dev-token`)가 `@Profile("local")`로 비활성화돼 404 — 양쪽 프로세스 모두 필요
-- `INTERNAL_API_TOKEN`은 양쪽에 동일 값 필수(`X-Internal-Token` 상호 검증)
+- `internal.api.token`은 양쪽 동일 값 필수(`X-Internal-Token` 상호 검증) — 로컬은 두 `application-local.yml`의 값을 맞춰 두고 `INTERNAL_API_TOKEN` 환경변수는 주지 않는다. 환경변수는 yml보다 우선하므로 한쪽에만 주면 그쪽만 덮어써 내부 API가 403이 되고, 값이 띄운 셸에만 남아 재기동 시 복원할 수 없다. 환경변수를 쓸 거면 반드시 양쪽에 같은 값을 준다(운영은 compose가 양쪽에 주입)
+- `application-local.yml`에 비밀값이 없으면 위 명령에 `JWT_SIGNING_KEY`·`AES_ENCRYPTION_KEY`·`KAKAO_CLIENT_ID`(root)·`TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID`를 양쪽에 환경변수로 더한다
 - 종료 시 `pkill -f "app.jar"`/`pkill -f "trading-core.*jar"`가 이 환경에서 프로세스를 실제로 못 죽이는 경우가 있음 — `jps -l`로 PID 확인 후 `taskkill //F //PID <pid>`로 대체
 
 ### Docker (로컬)
