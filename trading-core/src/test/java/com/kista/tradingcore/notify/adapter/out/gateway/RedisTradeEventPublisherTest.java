@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
+import java.math.BigDecimal;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import org.junit.jupiter.api.AfterAll;
@@ -61,7 +62,7 @@ class RedisTradeEventPublisherTest {
 
         RedisTradeEventPublisher publisher = new RedisTradeEventPublisher(redisTemplate, new ObjectMapper());
         UUID userId = UUID.randomUUID();
-        TradeEventMessage event = TradeEventMessage.buy("SOXL", 5, 22.5, 112.5, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
+        TradeEventMessage event = TradeEventMessage.buy("SOXL", BigDecimal.valueOf(5), 22.5, 112.5, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
 
         // 리스너 등록이 비동기라 발행 전 잠깐의 여유가 필요 — 실패 시 sleep 연장 대신 원인 재확인
         Thread.sleep(200);

@@ -1,5 +1,6 @@
 package com.kista.api.notify.adapter.out.sse;
 
+import java.math.BigDecimal;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -22,7 +23,7 @@ class TradeEventMessageSerializationTest {
     @Test
     @DisplayName("BUY 이벤트 — kind 필드가 문자열 'BUY'로 직렬화")
     void buy_kind_serializes_as_string() throws Exception {
-        TradeEventMessage event = TradeEventMessage.buy("SOXL", 5, 22.50, 112.50, "테스트계좌", ACCOUNT_ID, STRATEGY_ID);
+        TradeEventMessage event = TradeEventMessage.buy("SOXL", BigDecimal.valueOf(5), 22.50, 112.50, "테스트계좌", ACCOUNT_ID, STRATEGY_ID);
         String json = objectMapper.writeValueAsString(event);
         assertThat(json).contains("\"kind\":\"BUY\"")
                 .contains("\"accountId\":\"" + ACCOUNT_ID + "\"")
@@ -32,7 +33,7 @@ class TradeEventMessageSerializationTest {
     @Test
     @DisplayName("SELL 이벤트 — kind 필드가 문자열 'SELL'로 직렬화")
     void sell_kind_serializes_as_string() throws Exception {
-        TradeEventMessage event = TradeEventMessage.sell("SOXL", 3, 23.00, 69.00, "테스트계좌", ACCOUNT_ID, STRATEGY_ID);
+        TradeEventMessage event = TradeEventMessage.sell("SOXL", BigDecimal.valueOf(3), 23.00, 69.00, "테스트계좌", ACCOUNT_ID, STRATEGY_ID);
         String json = objectMapper.writeValueAsString(event);
         assertThat(json).contains("\"kind\":\"SELL\"");
     }

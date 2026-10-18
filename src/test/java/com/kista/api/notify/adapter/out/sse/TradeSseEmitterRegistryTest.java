@@ -1,5 +1,6 @@
 package com.kista.api.notify.adapter.out.sse;
 
+import java.math.BigDecimal;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +40,7 @@ class TradeSseEmitterRegistryTest {
     @Test
     void send_to_unknown_user_is_safe() {
         UUID userId = UUID.randomUUID(); // 연결 없는 사용자
-        TradeEventMessage event = TradeEventMessage.buy("SOXL", 5, 22.5, 112.5, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
+        TradeEventMessage event = TradeEventMessage.buy("SOXL", BigDecimal.valueOf(5), 22.5, 112.5, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
         assertThatCode(() -> registry.send(userId, event)).doesNotThrowAnyException();
     }
 
@@ -47,7 +48,7 @@ class TradeSseEmitterRegistryTest {
     void send_to_connected_user_sends_event() {
         UUID userId = UUID.randomUUID();
         registry.connect(userId);
-        TradeEventMessage event = TradeEventMessage.sell("SOXL", 5, 23.0, 115.0, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
+        TradeEventMessage event = TradeEventMessage.sell("SOXL", BigDecimal.valueOf(5), 23.0, 115.0, "테스트계좌", UUID.randomUUID(), UUID.randomUUID());
         assertThatCode(() -> registry.send(userId, event)).doesNotThrowAnyException();
     }
 }
