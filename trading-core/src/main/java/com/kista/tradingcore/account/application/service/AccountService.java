@@ -97,6 +97,8 @@ class AccountService implements AccountUseCase {
         return saved;
     }
 
+    private static final String DEDUPE_UNIQUE_INDEX = "uq_accounts_account_no_hash"; // accounts.account_no_hash(중복 판정 키 해시) 부분 unique 인덱스
+
     @Override
     public Account update(UUID accountId, UUID requesterId, UpdateAccountCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
@@ -130,7 +132,9 @@ class AccountService implements AccountUseCase {
             saved = accountPort.save(account.withCredentials(
                     cmd.appKey(), cmd.secretKey(), account.brokerAccountCode(), verified.apiKeyExpiresAt()));
         } catch (DataIntegrityViolationException e) {
-            // 사전 중복 검사와 저장 사이 다른 계좌가 같은 키를 등록한 경합 — unique 위반을 409로
+            // 사전 중복 검사와 저장 사이 다른 계좌가 같은 키를 등록한 경합 — dedupe unique 위반만 409로, 그 외 무결성 위반은 그대로 전파
+            String cause = e.getMostSpecificCause().getMessage();
+            if (cause == null || !cause.contains(DEDUPE_UNIQUE_INDEX)) throw e;
             throw new Account.DuplicateAccountException(cmd.appKey());
         }
         brokerTokenCachePort.deleteByAccountIds(List.of(accountId)); // 옛 키로 발급된 KIS 토큰 캐시 제거

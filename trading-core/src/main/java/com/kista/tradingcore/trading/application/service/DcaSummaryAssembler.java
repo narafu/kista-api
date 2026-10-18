@@ -35,11 +35,11 @@ class DcaSummaryAssembler {
 
     // 배치가 판정 가능한 첫 KST 거래일
     // 주식: TradingService.filterScheduledStart가 시작일 당일을 제외(tradeDate.isAfter(startDate)) — 오늘 회차 판정이 끝났으면 다음 날부터
-    // 코인: 시작일 제외 없음 — 오늘 실행 시각이 지났거나 오늘 이미 판정했으면 내일부터
+    // 코인: 시작일 제외 없음 — 오늘 실행 시각(HH:00 포함)이 되었거나 오늘 이미 판정했으면 내일부터
     static LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last, DcaConfig config, Market market, LocalDateTime nowKst) {
         if (market == Market.CRYPTO_KRW) {
             LocalDate today = nowKst.toLocalDate();
-            boolean hourPassed = nowKst.getHour() > config.executionHour();
+            boolean hourPassed = nowKst.getHour() >= config.executionHour();
             boolean decidedToday = last != null && last.tradeDate().equals(today);
             return hourPassed || decidedToday ? today.plusDays(1) : today;
         }

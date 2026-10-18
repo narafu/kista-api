@@ -472,13 +472,27 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("키 수정: 다른 무결성 위반(길이 초과 등)은 409로 바꾸지 않고 그대로 던진다")
+    void rotationOtherIntegrityViolationPropagates() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
+        when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
+        when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("x", new RuntimeException("value too long for type character varying(512)")));
+
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        verifyNoInteractions(brokerTokenCachePort);
+    }
+
+    @Test
     @DisplayName("키 수정: 저장 시 unique 위반(경합)은 DuplicateAccountException으로 변환한다")
     void rotationUniqueViolationIsDuplicate() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.upbitAccount(accountId, userId));
         when(accountPort.existsByDedupeKey("new-ak")).thenReturn(false);
         when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
         when(connectionTester.verifyAccount("new-ak", "new-sk", null)).thenReturn(new BrokerAccountVerification(null, null));
-        when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("uk"));
+        when(accountPort.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup", new RuntimeException("duplicate key value violates unique constraint \"uq_accounts_account_no_hash\"")));
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("new-ak", "new-sk")))
                 .isInstanceOf(Account.DuplicateAccountException.class);

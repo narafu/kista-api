@@ -99,9 +99,9 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
         }
     }
 
-    // 같은 (대상, 메시지)는 KST 하루 1회만 관리자 알림 — 10분 틱마다 반복 발송 방지
+    // 같은 (대상, 예외 클래스)는 KST 하루 1회만 관리자 알림 — 10분 틱마다 반복 발송 방지
     private void reportOncePerDay(UUID target, RuntimeException e, LocalDate today) {
-        String key = target + "|" + (e.getMessage() != null ? e.getMessage() : e.getClass().getName());
+        String key = target + "|" + e.getClass().getName(); // 메시지는 id·시각이 섞여 휘발적이라 클래스로 묶는다
         if (!today.equals(lastReported.put(key, today))) errorReportPort.reportError(e);
     }
 

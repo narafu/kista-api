@@ -156,6 +156,16 @@ class CryptoDcaRunnerTest {
     }
 
     @Test
+    void sameExceptionClassWithDifferentMessagesReportedOncePerDay() {
+        add(TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID()), StrategyType.DCA, true);
+        doThrow(new IllegalStateException("fail id=1")).doThrow(new IllegalStateException("fail id=2"))
+                .when(synchronizer).sync(any(), anyList(), any(), any());
+        tick();
+        runner.runTick(NOW.plusMinutes(10));
+        verify(errorReport, times(1)).reportError(any());
+    }
+
+    @Test
     void syncRunsBeforeExecute() {
         add(TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID()), StrategyType.DCA, true);
         tick();

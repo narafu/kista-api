@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.upbit;
 
+import lombok.extern.slf4j.Slf4j;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
@@ -24,6 +25,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 // 업비트 CryptoExchangePort — 잔고·시세·일봉·시장가 주문·주문 조회
+@Slf4j
 @Component
 class UpbitExchangeAdapter implements CryptoExchangePort {
 
@@ -102,7 +104,10 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
                     .forEach(r -> completed.putIfAbsent(r.startKst().toLocalDate(), new CryptoCandle(r.startKst().toLocalDate(), r.tradePrice())));
             to = rows.stream().map(CandleRow::startUtc).filter(Objects::nonNull).min(Comparator.naturalOrder())
                     .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format).orElse(null);
-            if (to == null) break;
+            if (to == null) {
+                log.warn("업비트 일봉 페이징 중단 — 가장 오래된 봉에 UTC 시각 없음: ticker={}, collected={}", ticker, completed.size());
+                break;
+            }
         }
         List<CryptoCandle> list = List.copyOf(completed.values());
         return list.subList(Math.max(0, list.size() - count), list.size());
