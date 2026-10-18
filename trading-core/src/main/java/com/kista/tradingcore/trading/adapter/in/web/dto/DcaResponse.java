@@ -16,7 +16,6 @@ import java.util.List;
 public record DcaResponse(
         OrderDirection direction,
         BigDecimal amount,                // 회차당 금액 (계좌 통화)
-        BigDecimal amountUsd,             // 구 필드 — amount와 같은 값 (전환 기간 호환)
         OrderType orderType, DcaFrequency frequency,
         DayOfWeek dayOfWeek, Integer dayOfMonth,
         Integer executionHour,            // 코인 실행 시각 (KST, 주식 null)
@@ -34,7 +33,7 @@ public record DcaResponse(
         DcaExecution e = s.lastExecution();
         LastExecution last = e == null ? null : new LastExecution(e.tradeDate(), e.status().name(),
                 e.skipReason() == null ? null : e.skipReason().name());
-        return new DcaResponse(c.direction(), c.amount(), c.amount(), c.orderType(), c.frequency(), c.dayOfWeek(), c.dayOfMonth(),
+        return new DcaResponse(c.direction(), c.amount(), c.orderType(), c.frequency(), c.dayOfWeek(), c.dayOfMonth(),
                 c.executionHour(), c.conditions().stream().map(DcaConditionResponse::from).toList(), next, last);
     }
 }

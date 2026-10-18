@@ -455,7 +455,7 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amountUsd":300,
+                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amount":300,
                                  "orderType":"MOC","frequency":"MONTHLY","dayOfWeek":null,"dayOfMonth":null,"conditions":[]}}
                                 """))
                 .andExpect(status().isCreated())
@@ -471,7 +471,7 @@ class TradingCycleControllerTest {
         assertThat(captor.getValue().dca()).isEqualTo(DCA_CONFIG);
     }
 
-    private static final String DCA_PREFIX = "{\"type\":\"DCA\",\"ticker\":\"UPRO\",\"dca\":{\"direction\":\"BUY\",\"amountUsd\":300,"
+    private static final String DCA_PREFIX = "{\"type\":\"DCA\",\"ticker\":\"UPRO\",\"dca\":{\"direction\":\"BUY\",\"amount\":300,"
             + "\"orderType\":\"MOC\",\"frequency\":\"DAILY\",\"conditions\":";
 
     @Test
@@ -561,7 +561,7 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amountUsd":300,"orderType":"MOC",
+                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amount":300,"orderType":"MOC",
                                  "frequency":"WEEKLY","dayOfWeek":"SATURDAY"}}
                                 """))
                 .andExpect(status().isBadRequest());
@@ -575,10 +575,10 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"direction":"BUY","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY","conditions":[]}
+                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY","conditions":[]}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dca.amountUsd").value(300));
+                .andExpect(jsonPath("$.dca.amount").value(300));
         verify(dcaConfig).updateConfig(CYCLE_ID, USER_ID, DCA_CONFIG);
     }
 
@@ -590,7 +590,7 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"direction":"BUY","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY",
+                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY",
                                  "conditions":[{"indicator":"FEAR_GREED","operator":"LTE","threshold":25}]}
                                 """))
                 .andExpect(status().isOk());
@@ -609,7 +609,7 @@ class TradingCycleControllerTest {
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"direction":"SELL","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY"}
+                                {"direction":"SELL","amount":300,"orderType":"MOC","frequency":"MONTHLY"}
                                 """))
                 .andExpect(status().isBadRequest());
     }
@@ -639,19 +639,21 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void reconfigureDca_conflictingAmounts_returns400() throws Exception {
+    void reconfigureDca_legacyAmountUsdOnly_returns400() throws Exception {
+        // 구 번들(amountUsd만 전송) — 구 필드는 무시되고 amount 누락으로 거부된다
         mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"direction":"BUY","amount":300,"amountUsd":301,"orderType":"MOC","frequency":"MONTHLY"}
+                                {"direction":"BUY","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY"}
                                 """))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("amount는 필수입니다."));
         verify(dcaConfig, never()).updateConfig(any(), any(), any());
     }
 
     @Test
-    void reconfigureDca_responseCarriesAmountAndAmountUsd() throws Exception {
+    void reconfigureDca_responseCarriesAmountOnly() throws Exception {
         when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
 
         mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
@@ -662,7 +664,7 @@ class TradingCycleControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.dca.amount").value(300))
-                .andExpect(jsonPath("$.dca.amountUsd").value(300));
+                .andExpect(jsonPath("$.dca.amountUsd").doesNotExist());
         verify(dcaConfig).updateConfig(CYCLE_ID, USER_ID, DCA_CONFIG);
     }
 }
