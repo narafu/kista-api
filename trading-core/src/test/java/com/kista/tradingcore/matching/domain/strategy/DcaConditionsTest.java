@@ -74,4 +74,48 @@ class DcaConditionsTest {
             assertThat(s.detail()).isEqualTo("SMA(200) 계산용 일봉 부족");
         });
     }
+
+    @Test
+    void skipKeepsReferencePriceUnchanged() {
+        DcaConfig c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
+        var holding = new DcaCycleOrderStrategy.DcaInputs.Holding(BigDecimal.ONE, new BigDecimal("1000"));
+        BigDecimal ref = new BigDecimal("123.45");
+        // 조건 미충족 skip
+        assertThat(DcaConditions.check(c, closes("951"), holding, null, ref))
+                .hasValueSatisfying(s -> assertThat(s.referencePrice()).isSameAs(ref));
+        // 지표 계산 불가 skip
+        assertThat(DcaConditions.check(c, closes("951"), null, null, ref))
+                .hasValueSatisfying(s -> assertThat(s.referencePrice()).isSameAs(ref));
+    }
+
+    @Test
+    void fearGreedConditionBoundary() {
+        DcaConfig c = config(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
+        assertThat(DcaConditions.check(c, closes("100"), null, new BigDecimal("25"), new BigDecimal("100"))).isEmpty();
+        assertThat(DcaConditions.check(c, closes("100"), null, new BigDecimal("26"), new BigDecimal("100"))).hasValueSatisfying(s -> {
+            assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
+            assertThat(s.detail()).isEqualTo("공포탐욕지수 26.00 > 25");
+        });
+        assertThat(DcaConditions.check(c, closes("100"), null, null, new BigDecimal("100"))).hasValueSatisfying(s -> {
+            assertThat(s.reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+            assertThat(s.detail()).isEqualTo("공포탐욕지수 조회 실패");
+        });
+    }
+
+    @Test
+    void rsiCondition() {
+        DcaConfig c = config(new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("30")));
+        // 15개 연속 하락 → 상승 없음 RSI 0 → 통과
+        List<BigDecimal> falling = IntStream.range(0, 15).mapToObj(i -> new BigDecimal(200 - i)).toList();
+        assertThat(check(c, falling, null)).isEmpty();
+        // 15개 연속 상승 → 하락 없음 RSI 100 → 미충족
+        List<BigDecimal> rising = IntStream.range(0, 15).mapToObj(i -> new BigDecimal(100 + i)).toList();
+        assertThat(check(c, rising, null)).hasValueSatisfying(s -> {
+            assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
+            assertThat(s.detail()).isEqualTo("RSI(14) 100.00 > 30");
+        });
+        // 일봉 14개(<15) → 계산 불가
+        assertThat(check(c, falling.subList(0, 14), null)).hasValueSatisfying(s ->
+                assertThat(s.reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE));
+    }
 }

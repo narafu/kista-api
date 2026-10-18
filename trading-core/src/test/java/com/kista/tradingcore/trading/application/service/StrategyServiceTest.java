@@ -2116,10 +2116,14 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                     arg.endAmount(), arg.startDate(), arg.endDate(), arg.createdAt(), arg.deletedAt());
         });
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        lenient().when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
-        lenient().when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
-        lenient().when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+    }
+
+    // 주식 DCA 다음 실행일 계산용 캘린더 stub — 코인 경로는 캘린더를 조회하지 않는다
+    private void stubUsCalendar() {
+        when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
+        when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
+        when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
     }
 
     private static DcaConfig cryptoDcaConfig() {
@@ -2185,6 +2189,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     @DisplayName("DCA는 같은 종목에 반대 방향 DCA가 있으면 공존 등록되고 설정 1행이 저장된다")
     void register_dca_allowsOppositeDirectionOnSameTicker() {
         stubDcaRegistration(StrategyTicker.UPRO);
+        stubUsCalendar();
         Strategy buyDca = dcaStrategy(UUID.randomUUID(), StrategyTicker.UPRO);
         when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of(buyDca));
         when(dcaDetailPort.findActiveByStrategyIds(List.of(buyDca.id())))
@@ -2206,6 +2211,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     @DisplayName("DCA 등록은 보유수량 입력(initialHoldings)을 무시하고 0으로 시작한다")
     void register_dca_ignoresBootstrapHoldings() {
         stubDcaRegistration(StrategyTicker.UPRO);
+        stubUsCalendar();
         when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of());
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.DCA, StrategyTicker.UPRO,
                 new BigDecimal("5000"), null, 0, 10, new BigDecimal("40"),
@@ -2289,9 +2295,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
         when(dcaDetailPort.findActiveByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(dcaConfig(OrderDirection.BUY)));
         when(dcaExecutionPort.findLatestByStrategyIds(List.of(STRATEGY_ID))).thenReturn(Map.of(STRATEGY_ID, last));
-        when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
-        when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
-        when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
+        stubUsCalendar();
 
         StrategyDetail detail = strategyService.getById(STRATEGY_ID, USER_ID);
 

@@ -49,6 +49,13 @@ class DcaSummaryAssemblerTest {
     }
 
     @Test
+    void cryptoExactExecutionHourMovesToTomorrow() {
+        LocalDate today = LocalDate.of(2026, 10, 14);
+        // 13:00 정각은 hour >= executionHour 이므로 이미 실행 시각 — 내일부터
+        assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today.plusDays(1));
+    }
+
+    @Test
     void cryptoWeeklySundayIsNotShiftedByUsHoliday() {
         DcaConfig sun = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET, DcaFrequency.WEEKLY, DayOfWeek.SUNDAY, null, null, 13);
         // 2026-10-14 수 → 다음 일요일 10-18, 캘린더 조회 없음

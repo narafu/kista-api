@@ -88,7 +88,7 @@ gh workflow run "Server Deploy" --repo narafu/kista-api          # 수동 재배
 컨테이너 자체 healthcheck(`docker-compose.yml`의 `healthcheck:`)는 실패 시 재시작만 할 뿐 사람에게 알리지 않음 — 아래 3개는 사람이 실제로 장애를 인지하기 위한 외부 계층.
 
 - **가동 여부**: UptimeRobot(무료) → `https://api.kista-app.com/actuator/health` 5분 간격 외부 체크, 알림 채널(이메일/텔레그램) 연결
-- **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 정상 완료 시에만 ping(배치가 예외로 실패하면 미발송 — `SchedulerJobRunner.run`의 완료 여부). `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
+- **스케줄러 미실행 감지(dead-man's switch)**: healthchecks.io(무료) — `HeartbeatPort`/`HeartbeatAdapter`가 `TradingOpenScheduler`(월~금 22:30 KST)·`TradingCloseScheduler`(화~토 04:30 KST) 정상 완료 시에만 ping(배치가 예외로 실패하면 미발송 — `SchedulerJobRunner.run`의 완료 여부). `CryptoDcaScheduler`(10분 주기 코인 DCA 틱)도 틱 완료 시 `pingCrypto()`(계좌별 실패는 러너가 관리자 알림으로 따로 처리하고 핑은 보냄). `HEARTBEAT_OPEN_URL`/`HEARTBEAT_CLOSE_URL`/`HEARTBEAT_CRYPTO_URL` 미설정 시 핑 생략(배포 안전) — healthchecks.io 콘솔에서 각 체크 예상 주기 등록 필요
 - **메트릭 가시성**: Grafana Cloud OTLP push — 호스팅 위치 무관하게 `micrometer-registry-otlp`가 앱에서 직접 `management.otlp.metrics.export.url`로 60초 간격 push (`GRAFANA_CLOUD_OTLP_*` 환경변수, kista-infra의 `secrets/kista-api.env.gpg`로 관리 — 값 목록은 저장소 루트 `.env.example` 참고)
   - 대시보드 JSON: `deploy/grafana/kista-api-dashboard.json` — Grafana Cloud 계정 유실 시 재구성용, Dashboards → New → Import로 재적용
   - **Import 시 주의**: 대시보드 JSON Model 편집창(Settings → JSON Model)은 계정이 이미 v2 스키마(`elements`/`layout`)로 마이그레이션된 경우 구버전 `panels`/`gridPos` JSON을 거부함(`Missing property "elements"` 등) — 기존 대시보드를 고치려 하지 말고 **Import로 새로 생성** 후 기존 것 삭제

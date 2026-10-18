@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.adapter.out.feargreed;
 
-import com.kista.shared.platform.http.CnnRestClients;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -30,8 +29,7 @@ class CryptoFearGreedIndexAdapterTest {
             }
             """;
 
-    private final RestClient.Builder builder = RestClient.builder()
-            .requestInterceptor(CnnRestClients.browserHeaderInterceptor());
+    private final RestClient.Builder builder = RestClient.builder();
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
     private final CryptoFearGreedIndexAdapter adapter = new CryptoFearGreedIndexAdapter(builder.build());
 
@@ -48,6 +46,22 @@ class CryptoFearGreedIndexAdapterTest {
     void returns_empty_on_empty_data() {
         server.expect(requestTo(URL))
                 .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.latest()).isEmpty();
+    }
+
+    @Test
+    void returns_empty_on_unparseable_value() {
+        server.expect(requestTo(URL))
+                .andRespond(withSuccess("{\"data\":[{\"value\":\"abc\"}]}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.latest()).isEmpty();
+    }
+
+    @Test
+    void returns_empty_on_missing_value() {
+        server.expect(requestTo(URL))
+                .andRespond(withSuccess("{\"data\":[{}]}", MediaType.APPLICATION_JSON));
 
         assertThat(adapter.latest()).isEmpty();
     }

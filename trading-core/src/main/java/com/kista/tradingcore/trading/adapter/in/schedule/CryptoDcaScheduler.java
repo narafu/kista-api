@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.schedule;
 
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
+import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,11 +21,14 @@ public class CryptoDcaScheduler {
 
     private final CryptoDcaExecutionUseCase useCase;
     private final SchedulerLockService schedulerLockService;
+    private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
     Clock clock = Clock.system(TimeZones.KST); // 테스트에서 고정 Clock으로 교체
 
     @Scheduled(cron = "0 */10 * * * *", zone = TimeZones.KST_ID) // 10분마다 KST 정각 기준
     public void run() throws InterruptedException {
-        schedulerLockService.tryRun("crypto-dca", Duration.ofMinutes(9),
+        boolean completed = schedulerLockService.tryRun("crypto-dca", Duration.ofMinutes(9),
                 () -> useCase.runTick(LocalDateTime.now(clock.withZone(TimeZones.KST))));
+        // 틱 완료 시에만 — 락 미획득·예외면 미발송. 계좌별 실패는 러너가 관리자 알림으로 따로 처리
+        if (completed) heartbeatPort.pingCrypto();
     }
 }

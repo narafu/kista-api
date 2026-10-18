@@ -1615,8 +1615,8 @@ flows:
         to: [db]
         title: 틱 시작·중복 실행 방지
         desc: 10분 cron이 발화하면 DB 분산 락(crypto-dca, TTL 9분)을 잡고 코인 계좌의 ACTIVE DCA 전략 컨텍스트를 모은다.
-        code: [CryptoDcaScheduler#run, CryptoDcaRunner#runTick]
-        fail: 락을 다른 프로세스가 쥐고 있으면 조용히 건너뛴다. 계좌 하나의 실패는 다른 계좌에 번지지 않고 관리자 오류 알림은 대상별 하루 1회만 보낸다.
+        code: [CryptoDcaScheduler#run, CryptoDcaRunner#runTick, HeartbeatPort#pingCrypto]
+        fail: 락을 다른 프로세스가 쥐고 있으면 조용히 건너뛴다. 계좌 하나의 실패는 다른 계좌에 번지지 않고 관리자 오류 알림은 대상별 하루 1회만 보낸다. 틱이 끝나면 외부 감시 서비스로 heartbeat를 보낸다(락 미획득·예외 시 미발송 — 계좌별 실패는 틱 완료로 본다).
 
       - id: sync
         lane: trading

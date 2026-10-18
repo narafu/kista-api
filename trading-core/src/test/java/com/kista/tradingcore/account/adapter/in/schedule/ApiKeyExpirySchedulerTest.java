@@ -53,6 +53,21 @@ class ApiKeyExpirySchedulerTest {
     }
 
     @Test
+    void expiryDateIsComputedInKst() {
+        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
+        // 15:30Z = 다음날 00:30 KST → 오늘(10-18 KST) 기준 만료일 10-25 KST, 7일 전
+        Instant expiresAt = Instant.parse("2026-10-24T15:30:00Z");
+        when(accountPort.findAll()).thenReturn(List.of(account(expiresAt)));
+
+        scheduler.publishDue();
+
+        ArgumentCaptor<ApiKeyExpiringEvent> ev = ArgumentCaptor.forClass(ApiKeyExpiringEvent.class);
+        verify(publisher).publishEvent(ev.capture());
+        assertThat(ev.getValue().daysLeft()).isEqualTo(7);
+        assertThat(ev.getValue().expiresOn()).isEqualTo(java.time.LocalDate.of(2026, 10, 25));
+    }
+
+    @Test
     void nonUpbitAccountIgnored() {
         scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
         Account kis = new Account(UUID.randomUUID(), UUID.randomUUID(), "KIS", "n", "a", "s", null, Broker.KIS, now, now);

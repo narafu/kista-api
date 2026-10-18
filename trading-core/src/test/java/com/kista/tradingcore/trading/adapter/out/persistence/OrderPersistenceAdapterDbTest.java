@@ -144,6 +144,27 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
+    void findOpenByAccountIdOrdersSameTradeDateByCreatedAtAscending() {
+        LocalDate day = LocalDate.of(2026, 10, 18);
+        // created_at을 명시해 삽입 순서와 정렬 기준이 어긋나게 한다(가장 늦게 만든 행을 먼저 삽입)
+        insertOrderCreatedAt(day, "LATE", "2026-10-18 03:00:00+00");
+        insertOrderCreatedAt(day, "EARLY", "2026-10-18 01:00:00+00");
+        insertOrderCreatedAt(day, "MID", "2026-10-18 02:00:00+00");
+
+        List<Order> open = adapter.findOpenByAccountId(accountId);
+
+        assertThat(open).extracting(Order::orderLeg).containsExactly("EARLY", "MID", "LATE");
+    }
+
+    // created_at 지정 주문 삽입(order_leg로 행 식별)
+    private void insertOrderCreatedAt(LocalDate tradeDate, String leg, String createdAt) {
+        jdbcTemplate.update(
+                "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', ?, 22.00, 5, 'PLANNED', ?::timestamptz, now())",
+                accountId, cycleId, tradeDate, leg, createdAt);
+    }
+
+    @Test
     void savesAndReloadsFractionalQuantity() {
         Order saved = adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),
                 StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,

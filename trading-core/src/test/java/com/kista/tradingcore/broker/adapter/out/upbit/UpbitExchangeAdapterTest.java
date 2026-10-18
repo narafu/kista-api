@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -18,8 +19,11 @@ import tools.jackson.databind.json.JsonMapper;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -50,7 +54,7 @@ class UpbitExchangeAdapterTest {
     @Test
     void balanceParsesStringDecimalsAndSkipsUnsupportedCoins() {
         server.expect(requestTo(BASE_URL + "/v1/accounts"))
-                .andExpect(header("Authorization", org.hamcrest.Matchers.startsWith("Bearer ")))
+                .andExpect(header("Authorization", Matchers.startsWith("Bearer ")))
                 .andRespond(withSuccess("""
                         [{"currency":"KRW","balance":"1000000.0","locked":"5000.0","avg_buy_price":"0","avg_buy_price_modified":false,"unit_currency":"KRW"},
                          {"currency":"BTC","balance":"0.00123456","locked":"0.0","avg_buy_price":"150000000","avg_buy_price_modified":false,"unit_currency":"KRW"},
@@ -98,11 +102,11 @@ class UpbitExchangeAdapterTest {
 
     // startKst = firstDay(KST 09:00)에서 하루씩 과거로 n개 — utc는 -9h
     private static String candleRows(LocalDate firstDay, int n) {
-        return "[" + java.util.stream.IntStream.range(0, n).mapToObj(i -> {
+        return "[" + IntStream.range(0, n).mapToObj(i -> {
             LocalDateTime kst = firstDay.minusDays(i).atTime(9, 0);
             return "{\"candle_date_time_kst\":\"%s\",\"candle_date_time_utc\":\"%s\",\"trade_price\":%d}"
                     .formatted(kst, kst.minusHours(9), 100 + i);
-        }).collect(java.util.stream.Collectors.joining(",")) + "]";
+        }).collect(Collectors.joining(",")) + "]";
     }
 
     @Test
@@ -124,10 +128,49 @@ class UpbitExchangeAdapterTest {
     }
 
     @Test
+    void count200NeedsSecondPageBecauseFirstPageYields199Completed() {
+        // 1차: count=min(201,200)=200 요청, 진행 중 봉 1개 버려 199개 → 부족해 2차 요청
+        LocalDate first = LocalDate.of(2026, 10, 17);
+        LocalDate oldest = first.minusDays(199);
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200"))
+                .andRespond(withSuccess(candleRows(first, 200), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200&to=" + oldest + "T00:00:00"))
+                .andRespond(withSuccess(candleRows(oldest.minusDays(1), 200), MediaType.APPLICATION_JSON));
+
+        List<CryptoCandle> candles = adapter.getCompletedDailyCandles(StrategyTicker.BTC, 200);
+
+        assertThat(candles).hasSize(200);
+        assertThat(candles.getLast().kstDate()).isEqualTo(LocalDate.of(2026, 10, 16));
+        assertThat(candles.getFirst().kstDate()).isEqualTo(LocalDate.of(2026, 10, 16).minusDays(199));
+        assertThat(candles).extracting(CryptoCandle::kstDate).doesNotHaveDuplicates().isSorted();
+        server.verify();
+    }
+
+    @Test
+    void count400UsesThreePages() {
+        LocalDate first = LocalDate.of(2026, 10, 17);
+        LocalDate oldest1 = first.minusDays(199);  // 1차 응답 중 가장 오래된 봉
+        LocalDate oldest2 = first.minusDays(399);  // 2차 응답 중 가장 오래된 봉
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200"))
+                .andRespond(withSuccess(candleRows(first, 200), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200&to=" + oldest1 + "T00:00:00"))
+                .andRespond(withSuccess(candleRows(oldest1.minusDays(1), 200), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200&to=" + oldest2 + "T00:00:00"))
+                .andRespond(withSuccess(candleRows(oldest2.minusDays(1), 200), MediaType.APPLICATION_JSON));
+
+        List<CryptoCandle> candles = adapter.getCompletedDailyCandles(StrategyTicker.BTC, 400);
+
+        assertThat(candles).hasSize(400);
+        assertThat(candles.getLast().kstDate()).isEqualTo(LocalDate.of(2026, 10, 16));
+        assertThat(candles).extracting(CryptoCandle::kstDate).doesNotHaveDuplicates().isSorted();
+        server.verify();
+    }
+
+    @Test
     void stopsWhenHistoryRunsOut() {
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200")))
+        server.expect(requestTo(Matchers.startsWith(BASE_URL + "/v1/candles/days?market=KRW-BTC&count=200")))
                 .andRespond(withSuccess(candleRows(LocalDate.of(2026, 10, 17), 200), MediaType.APPLICATION_JSON));
-        server.expect(requestTo(org.hamcrest.Matchers.containsString("&to=")))
+        server.expect(requestTo(Matchers.containsString("&to=")))
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThat(adapter.getCompletedDailyCandles(StrategyTicker.BTC, 250)).hasSize(199);
@@ -136,7 +179,7 @@ class UpbitExchangeAdapterTest {
 
     @Test
     void rejectsCountOver400() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.getCompletedDailyCandles(StrategyTicker.BTC, 401))
+        assertThatThrownBy(() -> adapter.getCompletedDailyCandles(StrategyTicker.BTC, 401))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -246,9 +289,9 @@ class UpbitExchangeAdapterTest {
 
     @Test
     void nonPositiveAmountsAreRejected() {
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, BigDecimal.ZERO, "i"))
+        assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, BigDecimal.ZERO, "i"))
                 .isInstanceOf(IllegalArgumentException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.BTC, new BigDecimal("0.000000001"), "i"))
+        assertThatThrownBy(() -> adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.BTC, new BigDecimal("0.000000001"), "i"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -256,9 +299,9 @@ class UpbitExchangeAdapterTest {
     void unknownOrMissingStateThrowsUpbitApiException() {
         expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", "weird");
         expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", null);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
+        assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
                 .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
+        assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
                 .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
     }
 
