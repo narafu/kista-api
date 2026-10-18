@@ -122,8 +122,11 @@ class CryptoDcaRoundExecutorTest {
     void buyCapsToAvailableKrwMinusFee() {
         balance("50000", "0");
         BatchContext c = ctx(StrategyTicker.BTC);
-        run(NOW, c, config(OrderDirection.BUY, "100000", 13));
-        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("49975")), anyString());
+        run(NOW, c, config(OrderDirection.BUY, "100000.00", 13));
+        var amount = org.mockito.ArgumentCaptor.forClass(BigDecimal.class);
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), amount.capture(), anyString());
+        assertThat(amount.getValue()).isEqualTo(new BigDecimal("49975")); // isEqualTo는 scale까지 비교
+        assertThat(amount.getValue().scale()).isZero();
     }
 
     @Test
@@ -200,15 +203,78 @@ class CryptoDcaRoundExecutorTest {
         verifyNoInteractions(exchange, recorder);
     }
 
+    Order existing(BatchContext c, OrderStatus status) {
+        return new Order(UUID.randomUUID(), account.id(), c.currentCycle().id(), TODAY, StrategyTicker.BTC, OrderType.MARKET,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", BigDecimal.ONE, BTC_PRICE, status, null, null, null);
+    }
+
     @Test
-    void existingActiveOrderIsRecoveredNotReordered() {
-        BatchContext c = ctx(StrategyTicker.BTC);
-        Order existing = new Order(UUID.randomUUID(), account.id(), c.currentCycle().id(), TODAY, StrategyTicker.BTC, OrderType.MARKET,
-                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", BigDecimal.ONE, BTC_PRICE, OrderStatus.SUBMITTING, null, null, null);
-        when(orderPort.findByStrategyId(c.strategy().id(), TODAY, TODAY)).thenReturn(List.of(existing));
-        run(NOW, c, config(OrderDirection.BUY, "10000", 13));
-        verify(recorder).recordOrdered(c, TODAY, existing, null);
+    void confirmedOrderIsRecoveredNotReordered() {
+        for (OrderStatus status : List.of(OrderStatus.PLACED, OrderStatus.FILLED)) {
+            BatchContext c = ctx(StrategyTicker.BTC);
+            Order existing = existing(c, status);
+            when(orderPort.findByStrategyId(c.strategy().id(), TODAY, TODAY)).thenReturn(List.of(existing));
+            run(NOW, c, config(OrderDirection.BUY, "10000", 13));
+            verify(recorder).recordOrdered(c, TODAY, existing, BTC_PRICE);
+        }
         verifyNoInteractions(exchange);
+    }
+
+    @Test
+    void submittingOrderBlocksWithoutRecording() {
+        for (OrderStatus status : List.of(OrderStatus.SUBMITTING, OrderStatus.PLANNED)) {
+            BatchContext c = ctx(StrategyTicker.BTC);
+            when(orderPort.findByStrategyId(c.strategy().id(), TODAY, TODAY)).thenReturn(List.of(existing(c, status)));
+            run(NOW, c, config(OrderDirection.BUY, "10000", 13));
+        }
+        verifyNoInteractions(exchange, recorder);
+        verify(orderPort, never()).save(any());
+    }
+
+    @Test
+    void failedOrderDoesNotBlockRetry() {
+        balance("100000", "0");
+        BatchContext c = ctx(StrategyTicker.BTC);
+        when(orderPort.findByStrategyId(c.strategy().id(), TODAY, TODAY)).thenReturn(List.of(existing(c, OrderStatus.FAILED)));
+        run(NOW, c, config(OrderDirection.BUY, "10000", 13));
+        verify(exchange).buyMarketByAmount(any(), any(), any(), anyString());
+    }
+
+    @Test
+    void keyExpiredOnPlacementSkipsRemainingWithoutCalls() {
+        balance("100000", "0");
+        when(exchange.buyMarketByAmount(any(), any(), any(), anyString())).thenThrow(new BrokerCredentialException());
+        BatchContext btc = ctx(StrategyTicker.BTC);
+        BatchContext eth = ctx(StrategyTicker.ETH);
+        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        m.put(btc, config(OrderDirection.BUY, "10000", 13));
+        m.put(eth, config(OrderDirection.BUY, "10000", 13));
+        run(NOW, m);
+        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
+    }
+
+    @Test
+    void transientPlacementStillDeductsForNextStrategy() {
+        balance("40000", "0");
+        when(exchange.buyMarketByAmount(any(), eq(StrategyTicker.BTC), any(), anyString())).thenThrow(new StubBrokerApiException("timeout"));
+        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        m.put(ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "30000", 13));
+        m.put(ctx(StrategyTicker.ETH), config(OrderDirection.BUY, "30000", 13));
+        run(NOW, m);
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.ETH), eq(new BigDecimal("9980")), anyString());
+    }
+
+    @Test
+    void sellDeductsHoldingsForNextSellOfSameTicker() {
+        balance("0", "0.0006");
+        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        m.put(ctx(StrategyTicker.BTC), config(OrderDirection.SELL, "10000", 13));
+        m.put(ctx(StrategyTicker.BTC), config(OrderDirection.SELL, "10000", 13));
+        run(NOW, m);
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.00033333")), anyString());
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.00026667")), anyString());
     }
 
     @Test
