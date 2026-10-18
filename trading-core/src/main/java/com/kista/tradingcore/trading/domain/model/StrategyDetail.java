@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.model;
 
+import com.kista.shared.kernel.Market;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,7 +13,14 @@ public record StrategyDetail(
         Integer divisionCount,
         boolean isReverseMode,
         Double currentRound,    // INFINITE 전략만 non-null, 이력 없으면 null
-        Integer currentHoldings, // 최신 cycle_position 기준 보유 수량
+        Integer currentHoldings, // 최신 cycle_position 기준 보유 수량 (코인 DCA는 null)
         VrSummary vr,           // VR 전략만 non-null, 비VR은 null (com.kista.tradingcore.trading.domain.model.VrSummary)
         DcaSummary dca          // DCA 전략만 non-null
-) {}
+) {
+    public StrategyDetail {
+        // 코인 DCA는 cycle_position을 갱신하지 않아(초기 0 고정) 보유 수량을 싣지 않는다 — 실잔고는 crypto-portfolio
+        if (strategy.ticker().getMarket() == Market.CRYPTO_KRW) {
+            currentHoldings = null;
+        }
+    }
+}

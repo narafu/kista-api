@@ -2179,9 +2179,11 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
         when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
 
-        strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, cryptoDcaConfig()));
+        StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, cryptoDcaConfig()));
 
         verify(dcaDetailPort).save(STRATEGY_VERSION_ID, cryptoDcaConfig());
+        // 코인 DCA는 cycle_position이 초기 0에 고정되므로 보유 수량을 내보내지 않는다
+        assertThat(detail.currentHoldings()).isNull();
         verifyNoInteractions(marginPort, brokerPricePort);
     }
 
