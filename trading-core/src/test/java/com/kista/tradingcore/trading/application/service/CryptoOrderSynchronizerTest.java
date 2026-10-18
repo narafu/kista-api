@@ -25,6 +25,7 @@ import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
@@ -38,6 +39,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -92,8 +95,9 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLANNED, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         run(o, 13);
-        verify(orderPort).markPlaced(orderId, "upbit-uuid");
-        verify(recorder).recordOrdered(ctx, TODAY, o, PRICE);
+        InOrder io = inOrder(recorder, orderPort);
+        io.verify(recorder).recordOrdered(ctx, TODAY, o, PRICE);
+        io.verify(orderPort).markPlaced(orderId, "upbit-uuid");
         verify(exchange, never()).buyMarketByAmount(any(), any(), any(), any());
         verify(exchange, never()).sellMarketByVolume(any(), any(), any(), any());
         verify(orderPort, never()).markFilled(any(), any(), any(), any());
@@ -122,8 +126,9 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLANNED, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 14);
-        verify(orderPort).markFailed(orderId);
-        verify(recorder).recordSkipped(ctx, TODAY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        InOrder io = inOrder(recorder, orderPort);
+        io.verify(recorder).recordSkipped(ctx, TODAY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        io.verify(orderPort).markFailed(orderId);
     }
 
     @Test
@@ -132,6 +137,32 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+    }
+
+    @Test
+    void recordSkippedFailureLeavesOrderPlanned() {
+        Order o = order(OrderStatus.PLANNED, TODAY, null);
+        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
+        doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any());
+        run(o, 14);
+        verify(orderPort, never()).markFailed(any());
+    }
+
+    @Test
+    void recordOrderedFailureLeavesOrderPlanned() {
+        Order o = order(OrderStatus.PLANNED, TODAY, null);
+        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
+        doThrow(new RuntimeException("db")).when(recorder).recordOrdered(any(), any(), any(), any());
+        run(o, 13);
+        verify(orderPort, never()).markPlaced(any(), any());
+    }
+
+    @Test
+    void filledWithoutAvgPriceIsSkipped() {
+        Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
+        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", null)));
+        run(o, 13);
+        verify(orderPort, never()).markFilled(any(), any(), any(), any());
     }
 
     @Test

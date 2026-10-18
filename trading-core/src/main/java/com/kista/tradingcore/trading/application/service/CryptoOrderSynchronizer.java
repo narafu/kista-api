@@ -62,15 +62,17 @@ class CryptoOrderSynchronizer {
             var found = exchange.findOrderByIdentifier(ref, order.id().toString());
             if (found.isEmpty()) {
                 // 거래소에 없음이 확인됐으므로 실패 처리 — 실행 시간대 안이면 같은 시간대 재시도(Task 7), 지났으면 미주문 기록
-                orderPort.markFailed(order.id());
+                // 이력(멱등 insertIfAbsent)을 먼저 남기고 상태를 전이 — 중간 실패 시 PLANNED로 남아 다음 틱이 무해하게 재처리
                 boolean retryable = order.tradeDate().equals(nowKst.toLocalDate()) && nowKst.getHour() == config.executionHour();
                 if (!retryable) {
                     recorder.recordSkipped(ctx, order.tradeDate(), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
                 }
+                orderPort.markFailed(order.id());
                 return;
             }
-            orderPort.markPlaced(order.id(), found.get().uuid());
+            // 이력 먼저, 상태 전이 나중 — recordOrdered 실패 시 PLANNED 유지(PLACED 경로는 이력을 쓰지 않음)
             recorder.recordOrdered(ctx, order.tradeDate(), order, order.price());
+            orderPort.markPlaced(order.id(), found.get().uuid());
             settle(ctx, order, found.get());
             return;
         }
@@ -84,6 +86,10 @@ class CryptoOrderSynchronizer {
         if (!closed) return;
         BigDecimal volume = r.executedVolume() == null ? BigDecimal.ZERO : r.executedVolume();
         if (volume.signum() > 0) {
+            if (r.avgPrice() == null) {
+                log.warn("체결 수량은 있으나 평균가 없음 — 건너뜀 orderId={}", order.id());
+                return;
+            }
             orderPort.markFilled(order.id(), volume, r.avgPrice(), OrderStatus.FILLED);
             eventPublisher.publishEvent(new CryptoOrderFilledEvent(ctx.account().userId(), ctx.account().id(), ctx.strategy().id(),
                     ctx.account().nickname(), order.ticker(), order.direction(), volume, r.avgPrice(),
