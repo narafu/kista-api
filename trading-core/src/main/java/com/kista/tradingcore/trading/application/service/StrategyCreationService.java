@@ -1,4 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
+import java.time.LocalDateTime;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.kernel.Market;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
@@ -129,7 +132,9 @@ class StrategyCreationService {
         }
         if (dca) {
             DcaSummary summary = dcaSummaryAssembler.assemble(cmd.dca(), null,
-                    DcaSummaryAssembler.firstEligibleDate(persisted.cycle().startDate(), null));
+                    DcaSummaryAssembler.firstEligibleDate(persisted.cycle().startDate(), null, cmd.dca(),
+                            persisted.strategy().ticker().getMarket(), LocalDateTime.now(TimeZones.KST)),
+                    persisted.strategy().ticker().getMarket());
             return new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, 0, null, summary);
         }
         return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings, null, null);

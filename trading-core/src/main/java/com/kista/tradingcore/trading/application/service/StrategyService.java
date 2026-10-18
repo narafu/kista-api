@@ -1,4 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
+import java.time.LocalDateTime;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -229,15 +232,16 @@ class StrategyService implements StrategyUseCase {
         if (strategy.isDca()) {
             DcaExecution last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id())).get(strategy.id());
             dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
-                    .map(config -> buildDcaSummary(config, last, c))).orElse(null);
+                    .map(config -> buildDcaSummary(config, last, c, strategy.ticker().getMarket()))).orElse(null);
         }
 
         return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
     }
 
     // DCA 요약 — 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산
-    private DcaSummary buildDcaSummary(DcaConfig config, DcaExecution last, StrategyCycle cycle) {
-        return dcaSummaryAssembler.assemble(config, last, DcaSummaryAssembler.firstEligibleDate(cycle.startDate(), last));
+    private DcaSummary buildDcaSummary(DcaConfig config, DcaExecution last, StrategyCycle cycle, Market market) {
+        LocalDateTime nowKst = LocalDateTime.now(TimeZones.KST);
+        return dcaSummaryAssembler.assemble(config, last, DcaSummaryAssembler.firstEligibleDate(cycle.startDate(), last, config, market, nowKst), market);
     }
 
     // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
@@ -308,7 +312,7 @@ class StrategyService implements StrategyUseCase {
 
             DcaSummary dcaSummary = null;
             if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
-                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.get(strategy.id()), latestCycle.get());
+                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.get(strategy.id()), latestCycle.get(), strategy.ticker().getMarket());
             }
 
             return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);

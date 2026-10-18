@@ -2100,9 +2100,9 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                     arg.endAmount(), arg.startDate(), arg.endDate(), arg.createdAt(), arg.deletedAt());
         });
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
-        when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
-        when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
+        lenient().when(marketCalendarPort.usSessionDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).minusDays(1));
+        lenient().when(marketCalendarPort.kstTradeDateOf(any())).thenAnswer(inv -> ((LocalDate) inv.getArgument(0)).plusDays(1));
+        lenient().when(marketCalendarPort.isUsSessionOpen(any())).thenReturn(true);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
     }
 
