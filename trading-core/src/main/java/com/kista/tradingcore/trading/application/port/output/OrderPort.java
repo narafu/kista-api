@@ -97,4 +97,7 @@ public interface OrderPort {
 
     // id 목록 일괄 조회 (DCA 회차 이력의 주문 조인용)
     List<Order> findAllByIds(Collection<UUID> ids);
+
+    // 계좌의 미완료(PLANNED·PLACED) 주문 — 날짜 무관(자정 넘김 대비), 거래일·생성 시각 오름차순 (코인 주문 동기화용)
+    List<Order> findOpenByAccountId(UUID accountId);
 }

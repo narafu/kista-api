@@ -65,6 +65,14 @@ public record Order(
                 BigDecimal.valueOf(quantity), price);
     }
 
+    // 코인 시장가 주문 — MARKET·PLANNED 고정, 수량은 소수 8자리 (매수는 price=주문 금액 기준 참고가)
+    public static Order cryptoMarket(UUID accountId, UUID strategyCycleId, LocalDate tradeDate, StrategyTicker ticker,
+                                     OrderDirection direction, String orderLeg, OrderTiming timing,
+                                     BigDecimal quantity, BigDecimal price) {
+        return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.MARKET, timing, direction,
+                orderLeg, quantity, price, OrderStatus.PLANNED, null, null, null);
+    }
+
     // 증권사 접수 완료 표시 — externalOrderId 추가, 나머지 필드 유지
     public Order withPlaced(String externalOrderId) {
         return new Order(id, accountId, strategyCycleId, tradeDate, ticker,

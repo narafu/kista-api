@@ -156,6 +156,12 @@ public class OrderPersistenceAdapter implements OrderPort {
     }
 
     @Override
+    public List<Order> findOpenByAccountId(UUID accountId) {
+        return repository.findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(
+                accountId, List.of(OrderStatus.PLANNED, OrderStatus.PLACED)).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<Order> findAllByIds(Collection<UUID> ids) {
         return repository.findAllById(ids).stream().map(this::toDomain).toList();
     }

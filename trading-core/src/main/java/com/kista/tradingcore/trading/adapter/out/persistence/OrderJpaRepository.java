@@ -18,6 +18,9 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatus(
             UUID strategyCycleId, LocalDate tradeDate, OrderStatus status);
 
+    // 계좌의 지정 상태 주문 — 거래일·생성 시각 오름차순
+    List<OrderEntity> findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(UUID accountId, List<OrderStatus> statuses);
+
     // 사이클·거래일 내 증권사 주문번호 존재 여부 (수동 체결 보정 중복 반영 방지 — 주문번호는 일자별 채번이라 거래일 포함)
     boolean existsByStrategyCycleIdAndTradeDateAndExternalOrderId(UUID strategyCycleId, LocalDate tradeDate, String externalOrderId);
 

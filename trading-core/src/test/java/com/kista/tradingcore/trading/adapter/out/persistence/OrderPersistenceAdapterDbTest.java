@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.support.DataJpaTestBase;
@@ -122,6 +123,35 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(deleted).isEqualTo(2);
         assertThat(adapter.findPlannedByCycleAndDate(cycleId, LocalDate.now())).isEmpty();
         assertThat(adapter.findPlacedByCycleAndDate(cycleId, LocalDate.now())).hasSize(1);
+    }
+
+    @Test
+    void findOpenByAccountIdReturnsPlannedAndPlacedAcrossDates() {
+        LocalDate today = LocalDate.of(2026, 10, 18);
+        UUID otherAccountId = UUID.randomUUID();
+        insertAccount(otherAccountId, userId, false);
+
+        insertOrderForAccount(accountId, cycleId, today, "SOXL", "BUY", "PLANNED", null, null);
+        insertOrderForAccount(accountId, cycleId, today.minusDays(1), "SOXL", "BUY", "PLACED", null, null);
+        insertOrderForAccount(accountId, cycleId, today, "SOXL", "BUY", "FILLED", 5, new BigDecimal("22.00"));
+        insertOrderForAccount(otherAccountId, cycleId, today, "SOXL", "BUY", "PLANNED", null, null);
+
+        List<Order> open = adapter.findOpenByAccountId(accountId);
+
+        assertThat(open).extracting(Order::status).containsExactly(OrderStatus.PLACED, OrderStatus.PLANNED);
+        assertThat(open).extracting(Order::tradeDate).containsExactly(today.minusDays(1), today);
+    }
+
+    @Test
+    void savesAndReloadsFractionalQuantity() {
+        Order saved = adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),
+                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
+                new BigDecimal("0.00012345"), new BigDecimal("150000000")));
+
+        Order reloaded = adapter.findById(saved.id()).orElseThrow();
+
+        assertThat(reloaded.quantity()).isEqualByComparingTo("0.00012345");
+        assertThat(reloaded.price()).isEqualByComparingTo("150000000");
     }
 
     // 주문 1건 직접 삽입 헬퍼
