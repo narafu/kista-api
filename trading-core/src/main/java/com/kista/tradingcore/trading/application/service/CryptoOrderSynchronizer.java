@@ -23,7 +23,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// 코인 주문 동기화 — 신규 실행 전에 PLANNED(접수 결과 불명)를 identifier로 복구하고 PLACED의 체결을 확정. 거래소 확인 전 재주문 금지(중복 매수 방지)
+// 코인 주문 동기화 — 신규 실행 전에 SUBMITTING(접수 결과 불명)을 identifier로 복구하고 PLACED의 체결을 확정. 거래소 확인 전 재주문 금지(중복 매수 방지)
 // HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder의 개별 트랜잭션
 @Slf4j
 @Component
@@ -59,18 +59,20 @@ class CryptoOrderSynchronizer {
     private void syncOne(CryptoExchangePort exchange, BatchContext ctx, DcaConfig config, Order order, LocalDateTime nowKst) {
         var ref = ctx.account().brokerRef();
         if (order.status() == OrderStatus.PLANNED) {
+            // 저장만 되고 SUBMITTING 선점 전에 중단된 주문 — 전송된 적이 없어 조회 없이 취소
+            skipIfNotRetryable(ctx, config, order, nowKst);
+            orderPort.cancelPlanned(order.id());
+            return;
+        }
+        if (order.status() == OrderStatus.SUBMITTING) {
             var found = exchange.findOrderByIdentifier(ref, order.id().toString());
             if (found.isEmpty()) {
-                // 거래소에 없음이 확인됐으므로 실패 처리 — 실행 시간대 안이면 같은 시간대 재시도(Task 7), 지났으면 미주문 기록
-                // 이력(멱등 insertIfAbsent)을 먼저 남기고 상태를 전이 — 중간 실패 시 PLANNED로 남아 다음 틱이 무해하게 재처리
-                boolean retryable = order.tradeDate().equals(nowKst.toLocalDate()) && nowKst.getHour() == config.executionHour();
-                if (!retryable) {
-                    recorder.recordSkipped(ctx, order.tradeDate(), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
-                }
+                // 거래소에 없음이 확인됐으므로 실패 처리 — 이력(멱등 insertIfAbsent)을 먼저 남기고 상태를 전이해 중간 실패 시 다음 틱이 무해하게 재처리
+                skipIfNotRetryable(ctx, config, order, nowKst);
                 orderPort.markFailed(order.id());
                 return;
             }
-            // 이력 먼저, 상태 전이 나중 — recordOrdered 실패 시 PLANNED 유지(PLACED 경로는 이력을 쓰지 않음)
+            // 이력 먼저, 상태 전이 나중 — recordOrdered 실패 시 SUBMITTING 유지(PLACED 경로는 이력을 쓰지 않음)
             recorder.recordOrdered(ctx, order.tradeDate(), order, order.price());
             orderPort.markPlaced(order.id(), found.get().uuid());
             settle(ctx, order, found.get());
@@ -78,6 +80,14 @@ class CryptoOrderSynchronizer {
         }
         // PLACED
         exchange.findOrderByUuid(ref, order.externalOrderId()).ifPresent(r -> settle(ctx, order, r));
+    }
+
+    // 실행 시간대 안(오늘·같은 시각)이면 Task 7이 재시도하므로 기록 없음, 지났으면 미주문 기록
+    private void skipIfNotRetryable(BatchContext ctx, DcaConfig config, Order order, LocalDateTime nowKst) {
+        boolean retryable = order.tradeDate().equals(nowKst.toLocalDate()) && nowKst.getHour() == config.executionHour();
+        if (!retryable) {
+            recorder.recordSkipped(ctx, order.tradeDate(), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
+        }
     }
 
     // 체결 수량이 있으면 FILLED 확정(+이벤트), 무체결 취소면 CANCELLED, 그 외(WAIT/WATCH)는 유지

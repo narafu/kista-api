@@ -91,8 +91,8 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void plannedFoundOnExchangeIsRecoveredWithoutResubmit() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void submittingFoundOnExchangeIsRecoveredWithoutResubmit() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         run(o, 13);
         InOrder io = inOrder(recorder, orderPort);
@@ -104,8 +104,8 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void plannedAlreadyFilledIsSettledInSameTick() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void submittingAlreadyFilledIsSettledInSameTick() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
         run(o, 13);
         verify(orderPort).markPlaced(orderId, "upbit-uuid");
@@ -113,8 +113,8 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void plannedOrderNotFoundBeforeHourEndsIsFailedThenRetried() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void submittingOrderNotFoundBeforeHourEndsIsFailedThenRetried() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(orderPort).markFailed(orderId);
@@ -122,8 +122,8 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void plannedOrderNotFoundAfterHourIsSkipped() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void submittingOrderNotFoundAfterHourIsSkipped() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 14);
         InOrder io = inOrder(recorder, orderPort);
@@ -132,16 +132,16 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void plannedOrderOfPastDayIsSkippedEvenInHour() {
-        Order o = order(OrderStatus.PLANNED, TODAY.minusDays(1), null);
+    void submittingOrderOfPastDayIsSkippedEvenInHour() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY.minusDays(1), null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
     }
 
     @Test
-    void recordSkippedFailureLeavesOrderPlanned() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void recordSkippedFailureLeavesOrderSubmitting() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any());
         run(o, 14);
@@ -149,8 +149,8 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void recordOrderedFailureLeavesOrderPlanned() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void recordOrderedFailureLeavesOrderSubmitting() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         doThrow(new RuntimeException("db")).when(recorder).recordOrdered(any(), any(), any(), any());
         run(o, 13);
@@ -166,8 +166,8 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
-    void transientLookupFailureLeavesPlanned() {
-        Order o = order(OrderStatus.PLANNED, TODAY, null);
+    void transientLookupFailureLeavesSubmitting() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenThrow(new RuntimeException("timeout"));
         run(o, 13);
         verifyNoMoreInteractions(recorder);
@@ -206,9 +206,27 @@ class CryptoOrderSynchronizerTest {
     }
 
     @Test
+    void plannedLeftoverIsCancelledWithoutLookup() {
+        Order o = order(OrderStatus.PLANNED, TODAY, null);
+        run(o, 14);
+        InOrder io = inOrder(recorder, orderPort);
+        io.verify(recorder).recordSkipped(ctx, TODAY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        io.verify(orderPort).cancelPlanned(orderId);
+        verifyNoMoreInteractions(exchange);
+    }
+
+    @Test
+    void plannedLeftoverInHourIsCancelledWithoutRecord() {
+        Order o = order(OrderStatus.PLANNED, TODAY, null);
+        run(o, 13);
+        verify(orderPort).cancelPlanned(orderId);
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any());
+    }
+
+    @Test
     void orderOfUnknownCycleIsUntouched() {
         Order o = new Order(orderId, ctx.account().id(), UUID.randomUUID(), TODAY, StrategyTicker.BTC, OrderType.MARKET,
-                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA", BigDecimal.ONE, PRICE, OrderStatus.PLANNED, null, null, null);
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA", BigDecimal.ONE, PRICE, OrderStatus.SUBMITTING, null, null, null);
         run(o, 13);
         verifyNoMoreInteractions(exchange);
     }

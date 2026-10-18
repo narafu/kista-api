@@ -126,20 +126,21 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
-    void findOpenByAccountIdReturnsPlannedAndPlacedAcrossDates() {
+    void findOpenByAccountIdReturnsPlannedSubmittingAndPlacedAcrossDates() {
         LocalDate today = LocalDate.of(2026, 10, 18);
         UUID otherAccountId = UUID.randomUUID();
         insertAccount(otherAccountId, userId, false);
 
         insertOrderForAccount(accountId, cycleId, today, "SOXL", "BUY", "PLANNED", null, null);
         insertOrderForAccount(accountId, cycleId, today.minusDays(1), "SOXL", "BUY", "PLACED", null, null);
+        insertOrderForAccount(accountId, cycleId, today, "SOXL", "SELL", "SUBMITTING", null, null);
         insertOrderForAccount(accountId, cycleId, today, "SOXL", "BUY", "FILLED", 5, new BigDecimal("22.00"));
         insertOrderForAccount(otherAccountId, cycleId, today, "SOXL", "BUY", "PLANNED", null, null);
 
         List<Order> open = adapter.findOpenByAccountId(accountId);
 
-        assertThat(open).extracting(Order::status).containsExactly(OrderStatus.PLACED, OrderStatus.PLANNED);
-        assertThat(open).extracting(Order::tradeDate).containsExactly(today.minusDays(1), today);
+        assertThat(open).extracting(Order::status).containsExactlyInAnyOrder(OrderStatus.PLACED, OrderStatus.PLANNED, OrderStatus.SUBMITTING);
+        assertThat(open.get(0).tradeDate()).isEqualTo(today.minusDays(1)); // 거래일 오름차순
     }
 
     @Test
@@ -273,6 +274,32 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
     private OrderStatus statusOf(UUID id) {
         return adapter.findById(id).orElseThrow().status();
+    }
+
+    Order saveCrypto() {
+        return adapter.save(Order.cryptoMarket(accountId, cycleId, LocalDate.of(2026, 10, 18),
+                StrategyTicker.BTC, OrderDirection.BUY, "DCA_BUY", OrderTiming.AT_CLOSE,
+                new BigDecimal("0.0001"), new BigDecimal("10000")));
+    }
+
+    @Test
+    void submittingCryptoOrderCanBePlacedOrFailed() {
+        UUID a = saveCrypto().id();
+        adapter.markSubmitting(a);
+        adapter.markPlaced(a, "upbit-uuid");
+        assertThat(statusOf(a)).isEqualTo(OrderStatus.PLACED);
+
+        UUID b = saveCrypto().id();
+        adapter.markSubmitting(b);
+        adapter.markFailed(b);
+        assertThat(statusOf(b)).isEqualTo(OrderStatus.FAILED);
+    }
+
+    @Test
+    void plannedCryptoOrderCanBeCancelled() {
+        UUID id = saveCrypto().id();
+        adapter.cancelPlanned(id);
+        assertThat(statusOf(id)).isEqualTo(OrderStatus.CANCELLED);
     }
 
     @Test
