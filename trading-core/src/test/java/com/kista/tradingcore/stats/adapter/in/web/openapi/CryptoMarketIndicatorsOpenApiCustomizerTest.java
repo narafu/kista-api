@@ -27,12 +27,17 @@ class CryptoMarketIndicatorsOpenApiCustomizerTest {
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "kimchiPremium"), "CryptoMarketIndicatorsKimchiPremium");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "fundingRate"), "CryptoMarketIndicatorsFundingRate");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "openInterest"), "CryptoMarketIndicatorsOpenInterest");
+        assertNullableReference(property("CryptoMarketIndicatorsTicker", "valuation"), "CryptoMarketIndicatorsValuation");
+        assertNullableReference(property("CryptoMarketIndicatorsTicker", "longShortRatio"), "CryptoMarketIndicatorsLongShortRatio");
     }
 
     @Test
     void null_가능_스칼라는_null_타입을_포함한다() {
         assertThat(property("CryptoMarketIndicatorsPremiumPair", "official").getTypes()).contains("null");
         assertThat(property("CryptoMarketIndicatorsDatedPremiumPair", "official").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedValuation", "wma200").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedValuation", "wma200Multiple").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedValuation", "mayerMultiple").getTypes()).contains("null");
     }
 
     @Test

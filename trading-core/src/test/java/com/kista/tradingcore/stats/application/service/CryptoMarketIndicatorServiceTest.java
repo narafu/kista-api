@@ -10,6 +10,7 @@ import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
+import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import com.kista.tradingcore.stats.domain.model.FundingRateQuote;
 import com.kista.tradingcore.stats.domain.model.FundingRateRecord;
@@ -91,6 +92,19 @@ class CryptoMarketIndicatorServiceTest {
         when(binance.getFundingRate(any())).thenReturn(new FundingRateQuote(new BigDecimal("0.0001"), NOW.plusSeconds(3600)));
         when(binance.getFundingHistory(any(), any())).thenReturn(List.of(new FundingRateRecord(NOW.minusSeconds(86400), new BigDecimal("0.0001"))));
         when(binance.getOpenInterestHistory(any())).thenReturn(List.of(new DatedValue(TODAY.minusDays(1), new BigDecimal("5"))));
+        when(binance.getSpotDailyClosesSince(any(), any())).thenReturn(closes(1500, "100000"));
+        when(binance.getLongShortAccountRatioHistory(any())).thenReturn(
+                List.of(new DatedLongShortRatio(TODAY.minusDays(1), new BigDecimal("0.6"), new BigDecimal("1.5"))));
+    }
+
+    // 전 섹션 실패 stub
+    void stubAllFail() {
+        when(upbit.getUsdtKrwPrice()).thenThrow(new RuntimeException("upbit down"));
+        when(brokerStats.currentExchangeRate()).thenThrow(new RuntimeException("fx down"));
+        when(binance.getFundingRate(any())).thenThrow(new RuntimeException("down"));
+        when(binance.getOpenInterestHistory(any())).thenThrow(new RuntimeException("down"));
+        when(binance.getSpotDailyClosesSince(any(), any())).thenThrow(new RuntimeException("down"));
+        when(binance.getLongShortAccountRatioHistory(any())).thenThrow(new RuntimeException("down"));
     }
 
     @Test
@@ -109,7 +123,75 @@ class CryptoMarketIndicatorServiceTest {
                     .noneMatch(p -> p.date().equals(TODAY));
             assertThat(t.fundingRate().current()).isEqualByComparingTo("0.0001");
             assertThat(t.openInterest().history()).hasSize(1);
+            // 밸류에이션은 오늘 봉을 빼고 마지막 200일, current는 어제
+            assertThat(t.valuation().history()).hasSize(200).noneMatch(v -> v.date().equals(TODAY));
+            assertThat(t.valuation().current().date()).isEqualTo(TODAY.minusDays(1));
+            assertThat(t.valuation().current().wma200Multiple()).isEqualByComparingTo("1");
+            assertThat(t.valuation().current().mayerMultiple()).isEqualByComparingTo("1");
+            assertThat(t.valuation().current().athDrawdownPercent()).isEqualByComparingTo("0");
+            assertThat(t.longShortRatio().longAccount()).isEqualByComparingTo("0.6");
+            assertThat(t.longShortRatio().longShortRatio()).isEqualByComparingTo("1.5");
         });
+    }
+
+    @Test
+    void 장기_일봉만_실패하면_밸류에이션만_null() {
+        when(binance.getSpotDailyClosesSince(any(), any())).thenThrow(new RuntimeException("klines down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        r.tickers().forEach(t -> {
+            assertThat(t.valuation()).isNull();
+            assertThat(t.kimchiPremium()).isNotNull();
+            assertThat(t.longShortRatio()).isNotNull();
+        });
+    }
+
+    @Test
+    void 롱숏_이력이_비면_롱숏만_null() {
+        when(binance.getLongShortAccountRatioHistory(any())).thenReturn(List.of());
+
+        CryptoMarketIndicators r = service.get(200);
+
+        r.tickers().forEach(t -> {
+            assertThat(t.longShortRatio()).isNull();
+            assertThat(t.valuation()).isNotNull();
+        });
+    }
+
+    @Test
+    void 새_섹션만_살아있어도_빈_결과가_아니다() {
+        stubAllFail();
+        reset(binance);
+        when(binance.getSpotDailyClosesSince(any(), any())).thenReturn(closes(10, "100"));
+        when(binance.getFundingRate(any())).thenThrow(new RuntimeException("down"));
+        when(binance.getOpenInterestHistory(any())).thenThrow(new RuntimeException("down"));
+        when(binance.getLongShortAccountRatioHistory(any())).thenThrow(new RuntimeException("down"));
+
+        assertThat(service.get(200).isEmpty()).isFalse();
+    }
+
+    @Test
+    void 장기_일봉은_같은_UTC_날짜_안에서는_메인_TTL이_지나도_재호출하지_않고_자정이_지나면_다시_부른다() {
+        service.get(200);
+        now[0] = NOW.plus(CryptoMarketIndicatorService.TTL).plusSeconds(1);
+        service.get(200);
+        verify(binance, times(1)).getSpotDailyClosesSince(org.mockito.ArgumentMatchers.eq(StrategyTicker.BTC), any());
+        verify(upbit, times(2)).getUsdtKrwPrice(); // 메인 캐시는 만료돼 재조립
+
+        now[0] = TODAY.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).plusSeconds(1);
+        service.get(200);
+        verify(binance, times(2)).getSpotDailyClosesSince(org.mockito.ArgumentMatchers.eq(StrategyTicker.BTC), any());
+    }
+
+    @Test
+    void 장기_일봉_조회_실패는_캐시하지_않는다() {
+        when(binance.getSpotDailyClosesSince(any(), any())).thenThrow(new RuntimeException("down"));
+        service.get(200);
+        now[0] = NOW.plus(CryptoMarketIndicatorService.TTL).plusSeconds(1);
+        service.get(200);
+
+        verify(binance, times(2)).getSpotDailyClosesSince(org.mockito.ArgumentMatchers.eq(StrategyTicker.BTC), any());
     }
 
     @Test
@@ -145,10 +227,7 @@ class CryptoMarketIndicatorServiceTest {
 
     @Test
     void 모두_실패하면_전부_null이고_1분만_캐시한다() {
-        when(upbit.getUsdtKrwPrice()).thenThrow(new RuntimeException("upbit down"));
-        when(brokerStats.currentExchangeRate()).thenThrow(new RuntimeException("fx down"));
-        when(binance.getFundingRate(any())).thenThrow(new RuntimeException("down"));
-        when(binance.getOpenInterestHistory(any())).thenThrow(new RuntimeException("down"));
+        stubAllFail();
 
         CryptoMarketIndicators r = service.get(200);
         service.get(200);
@@ -159,6 +238,8 @@ class CryptoMarketIndicatorServiceTest {
             assertThat(t.kimchiPremium()).isNull();
             assertThat(t.fundingRate()).isNull();
             assertThat(t.openInterest()).isNull();
+            assertThat(t.valuation()).isNull();
+            assertThat(t.longShortRatio()).isNull();
         });
         verify(upbit, times(1)).getUsdtKrwPrice();
 
@@ -170,10 +251,7 @@ class CryptoMarketIndicatorServiceTest {
 
     @Test
     void 장애가_복구되면_빈_결과_캐시가_끝난_뒤_정상_결과를_10분_캐시한다() {
-        when(upbit.getUsdtKrwPrice()).thenThrow(new RuntimeException("upbit down"));
-        when(brokerStats.currentExchangeRate()).thenThrow(new RuntimeException("fx down"));
-        when(binance.getFundingRate(any())).thenThrow(new RuntimeException("down"));
-        when(binance.getOpenInterestHistory(any())).thenThrow(new RuntimeException("down"));
+        stubAllFail();
         assertThat(service.get(200).isEmpty()).isTrue();
 
         reset(upbit, brokerStats, binance); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
@@ -192,6 +270,8 @@ class CryptoMarketIndicatorServiceTest {
 
         verify(upbit, times(1)).getUsdtKrwPrice();
         assertThat(r.tickers().getFirst().kimchiPremium().history()).hasSizeLessThanOrEqualTo(30);
+        assertThat(r.tickers().getFirst().valuation().history()).hasSize(30);
+        assertThat(r.tickers().getFirst().valuation().current().date()).isEqualTo(TODAY.minusDays(1));
         assertThat(r.usdtPremium().history()).hasSizeLessThanOrEqualTo(30);
     }
 

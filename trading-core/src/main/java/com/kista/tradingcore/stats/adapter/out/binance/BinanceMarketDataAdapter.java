@@ -3,6 +3,7 @@ package com.kista.tradingcore.stats.adapter.out.binance;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
+import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import com.kista.tradingcore.stats.domain.model.FundingRateQuote;
 import com.kista.tradingcore.stats.domain.model.FundingRateRecord;
@@ -14,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 // 바이낸스 공개(무인증) 시세 — 현물 api.binance.com, USDT-M 선물 fapi.binance.com
@@ -22,6 +24,8 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
 
     private static final String SPOT = "https://api.binance.com";
     private static final String FUTURES = "https://fapi.binance.com";
+    static final int KLINES_PAGE_LIMIT = 1000; // klines 요청당 최대 봉 수
+    static final int KLINES_MAX_PAGES = 10; // 페이징 상한 — 약 27년치, 무한 루프 방지
 
     private final RestClient restClient;
 
@@ -46,10 +50,25 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
                 .uri(SPOT + "/api/v3/klines?symbol={s}&interval=1d&limit={l}", symbol(ticker), limit)
                 .retrieve().body(new ParameterizedTypeReference<>() {});
         if (rows == null) return List.of();
-        // 행 구조: [0]=openTime(ms), [4]=종가(문자열)
-        return rows.stream()
-                .map(r -> new DatedValue(utcDate(((Number) r.get(0)).longValue()), new BigDecimal((String) r.get(4))))
-                .toList();
+        return rows.stream().map(BinanceMarketDataAdapter::toClose).toList();
+    }
+
+    @Override
+    public List<DatedValue> getSpotDailyClosesSince(StrategyTicker ticker, LocalDate from) {
+        List<DatedValue> closes = new ArrayList<>();
+        long startTime = from.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+        for (int page = 0; page < KLINES_MAX_PAGES; page++) {
+            List<List<Object>> rows = restClient.get()
+                    .uri(SPOT + "/api/v3/klines?symbol={s}&interval=1d&startTime={t}&limit={l}", symbol(ticker), startTime, KLINES_PAGE_LIMIT)
+                    .retrieve().body(new ParameterizedTypeReference<>() {});
+            if (rows == null || rows.isEmpty()) return closes;
+            rows.stream().map(BinanceMarketDataAdapter::toClose).forEach(closes::add);
+            if (rows.size() < KLINES_PAGE_LIMIT) return closes;
+            // 다음 페이지는 마지막 봉 openTime 직후부터 — openTime >= startTime 봉만 오므로 겹침·누락 없음
+            startTime = openTime(rows.getLast()) + 1;
+        }
+        // 상한 도달 시 잘라 반환하면 최근 봉이 빠진 채 그럴듯한 값이 나오므로 실패로 처리
+        throw new IllegalStateException("바이낸스 일봉 페이징 상한 초과: " + ticker);
     }
 
     @Override
@@ -86,6 +105,26 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
                 .toList();
     }
 
+    @Override
+    public List<DatedLongShortRatio> getLongShortAccountRatioHistory(StrategyTicker ticker) {
+        List<LongShortRatioItem> items = restClient.get()
+                .uri(FUTURES + "/futures/data/globalLongShortAccountRatio?symbol={s}&period=1d&limit=30", symbol(ticker))
+                .retrieve().body(new ParameterizedTypeReference<>() {});
+        if (items == null) return List.of();
+        return items.stream()
+                .map(i -> new DatedLongShortRatio(utcDate(i.timestamp()), i.longAccount(), i.longShortRatio()))
+                .toList();
+    }
+
+    // klines 행 구조: [0]=openTime(ms), [4]=종가(문자열)
+    private static DatedValue toClose(List<Object> row) {
+        return new DatedValue(utcDate(openTime(row)), new BigDecimal((String) row.get(4)));
+    }
+
+    private static long openTime(List<Object> row) {
+        return ((Number) row.get(0)).longValue();
+    }
+
     // 바이낸스 심볼: 티커 + USDT (예: BTCUSDT)
     private static String symbol(StrategyTicker ticker) {
         return ticker.name() + "USDT";
@@ -105,4 +144,8 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
 
     record OpenInterestItem(@JsonProperty("timestamp") long timestamp,
                             @JsonProperty("sumOpenInterestValue") BigDecimal sumOpenInterestValue) {}
+
+    record LongShortRatioItem(@JsonProperty("timestamp") long timestamp,
+                              @JsonProperty("longAccount") BigDecimal longAccount,
+                              @JsonProperty("longShortRatio") BigDecimal longShortRatio) {}
 }

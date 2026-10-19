@@ -18,7 +18,7 @@ public class CryptoMarketIndicatorsOpenApiCustomizer implements OpenApiCustomize
     // 스키마명 → null 가능 객체 속성
     private static final Map<String, List<String>> NULLABLE_REFERENCE_PROPERTIES = Map.of(
             "CryptoMarketIndicatorsResponse", List.of("usdtPremium"),
-            "CryptoMarketIndicatorsTicker", List.of("kimchiPremium", "fundingRate", "openInterest"));
+            "CryptoMarketIndicatorsTicker", List.of("kimchiPremium", "fundingRate", "openInterest", "valuation", "longShortRatio"));
 
     @Override
     public void customise(OpenAPI openApi) {

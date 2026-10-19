@@ -4,7 +4,9 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators.*;
+import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
+import com.kista.tradingcore.stats.domain.model.DatedValuation;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -43,7 +45,7 @@ class CryptoMarketIndicatorControllerTest {
     private static CryptoMarketIndicators sample(FundingRate funding) {
         var oi = new OpenInterest(List.of(new DatedValue(LocalDate.of(2026, 10, 18), new BigDecimal("1234567890"))));
         return new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), null,
-                List.of(new TickerIndicators(StrategyTicker.BTC, null, funding, oi)));
+                List.of(new TickerIndicators(StrategyTicker.BTC, null, funding, oi, null, null)));
     }
 
     @Test
@@ -74,7 +76,9 @@ class CryptoMarketIndicatorControllerTest {
         mockMvc.perform(get("/api/crypto-market-indicators").param("days", "30").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usdtPremium").value(nullValue()))
-                .andExpect(jsonPath("$.tickers[0].fundingRate").value(nullValue()));
+                .andExpect(jsonPath("$.tickers[0].fundingRate").value(nullValue()))
+                .andExpect(jsonPath("$.tickers[0].valuation").value(nullValue()))
+                .andExpect(jsonPath("$.tickers[0].longShortRatio").value(nullValue()));
     }
 
     @Test
@@ -86,8 +90,11 @@ class CryptoMarketIndicatorControllerTest {
         var funding = new FundingRate(new BigDecimal("0.0001"), Instant.parse("2026-10-19T08:00:00Z"),
                 List.of(new DatedValue(d, new BigDecimal("0.00012"))));
         var oi = new OpenInterest(List.of(new DatedValue(d, new BigDecimal("100"))));
+        var valuation = Valuation.of(List.of(new DatedValuation(d, new BigDecimal("100000"), null, null,
+                new BigDecimal("1.25"), new BigDecimal("-10.5"))));
+        var longShort = LongShortRatio.of(List.of(new DatedLongShortRatio(d, new BigDecimal("0.6331"), new BigDecimal("1.7255"))));
         when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
-                List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi))));
+                List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi, valuation, longShort))));
 
         mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
@@ -100,6 +107,15 @@ class CryptoMarketIndicatorControllerTest {
                 .andExpect(jsonPath("$.tickers[0].kimchiPremium.history[0].tether").value(2.4))
                 .andExpect(jsonPath("$.tickers[0].fundingRate.current").value(0.0001))
                 .andExpect(jsonPath("$.tickers[0].fundingRate.nextFundingTime").exists())
-                .andExpect(jsonPath("$.tickers[0].fundingRate.history[0].value").value(0.00012));
+                .andExpect(jsonPath("$.tickers[0].fundingRate.history[0].value").value(0.00012))
+                .andExpect(jsonPath("$.tickers[0].valuation.current.date").value("2026-10-18"))
+                .andExpect(jsonPath("$.tickers[0].valuation.current.close").value(100000))
+                .andExpect(jsonPath("$.tickers[0].valuation.current.wma200").value(nullValue()))
+                .andExpect(jsonPath("$.tickers[0].valuation.current.wma200Multiple").value(nullValue()))
+                .andExpect(jsonPath("$.tickers[0].valuation.current.mayerMultiple").value(1.25))
+                .andExpect(jsonPath("$.tickers[0].valuation.history[0].athDrawdownPercent").value(-10.5))
+                .andExpect(jsonPath("$.tickers[0].longShortRatio.longAccount").value(0.6331))
+                .andExpect(jsonPath("$.tickers[0].longShortRatio.longShortRatio").value(1.7255))
+                .andExpect(jsonPath("$.tickers[0].longShortRatio.history[0].date").value("2026-10-18"));
     }
 }

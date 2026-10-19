@@ -1,7 +1,9 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
+import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
+import com.kista.tradingcore.stats.domain.model.DatedValuation;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -48,19 +50,27 @@ public record CryptoMarketIndicatorsResponse(
             @Schema(description = "종목", example = "BTC", requiredMode = REQUIRED) String ticker,
             @Schema(description = "김치 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) KimchiPremiumResponse kimchiPremium,
             @Schema(description = "펀딩비 (실패 시 null)", nullable = true, requiredMode = REQUIRED) FundingRateResponse fundingRate,
-            @Schema(description = "미결제약정 (실패 시 null)", nullable = true, requiredMode = REQUIRED) OpenInterestResponse openInterest
+            @Schema(description = "미결제약정 (실패 시 null)", nullable = true, requiredMode = REQUIRED) OpenInterestResponse openInterest,
+            @Schema(description = "장기 밸류에이션 — 직전 완성 일봉 종가 기준 (실패 시 null)", nullable = true, requiredMode = REQUIRED) ValuationResponse valuation,
+            @Schema(description = "롱/숏 계좌 비율 — 계좌 수(사람) 기준, 포지션 규모(돈) 기준인 펀딩비와 다름 (실패 시 null)", nullable = true, requiredMode = REQUIRED) LongShortRatioResponse longShortRatio
     ) {
         static TickerResponse from(CryptoMarketIndicators.TickerIndicators t) {
             var kp = t.kimchiPremium();
             var fr = t.fundingRate();
             var oi = t.openInterest();
+            var va = t.valuation();
+            var ls = t.longShortRatio();
             return new TickerResponse(t.ticker().name(),
                     kp == null ? null : new KimchiPremiumResponse(
                             new PremiumPairResponse(kp.current().official(), kp.current().tether()),
                             kp.history().stream().map(DatedPremiumPairResponse::from).toList()),
                     fr == null ? null : new FundingRateResponse(fr.current(), fr.nextFundingTime(), points(fr.history())),
                     oi == null ? null : new OpenInterestResponse(
-                            oi.history().stream().map(v -> new OpenInterestPointResponse(v.date(), v.value())).toList()));
+                            oi.history().stream().map(v -> new OpenInterestPointResponse(v.date(), v.value())).toList()),
+                    va == null ? null : new ValuationResponse(DatedValuationResponse.from(va.current()),
+                            va.history().stream().map(DatedValuationResponse::from).toList()),
+                    ls == null ? null : new LongShortRatioResponse(ls.longAccount(), ls.longShortRatio(),
+                            ls.history().stream().map(DatedLongShortRatioResponse::from).toList()));
         }
     }
 
@@ -103,5 +113,43 @@ public record CryptoMarketIndicatorsResponse(
     @Schema(name = "CryptoMarketIndicatorsOpenInterest")
     public record OpenInterestResponse(
             @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<OpenInterestPointResponse> history
+    ) {}
+
+    @Schema(name = "CryptoMarketIndicatorsDatedValuation")
+    public record DatedValuationResponse(
+            @Schema(description = "기준 일자 (UTC 일봉)", requiredMode = REQUIRED) LocalDate date,
+            @Schema(description = "그날 종가 (USDT)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal close,
+            @Schema(description = "200주 이동평균 (USDT, 1400일 단순평균 — 이력 1400일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal wma200,
+            @Schema(description = "종가 / 200주 이동평균 배수 (200주 이동평균이 null이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal wma200Multiple,
+            @Schema(description = "Mayer Multiple — 종가 / 200일 이동평균 (이력 200일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal mayerMultiple,
+            @Schema(description = "최고 종가(ATH) 대비 하락률 (%, 0 이하)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal athDrawdownPercent
+    ) {
+        static DatedValuationResponse from(DatedValuation v) {
+            return new DatedValuationResponse(v.date(), v.close(), v.wma200(), v.wma200Multiple(), v.mayerMultiple(), v.athDrawdownPercent());
+        }
+    }
+
+    @Schema(name = "CryptoMarketIndicatorsValuation")
+    public record ValuationResponse(
+            @Schema(description = "현재 값 — 실시간이 아니라 직전 완성 일봉 기준 (history 마지막 점과 같음)", requiredMode = REQUIRED) DatedValuationResponse current,
+            @Schema(description = "일자별 추이 (각 일자는 그날까지의 일봉으로만 계산)", requiredMode = REQUIRED) List<DatedValuationResponse> history
+    ) {}
+
+    @Schema(name = "CryptoMarketIndicatorsDatedLongShortRatio")
+    public record DatedLongShortRatioResponse(
+            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
+            @Schema(description = "롱 포지션 계좌 비율 (0~1)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longAccount,
+            @Schema(description = "롱 계좌 수 / 숏 계좌 수", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longShortRatio
+    ) {
+        static DatedLongShortRatioResponse from(DatedLongShortRatio r) {
+            return new DatedLongShortRatioResponse(r.date(), r.longAccount(), r.longShortRatio());
+        }
+    }
+
+    @Schema(name = "CryptoMarketIndicatorsLongShortRatio")
+    public record LongShortRatioResponse(
+            @Schema(description = "최신 롱 포지션 계좌 비율 (0~1, 계좌 수 기준)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longAccount,
+            @Schema(description = "최신 롱 계좌 수 / 숏 계좌 수", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal longShortRatio,
+            @Schema(description = "일자별 추이 (최근 30일 고정)", requiredMode = REQUIRED) List<DatedLongShortRatioResponse> history
     ) {}
 }

@@ -65,6 +65,12 @@
 ### 캐시
 - 서비스 내 JVM 메모리 캐시, TTL 10분. 캐시 단위는 최대 범위(200일) 원본 계산 결과 1벌이고 `days`는 캐시된 추이를 잘라서 응답한다 — `days` 값마다 외부 호출이 늘지 않도록(내 판단). 실패한 섹션이 섞인 응답도 캐시할지는 빌더 판단이되, 전체 실패(200 + 전부 null)는 정상 TTL로 캐시하지 않는다 (선례: `TossMarketCalendarCache` — 예외·empty 미캐싱). 비인증 공개 전환 후 장애 중 fan-out 억제를 위해 전체 실패 결과만 별도 키에 1분 캐시
 
+### 지표 추가 (2026-10-20)
+- 무료 외부 온체인 API(Bitbo·BGeometrics·Coin Metrics)는 서비스 화면 공개가 유료이거나 비상업 라이선스라 쓰지 않고, 이미 연동한 Binance 공개 API로 직접 계산한다
+- 장기 밸류에이션(`tickers[].valuation{current, history[{date, close, wma200, wma200Multiple, mayerMultiple, athDrawdownPercent}]}`): Binance 현물 일봉(상장 2017-08-17부터, `startTime` 1000봉 페이징)으로 200주 이동평균(1400일 단순평균)·종가/200WMA 배수·Mayer Multiple(종가/200일 이동평균)·ATH(일봉 종가) 대비 하락률을 domain `CryptoValuations`가 계산. 진행 중 오늘 봉 제외, 각 일자는 그날까지의 봉만 사용, 이력 부족 시 해당 값 null. `current`는 직전 완성 일봉 기준(실시간 아님). 추이는 `days` 적용
+- 롱/숏 계좌 비율(`tickers[].longShortRatio{longAccount, longShortRatio, history[{date, longAccount, longShortRatio}]}`): `/futures/data/globalLongShortAccountRatio?period=1d&limit=30`. 계좌 수(사람) 기준이라 포지션 규모(돈) 기준인 펀딩비와 다르다. Binance가 30일만 제공해 `days`와 무관하게 30일
+- 장기 일봉 캐시: 메인 10분 캐시와 별도로 종목별 고정 키에 다음 UTC 자정까지 — 완성 봉은 하루 한 번만 늘고, 종목당 4페이지 호출을 10분마다 반복할 이유가 없다. 날짜를 키에 넣지 않는다(`TtlResultCache`는 1000건 이상일 때만 만료 청소)
+
 ## 내 판단으로 정한 것 (사용자 확인 전)
 
 - Upbit `KRW-USDT` 시세 노출 방식: `CryptoExchangePort`에 USDT 원화 시세용 메서드를 추가(현재가 + 완성 일봉). 빗썸 등 2차 거래소도 KRW-USDT 마켓이 있어 포트 계약으로 일반화 가능. 내부적으로 `UpbitExchangeAdapter.getCompletedDailyCandles`의 페이징 로직을 마켓 코드 기준으로 재사용
