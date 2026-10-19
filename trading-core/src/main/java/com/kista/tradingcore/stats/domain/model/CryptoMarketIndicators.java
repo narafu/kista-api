@@ -26,7 +26,7 @@ public record CryptoMarketIndicators(
         }
     }
 
-    // 테더 프리미엄
+    // 단일 값 프리미엄 (테더 프리미엄·코인베이스 프리미엄 공용)
     public record Premium(BigDecimal current, List<DatedValue> history) {}
 
     // 김프 두 기준 (official은 환율 장애 시 null)
@@ -57,9 +57,10 @@ public record CryptoMarketIndicators(
 
     // 종목별 지표 — 섹션 nullable
     public record TickerIndicators(StrategyTicker ticker, KimchiPremium kimchiPremium, FundingRate fundingRate, OpenInterest openInterest,
-                                   Valuation valuation, LongShortRatio longShortRatio) {}
+                                   Valuation valuation, LongShortRatio longShortRatio,
+                                   Premium coinbasePremium) {} // coinbasePremium: 테더 보정 코인베이스 프리미엄 (미국 현물 수요)
 
-    // 김프·펀딩·밸류에이션·테더 프리미엄 history를 마지막 days개로 자른다 (OI·롱숏은 30일 고정이라 유지)
+    // 김프·펀딩·밸류에이션·테더/코인베이스 프리미엄 history를 마지막 days개로 자른다 (OI·롱숏은 30일 고정이라 유지)
     public CryptoMarketIndicators withDays(int days) {
         return new CryptoMarketIndicators(asOf,
                 usdtPremium == null ? null : new Premium(usdtPremium.current(), tail(usdtPremium.history(), days)),
@@ -70,7 +71,9 @@ public record CryptoMarketIndicators(
                                 : new FundingRate(t.fundingRate().current(), t.fundingRate().nextFundingTime(), tail(t.fundingRate().history(), days)),
                         t.openInterest(),
                         t.valuation() == null ? null : new Valuation(t.valuation().current(), tail(t.valuation().history(), days)),
-                        t.longShortRatio())).toList(),
+                        t.longShortRatio(),
+                        t.coinbasePremium() == null ? null
+                                : new Premium(t.coinbasePremium().current(), tail(t.coinbasePremium().history(), days)))).toList(),
                 halving);
     }
 
@@ -78,7 +81,7 @@ public record CryptoMarketIndicators(
     public boolean isEmpty() {
         return usdtPremium == null && halving == null && tickers.stream().allMatch(t ->
                 t.kimchiPremium() == null && t.fundingRate() == null && t.openInterest() == null
-                        && t.valuation() == null && t.longShortRatio() == null);
+                        && t.valuation() == null && t.longShortRatio() == null && t.coinbasePremium() == null);
     }
 
     private static <T> List<T> tail(List<T> list, int days) {

@@ -8,6 +8,7 @@ import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
+import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
@@ -48,6 +49,7 @@ class CryptoMarketIndicatorServiceTest {
     BinanceMarketDataPort binance = mock(BinanceMarketDataPort.class);
     HistoricalFxRatePort fx = mock(HistoricalFxRatePort.class);
     BlockHeightPort blockHeight = mock(BlockHeightPort.class);
+    CoinbaseMarketDataPort coinbase = mock(CoinbaseMarketDataPort.class);
     BrokerStatisticsUseCase brokerStats = mock(BrokerStatisticsUseCase.class);
     CryptoMarketIndicatorService service;
     Instant[] now = {NOW}; // 테스트용 가변 시각
@@ -62,7 +64,7 @@ class CryptoMarketIndicatorServiceTest {
     void setUp() {
         CryptoExchanges exchanges = mock(CryptoExchanges.class); // 생성자가 package-private라 mock으로 대체
         when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
-        service = new CryptoMarketIndicatorService(exchanges, binance, fx, blockHeight, brokerStats,
+        service = new CryptoMarketIndicatorService(exchanges, binance, fx, blockHeight, coinbase, brokerStats,
                 movableClock);
         stubAllOk();
     }
@@ -97,6 +99,12 @@ class CryptoMarketIndicatorServiceTest {
         when(binance.getLongShortAccountRatioHistory(any())).thenReturn(
                 List.of(new DatedLongShortRatio(TODAY.minusDays(1), new BigDecimal("0.6"), new BigDecimal("1.5"))));
         when(blockHeight.currentBtcHeight()).thenReturn(972_175L);
+        when(coinbase.getUsdPrice("USDT")).thenReturn(new BigDecimal("0.999"));
+        when(coinbase.getUsdDailyCloses("USDT")).thenReturn(closes(250, "0.999"));
+        when(coinbase.getUsdPrice("BTC")).thenReturn(new BigDecimal("99900"));
+        when(coinbase.getUsdPrice("ETH")).thenReturn(new BigDecimal("99900"));
+        when(coinbase.getUsdDailyCloses("BTC")).thenReturn(closes(250, "99900"));
+        when(coinbase.getUsdDailyCloses("ETH")).thenReturn(closes(250, "99900"));
     }
 
     // 전 섹션 실패 stub
@@ -108,6 +116,7 @@ class CryptoMarketIndicatorServiceTest {
         when(binance.getSpotDailyClosesSince(any(), any())).thenThrow(new RuntimeException("down"));
         when(binance.getLongShortAccountRatioHistory(any())).thenThrow(new RuntimeException("down"));
         when(blockHeight.currentBtcHeight()).thenThrow(new RuntimeException("mempool down"));
+        when(coinbase.getUsdPrice(any())).thenThrow(new RuntimeException("coinbase down"));
     }
 
     @Test
@@ -134,7 +143,42 @@ class CryptoMarketIndicatorServiceTest {
             assertThat(t.valuation().current().athDrawdownPercent()).isEqualByComparingTo("0");
             assertThat(t.longShortRatio().longAccount()).isEqualByComparingTo("0.6");
             assertThat(t.longShortRatio().longShortRatio()).isEqualByComparingTo("1.5");
+            // 99900 / (100000 × 0.999) − 1 = 0
+            assertThat(t.coinbasePremium().current()).isEqualByComparingTo("0");
+            assertThat(t.coinbasePremium().history()).hasSize(200).noneMatch(p -> p.date().equals(TODAY));
         });
+    }
+
+    @Test
+    void 코인베이스만_실패하면_코인베이스_프리미엄만_null() {
+        when(coinbase.getUsdDailyCloses("BTC")).thenThrow(new RuntimeException("coinbase down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.tickers().get(0).coinbasePremium()).isNull(); // BTC
+        assertThat(r.tickers().get(1).coinbasePremium()).isNotNull(); // ETH
+        r.tickers().forEach(t -> assertThat(t.kimchiPremium()).isNotNull());
+    }
+
+    @Test
+    void 코인베이스_USDT_실패면_전_종목_코인베이스_프리미엄만_null() {
+        when(coinbase.getUsdPrice("USDT")).thenThrow(new RuntimeException("coinbase down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        r.tickers().forEach(t -> {
+            assertThat(t.coinbasePremium()).isNull();
+            assertThat(t.kimchiPremium()).isNotNull();
+        });
+    }
+
+    @Test
+    void 코인베이스_프리미엄만_살아있어도_빈_결과가_아니다() {
+        var onlyCoinbase = new CryptoMarketIndicators(NOW, null, List.of(new CryptoMarketIndicators.TickerIndicators(
+                StrategyTicker.BTC, null, null, null, null, null,
+                new CryptoMarketIndicators.Premium(BigDecimal.ZERO, List.of()))), null);
+
+        assertThat(onlyCoinbase.isEmpty()).isFalse();
     }
 
     @Test
@@ -305,7 +349,7 @@ class CryptoMarketIndicatorServiceTest {
         stubAllFail();
         assertThat(service.get(200).isEmpty()).isTrue();
 
-        reset(upbit, brokerStats, binance, blockHeight); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
+        reset(upbit, brokerStats, binance, blockHeight, coinbase); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
         stubAllOk();
         now[0] = NOW.plus(CryptoMarketIndicatorService.EMPTY_TTL).plusSeconds(1);
         assertThat(service.get(200).isEmpty()).isFalse();

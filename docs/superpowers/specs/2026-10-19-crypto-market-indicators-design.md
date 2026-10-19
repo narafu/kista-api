@@ -74,6 +74,16 @@
 ### 반감기 카운트다운 추가 (2026-10-20)
 - `halving{currentHeight, nextHalvingHeight, blocksRemaining, estimatedAt}`(최상위, 종목 무관, 실패 시 null): mempool.space `GET /api/blocks/tip/height`(무인증, text 숫자)로 현재 높이를 받아 다음 210,000 배수까지 남은 블록과 조립 시각 + 남은 블록 × 10분 예상 시각을 계산. 별도 캐시 없이 메인 10분 캐시 공유
 
+### Coinbase 프리미엄 추가 (2026-10-20)
+- 의도: 미국 현물 수요 지표. 김프(한국 수요)와 대비해 읽는다. UI는 김프 카드에 합치지 않고 별도 카드(김프 바로 옆) — 값 크기(김프 수 %, Coinbase ±0.1~0.3%)·비교 기준이 다르고 지표별 실패를 격리하기 위함(사용자 결정)
+- 계산식: 테더 보정 Coinbase 프리미엄(%) = (Coinbase `<코인>-USD` ÷ (Binance `<코인>USDT` × Coinbase `USDT-USD`) − 1) × 100. 보정 필수 — 2026-10-19 실측 BTC 보정 없이 −0.084%, `USDT-USD` 0.99882로 보정하면 +0.034%로 부호가 바뀐다
+- 대상: 김프와 같이 `StrategyTicker` 중 `Market.CRYPTO_KRW`(BTC·ETH). Coinbase 상품 ID는 `<코인>-USD`(`USDT`는 포트에 자산 코드 문자열로 넘긴다 — `StrategyTicker`에 넣지 않는다)
+- 소스: Coinbase Exchange 공개 API(무인증) — 현재가 `GET https://api.exchange.coinbase.com/products/<상품>/ticker`의 `price`, 일봉 `GET .../products/<상품>/candles?granularity=86400`(start/end 없이 최신 300봉, 응답 `[시작 UTC epoch초, low, high, open, close, volume]` 최신 순 — Binance kline과 필드 순서가 다름). 추이는 최대 200일이라 300봉 1회로 충분해 페이징하지 않는다. 운영 egress 실측 완료(2026-10-20, `kista-server`에서 ticker·candles 모두 HTTP 200)
+- 추이: 김프와 같은 방식 — 일봉 종가, UTC 날짜 키 조인(Coinbase 코인·Coinbase USDT·Binance 장기 일봉 교집합), 진행 중 오늘 봉 제외, `days` 적용. Binance 쪽은 김프·밸류에이션과 같은 장기 일봉 캐시를 공유하고, Binance 현물 현재가도 김프와 공유(조립당 종목별 1회)
+- 응답: `tickers[].coinbasePremium{current, history[{date, value}]}`(실패 시 null, % 값)
+- 실패 격리: Coinbase `USDT-USD` 실패 → 전 종목 이 섹션만 null, 종목 Coinbase 실패 → 그 종목 이 섹션만 null, Binance 장기 일봉·현재가 실패 → 그 종목 김프와 함께 null. warn 로그. 메인 10분 캐시 공유, 다른 지표 영향 없음
+- 쓰지 않는 것: Coinbase International(INTX) 무기한 선물 펀딩비·OI(`trading_state: PAUSED`, 2026-10-01에서 데이터 정지), 미국 CDE 선물(이력 엔드포인트 없음, Binance 대비 규모 작음)
+
 ## 내 판단으로 정한 것 (사용자 확인 전)
 
 - Upbit `KRW-USDT` 시세 노출 방식: `CryptoExchangePort`에 USDT 원화 시세용 메서드를 추가(현재가 + 완성 일봉). 빗썸 등 2차 거래소도 KRW-USDT 마켓이 있어 포트 계약으로 일반화 가능. 내부적으로 `UpbitExchangeAdapter.getCompletedDailyCandles`의 페이징 로직을 마켓 코드 기준으로 재사용
@@ -99,4 +109,4 @@
 - 신규 프록시 라우트 `app/api/crypto-market-indicators/route.ts`, `target: 'trading'`
 - `openapi.json` 재생성 → `gen:types`
 - 대시보드 `FearGreedSection` 옆 "코인 시장 지표" 영역: 종목별 김프 %(공식 환율·테더 두 기준, 현재 + 200일 추이) + 테더 프리미엄(분해 표시), 펀딩비(현재·다음 정산 + 200일 일평균), OI 30일 추이. 섹션이 `null`이면 해당 카드만 "일시적으로 불러올 수 없음"
-- 인프라: 신규 외부 호스트(`api.binance.com`, `fapi.binance.com`, `api.frankfurter.dev`) 외 추가 작업 없음 — egress 제한이 있다면 허용 필요
+- 인프라: 신규 외부 호스트(`api.binance.com`, `fapi.binance.com`, `api.frankfurter.dev`, `mempool.space`, `api.exchange.coinbase.com`) 외 추가 작업 없음 — egress 제한이 있다면 허용 필요

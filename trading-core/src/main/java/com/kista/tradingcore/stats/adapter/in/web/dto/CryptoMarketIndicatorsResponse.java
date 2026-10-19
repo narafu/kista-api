@@ -42,6 +42,12 @@ public record CryptoMarketIndicatorsResponse(
             @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsCoinbasePremium")
+    public record CoinbasePremiumResponse(
+            @Schema(description = "현재 코인베이스 프리미엄 (%) — (코인베이스 <코인>-USD ÷ (바이낸스 <코인>USDT × 코인베이스 USDT-USD) − 1) × 100", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
+            @Schema(description = "일자별 추이 (UTC 일봉 종가, 진행 중 봉 제외)", requiredMode = REQUIRED) List<DatedValueResponse> history
+    ) {}
+
     @Schema(name = "CryptoMarketIndicatorsHalving")
     public record HalvingResponse(
             @Schema(description = "현재 BTC 블록 높이", requiredMode = REQUIRED) long currentHeight,
@@ -63,7 +69,8 @@ public record CryptoMarketIndicatorsResponse(
             @Schema(description = "펀딩비 (실패 시 null)", nullable = true, requiredMode = REQUIRED) FundingRateResponse fundingRate,
             @Schema(description = "미결제약정 (실패 시 null)", nullable = true, requiredMode = REQUIRED) OpenInterestResponse openInterest,
             @Schema(description = "장기 밸류에이션 — 직전 완성 일봉 종가 기준 (실패 시 null)", nullable = true, requiredMode = REQUIRED) ValuationResponse valuation,
-            @Schema(description = "롱/숏 계좌 비율 — 계좌 수(사람) 기준, 포지션 규모(돈) 기준인 펀딩비와 다름 (실패 시 null)", nullable = true, requiredMode = REQUIRED) LongShortRatioResponse longShortRatio
+            @Schema(description = "롱/숏 계좌 비율 — 계좌 수(사람) 기준, 포지션 규모(돈) 기준인 펀딩비와 다름 (실패 시 null)", nullable = true, requiredMode = REQUIRED) LongShortRatioResponse longShortRatio,
+            @Schema(description = "테더 보정 코인베이스 프리미엄 — 미국 현물 수요 (실패 시 null)", nullable = true, requiredMode = REQUIRED) CoinbasePremiumResponse coinbasePremium
     ) {
         static TickerResponse from(CryptoMarketIndicators.TickerIndicators t) {
             var kp = t.kimchiPremium();
@@ -71,6 +78,7 @@ public record CryptoMarketIndicatorsResponse(
             var oi = t.openInterest();
             var va = t.valuation();
             var ls = t.longShortRatio();
+            var cb = t.coinbasePremium();
             return new TickerResponse(t.ticker().name(),
                     kp == null ? null : new KimchiPremiumResponse(
                             new PremiumPairResponse(kp.current().official(), kp.current().tether()),
@@ -81,7 +89,8 @@ public record CryptoMarketIndicatorsResponse(
                     va == null ? null : new ValuationResponse(DatedValuationResponse.from(va.current()),
                             va.history().stream().map(DatedValuationResponse::from).toList()),
                     ls == null ? null : new LongShortRatioResponse(ls.longAccount(), ls.longShortRatio(),
-                            ls.history().stream().map(DatedLongShortRatioResponse::from).toList()));
+                            ls.history().stream().map(DatedLongShortRatioResponse::from).toList()),
+                    cb == null ? null : new CoinbasePremiumResponse(cb.current(), points(cb.history())));
         }
     }
 

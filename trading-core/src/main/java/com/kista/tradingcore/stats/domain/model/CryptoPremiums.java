@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-// 김프·테더 프리미엄·펀딩비 일평균 순수 계산 — 날짜 키로만 조인한다(인덱스 정렬 금지)
+// 김프·테더 프리미엄·코인베이스 프리미엄·펀딩비 일평균 순수 계산 — 날짜 키로만 조인한다(인덱스 정렬 금지)
 public final class CryptoPremiums {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
@@ -43,8 +43,7 @@ public final class CryptoPremiums {
     public static List<DatedPremiumPair> kimchiHistory(List<CryptoCandle> upbitCoin, List<CryptoCandle> upbitUsdt,
                                                        List<DatedValue> binanceCloses, Map<LocalDate, BigDecimal> fxByDate) {
         Map<LocalDate, BigDecimal> usdt = closeByDate(upbitUsdt);
-        Map<LocalDate, BigDecimal> binance = binanceCloses.stream()
-                .collect(Collectors.toMap(DatedValue::date, DatedValue::value, (a, b) -> b));
+        Map<LocalDate, BigDecimal> binance = byDate(binanceCloses);
         return closeByDate(upbitCoin).entrySet().stream()
                 .filter(e -> usdt.containsKey(e.getKey()) && binance.containsKey(e.getKey()))
                 .map(e -> {
@@ -65,6 +64,19 @@ public final class CryptoPremiums {
                 .toList();
     }
 
+    // 테더 보정 코인베이스 프리미엄 추이 — 세 시계열 UTC 날짜 교집합 중 today 이전(완성 봉)만, 오래된 순
+    // (코인베이스 <코인>-USD ÷ (바이낸스 <코인>USDT × 코인베이스 USDT-USD) − 1) × 100
+    public static List<DatedValue> coinbasePremiumHistory(List<DatedValue> coinbaseCoin, List<DatedValue> coinbaseUsdt,
+                                                          List<DatedValue> binanceCloses, LocalDate today) {
+        Map<LocalDate, BigDecimal> usdt = byDate(coinbaseUsdt);
+        Map<LocalDate, BigDecimal> binance = byDate(binanceCloses);
+        return byDate(coinbaseCoin).entrySet().stream()
+                .filter(e -> e.getKey().isBefore(today) && usdt.containsKey(e.getKey()) && binance.containsKey(e.getKey()))
+                .map(e -> new DatedValue(e.getKey(),
+                        premiumPercent(e.getValue(), binance.get(e.getKey()).multiply(usdt.get(e.getKey())))))
+                .toList();
+    }
+
     // fundingTime의 UTC 날짜별 평균, 오래된 순
     public static List<DatedValue> fundingDailyAverage(List<FundingRateRecord> records) {
         Map<LocalDate, List<BigDecimal>> byDay = new TreeMap<>(records.stream().collect(Collectors.groupingBy(
@@ -74,6 +86,11 @@ public final class CryptoPremiums {
                 .map(e -> new DatedValue(e.getKey(), e.getValue().stream().reduce(BigDecimal.ZERO, BigDecimal::add)
                         .divide(BigDecimal.valueOf(e.getValue().size()), FUNDING_SCALE, RoundingMode.HALF_UP)))
                 .toList();
+    }
+
+    // 날짜 키 값 맵 (날짜 오름차순)
+    private static Map<LocalDate, BigDecimal> byDate(List<DatedValue> values) {
+        return values.stream().collect(Collectors.toMap(DatedValue::date, DatedValue::value, (a, b) -> b, TreeMap::new));
     }
 
     // 날짜 키 종가 맵 (날짜 오름차순)

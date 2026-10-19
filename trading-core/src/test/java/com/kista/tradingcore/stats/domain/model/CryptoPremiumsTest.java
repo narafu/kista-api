@@ -61,6 +61,23 @@ class CryptoPremiumsTest {
     }
 
     @Test
+    void 코인베이스_프리미엄은_테더_보정하고_세_시계열_교집합_중_진행중_봉을_뺀다() {
+        // 실측(2026-10-19) 형태: 보정 없이는 음수, USDT-USD 0.99882로 보정하면 양수
+        List<DatedValue> coin = List.of(new DatedValue(SUN, bd("99916")), new DatedValue(SAT, bd("50000")),
+                new DatedValue(MON, bd("101000")));
+        List<DatedValue> usdt = List.of(new DatedValue(SUN, bd("0.99882")), new DatedValue(MON, bd("0.99882")));
+        List<DatedValue> binance = List.of(new DatedValue(SAT, bd("50000")), new DatedValue(SUN, bd("100000")),
+                new DatedValue(MON, bd("101000")));
+
+        List<DatedValue> result = CryptoPremiums.coinbasePremiumHistory(coin, usdt, binance, MON);
+
+        // SAT은 USDT 없음, MON은 진행 중 봉
+        assertThat(result).extracting(DatedValue::date).containsExactly(SUN);
+        assertThat(result.get(0).value()).isEqualByComparingTo("0.0340"); // 99916 / (100000 × 0.99882) − 1
+        assertThat(CryptoPremiums.premiumPercent(bd("99916"), bd("100000"))).isNegative(); // 보정 없으면 부호가 반대
+    }
+
+    @Test
     void 환율이_없는_날은_official만_null이다() {
         List<DatedPremiumPair> result = CryptoPremiums.kimchiHistory(
                 List.of(new CryptoCandle(SAT, bd("147000000"))), List.of(new CryptoCandle(SAT, bd("1400"))),

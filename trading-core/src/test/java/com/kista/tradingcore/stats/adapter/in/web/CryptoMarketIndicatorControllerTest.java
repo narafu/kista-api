@@ -45,7 +45,7 @@ class CryptoMarketIndicatorControllerTest {
     private static CryptoMarketIndicators sample(FundingRate funding) {
         var oi = new OpenInterest(List.of(new DatedValue(LocalDate.of(2026, 10, 18), new BigDecimal("1234567890"))));
         return new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), null,
-                List.of(new TickerIndicators(StrategyTicker.BTC, null, funding, oi, null, null)), null);
+                List.of(new TickerIndicators(StrategyTicker.BTC, null, funding, oi, null, null, null)), null);
     }
 
     @Test
@@ -79,7 +79,8 @@ class CryptoMarketIndicatorControllerTest {
                 .andExpect(jsonPath("$.halving").value(nullValue()))
                 .andExpect(jsonPath("$.tickers[0].fundingRate").value(nullValue()))
                 .andExpect(jsonPath("$.tickers[0].valuation").value(nullValue()))
-                .andExpect(jsonPath("$.tickers[0].longShortRatio").value(nullValue()));
+                .andExpect(jsonPath("$.tickers[0].longShortRatio").value(nullValue()))
+                .andExpect(jsonPath("$.tickers[0].coinbasePremium").value(nullValue()));
     }
 
     @Test
@@ -95,7 +96,8 @@ class CryptoMarketIndicatorControllerTest {
                 new BigDecimal("1.25"), new BigDecimal("-10.5"))));
         var longShort = LongShortRatio.of(List.of(new DatedLongShortRatio(d, new BigDecimal("0.6331"), new BigDecimal("1.7255"))));
         when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
-                List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi, valuation, longShort)),
+                List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi, valuation, longShort,
+                        new Premium(new BigDecimal("0.0342"), List.of(new DatedValue(d, new BigDecimal("-0.0125")))))),
                 new Halving(972_175L, 1_050_000L, 77_825L, Instant.parse("2028-04-01T00:00:00Z"))));
 
         mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
@@ -119,6 +121,9 @@ class CryptoMarketIndicatorControllerTest {
                 .andExpect(jsonPath("$.tickers[0].longShortRatio.longAccount").value(0.6331))
                 .andExpect(jsonPath("$.tickers[0].longShortRatio.longShortRatio").value(1.7255))
                 .andExpect(jsonPath("$.tickers[0].longShortRatio.history[0].date").value("2026-10-18"))
+                .andExpect(jsonPath("$.tickers[0].coinbasePremium.current").value(0.0342))
+                .andExpect(jsonPath("$.tickers[0].coinbasePremium.history[0].date").value("2026-10-18"))
+                .andExpect(jsonPath("$.tickers[0].coinbasePremium.history[0].value").value(-0.0125))
                 .andExpect(jsonPath("$.halving.currentHeight").value(972175))
                 .andExpect(jsonPath("$.halving.nextHalvingHeight").value(1050000))
                 .andExpect(jsonPath("$.halving.blocksRemaining").value(77825))

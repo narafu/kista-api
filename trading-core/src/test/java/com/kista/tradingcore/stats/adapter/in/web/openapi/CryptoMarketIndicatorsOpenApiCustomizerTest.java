@@ -30,6 +30,7 @@ class CryptoMarketIndicatorsOpenApiCustomizerTest {
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "openInterest"), "CryptoMarketIndicatorsOpenInterest");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "valuation"), "CryptoMarketIndicatorsValuation");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "longShortRatio"), "CryptoMarketIndicatorsLongShortRatio");
+        assertNullableReference(property("CryptoMarketIndicatorsTicker", "coinbasePremium"), "CryptoMarketIndicatorsCoinbasePremium");
     }
 
     @Test

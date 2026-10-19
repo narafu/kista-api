@@ -9,6 +9,7 @@ import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
+import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
@@ -49,6 +50,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private static final String DAILY_CLOSES_CACHE_KEY = CACHE_KEY + ":daily-closes:";
     private static final LocalDate DAILY_CLOSES_FROM = LocalDate.of(2017, 1, 1); // 바이낸스 개장 이전 — 상장 첫 봉(BTC·ETH 2017-08-17)부터 받아 ATH를 전 이력으로
     private static final int FX_MARGIN_DAYS = 7; // Frankfurter 창 앞 여유 — 주말·연휴 직전 영업일 환율 확보
+    private static final String USDT = "USDT"; // 코인베이스 테더 보정용 자산 코드 (StrategyTicker에 넣지 않는다)
     private static final List<StrategyTicker> TICKERS = Arrays.stream(StrategyTicker.values())
             .filter(t -> t.getMarket() == Market.CRYPTO_KRW).toList();
 
@@ -56,23 +58,26 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final BinanceMarketDataPort binance; // 바이낸스 (해외 기준가·선물)
     private final HistoricalFxRatePort fxRates; // 과거 공식 환율
     private final BlockHeightPort blockHeight; // BTC 블록 높이 (반감기)
+    private final CoinbaseMarketDataPort coinbase; // 코인베이스 (미국 현물 기준가)
     private final BrokerStatisticsUseCase brokerStatistics; // 현재 공식 환율
     private final Clock clock; // 조립 시각·오늘 날짜 기준 — 테스트에서 고정
     private final TtlResultCache cache; // 결과 캐시 (single-flight, 정상 10분·전부 실패 1분)
 
     @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
     CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
-                                 BlockHeightPort blockHeight, BrokerStatisticsUseCase brokerStatistics) {
-        this(exchanges, binance, fxRates, blockHeight, brokerStatistics, Clock.systemUTC());
+                                 BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics) {
+        this(exchanges, binance, fxRates, blockHeight, coinbase, brokerStatistics, Clock.systemUTC());
     }
 
     CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
-                                 BlockHeightPort blockHeight, BrokerStatisticsUseCase brokerStatistics, Clock clock) {
+                                 BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics,
+                                 Clock clock) {
         this.cache = new TtlResultCache(clock);
         this.upbit = exchanges.of(Broker.UPBIT);
         this.binance = binance;
         this.fxRates = fxRates;
         this.blockHeight = blockHeight;
+        this.coinbase = coinbase;
         this.brokerStatistics = brokerStatistics;
         this.clock = clock;
     }
@@ -130,6 +135,18 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
                     CryptoPremiums.usdtPremiumHistory(usdtCandles, fxByDate));
         }
 
+        // (c) 코인베이스 USDT-USD 현재가·일봉 — 실패하면 모든 종목의 코인베이스 프리미엄만 null
+        BigDecimal cbUsdtPrice;
+        List<DatedValue> cbUsdtCloses;
+        try {
+            cbUsdtPrice = coinbase.getUsdPrice(USDT);
+            cbUsdtCloses = coinbase.getUsdDailyCloses(USDT);
+        } catch (Exception e) {
+            log.warn("코인베이스 USDT 시세 조회 실패", e);
+            cbUsdtPrice = null;
+            cbUsdtCloses = null;
+        }
+
         // 바이낸스 데이터는 UTC 일자 키가 스펙 — KST 단일 기준의 명시적 예외
         Instant fundingFrom = today.atStartOfDay().toInstant(ZoneOffset.UTC).minus(Duration.ofDays(MAX_DAYS));
         // 현재가는 전 종목 한 번에 조회 — 실패하면 김프 섹션만 null
@@ -138,13 +155,23 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         for (StrategyTicker t : TICKERS) {
             // 장기 일봉은 김프 추이·밸류에이션이 공유 — 실패하면 두 섹션 모두 null (조립당 종목별 1회 조회)
             List<DatedValue> closes = guard("장기 일봉 " + t, () -> dailyCloses(t, now));
+            // 바이낸스 현물 현재가는 김프·코인베이스 프리미엄이 공유 — 실패하면 두 섹션 모두 null
+            BigDecimal spot = guard("바이낸스 현재가 " + t, () -> binance.getSpotPrice(t));
             KimchiPremium kimchi = null;
-            if (upbitOk && krwPrices != null && closes != null) {
+            if (upbitOk && krwPrices != null && closes != null && spot != null) {
                 final BigDecimal tetherPrice = usdtPrice;
                 final List<CryptoCandle> usdtC = usdtCandles;
                 final BigDecimal fxNow = fxCurrent;
                 final Map<LocalDate, BigDecimal> fxMap = fxByDate;
-                kimchi = guard("김프 " + t, () -> kimchi(t, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap));
+                kimchi = guard("김프 " + t, () -> kimchi(t, spot, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap));
+            }
+            Premium coinbasePremium = null;
+            if (cbUsdtPrice != null && closes != null && spot != null) {
+                final BigDecimal usdtUsd = cbUsdtPrice;
+                final List<DatedValue> usdtUsdCloses = cbUsdtCloses;
+                coinbasePremium = guard("코인베이스 프리미엄 " + t, () -> new Premium(
+                        CryptoPremiums.premiumPercent(coinbase.getUsdPrice(t.name()), spot.multiply(usdtUsd)),
+                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyCloses(t.name()), usdtUsdCloses, closes, today)));
             }
             FundingRate funding = guard("펀딩비 " + t, () -> {
                 FundingRateQuote q = binance.getFundingRate(t);
@@ -155,15 +182,14 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
             Valuation valuation = closes == null ? null
                     : guard("밸류에이션 " + t, () -> Valuation.of(CryptoValuations.history(closes, today, MAX_DAYS)));
             LongShortRatio longShort = guard("롱숏 비율 " + t, () -> LongShortRatio.of(binance.getLongShortAccountRatioHistory(t)));
-            tickers.add(new TickerIndicators(t, kimchi, funding, oi, valuation, longShort));
+            tickers.add(new TickerIndicators(t, kimchi, funding, oi, valuation, longShort, coinbasePremium));
         }
         Halving halving = guard("반감기", () -> Halving.of(blockHeight.currentBtcHeight(), now));
         return new CryptoMarketIndicators(now, usdtPremium, List.copyOf(tickers), halving);
     }
 
-    private KimchiPremium kimchi(StrategyTicker t, List<DatedValue> binanceCloses, BigDecimal krw, BigDecimal usdtPrice, List<CryptoCandle> usdtCandles,
+    private KimchiPremium kimchi(StrategyTicker t, BigDecimal spot, List<DatedValue> binanceCloses, BigDecimal krw, BigDecimal usdtPrice, List<CryptoCandle> usdtCandles,
                                  BigDecimal fxCurrent, Map<LocalDate, BigDecimal> fxByDate) {
-        BigDecimal spot = binance.getSpotPrice(t);
         // 환율 장애면 official 없이 tether 기준만
         BigDecimal official = fxCurrent == null ? null : CryptoPremiums.premiumPercent(krw, spot.multiply(fxCurrent));
         BigDecimal tether = CryptoPremiums.premiumPercent(krw, spot.multiply(usdtPrice));
