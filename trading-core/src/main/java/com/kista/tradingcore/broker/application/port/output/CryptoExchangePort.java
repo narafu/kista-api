@@ -27,6 +27,12 @@ public interface CryptoExchangePort {
     // 완성 일봉 최근 count개(1~400, 이력 부족 시 적게), 오래된 순 — 진행 중인 오늘 봉(KST 09:00 시작)은 제외
     List<CryptoCandle> getCompletedDailyCandles(StrategyTicker ticker, int count);
 
+    // 원화 USDT(KRW-USDT) 현재가 — 공개 시세, 계좌 불필요. 김치 프리미엄 계산용
+    BigDecimal getUsdtKrwPrice();
+
+    // 원화 USDT 완성 일봉 최근 count개 — getCompletedDailyCandles와 같은 계약(1~400, 완성 봉만, 오래된 순)
+    List<CryptoCandle> getCompletedUsdtKrwDailyCandles(int count);
+
     // 금액 기준 시장가 매수 — identifier는 계정 내 영구 고유(재사용 불가)
     CryptoOrderResult buyMarketByAmount(BrokerAccountRef account, StrategyTicker ticker, BigDecimal krwAmount, String identifier);
 

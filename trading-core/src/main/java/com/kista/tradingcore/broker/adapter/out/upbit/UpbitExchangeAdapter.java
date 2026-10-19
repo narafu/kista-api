@@ -85,7 +85,27 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     }
 
     @Override
+    public BigDecimal getUsdtKrwPrice() {
+        LinkedHashMap<String, String> query = new LinkedHashMap<>();
+        query.put("markets", UpbitMarketRegistry.USDT_MARKET);
+        List<TickerRow> rows = http.getPublic("/v1/ticker", query, new ParameterizedTypeReference<>() {});
+        if (rows == null || rows.isEmpty()) {
+            throw new UpbitApiException(0, null, "Upbit USDT 시세 응답이 비어 있습니다: market=" + UpbitMarketRegistry.USDT_MARKET, null, false);
+        }
+        return rows.getFirst().tradePrice();
+    }
+
+    @Override
     public List<CryptoCandle> getCompletedDailyCandles(StrategyTicker ticker, int count) {
+        return completedDailyCandles(registry.marketOf(ticker), count);
+    }
+
+    @Override
+    public List<CryptoCandle> getCompletedUsdtKrwDailyCandles(int count) {
+        return completedDailyCandles(UpbitMarketRegistry.USDT_MARKET, count);
+    }
+
+    private List<CryptoCandle> completedDailyCandles(String market, int count) {
         if (count < 1 || count > MAX_COUNT) throw new IllegalArgumentException("일봉 개수는 1~" + MAX_COUNT + "입니다: " + count);
         LocalDateTime now = LocalDateTime.now(clock.withZone(TimeZones.KST));
         // kstDate 기준 중복 제거 + 오래된 순 정렬 — 페이지 경계 중복·정렬 미보장 방어
@@ -93,7 +113,7 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
         String to = null; // 직전 응답 중 가장 오래된 봉의 UTC 시작 — 업비트 to는 exclusive
         for (int page = 0; page < MAX_PAGES && completed.size() < count; page++) {
             LinkedHashMap<String, String> query = new LinkedHashMap<>();
-            query.put("market", registry.marketOf(ticker));
+            query.put("market", market);
             // 첫 페이지는 진행 중 봉 1개를 버릴 여유(count+1), 이후 페이지는 최대치
             query.put("count", String.valueOf(page == 0 ? Math.min(count + 1, MAX_CANDLES) : MAX_CANDLES));
             if (to != null) query.put("to", to);
@@ -105,7 +125,7 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
             to = rows.stream().map(CandleRow::startUtc).filter(Objects::nonNull).min(Comparator.naturalOrder())
                     .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format).orElse(null);
             if (to == null) {
-                log.warn("업비트 일봉 페이징 중단 — 가장 오래된 봉에 UTC 시각 없음: ticker={}, collected={}", ticker, completed.size());
+                log.warn("업비트 일봉 페이징 중단 — 가장 오래된 봉에 UTC 시각 없음: market={}, collected={}", market, completed.size());
                 break;
             }
         }
