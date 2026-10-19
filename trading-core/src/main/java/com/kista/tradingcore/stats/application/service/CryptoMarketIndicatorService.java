@@ -2,8 +2,8 @@ package com.kista.tradingcore.stats.application.service;
 
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Market;
-import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
@@ -39,6 +39,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
     static final int MAX_DAYS = 200; // 조회 가능 최대 기간(일)
     static final Duration TTL = Duration.ofMinutes(10); // 캐시 유효 시간
+    private static final String CACHE_KEY = "crypto-market-indicators"; // 전역 단일 결과
     private static final int FX_MARGIN_DAYS = 7; // Frankfurter 창 앞 여유 — 주말·연휴 직전 영업일 환율 확보
     private static final List<StrategyTicker> TICKERS = Arrays.stream(StrategyTicker.values())
             .filter(t -> t.getMarket() == Market.CRYPTO_KRW).toList();
@@ -49,8 +50,6 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final BrokerStatisticsUseCase brokerStatistics; // 현재 공식 환율
     private final Clock clock; // 조립 시각·오늘 날짜 기준 — 테스트에서 고정
     private final TtlResultCache cache; // 10분 결과 캐시 (single-flight, null 미캐시)
-
-    private static final String CACHE_KEY = "crypto-market-indicators"; // 전역 단일 결과
 
     @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
     CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,

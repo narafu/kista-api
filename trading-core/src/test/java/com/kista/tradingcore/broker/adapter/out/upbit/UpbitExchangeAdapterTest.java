@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
+import com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,7 +116,7 @@ class UpbitExchangeAdapterTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> adapter.getUsdtKrwPrice())
-                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+                .isInstanceOf(UpbitApiException.class);
     }
 
     @Test
@@ -334,9 +335,9 @@ class UpbitExchangeAdapterTest {
         expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", "weird");
         expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", null);
         assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
-                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+                .isInstanceOf(UpbitApiException.class);
         assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
-                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+                .isInstanceOf(UpbitApiException.class);
     }
 
     @Test

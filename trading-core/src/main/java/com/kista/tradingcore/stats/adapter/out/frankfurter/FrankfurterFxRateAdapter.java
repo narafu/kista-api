@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.util.stream.Collectors.toMap;
 
@@ -30,8 +31,10 @@ class FrankfurterFxRateAdapter implements HistoricalFxRatePort {
         if (res == null || res.rates() == null) return Map.of();
         // KRW 값이 없는 날짜(null 맵·누락 키)는 제외하고 영업일 원본 환율만 추출
         return res.rates().entrySet().stream()
-                .filter(e -> e.getValue() != null && e.getValue().get("KRW") != null)
-                .collect(toMap(Map.Entry::getKey, e -> e.getValue().get("KRW")));
+                .filter(e -> e.getValue() != null)
+                .map(e -> Map.entry(e.getKey(), Optional.ofNullable(e.getValue().get("KRW"))))
+                .filter(e -> e.getValue().isPresent())
+                .collect(toMap(Map.Entry::getKey, e -> e.getValue().get()));
     }
 
     record RatesResponse(Map<LocalDate, Map<String, BigDecimal>> rates) {}

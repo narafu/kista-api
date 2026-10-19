@@ -68,7 +68,7 @@ class CryptoMarketIndicatorControllerTest {
     }
 
     @Test
-    void 펀딩비_섹션이_null이면_null로_직렬화() throws Exception {
+    void 테더프리미엄과_펀딩비_섹션이_null이면_null로_직렬화() throws Exception {
         when(useCase.get(30)).thenReturn(sample(null));
 
         mockMvc.perform(get("/api/crypto-market-indicators").param("days", "30").with(authentication(userToken(USER_ID))))

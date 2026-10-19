@@ -57,7 +57,7 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
         PremiumIndexResponse res = restClient.get()
                 .uri(FUTURES + "/fapi/v1/premiumIndex?symbol={s}", symbol(ticker))
                 .retrieve().body(PremiumIndexResponse.class);
-        if (res == null || res.lastFundingRate() == null) {
+        if (res == null || res.lastFundingRate() == null || res.nextFundingTime() == null) {
             throw new IllegalStateException("바이낸스 펀딩비 응답이 비어있습니다: " + ticker);
         }
         return new FundingRateQuote(res.lastFundingRate(), Instant.ofEpochMilli(res.nextFundingTime()));
@@ -98,7 +98,7 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
     record PriceResponse(@JsonProperty("price") BigDecimal price) {}
 
     record PremiumIndexResponse(@JsonProperty("lastFundingRate") BigDecimal lastFundingRate,
-                                @JsonProperty("nextFundingTime") long nextFundingTime) {}
+                                @JsonProperty("nextFundingTime") Long nextFundingTime) {}
 
     record FundingRateItem(@JsonProperty("fundingTime") long fundingTime,
                            @JsonProperty("fundingRate") BigDecimal fundingRate) {}
