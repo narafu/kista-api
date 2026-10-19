@@ -15,6 +15,8 @@ class UpbitMarketRegistry {
             StrategyTicker.ETH, "KRW-ETH"
     );
 
+    static final String USDT_MARKET = "KRW-USDT"; // 테더 원화 마켓 — 코인 DCA 종목이 아니라 김프 지표 전용
+
     String marketOf(StrategyTicker ticker) {
         String market = MARKETS.get(ticker);
         if (market == null) throw new IllegalArgumentException("업비트 마켓 매핑 누락: " + ticker);

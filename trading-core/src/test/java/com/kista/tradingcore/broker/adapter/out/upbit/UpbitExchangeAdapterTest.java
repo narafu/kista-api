@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
+import com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,6 +99,40 @@ class UpbitExchangeAdapterTest {
         assertThat(candles).extracting(CryptoCandle::kstDate)
                 .containsExactly(LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 16));
         assertThat(candles.getLast().close()).isEqualByComparingTo("151000000");
+    }
+
+    @Test
+    void USDT_원화_현재가를_KRW_USDT_마켓으로_조회한다() {
+        server.expect(requestTo(BASE_URL + "/v1/ticker?markets=KRW-USDT"))
+                .andExpect(headerDoesNotExist("Authorization"))
+                .andRespond(withSuccess("[{\"market\":\"KRW-USDT\",\"trade_price\":1452.0}]", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getUsdtKrwPrice()).isEqualByComparingTo("1452");
+    }
+
+    @Test
+    void USDT_원화_현재가_응답이_비면_예외를_던진다() {
+        server.expect(requestTo(BASE_URL + "/v1/ticker?markets=KRW-USDT"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.getUsdtKrwPrice())
+                .isInstanceOf(UpbitApiException.class);
+    }
+
+    @Test
+    void USDT_원화_완성_일봉은_진행중_봉을_제외한다() {
+        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-USDT&count=3"))
+                .andRespond(withSuccess("""
+                        [{"candle_date_time_kst":"2026-10-17T09:00:00","trade_price":1455},
+                         {"candle_date_time_kst":"2026-10-16T09:00:00","trade_price":1450},
+                         {"candle_date_time_kst":"2026-10-15T09:00:00","trade_price":1448}]
+                        """, MediaType.APPLICATION_JSON));
+
+        List<CryptoCandle> candles = adapter.getCompletedUsdtKrwDailyCandles(2);
+
+        assertThat(candles).extracting(CryptoCandle::kstDate)
+                .containsExactly(LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 16));
+        assertThat(candles.getLast().close()).isEqualByComparingTo("1450");
     }
 
     // startKst = firstDay(KST 09:00)에서 하루씩 과거로 n개 — utc는 -9h
@@ -300,9 +335,9 @@ class UpbitExchangeAdapterTest {
         expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", "weird");
         expectOrder("{\"market\":\"KRW-BTC\",\"side\":\"bid\",\"ord_type\":\"price\",\"price\":\"5000\",\"identifier\":\"i\"}", null);
         assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
-                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+                .isInstanceOf(UpbitApiException.class);
         assertThatThrownBy(() -> adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("5000"), "i"))
-                .isInstanceOf(com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException.class);
+                .isInstanceOf(UpbitApiException.class);
     }
 
     @Test

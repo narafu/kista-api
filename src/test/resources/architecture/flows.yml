@@ -46,6 +46,7 @@ landscape:
       - {id: notify-settings, title: 알림 설정, flow: notify-settings}
       - {id: finance, title: 가계부, flow: finance}
       - {id: group-share, title: 그룹 공유, flow: group-share}
+      - {id: crypto-market-indicators, title: 코인 시장 지표(김프·펀딩비·OI), flow: result}
   - group: 자동 프로세스
     steps:
       - {id: open-batch, title: 개장 배치, when: "월~금 22:00", flow: open-batch}
@@ -783,7 +784,7 @@ flows:
     summary: >-
       화면마다 부르는 API와 처리 프로세스가 다르다. 계좌·전략·주문·통계는 kista-ui 프록시가 kista-trading으로 바로 가고,
       시장 달력·공포탐욕·주택 벤치마크는 kista-api로 간다. 거래 결과는 모두 DB에 쌓인 주문·포지션 기록에서 읽고,
-      증권사를 직접 부르는 것은 잔고·증거금 조회뿐이다.
+      증권사를 직접 부르는 것은 잔고·증거금 조회뿐이다. 코인 시장 지표(김프·펀딩비·OI)는 공포탐욕과 달리 kista-trading이 맡는다.
     steps:
       - id: dashboard
         lane: ui
@@ -794,6 +795,16 @@ flows:
           날짜별 매수·매도 금액과 건수로 보여 준다. 휴장일·공포탐욕지수는 kista-api가 맡는다.
         code: [DashboardController#getDailyTransactions, AccountStatisticsService#getDailyTransactionsForUser, AccountController#list, MarketHolidayController]
         fail: 체결 요약 조회가 실패하면 그 주 달력은 체결 표시 없이 나온다(5분 캐시).
+
+      - id: crypto-market-indicators
+        lane: ui
+        to: [trading, broker]
+        title: 코인 시장 지표(김프·펀딩비·OI)
+        desc: >-
+          코인 시장 지표 화면이 GET /api/crypto-market-indicators를 부르면 kista-trading이 Upbit 시세·Binance 현물/선물·환율(Toss 현재, Frankfurter 과거)을 모아
+          종목별 김프·테더 김프·펀딩비·미결제약정 추이와 종목 무관 테더 프리미엄을 계산해 돌려준다.
+        code: [CryptoMarketIndicatorController#get, CryptoMarketIndicatorService#get]
+        fail: 지표·종목별로 실패한 섹션만 null(200), 10분 캐시. 모든 섹션이 실패해도 200 + 전부 null(캐시하지 않음).
 
       - id: stats-screen
         lane: ui
