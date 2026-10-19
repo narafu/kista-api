@@ -78,7 +78,7 @@ public record CryptoMarketIndicatorsResponse(
     ) {}
 
     public record FundingRateResponse(
-            @Schema(description = "현재 펀딩비 (%)") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
+            @Schema(description = "현재 펀딩비 (비율, 예: 0.0001)") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
             @Schema(description = "다음 펀딩 시각") Instant nextFundingTime,
             @Schema(description = "일평균 추이") List<DatedValueResponse> history
     ) {}

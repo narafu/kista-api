@@ -4,6 +4,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators.*;
+import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -67,12 +68,38 @@ class CryptoMarketIndicatorControllerTest {
     }
 
     @Test
-    void 섹션이_null이면_null로_직렬화() throws Exception {
+    void 펀딩비_섹션이_null이면_null로_직렬화() throws Exception {
         when(useCase.get(30)).thenReturn(sample(null));
 
         mockMvc.perform(get("/api/crypto-market-indicators").param("days", "30").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usdtPremium").value(nullValue()))
                 .andExpect(jsonPath("$.tickers[0].fundingRate").value(nullValue()));
+    }
+
+    @Test
+    void 모든_섹션이_채워지면_값이_매핑된다() throws Exception {
+        var d = LocalDate.of(2026, 10, 18);
+        var premium = new Premium(new BigDecimal("0.35"), List.of(new DatedValue(d, new BigDecimal("0.3"))));
+        var kimchi = new KimchiPremium(new PremiumPair(new BigDecimal("1.5"), new BigDecimal("2.5")),
+                List.of(new DatedPremiumPair(d, null, new BigDecimal("2.4"))));
+        var funding = new FundingRate(new BigDecimal("0.0001"), Instant.parse("2026-10-19T08:00:00Z"),
+                List.of(new DatedValue(d, new BigDecimal("0.00012"))));
+        var oi = new OpenInterest(List.of(new DatedValue(d, new BigDecimal("100"))));
+        when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
+                List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi))));
+
+        mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usdtPremium.current").value(0.35))
+                .andExpect(jsonPath("$.usdtPremium.history[0].date").value("2026-10-18"))
+                .andExpect(jsonPath("$.usdtPremium.history[0].value").value(0.3))
+                .andExpect(jsonPath("$.tickers[0].kimchiPremium.current.official").value(1.5))
+                .andExpect(jsonPath("$.tickers[0].kimchiPremium.current.tether").value(2.5))
+                .andExpect(jsonPath("$.tickers[0].kimchiPremium.history[0].official").value(nullValue()))
+                .andExpect(jsonPath("$.tickers[0].kimchiPremium.history[0].tether").value(2.4))
+                .andExpect(jsonPath("$.tickers[0].fundingRate.current").value(0.0001))
+                .andExpect(jsonPath("$.tickers[0].fundingRate.nextFundingTime").exists())
+                .andExpect(jsonPath("$.tickers[0].fundingRate.history[0].value").value(0.00012));
     }
 }
