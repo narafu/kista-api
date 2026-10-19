@@ -1,6 +1,5 @@
 package com.kista.tradingcore.stats.adapter.out.frankfurter;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -29,10 +28,11 @@ class FrankfurterFxRateAdapter implements HistoricalFxRatePort {
                 .uri(BASE_URL + "/{from}..{to}?base=USD&symbols=KRW", from, to)
                 .retrieve().body(RatesResponse.class);
         if (res == null || res.rates() == null) return Map.of();
-        // 날짜별 응답에서 KRW 환율만 추출 (영업일 원본 유지)
+        // KRW 값이 없는 날짜(null 맵·누락 키)는 제외하고 영업일 원본 환율만 추출
         return res.rates().entrySet().stream()
+                .filter(e -> e.getValue() != null && e.getValue().get("KRW") != null)
                 .collect(toMap(Map.Entry::getKey, e -> e.getValue().get("KRW")));
     }
 
-    record RatesResponse(@JsonProperty("rates") Map<LocalDate, Map<String, BigDecimal>> rates) {}
+    record RatesResponse(Map<LocalDate, Map<String, BigDecimal>> rates) {}
 }

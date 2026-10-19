@@ -42,4 +42,25 @@ class FrankfurterFxRateAdapterTest {
 
         assertThat(adapter.getUsdKrwRates(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 4))).isEmpty();
     }
+
+    @Test
+    void KRW_없는_날짜는_제외한다() {
+        server.expect(requestTo("https://api.frankfurter.dev/v1/2026-09-01..2026-09-03?base=USD&symbols=KRW"))
+                .andRespond(withSuccess("""
+                        {"rates":{"2026-09-01":{},"2026-09-02":{"KRW":1375.00},"2026-09-03":null}}
+                        """, MediaType.APPLICATION_JSON));
+
+        Map<LocalDate, BigDecimal> result = adapter.getUsdKrwRates(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3));
+
+        assertThat(result).containsOnlyKeys(LocalDate.of(2026, 9, 2));
+        assertThat(result.get(LocalDate.of(2026, 9, 2))).isEqualByComparingTo("1375.00");
+    }
+
+    @Test
+    void rates_키_자체가_없으면_빈_맵() {
+        server.expect(requestTo("https://api.frankfurter.dev/v1/2026-09-01..2026-09-04?base=USD&symbols=KRW"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getUsdKrwRates(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 4))).isEmpty();
+    }
 }
