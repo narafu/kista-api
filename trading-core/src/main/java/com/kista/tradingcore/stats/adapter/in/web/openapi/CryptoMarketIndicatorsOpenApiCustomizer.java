@@ -17,7 +17,7 @@ import java.util.Map;
 public class CryptoMarketIndicatorsOpenApiCustomizer implements OpenApiCustomizer {
     // 스키마명 → null 가능 객체 속성
     private static final Map<String, List<String>> NULLABLE_REFERENCE_PROPERTIES = Map.of(
-            "CryptoMarketIndicatorsResponse", List.of("usdtPremium"),
+            "CryptoMarketIndicatorsResponse", List.of("usdtPremium", "halving"),
             "CryptoMarketIndicatorsTicker", List.of("kimchiPremium", "fundingRate", "openInterest", "valuation", "longShortRatio"));
 
     @Override

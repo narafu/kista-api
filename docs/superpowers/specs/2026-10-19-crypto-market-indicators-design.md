@@ -71,6 +71,9 @@
 - 롱/숏 계좌 비율(`tickers[].longShortRatio{longAccount, longShortRatio, history[{date, longAccount, longShortRatio}]}`): `/futures/data/globalLongShortAccountRatio?period=1d&limit=30`. 계좌 수(사람) 기준이라 포지션 규모(돈) 기준인 펀딩비와 다르다. Binance가 30일만 제공해 `days`와 무관하게 30일
 - 장기 일봉 캐시: 메인 10분 캐시와 별도로 종목별 고정 키에 다음 UTC 자정까지 — 완성 봉은 하루 한 번만 늘고, 종목당 4페이지 호출을 10분마다 반복할 이유가 없다. 날짜를 키에 넣지 않는다(`TtlResultCache`는 1000건 이상일 때만 만료 청소)
 
+### 반감기 카운트다운 추가 (2026-10-20)
+- `halving{currentHeight, nextHalvingHeight, blocksRemaining, estimatedAt}`(최상위, 종목 무관, 실패 시 null): mempool.space `GET /api/blocks/tip/height`(무인증, text 숫자)로 현재 높이를 받아 다음 210,000 배수까지 남은 블록과 조립 시각 + 남은 블록 × 10분 예상 시각을 계산. 별도 캐시 없이 메인 10분 캐시 공유
+
 ## 내 판단으로 정한 것 (사용자 확인 전)
 
 - Upbit `KRW-USDT` 시세 노출 방식: `CryptoExchangePort`에 USDT 원화 시세용 메서드를 추가(현재가 + 완성 일봉). 빗썸 등 2차 거래소도 KRW-USDT 마켓이 있어 포트 계약으로 일반화 가능. 내부적으로 `UpbitExchangeAdapter.getCompletedDailyCandles`의 페이징 로직을 마켓 코드 기준으로 재사용

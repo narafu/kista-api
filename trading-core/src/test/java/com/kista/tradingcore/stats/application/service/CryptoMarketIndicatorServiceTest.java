@@ -7,6 +7,7 @@ import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
+import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
@@ -46,6 +47,7 @@ class CryptoMarketIndicatorServiceTest {
     CryptoExchangePort upbit = mock(CryptoExchangePort.class);
     BinanceMarketDataPort binance = mock(BinanceMarketDataPort.class);
     HistoricalFxRatePort fx = mock(HistoricalFxRatePort.class);
+    BlockHeightPort blockHeight = mock(BlockHeightPort.class);
     BrokerStatisticsUseCase brokerStats = mock(BrokerStatisticsUseCase.class);
     CryptoMarketIndicatorService service;
     Instant[] now = {NOW}; // 테스트용 가변 시각
@@ -60,7 +62,7 @@ class CryptoMarketIndicatorServiceTest {
     void setUp() {
         CryptoExchanges exchanges = mock(CryptoExchanges.class); // 생성자가 package-private라 mock으로 대체
         when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
-        service = new CryptoMarketIndicatorService(exchanges, binance, fx, brokerStats,
+        service = new CryptoMarketIndicatorService(exchanges, binance, fx, blockHeight, brokerStats,
                 movableClock);
         stubAllOk();
     }
@@ -95,6 +97,7 @@ class CryptoMarketIndicatorServiceTest {
         when(binance.getSpotDailyClosesSince(any(), any())).thenReturn(closes(1500, "100000"));
         when(binance.getLongShortAccountRatioHistory(any())).thenReturn(
                 List.of(new DatedLongShortRatio(TODAY.minusDays(1), new BigDecimal("0.6"), new BigDecimal("1.5"))));
+        when(blockHeight.currentBtcHeight()).thenReturn(972_175L);
     }
 
     // 전 섹션 실패 stub
@@ -105,6 +108,7 @@ class CryptoMarketIndicatorServiceTest {
         when(binance.getOpenInterestHistory(any())).thenThrow(new RuntimeException("down"));
         when(binance.getSpotDailyClosesSince(any(), any())).thenThrow(new RuntimeException("down"));
         when(binance.getLongShortAccountRatioHistory(any())).thenThrow(new RuntimeException("down"));
+        when(blockHeight.currentBtcHeight()).thenThrow(new RuntimeException("mempool down"));
     }
 
     @Test
@@ -132,6 +136,43 @@ class CryptoMarketIndicatorServiceTest {
             assertThat(t.longShortRatio().longAccount()).isEqualByComparingTo("0.6");
             assertThat(t.longShortRatio().longShortRatio()).isEqualByComparingTo("1.5");
         });
+    }
+
+    @Test
+    void 반감기는_다음_210000_배수까지_남은_블록과_10분_가정_예상_시각을_계산한다() {
+        CryptoMarketIndicators.Halving h = service.get(200).halving();
+
+        assertThat(h.currentHeight()).isEqualTo(972_175L);
+        assertThat(h.nextHalvingHeight()).isEqualTo(1_050_000L);
+        assertThat(h.blocksRemaining()).isEqualTo(77_825L);
+        assertThat(h.estimatedAt()).isEqualTo(NOW.plus(java.time.Duration.ofMinutes(10 * 77_825L)));
+    }
+
+    @Test
+    void 반감기_높이에_정확히_도달하면_다음_주기를_가리킨다() {
+        when(blockHeight.currentBtcHeight()).thenReturn(840_000L);
+
+        assertThat(service.get(200).halving().nextHalvingHeight()).isEqualTo(1_050_000L);
+    }
+
+    @Test
+    void 반감기만_살아있어도_빈_결과가_아니다() {
+        stubAllFail();
+        reset(blockHeight);
+        when(blockHeight.currentBtcHeight()).thenReturn(972_175L);
+
+        assertThat(service.get(200).isEmpty()).isFalse();
+    }
+
+    @Test
+    void mempool만_실패하면_반감기만_null() {
+        when(blockHeight.currentBtcHeight()).thenThrow(new RuntimeException("mempool down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.halving()).isNull();
+        assertThat(r.usdtPremium()).isNotNull();
+        r.tickers().forEach(t -> assertThat(t.valuation()).isNotNull());
     }
 
     @Test
@@ -234,6 +275,7 @@ class CryptoMarketIndicatorServiceTest {
 
         assertThat(r.isEmpty()).isTrue();
         assertThat(r.usdtPremium()).isNull();
+        assertThat(r.halving()).isNull();
         r.tickers().forEach(t -> {
             assertThat(t.kimchiPremium()).isNull();
             assertThat(t.fundingRate()).isNull();
@@ -254,7 +296,7 @@ class CryptoMarketIndicatorServiceTest {
         stubAllFail();
         assertThat(service.get(200).isEmpty()).isTrue();
 
-        reset(upbit, brokerStats, binance); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
+        reset(upbit, brokerStats, binance, blockHeight); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
         stubAllOk();
         now[0] = NOW.plus(CryptoMarketIndicatorService.EMPTY_TTL).plusSeconds(1);
         assertThat(service.get(200).isEmpty()).isFalse();

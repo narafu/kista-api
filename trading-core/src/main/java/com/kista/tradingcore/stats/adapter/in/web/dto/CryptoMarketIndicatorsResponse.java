@@ -21,12 +21,15 @@ import java.util.List;
 public record CryptoMarketIndicatorsResponse(
         @Schema(description = "조립 시각", requiredMode = REQUIRED) Instant asOf,
         @Schema(description = "테더 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) PremiumResponse usdtPremium,
-        @Schema(description = "종목별 지표", requiredMode = REQUIRED) List<TickerResponse> tickers
+        @Schema(description = "종목별 지표", requiredMode = REQUIRED) List<TickerResponse> tickers,
+        @Schema(description = "BTC 반감기 카운트다운 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HalvingResponse halving
 ) {
     public static CryptoMarketIndicatorsResponse from(CryptoMarketIndicators m) {
         return new CryptoMarketIndicatorsResponse(m.asOf(),
                 m.usdtPremium() == null ? null : new PremiumResponse(m.usdtPremium().current(), points(m.usdtPremium().history())),
-                m.tickers().stream().map(TickerResponse::from).toList());
+                m.tickers().stream().map(TickerResponse::from).toList(),
+                m.halving() == null ? null : new HalvingResponse(m.halving().currentHeight(), m.halving().nextHalvingHeight(),
+                        m.halving().blocksRemaining(), m.halving().estimatedAt()));
     }
 
     private static List<DatedValueResponse> points(List<DatedValue> history) {
@@ -37,6 +40,14 @@ public record CryptoMarketIndicatorsResponse(
     public record PremiumResponse(
             @Schema(description = "현재 테더 프리미엄 (%)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
             @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
+    ) {}
+
+    @Schema(name = "CryptoMarketIndicatorsHalving")
+    public record HalvingResponse(
+            @Schema(description = "현재 BTC 블록 높이", requiredMode = REQUIRED) long currentHeight,
+            @Schema(description = "다음 반감기 블록 높이 (210,000 배수)", requiredMode = REQUIRED) long nextHalvingHeight,
+            @Schema(description = "남은 블록 수", requiredMode = REQUIRED) long blocksRemaining,
+            @Schema(description = "예상 반감기 시각 (조립 시각 + 남은 블록 × 10분, 추정치)", requiredMode = REQUIRED) Instant estimatedAt
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsDatedValue")

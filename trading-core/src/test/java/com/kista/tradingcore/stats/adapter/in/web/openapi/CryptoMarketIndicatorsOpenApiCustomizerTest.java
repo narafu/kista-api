@@ -24,6 +24,7 @@ class CryptoMarketIndicatorsOpenApiCustomizerTest {
     @Test
     void 실패시_null_섹션은_ref와_null_oneOf로_생성한다() {
         assertNullableReference(property("CryptoMarketIndicatorsResponse", "usdtPremium"), "CryptoMarketIndicatorsPremium");
+        assertNullableReference(property("CryptoMarketIndicatorsResponse", "halving"), "CryptoMarketIndicatorsHalving");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "kimchiPremium"), "CryptoMarketIndicatorsKimchiPremium");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "fundingRate"), "CryptoMarketIndicatorsFundingRate");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "openInterest"), "CryptoMarketIndicatorsOpenInterest");

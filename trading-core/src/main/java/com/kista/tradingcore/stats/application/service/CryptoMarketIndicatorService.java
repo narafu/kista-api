@@ -8,6 +8,7 @@ import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
+import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
@@ -54,22 +55,24 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final CryptoExchangePort upbit; // 업비트 (국내 기준가)
     private final BinanceMarketDataPort binance; // 바이낸스 (해외 기준가·선물)
     private final HistoricalFxRatePort fxRates; // 과거 공식 환율
+    private final BlockHeightPort blockHeight; // BTC 블록 높이 (반감기)
     private final BrokerStatisticsUseCase brokerStatistics; // 현재 공식 환율
     private final Clock clock; // 조립 시각·오늘 날짜 기준 — 테스트에서 고정
     private final TtlResultCache cache; // 결과 캐시 (single-flight, 정상 10분·전부 실패 1분)
 
     @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
     CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
-                                 BrokerStatisticsUseCase brokerStatistics) {
-        this(exchanges, binance, fxRates, brokerStatistics, Clock.systemUTC());
+                                 BlockHeightPort blockHeight, BrokerStatisticsUseCase brokerStatistics) {
+        this(exchanges, binance, fxRates, blockHeight, brokerStatistics, Clock.systemUTC());
     }
 
     CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
-                                 BrokerStatisticsUseCase brokerStatistics, Clock clock) {
+                                 BlockHeightPort blockHeight, BrokerStatisticsUseCase brokerStatistics, Clock clock) {
         this.cache = new TtlResultCache(clock);
         this.upbit = exchanges.of(Broker.UPBIT);
         this.binance = binance;
         this.fxRates = fxRates;
+        this.blockHeight = blockHeight;
         this.brokerStatistics = brokerStatistics;
         this.clock = clock;
     }
@@ -152,7 +155,8 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
             LongShortRatio longShort = guard("롱숏 비율 " + t, () -> LongShortRatio.of(binance.getLongShortAccountRatioHistory(t)));
             tickers.add(new TickerIndicators(t, kimchi, funding, oi, valuation, longShort));
         }
-        return new CryptoMarketIndicators(now, usdtPremium, List.copyOf(tickers));
+        Halving halving = guard("반감기", () -> Halving.of(blockHeight.currentBtcHeight(), now));
+        return new CryptoMarketIndicators(now, usdtPremium, List.copyOf(tickers), halving);
     }
 
     private KimchiPremium kimchi(StrategyTicker t, BigDecimal krw, BigDecimal usdtPrice, List<CryptoCandle> usdtCandles,

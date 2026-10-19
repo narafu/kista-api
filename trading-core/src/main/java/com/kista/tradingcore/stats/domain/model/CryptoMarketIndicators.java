@@ -3,6 +3,7 @@ package com.kista.tradingcore.stats.domain.model;
 import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -10,8 +11,21 @@ import java.util.List;
 public record CryptoMarketIndicators(
         Instant asOf, // 조립 시각
         Premium usdtPremium, // 테더 프리미엄 (USDT 원화가 vs 공식 환율) — 실패 시 null
-        List<TickerIndicators> tickers // 종목별 지표
+        List<TickerIndicators> tickers, // 종목별 지표
+        Halving halving // BTC 반감기 카운트다운 — 실패 시 null
 ) {
+    // BTC 반감기 카운트다운 — 예상 시각은 블록당 10분 가정
+    public record Halving(long currentHeight, long nextHalvingHeight, long blocksRemaining, Instant estimatedAt) {
+        static final long HALVING_INTERVAL = 210_000; // 반감기 주기(블록)
+        static final Duration BLOCK_TIME = Duration.ofMinutes(10); // 목표 블록 생성 간격
+
+        public static Halving of(long currentHeight, Instant asOf) {
+            long next = (currentHeight / HALVING_INTERVAL + 1) * HALVING_INTERVAL;
+            long remaining = next - currentHeight;
+            return new Halving(currentHeight, next, remaining, asOf.plus(BLOCK_TIME.multipliedBy(remaining)));
+        }
+    }
+
     // 테더 프리미엄
     public record Premium(BigDecimal current, List<DatedValue> history) {}
 
@@ -56,12 +70,13 @@ public record CryptoMarketIndicators(
                                 : new FundingRate(t.fundingRate().current(), t.fundingRate().nextFundingTime(), tail(t.fundingRate().history(), days)),
                         t.openInterest(),
                         t.valuation() == null ? null : new Valuation(t.valuation().current(), tail(t.valuation().history(), days)),
-                        t.longShortRatio())).toList());
+                        t.longShortRatio())).toList(),
+                halving);
     }
 
-    // usdtPremium과 모든 종목 섹션이 null이면 빈 결과 (캐시 제외 판정용)
+    // usdtPremium·halving과 모든 종목 섹션이 null이면 빈 결과 (캐시 제외 판정용)
     public boolean isEmpty() {
-        return usdtPremium == null && tickers.stream().allMatch(t ->
+        return usdtPremium == null && halving == null && tickers.stream().allMatch(t ->
                 t.kimchiPremium() == null && t.fundingRate() == null && t.openInterest() == null
                         && t.valuation() == null && t.longShortRatio() == null);
     }
