@@ -32,14 +32,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-// 코인 시장 지표 조립 — 섹션별 실패 격리(null) + 10분 인메모리 캐시
+// 코인 시장 지표 조립 — 섹션별 실패 격리(null) + 10분 인메모리 캐시(전부 실패 결과는 1분)
 @Slf4j
 @Service
 class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
     static final int MAX_DAYS = 200; // 조회 가능 최대 기간(일)
     static final Duration TTL = Duration.ofMinutes(10); // 캐시 유효 시간
+    static final Duration EMPTY_TTL = Duration.ofMinutes(1); // 전부 실패 결과 캐시 — 비인증 공개라 장애 중 요청마다 외부 재호출되는 것을 막는다
     private static final String CACHE_KEY = "crypto-market-indicators"; // 전역 단일 결과
+    private static final String EMPTY_CACHE_KEY = CACHE_KEY + ":empty"; // 전부 실패 결과 — 정상 결과와 TTL이 달라 키 분리
     private static final int FX_MARGIN_DAYS = 7; // Frankfurter 창 앞 여유 — 주말·연휴 직전 영업일 환율 확보
     private static final List<StrategyTicker> TICKERS = Arrays.stream(StrategyTicker.values())
             .filter(t -> t.getMarket() == Market.CRYPTO_KRW).toList();
@@ -49,7 +51,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final HistoricalFxRatePort fxRates; // 과거 공식 환율
     private final BrokerStatisticsUseCase brokerStatistics; // 현재 공식 환율
     private final Clock clock; // 조립 시각·오늘 날짜 기준 — 테스트에서 고정
-    private final TtlResultCache cache; // 10분 결과 캐시 (single-flight, null 미캐시)
+    private final TtlResultCache cache; // 결과 캐시 (single-flight, 정상 10분·전부 실패 1분)
 
     @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
     CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
@@ -70,11 +72,14 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     @Override
     public CryptoMarketIndicators get(int days) {
         if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~200일입니다: " + days);
-        // 전부 실패한 결과는 캐시하지 않는다(loader가 null) — 다음 요청이 재조회, 응답은 빈 결과 그대로
+        // 전부 실패한 결과는 정상 키에 두지 않고(loader가 null) 별도 키에 1분만 둔다 — 그동안은 빈 결과 재사용, 이후 재조회
         CryptoMarketIndicators[] assembled = new CryptoMarketIndicators[1];
         CryptoMarketIndicators result = cache.getOrCompute(CACHE_KEY, TTL, () -> {
-            assembled[0] = assemble();
-            return assembled[0].isEmpty() ? null : assembled[0];
+            CryptoMarketIndicators recentEmpty = cache.peek(EMPTY_CACHE_KEY);
+            assembled[0] = recentEmpty != null ? recentEmpty : assemble();
+            if (!assembled[0].isEmpty()) return assembled[0];
+            if (recentEmpty == null) cache.getOrCompute(EMPTY_CACHE_KEY, EMPTY_TTL, () -> assembled[0]);
+            return null;
         });
         return (result != null ? result : assembled[0]).withDays(days);
     }

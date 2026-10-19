@@ -23,16 +23,21 @@ class CryptoMarketIndicatorsOpenApiCustomizerTest {
 
     @Test
     void 실패시_null_섹션은_ref와_null_oneOf로_생성한다() {
-        assertNullableReference(property("CryptoMarketIndicatorsResponse", "usdtPremium"), "PremiumResponse");
-        assertNullableReference(property("TickerResponse", "kimchiPremium"), "KimchiPremiumResponse");
-        assertNullableReference(property("TickerResponse", "fundingRate"), "FundingRateResponse");
-        assertNullableReference(property("TickerResponse", "openInterest"), "OpenInterestResponse");
+        assertNullableReference(property("CryptoMarketIndicatorsResponse", "usdtPremium"), "CryptoMarketIndicatorsPremium");
+        assertNullableReference(property("CryptoMarketIndicatorsTicker", "kimchiPremium"), "CryptoMarketIndicatorsKimchiPremium");
+        assertNullableReference(property("CryptoMarketIndicatorsTicker", "fundingRate"), "CryptoMarketIndicatorsFundingRate");
+        assertNullableReference(property("CryptoMarketIndicatorsTicker", "openInterest"), "CryptoMarketIndicatorsOpenInterest");
     }
 
     @Test
     void null_가능_스칼라는_null_타입을_포함한다() {
-        assertThat(property("PremiumPairResponse", "official").getTypes()).contains("null");
-        assertThat(property("DatedPremiumPairResponse", "official").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsPremiumPair", "official").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedPremiumPair", "official").getTypes()).contains("null");
+    }
+
+    @Test
+    void 스키마명은_고유_접두사를_가진다() {
+        assertThat(schemas.keySet()).allMatch(name -> name.startsWith("CryptoMarketIndicators"));
     }
 
     @Test

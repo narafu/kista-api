@@ -13,7 +13,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-// 코인 시장 지표 응답 — 도메인 구조 미러링, 섹션 실패 시 null (부분 응답)
+// 코인 시장 지표 응답 — 도메인 구조 미러링, 섹션 실패 시 null (부분 응답).
+// 중첩 스키마명은 CryptoMarketIndicators 접두사로 고유화 — 일반명(TickerResponse 등)이 다른 DTO와 겹치면 springdoc이 개명해
+// CryptoMarketIndicatorsOpenApiCustomizer가 대상을 놓친다
 public record CryptoMarketIndicatorsResponse(
         @Schema(description = "조립 시각", requiredMode = REQUIRED) Instant asOf,
         @Schema(description = "테더 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) PremiumResponse usdtPremium,
@@ -29,16 +31,19 @@ public record CryptoMarketIndicatorsResponse(
         return history.stream().map(v -> new DatedValueResponse(v.date(), v.value())).toList();
     }
 
+    @Schema(name = "CryptoMarketIndicatorsPremium")
     public record PremiumResponse(
             @Schema(description = "현재 테더 프리미엄 (%)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
             @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsDatedValue")
     public record DatedValueResponse(
             @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
             @Schema(description = "값", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal value
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsTicker")
     public record TickerResponse(
             @Schema(description = "종목", example = "BTC", requiredMode = REQUIRED) String ticker,
             @Schema(description = "김치 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) KimchiPremiumResponse kimchiPremium,
@@ -59,11 +64,13 @@ public record CryptoMarketIndicatorsResponse(
         }
     }
 
+    @Schema(name = "CryptoMarketIndicatorsPremiumPair")
     public record PremiumPairResponse(
             @Schema(description = "공식 환율 기준 김프 (%, 환율 장애 시 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal official,
             @Schema(description = "테더 기준 김프 (%)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal tether
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsDatedPremiumPair")
     public record DatedPremiumPairResponse(
             @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
             @Schema(description = "공식 환율 기준 김프 (%, 환율 없는 날 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal official,
@@ -74,22 +81,26 @@ public record CryptoMarketIndicatorsResponse(
         }
     }
 
+    @Schema(name = "CryptoMarketIndicatorsKimchiPremium")
     public record KimchiPremiumResponse(
             @Schema(description = "현재 김프", requiredMode = REQUIRED) PremiumPairResponse current,
             @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedPremiumPairResponse> history
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsFundingRate")
     public record FundingRateResponse(
             @Schema(description = "현재 펀딩비 (비율, 예: 0.0001)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
             @Schema(description = "다음 펀딩 시각", requiredMode = REQUIRED) Instant nextFundingTime,
             @Schema(description = "일평균 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsOpenInterestPoint")
     public record OpenInterestPointResponse(
             @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
             @Schema(description = "미결제약정 명목가 (USD)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal valueUsd
     ) {}
 
+    @Schema(name = "CryptoMarketIndicatorsOpenInterest")
     public record OpenInterestResponse(
             @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<OpenInterestPointResponse> history
     ) {}

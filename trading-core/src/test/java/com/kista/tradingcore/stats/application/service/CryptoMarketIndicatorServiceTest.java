@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -143,7 +144,7 @@ class CryptoMarketIndicatorServiceTest {
     }
 
     @Test
-    void 모두_실패하면_전부_null이고_캐시하지_않는다() {
+    void 모두_실패하면_전부_null이고_1분만_캐시한다() {
         when(upbit.getUsdtKrwPrice()).thenThrow(new RuntimeException("upbit down"));
         when(brokerStats.currentExchangeRate()).thenThrow(new RuntimeException("fx down"));
         when(binance.getFundingRate(any())).thenThrow(new RuntimeException("down"));
@@ -159,7 +160,29 @@ class CryptoMarketIndicatorServiceTest {
             assertThat(t.fundingRate()).isNull();
             assertThat(t.openInterest()).isNull();
         });
+        verify(upbit, times(1)).getUsdtKrwPrice();
+
+        // 1분이 지나면 다시 조회한다
+        now[0] = NOW.plus(CryptoMarketIndicatorService.EMPTY_TTL).plusSeconds(1);
+        service.get(200);
         verify(upbit, times(2)).getUsdtKrwPrice();
+    }
+
+    @Test
+    void 장애가_복구되면_빈_결과_캐시가_끝난_뒤_정상_결과를_10분_캐시한다() {
+        when(upbit.getUsdtKrwPrice()).thenThrow(new RuntimeException("upbit down"));
+        when(brokerStats.currentExchangeRate()).thenThrow(new RuntimeException("fx down"));
+        when(binance.getFundingRate(any())).thenThrow(new RuntimeException("down"));
+        when(binance.getOpenInterestHistory(any())).thenThrow(new RuntimeException("down"));
+        assertThat(service.get(200).isEmpty()).isTrue();
+
+        reset(upbit, brokerStats, binance); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
+        stubAllOk();
+        now[0] = NOW.plus(CryptoMarketIndicatorService.EMPTY_TTL).plusSeconds(1);
+        assertThat(service.get(200).isEmpty()).isFalse();
+        service.get(200);
+
+        verify(upbit, times(1)).getUsdtKrwPrice(); // reset 이후 복구 조회 1회 — 두 번째 get은 10분 캐시 hit
     }
 
     @Test
