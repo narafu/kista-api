@@ -18,7 +18,7 @@
 	# trading-core(kista-trading) 공개 경로. path matcher의 `**`는 2단 이상 깊이에서 매치 실패(caddy v2.9.1 실측)라 path_regexp 사용.
 	# /api/stats는 kista-api(housing-benchmark)와 kista-trading(summary/equity-curve/cycles)이 prefix를 공유해 하위 경로로만 가른다.
 	# /api/internal/** 중 외부(FIDA)가 공인 도메인으로 호출하는 fida-orders만 여기로 — 나머지 internal은 kista-api가 내부망으로 직접 호출
-	@trading path_regexp ^/api/(trading-cycles(/.*)?|accounts(/.*)?|backtest|daily-trades|orders(/.*)?|stats/(summary|equity-curve|cycles)|internal/fida-orders)$
+	@trading path_regexp ^/api/(trading-cycles(/.*)?|accounts(/.*)?|backtest|crypto-market-indicators|daily-trades|orders(/.*)?|stats/(summary|equity-curve|cycles)|internal/fida-orders)$
 	handle @trading {
 		reverse_proxy kista-trading:8080 {
 			lb_try_duration 120s
