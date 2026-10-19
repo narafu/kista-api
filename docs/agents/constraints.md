@@ -186,7 +186,7 @@
 - allowedMethods에 **PATCH 필수** — 미포함 시 전략중지/재개 등 PATCH 엔드포인트 403
 - **`SecurityConfig`에 `.exceptionHandling()` + `authenticationEntryPoint` 반드시 설정** — 미설정 시 인증 실패가 401 대신 403 반환
 - **`JwtAuthFilter` catch 절은 `Exception`으로** — `JwtException`만 잡으면 NPE·IAE 미처리 → 익명 사용자 → 403
-- **라우트 규칙 순서(첫 매치 우선)**: 공통 permitAll → `/api/internal/**` → `/api/admin/**` → 셸 기여 `SecurityRoutePolicy`(root `web.RootSecurityPolicy`) → `anyRequest().authenticated()`. 프로세스 고유 permitAll은 `SecurityConfig`에 직접 쓰지 말고 셸 정책으로 기여한다 — internal/admin 규칙이 먼저라 정책이 그 경로를 permitAll로 뚫을 수 없다(`SecurityConfigOrderingTest`가 잠금). `@Import(SecurityConfig.class)` `@WebMvcTest`가 permitAll 경로를 검증하려면 `RootSecurityPolicy.class`도 함께 `@Import`
+- **라우트 규칙 순서(첫 매치 우선)**: 공통 permitAll → `/api/internal/**` → `/api/admin/**` → 셸 기여 `SecurityRoutePolicy`(root `web.RootSecurityPolicy`·trading-core `tradingcore.web.TradingSecurityPolicy`) → `anyRequest().authenticated()`. 프로세스 고유 permitAll은 `SecurityConfig`에 직접 쓰지 말고 셸 정책으로 기여한다 — internal/admin 규칙이 먼저라 정책이 그 경로를 permitAll로 뚫을 수 없다(`SecurityConfigOrderingTest`가 잠금). `@Import(SecurityConfig.class)` `@WebMvcTest`가 permitAll 경로를 검증하려면 해당 프로세스 정책(`RootSecurityPolicy`/`TradingSecurityPolicy`)도 함께 `@Import`
 
 ### @Transactional 내부 외부 시스템 호출 금지
 - 외부 HTTP 호출(텔레그램, KIS 등)을 `@Transactional` 내부에서 호출 금지 — 롤백 시 취소 불가

@@ -54,7 +54,7 @@
 - OI: `/futures/data/openInterestHist?period=1d&limit=30`의 `sumOpenInterestValue`(USD 명목가) 일별 추이. 별도 현재값 호출 없음 — 최신 포인트가 현재값 역할
 
 ### API
-- `GET /api/crypto-market-indicators?days=200` (인증 사용자, 기본 200, 범위 1~200 — 벗어나면 400). `days`는 김프·펀딩비 추이에만 적용, OI는 항상 최근 30일
+- `GET /api/crypto-market-indicators?days=200` (비인증 공개 — trading-core `TradingSecurityPolicy` permitAll, 기본 200, 범위 1~200 — 벗어나면 400). `days`는 김프·펀딩비 추이에만 적용, OI는 항상 최근 30일
 - 응답(전용 Response DTO, 섹션별 nullable):
   - `asOf`: 계산 시각
   - `usdtPremium{current, history[{date, value}]}`: 테더 프리미엄(종목 무관)
