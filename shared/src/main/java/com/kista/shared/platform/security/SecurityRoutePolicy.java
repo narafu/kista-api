@@ -2,6 +2,9 @@ package com.kista.shared.platform.security;
 
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.util.matcher.RequestMatcher;
+
+import java.util.List;
 
 // 프로세스 고유 라우트 인가 규칙(permitAll/authenticated)을 앱셸이 SecurityConfig에 기여하는 확장점 —
 // 인프라 leaf(platform.security)가 특정 프로세스에만 있는 경로를 알지 않도록 한다.
@@ -11,4 +14,10 @@ public interface SecurityRoutePolicy {
 
     // 셸 고유 경로 규칙을 registry에 추가 — 같은 정책 안에서는 선언 순서가 첫 매치 우선순위다
     void contribute(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry registry);
+
+    // 무효 Bearer 토큰(만료·블랙리스트·stale role)이어도 401 대신 익명으로 통과시킬 공개 읽기 경로 — JwtAuthFilter가 참조.
+    // contribute에서 permitAll로 등록한 같은 매처 인스턴스를 돌려줄 것. principal을 읽는 경로(/api/auth/me 등)는 넣지 않는다
+    default List<RequestMatcher> anonymousFallbackMatchers() {
+        return List.of();
+    }
 }

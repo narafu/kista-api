@@ -1,6 +1,7 @@
 package com.kista.shared.platform.security;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -10,7 +11,7 @@ class JwtAuthFilterTest {
 
     @Test
     void shouldNotFilterAsyncDispatch_returnsFalse() {
-        JwtAuthFilter filter = new JwtAuthFilter(mock(JwtDecoder.class), mock(TokenBlacklistPort.class));
+        JwtAuthFilter filter = new JwtAuthFilter(mock(JwtDecoder.class), mock(TokenBlacklistPort.class), new StaticListableBeanFactory().getBeanProvider(SecurityRoutePolicy.class));
 
         assertThat(filter.shouldNotFilterAsyncDispatch()).isFalse();
     }

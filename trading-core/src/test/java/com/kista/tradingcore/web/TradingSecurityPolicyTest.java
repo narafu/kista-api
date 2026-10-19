@@ -13,10 +13,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -58,5 +60,12 @@ class TradingSecurityPolicyTest {
     @Test
     void otherRoute_anonymousIs401() throws Exception {
         mockMvc.perform(get("/api/accounts/probe")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cryptoMarketIndicators_invalidTokenFallsBackToAnonymous_otherRouteStays401() throws Exception {
+        when(jwtDecoder.decode("expired")).thenThrow(new BadJwtException("expired"));
+        mockMvc.perform(get("/api/crypto-market-indicators").header("Authorization", "Bearer expired")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/accounts/probe").header("Authorization", "Bearer expired")).andExpect(status().isUnauthorized());
     }
 }
