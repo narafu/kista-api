@@ -39,18 +39,6 @@ class BinanceMarketDataAdapterTest {
     }
 
     @Test
-    void 일봉은_openTime_UTC_날짜와_종가로_매핑한다() {
-        server.expect(requestTo("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=2"))
-                .andRespond(withSuccess("""
-                        [[1792368000000,"82116.0","83158.0","82010.58","83034.01","6092.44",1792454399999,"1","1050886","1","1","0"]]
-                        """, MediaType.APPLICATION_JSON));
-
-        List<DatedValue> result = adapter.getSpotDailyCloses(StrategyTicker.BTC, 2);
-
-        assertThat(result).containsExactly(new DatedValue(LocalDate.of(2026, 10, 19), new BigDecimal("83034.01")));
-    }
-
-    @Test
     void 펀딩비_현재값과_다음_정산시각을_매핑한다() {
         server.expect(requestTo("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT"))
                 .andRespond(withSuccess("""
@@ -124,6 +112,7 @@ class BinanceMarketDataAdapterTest {
 
         server.verify();
         assertThat(result).hasSize(1003);
+        // openTime의 UTC 날짜와 [4] 종가로 매핑
         assertThat(result.getFirst()).isEqualTo(new DatedValue(LocalDate.of(2017, 8, 17), new BigDecimal("1")));
         // 연속된 날짜 — 겹침·누락 없음
         for (int i = 1; i < result.size(); i++) {

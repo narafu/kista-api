@@ -69,7 +69,7 @@
 - 무료 외부 온체인 API(Bitbo·BGeometrics·Coin Metrics)는 서비스 화면 공개가 유료이거나 비상업 라이선스라 쓰지 않고, 이미 연동한 Binance 공개 API로 직접 계산한다
 - 장기 밸류에이션(`tickers[].valuation{current, history[{date, close, wma200, wma200Multiple, mayerMultiple, athDrawdownPercent}]}`): Binance 현물 일봉(상장 2017-08-17부터, `startTime` 1000봉 페이징)으로 200주 이동평균(1400일 단순평균)·종가/200WMA 배수·Mayer Multiple(종가/200일 이동평균)·ATH(일봉 종가) 대비 하락률을 domain `CryptoValuations`가 계산. 진행 중 오늘 봉 제외, 각 일자는 그날까지의 봉만 사용, 이력 부족 시 해당 값 null. `current`는 직전 완성 일봉 기준(실시간 아님). 추이는 `days` 적용
 - 롱/숏 계좌 비율(`tickers[].longShortRatio{longAccount, longShortRatio, history[{date, longAccount, longShortRatio}]}`): `/futures/data/globalLongShortAccountRatio?period=1d&limit=30`. 계좌 수(사람) 기준이라 포지션 규모(돈) 기준인 펀딩비와 다르다. Binance가 30일만 제공해 `days`와 무관하게 30일
-- 장기 일봉 캐시: 메인 10분 캐시와 별도로 종목별 고정 키에 다음 UTC 자정까지 — 완성 봉은 하루 한 번만 늘고, 종목당 4페이지 호출을 10분마다 반복할 이유가 없다. 날짜를 키에 넣지 않는다(`TtlResultCache`는 1000건 이상일 때만 만료 청소)
+- 장기 일봉 캐시: 메인 10분 캐시와 별도로 종목별 고정 키에 다음 UTC 자정까지. 김프 추이도 이 일봉을 공유한다(기존 `limit=201` 별도 호출 제거 — 조회 실패 시 김프·밸류에이션이 함께 null) — 완성 봉은 하루 한 번만 늘고, 종목당 4페이지 호출을 10분마다 반복할 이유가 없다. 날짜를 키에 넣지 않는다(`TtlResultCache`는 1000건 이상일 때만 만료 청소)
 
 ### 반감기 카운트다운 추가 (2026-10-20)
 - `halving{currentHeight, nextHalvingHeight, blocksRemaining, estimatedAt}`(최상위, 종목 무관, 실패 시 null): mempool.space `GET /api/blocks/tip/height`(무인증, text 숫자)로 현재 높이를 받아 다음 210,000 배수까지 남은 블록과 조립 시각 + 남은 블록 × 10분 예상 시각을 계산. 별도 캐시 없이 메인 10분 캐시 공유

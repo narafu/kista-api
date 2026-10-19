@@ -136,13 +136,15 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         Map<StrategyTicker, BigDecimal> krwPrices = upbitOk ? guard("업비트 현재가", () -> upbit.getCurrentPrices(TICKERS)) : null;
         List<TickerIndicators> tickers = new ArrayList<>();
         for (StrategyTicker t : TICKERS) {
+            // 장기 일봉은 김프 추이·밸류에이션이 공유 — 실패하면 두 섹션 모두 null (조립당 종목별 1회 조회)
+            List<DatedValue> closes = guard("장기 일봉 " + t, () -> dailyCloses(t, now));
             KimchiPremium kimchi = null;
-            if (upbitOk && krwPrices != null) {
+            if (upbitOk && krwPrices != null && closes != null) {
                 final BigDecimal tetherPrice = usdtPrice;
                 final List<CryptoCandle> usdtC = usdtCandles;
                 final BigDecimal fxNow = fxCurrent;
                 final Map<LocalDate, BigDecimal> fxMap = fxByDate;
-                kimchi = guard("김프 " + t, () -> kimchi(t, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap));
+                kimchi = guard("김프 " + t, () -> kimchi(t, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap));
             }
             FundingRate funding = guard("펀딩비 " + t, () -> {
                 FundingRateQuote q = binance.getFundingRate(t);
@@ -150,8 +152,8 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
                         CryptoPremiums.fundingDailyAverage(binance.getFundingHistory(t, fundingFrom)));
             });
             OpenInterest oi = guard("OI " + t, () -> new OpenInterest(binance.getOpenInterestHistory(t)));
-            Valuation valuation = guard("밸류에이션 " + t,
-                    () -> Valuation.of(CryptoValuations.history(dailyCloses(t, now), today, MAX_DAYS)));
+            Valuation valuation = closes == null ? null
+                    : guard("밸류에이션 " + t, () -> Valuation.of(CryptoValuations.history(closes, today, MAX_DAYS)));
             LongShortRatio longShort = guard("롱숏 비율 " + t, () -> LongShortRatio.of(binance.getLongShortAccountRatioHistory(t)));
             tickers.add(new TickerIndicators(t, kimchi, funding, oi, valuation, longShort));
         }
@@ -159,7 +161,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         return new CryptoMarketIndicators(now, usdtPremium, List.copyOf(tickers), halving);
     }
 
-    private KimchiPremium kimchi(StrategyTicker t, BigDecimal krw, BigDecimal usdtPrice, List<CryptoCandle> usdtCandles,
+    private KimchiPremium kimchi(StrategyTicker t, List<DatedValue> binanceCloses, BigDecimal krw, BigDecimal usdtPrice, List<CryptoCandle> usdtCandles,
                                  BigDecimal fxCurrent, Map<LocalDate, BigDecimal> fxByDate) {
         BigDecimal spot = binance.getSpotPrice(t);
         // 환율 장애면 official 없이 tether 기준만
@@ -167,20 +169,18 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         BigDecimal tether = CryptoPremiums.premiumPercent(krw, spot.multiply(usdtPrice));
         List<DatedPremiumPair> history = CryptoPremiums.kimchiHistory(
                 upbit.getCompletedDailyCandles(t, MAX_DAYS), usdtCandles,
-                binance.getSpotDailyCloses(t, MAX_DAYS + 1), fxByDate);
+                binanceCloses, fxByDate); // 장기 일봉 — 날짜 교집합만 쓰므로 길이 무관
         return new KimchiPremium(new PremiumPair(official, tether), history);
     }
 
     // 상장 이후 전체 일봉(종목당 약 3,400봉, 페이지 4회)은 다음 UTC 자정까지 따로 캐시 — 완성 봉은 하루 한 번만 늘어나
-    // 10분마다 페이징 재호출할 이유가 없다. 진행 중 봉은 계산에서 빼므로 그 사이 갱신은 무관. 실패(예외)는 캐시되지 않는다
+    // 10분마다 페이징 재호출할 이유가 없다. 진행 중 봉은 김프 조인·밸류에이션 계산이 빼므로 그 사이 갱신은 무관. 실패(예외)는 캐시되지 않는다.
+    // 만료는 로더 종료 + TTL이라 자정을 로더 실행 시간만큼 넘기지만, 이 캐시는 메인 조립 안에서만 읽히고 다음 조립은
+    // 최소 1분(EMPTY_TTL) 뒤라 자정 직후 어제의 미완성 봉을 완성 봉으로 쓰는 경로는 없다
     private List<DatedValue> dailyCloses(StrategyTicker t, Instant now) {
-        LocalDate today = now.atZone(ZoneOffset.UTC).toLocalDate();
-        Instant nextUtcMidnight = today.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
-        // 만료 시각은 로더 종료 시점 + TTL이라 자정을 몇 초 넘길 수 있다 — 조회 시점 진행 중 봉을 캐시에 남기지 않아
-        // 자정 직후 그 미완성 봉이 '어제 완성 봉'으로 오인되지 않게 한다(그 몇 초는 하루 늦은 값)
+        Instant nextUtcMidnight = now.atZone(ZoneOffset.UTC).toLocalDate().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
         return cache.getOrCompute(DAILY_CLOSES_CACHE_KEY + t, Duration.between(now, nextUtcMidnight),
-                () -> binance.getSpotDailyClosesSince(t, DAILY_CLOSES_FROM).stream()
-                        .filter(c -> c.date().isBefore(today)).toList());
+                () -> binance.getSpotDailyClosesSince(t, DAILY_CLOSES_FROM));
     }
 
     // 섹션 실패 시 null + 경고 로그

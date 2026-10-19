@@ -45,15 +45,6 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
     }
 
     @Override
-    public List<DatedValue> getSpotDailyCloses(StrategyTicker ticker, int limit) {
-        List<List<Object>> rows = restClient.get()
-                .uri(SPOT + "/api/v3/klines?symbol={s}&interval=1d&limit={l}", symbol(ticker), limit)
-                .retrieve().body(new ParameterizedTypeReference<>() {});
-        if (rows == null) return List.of();
-        return rows.stream().map(BinanceMarketDataAdapter::toClose).toList();
-    }
-
-    @Override
     public List<DatedValue> getSpotDailyClosesSince(StrategyTicker ticker, LocalDate from) {
         List<DatedValue> closes = new ArrayList<>();
         long startTime = from.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();

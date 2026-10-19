@@ -90,7 +90,6 @@ class CryptoMarketIndicatorServiceTest {
         when(brokerStats.currentExchangeRate()).thenReturn(new ExchangeRateQuote(new BigDecimal("1401"), new BigDecimal("1400")));
         when(fx.getUsdKrwRates(any(), any())).thenReturn(Map.of(TODAY.minusDays(210), new BigDecimal("1400")));
         when(binance.getSpotPrice(any())).thenReturn(new BigDecimal("100000"));
-        when(binance.getSpotDailyCloses(any(), anyInt())).thenReturn(closes(200, "100000"));
         when(binance.getFundingRate(any())).thenReturn(new FundingRateQuote(new BigDecimal("0.0001"), NOW.plusSeconds(3600)));
         when(binance.getFundingHistory(any(), any())).thenReturn(List.of(new FundingRateRecord(NOW.minusSeconds(86400), new BigDecimal("0.0001"))));
         when(binance.getOpenInterestHistory(any())).thenReturn(List.of(new DatedValue(TODAY.minusDays(1), new BigDecimal("5"))));
@@ -176,16 +175,26 @@ class CryptoMarketIndicatorServiceTest {
     }
 
     @Test
-    void 장기_일봉만_실패하면_밸류에이션만_null() {
+    void 장기_일봉만_실패하면_이를_공유하는_밸류에이션과_김프만_null() {
         when(binance.getSpotDailyClosesSince(any(), any())).thenThrow(new RuntimeException("klines down"));
 
         CryptoMarketIndicators r = service.get(200);
 
+        assertThat(r.usdtPremium()).isNotNull();
         r.tickers().forEach(t -> {
             assertThat(t.valuation()).isNull();
-            assertThat(t.kimchiPremium()).isNotNull();
+            assertThat(t.kimchiPremium()).isNull();
+            assertThat(t.fundingRate()).isNotNull();
             assertThat(t.longShortRatio()).isNotNull();
         });
+    }
+
+    @Test
+    void 김프와_밸류에이션은_장기_일봉을_종목당_한_번만_조회한다() {
+        service.get(200);
+
+        verify(binance, times(1)).getSpotDailyClosesSince(org.mockito.ArgumentMatchers.eq(StrategyTicker.BTC), any());
+        verify(binance, times(1)).getSpotDailyClosesSince(org.mockito.ArgumentMatchers.eq(StrategyTicker.ETH), any());
     }
 
     @Test
