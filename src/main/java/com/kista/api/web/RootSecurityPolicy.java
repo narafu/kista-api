@@ -12,7 +12,7 @@ import java.util.List;
 
 // root 프로세스(kista-api·kista-scheduler) 고유 공개/인증 라우트 규칙 — platform.security.SecurityConfig가
 // 공통 규칙(/api/internal/**, /api/admin/**) 뒤에 이 정책을 적용한다. 규칙 순서는 첫 매치 우선이라
-// 구체 경로(status-stream·DELETE me)를 /api/auth/** permitAll보다 먼저 둔다.
+// 구체 경로(status-stream·me·approval-requests)를 /api/auth/** permitAll보다 먼저 둔다.
 @Component
 public class RootSecurityPolicy implements SecurityRoutePolicy {
 
@@ -30,6 +30,8 @@ public class RootSecurityPolicy implements SecurityRoutePolicy {
         registry.requestMatchers("/api/auth/status-stream").authenticated(); // 상태 SSE 연결은 인증 필수
         registry.requestMatchers("/api/trades/stream").authenticated(); // 매매 SSE 연결은 인증 필수
         registry.requestMatchers(HttpMethod.DELETE, "/api/auth/me").authenticated(); // 회원 탈퇴는 인증 필수
+        registry.requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated(); // 내 정보 — principal 필수(없으면 getById(null) 500)
+        registry.requestMatchers(HttpMethod.POST, "/api/auth/approval-requests").authenticated(); // 승인 재신청 — principal 필수
         registry.requestMatchers("/api/auth/**").permitAll();
         registry.requestMatchers(MARKET, META, RUNTIME_CONFIG).permitAll();
     }

@@ -60,6 +60,9 @@ class RootSecurityPolicyTest {
         @GetMapping("/api/auth/me")
         String me() { return "me"; }
 
+        @PostMapping("/api/auth/approval-requests")
+        String reapply() { return "reapply"; }
+
         @PostMapping("/api/auth/logout")
         String logout() { return "logout"; }
 
@@ -140,5 +143,12 @@ class RootSecurityPolicyTest {
         mockMvc.perform(post("/api/auth/logout").header("Authorization", EXPIRED)).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/auth/logout").header("Authorization", BLACKLISTED))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error").value("TOKEN_BLACKLISTED"));
+    }
+
+    @Test
+    void principalReadingAuthRoutes_anonymousIs401_butLogoutStaysOpen() throws Exception {
+        mockMvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/approval-requests")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/auth/logout")).andExpect(status().isOk());
     }
 }
