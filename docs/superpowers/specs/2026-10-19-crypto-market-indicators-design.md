@@ -59,7 +59,7 @@
   - `asOf`: 계산 시각
   - `usdtPremium{current, history[{date, value}]}`: 테더 프리미엄(종목 무관)
   - `tickers[]`: `ticker`, `kimchiPremium{current{official, tether}, history[{date, official, tether}]}`(환율 실패 시 `official`만 null), `fundingRate{current, nextFundingTime, history[{date, value}]}`, `openInterest{history[{date, valueUsd}]}`
-- 실패 격리: 종목·지표 단위로 실패를 잡아 해당 섹션만 `null` + warn 로그. 환율(Toss·Frankfurter) 실패는 공식 환율 김프 값·`usdtPremium`만 비우고 테더 김프는 유지(`FearGreedService` 소스별 try/catch 패턴). 모든 종목의 모든 섹션이 실패하면 503(기존 매핑되는 예외 재사용 — 빌더 판단)
+- 실패 격리: 종목·지표 단위로 실패를 잡아 해당 섹션만 `null` + warn 로그. 환율(Toss·Frankfurter) 실패는 공식 환율 김프 값·`usdtPremium`만 비우고 테더 김프는 유지(`FearGreedService` 소스별 try/catch 패턴). 모든 종목의 모든 섹션이 실패해도 200 + 전부 null(미캐시)
 - `Cache-Control` 공개 캐시 10분(`FearGreedController` 패턴)
 
 ### 캐시
