@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -17,6 +19,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 // Toss 캔들 API 스펙 (openapi.json 검증):
@@ -34,8 +37,11 @@ class TossCandleApi {
     private static final int MAX_COUNT = 200;
     // 최신 일봉 조회 최대 개수 (페이징 3회)
     private static final int MAX_LATEST_DAILY_COUNT = 600;
+    // 최신 일봉 캐시 TTL — 장중 마지막 봉이 계속 바뀌어 짧게
+    private static final Duration LATEST_DAILY_TTL = Duration.ofMinutes(2);
 
     private final TossHttpClient tossHttpClient;
+    private final TtlResultCache latestDailyCache = new TtlResultCache(); // 종목별 최신 일봉 600봉 (공용 시세)
 
     public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
         List<TossCandle> all = new ArrayList<>(); // 오름차순 유지 — 더 오래된 페이지는 앞에 붙인다
@@ -60,10 +66,20 @@ class TossCandleApi {
     }
 
     // 일봉은 최대 600봉(MA200을 400봉 전체에 잇는 차트용)까지 페이징 — before가 날짜 단위라 분봉은 1페이지(200)만
+    // 일봉은 종목별 600봉을 사용자 공용으로 2분 캐시하고 요청 개수만큼 뒤에서 잘라 준다
+    // 600봉을 다 채운 결과만 캐시 — 중간 페이지 빈 응답(일시 장애)으로 잘린 결과가 TTL 동안 고착되지 않게. 이력 짧은 신규 상장은 매번 조회
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
         if (!"1d".equals(interval)) return fetchCandles(symbol, interval, Math.clamp(count, 1, MAX_COUNT), null, false);
-        // before 미지정 첫 페이지는 Toss가 최신 봉부터 반환
-        return pageDailyBefore(symbol, null, Math.clamp(count, 1, MAX_LATEST_DAILY_COUNT), false);
+        String key = symbol.toUpperCase(Locale.ROOT); // 대소문자 다른 같은 종목을 한 엔트리로
+        List<TossCandle> latest = latestDailyCache.peek(key);
+        if (latest == null) {
+            // before 미지정 첫 페이지는 Toss가 최신 봉부터 반환
+            List<TossCandle> fetched = pageDailyBefore(symbol, null, MAX_LATEST_DAILY_COUNT, false);
+            if (fetched.size() == MAX_LATEST_DAILY_COUNT) latestDailyCache.getOrCompute(key, LATEST_DAILY_TTL, () -> fetched);
+            latest = fetched;
+        }
+        int n = Math.clamp(count, 1, MAX_LATEST_DAILY_COUNT);
+        return latest.subList(Math.max(0, latest.size() - n), latest.size());
     }
 
     // 200봉 단위 페이징 — 다음 페이지 before = 직전 페이지 가장 오래된 봉일 00:00 UTC (isBefore 필터가 엄격해 중복 없음).

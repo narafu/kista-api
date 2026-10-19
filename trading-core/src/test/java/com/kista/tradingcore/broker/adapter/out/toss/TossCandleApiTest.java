@@ -163,6 +163,38 @@ class TossCandleApiTest {
         assertThat(captor.getValue().getFirst("count")).isEqualTo("200");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("최신 일봉은 종목별 600봉을 캐시해 재요청 시 Toss를 다시 부르지 않고 요청 개수만큼 뒤에서 자른다")
+    void latest_daily_is_cached_per_symbol_and_sliced() {
+        LocalDate latest = LocalDate.of(2026, 10, 19);
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(page(days(latest, 0, 200)), page(days(latest, 200, 200)), page(days(latest, 400, 200)));
+
+        tossCandleApi.getLatestCandles("QQQ", "1d", 600);
+        var sliced = tossCandleApi.getLatestCandles("qqq", "1d", 50); // 키는 대문자 정규화
+
+        verify(tossHttpClient, times(3)).getCommon(any(), any(), any(ParameterizedTypeReference.class));
+        assertThat(sliced).hasSize(50);
+        assertThat(sliced.getFirst().date()).isEqualTo(latest.minusDays(49));
+        assertThat(sliced.getLast().date()).isEqualTo(latest);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("600봉을 다 채우지 못한 결과(빈 결과·중간 페이지 빈 응답)는 캐시하지 않는다")
+    void latest_daily_short_result_is_not_cached() {
+        LocalDate latest = LocalDate.of(2026, 10, 19);
+        // 1차: 200봉 뒤 빈 페이지로 잘림, 2차: 첫 페이지부터 빈 응답
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(page(days(latest, 0, 200)), page(), page());
+
+        assertThat(tossCandleApi.getLatestCandles("QQQ", "1d", 600)).hasSize(200);
+        assertThat(tossCandleApi.getLatestCandles("QQQ", "1d", 600)).isEmpty();
+
+        verify(tossHttpClient, times(3)).getCommon(any(), any(), any(ParameterizedTypeReference.class));
+    }
+
     // latest에서 offset일 전부터 거슬러 n개 날짜 (최신순)
     private static String[] days(LocalDate latest, int offset, int n) {
         return java.util.stream.IntStream.range(offset, offset + n).mapToObj(i -> latest.minusDays(i).toString()).toArray(String[]::new);
