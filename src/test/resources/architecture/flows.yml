@@ -803,7 +803,7 @@ flows:
         desc: >-
           코인 시장 지표 화면이 GET /api/crypto-market-indicators를 부르면 kista-trading이 Upbit 시세·Binance 현물/선물·환율(Toss 현재, Frankfurter 과거)을 모아
           종목별 김프·테더 김프·펀딩비·미결제약정 추이와 종목 무관 테더 프리미엄을 계산해 돌려준다.
-        code: [CryptoMarketIndicatorController#get, CryptoMarketIndicatorService#get]
+        code: [CryptoMarketIndicatorController#getCryptoMarketIndicators, CryptoMarketIndicatorService#get]
         fail: 비인증 공개 엔드포인트(로그인 없이 호출 가능). 지표·종목별로 실패한 섹션만 null(200), 10분 캐시. 모든 섹션이 실패해도 200 + 전부 null(캐시하지 않음).
 
       - id: stats-screen
