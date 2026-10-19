@@ -29,7 +29,7 @@ public class CryptoMarketIndicatorController {
     @ApiResponse(responseCode = "400", description = "days 범위 오류")
     @GetMapping("/api/crypto-market-indicators")
     public ResponseEntity<CryptoMarketIndicatorsResponse> getCryptoMarketIndicators(
-            @Parameter(description = "조회 기간(일)", example = "200") @RequestParam(defaultValue = "200") int days) {
+            @Parameter(description = "조회 기간(일, 1~365)", example = "200") @RequestParam(defaultValue = "200") int days) {
         return ResponseEntity.ok().cacheControl(CACHE).body(CryptoMarketIndicatorsResponse.from(useCase.get(days)));
     }
 }

@@ -143,6 +143,44 @@ class BinanceMarketDataAdapterTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
+    private static final long EIGHT_HOURS_MS = 28_800_000L;
+
+    // fundingTime(ms)부터 8시간 간격 n건 펀딩비 JSON
+    private static String fundings(long firstTime, int n) {
+        return LongStream.range(0, n)
+                .mapToObj(i -> "{\"symbol\":\"BTCUSDT\",\"fundingTime\":%d,\"fundingRate\":\"0.0001\"}".formatted(firstTime + i * EIGHT_HOURS_MS))
+                .collect(Collectors.joining(",", "[", "]"));
+    }
+
+    @Test
+    void 펀딩비_이력이_1000건이면_마지막_fundingTime_직후로_이어_받는다() {
+        long first = 1790000000000L;
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://fapi.binance.com/fapi/v1/fundingRate")))
+                .andExpect(queryParam("startTime", String.valueOf(first)))
+                .andRespond(withSuccess(fundings(first, 1000), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://fapi.binance.com/fapi/v1/fundingRate")))
+                .andExpect(queryParam("startTime", String.valueOf(first + 999 * EIGHT_HOURS_MS + 1)))
+                .andExpect(queryParam("limit", "1000"))
+                .andRespond(withSuccess(fundings(first + 1000 * EIGHT_HOURS_MS, 200), MediaType.APPLICATION_JSON));
+
+        List<FundingRateRecord> result = adapter.getFundingHistory(StrategyTicker.BTC, Instant.ofEpochMilli(first));
+
+        server.verify();
+        assertThat(result).hasSize(1200);
+        assertThat(result.getLast().fundingTime()).isEqualTo(Instant.ofEpochMilli(first + 1199 * EIGHT_HOURS_MS));
+    }
+
+    @Test
+    void 펀딩비_페이징_상한을_넘으면_잘라_반환하지_않고_실패한다() {
+        for (int p = 0; p < BinanceMarketDataAdapter.FUNDING_MAX_PAGES; p++) {
+            server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://fapi.binance.com/fapi/v1/fundingRate")))
+                    .andRespond(withSuccess(fundings(1790000000000L + p * 1000L * EIGHT_HOURS_MS, 1000), MediaType.APPLICATION_JSON));
+        }
+
+        assertThatThrownBy(() -> adapter.getFundingHistory(StrategyTicker.BTC, Instant.ofEpochMilli(1790000000000L)))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
     @Test
     void 롱숏_계좌_비율은_period_1d_limit_30으로_조회해_UTC_날짜로_매핑한다() {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://fapi.binance.com/futures/data/globalLongShortAccountRatio")))

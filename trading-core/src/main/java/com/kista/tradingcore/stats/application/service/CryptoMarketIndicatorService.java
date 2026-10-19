@@ -41,7 +41,7 @@ import java.util.function.Supplier;
 @Service
 class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
-    static final int MAX_DAYS = 200; // 조회 가능 최대 기간(일)
+    static final int MAX_DAYS = 365; // 조회 가능 최대 기간(일)
     static final Duration TTL = Duration.ofMinutes(10); // 캐시 유효 시간
     static final Duration EMPTY_TTL = Duration.ofMinutes(1); // 전부 실패 결과 캐시 — 비인증 공개라 장애 중 요청마다 외부 재호출되는 것을 막는다
     private static final String CACHE_KEY = "crypto-market-indicators"; // 전역 단일 결과
@@ -84,7 +84,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
     @Override
     public CryptoMarketIndicators get(int days) {
-        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~200일입니다: " + days);
+        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일입니다: " + days);
         // 전부 실패한 결과는 정상 키에 두지 않고(loader가 null) 별도 키에 1분만 둔다 — 그동안은 빈 결과 재사용, 이후 재조회
         CryptoMarketIndicators[] assembled = new CryptoMarketIndicators[1];
         CryptoMarketIndicators result = cache.getOrCompute(CACHE_KEY, TTL, () -> {
@@ -140,7 +140,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         List<DatedValue> cbUsdtCloses;
         try {
             cbUsdtPrice = coinbase.getUsdPrice(USDT);
-            cbUsdtCloses = coinbase.getUsdDailyCloses(USDT);
+            cbUsdtCloses = coinbase.getUsdDailyClosesSince(USDT, today.minusDays(MAX_DAYS));
         } catch (Exception e) {
             log.warn("코인베이스 USDT 시세 조회 실패", e);
             cbUsdtPrice = null;
@@ -171,7 +171,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
                 final List<DatedValue> usdtUsdCloses = cbUsdtCloses;
                 coinbasePremium = guard("코인베이스 프리미엄 " + t, () -> new Premium(
                         CryptoPremiums.premiumPercent(coinbase.getUsdPrice(t.name()), spot.multiply(usdtUsd)),
-                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyCloses(t.name()), usdtUsdCloses, closes, today)));
+                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyClosesSince(t.name(), today.minusDays(MAX_DAYS)), usdtUsdCloses, closes, today)));
             }
             FundingRate funding = guard("펀딩비 " + t, () -> {
                 FundingRateQuote q = binance.getFundingRate(t);

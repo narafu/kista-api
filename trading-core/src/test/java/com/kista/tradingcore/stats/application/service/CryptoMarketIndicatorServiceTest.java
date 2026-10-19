@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -32,6 +33,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
@@ -85,12 +87,12 @@ class CryptoMarketIndicatorServiceTest {
 
     void stubAllOk() {
         when(upbit.getUsdtKrwPrice()).thenReturn(new BigDecimal("1450"));
-        when(upbit.getCompletedUsdtKrwDailyCandles(anyInt())).thenReturn(candles(200, "1450"));
+        when(upbit.getCompletedUsdtKrwDailyCandles(anyInt())).thenReturn(candles(400, "1450"));
         when(upbit.getCurrentPrices(anyCollection())).thenReturn(
                 Map.of(StrategyTicker.BTC, new BigDecimal("150000000"), StrategyTicker.ETH, new BigDecimal("150000000")));
-        when(upbit.getCompletedDailyCandles(any(), anyInt())).thenReturn(candles(200, "150000000"));
+        when(upbit.getCompletedDailyCandles(any(), anyInt())).thenReturn(candles(400, "150000000"));
         when(brokerStats.currentExchangeRate()).thenReturn(new ExchangeRateQuote(new BigDecimal("1401"), new BigDecimal("1400")));
-        when(fx.getUsdKrwRates(any(), any())).thenReturn(Map.of(TODAY.minusDays(210), new BigDecimal("1400")));
+        when(fx.getUsdKrwRates(any(), any())).thenReturn(Map.of(TODAY.minusDays(410), new BigDecimal("1400")));
         when(binance.getSpotPrice(any())).thenReturn(new BigDecimal("100000"));
         when(binance.getFundingRate(any())).thenReturn(new FundingRateQuote(new BigDecimal("0.0001"), NOW.plusSeconds(3600)));
         when(binance.getFundingHistory(any(), any())).thenReturn(List.of(new FundingRateRecord(NOW.minusSeconds(86400), new BigDecimal("0.0001"))));
@@ -100,11 +102,11 @@ class CryptoMarketIndicatorServiceTest {
                 List.of(new DatedLongShortRatio(TODAY.minusDays(1), new BigDecimal("0.6"), new BigDecimal("1.5"))));
         when(blockHeight.currentBtcHeight()).thenReturn(972_175L);
         when(coinbase.getUsdPrice("USDT")).thenReturn(new BigDecimal("0.999"));
-        when(coinbase.getUsdDailyCloses("USDT")).thenReturn(closes(250, "0.999"));
+        when(coinbase.getUsdDailyClosesSince(eq("USDT"), any())).thenReturn(closes(450, "0.999"));
         when(coinbase.getUsdPrice("BTC")).thenReturn(new BigDecimal("99900"));
         when(coinbase.getUsdPrice("ETH")).thenReturn(new BigDecimal("99900"));
-        when(coinbase.getUsdDailyCloses("BTC")).thenReturn(closes(250, "99900"));
-        when(coinbase.getUsdDailyCloses("ETH")).thenReturn(closes(250, "99900"));
+        when(coinbase.getUsdDailyClosesSince(eq("BTC"), any())).thenReturn(closes(450, "99900"));
+        when(coinbase.getUsdDailyClosesSince(eq("ETH"), any())).thenReturn(closes(450, "99900"));
     }
 
     // 전 섹션 실패 stub
@@ -121,22 +123,22 @@ class CryptoMarketIndicatorServiceTest {
 
     @Test
     void 정상_조회시_종목별_세_지표와_테더프리미엄을_채운다() {
-        CryptoMarketIndicators r = service.get(200);
+        CryptoMarketIndicators r = service.get(365);
 
         assertThat(r.asOf()).isEqualTo(NOW);
         assertThat(r.usdtPremium().current()).isEqualByComparingTo("3.5714"); // 1450/1400-1
-        assertThat(r.usdtPremium().history()).hasSize(200);
+        assertThat(r.usdtPremium().history()).hasSize(365);
         assertThat(r.tickers()).hasSize(2);
         r.tickers().forEach(t -> {
             assertThat(t.kimchiPremium().current().official()).isNotNull();
             assertThat(t.kimchiPremium().current().tether()).isNotNull();
             // 진행 중인 오늘 봉은 history에 섞이지 않는다
-            assertThat(t.kimchiPremium().history()).hasSize(200)
+            assertThat(t.kimchiPremium().history()).hasSize(365)
                     .noneMatch(p -> p.date().equals(TODAY));
             assertThat(t.fundingRate().current()).isEqualByComparingTo("0.0001");
             assertThat(t.openInterest().history()).hasSize(1);
-            // 밸류에이션은 오늘 봉을 빼고 마지막 200일, current는 어제
-            assertThat(t.valuation().history()).hasSize(200).noneMatch(v -> v.date().equals(TODAY));
+            // 밸류에이션은 오늘 봉을 빼고 마지막 365일, current는 어제
+            assertThat(t.valuation().history()).hasSize(365).noneMatch(v -> v.date().equals(TODAY));
             assertThat(t.valuation().current().date()).isEqualTo(TODAY.minusDays(1));
             assertThat(t.valuation().current().wma200Multiple()).isEqualByComparingTo("1");
             assertThat(t.valuation().current().mayerMultiple()).isEqualByComparingTo("1");
@@ -145,13 +147,17 @@ class CryptoMarketIndicatorServiceTest {
             assertThat(t.longShortRatio().longShortRatio()).isEqualByComparingTo("1.5");
             // 99900 / (100000 × 0.999) − 1 = 0
             assertThat(t.coinbasePremium().current()).isEqualByComparingTo("0");
-            assertThat(t.coinbasePremium().history()).hasSize(200).noneMatch(p -> p.date().equals(TODAY));
+            assertThat(t.coinbasePremium().history()).hasSize(365).noneMatch(p -> p.date().equals(TODAY));
         });
+        // 외부 기간 조회는 최대 기간(365일) 기준
+        verify(coinbase).getUsdDailyClosesSince("USDT", TODAY.minusDays(365));
+        verify(binance).getFundingHistory(StrategyTicker.BTC, TODAY.atStartOfDay(ZoneOffset.UTC).toInstant().minus(Duration.ofDays(365)));
+        verify(fx).getUsdKrwRates(TODAY.minusDays(372), TODAY);
     }
 
     @Test
     void 코인베이스만_실패하면_코인베이스_프리미엄만_null() {
-        when(coinbase.getUsdDailyCloses("BTC")).thenThrow(new RuntimeException("coinbase down"));
+        when(coinbase.getUsdDailyClosesSince(eq("BTC"), any())).thenThrow(new RuntimeException("coinbase down"));
 
         CryptoMarketIndicators r = service.get(200);
 
@@ -382,6 +388,6 @@ class CryptoMarketIndicatorServiceTest {
     @Test
     void days_범위_밖이면_IllegalArgumentException() {
         assertThatThrownBy(() -> service.get(0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.get(201)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.get(366)).isInstanceOf(IllegalArgumentException.class);
     }
 }

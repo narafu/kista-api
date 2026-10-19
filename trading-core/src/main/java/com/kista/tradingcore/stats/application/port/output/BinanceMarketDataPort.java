@@ -23,7 +23,7 @@ public interface BinanceMarketDataPort {
     // 선물 현재 펀딩비율·다음 정산 시각
     FundingRateQuote getFundingRate(StrategyTicker ticker);
 
-    // from 이후 펀딩비 정산 이력 (최대 1000건)
+    // from 이후 펀딩비 정산 이력 전체 — 1000건 초과는 페이징
     List<FundingRateRecord> getFundingHistory(StrategyTicker ticker, Instant from);
 
     // 선물 일별 미결제약정 명목가(USD) 최근 30일

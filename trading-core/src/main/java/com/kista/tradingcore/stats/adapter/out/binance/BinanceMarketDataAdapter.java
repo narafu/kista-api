@@ -26,6 +26,8 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
     private static final String FUTURES = "https://fapi.binance.com";
     static final int KLINES_PAGE_LIMIT = 1000; // klines 요청당 최대 봉 수
     static final int KLINES_MAX_PAGES = 10; // 페이징 상한 — 약 27년치, 무한 루프 방지
+    static final int FUNDING_PAGE_LIMIT = 1000; // fundingRate 요청당 최대 건수 (8시간 정산 — 약 333일)
+    static final int FUNDING_MAX_PAGES = 3; // 페이징 상한 — 약 1,000일, 무한 루프 방지
 
     private final RestClient restClient;
 
@@ -75,14 +77,20 @@ class BinanceMarketDataAdapter implements BinanceMarketDataPort {
 
     @Override
     public List<FundingRateRecord> getFundingHistory(StrategyTicker ticker, Instant from) {
-        List<FundingRateItem> items = restClient.get()
-                .uri(FUTURES + "/fapi/v1/fundingRate?symbol={s}&startTime={t}&limit=1000",
-                        symbol(ticker), from.toEpochMilli())
-                .retrieve().body(new ParameterizedTypeReference<>() {});
-        if (items == null) return List.of();
-        return items.stream()
-                .map(i -> new FundingRateRecord(Instant.ofEpochMilli(i.fundingTime()), i.fundingRate()))
-                .toList();
+        List<FundingRateRecord> records = new ArrayList<>();
+        long startTime = from.toEpochMilli();
+        for (int page = 0; page < FUNDING_MAX_PAGES; page++) {
+            List<FundingRateItem> items = restClient.get()
+                    .uri(FUTURES + "/fapi/v1/fundingRate?symbol={s}&startTime={t}&limit={l}", symbol(ticker), startTime, FUNDING_PAGE_LIMIT)
+                    .retrieve().body(new ParameterizedTypeReference<>() {});
+            if (items == null || items.isEmpty()) return records;
+            items.forEach(i -> records.add(new FundingRateRecord(Instant.ofEpochMilli(i.fundingTime()), i.fundingRate())));
+            if (items.size() < FUNDING_PAGE_LIMIT) return records;
+            // 다음 페이지는 마지막 정산 직후부터 — fundingTime >= startTime만 오므로 겹침·누락 없음
+            startTime = items.getLast().fundingTime() + 1;
+        }
+        // 상한 도달 시 잘라 반환하면 최근 정산이 빠진 채 그럴듯한 값이 나오므로 실패로 처리
+        throw new IllegalStateException("바이낸스 펀딩비 페이징 상한 초과: " + ticker);
     }
 
     @Override

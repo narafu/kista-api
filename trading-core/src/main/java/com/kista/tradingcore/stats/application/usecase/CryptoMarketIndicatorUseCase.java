@@ -5,6 +5,6 @@ import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 // 코인 시장 지표 조회 (김프·테더 프리미엄·펀딩비·OI·밸류에이션·롱숏 비율·반감기)
 public interface CryptoMarketIndicatorUseCase {
 
-    // days: 1~200, 범위 밖이면 IllegalArgumentException
+    // days: 1~365, 범위 밖이면 IllegalArgumentException
     CryptoMarketIndicators get(int days);
 }
