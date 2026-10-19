@@ -45,13 +45,20 @@ class CryptoMarketIndicatorServiceTest {
     HistoricalFxRatePort fx = mock(HistoricalFxRatePort.class);
     BrokerStatisticsUseCase brokerStats = mock(BrokerStatisticsUseCase.class);
     CryptoMarketIndicatorService service;
+    Instant[] now = {NOW}; // 테스트용 가변 시각
+
+    Clock movableClock = new Clock() {
+        @Override public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+        @Override public Instant instant() { return now[0]; }
+    };
 
     @BeforeEach
     void setUp() {
         CryptoExchanges exchanges = mock(CryptoExchanges.class); // 생성자가 package-private라 mock으로 대체
         when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
         service = new CryptoMarketIndicatorService(exchanges, binance, fx, brokerStats,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                movableClock);
         stubAllOk();
     }
 
@@ -72,8 +79,8 @@ class CryptoMarketIndicatorServiceTest {
     void stubAllOk() {
         when(upbit.getUsdtKrwPrice()).thenReturn(new BigDecimal("1450"));
         when(upbit.getCompletedUsdtKrwDailyCandles(anyInt())).thenReturn(candles(200, "1450"));
-        when(upbit.getCurrentPrices(anyCollection())).thenAnswer(inv ->
-                Map.of(((java.util.Collection<StrategyTicker>) inv.getArgument(0)).iterator().next(), new BigDecimal("150000000")));
+        when(upbit.getCurrentPrices(anyCollection())).thenReturn(
+                Map.of(StrategyTicker.BTC, new BigDecimal("150000000"), StrategyTicker.ETH, new BigDecimal("150000000")));
         when(upbit.getCompletedDailyCandles(any(), anyInt())).thenReturn(candles(200, "150000000"));
         when(brokerStats.currentExchangeRate()).thenReturn(new ExchangeRateQuote(new BigDecimal("1401"), new BigDecimal("1400")));
         when(fx.getUsdKrwRates(any(), any())).thenReturn(Map.of(TODAY.minusDays(210), new BigDecimal("1400")));
@@ -162,6 +169,15 @@ class CryptoMarketIndicatorServiceTest {
         verify(upbit, times(1)).getUsdtKrwPrice();
         assertThat(r.tickers().getFirst().kimchiPremium().history()).hasSizeLessThanOrEqualTo(30);
         assertThat(r.usdtPremium().history()).hasSizeLessThanOrEqualTo(30);
+    }
+
+    @Test
+    void TTL이_지나면_외부를_다시_부른다() {
+        service.get(200);
+        now[0] = NOW.plus(CryptoMarketIndicatorService.TTL).plusSeconds(1);
+        service.get(200);
+
+        verify(upbit, times(2)).getUsdtKrwPrice();
     }
 
     @Test
