@@ -9,7 +9,7 @@ import java.util.List;
 public interface MarketUseCase {
     List<LocalDate> getMonthlyHolidays(int year, int month);
 
-    // 일봉만 지원 — count는 1~200으로 clamp
+    // 일봉만 지원 — count는 1~600으로 clamp (trading-core가 200봉 단위 페이징)
     List<DailyCandleResponse> getDailyCandles(String symbol, int count);
 
     // from~to(양끝 포함) 일봉 — 200봉 한도 없음

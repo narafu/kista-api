@@ -133,6 +133,43 @@ class TossCandleApiTest {
 
     @SuppressWarnings("unchecked")
     @Test
+    @DisplayName("최신 일봉 600개 요청은 before 없이 최신 200봉부터 200봉 단위로 세 페이지를 이어 받는다")
+    void latest_daily_pages_up_to_600() {
+        LocalDate latest = LocalDate.of(2026, 10, 19);
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class)))
+                .thenReturn(page(days(latest, 0, 200)), page(days(latest, 200, 200)), page(days(latest, 400, 200)));
+
+        var result = tossCandleApi.getLatestCandles("QQQ", "1d", 1000); // 상한 600으로 clamp
+
+        assertThat(result).hasSize(600);
+        assertThat(result).extracting(c -> c.date()).isSorted().doesNotHaveDuplicates();
+        assertThat(result.getLast().date()).isEqualTo(latest);
+        ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient, times(3)).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getAllValues().get(0).containsKey("before")).isFalse();
+        // 다음 페이지 before = 직전 페이지 가장 오래된 봉일
+        assertThat(captor.getAllValues().get(1).getFirst("before")).isEqualTo(latest.minusDays(199) + "T00:00Z");
+        assertThat(captor.getAllValues().get(2).getFirst("count")).isEqualTo("200");
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("분봉 최신 조회는 날짜 단위 페이징을 하지 않고 200봉 1회로 자른다")
+    void latest_minute_is_single_page_clamped_to_200() {
+        when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class))).thenReturn(page());
+        tossCandleApi.getLatestCandles("QQQ", "1m", 600);
+        ArgumentCaptor<MultiValueMap<String, String>> captor = ArgumentCaptor.forClass(MultiValueMap.class);
+        verify(tossHttpClient).getCommon(eq("/api/v1/candles"), captor.capture(), any(ParameterizedTypeReference.class));
+        assertThat(captor.getValue().getFirst("count")).isEqualTo("200");
+    }
+
+    // latest에서 offset일 전부터 거슬러 n개 날짜 (최신순)
+    private static String[] days(LocalDate latest, int offset, int n) {
+        return java.util.stream.IntStream.range(offset, offset + n).mapToObj(i -> latest.minusDays(i).toString()).toArray(String[]::new);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
     @DisplayName("다른 캔들 조회는 adjusted를 보내지 않는다")
     void other_queries_do_not_send_adjusted() {
         when(tossHttpClient.getCommon(any(), any(), any(ParameterizedTypeReference.class))).thenReturn(page());

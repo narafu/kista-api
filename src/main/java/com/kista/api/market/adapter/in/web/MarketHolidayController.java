@@ -60,12 +60,12 @@ public class MarketHolidayController {
     }
 
     @Operation(summary = "종목 일봉 캔들 조회 (계좌 무관 공용 시세)",
-            description = "from·to를 함께 주면 기간(양끝 포함, 최대 5년) 조회 — 200개 한도 없음. 없으면 최신 count개(최대 200)")
+            description = "from·to를 함께 주면 기간(양끝 포함, 최대 5년) 조회 — 200개 한도 없음. 없으면 최신 count개(최대 600)")
     @ApiResponse(responseCode = "200", description = "조회 성공")
     @GetMapping("/candles")
     public List<TossCandleResponse> getCandles(
             @Parameter(description = "종목코드", example = "QQQ") @RequestParam String ticker,
-            @Parameter(description = "캔들 개수 (최대 200, from/to 지정 시 무시)", example = "200") @RequestParam(defaultValue = "200") int count,
+            @Parameter(description = "캔들 개수 (최대 600, 초과 시 600으로 잘림, from/to 지정 시 무시)", example = "200") @RequestParam(defaultValue = "200") int count,
             @Parameter(description = "시작일 (to와 함께 지정)", example = "2025-01-01") @RequestParam(required = false) LocalDate from,
             @Parameter(description = "종료일 (from과 함께 지정)", example = "2026-10-14") @RequestParam(required = false) LocalDate to) {
         if ((from == null) != (to == null)) throw new IllegalArgumentException("from과 to는 함께 지정해야 합니다.");

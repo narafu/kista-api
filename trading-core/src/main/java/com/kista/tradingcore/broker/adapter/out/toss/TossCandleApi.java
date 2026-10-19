@@ -32,6 +32,8 @@ class TossCandleApi {
     private static final String CANDLES_PATH = "/api/v1/candles";
     // 일봉 기준 최대 요청 수 (주말 포함 여유분)
     private static final int MAX_COUNT = 200;
+    // 최신 일봉 조회 최대 개수 (페이징 3회)
+    private static final int MAX_LATEST_DAILY_COUNT = 600;
 
     private final TossHttpClient tossHttpClient;
 
@@ -57,23 +59,29 @@ class TossCandleApi {
         return List.copyOf(all);
     }
 
+    // 일봉은 최대 600봉(MA200을 400봉 전체에 잇는 차트용)까지 페이징 — before가 날짜 단위라 분봉은 1페이지(200)만
     public List<TossCandle> getLatestCandles(String symbol, String interval, int count) {
-        int clamped = Math.clamp(count, 1, MAX_COUNT);
-        // before 미지정 시 Toss가 최신 봉부터 반환 — 별도 계산 불필요
-        return fetchCandles(symbol, interval, clamped, null, false);
+        if (!"1d".equals(interval)) return fetchCandles(symbol, interval, Math.clamp(count, 1, MAX_COUNT), null, false);
+        // before 미지정 첫 페이지는 Toss가 최신 봉부터 반환
+        return pageDailyBefore(symbol, null, Math.clamp(count, 1, MAX_LATEST_DAILY_COUNT), false);
     }
 
     // 200봉 단위 페이징 — 다음 페이지 before = 직전 페이지 가장 오래된 봉일 00:00 UTC (isBefore 필터가 엄격해 중복 없음).
     // 봉 date()는 US 세션일, adjusted=true(분할·배당 조정 — DCA 지표용, 이 메서드만)
     public List<TossCandle> getDailyCandlesBefore(String symbol, LocalDate beforeUsSession, int count) {
+        return pageDailyBefore(symbol, beforeUsSession, count, true);
+    }
+
+    // 일봉 200봉 단위 페이징 — before가 null이면 최신 봉부터. 오름차순 마지막 count개
+    private List<TossCandle> pageDailyBefore(String symbol, LocalDate firstBefore, int count, boolean adjusted) {
         List<TossCandle> all = new ArrayList<>(); // 오름차순 유지 — 더 오래된 페이지는 앞에 붙인다
-        LocalDate before = beforeUsSession;
+        LocalDate before = firstBefore;
         int maxPages = count / MAX_COUNT + 2; // 첫 페이지 진행 중 봉 필터 여유
         for (int page = 0; page < maxPages && all.size() < count; page++) {
             LocalDate pageBefore = before;
             List<TossCandle> fetched = fetchCandles(symbol, "1d", Math.clamp(count - all.size(), 1, MAX_COUNT),
-                    pageBefore.atStartOfDay(ZoneOffset.UTC).toString(), true).stream()
-                    .filter(c -> c.date().isBefore(pageBefore))
+                    pageBefore == null ? null : pageBefore.atStartOfDay(ZoneOffset.UTC).toString(), adjusted).stream()
+                    .filter(c -> pageBefore == null || c.date().isBefore(pageBefore))
                     .toList();
             if (fetched.isEmpty()) break;
             all.addAll(0, fetched);
