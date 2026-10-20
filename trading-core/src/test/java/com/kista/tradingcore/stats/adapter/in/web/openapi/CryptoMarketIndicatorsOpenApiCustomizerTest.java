@@ -25,6 +25,9 @@ class CryptoMarketIndicatorsOpenApiCustomizerTest {
     void 실패시_null_섹션은_ref와_null_oneOf로_생성한다() {
         assertNullableReference(property("CryptoMarketIndicatorsResponse", "usdtPremium"), "CryptoMarketIndicatorsPremium");
         assertNullableReference(property("CryptoMarketIndicatorsResponse", "halving"), "CryptoMarketIndicatorsHalving");
+        assertNullableReference(property("CryptoMarketIndicatorsResponse", "btcDominance"), "CryptoMarketIndicatorsDailyIndicator");
+        assertNullableReference(property("CryptoMarketIndicatorsResponse", "altcoinSeason"), "CryptoMarketIndicatorsDailyIndicator");
+        assertNullableReference(property("CryptoMarketIndicatorsResponse", "hashRibbons"), "CryptoMarketIndicatorsHashRibbons");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "kimchiPremium"), "CryptoMarketIndicatorsKimchiPremium");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "fundingRate"), "CryptoMarketIndicatorsFundingRate");
         assertNullableReference(property("CryptoMarketIndicatorsTicker", "openInterest"), "CryptoMarketIndicatorsOpenInterest");
@@ -40,6 +43,9 @@ class CryptoMarketIndicatorsOpenApiCustomizerTest {
         assertThat(property("CryptoMarketIndicatorsDatedValuation", "wma200").getTypes()).contains("null");
         assertThat(property("CryptoMarketIndicatorsDatedValuation", "wma200Multiple").getTypes()).contains("null");
         assertThat(property("CryptoMarketIndicatorsDatedValuation", "mayerMultiple").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedHashRibbon", "sma30").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedHashRibbon", "sma60").getTypes()).contains("null");
+        assertThat(property("CryptoMarketIndicatorsDatedHashRibbon", "state").getTypes()).contains("null");
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
+import com.kista.tradingcore.stats.domain.model.DatedHashRibbon;
 import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
 import com.kista.tradingcore.stats.domain.model.DatedValuation;
@@ -22,14 +23,24 @@ public record CryptoMarketIndicatorsResponse(
         @Schema(description = "조립 시각", requiredMode = REQUIRED) Instant asOf,
         @Schema(description = "테더 프리미엄 (실패 시 null)", nullable = true, requiredMode = REQUIRED) PremiumResponse usdtPremium,
         @Schema(description = "종목별 지표", requiredMode = REQUIRED) List<TickerResponse> tickers,
-        @Schema(description = "BTC 반감기 카운트다운 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HalvingResponse halving
+        @Schema(description = "BTC 반감기 카운트다운 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HalvingResponse halving,
+        @Schema(description = "BTC 도미넌스 — BTC 시가총액 비중 (%) (CMC 키 없음·실패 시 null)", nullable = true, requiredMode = REQUIRED) DailyIndicatorResponse btcDominance,
+        @Schema(description = "알트코인 시즌 지수 0~100 (CMC — 상위 100 알트 중 90일간 BTC를 이긴 비율, 75↑ 알트 시즌·25↓ 비트코인 시즌). 이력은 비공식 API라 실패 시 빈 배열 (현재값 조회 실패 시 null)", nullable = true, requiredMode = REQUIRED) DailyIndicatorResponse altcoinSeason,
+        @Schema(description = "Hash Ribbons — 해시레이트(EH/s) 30·60일 이동평균, CAPITULATION: sma30 < sma60(채굴자 항복), buySignal: 항복→회복 전환일 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HashRibbonsResponse hashRibbons
 ) {
     public static CryptoMarketIndicatorsResponse from(CryptoMarketIndicators m) {
         return new CryptoMarketIndicatorsResponse(m.asOf(),
                 m.usdtPremium() == null ? null : new PremiumResponse(m.usdtPremium().current(), points(m.usdtPremium().history())),
                 m.tickers().stream().map(TickerResponse::from).toList(),
                 m.halving() == null ? null : new HalvingResponse(m.halving().currentHeight(), m.halving().nextHalvingHeight(),
-                        m.halving().blocksRemaining(), m.halving().estimatedAt()));
+                        m.halving().blocksRemaining(), m.halving().estimatedAt()),
+                daily(m.btcDominance()), daily(m.altcoinSeason()),
+                m.hashRibbons() == null ? null : new HashRibbonsResponse(DatedHashRibbonResponse.from(m.hashRibbons().current()),
+                        m.hashRibbons().history().stream().map(DatedHashRibbonResponse::from).toList()));
+    }
+
+    private static DailyIndicatorResponse daily(CryptoMarketIndicators.DailyIndicator d) {
+        return d == null ? null : new DailyIndicatorResponse(d.current(), points(d.history()));
     }
 
     private static List<DatedValueResponse> points(List<DatedValue> history) {
@@ -46,6 +57,32 @@ public record CryptoMarketIndicatorsResponse(
     public record CoinbasePremiumResponse(
             @Schema(description = "현재 코인베이스 프리미엄 (%) — (코인베이스 <코인>-USD ÷ (바이낸스 <코인>USDT × 코인베이스 USDT-USD) − 1) × 100", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
             @Schema(description = "일자별 추이 (UTC 일봉 종가, 진행 중 봉 제외)", requiredMode = REQUIRED) List<DatedValueResponse> history
+    ) {}
+
+    @Schema(name = "CryptoMarketIndicatorsDailyIndicator")
+    public record DailyIndicatorResponse(
+            @Schema(description = "현재 값", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal current,
+            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedValueResponse> history
+    ) {}
+
+    @Schema(name = "CryptoMarketIndicatorsDatedHashRibbon")
+    public record DatedHashRibbonResponse(
+            @Schema(description = "기준 일자", requiredMode = REQUIRED) LocalDate date,
+            @Schema(description = "일 평균 해시레이트 (EH/s)", requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal hashrateEh,
+            @Schema(description = "30일 이동평균 (이력 30일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal sma30,
+            @Schema(description = "60일 이동평균 (이력 60일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal sma60,
+            @Schema(description = "CAPITULATION: sma30 < sma60 (채굴자 항복), RECOVERY: 그 외 (sma60 없으면 null)", nullable = true, requiredMode = REQUIRED) DatedHashRibbon.State state,
+            @Schema(description = "매수 신호 — 전날 CAPITULATION → 당일 RECOVERY 전환일", requiredMode = REQUIRED) boolean buySignal
+    ) {
+        static DatedHashRibbonResponse from(DatedHashRibbon r) {
+            return new DatedHashRibbonResponse(r.date(), r.hashrateEh(), r.sma30(), r.sma60(), r.state(), r.buySignal());
+        }
+    }
+
+    @Schema(name = "CryptoMarketIndicatorsHashRibbons")
+    public record HashRibbonsResponse(
+            @Schema(description = "최신 점 (history 마지막과 같음)", requiredMode = REQUIRED) DatedHashRibbonResponse current,
+            @Schema(description = "일자별 추이", requiredMode = REQUIRED) List<DatedHashRibbonResponse> history
     ) {}
 
     @Schema(name = "CryptoMarketIndicatorsHalving")

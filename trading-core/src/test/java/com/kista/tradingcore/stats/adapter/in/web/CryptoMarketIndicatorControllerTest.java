@@ -4,6 +4,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators.*;
+import com.kista.tradingcore.stats.domain.model.DatedHashRibbon;
 import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
 import com.kista.tradingcore.stats.domain.model.DatedValuation;
@@ -77,6 +78,9 @@ class CryptoMarketIndicatorControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usdtPremium").value(nullValue()))
                 .andExpect(jsonPath("$.halving").value(nullValue()))
+                .andExpect(jsonPath("$.btcDominance").value(nullValue()))
+                .andExpect(jsonPath("$.altcoinSeason").value(nullValue()))
+                .andExpect(jsonPath("$.hashRibbons").value(nullValue()))
                 .andExpect(jsonPath("$.tickers[0].fundingRate").value(nullValue()))
                 .andExpect(jsonPath("$.tickers[0].valuation").value(nullValue()))
                 .andExpect(jsonPath("$.tickers[0].longShortRatio").value(nullValue()))
@@ -98,7 +102,11 @@ class CryptoMarketIndicatorControllerTest {
         when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
                 List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi, valuation, longShort,
                         new Premium(new BigDecimal("0.0342"), List.of(new DatedValue(d, new BigDecimal("-0.0125")))))),
-                new Halving(972_175L, 1_050_000L, 77_825L, Instant.parse("2028-04-01T00:00:00Z")), null, null, null));
+                new Halving(972_175L, 1_050_000L, 77_825L, Instant.parse("2028-04-01T00:00:00Z")),
+                new DailyIndicator(new BigDecimal("60.1"), List.of(new DatedValue(d, new BigDecimal("60.0")))),
+                new DailyIndicator(new BigDecimal("55"), List.of(new DatedValue(d, new BigDecimal("55")))),
+                HashRibbons.of(List.of(new DatedHashRibbon(d, new BigDecimal("1050.12"), new BigDecimal("1000"), new BigDecimal("1010"),
+                        DatedHashRibbon.State.CAPITULATION, false)))));
 
         mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
@@ -127,6 +135,11 @@ class CryptoMarketIndicatorControllerTest {
                 .andExpect(jsonPath("$.halving.currentHeight").value(972175))
                 .andExpect(jsonPath("$.halving.nextHalvingHeight").value(1050000))
                 .andExpect(jsonPath("$.halving.blocksRemaining").value(77825))
-                .andExpect(jsonPath("$.halving.estimatedAt").value("2028-04-01T00:00:00Z"));
+                .andExpect(jsonPath("$.halving.estimatedAt").value("2028-04-01T00:00:00Z"))
+                .andExpect(jsonPath("$.btcDominance.current").value(60.1))
+                .andExpect(jsonPath("$.altcoinSeason.history[0].value").value(55))
+                .andExpect(jsonPath("$.hashRibbons.current.state").value("CAPITULATION"))
+                .andExpect(jsonPath("$.hashRibbons.current.buySignal").value(false))
+                .andExpect(jsonPath("$.hashRibbons.current.hashrateEh").value(1050.12));
     }
 }
