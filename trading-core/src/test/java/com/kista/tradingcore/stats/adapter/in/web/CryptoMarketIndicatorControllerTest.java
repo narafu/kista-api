@@ -45,7 +45,7 @@ class CryptoMarketIndicatorControllerTest {
     private static CryptoMarketIndicators sample(FundingRate funding) {
         var oi = new OpenInterest(List.of(new DatedValue(LocalDate.of(2026, 10, 18), new BigDecimal("1234567890"))));
         return new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), null,
-                List.of(new TickerIndicators(StrategyTicker.BTC, null, funding, oi, null, null, null)), null);
+                List.of(new TickerIndicators(StrategyTicker.BTC, null, funding, oi, null, null, null)), null, null, null, null);
     }
 
     @Test
@@ -98,7 +98,7 @@ class CryptoMarketIndicatorControllerTest {
         when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), premium,
                 List.of(new TickerIndicators(StrategyTicker.BTC, kimchi, funding, oi, valuation, longShort,
                         new Premium(new BigDecimal("0.0342"), List.of(new DatedValue(d, new BigDecimal("-0.0125")))))),
-                new Halving(972_175L, 1_050_000L, 77_825L, Instant.parse("2028-04-01T00:00:00Z"))));
+                new Halving(972_175L, 1_050_000L, 77_825L, Instant.parse("2028-04-01T00:00:00Z")), null, null, null));
 
         mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())

@@ -9,10 +9,13 @@ import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
 import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort;
+import com.kista.tradingcore.stats.application.port.output.CryptoMarketMetricsPort;
+import com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoMarketIndicators;
 import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
+import com.kista.tradingcore.stats.domain.model.DatedHashRibbon;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import com.kista.tradingcore.stats.domain.model.FundingRateQuote;
 import com.kista.tradingcore.stats.domain.model.FundingRateRecord;
@@ -37,6 +40,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -53,6 +57,8 @@ class CryptoMarketIndicatorServiceTest {
     BlockHeightPort blockHeight = mock(BlockHeightPort.class);
     CoinbaseMarketDataPort coinbase = mock(CoinbaseMarketDataPort.class);
     BrokerStatisticsUseCase brokerStats = mock(BrokerStatisticsUseCase.class);
+    CryptoMarketMetricsPort cmc = mock(CryptoMarketMetricsPort.class);
+    HashrateHistoryPort hashrates = mock(HashrateHistoryPort.class);
     CryptoMarketIndicatorService service;
     Instant[] now = {NOW}; // 테스트용 가변 시각
 
@@ -67,7 +73,7 @@ class CryptoMarketIndicatorServiceTest {
         CryptoExchanges exchanges = mock(CryptoExchanges.class); // 생성자가 package-private라 mock으로 대체
         when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
         service = new CryptoMarketIndicatorService(exchanges, binance, fx, blockHeight, coinbase, brokerStats,
-                movableClock);
+                cmc, hashrates, movableClock);
         stubAllOk();
     }
 
@@ -107,6 +113,11 @@ class CryptoMarketIndicatorServiceTest {
         when(coinbase.getUsdPrice("ETH")).thenReturn(new BigDecimal("99900"));
         when(coinbase.getUsdDailyClosesSince(eq("BTC"), any())).thenReturn(closes(450, "99900"));
         when(coinbase.getUsdDailyClosesSince(eq("ETH"), any())).thenReturn(closes(450, "99900"));
+        when(cmc.btcDominance()).thenReturn(new BigDecimal("60.1"));
+        when(cmc.btcDominanceDaily(anyInt())).thenReturn(closes(400, "59"));
+        when(cmc.altcoinSeasonIndex()).thenReturn(new BigDecimal("57"));
+        when(cmc.altcoinSeasonDaily(any(), any())).thenReturn(closes(400, "57"));
+        when(hashrates.dailyHashratesEh()).thenReturn(closes(730, "1000"));
     }
 
     // 전 섹션 실패 stub
@@ -119,6 +130,11 @@ class CryptoMarketIndicatorServiceTest {
         when(binance.getLongShortAccountRatioHistory(any())).thenThrow(new RuntimeException("down"));
         when(blockHeight.currentBtcHeight()).thenThrow(new RuntimeException("mempool down"));
         when(coinbase.getUsdPrice(any())).thenThrow(new RuntimeException("coinbase down"));
+        when(cmc.btcDominance()).thenThrow(new RuntimeException("cmc down"));
+        when(cmc.btcDominanceDaily(anyInt())).thenThrow(new RuntimeException("cmc down"));
+        when(cmc.altcoinSeasonIndex()).thenThrow(new RuntimeException("cmc down"));
+        when(cmc.altcoinSeasonDaily(any(), any())).thenThrow(new RuntimeException("cmc down"));
+        when(hashrates.dailyHashratesEh()).thenThrow(new RuntimeException("hashrate down"));
     }
 
     @Test
@@ -182,9 +198,107 @@ class CryptoMarketIndicatorServiceTest {
     void 코인베이스_프리미엄만_살아있어도_빈_결과가_아니다() {
         var onlyCoinbase = new CryptoMarketIndicators(NOW, null, List.of(new CryptoMarketIndicators.TickerIndicators(
                 StrategyTicker.BTC, null, null, null, null, null,
-                new CryptoMarketIndicators.Premium(BigDecimal.ZERO, List.of()))), null);
+                new CryptoMarketIndicators.Premium(BigDecimal.ZERO, List.of()))), null, null, null, null);
 
         assertThat(onlyCoinbase.isEmpty()).isFalse();
+    }
+
+    @Test
+    void 시장_전체_지표_세_섹션을_채운다() {
+        CryptoMarketIndicators r = service.get(365);
+
+        assertThat(r.btcDominance().current()).isEqualByComparingTo("60.1");
+        assertThat(r.btcDominance().history()).hasSize(365);
+        assertThat(r.btcDominance().history().getLast().date()).isEqualTo(TODAY.minusDays(1)); // 오늘 점 제외
+        assertThat(r.altcoinSeason().current()).isEqualByComparingTo("57");
+        assertThat(r.altcoinSeason().history()).hasSize(365);
+        assertThat(r.altcoinSeason().history().getLast().date()).isEqualTo(TODAY.minusDays(1));
+        assertThat(r.hashRibbons().current().date()).isEqualTo(TODAY.minusDays(1));
+        assertThat(r.hashRibbons().current().state()).isEqualTo(DatedHashRibbon.State.RECOVERY);
+        assertThat(r.hashRibbons().history()).hasSize(365);
+        assertThat(r.hashRibbons().history().getFirst().sma60()).isNotNull();
+        verify(cmc).btcDominanceDaily(CryptoMarketIndicatorService.MAX_DAYS + 1); // 오늘 점이 섞여도 365개 남게
+    }
+
+    @Test
+    void days를_적용한다() {
+        CryptoMarketIndicators r = service.get(30);
+
+        assertThat(r.btcDominance().history()).hasSize(30);
+        assertThat(r.altcoinSeason().history()).hasSize(30);
+        assertThat(r.hashRibbons().history()).hasSize(30);
+    }
+
+    @Test
+    void CMC_latest_실패면_도미넌스_알트시즌만_null() {
+        when(cmc.btcDominance()).thenThrow(new RuntimeException("cmc down"));
+        when(cmc.altcoinSeasonIndex()).thenThrow(new RuntimeException("cmc down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.btcDominance()).isNull();
+        assertThat(r.altcoinSeason()).isNull();
+        assertThat(r.hashRibbons()).isNotNull();
+        assertThat(r.halving()).isNotNull();
+        assertThat(r.tickers().getFirst().fundingRate()).isNotNull();
+        verify(cmc, never()).altcoinSeasonDaily(any(), any());
+    }
+
+    @Test
+    void 알트_이력_실패면_현재값만_유지() {
+        when(cmc.altcoinSeasonDaily(any(), any())).thenThrow(new RuntimeException("cmc down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.altcoinSeason().current()).isEqualByComparingTo("57");
+        assertThat(r.altcoinSeason().history()).isEmpty();
+    }
+
+    @Test
+    void 해시레이트_실패면_hashRibbons만_null() {
+        when(hashrates.dailyHashratesEh()).thenThrow(new RuntimeException("hashrate down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.hashRibbons()).isNull();
+        assertThat(r.btcDominance()).isNotNull();
+        assertThat(r.altcoinSeason()).isNotNull();
+    }
+
+    @Test
+    void 이력은_UTC_자정까지_캐시하고_실패는_캐시하지_않는다() {
+        service.get(200);
+        now[0] = NOW.plus(CryptoMarketIndicatorService.TTL).plusSeconds(60);
+        service.get(200);
+
+        verify(cmc, times(1)).btcDominanceDaily(anyInt());
+        verify(cmc, times(1)).altcoinSeasonDaily(any(), any());
+        verify(hashrates, times(1)).dailyHashratesEh();
+        verify(cmc, times(2)).btcDominance(); // 현재값은 메인 TTL 따라 재조회
+    }
+
+    @Test
+    void 해시레이트_이력_실패는_캐시하지_않아_다음_조립에서_재호출한다() {
+        when(hashrates.dailyHashratesEh()).thenThrow(new RuntimeException("hashrate down"));
+        service.get(200);
+        now[0] = NOW.plus(CryptoMarketIndicatorService.TTL).plusSeconds(60);
+        service.get(200);
+
+        verify(hashrates, times(2)).dailyHashratesEh();
+    }
+
+    @Test
+    void 세_섹션만_살아있어도_빈_결과가_아니다() {
+        stubAllFail();
+        reset(hashrates);
+        when(hashrates.dailyHashratesEh()).thenReturn(closes(730, "1000"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.isEmpty()).isFalse();
+        assertThat(r.hashRibbons()).isNotNull();
+        service.get(200);
+        verify(hashrates, times(1)).dailyHashratesEh(); // 정상 키로 캐시돼 재조회 없음
     }
 
     @Test
@@ -355,7 +469,7 @@ class CryptoMarketIndicatorServiceTest {
         stubAllFail();
         assertThat(service.get(200).isEmpty()).isTrue();
 
-        reset(upbit, brokerStats, binance, blockHeight, coinbase); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
+        reset(upbit, brokerStats, binance, blockHeight, coinbase, cmc, hashrates); // throw 스텁 위에 when()을 다시 걸면 스텁 호출이 던지므로 초기화
         stubAllOk();
         now[0] = NOW.plus(CryptoMarketIndicatorService.EMPTY_TTL).plusSeconds(1);
         assertThat(service.get(200).isEmpty()).isFalse();

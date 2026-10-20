@@ -12,7 +12,10 @@ public record CryptoMarketIndicators(
         Instant asOf, // 조립 시각
         Premium usdtPremium, // 테더 프리미엄 (USDT 원화가 vs 공식 환율) — 실패 시 null
         List<TickerIndicators> tickers, // 종목별 지표
-        Halving halving // BTC 반감기 카운트다운 — 실패 시 null
+        Halving halving, // BTC 반감기 카운트다운 — 실패 시 null
+        DailyIndicator btcDominance, // BTC 도미넌스 (시장 전체) — 실패 시 null
+        DailyIndicator altcoinSeason, // 알트코인 시즌 지수 (시장 전체) — 실패 시 null
+        HashRibbons hashRibbons // BTC 해시 리본 (시장 전체) — 실패 시 null
 ) {
     // BTC 반감기 카운트다운 — 예상 시각은 블록당 10분 가정
     public record Halving(long currentHeight, long nextHalvingHeight, long blocksRemaining, Instant estimatedAt) {
@@ -28,6 +31,17 @@ public record CryptoMarketIndicators(
 
     // 단일 값 프리미엄 (테더 프리미엄·코인베이스 프리미엄 공용)
     public record Premium(BigDecimal current, List<DatedValue> history) {}
+
+    // 일 단위 시장 전체 지표 (BTC 도미넌스·알트코인 시즌 지수 공용) — current는 최신 값, history는 어제까지 일별
+    public record DailyIndicator(BigDecimal current, List<DatedValue> history) {}
+
+    // 해시 리본 — current는 history 마지막 점
+    public record HashRibbons(DatedHashRibbon current, List<DatedHashRibbon> history) {
+        public static HashRibbons of(List<DatedHashRibbon> history) {
+            if (history.isEmpty()) throw new IllegalStateException("해시 리본 이력이 없습니다");
+            return new HashRibbons(history.getLast(), history);
+        }
+    }
 
     // 김프 두 기준 (official은 환율 장애 시 null)
     public record PremiumPair(BigDecimal official, BigDecimal tether) {}
@@ -60,7 +74,7 @@ public record CryptoMarketIndicators(
                                    Valuation valuation, LongShortRatio longShortRatio,
                                    Premium coinbasePremium) {} // coinbasePremium: 테더 보정 코인베이스 프리미엄 (미국 현물 수요)
 
-    // 김프·펀딩·밸류에이션·테더/코인베이스 프리미엄 history를 마지막 days개로 자른다 (OI·롱숏은 30일 고정이라 유지)
+    // 김프·펀딩·밸류에이션·테더/코인베이스 프리미엄·도미넌스·알트 시즌·해시 리본 history를 마지막 days개로 자른다 (OI·롱숏은 30일 고정이라 유지)
     public CryptoMarketIndicators withDays(int days) {
         return new CryptoMarketIndicators(asOf,
                 usdtPremium == null ? null : new Premium(usdtPremium.current(), tail(usdtPremium.history(), days)),
@@ -74,12 +88,16 @@ public record CryptoMarketIndicators(
                         t.longShortRatio(),
                         t.coinbasePremium() == null ? null
                                 : new Premium(t.coinbasePremium().current(), tail(t.coinbasePremium().history(), days)))).toList(),
-                halving);
+                halving,
+                btcDominance == null ? null : new DailyIndicator(btcDominance.current(), tail(btcDominance.history(), days)),
+                altcoinSeason == null ? null : new DailyIndicator(altcoinSeason.current(), tail(altcoinSeason.history(), days)),
+                hashRibbons == null ? null : new HashRibbons(hashRibbons.current(), tail(hashRibbons.history(), days)));
     }
 
-    // usdtPremium·halving과 모든 종목 섹션이 null이면 빈 결과 (캐시 제외 판정용)
+    // usdtPremium·halving·시장 전체 3섹션과 모든 종목 섹션이 null이면 빈 결과 (캐시 제외 판정용)
     public boolean isEmpty() {
-        return usdtPremium == null && halving == null && tickers.stream().allMatch(t ->
+        return usdtPremium == null && halving == null
+                && btcDominance == null && altcoinSeason == null && hashRibbons == null && tickers.stream().allMatch(t ->
                 t.kimchiPremium() == null && t.fundingRate() == null && t.openInterest() == null
                         && t.valuation() == null && t.longShortRatio() == null && t.coinbasePremium() == null);
     }
