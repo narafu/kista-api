@@ -4,7 +4,6 @@ import com.kista.api.market.application.event.FearGreedFetchFailedEvent;
 import com.kista.api.market.domain.model.FearGreedRating;
 import com.kista.api.market.domain.model.FearGreedSnapshot;
 import com.kista.api.market.application.port.output.CnnFearGreedPort;
-import com.kista.api.market.application.port.output.CryptoFearGreedPort;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +16,6 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,12 +24,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// FearGreedService 순수 Mockito 단위 테스트 — CRYPTO/CNN 독립 실패 격리 검증
+// FearGreedService 순수 Mockito 단위 테스트 — CNN 수집·저장과 실패 이벤트 검증
 @Execution(ExecutionMode.SAME_THREAD)
 class FearGreedServiceTest {
-
-    @Mock
-    private CryptoFearGreedPort cryptoFearGreedPort;
 
     @Mock
     private CnnFearGreedPort cnnFearGreedPort;
@@ -47,82 +42,43 @@ class FearGreedServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        fearGreedService = new FearGreedService(cryptoFearGreedPort, cnnFearGreedPort, fearGreedSnapshotPort, eventPublisher);
+        fearGreedService = new FearGreedService(cnnFearGreedPort, fearGreedSnapshotPort, eventPublisher);
     }
 
     @Test
-    @DisplayName("CRYPTO·CNN 모두 fetch 성공 시 각각 스냅샷 저장")
-    void fetchAndSave_bothSucceed_savesBothSnapshots() {
-        // given: CRYPTO·CNN 모두 정상 fetch
+    @DisplayName("CNN fetch 성공 시 CNN 스냅샷만 저장")
+    void fetchAndSave_cnnSucceeds_savesCnnSnapshot() {
+        // given: CNN 정상 fetch
         Instant snapshotDate = Instant.parse("2026-07-16T00:00:00Z");
-        when(cryptoFearGreedPort.fetch())
-                .thenReturn(new CryptoFearGreedPort.CryptoFearGreedData(30, FearGreedRating.FEAR));
         when(cnnFearGreedPort.fetch())
                 .thenReturn(new CnnFearGreedPort.CnnFearGreedData(70, FearGreedRating.GREED));
 
         // when
         fearGreedService.fetchAndSave(snapshotDate);
 
-        // then: 2건 저장, source 필드가 각각 CRYPTO/CNN인지 검증
-        ArgumentCaptor<FearGreedSnapshot> captor = ArgumentCaptor.forClass(FearGreedSnapshot.class);
-        verify(fearGreedSnapshotPort, times(2)).save(captor.capture());
-        List<FearGreedSnapshot> saved = captor.getAllValues();
-
-        assertThat(saved).hasSize(2);
-        assertThat(saved.getFirst().source()).isEqualTo("CRYPTO");
-        assertThat(saved.getFirst().value()).isEqualTo(30);
-        assertThat(saved.getFirst().rating()).isEqualTo(FearGreedRating.FEAR);
-        assertThat(saved.get(1).source()).isEqualTo("CNN");
-        assertThat(saved.get(1).value()).isEqualTo(70);
-        assertThat(saved.get(1).rating()).isEqualTo(FearGreedRating.GREED);
-        verify(eventPublisher, never()).publishEvent(any(Object.class));
-    }
-
-    @Test
-    @DisplayName("CRYPTO fetch 실패 시 이벤트 발행 + CNN은 정상 저장 (실패 격리)")
-    void fetchAndSave_cryptoFails_notifiesErrorAndStillSavesCnn() {
-        // given: CRYPTO fetch가 예외 발생, CNN은 정상
-        Instant snapshotDate = Instant.parse("2026-07-16T00:00:00Z");
-        RuntimeException cryptoFailure = new RuntimeException("crypto api down");
-        when(cryptoFearGreedPort.fetch()).thenThrow(cryptoFailure);
-        when(cnnFearGreedPort.fetch())
-                .thenReturn(new CnnFearGreedPort.CnnFearGreedData(50, FearGreedRating.NEUTRAL));
-
-        // when
-        fearGreedService.fetchAndSave(snapshotDate);
-
-        // then: CRYPTO 실패는 이벤트 발행으로 격리되고 CNN 저장까지 도달
-        verify(eventPublisher, times(1)).publishEvent(new FearGreedFetchFailedEvent(cryptoFailure.getMessage()));
-
+        // then: CNN 1건 저장, 실패 이벤트 없음
         ArgumentCaptor<FearGreedSnapshot> captor = ArgumentCaptor.forClass(FearGreedSnapshot.class);
         verify(fearGreedSnapshotPort, times(1)).save(captor.capture());
         FearGreedSnapshot saved = captor.getValue();
         assertThat(saved.source()).isEqualTo("CNN");
-        assertThat(saved.value()).isEqualTo(50);
-        assertThat(saved.rating()).isEqualTo(FearGreedRating.NEUTRAL);
+        assertThat(saved.snapshotDate()).isEqualTo(snapshotDate);
+        assertThat(saved.value()).isEqualTo(70);
+        assertThat(saved.rating()).isEqualTo(FearGreedRating.GREED);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
-    @DisplayName("CNN fetch 실패 시 이벤트 발행 + CRYPTO는 정상 저장 (대칭 케이스)")
-    void fetchAndSave_cnnFails_notifiesErrorAndStillSavesCrypto() {
-        // given: CNN fetch가 예외 발생, CRYPTO는 정상
-        Instant snapshotDate = Instant.parse("2026-07-16T00:00:00Z");
-        when(cryptoFearGreedPort.fetch())
-                .thenReturn(new CryptoFearGreedPort.CryptoFearGreedData(80, FearGreedRating.EXTREME_GREED));
+    @DisplayName("CNN fetch 실패 시 저장 없이 실패 이벤트 발행")
+    void fetchAndSave_cnnFails_publishesFailedEvent() {
+        // given: CNN fetch가 예외 발생
         RuntimeException cnnFailure = new RuntimeException("cnn api down");
         when(cnnFearGreedPort.fetch()).thenThrow(cnnFailure);
 
         // when
-        fearGreedService.fetchAndSave(snapshotDate);
+        fearGreedService.fetchAndSave(Instant.parse("2026-07-16T00:00:00Z"));
 
-        // then: CNN 실패는 이벤트 발행으로 격리되고 CRYPTO 저장은 그대로 유지
+        // then: 예외는 이벤트로 격리, 저장 없음
         verify(eventPublisher, times(1)).publishEvent(new FearGreedFetchFailedEvent(cnnFailure.getMessage()));
-
-        ArgumentCaptor<FearGreedSnapshot> captor = ArgumentCaptor.forClass(FearGreedSnapshot.class);
-        verify(fearGreedSnapshotPort, times(1)).save(captor.capture());
-        FearGreedSnapshot saved = captor.getValue();
-        assertThat(saved.source()).isEqualTo("CRYPTO");
-        assertThat(saved.value()).isEqualTo(80);
-        assertThat(saved.rating()).isEqualTo(FearGreedRating.EXTREME_GREED);
+        verify(fearGreedSnapshotPort, never()).save(any());
     }
 }

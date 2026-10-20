@@ -67,6 +67,20 @@ class FearGreedControllerTest {
     }
 
     @Test
+    void getFearGreed_empty_crypto_keeps_cnn_and_nulls_crypto_current() throws Exception {
+        // CRYPTO 외부 조회 실패 시 서비스가 빈 이력을 돌려준다 — CNN은 정상, crypto.current=null
+        when(getFearGreedUseCase.getRecent(eq("CNN"), anyInt())).thenReturn(List.of(
+                new FearGreedSnapshot(null, "CNN", Instant.parse("2026-06-22T00:00:00Z"), 72, FearGreedRating.GREED, null)));
+        when(getFearGreedUseCase.getRecent(eq("CRYPTO"), anyInt())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cnn.current.value").value(72))
+                .andExpect(jsonPath("$.crypto.current").doesNotExist())
+                .andExpect(jsonPath("$.crypto.history.length()").value(0));
+    }
+
+    @Test
     void getFearGreed_anonymous_returns_200() throws Exception {
         // GET /api/market/**은 SecurityConfig에서 permitAll() — 비인증 대시보드 공개 엔드포인트
         mockMvc.perform(get("/api/market/fear-greed").param("days", "90"))

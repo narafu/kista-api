@@ -7,7 +7,7 @@ import java.util.UUID;
 public record FearGreedSnapshot(
         UUID id,
         String source,         // "CRYPTO" | "CNN"
-        Instant snapshotDate,  // 수집 시각
+        Instant snapshotDate,  // 수집 시각 (CRYPTO는 지수 기준일 UTC 00:00)
         int value,             // 0-100
         FearGreedRating rating,
         Instant createdAt
