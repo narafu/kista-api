@@ -36,21 +36,26 @@ public final class CryptoHashRibbons {
         List<DatedHashRibbon> all = new ArrayList<>();
         DatedHashRibbon.State prev = null;
         for (int i = 0; i < values.size(); i++) {
-            BigDecimal sma30 = average(prefix, i, FAST_DAYS);
-            BigDecimal sma60 = average(prefix, i, SLOW_DAYS);
-            DatedHashRibbon.State state = sma60 == null ? null
-                    : sma30.compareTo(sma60) < 0 ? DatedHashRibbon.State.CAPITULATION : DatedHashRibbon.State.RECOVERY;
+            BigDecimal raw30 = average(prefix, i, FAST_DAYS);
+            BigDecimal raw60 = average(prefix, i, SLOW_DAYS);
+            // 상태는 반올림 전 평균으로 판정 — 반환값만 scale 2
+            DatedHashRibbon.State state = raw60 == null ? null
+                    : raw30.compareTo(raw60) < 0 ? DatedHashRibbon.State.CAPITULATION : DatedHashRibbon.State.RECOVERY;
             boolean buy = prev == DatedHashRibbon.State.CAPITULATION && state == DatedHashRibbon.State.RECOVERY;
-            all.add(new DatedHashRibbon(dates.get(i), values.get(i), sma30, sma60, state, buy));
+            all.add(new DatedHashRibbon(dates.get(i), values.get(i), round(raw30), round(raw60), state, buy));
             prev = state;
         }
         return all.subList(Math.max(0, all.size() - days), all.size());
     }
 
-    // values[i-window+1..i] 단순평균(scale 2) — 이력이 window보다 짧으면 null
+    private static BigDecimal round(BigDecimal v) {
+        return v == null ? null : v.setScale(SCALE, RoundingMode.HALF_UP);
+    }
+
+    // values[i-window+1..i] 단순평균(반올림 전) — 이력이 window보다 짧으면 null
     private static BigDecimal average(BigDecimal[] prefix, int i, int window) {
         if (i + 1 < window) return null;
         return prefix[i + 1].subtract(prefix[i + 1 - window])
-                .divide(BigDecimal.valueOf(window), MathContext.DECIMAL64).setScale(SCALE, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(window), MathContext.DECIMAL64);
     }
 }

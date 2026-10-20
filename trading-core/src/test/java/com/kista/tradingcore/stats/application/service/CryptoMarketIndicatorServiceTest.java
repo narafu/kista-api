@@ -218,6 +218,7 @@ class CryptoMarketIndicatorServiceTest {
         assertThat(r.hashRibbons().history()).hasSize(365);
         assertThat(r.hashRibbons().history().getFirst().sma60()).isNotNull();
         verify(cmc).btcDominanceDaily(CryptoMarketIndicatorService.MAX_DAYS + 1); // 오늘 점이 섞여도 365개 남게
+        verify(cmc).altcoinSeasonDaily(TODAY.minusDays(CryptoMarketIndicatorService.MAX_DAYS), TODAY);
     }
 
     @Test

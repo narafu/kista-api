@@ -89,6 +89,44 @@ class CoinMarketCapAdapterTest {
     }
 
     @Test
+    void 알트_시즌_차트_점이_깨져있으면_IllegalStateException() {
+        for (String point : new String[]{"{\"altcoinIndex\":null,\"timestamp\":\"1729468800\"}",
+                "{\"altcoinIndex\":\"abc\",\"timestamp\":\"1729468800\"}",
+                "{\"altcoinIndex\":\"34\",\"timestamp\":null}",
+                "{\"altcoinIndex\":\"34\",\"timestamp\":\"x\"}"}) {
+            server.reset();
+            server.expect(requestTo("https://api.coinmarketcap.com/data-api/v3/altcoin-season/chart?start=1729468800&end=1760227200"))
+                    .andRespond(withSuccess("{\"data\":{\"points\":[" + point + "]}}", MediaType.APPLICATION_JSON));
+
+            assertThatThrownBy(() -> adapter.altcoinSeasonDaily(LocalDate.of(2024, 10, 21), LocalDate.of(2025, 10, 11)))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("CoinMarketCap");
+        }
+    }
+
+    @Test
+    void status는_정상이지만_data가_없으면_IllegalStateException() {
+        server.expect(requestTo(OFFICIAL + "/v1/global-metrics/quotes/latest"))
+                .andRespond(withSuccess("{\"status\":{\"error_code\":0}}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(adapter::btcDominance).isInstanceOf(IllegalStateException.class).hasMessageContaining("data");
+    }
+
+    @Test
+    void 도미넌스_이력은_같은_UTC_날짜면_마지막_점() {
+        server.expect(requestTo(OFFICIAL + "/v1/global-metrics/quotes/historical?interval=daily&count=2"))
+                .andRespond(withSuccess("""
+                        {"status":{"error_code":0},"data":{"quotes":[
+                          {"timestamp":"2026-10-15T00:00:00.000Z","btc_dominance":59.0},
+                          {"timestamp":"2026-10-15T23:59:00.000Z","btc_dominance":60.0}]}}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<DatedValue> result = adapter.btcDominanceDaily(2);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().value()).isEqualByComparingTo("60.0");
+    }
+
+    @Test
     void 키가_비면_HTTP_호출_없이_실패() {
         for (String key : new String[]{"", null}) {
             CoinMarketCapAdapter noKey = new CoinMarketCapAdapter(builder.build(), new CoinMarketCapProperties(key));

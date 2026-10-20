@@ -55,6 +55,17 @@ class CryptoHashRibbonsTest {
     }
 
     @Test
+    void 반올림_후_같아도_원본_평균이_sma30_미만이면_CAPITULATION() {
+        // sma30=100.000, sma60=100.004 → 둘 다 100.00으로 반올림되지만 sma30 < sma60
+        double[] v = concat(repeat(100.008, 30), repeat(100.000, 30));
+        DatedHashRibbon last = CryptoHashRibbons.history(series(START, v), TODAY, 100).getLast();
+
+        assertThat(last.sma30()).isEqualByComparingTo("100.00");
+        assertThat(last.sma60()).isEqualByComparingTo("100.00");
+        assertThat(last.state()).isEqualTo(DatedHashRibbon.State.CAPITULATION);
+    }
+
+    @Test
     void 하락하면_CAPITULATION_회복_교차일만_buySignal() {
         List<DatedHashRibbon> r = CryptoHashRibbons.history(
                 series(START, concat(repeat(100, 60), repeat(50, 20), repeat(200, 40))), TODAY, 200);

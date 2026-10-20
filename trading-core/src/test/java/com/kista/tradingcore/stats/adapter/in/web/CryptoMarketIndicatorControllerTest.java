@@ -88,6 +88,21 @@ class CryptoMarketIndicatorControllerTest {
     }
 
     @Test
+    void hashRibbons의_SMA와_state가_null이면_null로_직렬화() throws Exception {
+        var d = LocalDate.of(2026, 10, 18);
+        when(useCase.get(200)).thenReturn(new CryptoMarketIndicators(Instant.parse("2026-10-19T00:00:00Z"), null, List.of(),
+                null, null, null,
+                HashRibbons.of(List.of(new DatedHashRibbon(d, new BigDecimal("1050.12"), null, null, null, false)))));
+
+        mockMvc.perform(get("/api/crypto-market-indicators").with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hashRibbons.current.sma30").value(nullValue()))
+                .andExpect(jsonPath("$.hashRibbons.current.sma60").value(nullValue()))
+                .andExpect(jsonPath("$.hashRibbons.current.state").value(nullValue()))
+                .andExpect(jsonPath("$.hashRibbons.current.buySignal").value(false));
+    }
+
+    @Test
     void 모든_섹션이_채워지면_값이_매핑된다() throws Exception {
         var d = LocalDate.of(2026, 10, 18);
         var premium = new Premium(new BigDecimal("0.35"), List.of(new DatedValue(d, new BigDecimal("0.3"))));

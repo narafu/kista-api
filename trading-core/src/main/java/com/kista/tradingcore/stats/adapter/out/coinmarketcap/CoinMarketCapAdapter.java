@@ -65,8 +65,12 @@ class CoinMarketCapAdapter implements CryptoMarketMetricsPort {
         TreeMap<LocalDate, BigDecimal> byDate = new TreeMap<>();
         // points는 시간순 — 같은 날짜는 뒤 점이 덮어써 마지막 점이 남는다. 값이 문자열로 온다
         for (ChartPoint p : res.data().points()) {
-            byDate.put(Instant.ofEpochSecond(Long.parseLong(p.timestamp())).atZone(ZoneOffset.UTC).toLocalDate(),
-                    new BigDecimal(p.altcoinIndex()));
+            try {
+                byDate.put(Instant.ofEpochSecond(Long.parseLong(p.timestamp())).atZone(ZoneOffset.UTC).toLocalDate(),
+                        new BigDecimal(p.altcoinIndex()));
+            } catch (NumberFormatException | NullPointerException e) {
+                throw new IllegalStateException("CoinMarketCap 알트 시즌 차트 점 형식이 올바르지 않습니다", e);
+            }
         }
         return toList(byDate);
     }

@@ -47,6 +47,14 @@ class MempoolBlockHeightAdapterTest {
     }
 
     @Test
+    void 해시레이트는_같은_UTC_날짜면_마지막_점만_남긴다() {
+        server.expect(requestTo("https://mempool.space/api/v1/mining/hashrate/2y"))
+                .andRespond(withSuccess("{\"hashrates\":[{\"timestamp\":1761004800,\"avgHashrate\":1.0e21},{\"timestamp\":1761040000,\"avgHashrate\":2.0e21}]}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.dailyHashratesEh()).isEqualTo(List.of(new DatedValue(LocalDate.of(2025, 10, 21), new BigDecimal("2000.00"))));
+    }
+
+    @Test
     void 해시레이트_빈_응답이면_실패() {
         server.expect(requestTo("https://mempool.space/api/v1/mining/hashrate/2y"))
                 .andRespond(withSuccess("{\"hashrates\":[]}", MediaType.APPLICATION_JSON));
