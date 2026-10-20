@@ -267,6 +267,17 @@ class CryptoMarketIndicatorServiceTest {
     }
 
     @Test
+    void BTC_장기_일봉_실패면_hashRibbons만_null() {
+        when(binance.getSpotDailyClosesSince(org.mockito.ArgumentMatchers.eq(StrategyTicker.BTC), any())).thenThrow(new RuntimeException("klines down"));
+
+        CryptoMarketIndicators r = service.get(200);
+
+        assertThat(r.hashRibbons()).isNull();
+        assertThat(r.btcDominance()).isNotNull();
+        assertThat(r.altcoinSeason()).isNotNull();
+    }
+
+    @Test
     void 이력은_UTC_자정까지_캐시하고_실패는_캐시하지_않는다() {
         service.get(200);
         now[0] = NOW.plus(CryptoMarketIndicatorService.TTL).plusSeconds(60);
@@ -293,6 +304,7 @@ class CryptoMarketIndicatorServiceTest {
         stubAllFail();
         reset(hashrates);
         when(hashrates.dailyHashratesEh()).thenReturn(closes(730, "1000"));
+        org.mockito.Mockito.doReturn(closes(1500, "100000")).when(binance).getSpotDailyClosesSince(eq(StrategyTicker.BTC), any()); // Hash Ribbons 가격 모멘텀용
 
         CryptoMarketIndicators r = service.get(200);
 

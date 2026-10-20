@@ -163,9 +163,11 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         // 현재가는 전 종목 한 번에 조회 — 실패하면 김프 섹션만 null
         Map<StrategyTicker, BigDecimal> krwPrices = upbitOk ? guard("업비트 현재가", () -> upbit.getCurrentPrices(TICKERS)) : null;
         List<TickerIndicators> tickers = new ArrayList<>();
+        List<DatedValue> btcCloses = null; // Hash Ribbons 가격 모멘텀용 — 실패하면 섹션 null
         for (StrategyTicker t : TICKERS) {
             // 장기 일봉은 김프 추이·밸류에이션이 공유 — 실패하면 두 섹션 모두 null (조립당 종목별 1회 조회)
             List<DatedValue> closes = guard("장기 일봉 " + t, () -> dailyCloses(t, now));
+            if (t == StrategyTicker.BTC) btcCloses = closes;
             // 바이낸스 현물 현재가는 김프·코인베이스 프리미엄이 공유 — 실패하면 두 섹션 모두 null
             BigDecimal spot = guard("바이낸스 현재가 " + t, () -> binance.getSpotPrice(t));
             KimchiPremium kimchi = null;
@@ -214,8 +216,9 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
             }
             altcoinSeason = new DailyIndicator(altIndex, altHistory);
         }
-        HashRibbons hashRibbons = guard("Hash Ribbons", () -> HashRibbons.of(CryptoHashRibbons.history(
-                untilUtcMidnight(HASHRATES_CACHE_KEY, now, hashrates::dailyHashratesEh), today, MAX_DAYS)));
+        List<DatedValue> hashRibbonCloses = btcCloses;
+        HashRibbons hashRibbons = hashRibbonCloses == null ? null : guard("Hash Ribbons", () -> HashRibbons.of(CryptoHashRibbons.history(
+                untilUtcMidnight(HASHRATES_CACHE_KEY, now, hashrates::dailyHashratesEh), hashRibbonCloses, today, MAX_DAYS)));
         return new CryptoMarketIndicators(now, usdtPremium, List.copyOf(tickers), halving, btcDominance, altcoinSeason, hashRibbons);
     }
 

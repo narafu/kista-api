@@ -98,7 +98,7 @@
 - 계산:
   - 도미넌스 이력: `quotes[].timestamp`의 UTC 날짜 키, 값은 `btc_dominance` 그대로(%)
   - 알트 시즌 이력: `timestamp` UTC 날짜 키로 묶어 날짜별 마지막 점, 오늘(UTC) 점 제외(현재값은 latest가 담당), 정수 값
-  - Hash Ribbons: domain 순수 계산(`CryptoValuations` 류). 해시레이트는 어댑터가 EH/s(÷10¹⁸)로 변환해 넘기고, 각 일자까지의 30일·60일 단순이동평균(이력 부족 시 null), 상태 `CAPITULATION`(sma30 < sma60) / `RECOVERY`(그 외), `buySignal`은 전날 `CAPITULATION` → 당일 `RECOVERY`로 돌아선 날만 true(원본 Hash Ribbons의 가격 모멘텀 조건 — 10일 가격 SMA > 20일 — 은 빼고 해시레이트 교차만). 오늘(UTC) 점이 있으면 제외. 2y 전체로 SMA를 계산한 뒤 최근 `MAX_DAYS`(365)만 남긴다 → 365일 전 구간 SMA 값이 채워진다
+  - Hash Ribbons: domain 순수 계산(`CryptoValuations` 류). 해시레이트는 어댑터가 EH/s(÷10¹⁸)로 변환해 넘기고, 각 일자까지의 30일·60일 단순이동평균(이력 부족 시 null), 상태 `CAPITULATION`(sma30 < sma60) / `RECOVERY`(그 외), `buySignal`은 `CAPITULATION` → `RECOVERY` 전환 후 BTC 종가 10일 SMA > 20일 SMA(점 개수 기준, 20점 미만·당일 가격 없으면 false)가 처음 충족되는 날만 true — 전환일에 이미 충족이면 그날, 아니면 RECOVERY가 유지되는 동안 첫 충족일로 지연, 충족 전에 다시 `CAPITULATION`이면 취소(2026-10-20 사용자 결정: 원본 정의로 변경, 가격 조건 충족일까지 지연). 가격은 캐시된 Binance BTC 장기 일봉 재사용, 실패 시 섹션 null. 오늘(UTC) 점이 있으면 제외. 2y 전체로 SMA를 계산한 뒤 최근 `MAX_DAYS`(365)만 남긴다 → 365일 전 구간 SMA 값이 채워진다
 - 응답(최상위, 각 섹션 실패 시 null):
   - `btcDominance{current, history[{date, value}]}` — current는 latest(실시간)
   - `altcoinSeason{current, history[{date, value}]}` — 비공식 이력 실패 시 섹션을 null로 하지 않고 `history: []`로 current 유지(이 섹션만의 예외 — 공식/비공식 혼합의 목적), latest 실패 시 null
@@ -112,7 +112,7 @@
   - 이력 조회 길이는 `MAX_DAYS`(365) 고정 — CMC `count=365`, 비공식 `start = 오늘 − 365일`, 응답 `days`는 `withDays`로 자른다. 세 이력 모두 오늘(UTC) 점 제외(timestamp의 UTC 날짜 == 오늘이면 버림)
   - 이력 캐시 실패(예외)는 캐시하지 않는다(장기 일봉 패턴) — 다음 메인 조립(최소 10분, 전부 실패면 1분 뒤)에 재시도. 장애 중 최악 CMC 이력 4크레딧/10분은 한시적이라 감수
   - 키가 비면 어댑터가 HTTP 호출 없이 즉시 예외(크레딧 소모 없음), warn은 조립마다 남아도 무방. 비공식 알트 이력은 latest가 성공했을 때만 호출
-  - Hash Ribbons SMA가 null인 일자는 `state: null`, `buySignal: false`. 전날 state가 null이면 buySignal false
+  - Hash Ribbons SMA가 null인 일자는 `state: null`, `buySignal: false`. state가 null인 날은 전환으로 보지 않아 대기(pending)를 만들지 않는다(null→RECOVERY는 전환 아님)
   - `CryptoMarketIndicators`에 `halving`처럼 최상위 필드 3개 추가, 응답 필드명은 위 이름 그대로
 
 ## 내 판단으로 정한 것 (사용자 확인 전)

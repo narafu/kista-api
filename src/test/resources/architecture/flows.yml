@@ -803,7 +803,7 @@ flows:
         desc: >-
           코인 시장 지표 화면이 GET /api/crypto-market-indicators를 부르면 kista-trading이 Upbit 시세·Binance 현물/선물·Coinbase 현물(BTC·ETH·USDT-USD)·환율(Toss 현재, Frankfurter 과거)·mempool.space BTC 블록 높이·해시레이트, CoinMarketCap BTC 도미넌스·알트코인 시즌 지수를 모아
           종목별 김프·테더 김프·테더 보정 Coinbase 프리미엄(미국 현물 수요)·펀딩비·미결제약정·롱/숏 계좌 비율 추이, Binance 상장 이후 일봉으로 계산한 장기 밸류에이션(200주 이동평균·Mayer Multiple·ATH 대비 하락률 — 직전 완성 일봉 기준),
-          종목 무관 테더 프리미엄과 BTC 반감기 카운트다운(다음 210,000 배수 블록까지 남은 블록·블록당 10분 가정 예상 시각), BTC 도미넌스·알트 시즌 지수, 해시레이트 30·60일 이동평균 기반 Hash Ribbons(채굴자 항복·회복)를 계산해 돌려준다.
+          종목 무관 테더 프리미엄과 BTC 반감기 카운트다운(다음 210,000 배수 블록까지 남은 블록·블록당 10분 가정 예상 시각), BTC 도미넌스·알트 시즌 지수, 해시레이트 30·60일 이동평균 기반 Hash Ribbons(채굴자 항복·회복, 매수 신호는 회복 전환 후 BTC 10일>20일 SMA 가격 모멘텀 충족일)를 계산해 돌려준다.
         code: [CryptoMarketIndicatorController#getCryptoMarketIndicators, CryptoMarketIndicatorService#get]
         fail: 비인증 공개 엔드포인트(로그인 없이 호출 가능). 지표·종목별로 실패한 섹션만 null(200), 10분 캐시. 모든 섹션이 실패해도 200 + 전부 null(1분만 캐시 — 장애 중 외부 재호출 억제). 장기 일봉은 다음 UTC 자정까지 따로 캐시하고 김프 추이·밸류에이션이 공유한다 — 조회 실패·페이징 상한 초과 시 그 종목의 김프·밸류에이션·Coinbase 프리미엄이 함께 null. Coinbase 실패는 Coinbase 프리미엄만 null. CMC 키 없음·실패 시 도미넌스·알트 시즌 null, 비공식 알트 이력 실패 시 알트 시즌은 현재값만(history 빈 배열), 도미넌스·알트 시즌·해시레이트 이력 3종은 다음 UTC 자정까지 캐시.
 

@@ -26,7 +26,7 @@ public record CryptoMarketIndicatorsResponse(
         @Schema(description = "BTC 반감기 카운트다운 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HalvingResponse halving,
         @Schema(description = "BTC 도미넌스 — BTC 시가총액 비중 (%) (CMC 키 없음·실패 시 null)", nullable = true, requiredMode = REQUIRED) DailyIndicatorResponse btcDominance,
         @Schema(description = "알트코인 시즌 지수 0~100 (CMC — 상위 100 알트 중 90일간 BTC를 이긴 비율, 75↑ 알트 시즌·25↓ 비트코인 시즌). 이력은 비공식 API라 실패 시 빈 배열 (현재값 조회 실패 시 null)", nullable = true, requiredMode = REQUIRED) DailyIndicatorResponse altcoinSeason,
-        @Schema(description = "Hash Ribbons — 해시레이트(EH/s) 30·60일 이동평균, CAPITULATION: sma30 < sma60(채굴자 항복), buySignal: 항복→회복 전환일 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HashRibbonsResponse hashRibbons
+        @Schema(description = "Hash Ribbons — 해시레이트(EH/s) 30·60일 이동평균, CAPITULATION: sma30 < sma60(채굴자 항복), buySignal: 항복→회복 전환 후 BTC 10일 SMA > 20일 SMA가 되는 첫날 (실패 시 null)", nullable = true, requiredMode = REQUIRED) HashRibbonsResponse hashRibbons
 ) {
     public static CryptoMarketIndicatorsResponse from(CryptoMarketIndicators m) {
         return new CryptoMarketIndicatorsResponse(m.asOf(),
@@ -72,7 +72,7 @@ public record CryptoMarketIndicatorsResponse(
             @Schema(description = "30일 이동평균 (이력 30일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal sma30,
             @Schema(description = "60일 이동평균 (이력 60일 미만이면 null)", nullable = true, requiredMode = REQUIRED) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal sma60,
             @Schema(description = "CAPITULATION: sma30 < sma60 (채굴자 항복), RECOVERY: 그 외 (sma60 없으면 null)", nullable = true, requiredMode = REQUIRED) DatedHashRibbon.State state,
-            @Schema(description = "매수 신호 — 전날 CAPITULATION → 당일 RECOVERY 전환일", requiredMode = REQUIRED) boolean buySignal
+            @Schema(description = "매수 신호 — CAPITULATION → RECOVERY 전환 후 BTC 종가 10일 SMA > 20일 SMA가 처음 충족되는 날(전환일에 이미 충족이면 그날, 아니면 이후 RECOVERY 유지 중 첫 충족일, 다시 CAPITULATION이면 취소)", requiredMode = REQUIRED) boolean buySignal
     ) {
         static DatedHashRibbonResponse from(DatedHashRibbon r) {
             return new DatedHashRibbonResponse(r.date(), r.hashrateEh(), r.sma30(), r.sma60(), r.state(), r.buySignal());
