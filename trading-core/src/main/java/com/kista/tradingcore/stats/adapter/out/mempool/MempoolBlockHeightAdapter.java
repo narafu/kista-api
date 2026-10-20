@@ -1,12 +1,21 @@
 package com.kista.tradingcore.stats.adapter.out.mempool;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
+import com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort;
+import com.kista.tradingcore.stats.domain.model.DatedValue;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-// mempool.space 공개 API — 무인증, 최신 블록 높이를 text 숫자 하나로 응답
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+
+// mempool.space 공개 API — 무인증, 최신 블록 높이(text 숫자)와 해시레이트 이력
 @Component
-class MempoolBlockHeightAdapter implements BlockHeightPort {
+class MempoolBlockHeightAdapter implements BlockHeightPort, HashrateHistoryPort {
 
     private static final String BASE_URL = "https://mempool.space/api";
 
@@ -22,4 +31,21 @@ class MempoolBlockHeightAdapter implements BlockHeightPort {
         if (body == null || body.isBlank()) throw new IllegalStateException("mempool.space 블록 높이 응답이 비어있습니다");
         return Long.parseLong(body.trim());
     }
+
+    @Override
+    public List<DatedValue> dailyHashratesEh() {
+        HashrateResponse res = restClient.get().uri(BASE_URL + "/v1/mining/hashrate/2y").retrieve().body(HashrateResponse.class);
+        if (res == null || res.hashrates() == null || res.hashrates().isEmpty()) {
+            throw new IllegalStateException("mempool.space 해시레이트 응답이 비어있습니다");
+        }
+        // H/s → EH/s(10^18), 소수 2자리
+        return res.hashrates().stream()
+                .map(h -> new DatedValue(Instant.ofEpochSecond(h.timestamp()).atZone(ZoneOffset.UTC).toLocalDate(),
+                        BigDecimal.valueOf(h.avgHashrate()).movePointLeft(18).setScale(2, RoundingMode.HALF_UP)))
+                .toList();
+    }
+
+    record HashrateResponse(@JsonProperty("hashrates") List<HashratePoint> hashrates) {}
+
+    record HashratePoint(@JsonProperty("timestamp") long timestamp, @JsonProperty("avgHashrate") double avgHashrate) {}
 }

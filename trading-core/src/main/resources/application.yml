@@ -110,3 +110,6 @@ alpaca: # marketcalendar(휴장일)와 stats(백테스트 과거 일봉) 공용 
   api-key: ${ALPACA_API_KEY:}
   api-secret: ${ALPACA_API_SECRET:}
   data-base-url: https://data.alpaca.markets
+
+cmc:
+  api-key: ${CMC_API_KEY:} # CoinMarketCap Pro API(무료 Basic) — 비면 도미넌스·알트 시즌 섹션만 null

@@ -1,9 +1,14 @@
 package com.kista.tradingcore.stats.adapter.out.mempool;
 
+import com.kista.tradingcore.stats.domain.model.DatedValue;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,5 +36,21 @@ class MempoolBlockHeightAdapterTest {
                 .andRespond(withSuccess("", MediaType.TEXT_PLAIN));
 
         assertThatThrownBy(adapter::currentBtcHeight).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void 해시레이트는_EH_s로_변환() {
+        server.expect(requestTo("https://mempool.space/api/v1/mining/hashrate/2y"))
+                .andRespond(withSuccess("{\"hashrates\":[{\"timestamp\":1761004800,\"avgHashrate\":1.085536445332513e21}],\"currentHashrate\":1.0e21}", MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.dailyHashratesEh()).isEqualTo(List.of(new DatedValue(LocalDate.of(2025, 10, 21), new BigDecimal("1085.54"))));
+    }
+
+    @Test
+    void 해시레이트_빈_응답이면_실패() {
+        server.expect(requestTo("https://mempool.space/api/v1/mining/hashrate/2y"))
+                .andRespond(withSuccess("{\"hashrates\":[]}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(adapter::dailyHashratesEh).isInstanceOf(IllegalStateException.class);
     }
 }

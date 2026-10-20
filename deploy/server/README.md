@@ -90,6 +90,7 @@ KIS_ADMIN_APP_KEY=                # 선택 — 관리자 KIS 시세(Toss 관리�
 KIS_ADMIN_APP_SECRET=
 ALPACA_API_KEY=
 ALPACA_API_SECRET=
+CMC_API_KEY=                     # 선택 — CoinMarketCap Pro 무료 키, 비우면 코인 지표의 BTC 도미넌스·알트 시즌만 null
 FIREBASE_SERVICE_ACCOUNT_JSON=   # 반드시 단일 행 JSON
 
 GRAFANA_CLOUD_OTLP_ENABLED=true
