@@ -84,6 +84,37 @@
 - 실패 격리: Coinbase `USDT-USD` 실패 → 전 종목 이 섹션만 null, 종목 Coinbase 실패 → 그 종목 이 섹션만 null, Binance 장기 일봉·현재가 실패 → 그 종목 김프와 함께 null. warn 로그. 메인 10분 캐시 공유, 다른 지표 영향 없음
 - 쓰지 않는 것: Coinbase International(INTX) 무기한 선물 펀딩비·OI(`trading_state: PAUSED`, 2026-10-01에서 데이터 정지), 미국 CDE 선물(이력 엔드포인트 없음, Binance 대비 규모 작음)
 
+### 시장 전체 지표 추가 — BTC 도미넌스·알트코인 시즌·Hash Ribbons (2026-10-20)
+- 의도: 사이클 위치 판단 보조. 도미넌스·알트 시즌은 "자금이 BTC에 몰렸나 알트로 퍼졌나", Hash Ribbons는 채굴자 항복(바닥권) 신호. 셋 다 종목 무관이라 `halving`처럼 **최상위** 섹션(`tickers[]` 아님)
+- 소스 실측(2026-10-20, 로컬·`kista-server` 모두 HTTP 200):
+  - CMC 공식 Pro API(`pro-api.coinmarketcap.com`, 헤더 `X-CMC_PRO_API_KEY` 필수 — 없으면 `error_code 1002 "API key missing."`). Basic 무료 플랜: 월 15,000 크레딧·분당 50회
+    - `GET /v1/global-metrics/quotes/latest` → `data.btc_dominance`(%, 약 5분 갱신, 1크레딧)
+    - `GET /v1/global-metrics/quotes/historical?interval=daily&count=<n>` → `data.quotes[]{timestamp(UTC 00:00), btc_dominance}` — 무료 키로 365일 동작(4크레딧). 시간 오름차순
+    - `GET /v1/altcoin-season-index/latest` → `data.altcoin_index`(0~100 정수, 1크레딧)
+    - 공식 이력(`/v1/altcoin-season-index/historical`)은 `timeframe` 7d/30d/90d만 허용(`1y`·`180d` 등 "Invalid value", `time_start` 무시) → **쓰지 않는다**
+  - CMC 비공식 웹 API(무인증): `GET https://api.coinmarketcap.com/data-api/v3/altcoin-season/chart?start=<epoch초>&end=<epoch초>` → `data.points[]{altcoinIndex(문자열), altcoinMarketcap(문자열), timestamp(epoch초 문자열)}`, 일별 + 마지막 점은 실시간(오늘). 2024-03부터 제공
+  - mempool.space(무인증): `GET /api/v1/mining/hashrate/2y` → `hashrates[]{timestamp(UTC 00:00 epoch초), avgHashrate(H/s, double)}` 일별 약 730개(`1y`는 365개라 60일 SMA 워밍업 부족)
+- 알트 시즌 이력은 비공식 API 사용(사용자 결정 — 365일 이력 우선, 문서화되지 않은 API라 형식 변경·차단 위험 감수). 현재값은 공식 `latest`라 비공식이 깨져도 현재값은 유지된다
+- 계산:
+  - 도미넌스 이력: `quotes[].timestamp`의 UTC 날짜 키, 값은 `btc_dominance` 그대로(%)
+  - 알트 시즌 이력: `timestamp` UTC 날짜 키로 묶어 날짜별 마지막 점, 오늘(UTC) 점 제외(현재값은 latest가 담당), 정수 값
+  - Hash Ribbons: domain 순수 계산(`CryptoValuations` 류). 해시레이트는 어댑터가 EH/s(÷10¹⁸)로 변환해 넘기고, 각 일자까지의 30일·60일 단순이동평균(이력 부족 시 null), 상태 `CAPITULATION`(sma30 < sma60) / `RECOVERY`(그 외), `buySignal`은 전날 `CAPITULATION` → 당일 `RECOVERY`로 돌아선 날만 true(원본 Hash Ribbons의 가격 모멘텀 조건 — 10일 가격 SMA > 20일 — 은 빼고 해시레이트 교차만). 오늘(UTC) 점이 있으면 제외. 2y 전체로 SMA를 계산한 뒤 최근 `MAX_DAYS`(365)만 남긴다 → 365일 전 구간 SMA 값이 채워진다
+- 응답(최상위, 각 섹션 실패 시 null):
+  - `btcDominance{current, history[{date, value}]}` — current는 latest(실시간)
+  - `altcoinSeason{current, history[{date, value}]}` — 비공식 이력 실패 시 섹션을 null로 하지 않고 `history: []`로 current 유지(이 섹션만의 예외 — 공식/비공식 혼합의 목적), latest 실패 시 null
+  - `hashRibbons{current{date, hashrateEh, sma30, sma60, state, buySignal}, history[{...같은 필드}]}` — current는 history 마지막 점(직전 완성일 기준)
+  - 세 섹션 history 모두 `days` 적용(`withDays`). `isEmpty`에도 세 섹션 포함
+- 캐시: 이력 3종(CMC 도미넌스 이력·비공식 알트 이력·mempool 해시레이트)은 장기 일봉처럼 고정 키에 다음 UTC 자정까지. latest 2종은 메인 10분 캐시 공유. 크레딧 예산: latest 2크레딧 × 144회/일 + 이력 4크레딧/일 ≈ 월 8.8천(15,000 한도 내 — 로컬 개발도 같은 키면 합산되므로 로컬은 별도 키 권장)
+- 설정: `cmc.api-key: ${CMC_API_KEY:}`(trading-core `application.yml`, 기본값 빈 문자열 — 필수 환경변수 아님). 키가 비면 CMC 공식 호출은 예외 → 도미넌스·알트 시즌 섹션 null + warn(기동 실패시키지 않는다). 키는 코드·커밋에 넣지 않고 운영 `.env`(`deploy/server/README.md` 목록에 추가)·로컬 `application-local.yml`에만
+- 어댑터: CMC는 신규 `stats/adapter/out/coinmarketcap`(Config + Properties + Adapter, `new-adapter` 패턴, 공식·비공식 둘 다 이 어댑터가 담당). mempool 해시레이트는 기존 `MempoolBlockHeightAdapter`에 메서드 추가(포트 개명/분리는 빌더 판단)
+- 실패 격리: 세 섹션은 서로·기존 지표와 독립(`guard`). 비공식 API 파싱 실패는 warn 로그로 드러나게
+- 세부(빌더 체크 후 내 판단):
+  - 이력 조회 길이는 `MAX_DAYS`(365) 고정 — CMC `count=365`, 비공식 `start = 오늘 − 365일`, 응답 `days`는 `withDays`로 자른다. 세 이력 모두 오늘(UTC) 점 제외(timestamp의 UTC 날짜 == 오늘이면 버림)
+  - 이력 캐시 실패(예외)는 캐시하지 않는다(장기 일봉 패턴) — 다음 메인 조립(최소 10분, 전부 실패면 1분 뒤)에 재시도. 장애 중 최악 CMC 이력 4크레딧/10분은 한시적이라 감수
+  - 키가 비면 어댑터가 HTTP 호출 없이 즉시 예외(크레딧 소모 없음), warn은 조립마다 남아도 무방. 비공식 알트 이력은 latest가 성공했을 때만 호출
+  - Hash Ribbons SMA가 null인 일자는 `state: null`, `buySignal: false`. 전날 state가 null이면 buySignal false
+  - `CryptoMarketIndicators`에 `halving`처럼 최상위 필드 3개 추가, 응답 필드명은 위 이름 그대로
+
 ## 내 판단으로 정한 것 (사용자 확인 전)
 
 - Upbit `KRW-USDT` 시세 노출 방식: `CryptoExchangePort`에 USDT 원화 시세용 메서드를 추가(현재가 + 완성 일봉). 빗썸 등 2차 거래소도 KRW-USDT 마켓이 있어 포트 계약으로 일반화 가능. 내부적으로 `UpbitExchangeAdapter.getCompletedDailyCandles`의 페이징 로직을 마켓 코드 기준으로 재사용
@@ -109,4 +140,5 @@
 - 신규 프록시 라우트 `app/api/crypto-market-indicators/route.ts`, `target: 'trading'`
 - `openapi.json` 재생성 → `gen:types`
 - 대시보드 `FearGreedSection` 옆 "코인 시장 지표" 영역: 종목별 김프 %(공식 환율·테더 두 기준, 현재 + 200일 추이) + 테더 프리미엄(분해 표시), 펀딩비(현재·다음 정산 + 200일 일평균), OI 30일 추이. 섹션이 `null`이면 해당 카드만 "일시적으로 불러올 수 없음"
-- 인프라: 신규 외부 호스트(`api.binance.com`, `fapi.binance.com`, `api.frankfurter.dev`, `mempool.space`, `api.exchange.coinbase.com`) 외 추가 작업 없음 — egress 제한이 있다면 허용 필요
+- 시장 전체 지표(2026-10-20): 최상위 `btcDominance`·`altcoinSeason`·`hashRibbons` 카드 3개(섹션 null이면 해당 카드만 실패 표시, `altcoinSeason.history`가 빈 배열이면 현재값만). 알트 시즌 0~100(75↑ 알트 시즌·25↓ 비트코인 시즌이 CMC 관례), Hash Ribbons는 `state`·`buySignal` 강조
+- 인프라: 운영 `.env`에 `CMC_API_KEY` 추가 필요. 신규 외부 호스트(`api.binance.com`, `fapi.binance.com`, `api.frankfurter.dev`, `mempool.space`, `api.exchange.coinbase.com`, `pro-api.coinmarketcap.com`, `api.coinmarketcap.com`) 외 추가 작업 없음 — egress 제한이 있다면 허용 필요
