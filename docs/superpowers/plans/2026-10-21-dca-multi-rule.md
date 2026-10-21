@@ -208,7 +208,7 @@
   - `DcaRoundPlanner`의 실행일·timing·당일 판정 여부·기존 주문 복구 로직을 옮긴다.
   - 일봉 캐시, 공포탐욕 TTL 메모, 판매가능수량 조회 로직도 옮긴다.
   - 같은 배치에서 앞 SELL 규칙의 수량을 예약분으로 차감하는 로직도 여기에 둔다.
-  - **collect는 부작용이 없다.** 이력 기록은 하지 않고, 입력 수집만 한다. 프리뷰도 이 경로를 타기 때문이다. 기존 주문 → ORDERED 복구 대상은 `DcaPlanInputs.recoveries`(ruleKey → 기존 Order)로 돌려준다. 실제 기록은 배치 쪽(`TradingCandidatePlanner`)이 `recordsRounds()` 경로에서 한다.
+  - **collect는 부작용이 없다.** 이력 기록은 하지 않고, 입력 수집만 한다. 프리뷰도 이 경로를 타기 때문이다. 기존 주문 → ORDERED 복구 대상은 `DcaCollected.recoveries`(ruleKey → 기존 Order)로 돌려준다. 실제 기록은 배치 쪽(`TradingCandidatePlanner`)이 `recordsRounds()` 경로에서 한다.
   - AVG_PRICE용 브로커 실잔고 조회는 삭제한다. 원장을 쓴다.
 - Modify: `CycleOrderComputer.compute(...)`. DCA면 `DcaPlanInputCollector`로 `PlanContext.dca`를 채운다.
 - Modify: `TradingCandidatePlanner`. `isDca()` 분기 6곳(L149·152·156·168·256·276·335)을 전략 능력 메서드로 대체한다.
@@ -227,9 +227,10 @@
 **Interfaces:**
 - Consumes: Task 2의 `StrategyDcaDetailPort`, `DcaExecutionPort`, `DcaExecutionRecorder`
 - Produces:
-  - `record PlanContext.DcaPlanInputs(List<DcaRuleInputs> dueRules, Map<String, Order> recoveries)` — recoveries를 커널에 넘기면 안 되므로, 커널 PlanContext에는 `dueRules`만 싣는다. recoveries는 collector 반환 타입 `DcaCollected(DcaPlanInputs inputs, Map<String, Order> recoveries)`로 분리한다. 커널이 trading `Order`를 모르게 하려는 것이다.
+  - `record PlanContext.DcaPlanInputs(List<DcaRuleInputs> dueRules)` (matching 커널)
+  - `record DcaCollected(DcaPlanInputs inputs, Map<String, Order> recoveries)` (trading, collector 반환 — 커널이 trading `Order`를 모르게 분리)
   - `OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders, List<DcaRuleDecision.Skipped> skips, Map<String, BigDecimal> referencePrices)`
-  - `DcaPlanInputs DcaPlanInputCollector.collect(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings, List<Order> existingOrders, BigDecimal currentPrice, AccountBalance ledger)`
+  - `DcaCollected DcaPlanInputCollector.collect(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings, List<Order> existingOrders, BigDecimal currentPrice, AccountBalance ledger)`
     - 판정할 규칙이 없으면 `dueRules`가 빈 목록이다.
     - 정확한 반환 타입은 `DcaCollected collect(...)`다. 복구 기록은 호출부가 한다.
 
