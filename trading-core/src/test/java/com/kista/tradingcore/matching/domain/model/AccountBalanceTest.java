@@ -11,6 +11,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("AccountBalance.applyExecutions — 평단가 계산")
@@ -29,10 +31,15 @@ class AccountBalanceTest {
     }
 
     private static AccountBalance.Fill fill(OrderDirection direction, int qty, String price) {
-        BigDecimal amount = new BigDecimal(price).multiply(BigDecimal.valueOf(qty));
+        return fill(direction, String.valueOf(qty), price);
+    }
+
+    private static AccountBalance.Fill fill(OrderDirection direction, String qty, String price) {
+        BigDecimal quantity = new BigDecimal(qty);
+        BigDecimal amount = new BigDecimal(price).multiply(quantity);
         return new AccountBalance.Fill() {
             @Override public OrderDirection direction() { return direction; }
-            @Override public int quantity() { return qty; }
+            @Override public BigDecimal quantity() { return quantity; }
             @Override public BigDecimal amountUsd() { return amount; }
         };
     }
@@ -53,7 +60,7 @@ class AccountBalanceTest {
         AccountBalance result = balance.applyExecutions(List.of(buy(50, "30.00")));
 
         // (100*25 + 50*30) / 150 = 4000 / 150 = 26.6667
-        assertThat(result.holdings()).isEqualTo(150);
+        assertThat(result.holdings()).isEqualByComparingTo("150");
         assertThat(result.avgPrice()).isEqualByComparingTo("26.6667");
     }
 
@@ -64,7 +71,7 @@ class AccountBalanceTest {
         AccountBalance balance = new AccountBalance(200, new BigDecimal("25.00"), new BigDecimal("1000"));
         AccountBalance result = balance.applyExecutions(List.of(sell(100, "30.00")));
 
-        assertThat(result.holdings()).isEqualTo(100);
+        assertThat(result.holdings()).isEqualByComparingTo("100");
         assertThat(result.avgPrice()).isEqualByComparingTo("25.0000");
     }
 
@@ -74,7 +81,7 @@ class AccountBalanceTest {
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("1000"));
         AccountBalance result = balance.applyExecutions(List.of(sell(100, "30.00")));
 
-        assertThat(result.holdings()).isZero();
+        assertThat(result.holdings().signum()).isZero();
         assertThat(result.avgPrice()).isNull();
     }
 
@@ -87,7 +94,7 @@ class AccountBalanceTest {
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("5000"));
         AccountBalance result = balance.applyExecutions(List.of(sell(50, "30.00"), buy(30, "30.00")));
 
-        assertThat(result.holdings()).isEqualTo(80);
+        assertThat(result.holdings()).isEqualByComparingTo("80");
         assertThat(result.avgPrice()).isEqualByComparingTo("26.8750");
     }
 
@@ -97,8 +104,32 @@ class AccountBalanceTest {
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("10000"));
         AccountBalance result = balance.applyExecutions(List.of(buy(100, "25.00")));
 
-        assertThat(result.holdings()).isEqualTo(100);
+        assertThat(result.holdings()).isEqualByComparingTo("100");
         assertThat(result.avgPrice()).isEqualByComparingTo("25.0000");
+    }
+
+    @Test
+    @DisplayName("소수 보유는 wholeShares에서 예외")
+    void fractionalHoldings_wholeSharesThrows() {
+        AccountBalance balance = new AccountBalance(new BigDecimal("0.5"), BigDecimal.TEN, BigDecimal.ZERO);
+        assertThatThrownBy(balance::wholeShares).isInstanceOf(ArithmeticException.class);
+    }
+
+    @Test
+    @DisplayName("소수 체결을 원장에 반영")
+    void fractionalFill_appliedToLedger() {
+        AccountBalance result = new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO)
+                .applyExecutions(List.of(fill(OrderDirection.BUY, "0.00123", "100000")));
+        assertThat(result.holdings()).isEqualByComparingTo("0.00123");
+        // 체결금액 = 100000 × 0.00123 = 123 → 평단 = 123 / 0.00123 = 100000
+        assertThat(result.avgPrice()).isEqualByComparingTo("100000");
+    }
+
+    @Test
+    @DisplayName("꼬리 0 보유는 정규화")
+    void trailingZeroHoldings_normalized() {
+        assertThat(new AccountBalance(new BigDecimal("5.00000000"), BigDecimal.ONE, BigDecimal.ZERO).holdings())
+                .isEqualTo(new BigDecimal("5"));
     }
 
     @Nested

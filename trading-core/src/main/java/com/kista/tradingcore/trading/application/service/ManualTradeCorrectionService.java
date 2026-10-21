@@ -82,7 +82,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
 
             // 청산이 발생하면 즉시 사이클 종료 + 안전하게 PAUSED 고정 — VR처럼 청산에도 사이클을 유지하는 전략은 제외
             // (VR 사이클을 닫으면 재개가 재오픈하지 않아 좀비 사이클로 영구 정지된다)
-            if (balance.holdings() == 0 && endsCycleOnLiquidation) {
+            if (balance.wholeShares() == 0 && endsCycleOnLiquidation) {
                 if (!isLastFill) {
                     throw new IllegalArgumentException("청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다");
                 }
@@ -124,7 +124,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
 
     // SELL 수량이 현재 holdings를 초과하는지 검증
     private static void validateSellQuantity(ManualTradeCorrectionCommand.Fill fill, AccountBalance balance) {
-        if (fill.direction() == OrderDirection.SELL && fill.quantity() > balance.holdings()) {
+        if (fill.direction() == OrderDirection.SELL && fill.quantity() > balance.wholeShares()) {
             throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
         }
     }
@@ -152,7 +152,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                                                      Strategy updatedStrategy, boolean cycleEnded) {
         return new ManualTradeCorrectionResult(
                 command.userId(), account.id(), strategy.id(),
-                command.fills().size(), balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
+                command.fills().size(), balance.wholeShares(), balance.avgPrice(), balance.usdDeposit(),
                 updatedStrategy.status(), cycleEnded,
                 cycleEnded ? command.fills().getLast().tradeDate() : null);
     }

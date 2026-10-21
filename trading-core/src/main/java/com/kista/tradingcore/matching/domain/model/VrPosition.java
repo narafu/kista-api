@@ -25,7 +25,7 @@ public record VrPosition(
 
     // 현재 보유 수량
     public int holdings() {
-        return balance.holdings();
+        return balance.wholeShares();
     }
 
     // 현재 예수금 (= usdDeposit)

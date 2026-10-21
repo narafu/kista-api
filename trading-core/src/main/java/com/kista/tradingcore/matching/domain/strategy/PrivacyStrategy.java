@@ -61,7 +61,7 @@ public class PrivacyStrategy {
 
         // 기준표 목표 보유량과 현재 잔량의 차이로 BUY 가감 (실수 기준 — 버림 전)
         BigDecimal target = BigDecimal.valueOf(plan.holdings()).multiply(multiple);
-        BigDecimal diff = target.subtract(BigDecimal.valueOf(balance.holdings()));
+        BigDecimal diff = target.subtract(BigDecimal.valueOf(balance.wholeShares()));
         log.info("[PRIVACY] 보유 보정: target={}, current={}, diff={}", target, balance.holdings(), diff);
         adjustBuyQuantities(buyEntries, diff);
 
@@ -156,13 +156,13 @@ public class PrivacyStrategy {
         // 명시 SELL 합이 실제 보유수량을 초과하면 가장 싼 SELL부터 차례로 차감 — BUY의 adjustBuyQuantities(보유
         // 초과 시 가장 비싼 BUY부터 차감)와 대칭으로, 보유하지 않은 수량을 매도 시도해 판매가능수량 부족으로
         // 전량 거절되는 상황을 방지한다
-        result = capSellQuantitiesToHoldings(result, balance.holdings());
+        result = capSellQuantitiesToHoldings(result, balance.wholeShares());
 
         if (nullTemplate == null) return result;
 
         // null SELL = balance.holdings() - 명시 SELL 합 (음수면 제외)
         int sumExplicit = result.stream().mapToInt(PlannedOrder::quantity).sum();
-        int remaining = balance.holdings() - sumExplicit;
+        int remaining = balance.wholeShares() - sumExplicit;
         if (remaining <= 0) {
             log.warn("[PRIVACY] 잔량 매도 SELL 제외 — 명시 SELL 합이 잔량 이상: balance={}, sumExplicit={}",
                     balance.holdings(), sumExplicit);

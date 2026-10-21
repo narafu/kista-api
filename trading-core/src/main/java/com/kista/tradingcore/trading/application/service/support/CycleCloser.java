@@ -18,7 +18,7 @@ public final class CycleCloser {
     public static CycleEndResult closeIfExhausted(StrategyCyclePort strategyCyclePort, StrategyPort strategyPort,
                                            Strategy strategy, StrategyCycle currentCycle,
                                            AccountBalance balance, LocalDate tradeDate) {
-        if (balance.holdings() == 0) {
+        if (balance.wholeShares() == 0) {
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), tradeDate);
             Strategy updated = strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
             return new CycleEndResult(updated, true, tradeDate);

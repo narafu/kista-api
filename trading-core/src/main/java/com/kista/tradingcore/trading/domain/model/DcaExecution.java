@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.domain.model;
 
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.Quantities;
 
 import java.math.BigDecimal;
 import java.time.Instant;

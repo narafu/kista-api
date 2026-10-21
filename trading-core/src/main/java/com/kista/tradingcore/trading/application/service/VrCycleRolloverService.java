@@ -115,7 +115,7 @@ class VrCycleRolloverService {
 
         // V′ 계산: evaluation = holdings × due일 기준 확정 종가, gradient는 경과 주수 기준 램프 재계산값 사용
         // pool은 적립/인출 반영 전 원래 예수금 사용 — 공식은 V′=V+pool/G+(E-V)/(2√G)±적립금 (recurringAmount는 별도 항)
-        BigDecimal evaluation = BigDecimal.valueOf(postBalance.holdings()).multiply(evaluationClosingPrice);
+        BigDecimal evaluation = BigDecimal.valueOf(postBalance.wholeShares()).multiply(evaluationClosingPrice);
         BigDecimal newValue = VrPosition.nextValue(
                 cycleVr.value(),
                 postBalance.usdDeposit(),

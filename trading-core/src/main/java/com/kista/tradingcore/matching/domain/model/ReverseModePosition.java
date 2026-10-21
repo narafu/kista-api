@@ -20,7 +20,7 @@ public record ReverseModePosition(
     // 잔고 스냅샷 기반 생성 — 리버스모드 전용 필드(별지점·첫날 여부)만 별도 전달
     public static ReverseModePosition of(AccountBalance balance, StrategyTicker ticker, int divisionCount,
                                          BigDecimal starPointPrice, boolean isFirstDay) {
-        return new ReverseModePosition(balance.holdings(), balance.avgPrice(), balance.usdDeposit(),
+        return new ReverseModePosition(balance.wholeShares(), balance.avgPrice(), balance.usdDeposit(),
                 ticker, divisionCount, starPointPrice, isFirstDay);
     }
 

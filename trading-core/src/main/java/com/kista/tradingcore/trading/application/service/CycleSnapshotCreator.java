@@ -104,7 +104,7 @@ class CycleSnapshotCreator {
 
     private static BigDecimal totalAssets(AccountBalance balance, BigDecimal closingPrice) {
         return balance.usdDeposit()
-                .add(closingPrice.multiply(BigDecimal.valueOf(balance.holdings())))
+                .add(closingPrice.multiply(BigDecimal.valueOf(balance.wholeShares())))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 }

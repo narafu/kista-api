@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.domain.model;
+package com.kista.shared.kernel;
 
 import java.math.BigDecimal;
 

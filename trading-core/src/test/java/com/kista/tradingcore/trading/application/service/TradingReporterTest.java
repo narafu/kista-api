@@ -255,7 +255,7 @@ class TradingReporterTest {
 
         ArgumentCaptor<AccountBalance> balanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
         verify(cyclePositionPersistor).saveCyclePosition(eq(TODAY), balanceCaptor.capture(), eq(dcaCtx), eq(CLOSE), isNull());
-        assertThat(balanceCaptor.getValue().holdings()).isEqualTo(15);
+        assertThat(balanceCaptor.getValue().wholeShares()).isEqualTo(15);
         assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo("0");
     }
 

@@ -114,7 +114,7 @@ public class BacktestEngine {
 
             // (2) 오늘 EOD 자산 기록 — 보유분은 평단가가 아닌 종가 시장가로 평가
             points.add(new BacktestPoint(candle.date(),
-                    state.availableCash().add(marketValue(candle, state.balance.holdings())),
+                    state.availableCash().add(marketValue(candle, state.balance.wholeShares())),
                     state.principal));
 
             // (3) 전략별 하루 처리 — 사이클 판정 후 오늘 주문 생성 + 접수 전 BUY 가격 캡 보정
@@ -183,7 +183,7 @@ public class BacktestEngine {
         // 램프 기준 경과 주수는 전략 최초 사이클 시작일(= 백테스트 시작일) 기준 — 사이클마다 리셋하지 않는다
         long weeks = ChronoUnit.WEEKS.between(state.firstCycleStartDate, candle.date());
         DailyCandle evaluationCandle = state.dueEvaluationCandle;
-        BigDecimal evaluation = marketValue(evaluationCandle, state.balance.holdings());
+        BigDecimal evaluation = marketValue(evaluationCandle, state.balance.wholeShares());
         BigDecimal newValue = VrPosition.nextValue(state.value, state.balance.usdDeposit(),
                 detail.gradientAt(weeks), command.vrRecurringAmount(), evaluation);
 
@@ -256,12 +256,12 @@ public class BacktestEngine {
         state.applyReverseModeTransition(command.ticker(), candle.close());
 
         // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클의 0회차 주문이어야 한다
-        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0) {
+        if (state.balance.wholeShares() == 0 && state.prevDayHoldings > 0) {
             if (!state.restartCycle(command.cycleSeedTypeOrMax(), candle.date(), warnings)) return List.of();
             state.resetReverseMode();
         }
         // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다(모든 분기 공통 통과 지점)
-        state.prevDayHoldings = state.balance.holdings();
+        state.prevDayHoldings = state.balance.wholeShares();
 
         return planInfiniteOrders(state, command, candle);
     }
@@ -315,12 +315,12 @@ public class BacktestEngine {
                                        LocalDate nextSession, List<String> warnings) {
         if (state.stopped) return List.of(); // 사이클 시드 정책으로 매매 중단된 뒤엔 주문 없음
         // 청산(어제 보유>0 → 오늘 0) 판정은 반드시 주문 생성 전 — 오늘 주문은 새 사이클 개장 자산(cycleStartAmount) 기준이어야 한다
-        if (state.balance.holdings() == 0 && state.prevDayHoldings > 0
+        if (state.balance.wholeShares() == 0 && state.prevDayHoldings > 0
                 && !state.restartCycle(command.cycleSeedTypeOrMax(), candle.date(), warnings)) {
             return List.of();
         }
         // 주문 생성은 보유수량을 바꾸지 않으므로 여기서 "오늘 종료 시점 보유수량"을 확정해도 안전하다
-        state.prevDayHoldings = state.balance.holdings();
+        state.prevDayHoldings = state.balance.wholeShares();
 
         return planPrivacyOrders(state, command, privacyBases, candle, nextSession, warnings);
     }
@@ -469,7 +469,7 @@ public class BacktestEngine {
             List<AccountBalance.Fill> fills = executions.stream()
                     .map(e -> (AccountBalance.Fill) new AccountBalance.Fill() {
                         @Override public OrderDirection direction() { return e.direction(); }
-                        @Override public int quantity() { return e.quantity(); }
+                        @Override public BigDecimal quantity() { return BigDecimal.valueOf(e.quantity()); }
                         @Override public BigDecimal amountUsd() { return e.amountUsd(); }
                     })
                     .toList();
@@ -537,7 +537,7 @@ public class BacktestEngine {
             this.divisionCount = command.divisionCount() != null
                     ? command.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
             // 시작 보유분이 있으면 청산 판정 기준선도 그만큼에서 출발 — 0으로 두면 매매 없는 첫날에도 오탐은 없지만(§엔진 주석 참고) 명시적으로 맞춰둔다
-            this.prevDayHoldings = this.balance.holdings();
+            this.prevDayHoldings = this.balance.wholeShares();
         }
 
         // 오늘 종가를 별지점 윈도우에 append — 6개째부터 가장 오래된 값을 버린다
@@ -579,7 +579,7 @@ public class BacktestEngine {
 
         PrivacyState(BacktestCommand command, BigDecimal day0Close) {
             super(command, day0Close);
-            this.prevDayHoldings = balance.holdings();
+            this.prevDayHoldings = balance.wholeShares();
         }
 
         // 오늘을 진행 중인 결측 구간에 편입 — 경고는 구간이 닫힐 때 1건만 기록한다

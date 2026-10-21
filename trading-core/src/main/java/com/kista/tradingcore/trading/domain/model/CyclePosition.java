@@ -32,7 +32,7 @@ public record CyclePosition(
 
     public static CyclePosition tradeSnapshot(UUID strategyCycleId, AccountBalance balance, BigDecimal closingPrice) {
         return new CyclePosition(null, strategyCycleId,
-                balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.holdings(), null, null);
+                balance.usdDeposit(), closingPrice, balance.avgPrice(), balance.wholeShares(), null, null);
     }
 
     // 중간부터 시작 — 기존 보유 수량·평단가로 seed하는 초기 포지션 (세 전략 공통)

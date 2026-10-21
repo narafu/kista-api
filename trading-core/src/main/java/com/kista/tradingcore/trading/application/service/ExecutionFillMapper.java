@@ -14,10 +14,10 @@ final class ExecutionFillMapper {
     }
 
     static AccountBalance.Fill toFill(Execution execution) {
-        return new ExecutionFill(execution.direction(), execution.quantity(), execution.amountUsd());
+        return new ExecutionFill(execution.direction(), BigDecimal.valueOf(execution.quantity()), execution.amountUsd());
     }
 
-    private record ExecutionFill(OrderDirection direction, int quantity, BigDecimal amountUsd)
+    private record ExecutionFill(OrderDirection direction, BigDecimal quantity, BigDecimal amountUsd)
             implements AccountBalance.Fill {
     }
 }

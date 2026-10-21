@@ -217,7 +217,7 @@ class VrCycleRolloverServiceTest {
                 any(), any(), any(), any(), newValueCaptor.capture(), anyInt(), any(), any());
         BigDecimal expectedNewValue = VrPosition.nextValue(
                 CYCLE_VR.value(), USD_DEPOSIT, CYCLE_VR.gradient(), DETAIL.recurringAmount(),
-                BigDecimal.valueOf(POST_BALANCE.holdings()).multiply(CLOSING_PRICE));
+                BigDecimal.valueOf(POST_BALANCE.wholeShares()).multiply(CLOSING_PRICE));
         assertThat(newValueCaptor.getValue()).isEqualByComparingTo(expectedNewValue);
     }
 
@@ -410,7 +410,7 @@ class VrCycleRolloverServiceTest {
         verify(cycleSnapshotCreator).createVrCycleAndSnapshot(
                 any(), any(), balanceCaptor.capture(), any(), any(), anyInt(), any(), any());
         AccountBalance captured = balanceCaptor.getValue();
-        assertThat(captured.holdings()).isEqualTo(10);
+        assertThat(captured.wholeShares()).isEqualTo(10);
         assertThat(captured.avgPrice()).isEqualByComparingTo(new BigDecimal("45.00"));
         assertThat(captured.usdDeposit()).isEqualByComparingTo(USD_DEPOSIT);
     }

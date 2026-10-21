@@ -206,7 +206,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.pStepWeeks()).isEqualTo(currentDetail.pStepWeeks());
         assertThat(captured.poolLimitFloor()).isEqualByComparingTo(currentDetail.poolLimitFloor());
         // 자본 주입 없음 → holdings/usdDeposit 불변, V 이월
-        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().wholeShares()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo(latestPosition.usdDeposit());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
 
@@ -226,7 +226,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         // newHoldings = 기존 10 + 5 = 15
-        assertThat(captured.postBalance().holdings()).isEqualTo(15);
+        assertThat(captured.postBalance().wholeShares()).isEqualTo(15);
         // 가중평균: (50.00×10 + 60.00×5) / 15 = 800.00/15 = 53.3333 (scale4 HALF_UP)
         BigDecimal expectedAvgPrice = new BigDecimal("500.00").add(new BigDecimal("300.00"))
                 .divide(BigDecimal.valueOf(15), 4, java.math.RoundingMode.HALF_UP);
@@ -265,7 +265,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("700.00"); // 500.00 + 200.00
-        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().wholeShares()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         // 수량 주입 없으므로 V 이월 (증분 없음)
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
@@ -284,7 +284,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         // newHoldings = 기존 10 - 4 = 6
-        assertThat(captured.postBalance().holdings()).isEqualTo(6);
+        assertThat(captured.postBalance().wholeShares()).isEqualTo(6);
         // 인출은 잔여 수량의 원가를 바꾸지 않음 — 평단가 그대로
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         // V -= 4 × 120.00 = 480.00 → 1000.00 - 480.00 = 520.00
@@ -302,7 +302,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("350.00"); // 500.00 - 150.00
-        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().wholeShares()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
     }
@@ -355,7 +355,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         // newHoldings = (10 - 4) + 3 = 9
-        assertThat(captured.postBalance().holdings()).isEqualTo(9);
+        assertThat(captured.postBalance().wholeShares()).isEqualTo(9);
         // 가중평균: (50.00×6 + 60.00×3) / 9 = (300.00+180.00)/9 = 480.00/9
         BigDecimal expectedAvgPrice = new BigDecimal("300.00").add(new BigDecimal("180.00"))
                 .divide(BigDecimal.valueOf(9), 4, java.math.RoundingMode.HALF_UP);

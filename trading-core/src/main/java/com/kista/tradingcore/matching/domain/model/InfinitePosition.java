@@ -22,7 +22,7 @@ public record InfinitePosition(
     // --- 기본 도메인 속성 조회 ---
 
     public int holdings() {
-        return balance.holdings();
+        return balance.wholeShares();
     }
 
     public BigDecimal usdDeposit() {
