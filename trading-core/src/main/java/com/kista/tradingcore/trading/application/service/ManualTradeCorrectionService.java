@@ -4,7 +4,9 @@ import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
 import com.kista.tradingcore.trading.application.event.CycleEndedEvent;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.tradingcore.broker.domain.model.Execution;
+import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Quantities;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionResult;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -44,6 +46,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final ApplicationEventPublisher eventPublisher; // 사이클 종료 시 사용자 알림 — 커밋 후 이벤트로 위임
+    private static final int CRYPTO_SCALE = 8; // 코인 수량 소수 자릿수 상한 (업비트)
     private final CycleOrderStrategies cycleOrderStrategies; // 청산 시 사이클 종료 여부(endsCycleOnLiquidation) SSOT
 
     @Override
@@ -52,10 +55,6 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                 accountPort, strategyPort, command.accountId(), command.strategyId(), command.userId());
         Account account = sel.account();
         Strategy strategy = sel.strategy();
-        // DCA는 보유·평단 SSOT가 증권사 실잔고라 자체 포지션 보정이 의미 없다(사이클도 영구)
-        if (strategy.isDca()) {
-            throw new IllegalArgumentException("DCA 전략은 증권사 잔고 기준이라 수동 체결 보정을 지원하지 않습니다");
-        }
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         // 사이클 행 잠금 — 동시에 들어온 같은 보정(원 요청 + 재시도)이 중복 검사를 함께 통과하지 않도록 직렬화
         strategyCyclePort.lockForUpdate(currentCycle.id());
@@ -67,7 +66,9 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         }
 
         AccountBalance balance = latest.toBalance();
-        boolean endsCycleOnLiquidation = cycleOrderStrategies.of(strategy.type()).endsCycleOnLiquidation();
+        CycleOrderStrategy cycleStrategy = cycleOrderStrategies.of(strategy.type());
+        boolean endsCycleOnLiquidation = cycleStrategy.endsCycleOnLiquidation();
+        boolean occupiesSeed = cycleStrategy.occupiesSeed(); // 시드 비점유 전략(DCA)은 보정 후에도 usd_deposit 0
         Strategy updatedStrategy = strategy;
         boolean cycleEnded = false;
         List<Order> manualOrders = new ArrayList<>();
@@ -77,9 +78,10 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
             boolean isLastFill = i == command.fills().size() - 1;
 
             // fill 1건 반영: 검증 → FILLED 주문 이력 → 잔고 재계산 → 포지션 스냅샷
+            validateQuantity(fill, strategy);
             validateSellQuantity(fill, balance);
             manualOrders.add(toManualOrder(fill, account, currentCycle, strategy));
-            balance = applyFillAndSnapshot(fill, strategy, balance, currentCycle);
+            balance = applyFillAndSnapshot(fill, balance, currentCycle, occupiesSeed);
 
             // 청산이 발생하면 즉시 사이클 종료 + 안전하게 PAUSED 고정 — VR처럼 청산에도 사이클을 유지하는 전략은 제외
             // (VR 사이클을 닫으면 재개가 재오픈하지 않아 좀비 사이클로 영구 정지된다)
@@ -123,9 +125,19 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         }
     }
 
+    // 수량 단위 검증 — 주식은 정수, 코인은 소수 8자리까지 (원장 normalize 기준)
+    private static void validateQuantity(ManualTradeCorrectionCommand.Fill fill, Strategy strategy) {
+        boolean crypto = strategy.ticker().getMarket() == Market.CRYPTO_KRW;
+        int scale = Quantities.normalize(fill.quantity()).scale();
+        if (crypto ? scale > CRYPTO_SCALE : scale > 0) {
+            throw new IllegalArgumentException(crypto ? "코인 체결 수량은 소수 8자리까지 입력할 수 있습니다"
+                    : "주식 체결 수량은 정수여야 합니다");
+        }
+    }
+
     // SELL 수량이 현재 holdings를 초과하는지 검증
     private static void validateSellQuantity(ManualTradeCorrectionCommand.Fill fill, AccountBalance balance) {
-        if (fill.direction() == OrderDirection.SELL && balance.holdings().compareTo(BigDecimal.valueOf(fill.quantity())) < 0) {
+        if (fill.direction() == OrderDirection.SELL && fill.quantity().compareTo(balance.holdings()) > 0) {
             throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
         }
     }
@@ -139,11 +151,12 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     }
 
     // 체결 반영 후 잔고 재계산 + cycle_position 스냅샷 append
-    private AccountBalance applyFillAndSnapshot(ManualTradeCorrectionCommand.Fill fill, Strategy strategy,
-                                                AccountBalance balance, StrategyCycle currentCycle) {
-        Execution execution = Execution.ofManualFill(fill.tradeDate(), strategy.ticker(),
-                fill.direction(), fill.quantity(), fill.price(), fill.externalOrderId());
-        AccountBalance updated = balance.applyExecutions(List.of(ExecutionFillMapper.toFill(execution)));
+    private AccountBalance applyFillAndSnapshot(ManualTradeCorrectionCommand.Fill fill, AccountBalance balance,
+                                                StrategyCycle currentCycle, boolean occupiesSeed) {
+        // 소수 수량을 쓰므로 브로커 Execution(int) 대신 원장 Fill을 직접 만든다
+        AccountBalance applied = balance.applyExecutions(List.of(ExecutionFillMapper.of(
+                fill.direction(), fill.quantity(), fill.price().multiply(fill.quantity()))));
+        AccountBalance updated = occupiesSeed ? applied : applied.withUsdDeposit(BigDecimal.ZERO);
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
         return updated;
     }

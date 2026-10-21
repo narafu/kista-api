@@ -175,7 +175,7 @@ class AdminInternalApiIntegrationTest {
         TradeCorrectionRequest command = new TradeCorrectionRequest(
                 userId, accountId, strategyId,
                 List.of(new TradeCorrectionRequest.Fill(
-                        today, OrderDirection.BUY, 1, new BigDecimal("120.00"), "MANUAL-1", "통합테스트")));
+                        today, OrderDirection.BUY, BigDecimal.ONE, new BigDecimal("120.00"), "MANUAL-1", "통합테스트")));
 
         TradeCorrectionResponse result = adminTradeCorrectionUseCase.correctManualFills(userId, command);
 

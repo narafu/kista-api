@@ -21,6 +21,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.VrCycleOrderStrategy;
@@ -59,6 +60,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Spy CycleOrderStrategies cycleOrderStrategies = new CycleOrderStrategies(List.of(
             new InfiniteCycleOrderStrategy(null, null),
+            new DcaCycleOrderStrategy(),
             new PrivacyCycleOrderStrategy(null),
             new VrCycleOrderStrategy(null)));
     @InjectMocks ManualTradeCorrectionService service;
@@ -81,7 +83,7 @@ class ManualTradeCorrectionServiceTest {
         ManualTradeCorrectionCommand command = new ManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new ManualTradeCorrectionCommand.Fill(
-                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
+                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, BigDecimal.valueOf(2),
                         new BigDecimal("267.37"), "MANUAL-1", "manual correction")));
 
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
@@ -119,7 +121,7 @@ class ManualTradeCorrectionServiceTest {
         ManualTradeCorrectionCommand command = new ManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new ManualTradeCorrectionCommand.Fill(
-                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 3,
+                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, BigDecimal.valueOf(3),
                         new BigDecimal("267.37"), null, null)));
 
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
@@ -156,17 +158,51 @@ class ManualTradeCorrectionServiceTest {
     }
 
     @Test
-    void correctManualFills_dca_rejected() {
-        // DCA 보유·평단 SSOT는 증권사 실잔고 — 자체 포지션 보정 불가
+    void DCA_보정은_원장에_반영되고_사이클은_유지() {
+        // DCA는 영구 사이클·시드 비점유 — 청산해도 사이클 유지, usd_deposit은 0
         Strategy dca = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
+        stubSelection(dca);
 
-        assertThatThrownBy(() -> service.correctManualFills(command(sell(1, "DCA-1"))))
+        ManualTradeCorrectionResult result = service.correctManualFills(command(sell(2, "DCA-1")));
+
+        assertThat(result.finalHoldings()).isZero();
+        assertThat(result.cycleEnded()).isFalse();
+        assertThat(result.finalUsdDeposit()).isZero();
+        verify(strategyCyclePort, never()).markEnded(any(), any(), any());
+        ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
+        verify(cyclePositionPort).save(captor.capture());
+        assertThat(captor.getValue().usdDeposit()).isZero();
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void 크립토_소수_보정() {
+        Strategy dca = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+        stubSelection(dca);
+        ManualTradeCorrectionCommand.Fill buy = new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 1),
+                OrderDirection.BUY, new BigDecimal("0.00123456"), new BigDecimal("100000000"), "C-1", null);
+
+        ManualTradeCorrectionResult result = service.correctManualFills(command(buy));
+
+        // 기존 보유 2 + 0.00123456
+        assertThat(result.finalHoldings()).isEqualByComparingTo("2.00123456");
+        assertThat(result.finalUsdDeposit()).isZero();
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void 주식_소수_보정은_400() {
+        stubSelection(privacy());
+        ManualTradeCorrectionCommand.Fill buy = new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 1),
+                OrderDirection.BUY, new BigDecimal("1.5"), new BigDecimal("267.37"), "S-1", null);
+
+        assertThatThrownBy(() -> service.correctManualFills(command(buy)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("DCA");
+                .hasMessageContaining("정수");
         verify(cyclePositionPort, never()).save(any());
+        verify(orderPort, never()).saveAll(any());
     }
 
     @Test
@@ -198,7 +234,7 @@ class ManualTradeCorrectionServiceTest {
         stubSelection(privacy());
         ManualTradeCorrectionCommand.Fill day1 = sell(1, "ODNO-1");
         ManualTradeCorrectionCommand.Fill day2 = new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 2),
-                OrderDirection.SELL, 1, new BigDecimal("267.37"), "ODNO-1", null);
+                OrderDirection.SELL, BigDecimal.ONE, new BigDecimal("267.37"), "ODNO-1", null);
         when(strategyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         ManualTradeCorrectionResult result = service.correctManualFills(command(day1, day2));
@@ -229,7 +265,7 @@ class ManualTradeCorrectionServiceTest {
     }
 
     private static ManualTradeCorrectionCommand.Fill sell(int quantity, String externalOrderId) {
-        return new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 1), OrderDirection.SELL, quantity,
+        return new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 1), OrderDirection.SELL, BigDecimal.valueOf(quantity),
                 new BigDecimal("267.37"), externalOrderId, null);
     }
 

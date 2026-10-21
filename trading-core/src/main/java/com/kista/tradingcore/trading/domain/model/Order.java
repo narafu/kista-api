@@ -60,10 +60,10 @@ public record Order(
     // 관리자 수동 보정용 FILLED 주문 — LIMIT 고정, 체결 수량·가격 즉시 기록
     public static Order filledManual(UUID accountId, UUID strategyCycleId, LocalDate tradeDate,
                                      StrategyTicker ticker, OrderTiming timing, OrderDirection direction,
-                                     int quantity, BigDecimal price, String externalOrderId) {
+                                     BigDecimal quantity, BigDecimal price, String externalOrderId) {
         return new Order(null, accountId, strategyCycleId, tradeDate, ticker, OrderType.LIMIT,
-                timing, direction, UNKNOWN_LEG, BigDecimal.valueOf(quantity), price, OrderStatus.FILLED, externalOrderId,
-                BigDecimal.valueOf(quantity), price);
+                timing, direction, UNKNOWN_LEG, quantity, price, OrderStatus.FILLED, externalOrderId,
+                quantity, price);
     }
 
     // 코인 시장가 주문 — MARKET·PLANNED 고정, 수량은 소수 8자리 (매수는 price=주문 금액 기준 참고가)

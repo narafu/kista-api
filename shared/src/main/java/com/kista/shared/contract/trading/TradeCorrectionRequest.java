@@ -22,7 +22,7 @@ public record TradeCorrectionRequest(
     public record Fill(
             @NotNull LocalDate tradeDate,       // KST 거래일
             @NotNull OrderDirection direction,  // 매매 방향
-            @Positive int quantity,             // 체결 수량
+            @NotNull @Positive BigDecimal quantity, // 체결 수량 (주식 정수, 코인 소수 8자리까지)
             @NotNull @Positive BigDecimal price,// 체결 가격
             String externalOrderId,             // 브로커 측 원본 주문 ID (선택)
             String memo                         // 메모 (선택)

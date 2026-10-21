@@ -44,7 +44,7 @@ class AdminTradeCorrectionServiceTest {
         TradeCorrectionRequest command = new TradeCorrectionRequest(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new TradeCorrectionRequest.Fill(
-                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
+                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, BigDecimal.valueOf(2),
                         new BigDecimal("267.37"), "MANUAL-1", "manual correction")));
         TradeCorrectionResponse result = new TradeCorrectionResponse(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, 1, BigDecimal.ZERO,

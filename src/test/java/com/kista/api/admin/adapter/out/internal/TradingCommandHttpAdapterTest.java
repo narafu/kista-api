@@ -65,7 +65,7 @@ class TradingCommandHttpAdapterTest {
     private static TradeCorrectionRequest correctionCommand() {
         return new TradeCorrectionRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 List.of(new TradeCorrectionRequest.Fill(
-                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
+                        LocalDate.of(2026, 7, 1), OrderDirection.SELL, BigDecimal.valueOf(2),
                         new BigDecimal("267.37"), "MANUAL-1", "memo")));
     }
 
