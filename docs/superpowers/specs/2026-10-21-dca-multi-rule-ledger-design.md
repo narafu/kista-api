@@ -49,7 +49,7 @@
 | 같은 시점 매수·매도 동시 발동 | **둘 다 각각 주문**한다 |
 | 매도 규모 | **금액**(기본) 또는 **보유 비율 %**(100% = 전량). 수량 입력은 두지 않는다 |
 | 부족 시 정책 | 규칙마다 고른다. 매수 부족: `PARTIAL`(남은 금액만큼) / `REJECT`(거부). 매도 부족: `PARTIAL`(잔량 전부) / `REJECT` |
-| 원장 저장 | `cycle_position.holdings`를 numeric으로 넓히고, 매매 커널(`AccountBalance`·Infinite·VR·Privacy 포지션)까지 **BigDecimal로 통일**한다(R1, 이번 범위). 처음 검토한 A′(커널 int 유지)는 대체한다 |
+| 원장 저장 | 원장 타입 전부를 **BigDecimal로 통일**한다(R1, 이번 범위): `cycle_position.holdings`(numeric), `CyclePosition`, `AccountBalance.holdings`, `AccountBalance.Fill.quantity`, 원장을 노출하는 응답·wire. 주식 전략(Infinite·VR·Privacy·백테스트) 공식은 **변경하지 않고** `AccountBalance.wholeShares()`(정수 주, 소수면 `ArithmeticException`)로 읽는다 — "주식 보유는 정수 주"라는 도메인 사실. 증권사 vendor 타입(`BrokerBalance`·`SellableQuantity`·`Execution`)과 FIDA 기준표(`PrivacyPlan`·privacy 계약)는 외부에서 정수로 정해지므로 int 유지 |
 | 계획 경로 | DCA를 `CycleOrderStrategy.plan()` 정규 경로로 편입한다(R2, 이번 범위). 크립토는 실행 루프만 별도로 두고 판정 커널은 공유한다 |
 | DCA 통계 원금 | **누적 순투입액** = 자기 주문 매수 체결 합계 − 매도 체결 합계. 수익 = 평가액 − 순투입액 |
 | 계좌+종목 중복 | DCA도 다른 전략처럼 **계좌+종목당 1개**로 되돌린다(spec 2026-10-13 §3.4의 완화를 철회) |
@@ -246,12 +246,12 @@ DcaRule(
 | E9 | 프리뷰에서 DCA 제외 | **확정 해소** — R2로 같은 `plan()` 경로가 되므로 포함한다 |
 | E10 | 원장 갱신 시점: 주식은 마감 리포트, 크립토는 체결 동기화 | 유지 — 체결 확인 수단이 다르다(배치 vs 24/7 폴링). 원장 반영 함수(`applyExecutions` → `cycle_position` 저장)는 하나로 공유한다(확정) |
 
-**R1. 매매 커널 holdings를 BigDecimal로 통일 (E6 해소)**
-- `AccountBalance.holdings`와 Infinite·VR·Privacy 포지션을 BigDecimal로 바꾼다.
-- 정수 나눗셈과 `== 0` 비교 지점을 명시적인 `setScale(0, FLOOR)`와 `signum()`으로 옮긴다.
-- 주식 전략은 "정수 주 단위" 불변식을 도메인 검증으로 갖는다.
-- 비용: `trading-formulas.md` 대상 공식 코드를 건드린다. 기존 테스트 전체와 백테스트 결과 동일성으로 회귀를 잠근다.
-- **확정: 이번 범위에 포함한다.** 구현 계획의 첫 독립 단계로 두고, 기존 테스트 전체와 백테스트 골든 비교를 통과한 뒤 DCA 작업을 진행한다. 정수 주 불변식이 필요한 지점(주식 주문 수량)은 도메인 검증으로 둔다.
+**R1. 원장 holdings를 BigDecimal로 통일 (E6 해소)**
+- 원장 타입(`AccountBalance.holdings`·`Fill.quantity`·`CyclePosition`·DB·응답)을 BigDecimal로 바꾼다. 주식과 크립토가 같은 `applyExecutions`를 쓴다.
+- 주식 전략 공식(정수 나눗셈: `InfinitePosition` 1/4 매도, `VrPosition`·`VrStrategy` 사다리 분모, `ReverseModePosition` 분할)은 그대로 둔다. 대신 `AccountBalance.wholeShares()`로 읽는다. 소수 보유가 주식 공식에 닿으면 조용히 계산하지 않고 즉시 예외를 낸다.
+- `== 0`·`> 0` 같은 원장 비교는 `signum()`으로 바꾼다.
+- **확정: 이번 범위에 포함한다(Plan 1).** 첫 단계에서 현재 HEAD의 백테스트·배치 주문 결과를 골든 테스트로 고정하고, 타입 변경 후 같은 결과가 나오는지 확인한다.
+- 운영 근거(2026-10-21 읽기 전용 조회): 최근 30일 INFINITE·VR·PRIVACY의 `cycle_position` 보유 변화 106건이 모두 같은 날 자기 주문 FILLED 수량 합과 일치했다(불일치 0건). 자기 주문만 반영하도록 전환해도 기존 원장은 바뀌지 않는다.
 
 **R2. DCA를 `CycleOrderStrategy.plan()` 정규 경로로 편입 (E7·E9 해소)**
 - `OrderPlan`이 "주문 목록 + 규칙별 skip 사유"를 담을 수 있게 확장한다.
