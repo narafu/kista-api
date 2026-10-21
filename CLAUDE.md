@@ -3,7 +3,7 @@
 한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
 Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 루트 패키지는 서브프로젝트별 `com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`이고, 모듈 경계는 프로세스별 `ApplicationModules.verify()`(api·trading-core 각 1개)가 검증한다.
 
-이 파일은 Claude Code 진입점이다. Codex 진입점은 `AGENTS.md`이며, 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
+이 파일은 Claude Code 진입점이다. 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
 
 ## 코드 철학
 

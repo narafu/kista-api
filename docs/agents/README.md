@@ -1,10 +1,9 @@
 # Agent Documentation
 
-This directory contains project knowledge shared by Codex, Claude Code, and other coding agents.
+This directory contains project knowledge shared by Claude Code and other coding agents.
 
 Root entrypoints stay tool-specific:
 
-- `AGENTS.md`: Codex entrypoint and concise repository guide.
 - `CLAUDE.md`: Claude Code entrypoint and Claude-specific `@` references.
 - `.claude/`: Claude-only hooks, agents, and skills.
 

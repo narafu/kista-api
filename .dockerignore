@@ -23,9 +23,6 @@
 **/.env*
 !**/.env.example
 
-# Querydsl 생성 파일
-**/build/generated
-
 # Test reports
 **/build/reports
 **/build/test-results

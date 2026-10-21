@@ -24,9 +24,6 @@ Thumbs.db
 .env*
 !.env.example
 
-# Querydsl 생성 파일
-build/generated/
-
 # Test reports
 build/reports/
 build/test-results/
@@ -34,16 +31,10 @@ build/test-results/
 # Docker override
 docker-compose.override.yml
 
-# memory
-/.shrimp-data/memory/
-
 # Claude Code 런타임 파일
 .claude/scheduled_tasks.lock
 .claude/scheduled_tasks.json
 .claude/settings.local.json
-
-# Codex 로컬 설정
-.codex/
 
 # Git worktrees
 .worktrees/
@@ -57,15 +48,8 @@ docker-compose.override.yml
 # Gradle 컴파일 바이너리 출력
 bin/
 
-# Node.js 의존성 폴더
-node_modules/
-
 # 로컬 서버 로그
 logs/
-
-# npm 잔재 (Java 프로젝트 — node 의존성 없음)
-package-lock.json
-node_modules/
 
 # Claude Code native worktrees
 .claude/worktrees/
