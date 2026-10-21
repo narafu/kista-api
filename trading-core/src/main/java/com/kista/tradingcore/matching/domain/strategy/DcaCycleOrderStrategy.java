@@ -17,10 +17,13 @@ import com.kista.tradingcore.matching.domain.model.VrPosition;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-// DCA 회차 판정 커널 — 순수 계산. 배치 진입은 trading DcaRoundPlanner·CryptoDcaRoundExecutor가 규칙마다 decideRule()을 직접 호출한다
+// DCA 회차 판정 커널 — 순수 계산. 주식은 plan()(입력은 trading DcaPlanInputCollector), 코인은 CryptoDcaRoundExecutor가 규칙마다 decideRule()을 직접 호출한다
 public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
@@ -37,10 +40,38 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         return StrategyType.DCA;
     }
 
-    // DCA는 PlanContext 경로를 쓰지 않는다 — 판정 사유(skip)를 돌려줘야 해서 DcaRoundPlanner → decideRule()로 진입
+    // 주식 DCA 배치 계획 — 판정할 규칙마다 decideRule, 같은 시점 발동 규칙은 각자 주문(상계 없음)
+    // SELL 가용 = 수집 시점 가용(min(판매가능 − 예약분, 원장)) − 같은 배치 앞 규칙이 계획한 SELL — 규칙 합계가 원장·판매가능을 넘지 않게
+    // 판정할 규칙이 없어도 빈 계획을 돌려준다(전략 차원 skip 아님). 코인은 CryptoDcaRoundExecutor가 decideRule을 직접 부른다
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
-        throw new UnsupportedOperationException("DCA는 DcaRoundPlanner.decideRule 경유로만 계획한다");
+        List<DcaRuleInputs> due = ctx.dca() == null ? List.of() : ctx.dca().dueRules();
+        List<PlannedOrder> orders = new ArrayList<>();
+        List<DcaRuleDecision.Skipped> skips = new ArrayList<>();
+        Map<String, BigDecimal> referencePrices = new LinkedHashMap<>();
+        BigDecimal plannedSell = BigDecimal.ZERO;
+        for (DcaRuleInputs in : due) {
+            DcaRule rule = in.rule();
+            boolean sell = rule.direction() == OrderDirection.SELL;
+            DcaRuleInputs adjusted = sell && in.sellableAfterReserved() != null
+                    ? withSellable(in, in.sellableAfterReserved().subtract(plannedSell).max(BigDecimal.ZERO))
+                    : in;
+            switch (decideRule(adjusted)) {
+                case DcaRuleDecision.Planned p -> {
+                    if (sell) plannedSell = plannedSell.add(p.quantity());
+                    orders.add(PlannedOrder.of(ctx.tradeDate(), ctx.ticker(), rule.orderType(), rule.direction(),
+                            p.quantity().intValueExact(), p.limitPrice(), rule.timing(), rule.orderLeg()));
+                    referencePrices.put(rule.orderLeg(), p.referencePrice());
+                }
+                case DcaRuleDecision.Skipped s -> skips.add(s);
+            }
+        }
+        return Optional.of(new OrderPlan(null, null, List.copyOf(orders), List.copyOf(skips), Map.copyOf(referencePrices)));
+    }
+
+    private static DcaRuleInputs withSellable(DcaRuleInputs in, BigDecimal sellable) {
+        return new DcaRuleInputs(in.rule(), in.market(), in.closes(), in.ledger(), sellable, in.fearGreed(),
+                in.currentPrice(), in.availableCash());
     }
 
     // 규칙 1개 판정 — 데이터 → 조건 → 보유(SELL) → 규모 → 부족 정책 → 최소 단위
@@ -138,6 +169,12 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public boolean snapshotsBrokerBalance() { return true; }
+
+    @Override
+    public boolean fixesPricesAtPlan() { return true; } // 계획 시점 캡가 고정 — 현재가 기준 재캡 없음
+
+    @Override
+    public boolean recordsRounds() { return true; }
 
     // 예산 부족 시 단일 BUY 수량을 floor(budget / 캡가)로 축소 — 브로커가 지정가×수량으로 주문가능금액을 검증하므로 캡가 기준
     @Override

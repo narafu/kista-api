@@ -6,10 +6,12 @@ import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
+import com.kista.tradingcore.matching.domain.model.DcaRuleDecision;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import com.kista.shared.kernel.StrategyCapability;
@@ -86,6 +88,13 @@ public interface CycleOrderStrategy {
     // 리포트 후 cycle_position을 내부 원장(applyExecutions) 대신 브로커 실잔고 스냅샷으로 기록할지 (DCA만 true — 매수·매도 DCA가 한 포지션 공유)
     default boolean snapshotsBrokerBalance() { return false; }
 
+    // 계획 시점 지정가를 고정하는지 (DCA만 true) — true면 호출부가 예산 배정 전 현재가 기준 재캡(prepareForAllocation)을 건너뛴다
+    default boolean fixesPricesAtPlan() { return false; }
+
+    // 규칙 회차 이력을 기록하는 전략인지 (DCA만 true) — true면 배치가 회차 입력을 수집해 plan()에 넘기고,
+    // OrderPlan.skips·저장 주문을 회차 이력으로 기록하며 예산 거절을 잔고 부족 알림 대신 skip 이력으로 남긴다
+    default boolean recordsRounds() { return false; }
+
     // 기존 주문만으로 오늘 생성 가능한 주문 슬롯이 모두 점유됐는지 여부
     // existingOrders: 호출부(TradingService)가 영속 Order를 Order::toPlanned로 강등해 전달한다
     default boolean canSkipOrderComputation(List<PlannedOrder> existingOrders, Set<OrderTiming> creatableTimings) {
@@ -102,8 +111,19 @@ public interface CycleOrderStrategy {
             String label,
             InfiniteInputs infinite,  // INFINITE 전용 입력 (PRIVACY·VR은 무시)
             PrivacyInputs privacy,    // PRIVACY 전용 입력 (INFINITE·VR은 무시)
-            VrInputs vr               // VR 전용 입력 (INFINITE·PRIVACY는 무시)
+            VrInputs vr,              // VR 전용 입력 (INFINITE·PRIVACY는 무시)
+            DcaPlanInputs dca         // DCA 전용 입력 (그 외 전략은 무시)
     ) {
+
+        // DCA 외 전략용 — dca 입력 없음
+        public PlanContext(AccountBalance balance, StrategyTicker ticker, LocalDate tradeDate, String label,
+                           InfiniteInputs infinite, PrivacyInputs privacy, VrInputs vr) {
+            this(balance, ticker, tradeDate, label, infinite, privacy, vr, null);
+        }
+
+        // DCA 전략 전용 입력 묶음 — 이번 배치에서 판정할 규칙별 입력(입력 순서 유지, 빈 목록 = 판정할 규칙 없음)
+        // 같은 배치 앞 SELL 규칙 계획분 차감은 판정 결과에 의존하므로 plan()이 순회하며 적용한다
+        public record DcaPlanInputs(List<DcaCycleOrderStrategy.DcaRuleInputs> dueRules) {}
 
         // INFINITE 전략 전용 입력 묶음
         // divisionCount: 전략 버전 상세값 (없으면 기본 분할 수)
@@ -150,5 +170,12 @@ public interface CycleOrderStrategy {
 
     // 전략 계산 결과 — position은 INFINITE만 non-null, vrPosition은 VR만 non-null
     // (preview의 INSUFFICIENT_BALANCE 케이스에서도 보존 — BuyOrderPriceCapper 접수 전 보정에 재사용)
-    record OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders) {}
+    // skips: DCA 규칙 skip 판정(이력 기록용), referencePrices: DCA 주문 leg → 주문 기준가 — DCA 외 전략은 빈 값
+    record OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders,
+                     List<DcaRuleDecision.Skipped> skips, Map<String, BigDecimal> referencePrices) {
+
+        public OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders) {
+            this(position, vrPosition, orders, List.of(), Map.of());
+        }
+    }
 }

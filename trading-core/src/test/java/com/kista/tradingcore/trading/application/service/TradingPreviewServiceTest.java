@@ -37,6 +37,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -581,24 +582,77 @@ class TradingPreviewServiceTest {
         assertThat(competition.blockedByHigherPriority()).isEmpty();
     }
 
-    @Test
-    void preview_dca_throwsManualExecutionUnsupported() {
-        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
-                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByIdOrThrow(dca.id())).thenReturn(dca);
+    static final Strategy STOCK_DCA = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
+            StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+    static final StrategyCycle DCA_CYCLE = new StrategyCycle(UUID.randomUUID(), STOCK_DCA.id(), UUID.randomUUID(),
+            BigDecimal.ZERO, null, LocalDate.now().minusDays(7), null, null, null);
+    static final String DCA_KEY = "11111111-1111-1111-1111-111111111111";
 
-        assertThatThrownBy(() -> service.preview(dca.id(), ACCOUNT.userId()))
-                .isInstanceOf(DcaManualExecutionUnsupportedException.class);
+    private void stubDcaAccount() {
+        when(strategyPort.findByIdOrThrow(STOCK_DCA.id())).thenReturn(STOCK_DCA);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STOCK_DCA));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STOCK_DCA.id()))).thenReturn(Map.of(STOCK_DCA.id(), DCA_CYCLE));
     }
 
     @Test
-    void previewBatch_excludesDcaStrategies() {
-        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
-                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
-        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(dca));
+    void DCA_주식_전략도_프리뷰에_포함() {
+        stubDcaAccount();
+        PlannedOrder dcaBuy = PlannedOrder.of(LocalDate.now(), StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 3,
+                new BigDecimal("91.48"), OrderTiming.AT_CLOSE, "DCA_" + DCA_KEY);
+        when(planBuilder.build(eq(STOCK_DCA), eq(TRADING_ACCOUNT), eq(DCA_CYCLE), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(dcaBuy)), null));
 
-        assertThat(service.previewBatch(ACCOUNT.id(), ACCOUNT.userId())).isEmpty();
-        verifyNoInteractions(planBuilder);
+        NextOrdersPreview result = service.preview(STOCK_DCA.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isNull();
+        assertThat(result.orders()).containsExactly(dcaBuy);
+    }
+
+    @Test
+    void 프리뷰는_DCA_이력을_쓰지_않는다() {
+        // 실제 planBuilder → CycleOrderComputer → DcaPlanInputCollector → DCA 커널 경로. 수집기는 이력 기록 의존이 없고,
+        // 판정 완료 여부 조회(find)만 읽는다 — insertIfAbsent(기록)는 한 번도 호출되지 않아야 한다
+        stubDcaAccount();
+        LocalDate usSession = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate().minusDays(1);
+        var calendar = mock(com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort.class);
+        when(calendar.usSessionDateOf(any())).thenReturn(usSession);
+        when(calendar.isUsSessionOpen(any())).thenReturn(true);
+        var candlePort = mock(com.kista.tradingcore.broker.application.port.output.CandlePort.class);
+        when(candlePort.getDailyCandlesBefore(eq("UPRO"), eq(usSession), anyInt())).thenReturn(List.of(
+                new com.kista.tradingcore.broker.domain.model.BrokerCandle(usSession.minusDays(1), null, null, null, new BigDecimal("87.12"), 0)));
+        var dcaDetailPort = mock(com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort.class);
+        when(dcaDetailPort.findActiveByStrategyId(STOCK_DCA.id())).thenReturn(Optional.of(TradingFixtures.dcaConfig(
+                TradingFixtures.stockDcaRule(DCA_KEY, OrderDirection.BUY, "300", OrderType.MOC))));
+        var executionPort = mock(com.kista.tradingcore.trading.application.port.output.DcaExecutionPort.class);
+        DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort,
+                mock(com.kista.tradingcore.broker.application.port.output.SellableQuantityPort.class),
+                mock(com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort.class), orderPort, dcaDetailPort, executionPort);
+        var strategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(
+                List.of(new com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy()));
+        var balanceLoader = mock(com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader.class);
+        when(balanceLoader.tryLoadBalance(STOCK_DCA)).thenReturn(new com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader.BalanceLoad(
+                new com.kista.tradingcore.matching.domain.model.AccountBalance(0, null, BigDecimal.ZERO), null));
+        StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
+                new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
+        TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, realBuilder,
+                competitionSimulator, sellSufficiencySimulator, priceFetcher);
+
+        NextOrdersPreview result = wired.preview(STOCK_DCA.id(), ACCOUNT.userId());
+
+        assertThat(result.orders()).extracting(PlannedOrder::orderLeg).containsExactly("DCA_" + DCA_KEY);
+        verify(executionPort, never()).insertIfAbsent(any());
+    }
+
+    @Test
+    void 코인_DCA는_단건_프리뷰를_지원하지_않는다() {
+        Account upbit = TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID());
+        Strategy btc = new Strategy(UUID.randomUUID(), upbit.id(), StrategyType.DCA,
+                StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(btc.id())).thenReturn(btc);
+        when(accountPort.requireOwnedAccount(upbit.id(), upbit.userId())).thenReturn(upbit);
+
+        assertThatThrownBy(() -> service.preview(btc.id(), upbit.userId()))
+                .isInstanceOf(DcaManualExecutionUnsupportedException.class);
     }
 
     @Test

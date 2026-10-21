@@ -12,11 +12,15 @@ import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.domain.model.BatchContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.EnumSet;
 import java.util.Map;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -33,6 +37,8 @@ class StrategyOrderPlanBuilder {
     private final CycleOrderComputer orderComputer;          // 전략 계산 + 유효성 검증
     private final CycleOrderStrategies cycleOrderStrategies; // 전략 타입별 capability 조회
     private final PrivacyBaseGuard privacyBaseGuard;         // PRIVACY 기준표 장전 점검 (무알림 판정)
+    private final OrderPort orderPort;                       // 회차 판정 전략(DCA)의 당일 기존 주문 조회
+    private final DcaPlanInputCollector dcaInputCollector;   // 회차 판정 전략(DCA) 입력 수집 — 부작용 없음
 
     // 계산 결과 — 정상이면 plan non-null, skip이면 skipReason non-null
     record PlanResult(CycleOrderStrategy.OrderPlan plan, SkipReason skipReason) {
@@ -69,8 +75,14 @@ class StrategyOrderPlanBuilder {
             return new PlanResult(null, SkipReason.PRIVACY_BASE_BLOCKED);
         }
 
+        // 회차 판정 전략(DCA)은 배치와 같은 수집 경로로 plan 입력을 채운다 — 양 timing 대상, 당일 기존 주문 규칙은 제외(복구 기록은 배치 몫)
+        CycleOrderStrategy.PlanContext.DcaPlanInputs dcaInputs = orderStrategy.recordsRounds()
+                ? dcaInputCollector.collect(new BatchContext(strategy, currentCycle, account, null), today,
+                        EnumSet.of(OrderTiming.AT_OPEN, OrderTiming.AT_CLOSE), orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today),
+                        null, balance).inputs()
+                : null;
         CycleOrderStrategy.OrderPlan plan = orderComputer.compute(
-                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, label, null)
+                balance, strategy, prevClosePrice, today, currentCycle, privacyBase, label, null, dcaInputs)
                 .orElse(null);
         if (plan == null) {
             return new PlanResult(null, SkipReason.NO_PRIVACY_BASE);

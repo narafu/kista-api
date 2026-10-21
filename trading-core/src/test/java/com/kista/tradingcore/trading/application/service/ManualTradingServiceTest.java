@@ -115,7 +115,7 @@ class ManualTradingServiceTest {
         TradingOrderPlanner orderPlanner = new TradingOrderPlanner(orderPort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
         StrategyOrderPlanBuilder planBuilder = new StrategyOrderPlanBuilder(
-                balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard);
+                balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(

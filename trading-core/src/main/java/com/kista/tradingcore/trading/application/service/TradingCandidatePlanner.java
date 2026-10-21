@@ -11,6 +11,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
@@ -45,7 +46,7 @@ class TradingCandidatePlanner {
     private final ApplicationEventPublisher eventPublisher; // 예수금 부족 알림(InsufficientBalanceEvent)
     private final TradingBatchGuard batchGuard;
     private final AccountBudgetLock budgetLock;                 // 계좌별 배정~저장 직렬화 — 수동 실행·재캡과 같은 락
-    private final DcaRoundPlanner dcaRoundPlanner;              // DCA 회차 판정 (일반 전략의 orderComputer 대체 경로)
+    private final DcaPlanInputCollector dcaInputCollector;      // 회차 판정 전략(DCA) plan 입력 수집 — 부작용 없음
     private final DcaExecutionRecorder dcaExecutionRecorder;    // DCA 회차 이력·skip 알림 기록
     private final TradingParallelRunner parallelRunner;         // 계좌별 조회+예산배정 병렬 실행
 
@@ -145,30 +146,28 @@ class TradingCandidatePlanner {
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), false);
             return new CyclePlanCandidate(existingState, List.of(), true);
         }
-        // DCA는 판정·이력 기록 경로가 별도 — 기준가는 이력 기록용으로 후보에 싣는다
+        // 회차 판정 전략(DCA)은 규칙 입력을 수집해 plan()에 넘기고, 이력 없이 남은 당일 규칙 주문은 ORDERED로 복구 기록한다
         // 원장(balance)이 규칙 판정의 AVG_PRICE 평단·SELL 보유 상한 기준
-        List<DcaDecision.Planned> dcaPlans = strategy.isDca()
-                ? dcaRoundPlanner.plan(ctx, tradeDate, creatableTimings, existingOrders, price, balance)
-                : List.of();
-        Optional<CycleOrderStrategy.OrderPlan> planOpt = strategy.isDca()
-                ? Optional.of(dcaPlans).filter(p -> !p.isEmpty())
-                        .map(p -> new CycleOrderStrategy.OrderPlan(null, null, p.stream().map(DcaDecision.Planned::order).toList()))
-                : orderComputer.compute(balance, strategy, prevClosePrice, tradeDate, ctx.currentCycle(), privacyBase, account.nickname(), price);
+        DcaCollected dca = strategyHandler.recordsRounds()
+                ? dcaInputCollector.collect(ctx, tradeDate, creatableTimings, existingOrders, price, balance)
+                : null;
+        if (dca != null) {
+            dca.recoveries().forEach((ruleKey, order) -> dcaExecutionRecorder.recordOrdered(ctx, tradeDate, ruleKey, order, null));
+        }
+        Optional<CycleOrderStrategy.OrderPlan> planOpt = orderComputer.compute(balance, strategy, prevClosePrice, tradeDate,
+                ctx.currentCycle(), privacyBase, account.nickname(), price, dca == null ? null : dca.inputs());
         if (planOpt.isEmpty()) {
-            if (strategy.isDca()) {
-                log.debug("[{}] DCA 이번 배치 신규 주문 없음 (비실행일·다른 timing·판정 완료·skip)", account.nickname());
-            } else {
-                log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
-            }
+            log.info("[{}] 전략 계산 skip (PRIVACY 기준 미수신 등)", account.nickname());
             if (existingOrders.isEmpty()) return null;
             CycleState existingState = buildCycleStateFromExistingOrders(
                     ctx, balance, priceSnapshot, privacyBase, tradeDate, existingOrders.size(), true);
             return new CyclePlanCandidate(existingState, List.of(), true);
         }
+        if (dca != null) recordDcaSkips(ctx, tradeDate, planOpt.get().skips(), dca.inputs());
 
         // 예산 배정 전에 전략별 가격 cap을 반영해 최종 BUY 수량과 correction 주문까지 포함한다.
-        List<PlannedOrder> preparedOrders = strategy.isDca()
-                ? planOpt.get().orders() // DCA는 계획 시점 캡가 고정 — 현재가 기준 재캡 없음
+        List<PlannedOrder> preparedOrders = strategyHandler.fixesPricesAtPlan()
+                ? planOpt.get().orders() // 계획 시점 캡가 고정 — 현재가 기준 재캡 없음
                 : priceCapper.prepareForAllocation(
                         planOpt.get().orders(), price, planOpt.get().position(), planOpt.get().vrPosition(), strategy.ticker(),
                         strategy.type(), tradeDate);
@@ -177,8 +176,22 @@ class TradingCandidatePlanner {
                 preparedOrders, existingOrders, creatableTimings);
         PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
         CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
-        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty(),
-                dcaPlans.stream().collect(Collectors.toMap(p -> p.order().orderLeg(), DcaDecision.Planned::referencePrice)));
+        return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty(), planOpt.get().referencePrices());
+    }
+
+    // 규칙 skip 판정 이력 기록 — 방향은 판정 입력의 규칙에서 찾는다
+    private void recordDcaSkips(BatchContext ctx, LocalDate tradeDate, List<DcaRuleDecision.Skipped> skips,
+                                CycleOrderStrategy.PlanContext.DcaPlanInputs inputs) {
+        for (DcaRuleDecision.Skipped skip : skips) {
+            OrderDirection direction = inputs.dueRules().stream()
+                    .filter(in -> in.rule().ruleKey().equals(skip.ruleKey()))
+                    .findFirst().orElseThrow().rule().direction();
+            dcaExecutionRecorder.recordSkipped(ctx, tradeDate, skip.ruleKey(), direction, skip.reason(), skip.detail(), skip.referencePrice());
+        }
+    }
+
+    private boolean recordsRounds(BatchContext ctx) {
+        return cycleOrderStrategies.of(ctx.strategy().type()).recordsRounds();
     }
 
     private void validateConcreteOrderLegs(Strategy strategy, List<PlannedOrder> orders) {
@@ -226,7 +239,7 @@ class TradingCandidatePlanner {
                 .forEach(candidate -> candidatesByAccount
                         .computeIfAbsent(candidate.ctx().account().id(), _ -> new ArrayList<>())
                         .add(candidate));
-        // DCA 사이클별 leg → 주문 기준가 — ORDERED·거절 skip 이력의 reference_price (병렬 태스크는 읽기만 한다)
+        // 회차 판정 사이클별 leg → 주문 기준가 — ORDERED·거절 skip 이력의 reference_price (병렬 태스크는 읽기만 한다)
         Map<BatchContext, Map<String, BigDecimal>> dcaReferencePrices = candidates.stream()
                 .filter(candidate -> !candidate.dcaReferencePrices().isEmpty())
                 .collect(Collectors.toMap(candidate -> candidate.state().ctx(), CyclePlanCandidate::dcaReferencePrices, (a, b) -> a));
@@ -255,7 +268,7 @@ class TradingCandidatePlanner {
             Set<BatchContext> rejectedContexts = Stream.concat(
                             allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
                     .map(TradingOrderBudgetAllocator.Candidate::ctx)
-                    .filter(ctx -> !ctx.strategy().isDca())
+                    .filter(ctx -> !recordsRounds(ctx))
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             for (BatchContext ctx : rejectedContexts) {
                 batchGuard.runSafely("예수금 부족 알림", ctx, () -> {
@@ -275,7 +288,7 @@ class TradingCandidatePlanner {
                                      DcaSkipReason reason, String detail,
                                      Map<BatchContext, Map<String, BigDecimal>> dcaReferencePrices) throws InterruptedException {
         for (TradingOrderBudgetAllocator.Candidate candidate : rejected) {
-            if (!candidate.ctx().strategy().isDca()) continue;
+            if (!recordsRounds(candidate.ctx())) continue;
             Map<String, BigDecimal> prices = dcaReferencePrices.getOrDefault(candidate.ctx(), Map.of());
             batchGuard.runSafely("DCA 미주문 기록", candidate.ctx(), () -> {
                 for (PlannedOrder order : candidate.orders()) {
@@ -345,7 +358,7 @@ class TradingCandidatePlanner {
                 return approved.ctx();
             });
             savedCtx.ifPresent(saved::add);
-            if (savedCtx.isPresent() && approved.ctx().strategy().isDca()) {
+            if (savedCtx.isPresent() && recordsRounds(approved.ctx())) {
                 recordDcaOrdered(approved.ctx(), tradeDate, dcaReferencePrices.getOrDefault(approved.ctx(), Map.of())); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
             }
         }

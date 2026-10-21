@@ -11,7 +11,13 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
-import com.kista.tradingcore.matching.domain.model.DcaDecision;
+import com.kista.shared.kernel.DcaIndicator;
+import com.kista.shared.kernel.DcaOperator;
+import com.kista.shared.kernel.Market;
+import com.kista.tradingcore.matching.domain.model.DcaCondition;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.support.TradingFixtures;
@@ -37,7 +43,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.kista.tradingcore.support.TradingFixtures.stockDcaRule;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -61,8 +71,8 @@ class TradingCandidatePlannerDcaTest {
 
     @BeforeEach
     void setUp() {
-        planner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, null, allocator, null,
-                publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), mock(DcaRoundPlanner.class), recorder,
+        planner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, STRATEGIES, allocator, null,
+                publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), mock(DcaPlanInputCollector.class), recorder,
                 new TradingParallelRunner(0));
         TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
         Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.DCA,
@@ -82,26 +92,77 @@ class TradingCandidatePlannerDcaTest {
                 new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(planned), false, Map.of("DCA_" + KEY, REFERENCE));
     }
 
-    @Test
-    void open_candidate_passes_current_price_and_carries_reference_price() throws Exception {
-        DcaRoundPlanner dcaRoundPlanner = mock(DcaRoundPlanner.class);
-        TradingBalanceLoader balanceLoader = mock(TradingBalanceLoader.class);
-        CycleOrderStrategies strategies = mock(CycleOrderStrategies.class);
-        TradingCandidatePlanner withPlanner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, strategies, allocator,
-                balanceLoader, publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), dcaRoundPlanner, recorder,
+    static final CycleOrderStrategies STRATEGIES = new CycleOrderStrategies(List.of(new DcaCycleOrderStrategy()));
+    static final String KEY2 = "22222222-2222-2222-2222-222222222222";
+    static final BigDecimal PREMARKET = new BigDecimal("95.00");
+    static final AccountBalance LEDGER = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO); // 원장 10주 평단 80
+
+    DcaPlanInputCollector collector = mock(DcaPlanInputCollector.class);
+    TradingBalanceLoader balanceLoader = mock(TradingBalanceLoader.class);
+
+    // 실제 CycleOrderComputer·DCA 커널로 plan() 정규 경로를 태우고 수집기만 스텁한다
+    private TradingCandidatePlanner wiredPlanner() {
+        CycleOrderComputer computer = new CycleOrderComputer(STRATEGIES, null, null, null, null, null, orderPort);
+        return new TradingCandidatePlanner(orderPort, computer, orderPlanner, null, STRATEGIES, allocator,
+                balanceLoader, publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), collector, recorder,
                 new TradingParallelRunner(0));
-        when(balanceLoader.loadBalanceOrThrow(ctx.strategy()))
-                .thenReturn(new TradingBalanceLoader.BalanceLoad(new AccountBalance(0, null, BigDecimal.ZERO), null));
+    }
+
+    private void stubCollected(Map<String, Order> recoveries, DcaRule... rules) {
+        when(balanceLoader.loadBalanceOrThrow(ctx.strategy())).thenReturn(new TradingBalanceLoader.BalanceLoad(LEDGER, null));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
-        BigDecimal premarket = new BigDecimal("95.00");
-        when(dcaRoundPlanner.plan(eq(ctx), eq(DAY), any(), eq(List.of()), eq(premarket), any()))
-                .thenReturn(List.of(new DcaDecision.Planned(planned, premarket)));
+        List<DcaCycleOrderStrategy.DcaRuleInputs> due = java.util.Arrays.stream(rules)
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(REFERENCE), LEDGER,
+                        r.direction() == OrderDirection.SELL ? BigDecimal.TEN : null, null, PREMARKET, null))
+                .toList();
+        when(collector.collect(eq(ctx), eq(DAY), any(), eq(List.of()), eq(PREMARKET), eq(LEDGER)))
+                .thenReturn(new DcaCollected(new CycleOrderStrategy.PlanContext.DcaPlanInputs(due), recoveries));
+    }
 
-        List<TradingCandidatePlanner.CyclePlanCandidate> candidates = withPlanner.collectOpenCandidates(List.of(ctx),
-                Map.of(StrategyTicker.UPRO, new PriceSnapshot(premarket, REFERENCE)), null, DAY);
+    private List<TradingCandidatePlanner.CyclePlanCandidate> collectOpen() throws Exception {
+        return wiredPlanner().collectOpenCandidates(List.of(ctx), Map.of(StrategyTicker.UPRO, new PriceSnapshot(PREMARKET, REFERENCE)), null, DAY);
+    }
 
-        assertThat(candidates).singleElement().extracting(TradingCandidatePlanner.CyclePlanCandidate::dcaReferencePrices)
-                .isEqualTo(Map.of("DCA_" + KEY, premarket));
+    @Test
+    void DCA_같은_MOO에_BUY와_SELL_규칙이_모두_주문된다() throws Exception {
+        stubCollected(Map.of(), stockDcaRule(KEY, OrderDirection.BUY, "300", OrderType.MOO),
+                stockDcaRule(KEY2, OrderDirection.SELL, "300", OrderType.MOO));
+
+        List<TradingCandidatePlanner.CyclePlanCandidate> candidates = collectOpen();
+
+        TradingCandidatePlanner.CyclePlanCandidate candidate = candidates.getFirst();
+        // BUY 기준가 = max(전일 87.12, 현재 95) = 95 → 300/95 = 3주, SELL 기준가 = 전일 종가 87.12 → 3주
+        assertThat(candidate.creatableOrders()).extracting(PlannedOrder::orderLeg, PlannedOrder::direction, PlannedOrder::quantity)
+                .containsExactly(tuple("DCA_" + KEY, OrderDirection.BUY, 3), tuple("DCA_" + KEY2, OrderDirection.SELL, 3));
+        assertThat(candidate.dcaReferencePrices()).isEqualTo(Map.of("DCA_" + KEY, PREMARKET, "DCA_" + KEY2, REFERENCE));
+        verifyNoInteractions(recorder);
+    }
+
+    @Test
+    void DCA_조건미충족_규칙은_skip_이력_나머지는_주문() throws Exception {
+        // 평단 80 × 0.95 = 76 < 기준가 → AVG_PRICE ≤ −5% 미충족
+        stubCollected(Map.of(), stockDcaRule(KEY, OrderDirection.BUY, "300", OrderType.MOO,
+                        new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5"))),
+                stockDcaRule(KEY2, OrderDirection.SELL, "300", OrderType.MOO));
+
+        List<TradingCandidatePlanner.CyclePlanCandidate> candidates = collectOpen();
+
+        assertThat(candidates.getFirst().creatableOrders()).extracting(PlannedOrder::orderLeg).containsExactly("DCA_" + KEY2);
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(OrderDirection.BUY), eq(DcaSkipReason.CONDITION_NOT_MET), anyString(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), eq(KEY2), any(), any(), any(), any());
+    }
+
+    @Test
+    void DCA_수집기가_돌려준_복구_대상은_ORDERED로_기록한다() throws Exception {
+        Order existing = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO,
+                OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.valueOf(3), new BigDecimal("91.48"),
+                OrderStatus.FILLED, "E1", BigDecimal.valueOf(3), new BigDecimal("88.00"));
+        stubCollected(Map.of(KEY, existing));
+
+        List<TradingCandidatePlanner.CyclePlanCandidate> candidates = collectOpen();
+
+        verify(recorder).recordOrdered(ctx, DAY, KEY, existing, null);
+        assertThat(candidates).allSatisfy(c -> assertThat(c.creatableOrders()).isEmpty());
     }
 
     @Test

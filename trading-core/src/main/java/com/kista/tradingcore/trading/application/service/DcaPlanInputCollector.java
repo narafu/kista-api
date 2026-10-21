@@ -9,11 +9,9 @@ import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
-import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
-import com.kista.tradingcore.matching.domain.model.DcaRuleDecision;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
-import com.kista.tradingcore.matching.domain.model.PlannedOrder;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
@@ -33,6 +31,7 @@ import java.time.Instant;
 import java.time.InstantSource;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,12 +39,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
-// DCA 배치 회차 계획 — 규칙마다 기존 주문 복구·timing·실행일·이력 판정 후 250봉 종가(신선도 검증·세션 캐시)·판매가능수량·CNN 지수 조회
-// → DcaCycleOrderStrategy.decideRule → skip이면 규칙 단위 이력·알림 기록. 같은 시점 발동 규칙은 각자 주문(상계 없음)
+// 주식 DCA plan() 입력 수집 — 규칙마다 판정 이력·기존 주문 복구·timing·실행일 확인 후 250봉 종가(신선도 검증·세션 캐시)·
+// 판매가능수량·CNN 지수를 모은다. 부작용 없음(이력 기록 안 함) — 프리뷰도 이 경로를 타며, 복구 기록은 배치(TradingCandidatePlanner)가 한다
 @Slf4j
 @Component
 @RequiredArgsConstructor
-class DcaRoundPlanner {
+class DcaPlanInputCollector {
 
     private static final int CANDLE_COUNT = 250;            // SMA 최대 200 + RSI 안정화 (spec 6.1)
     private static final int PREVIOUS_SESSION_SCAN_DAYS = 10; // 직전 개장일 역탐색 상한 (연휴 여유)
@@ -57,9 +56,7 @@ class DcaRoundPlanner {
     private final FearGreedIndexPort fearGreedIndexPort;    // FEAR_GREED 조건용 CNN 지수
     private final OrderPort orderPort;
     private final StrategyDcaDetailPort dcaDetailPort;
-    private final DcaExecutionPort dcaExecutionPort;
-    private final DcaExecutionRecorder recorder;
-    private final DcaCycleOrderStrategy dcaStrategy;
+    private final DcaExecutionPort dcaExecutionPort;        // 판정 완료 여부 조회 전용(읽기)
     // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
     // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회 (spec 6.2)
@@ -72,19 +69,19 @@ class DcaRoundPlanner {
 
     private record FearGreedMemo(BigDecimal value, Instant fetchedAt) {}
 
-    // 빈 목록 = 이번 배치에서 DCA 신규 주문 없음 (비실행일·다른 timing·이미 판정·skip). 규칙 입력 순서 유지
     // currentPrice: 배치 시작 시점 현재가(null 허용) — BUY 기준가 max(전일 종가, 현재가) 산정용
     // ledger: 원장(최신 cycle_position) — AVG_PRICE 평단·SELL 보유 상한·보유 비율 기준
-    // ponytail: 최소 적응 단계 — Task 3에서 CycleOrderStrategy.plan() 경로로 이관된다
-    List<DcaDecision.Planned> plan(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings,
-                                   List<Order> existingOrders, BigDecimal currentPrice, AccountBalance ledger) {
+    // existingOrders: 같은 사이클·거래일 PLANNED/PLACED 주문 — 규칙 leg가 있으면 재판정 없이 복구 대상
+    DcaCollected collect(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings,
+                         List<Order> existingOrders, BigDecimal currentPrice, AccountBalance ledger) {
         Strategy strategy = ctx.strategy();
         DcaStrategyConfig config = dcaDetailPort.findActiveByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("DCA 설정이 없습니다: " + strategy.id()));
-        List<DcaDecision.Planned> planned = new ArrayList<>();
-        Integer sellable = null; // 판매가능 − 기존 예약분, SELL 규칙이 처음 필요할 때 1회 조회(실패 시 계속 null)
+        List<DcaCycleOrderStrategy.DcaRuleInputs> due = new ArrayList<>();
+        Map<String, Order> recoveries = new LinkedHashMap<>();
+        List<Order> todayOrders = null;          // 종결 주문 포함 당일 주문 — 처음 필요할 때 1회 조회
+        BigDecimal sellable = null;              // min(판매가능 − 기존 예약분, 원장) — SELL 규칙이 처음 필요할 때 1회 조회(실패 시 null)
         boolean sellableLoaded = false;
-        BigDecimal plannedSell = BigDecimal.ZERO; // 같은 배치 앞 규칙이 계획한 SELL 수량
         for (DcaRule rule : config.rules()) {
             String key = rule.ruleKey();
             if (dcaExecutionPort.find(strategy.id(), key, tradeDate).isPresent()) continue; // 이미 판정됨
@@ -92,7 +89,7 @@ class DcaRoundPlanner {
             // 주문 저장 후 이력 기록 전 중단된 재개 — 기존 규칙 주문으로 ORDERED 복구 (다른 timing 배치에서도 복구되도록 timing 판정보다 먼저)
             Optional<Order> existing = existingOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst();
             if (existing.isPresent()) {
-                recorder.recordOrdered(ctx, tradeDate, key, existing.get(), null);
+                recoveries.put(key, existing.get());
                 continue;
             }
 
@@ -101,41 +98,26 @@ class DcaRoundPlanner {
             if (!DcaSchedule.isExecutionDay(usSession, rule, marketCalendarPort::isUsSessionOpen)) continue;
 
             // PLANNED/PLACED 외 상태(FILLED 등)로 넘어간 당일 규칙 주문 — 이력만 누락된 경우 재주문하지 않고 복구
-            Optional<Order> terminal = orderPort.findByStrategyId(strategy.id(), tradeDate, tradeDate).stream()
-                    .filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst();
+            if (todayOrders == null) todayOrders = orderPort.findByStrategyId(strategy.id(), tradeDate, tradeDate);
+            Optional<Order> terminal = todayOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst();
             if (terminal.isPresent()) {
-                recorder.recordOrdered(ctx, tradeDate, key, terminal.get(), null);
+                recoveries.put(key, terminal.get());
                 continue;
             }
 
             boolean sell = rule.direction() == OrderDirection.SELL;
             if (sell && !sellableLoaded) {
-                sellable = loadSellable(ctx, tradeDate);
+                Integer loaded = loadSellable(ctx, tradeDate);
+                // 원장 쪽 상한도 함께 걸어야 같은 배치 SELL 규칙 합계(커널이 앞 계획분을 뺀다)가 원장을 넘지 않는다
+                sellable = loaded == null ? null
+                        : ledger == null ? BigDecimal.valueOf(loaded) : BigDecimal.valueOf(loaded).min(ledger.holdings());
                 sellableLoaded = true;
             }
-            // 가용 = min(판매가능 − 예약분, 원장 보유) − 앞 규칙 계획 SELL — 원장 쪽도 차감해야 규칙 합계가 원장을 넘지 않는다
-            BigDecimal sellableAfterReserved = null;
-            if (sell && sellable != null) {
-                BigDecimal cap = ledger == null ? BigDecimal.valueOf(sellable) : BigDecimal.valueOf(sellable).min(ledger.holdings());
-                sellableAfterReserved = cap.subtract(plannedSell).max(BigDecimal.ZERO);
-            }
-            DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule,
-                    strategy.ticker().getMarket(), loadCloses(strategy.ticker(), usSession), ledger, sellableAfterReserved,
+            due.add(new DcaCycleOrderStrategy.DcaRuleInputs(rule, strategy.ticker().getMarket(),
+                    loadCloses(strategy.ticker(), usSession), ledger, sell ? sellable : null,
                     loadFearGreed(rule), currentPrice, null));
-            switch (decision) {
-                case DcaRuleDecision.Planned p -> {
-                    PlannedOrder order = PlannedOrder.of(tradeDate, strategy.ticker(), rule.orderType(), rule.direction(),
-                            p.quantity().intValueExact(), p.limitPrice(), rule.timing(), rule.orderLeg());
-                    if (sell) plannedSell = plannedSell.add(p.quantity());
-                    log.info("[DCA] 회차 계획: strategy={}, rule={}, 현재가={}, 기준가={}, 수량={}, 지정가={}",
-                            strategy.id(), key, currentPrice, p.referencePrice(), order.quantity(), order.price());
-                    planned.add(new DcaDecision.Planned(order, p.referencePrice()));
-                }
-                case DcaRuleDecision.Skipped s ->
-                        recorder.recordSkipped(ctx, tradeDate, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
-            }
         }
-        return planned;
+        return new DcaCollected(new CycleOrderStrategy.PlanContext.DcaPlanInputs(List.copyOf(due)), Map.copyOf(recoveries));
     }
 
     // 조회 US 세션 이전 확정 종가 250봉 — 실패·피드 지연(마지막 봉 ≠ 직전 개장일)이면 null(DATA_UNAVAILABLE)

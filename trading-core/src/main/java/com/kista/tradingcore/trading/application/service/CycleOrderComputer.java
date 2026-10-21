@@ -48,6 +48,14 @@ class CycleOrderComputer {
     Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
                                                    LocalDate tradeDate, StrategyCycle currentCycle,
                                                    PrivacyTradeBase privacyBase, String label, BigDecimal currentPrice) {
+        return compute(balance, strategy, prevClosePrice, tradeDate, currentCycle, privacyBase, label, currentPrice, null);
+    }
+
+    // dcaInputs: 회차 판정 전략(recordsRounds)의 수집 입력(DcaPlanInputCollector) — 호출부가 수집해 복구 대상을 직접 다룬다, 그 외 null
+    Optional<CycleOrderStrategy.OrderPlan> compute(AccountBalance balance, Strategy strategy, BigDecimal prevClosePrice,
+                                                   LocalDate tradeDate, StrategyCycle currentCycle,
+                                                   PrivacyTradeBase privacyBase, String label, BigDecimal currentPrice,
+                                                   CycleOrderStrategy.PlanContext.DcaPlanInputs dcaInputs) {
         BigDecimal initialUsdDeposit = strategy.isPrivacy()
                 ? currentCycle.startAmount()
                 : null;
@@ -98,7 +106,7 @@ class CycleOrderComputer {
 
         CycleOrderStrategy orderStrategy = cycleStrategies.of(strategy.type());
         return orderStrategy.plan(new CycleOrderStrategy.PlanContext(
-                balance, strategy.ticker(), tradeDate, label, infiniteInputs, privacyInputs, vrInputs));
+                balance, strategy.ticker(), tradeDate, label, infiniteInputs, privacyInputs, vrInputs, dcaInputs));
     }
 
     // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균

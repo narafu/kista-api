@@ -318,7 +318,7 @@ class TradingService {
     }
 
     // 개장 전 접수 대상: KIS 계좌의 DCA AT_OPEN(MOO) 전략 — 계획·배정·저장·접수를 임계구역에서 수행
-    // 개장 후 기존 흐름이 같은 컨텍스트를 다시 처리해도 중복 없음 — DcaRoundPlanner가 이력 행으로, 슬롯 로직이 기존 주문으로 거르고 placeAtOpenOrders는 PLANNED만 접수
+    // 개장 후 기존 흐름이 같은 컨텍스트를 다시 처리해도 중복 없음 — DcaPlanInputCollector가 이력 행으로, 슬롯 로직이 기존 주문으로 거르고 placeAtOpenOrders는 PLANNED만 접수
     private void placePreOpenDcaOrders(List<BatchContext> started, LocalDate tradeDate, TradingPriceFetcher.PriceContext priceCtx) throws InterruptedException {
         List<BatchContext> targets = started.stream()
                 .filter(c -> c.strategy().isDca() && c.account().broker().supportsOpenAuctionOrders())

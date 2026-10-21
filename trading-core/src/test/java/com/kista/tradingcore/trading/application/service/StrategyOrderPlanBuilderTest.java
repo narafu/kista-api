@@ -60,7 +60,7 @@ class StrategyOrderPlanBuilderTest {
 
     @BeforeEach
     void setUp() {
-        builder = new StrategyOrderPlanBuilder(balanceLoader, pricePort, privacyTradePort, orderComputer, cycleOrderStrategies, privacyBaseGuard);
+        builder = new StrategyOrderPlanBuilder(balanceLoader, pricePort, privacyTradePort, orderComputer, cycleOrderStrategies, privacyBaseGuard, null, null);
         lenient().when(cycleOrderStrategies.of(strategy.type())).thenReturn(orderStrategy);
     }
 
@@ -84,7 +84,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
         when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("21.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
+        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null, null))
                 .thenReturn(Optional.of(plan));
 
         StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
@@ -108,7 +108,7 @@ class StrategyOrderPlanBuilderTest {
         when(pricePort.getPrevClose(StrategyTicker.TQQQ, account.brokerRef())).thenReturn(new BigDecimal("100.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
         when(orderComputer.compute(eq(balance), eq(vrStrategy), nullable(BigDecimal.class),
-                eq(today), eq(vrCycle), eq(null), eq("vr-preview"), eq(null)))
+                eq(today), eq(vrCycle), eq(null), eq("vr-preview"), eq(null), eq(null)))
                 .thenReturn(Optional.of(plan));
 
         StrategyOrderPlanBuilder.PlanResult result = builder.build(vrStrategy, account, vrCycle, today, "vr-preview", Map.of());
@@ -117,7 +117,7 @@ class StrategyOrderPlanBuilderTest {
         assertThat(result.plan()).isSameAs(plan);
         verify(pricePort).getPrevClose(StrategyTicker.TQQQ, account.brokerRef());
         verify(orderComputer).compute(balance, vrStrategy, new BigDecimal("100.00"),
-                today, vrCycle, null, "vr-preview", null);
+                today, vrCycle, null, "vr-preview", null, null);
     }
 
     @Test
@@ -127,7 +127,7 @@ class StrategyOrderPlanBuilderTest {
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null))
+        when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null, null))
                 .thenReturn(Optional.of(plan));
 
         StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
@@ -143,7 +143,7 @@ class StrategyOrderPlanBuilderTest {
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, new BigDecimal("22.00"), today, cycle, null, "label", null))
+        when(orderComputer.compute(balance, strategy, new BigDecimal("22.00"), today, cycle, null, "label", null, null))
                 .thenReturn(Optional.of(plan));
         Map<StrategyTicker, BigDecimal> prevCloseCache = Map.of(StrategyTicker.SOXL, new BigDecimal("22.00"));
 
@@ -162,7 +162,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderStrategy.requiresPrevClose()).thenReturn(true);
         when(pricePort.getPrevClose(StrategyTicker.SOXL, account.brokerRef())).thenReturn(new BigDecimal("21.00"));
         CycleOrderStrategy.OrderPlan plan = new CycleOrderStrategy.OrderPlan(null, null, List.of());
-        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null))
+        when(orderComputer.compute(balance, strategy, new BigDecimal("21.00"), today, cycle, null, "label", null, null))
                 .thenReturn(Optional.of(plan));
 
         StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
@@ -177,7 +177,7 @@ class StrategyOrderPlanBuilderTest {
         when(balanceLoader.tryLoadBalance(strategy))
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(balance, null));
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
-        when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null))
+        when(orderComputer.compute(balance, strategy, null, today, cycle, null, "label", null, null))
                 .thenReturn(Optional.empty());
 
         StrategyOrderPlanBuilder.PlanResult result = builder.build(strategy, account, cycle, today, "label", Map.of());
@@ -219,7 +219,7 @@ class StrategyOrderPlanBuilderTest {
         when(orderStrategy.requiresPrevClose()).thenReturn(false);
         when(privacyTradePort.findTodayTrade(today)).thenReturn(Optional.of(base));
         when(privacyBaseGuard.usable(base)).thenReturn(true);
-        when(orderComputer.compute(balance, privacy, null, today, cycle, base, "label", null))
+        when(orderComputer.compute(balance, privacy, null, today, cycle, base, "label", null, null))
                 .thenReturn(Optional.of(plan));
 
         StrategyOrderPlanBuilder.PlanResult result = builder.build(privacy, account, cycle, today, "label", Map.of());

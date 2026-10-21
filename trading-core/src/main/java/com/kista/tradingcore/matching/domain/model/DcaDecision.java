@@ -4,10 +4,8 @@ import com.kista.shared.kernel.DcaSkipReason;
 
 import java.math.BigDecimal;
 
-// DCA 회차 판정 결과 — 주문 계획 또는 skip(사유·상세)
-public sealed interface DcaDecision permits DcaDecision.Planned, DcaDecision.Skipped {
-
-    record Planned(PlannedOrder order, BigDecimal referencePrice) implements DcaDecision {}
+// DCA 조건 판정의 skip 결과(사유·상세·기준가) — DcaConditions.check 반환 타입. 규칙 단위 판정 결과는 DcaRuleDecision
+public sealed interface DcaDecision permits DcaDecision.Skipped {
 
     record Skipped(DcaSkipReason reason, String detail, BigDecimal referencePrice) implements DcaDecision {}
 }

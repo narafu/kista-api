@@ -94,7 +94,7 @@ class TradingServiceTest {
     @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
     @Mock com.kista.tradingcore.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
     @Mock LiveBalancePort liveBalancePort;
-    @Mock DcaRoundPlanner dcaRoundPlanner; // DCA 경로 — 기존 시나리오는 DCA 전략이 없어 미사용
+    @Mock DcaPlanInputCollector dcaInputCollector; // DCA 입력 수집 — 기존 시나리오는 DCA 전략이 없어 미사용
     @Mock DcaExecutionRecorder dcaExecutionRecorder;
     @Mock StrategyDcaDetailPort dcaDetailPort; // 개장 전 접수 대상(KIS DCA MOO) 판별
     @Mock SellableQuantityPort sellableQuantityPort;
@@ -231,7 +231,7 @@ class TradingServiceTest {
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
                 orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
-                budgetAllocator, balanceLoader, eventPublisher, batchGuard, budgetLock, dcaRoundPlanner, dcaExecutionRecorder, new TradingParallelRunner(0));
+                budgetAllocator, balanceLoader, eventPublisher, batchGuard, budgetLock, dcaInputCollector, dcaExecutionRecorder, new TradingParallelRunner(0));
         service = new TradingService(
                 marketCalendarPort, eventPublisher,
                 orderPort, strategyCyclePort,

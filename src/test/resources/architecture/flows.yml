@@ -147,7 +147,7 @@ flows:
         desc: >-
           DCA 전략은 일반 공식 대신 규칙(1~10개)마다 회차 판정을 거친다. 규칙별 기존 주문(leg DCA_{ruleKey})·timing·실행일·이력(UNIQUE 전략+규칙+거래일)을 확인하고, 티커·세션별로 캐시한 250봉 종가(마지막 봉이 직전 개장일이 아니면 데이터 실패)와 판매가능수량(앞 규칙 계획 SELL 차감)·원장(최신 cycle_position) 평단, 그리고 공포탐욕지수(CNN, FEAR_GREED 조건 시 배치 시점 최신값)를 조회해
           평단가·이평선·RSI·공포탐욕지수 조건을 AND로 평가한다(가격 조건은 전일 종가 기준). 매수 수량·캡 지정가는 max(전일 종가, 배치 시작 시점 현재가) 기준가로 계산하고, 매도는 고정 금액 또는 원장 보유 비율이다. 데이터 실패 → 조건 미충족 → 보유 없음 → 1주 미만 순으로 skip 사유를 정하고 규칙 단위 이력·알림을 남긴다. 같은 시점에 발동한 규칙은 각자 주문한다. skip이면 사용자에게 "미주문" 알림(방향·규칙 순번 포함)을 보낸다(이력 삽입 성공 시에만 발행해 재개 때 중복 없음).
-        code: [DcaRoundPlanner#plan, DcaCycleOrderStrategy#decideRule, DcaRoundSkippedEvent, TradingAlertNotifier#onDcaRoundSkipped]
+        code: [DcaPlanInputCollector#collect, DcaCycleOrderStrategy#plan, DcaCycleOrderStrategy#decideRule, DcaRoundSkippedEvent, TradingAlertNotifier#onDcaRoundSkipped]
         cond: DCA 전략이 있을 때
         state: "dca_execution 기록"
         fail: 전략 하나가 실패해도 그 전략만 격리한다.
@@ -331,7 +331,7 @@ flows:
         desc: >-
           개장 대기 전에 KIS 계좌의 DCA 개장(MOO) 전략만 먼저 회차를 판정해 접수한다. 접수 뒤 체크포인트를 STARTED로 되돌려 대기 중 재기동이 오경고를 내지 않게 하고,
           이 단계가 실패해도 일반 전략 흐름은 계속된다.
-        code: [TradingService#placePreOpenDcaOrders, DcaRoundPlanner#plan]
+        code: [TradingService#placePreOpenDcaOrders, DcaPlanInputCollector#collect, DcaCycleOrderStrategy#plan]
         cond: KIS 계좌에 DCA 개장 주문 전략이 있을 때
         state: "orders → PLACED · trading_batch_run → STARTED"
         fail: 실패는 격리하고 개장 후 경로가 이어받는다(이력 행·기존 주문으로 중복 방지).
