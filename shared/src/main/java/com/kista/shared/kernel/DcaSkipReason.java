@@ -10,6 +10,7 @@ public enum DcaSkipReason {
     DATA_UNAVAILABLE("데이터 확보 실패"),
     CONDITION_NOT_MET("조건 미충족"),
     NO_HOLDINGS("보유 수량 없음"),
+    INSUFFICIENT_HOLDINGS("보유 수량 부족"), // 매도 REJECT 정책 — 가용 보유가 계획 수량보다 적음
     INSUFFICIENT_BALANCE("예수금 부족"),
     BELOW_ONE_SHARE("1주 미만 금액"),
     BELOW_MIN_ORDER_AMOUNT("최소 주문 금액 미달"), // 코인 — 산정 금액이 거래소 최소 주문 금액(5,000원) 미만

@@ -24,7 +24,7 @@ public record DcaConfig(
         Integer executionHour     // 코인 실행 시각 (KST 0~23) — MARKET에서만 필수, 주식은 null
 ) {
     public static final int MAX_CONDITIONS = 10; // 전략당 조건 상한
-    public static final BigDecimal CRYPTO_MIN_AMOUNT = new BigDecimal("5000"); // 업비트 KRW 마켓 최소 주문 금액
+    public static final BigDecimal CRYPTO_MIN_AMOUNT = DcaRule.CRYPTO_MIN_AMOUNT; // 업비트 KRW 마켓 최소 주문 금액
 
     public DcaConfig {
         Objects.requireNonNull(direction, "direction");

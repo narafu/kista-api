@@ -5,7 +5,9 @@ import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.DcaConfig;
 import com.kista.tradingcore.matching.domain.model.DcaDecision;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.DcaIndicators;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,13 +26,25 @@ public final class DcaConditions {
     // 전부 통과면 empty. 전일 종가 없음 → 지표 계산 불가 → 미충족 순. referencePrice는 skip 기록용(전일 종가 실패만 null)
     public static Optional<DcaDecision.Skipped> check(DcaConfig config, List<BigDecimal> closes, DcaCycleOrderStrategy.DcaInputs.Holding holding,
                                                       BigDecimal fearGreed, BigDecimal referencePrice) {
+        return check(config.conditions(), closes, holding, fearGreed, referencePrice);
+    }
+
+    // 규칙 기반 — AVG_PRICE는 원장(ledger) 평단 기준
+    public static Optional<DcaDecision.Skipped> check(DcaRule rule, List<BigDecimal> closes, AccountBalance ledger,
+                                                      BigDecimal fearGreed, BigDecimal referencePrice) {
+        var holding = ledger == null ? null : new DcaCycleOrderStrategy.DcaInputs.Holding(ledger.holdings(), ledger.avgPrice());
+        return check(rule.conditions(), closes, holding, fearGreed, referencePrice);
+    }
+
+    private static Optional<DcaDecision.Skipped> check(List<DcaCondition> conditions, List<BigDecimal> closes, DcaCycleOrderStrategy.DcaInputs.Holding holding,
+                                                       BigDecimal fearGreed, BigDecimal referencePrice) {
         BigDecimal prevClose = closes == null || closes.isEmpty() ? null : closes.getLast();
         if (prevClose == null || prevClose.signum() <= 0) {
             return Optional.of(new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null));
         }
         // 모든 조건 지표값을 먼저 계산 — 하나라도 계산 불가면 다른 조건과 무관하게 DATA_UNAVAILABLE
         List<Evaluation> evaluations = new ArrayList<>();
-        for (DcaCondition cond : config.conditions()) {
+        for (DcaCondition cond : conditions) {
             Optional<Evaluation> e = evaluate(cond, closes, prevClose, holding, fearGreed);
             if (e.isEmpty()) return Optional.of(new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, dataFailure(cond), referencePrice));
             evaluations.add(e.get());

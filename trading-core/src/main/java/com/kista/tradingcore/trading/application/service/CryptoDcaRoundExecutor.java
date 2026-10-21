@@ -11,6 +11,7 @@ import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.strategy.DcaConditions;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy.DcaInputs.Holding;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
@@ -44,8 +45,6 @@ import java.util.UUID;
 class CryptoDcaRoundExecutor {
 
     private static final int CANDLE_COUNT = 250;                  // 일봉 조회 봉 수 (주식 DcaRoundPlanner와 동일)
-    // ponytail: 업비트 KRW 수수료율 고정 — 거래소별 수수료 조회가 필요해지면 확장
-    private static final BigDecimal FEE_FACTOR = new BigDecimal("1.0005"); // 1 + 수수료율 0.05%
     static final int LAST_TICK_MINUTE = 50;               // 이 분 이후 틱은 마지막 시도 — 일시 장애도 미주문 기록
     // 접수 확정 상태 — 신규 주문을 막고 이력만 복구 (FAILED·CANCELLED는 재시도 허용)
     private static final Set<OrderStatus> CONFIRMED = Set.of(OrderStatus.PLACED, OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED);
@@ -163,7 +162,7 @@ class CryptoDcaRoundExecutor {
         BigDecimal volume;   // 추정·실제 수량
         if (buy) {
             // 업비트 금액 주문은 정수 원 — 저장 스케일(30000.00)이 새지 않도록 scale 0 고정
-            amount = config.amount().min(wallet.krw.divide(FEE_FACTOR, 0, RoundingMode.FLOOR)).setScale(0, RoundingMode.FLOOR);
+            amount = config.amount().min(wallet.krw.divide(DcaRule.CRYPTO_FEE_FACTOR, 0, RoundingMode.FLOOR)).setScale(0, RoundingMode.FLOOR);
             volume = amount.divide(price, 8, RoundingMode.FLOOR);
         } else {
             BigDecimal held = wallet.held.getOrDefault(ticker, BigDecimal.ZERO);
@@ -174,7 +173,7 @@ class CryptoDcaRoundExecutor {
             volume = config.amount().divide(price, 8, RoundingMode.FLOOR).min(held);
             amount = volume.multiply(price);
         }
-        if (amount.compareTo(DcaConfig.CRYPTO_MIN_AMOUNT) < 0) {
+        if (amount.compareTo(DcaRule.CRYPTO_MIN_AMOUNT) < 0) {
             recorder.recordSkipped(ctx, today, DcaSkipReason.BELOW_MIN_ORDER_AMOUNT,
                     "주문 금액 " + amount.setScale(0, RoundingMode.FLOOR).toPlainString() + " < 최소 5000", price);
             return null;
@@ -201,7 +200,7 @@ class CryptoDcaRoundExecutor {
                 return failure == CryptoFailure.KEY_EXPIRED ? e : null;
             }
         }
-        if (buy) wallet.krw = wallet.krw.subtract(amount.multiply(FEE_FACTOR));
+        if (buy) wallet.krw = wallet.krw.subtract(amount.multiply(DcaRule.CRYPTO_FEE_FACTOR));
         else wallet.held.merge(ticker, volume, BigDecimal::subtract);
         return null;
     }
