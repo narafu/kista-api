@@ -204,13 +204,71 @@ class TradingReporterTest {
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
                 .thenReturn(List.of(buyExecution("E1", 3, "20.00"), buyExecution("E2", 2, "21.00")));
 
-        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE,
+                List.of(placedOrder(UUID.randomUUID(), "E1", 3), placedOrder(UUID.randomUUID(), "E2", 2)), null);
 
         ArgumentCaptor<TradingReportReadyEvent> captor = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().executions()).hasSize(2);
         assertThat(captor.getValue().accountId()).isEqualTo(ACCOUNT.id());
         assertThat(captor.getValue().strategyId()).isEqualTo(STRATEGY.id());
+    }
+
+    // 저장된 포지션의 보유수량 캡처
+    private BigDecimal savedHoldings() {
+        ArgumentCaptor<AccountBalance> c = ArgumentCaptor.forClass(AccountBalance.class);
+        verify(cyclePositionPersistor).saveCyclePosition(eq(TODAY), c.capture(), eq(CTX), eq(CLOSE), isNull());
+        return c.getValue().holdings();
+    }
+
+    @Test
+    void INFINITE_외부_체결은_원장에_반영하지_않는다() {
+        // 자기 주문 A1(3주) + 사용자 앱 직접 매매 EXT9(5주)
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("A1", 3, "20.00"), buyExecution("EXT9", 5, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(placedOrder(UUID.randomUUID(), "A1", 3)), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("13");
+        // 리포트 알림도 필터된 체결로만 만든다
+        ArgumentCaptor<TradingReportReadyEvent> ev = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
+        verify(eventPublisher).publishEvent(ev.capture());
+        assertThat(ev.getValue().executions()).singleElement().satisfies(l -> assertThat(l.quantity()).isEqualTo(3));
+        assertThat(ev.getValue().report().totalBoughtUsd()).isEqualByComparingTo("60.00");
+    }
+
+    @Test
+    void 보정_leg_주문_체결은_반영한다() {
+        Order correction = placedOrder(UUID.randomUUID(), "C1", 2).withLeg("INFINITE_CORRECTION_01");
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("C1", 2, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(correction), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("12");
+    }
+
+    @Test
+    void 체결_없는_자기_주문은_원장_불변() {
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(placedOrder(UUID.randomUUID(), "A1", 3)), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void 개장배치_AT_OPEN_자기주문_체결도_반영한다() {
+        // 개장 배치에서 선접수된 주문(prePlaced)도 mainOrders에 합쳐져 들어온다
+        Order open = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), TODAY, StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.BUY,
+                BigDecimal.valueOf(4), new BigDecimal("20.00"), OrderStatus.PLACED, "O1", null, null);
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("O1", 4, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(open), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("14");
     }
 
     @Test

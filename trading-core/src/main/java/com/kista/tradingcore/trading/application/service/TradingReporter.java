@@ -65,11 +65,9 @@ class TradingReporter {
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
         boolean snapshots = cycleStrategies.of(strategy.type()).snapshotsBrokerBalance();
-        if (snapshots) {
-            // DCA: 같은 계좌·티커의 반대 방향 DCA 체결이 섞이지 않도록 자기 주문(externalOrderId) 체결만 사용
-            Set<String> ownIds = mainOrders.stream().map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
-            executions = executions.stream().filter(e -> ownIds.contains(e.externalOrderId())).toList();
-        }
+        // 원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 (spec 3장 원장 원칙) — 자기 주문(externalOrderId) 체결만 사용
+        Set<String> ownIds = mainOrders.stream().map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
+        executions = executions.stream().filter(e -> ownIds.contains(e.externalOrderId())).toList();
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 
         // 체결 결과로 매매 후 잔고 계산 (체결 없으면 pre-trade 그대로)
