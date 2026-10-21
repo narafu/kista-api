@@ -60,6 +60,7 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
     }
 
     private static PositionView toPositionView(CyclePosition position) {
+        // MOCK은 정수 주식만 거래하므로 소수 보유수량이면 여기서 즉시 실패시킨다
         return new PositionView(position.holdings().intValueExact(), position.avgPrice(), position.usdDeposit());
     }
 }

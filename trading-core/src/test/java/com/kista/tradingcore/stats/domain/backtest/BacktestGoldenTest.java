@@ -16,7 +16,6 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -76,7 +75,8 @@ class BacktestGoldenTest {
         // 리버스 시나리오가 실제로 리버스모드를 탔는지(그리고 일반 시나리오는 안 탔는지) 고정
         if (scenario.equals("infinite-reverse")) assertThat(infinite.reverseDays).as("리버스모드 일수").isPositive();
         if (scenario.equals("infinite")) assertThat(infinite.reverseDays).as("리버스모드 일수").isZero();
-        assertThat(render(output)).isEqualTo(readGolden(scenario, render(output)));
+        String rendered = render(output);
+        assertThat(rendered).isEqualTo(readGolden(scenario, rendered));
     }
 
     // --- 캔들·명령 생성 ---

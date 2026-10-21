@@ -12,7 +12,7 @@ public record TradeCorrectionResponse(
         UUID accountId,                 // 대상 계좌
         UUID strategyId,                // 대상 전략
         int processedCount,             // 처리된 체결 건수
-        BigDecimal finalHoldings,              // 보정 후 보유 수량
+        BigDecimal finalHoldings,       // 보정 후 보유 수량
         BigDecimal finalAvgPrice,       // 보정 후 평단가
         BigDecimal finalUsdDeposit,     // 보정 후 예수금(USD)
         StrategyStatus strategyStatus,  // 보정 후 전략 상태

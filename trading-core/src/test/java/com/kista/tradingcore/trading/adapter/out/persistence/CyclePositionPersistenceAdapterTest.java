@@ -127,7 +127,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 .isEqualTo(new BigDecimal("0.00123"));
 
         // 정수 5는 numeric(20,8) 왕복 뒤에도 5.00000000이 아니라 5로 정규화
-        cyclePositionAdapter.save(new CyclePosition(
+        CyclePosition integral = cyclePositionAdapter.save(new CyclePosition(
                 null, cycle.id(), new BigDecimal("900.00"), null, BigDecimal.TEN, BigDecimal.valueOf(5), null, null));
         entityManager.flush();
         entityManager.clear();
@@ -137,8 +137,11 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
                 .extracting(CyclePositionHistoryEntry::holdings)
                 .contains(new BigDecimal("5"));
-        assertThat(cyclePositionAdapter.findLatestOne(cycle.id()).orElseThrow().holdings())
-                .isEqualTo(new BigDecimal("5"));
+        // 저장 순서(생성 시각)에 기대지 않고 저장한 행 id로 직접 확인
+        assertThat(cyclePositionAdapter.findLatestByCycleId(cycle.id(), 10))
+                .filteredOn(p -> p.id().equals(integral.id()))
+                .singleElement()
+                .satisfies(p -> assertThat(p.holdings()).isEqualTo(new BigDecimal("5")));
     }
 
     @Test
