@@ -16,11 +16,10 @@ com.kista.tradingcore.matching/  ← Spring Modulith 모듈(CLOSED) — 주문�
 
 매매 공식(변경 금지 SSOT)은 이 모듈이 소비하지만 `docs/agents/modules/tradingcore/trading-formulas.md`에 별도 보관한다(matching/trading 양쪽 shim에서 import).
 
-### DCA 전략 (무조건 적립식, 단계 ①)
+### DCA 전략 (무조건 적립식, 다중 규칙)
 - `DcaCycleOrderStrategy`(`matching.domain.strategy`): 주식은 공통 `plan`(규칙마다 `decideRule` → `DcaRuleDecision` `Planned`/`Skipped`), 코인은 `CryptoDcaRoundExecutor`가 `decideRule`을 직접 호출한다. `occupiesSeed()=false`(usd_deposit 0), `needsCapCheck=false`. REJECT 규칙 주문은 `PlannedOrder.partialAllowed=false` — `fitBuysToBudget`이 입력 순서대로 예산을 소진하며 REJECT는 전량 아니면 제외, PARTIAL은 `floor(남은 예산 / 캡가)`로 축소한다.
-- `DcaSchedule`: 빈도(`DcaFrequency`)별 실행일 판정. `DcaConfig`: 전략 버전의 DCA 설정 값 객체(티커 UPRO/QLD, 방향·금액·빈도·조건 목록 최대 10개). `DcaDecision.Skipped`는 `DcaSkipReason`을 담는다.
+- 값 객체: `DcaStrategyConfig`(규칙 1~10개 + ruleKey 확정 `withAssignedKeys`), `DcaRule`(방향·`DcaSchedule` 주기·주문유형·`DcaSizing`·`DcaShortfallPolicy`·조건 목록 최대 10개, 시장 규칙 `requireCompatible`), `DcaRuleDecision`(`Planned`/`Skipped`), `DcaSkipReason`(sharedkernel — `INSUFFICIENT_HOLDINGS` 포함). `DcaSchedule`: 빈도(`DcaFrequency`)별 실행일 판정.
 - `DcaIndicators`(순수 계산): SMA는 마지막 N개 종가 평균, RSI는 기간 14 고정 Wilder 평활. 결과는 소수 둘째 자리 HALF_UP으로 반올림하며 데이터가 부족하면 빈 값을 돌려준다.
-- `DcaCondition` 검증: 지표는 `AVG_PRICE`·`SMA`·`RSI`·`FEAR_GREED`(0~100, 값은 `DcaInputs.fearGreed` — 플래너가 배치 시점 최신 CNN 값을 넣는다). SMA는 `smaPeriod` ∈ 20/50/120/200이고 threshold를 두지 않는다. RSI는 0~100, AVG_PRICE는 -100 초과, threshold는 소수 둘째 자리까지 허용한다.
-- 판정 순서(`decide`): ① 데이터(종가·판매가능수량·모든 지표 계산 가능 여부) → ② 조건 AND 평가(입력 순서대로, 처음 실패한 조건이 `CONDITION_NOT_MET`와 뒤집힌 연산자 detail을 남긴다) → ③ `NO_HOLDINGS`(SELL) → ④ `BELOW_ONE_SHARE`. AVG_PRICE는 보유 0주일 때 BUY는 통과하고 SELL은 통과 후 `NO_HOLDINGS`로 막힌다.
-
-- 코인 DCA 공유: `DcaConditions.check`(public static — 데이터 충족·조건 AND 평가·실패 detail)는 주식 `DcaCycleOrderStrategy.decide`와 trading의 `CryptoDcaRoundExecutor`가 함께 쓴다. 코인 FEAR_GREED 값은 `CryptoFearGreedIndexPort`(alternative.me)에서 오고 주식은 CNN 값을 쓴다.
+- `DcaCondition` 검증: 지표는 `AVG_PRICE`·`SMA`·`RSI`·`FEAR_GREED`(0~100, 값은 `DcaRuleInputs.fearGreed` — 수집기가 배치 시점 최신 CNN 값을 넣는다). SMA는 `smaPeriod` ∈ 20/50/120/200이고 threshold를 두지 않는다. RSI는 0~100, AVG_PRICE는 -100 초과, threshold는 소수 둘째 자리까지 허용한다.
+- 판정 순서(`decideRule`): ① 데이터(종가·판매가능수량·모든 지표 계산 가능 여부) → ② 조건 AND 평가(입력 순서대로, 처음 실패한 조건이 `CONDITION_NOT_MET`와 뒤집힌 연산자 detail을 남긴다) → ③ `NO_HOLDINGS`/`INSUFFICIENT_HOLDINGS`(SELL, 원장 보유 기준) → ④ `BELOW_ONE_SHARE`. AVG_PRICE는 보유 0주일 때 BUY는 통과하고 SELL은 통과 후 `NO_HOLDINGS`로 막힌다. 크립토 SELL 기준가는 현재가, 원장이 null이면 skip 처리한다.
+- 코인 DCA 공유: `DcaConditions.check`(public static — 데이터 충족·조건 AND 평가·실패 detail)는 `decideRule`이 쓰며 주식·코인 모두 이 경로다. 코인 FEAR_GREED 값은 `CryptoFearGreedIndexPort`(alternative.me)에서 오고 주식은 CNN 값을 쓴다.
