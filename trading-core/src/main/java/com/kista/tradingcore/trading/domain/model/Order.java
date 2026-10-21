@@ -102,13 +102,6 @@ public record Order(
                 OrderStatus.PLANNED, null, null, null);
     }
 
-    // 즉시 접수 실패 시 FAILED 주문으로 변환 — id·접수번호·체결 정보 초기화
-    public Order withFailed() {
-        return new Order(null, accountId, strategyCycleId, tradeDate, ticker,
-                orderType, timing, direction, orderLeg, quantity, price,
-                OrderStatus.FAILED, null, null, null);
-    }
-
     // 전략 주문 다리 식별자만 교체한 새 주문
     public Order withLeg(String newLeg) {
         return new Order(id, accountId, strategyCycleId, tradeDate, ticker,
