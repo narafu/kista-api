@@ -3,7 +3,7 @@ package com.kista.shared.kernel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-// DCA 실행 주기 — strategy_dca_version.frequency 컬럼 상수명과 직결(변경 금지)
+// DCA 실행 주기 — strategy_dca_rule.frequency 컬럼 상수명과 직결(변경 금지)
 @Getter
 @RequiredArgsConstructor
 public enum DcaFrequency {

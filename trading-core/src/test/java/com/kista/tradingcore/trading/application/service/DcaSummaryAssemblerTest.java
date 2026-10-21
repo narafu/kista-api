@@ -5,7 +5,10 @@ import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaSummary;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
@@ -25,18 +28,23 @@ import static org.mockito.Mockito.when;
 class DcaSummaryAssemblerTest {
 
     private final MarketCalendarPort calendar = mock(MarketCalendarPort.class);
+    private static DcaRule rule(OrderType type, DcaFrequency frequency, java.time.DayOfWeek dow, Integer dom, Integer hour, String amount) {
+        return new DcaRule("k", OrderDirection.BUY, frequency, dow, dom, type, hour,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, java.util.List.of());
+    }
+
     private final DcaSummaryAssembler assembler = new DcaSummaryAssembler(calendar);
 
-    private static final DcaConfig STOCK = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null);
+    private static final DcaRule STOCK = rule(OrderType.MOC, DcaFrequency.DAILY, null, null, null, "300");
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 10, 14, 10, 0);
-    private static final DcaConfig CRYPTO_DAILY = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET, DcaFrequency.DAILY, null, null, null, 13);
+    private static final DcaRule CRYPTO_DAILY = rule(OrderType.MARKET, DcaFrequency.DAILY, null, null, 13, "10000");
 
     @Test
     void cryptoNextExecutionIncludesTodayBeforeHour() {
         LocalDate today = LocalDate.of(2026, 10, 14);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
-        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
+        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today.plusDays(1));
     }
 
@@ -58,15 +66,15 @@ class DcaSummaryAssemblerTest {
         LocalDate today = LocalDate.of(2026, 10, 14);
         // 13:00 정각 판정 전은 오늘, 같은 시각대에 이미 판정했으면 내일
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today);
-        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
+        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 10))).isEqualTo(today.plusDays(1));
     }
 
     @Test
     void cryptoWeeklySundayIsNotShiftedByUsHoliday() {
-        DcaConfig sun = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET, DcaFrequency.WEEKLY, DayOfWeek.SUNDAY, null, null, 13);
+        DcaRule sun = rule(OrderType.MARKET, DcaFrequency.WEEKLY, DayOfWeek.SUNDAY, null, 13, "10000");
         // 2026-10-14 수 → 다음 일요일 10-18, 캘린더 조회 없음
-        DcaSummary summary = assembler.assemble(sun, null, LocalDate.of(2026, 10, 14), Market.CRYPTO_KRW);
+        DcaSummary.RuleSummary summary = assembler.assembleRule(sun, null, LocalDate.of(2026, 10, 14), Market.CRYPTO_KRW);
         assertThat(summary.nextKstTradeDate()).isEqualTo(LocalDate.of(2026, 10, 18));
         assertThat(summary.nextUsSessionDate()).isEqualTo(LocalDate.of(2026, 10, 18));
     }
@@ -80,9 +88,9 @@ class DcaSummaryAssemblerTest {
             return d != DayOfWeek.SATURDAY && d != DayOfWeek.SUNDAY;
         });
         when(calendar.kstTradeDateOf(LocalDate.of(2026, 10, 30))).thenReturn(LocalDate.of(2026, 10, 31));
-        DcaConfig monthlyEnd = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY, null, null);
+        DcaRule monthlyEnd = rule(OrderType.MOC, DcaFrequency.MONTHLY, null, null, null, "300");
 
-        DcaSummary summary = assembler.assemble(monthlyEnd, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+        DcaSummary.RuleSummary summary = assembler.assembleRule(monthlyEnd, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
 
         assertThat(summary.nextUsSessionDate()).isEqualTo(LocalDate.of(2026, 10, 30));
         assertThat(summary.nextKstTradeDate()).isEqualTo(LocalDate.of(2026, 10, 31));
@@ -93,9 +101,9 @@ class DcaSummaryAssemblerTest {
     void next_execution_null_when_calendar_unknown() {
         when(calendar.usSessionDateOf(any())).thenReturn(LocalDate.of(2026, 10, 13));
         when(calendar.isUsSessionOpen(any())).thenReturn(false);
-        DcaConfig daily = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null);
+        DcaRule daily = rule(OrderType.MOC, DcaFrequency.DAILY, null, null, null, "300");
 
-        DcaSummary summary = assembler.assemble(daily, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
+        DcaSummary.RuleSummary summary = assembler.assembleRule(daily, null, LocalDate.of(2026, 10, 14), Market.US_STOCK);
 
         assertThat(summary.nextUsSessionDate()).isNull();
         assertThat(summary.nextKstTradeDate()).isNull();
@@ -112,7 +120,7 @@ class DcaSummaryAssemblerTest {
     @Test
     void firstEligibleDate_moves_to_next_day_when_today_already_decided() {
         LocalDate today = DstInfo.nextTradeDate();
-        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
+        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), "k", today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
     }
 }

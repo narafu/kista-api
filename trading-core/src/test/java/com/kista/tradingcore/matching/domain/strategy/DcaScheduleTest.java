@@ -3,12 +3,16 @@ package com.kista.tradingcore.matching.domain.strategy;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
@@ -22,17 +26,22 @@ class DcaScheduleTest {
         return d -> d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY && !closed.contains(d);
     }
 
-    private static DcaConfig weekly(DayOfWeek dow) {
-        return new DcaConfig(OrderDirection.BUY, new BigDecimal("100"), OrderType.MOC, DcaFrequency.WEEKLY, dow, null);
+    private static DcaRule rule(OrderType type, DcaFrequency frequency, DayOfWeek dow, Integer dayOfMonth) {
+        return new DcaRule("k", OrderDirection.BUY, frequency, dow, dayOfMonth, type, type == OrderType.MARKET ? 9 : null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("100"), null), DcaShortfallPolicy.PARTIAL, List.of());
     }
 
-    private static DcaConfig monthly(Integer day) {
-        return new DcaConfig(OrderDirection.BUY, new BigDecimal("100"), OrderType.MOC, DcaFrequency.MONTHLY, null, day);
+    private static DcaRule weekly(DayOfWeek dow) {
+        return rule(OrderType.MOC, DcaFrequency.WEEKLY, dow, null);
+    }
+
+    private static DcaRule monthly(Integer day) {
+        return rule(OrderType.MOC, DcaFrequency.MONTHLY, null, day);
     }
 
     @Test
     void daily_runs_every_open_session() {
-        DcaConfig daily = new DcaConfig(OrderDirection.BUY, new BigDecimal("100"), OrderType.MOC, DcaFrequency.DAILY, null, null);
+        DcaRule daily = rule(OrderType.MOC, DcaFrequency.DAILY, null, null);
         assertThat(DcaSchedule.isExecutionDay(LocalDate.of(2026, 10, 13), daily, openExcept())).isTrue();
     }
 

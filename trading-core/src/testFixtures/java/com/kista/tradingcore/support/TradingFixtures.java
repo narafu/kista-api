@@ -2,9 +2,20 @@ package com.kista.tradingcore.support;
 
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.DcaFrequency;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.tradingcore.matching.domain.model.DcaCondition;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,5 +52,23 @@ public final class TradingFixtures {
     // 배치 경로용 Toss 계좌 투영 — tossAccount와 동일 값
     public static TradingAccount tossTradingAccount(UUID id, UUID userId) {
         return TradingAccount.from(tossAccount(id, userId));
+    }
+
+    // 주식 DCA 규칙 — 매일·고정 금액·PARTIAL(기존 단일 규칙 동작과 같은 부족 처리)
+    public static DcaRule stockDcaRule(String ruleKey, OrderDirection direction, String amount, OrderType orderType,
+                                       DcaCondition... conditions) {
+        return new DcaRule(ruleKey, direction, DcaFrequency.DAILY, null, null, orderType, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, List.of(conditions));
+    }
+
+    // 코인 DCA 규칙 — 매일·고정 금액(원)·PARTIAL, executionHour 시각 실행
+    public static DcaRule cryptoDcaRule(String ruleKey, OrderDirection direction, String amount, int executionHour,
+                                        DcaCondition... conditions) {
+        return new DcaRule(ruleKey, direction, DcaFrequency.DAILY, null, null, OrderType.MARKET, executionHour,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, List.of(conditions));
+    }
+
+    public static DcaStrategyConfig dcaConfig(DcaRule... rules) {
+        return new DcaStrategyConfig(List.of(rules));
     }
 }

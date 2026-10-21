@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
+import com.kista.shared.kernel.OrderDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionPage;
@@ -14,7 +15,8 @@ import java.util.UUID;
 public record DcaExecutionPageResponse(List<Item> content, int page, int size, long totalElements) {
 
     @Schema(name = "DcaExecutionItem")
-    public record Item(LocalDate kstTradeDate, LocalDate usSessionDate, String status, String skipReason, String detail,
+    public record Item(String ruleKey, OrderDirection direction, // 규칙 키·방향 (삭제된 규칙의 주문 없는 회차는 direction null)
+                       LocalDate kstTradeDate, LocalDate usSessionDate, String status, String skipReason, String detail,
                        BigDecimal referencePrice, BigDecimal quantity,
                        OrderSummary order) {}
 
@@ -28,7 +30,7 @@ public record DcaExecutionPageResponse(List<Item> content, int page, int size, l
     private static Item item(DcaExecutionPage.Row r) {
         DcaExecution e = r.execution();
         Order o = r.order();
-        return new Item(e.tradeDate(), r.usSessionDate(), e.status().name(),
+        return new Item(e.ruleKey(), r.direction(), e.tradeDate(), r.usSessionDate(), e.status().name(),
                 e.skipReason() == null ? null : e.skipReason().name(), e.detail(), e.referencePrice(), e.quantity(),
                 o == null ? null : new OrderSummary(o.id(), o.status().name(), o.filledQuantity(), o.filledPrice()));
     }

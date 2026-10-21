@@ -3,14 +3,19 @@ package com.kista.tradingcore.matching.domain.strategy;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
-import com.kista.tradingcore.matching.domain.model.DcaDecision;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaRuleDecision;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import org.junit.jupiter.api.Test;
 
@@ -21,73 +26,44 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+// 주식 규칙 판정(decideRule) — 조건 문구·skip 우선순위·기준가·수량 (구 단일 규칙 decide 테스트를 규칙 판정으로 이관)
 class DcaCycleOrderStrategyTest {
 
     private static final LocalDate DAY = LocalDate.of(2026, 10, 14);
+    private static final String KEY = "11111111-1111-1111-1111-111111111111";
+    private static final AccountBalance SELL_LEDGER = new AccountBalance(1000, new BigDecimal("50"), BigDecimal.ZERO); // SELL 기본 원장 — 판매가능이 상한
     private final DcaCycleOrderStrategy strategy = new DcaCycleOrderStrategy();
 
-    private static DcaConfig config(OrderDirection dir, String amount, OrderType type) {
-        return new DcaConfig(dir, new BigDecimal(amount), type, DcaFrequency.DAILY, null, null);
+    private static DcaRule rule(OrderDirection dir, String amount, OrderType type, DcaCondition... conds) {
+        return new DcaRule(KEY, dir, DcaFrequency.DAILY, null, null, type, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), DcaShortfallPolicy.PARTIAL, List.of(conds));
     }
 
-    private DcaDecision decide(DcaConfig c, String prevClose, Integer sellable) {
-        return decide(c, prevClose == null ? null : List.of(new BigDecimal(prevClose)), sellable, null);
+    private DcaRuleDecision decide(DcaRule r, List<BigDecimal> closes, Integer sellable, AccountBalance ledger,
+                                   BigDecimal fearGreed, String currentPrice) {
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, closes, ledger,
+                sellable == null ? null : BigDecimal.valueOf(sellable), fearGreed,
+                currentPrice == null ? null : new BigDecimal(currentPrice), null));
     }
 
-    private DcaDecision decide(DcaConfig c, List<BigDecimal> closes, Integer sellable, DcaCycleOrderStrategy.DcaInputs.Holding holding) {
-        return decideWithFearGreed(c, closes, sellable, holding, null);
+    private DcaRuleDecision decide(DcaRule r, String prevClose, Integer sellable) {
+        return decide(r, prevClose == null ? null : List.of(new BigDecimal(prevClose)), sellable,
+                r.direction() == OrderDirection.SELL ? SELL_LEDGER : null, null, null);
     }
 
-    private DcaDecision decideWithFearGreed(DcaConfig c, List<BigDecimal> closes, Integer sellable,
-                                            DcaCycleOrderStrategy.DcaInputs.Holding holding, BigDecimal fearGreed) {
-        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, closes, sellable, holding, fearGreed, null));
+    private DcaRuleDecision decideAt(DcaRule r, String prevClose, String currentPrice, Integer sellable) {
+        return decide(r, List.of(new BigDecimal(prevClose)), sellable,
+                r.direction() == OrderDirection.SELL ? SELL_LEDGER : null, null, currentPrice);
     }
 
-    // 현재가(프리마켓·장중) 주입 판정
-    private DcaDecision decideAt(DcaConfig c, String prevClose, String currentPrice, Integer sellable) {
-        return strategy.decide(new DcaCycleOrderStrategy.DcaInputs(c, StrategyTicker.UPRO, DAY, List.of(new BigDecimal(prevClose)),
-                sellable, null, null, currentPrice == null ? null : new BigDecimal(currentPrice)));
-    }
-
-    private static DcaConfig fearGreedConfig(DcaOperator op, String threshold) {
-        return new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null,
-                List.of(new DcaCondition(DcaIndicator.FEAR_GREED, op, null, new BigDecimal(threshold))));
-    }
-
-    @Test
-    void fear_greed_condition_met_plans_order() {
-        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.LTE, "25"), List.of(new BigDecimal("100")), null, null,
-                new BigDecimal("20.50"));
-        assertThat(d).isInstanceOf(DcaDecision.Planned.class);
-    }
-
-    @Test
-    void fear_greed_condition_not_met_reports_negated_detail() {
-        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.LTE, "25"), List.of(new BigDecimal("100")), null, null,
-                new BigDecimal("45.09"));
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET, "공포탐욕지수 45.09 > 25", new BigDecimal("100")));
-    }
-
-    @Test
-    void fear_greed_equal_to_threshold_passes_lte() {
-        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.LTE, "25"), List.of(new BigDecimal("100")), null, null,
-                new BigDecimal("25.00"));
-        assertThat(d).isInstanceOf(DcaDecision.Planned.class);
-    }
-
-    @Test
-    void fear_greed_null_is_data_unavailable() {
-        DcaDecision d = decideWithFearGreed(fearGreedConfig(DcaOperator.GTE, "75"), List.of(new BigDecimal("100")), null, null, null);
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "공포탐욕지수 조회 실패", new BigDecimal("100")));
-    }
-
-    private static DcaConfig withConditions(OrderDirection dir, DcaCondition... conds) {
-        return new DcaConfig(dir, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null, List.of(conds));
+    private static DcaRuleDecision.Skipped skipped(DcaSkipReason reason, String detail, String ref) {
+        return new DcaRuleDecision.Skipped(KEY, reason, detail, ref == null ? null : new BigDecimal(ref));
     }
 
     private static DcaCondition rsi(DcaOperator op, String t) { return new DcaCondition(DcaIndicator.RSI, op, null, new BigDecimal(t)); }
     private static DcaCondition sma(DcaOperator op, int p) { return new DcaCondition(DcaIndicator.SMA, op, p, null); }
     private static DcaCondition avg(DcaOperator op, String n) { return new DcaCondition(DcaIndicator.AVG_PRICE, op, null, new BigDecimal(n)); }
+    private static DcaCondition fearGreed(DcaOperator op, String t) { return new DcaCondition(DcaIndicator.FEAR_GREED, op, null, new BigDecimal(t)); }
 
     // n봉 완만한 상승(80.0부터 0.1씩) + 마지막 종가 — RSI 100, 마지막 종가 > SMA
     private static List<BigDecimal> rising(int n, String last) {
@@ -96,24 +72,53 @@ class DcaCycleOrderStrategyTest {
         return list;
     }
 
+    private static final List<BigDecimal> HUNDRED = List.of(new BigDecimal("100"));
+
+    @Test
+    void fear_greed_condition_met_plans_order() {
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, fearGreed(DcaOperator.LTE, "25")), HUNDRED, null, null,
+                new BigDecimal("20.50"), null);
+        assertThat(d).isInstanceOf(DcaRuleDecision.Planned.class);
+    }
+
+    @Test
+    void fear_greed_condition_not_met_reports_negated_detail() {
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, fearGreed(DcaOperator.LTE, "25")), HUNDRED, null, null,
+                new BigDecimal("45.09"), null);
+        assertThat(d).isEqualTo(skipped(DcaSkipReason.CONDITION_NOT_MET, "공포탐욕지수 45.09 > 25", "100"));
+    }
+
+    @Test
+    void fear_greed_equal_to_threshold_passes_lte() {
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, fearGreed(DcaOperator.LTE, "25")), HUNDRED, null, null,
+                new BigDecimal("25.00"), null);
+        assertThat(d).isInstanceOf(DcaRuleDecision.Planned.class);
+    }
+
+    @Test
+    void fear_greed_null_is_data_unavailable() {
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, fearGreed(DcaOperator.GTE, "75")), HUNDRED, null, null, null, null);
+        assertThat(d).isEqualTo(skipped(DcaSkipReason.DATA_UNAVAILABLE, "공포탐욕지수 조회 실패", "100"));
+    }
+
     @Test
     void all_conditions_true_plans() {
         // 상승 시계열 → RSI 100, 종가 87.12 > SMA(20)
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, rsi(DcaOperator.GTE, "70"), sma(DcaOperator.GT, 20)),
-                rising(30, "87.12"), null, null);
-        assertThat(d).isInstanceOf(DcaDecision.Planned.class);
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, rsi(DcaOperator.GTE, "70"), sma(DcaOperator.GT, 20)),
+                rising(30, "87.12"), null, null, null, null);
+        assertThat(d).isInstanceOf(DcaRuleDecision.Planned.class);
     }
 
     @Test
     void first_false_condition_is_reported_with_negated_operator() {
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, rsi(DcaOperator.LTE, "35")), rising(30, "87.12"), null, null);
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET, "RSI(14) 100.00 > 35", new BigDecimal("87.12")));
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, rsi(DcaOperator.LTE, "35")), rising(30, "87.12"), null, null, null, null);
+        assertThat(d).isEqualTo(skipped(DcaSkipReason.CONDITION_NOT_MET, "RSI(14) 100.00 > 35", "87.12"));
     }
 
     @Test
     void sma_detail_format() {
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, sma(DcaOperator.LT, 20)), rising(30, "87.12"), null, null);
-        DcaDecision.Skipped s = (DcaDecision.Skipped) d;
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, sma(DcaOperator.LT, 20)), rising(30, "87.12"), null, null, null, null);
+        DcaRuleDecision.Skipped s = (DcaRuleDecision.Skipped) d;
         assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
         assertThat(s.detail()).isEqualTo("전일 종가 87.12 ≥ SMA(20) 82.16");
     }
@@ -121,169 +126,167 @@ class DcaCycleOrderStrategyTest {
     @Test
     void insufficient_candles_win_over_false_condition() {
         // RSI 조건은 거짓(100 > 35)이지만 SMA(200)이 봉 부족 → DATA_UNAVAILABLE 우선
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, rsi(DcaOperator.LTE, "35"), sma(DcaOperator.LT, 200)),
-                rising(30, "87.12"), null, null);
-        assertThat(((DcaDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, rsi(DcaOperator.LTE, "35"), sma(DcaOperator.LT, 200)),
+                rising(30, "87.12"), null, null, null, null);
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }
 
     @Test
     void avg_price_condition_compares_rounded_threshold() {
-        // 평단 85 × (1 − 5%) = 80.75, 종가 90 > 80.75 → LTE 미충족
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")), null,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("10"), new BigDecimal("85.00")));
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.CONDITION_NOT_MET,
-                "전일 종가 90.00 > 평단 85.00 × (1 − 5%) = 80.75", new BigDecimal("90.00")));
+        // 원장 평단 85 × (1 − 5%) = 80.75, 종가 90 > 80.75 → LTE 미충족
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")),
+                null, new AccountBalance(10, new BigDecimal("85.00"), BigDecimal.ZERO), null, null);
+        assertThat(d).isEqualTo(skipped(DcaSkipReason.CONDITION_NOT_MET, "전일 종가 90.00 > 평단 85.00 × (1 − 5%) = 80.75", "90.00"));
     }
 
     @Test
     void avg_price_positive_threshold_detail() {
-        DcaDecision d = decide(withConditions(OrderDirection.SELL, avg(DcaOperator.GTE, "10")), List.of(new BigDecimal("90.00")), 5,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("10"), new BigDecimal("85.00")));
-        assertThat(((DcaDecision.Skipped) d).detail()).isEqualTo("전일 종가 90.00 < 평단 85.00 × (1 + 10%) = 93.50");
+        DcaRuleDecision d = decide(rule(OrderDirection.SELL, "300", OrderType.MOC, avg(DcaOperator.GTE, "10")), List.of(new BigDecimal("90.00")),
+                5, new AccountBalance(10, new BigDecimal("85.00"), BigDecimal.ZERO), null, null);
+        assertThat(((DcaRuleDecision.Skipped) d).detail()).isEqualTo("전일 종가 90.00 < 평단 85.00 × (1 + 10%) = 93.50");
     }
 
     @Test
     void avg_price_buy_with_zero_holdings_passes() {
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")), null,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("0"), null));
-        assertThat(d).isInstanceOf(DcaDecision.Planned.class);
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")),
+                null, new AccountBalance(0, null, BigDecimal.ZERO), null, null);
+        assertThat(d).isInstanceOf(DcaRuleDecision.Planned.class);
     }
 
     @Test
     void avg_price_sell_with_zero_holdings_reports_no_holdings() {
-        DcaDecision d = decide(withConditions(OrderDirection.SELL, avg(DcaOperator.GTE, "10")), List.of(new BigDecimal("90.00")), 0,
-                new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("0"), null));
-        assertThat(((DcaDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.NO_HOLDINGS);
+        DcaRuleDecision d = decide(rule(OrderDirection.SELL, "300", OrderType.MOC, avg(DcaOperator.GTE, "10")), List.of(new BigDecimal("90.00")),
+                0, new AccountBalance(0, null, BigDecimal.ZERO), null, null);
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.NO_HOLDINGS);
     }
 
     @Test
-    void avg_price_without_holding_data_is_data_unavailable() {
-        DcaDecision d = decide(withConditions(OrderDirection.BUY, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")), null, null);
-        assertThat(((DcaDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+    void avg_price_without_ledger_is_data_unavailable() {
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "300", OrderType.MOC, avg(DcaOperator.LTE, "-5")), List.of(new BigDecimal("90.00")),
+                null, null, null, null);
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }
 
     @Test
     void condition_not_met_wins_over_no_holdings_and_below_one_share() {
         // SELL 판매가능 0 + 금액 < 종가지만 RSI 조건 거짓이 먼저
-        DcaConfig c = new DcaConfig(OrderDirection.SELL, new BigDecimal("50"), OrderType.MOC, DcaFrequency.DAILY, null, null,
-                List.of(rsi(DcaOperator.LTE, "35")));
-        DcaDecision d = decide(c, rising(30, "87.12"), 0, null);
-        assertThat(((DcaDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
+        DcaRuleDecision d = decide(rule(OrderDirection.SELL, "50", OrderType.MOC, rsi(DcaOperator.LTE, "35")), rising(30, "87.12"),
+                0, SELL_LEDGER, null, null);
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
     }
 
     @Test
     void buy_quantity_is_floor_of_amount_over_prev_close_with_cap_price() {
-        DcaDecision d = decide(config(OrderDirection.BUY, "300", OrderType.MOC), "87.12", null);
-        PlannedOrder o = ((DcaDecision.Planned) d).order();
-        assertThat(o.quantity()).isEqualTo(3);
-        assertThat(o.price()).isEqualByComparingTo("91.48"); // 87.12 × 1.05 HALF_UP — PriceCapPolicy 결과와 일치해야 함
-        assertThat(o.orderType()).isEqualTo(OrderType.MOC);
-        assertThat(o.timing()).isEqualTo(OrderTiming.AT_CLOSE);
-        assertThat(o.direction()).isEqualTo(OrderDirection.BUY);
-        assertThat(o.orderLeg()).isEqualTo("DCA_BUY");
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decide(rule(OrderDirection.BUY, "300", OrderType.MOC), "87.12", null);
+        assertThat(p.quantity()).isEqualByComparingTo("3");
+        assertThat(p.limitPrice()).isEqualByComparingTo("91.48"); // 87.12 × 1.05 HALF_UP — PriceCapPolicy 결과와 일치해야 함
+        assertThat(p.direction()).isEqualTo(OrderDirection.BUY);
+        assertThat(p.ruleKey()).isEqualTo(KEY);
     }
 
     @Test
-    void moo_is_at_open() {
-        PlannedOrder o = ((DcaDecision.Planned) decide(config(OrderDirection.BUY, "300", OrderType.MOO), "87.12", null)).order();
-        assertThat(o.timing()).isEqualTo(OrderTiming.AT_OPEN);
+    void rule_timing_and_leg() {
+        assertThat(rule(OrderDirection.BUY, "300", OrderType.MOO).timing()).isEqualTo(OrderTiming.AT_OPEN);
+        assertThat(rule(OrderDirection.BUY, "300", OrderType.MOC).timing()).isEqualTo(OrderTiming.AT_CLOSE);
+        assertThat(rule(OrderDirection.BUY, "300", OrderType.MOC).orderLeg()).isEqualTo("DCA_" + KEY);
     }
 
     @Test
     void below_one_share_skips() {
-        DcaDecision d = decide(config(OrderDirection.BUY, "50", OrderType.MOC), "87.12", null);
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 50 < 기준가 87.12", new BigDecimal("87.12")));
+        DcaRuleDecision d = decide(rule(OrderDirection.BUY, "50", OrderType.MOC), "87.12", null);
+        assertThat(d).isEqualTo(skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 < 기준가 87.12", "87.12"));
     }
 
     @Test
     void buy_uses_current_price_when_above_prev_close() {
-        DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "95", null);
-        assertThat(p.order().quantity()).isEqualTo(10);                       // floor(1000 / 95), 전일 종가 기준이면 11
-        assertThat(p.order().price()).isEqualByComparingTo("99.75");          // 95 × 1.05
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decideAt(rule(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "95", null);
+        assertThat(p.quantity()).isEqualByComparingTo("10");              // floor(1000 / 95), 전일 종가 기준이면 11
+        assertThat(p.limitPrice()).isEqualByComparingTo("99.75");         // 95 × 1.05
         assertThat(p.referencePrice()).isEqualByComparingTo("95");
     }
 
     @Test
     void buy_keeps_prev_close_when_current_price_is_lower() {
-        DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "80", null);
-        assertThat(p.order().quantity()).isEqualTo(11);
-        assertThat(p.order().price()).isEqualByComparingTo("91.48");
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decideAt(rule(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "80", null);
+        assertThat(p.quantity()).isEqualByComparingTo("11");
+        assertThat(p.limitPrice()).isEqualByComparingTo("91.48");
         assertThat(p.referencePrice()).isEqualByComparingTo("87.12");
     }
 
     @Test
     void buy_falls_back_to_prev_close_when_current_price_missing_or_zero() {
         for (String current : new String[]{null, "0"}) {
-            DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", current, null);
-            assertThat(p.order().quantity()).isEqualTo(11);
-            assertThat(p.order().price()).isEqualByComparingTo("91.48");
+            DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decideAt(rule(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", current, null);
+            assertThat(p.quantity()).isEqualByComparingTo("11");
+            assertThat(p.limitPrice()).isEqualByComparingTo("91.48");
             assertThat(p.referencePrice()).isEqualByComparingTo("87.12");
         }
     }
 
     @Test
     void below_one_share_reports_current_price_basis() {
-        DcaDecision d = decideAt(config(OrderDirection.BUY, "90", OrderType.MOO), "87.12", "95.0039", null);
-        assertThat(d).isEqualTo(new DcaDecision.Skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 90 < 기준가 95.00", new BigDecimal("95.0039")));
+        DcaRuleDecision d = decideAt(rule(OrderDirection.BUY, "90", OrderType.MOO), "87.12", "95.0039", null);
+        assertThat(d).isEqualTo(skipped(DcaSkipReason.BELOW_ONE_SHARE, "회차 금액 < 기준가 95.00", "95.0039"));
     }
 
     @Test
     void sell_ignores_current_price() {
-        DcaDecision.Planned p = (DcaDecision.Planned) decideAt(config(OrderDirection.SELL, "1000", OrderType.MOC), "100", "120", 50);
-        assertThat(p.order().quantity()).isEqualTo(10);
-        assertThat(p.order().price()).isEqualByComparingTo("100");
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decideAt(rule(OrderDirection.SELL, "1000", OrderType.MOC), "100", "120", 50);
+        assertThat(p.quantity()).isEqualByComparingTo("10");
+        assertThat(p.limitPrice()).isEqualByComparingTo("100");
         assertThat(p.referencePrice()).isEqualByComparingTo("100");
     }
 
     @Test
     void fitBuysToBudget_shrinks_current_price_basis_order_by_its_cap() {
-        PlannedOrder buy = ((DcaDecision.Planned) decideAt(config(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "95", null)).order();
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decideAt(rule(OrderDirection.BUY, "1000", OrderType.MOO), "87.12", "95", null);
+        PlannedOrder buy = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOO, OrderDirection.BUY, p.quantity().intValueExact(),
+                p.limitPrice(), OrderTiming.AT_OPEN, "DCA_" + KEY);
         assertThat(strategy.fitBuysToBudget(List.of(buy), new BigDecimal("500")))
                 .singleElement().extracting(PlannedOrder::quantity).isEqualTo(5); // floor(500 / 99.75)
     }
 
     @Test
     void missing_prev_close_is_data_unavailable() {
-        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.BUY, "300", OrderType.MOC), null, null)).reason())
+        assertThat(((DcaRuleDecision.Skipped) decide(rule(OrderDirection.BUY, "300", OrderType.MOC), null, null)).reason())
                 .isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }
 
     @Test
-    void sell_caps_to_sellable_and_uses_prev_close_price() {
-        PlannedOrder o = ((DcaDecision.Planned) decide(config(OrderDirection.SELL, "1000", OrderType.MOC), "100", 4)).order();
-        assertThat(o.quantity()).isEqualTo(4);
-        assertThat(o.price()).isEqualByComparingTo("100");
-        assertThat(o.orderLeg()).isEqualTo("DCA_SELL");
+    void sell_partial_caps_to_sellable_and_uses_prev_close_price() {
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) decide(rule(OrderDirection.SELL, "1000", OrderType.MOC), "100", 4);
+        assertThat(p.quantity()).isEqualByComparingTo("4");
+        assertThat(p.limitPrice()).isEqualByComparingTo("100");
     }
 
     @Test
     void sell_with_no_sellable_skips_no_holdings() {
-        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.SELL, "1000", OrderType.MOC), "100", 0)).reason())
+        assertThat(((DcaRuleDecision.Skipped) decide(rule(OrderDirection.SELL, "1000", OrderType.MOC), "100", 0)).reason())
                 .isEqualTo(DcaSkipReason.NO_HOLDINGS);
     }
 
     @Test
     void sell_without_sellable_data_is_data_unavailable() {
-        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.SELL, "1000", OrderType.MOC), "100", null)).reason())
+        assertThat(((DcaRuleDecision.Skipped) decide(rule(OrderDirection.SELL, "1000", OrderType.MOC), "100", null)).reason())
                 .isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }
 
     @Test
     void sell_below_one_share_with_unknown_sellable_is_data_unavailable() {
-        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.SELL, "50", OrderType.MOC), "87.12", null)).reason())
+        assertThat(((DcaRuleDecision.Skipped) decide(rule(OrderDirection.SELL, "50", OrderType.MOC), "87.12", null)).reason())
                 .isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }
 
     @Test
     void sell_below_one_share_with_zero_sellable_is_no_holdings() {
-        assertThat(((DcaDecision.Skipped) decide(config(OrderDirection.SELL, "50", OrderType.MOC), "87.12", 0)).reason())
+        assertThat(((DcaRuleDecision.Skipped) decide(rule(OrderDirection.SELL, "50", OrderType.MOC), "87.12", 0)).reason())
                 .isEqualTo(DcaSkipReason.NO_HOLDINGS);
     }
 
     @Test
     void fitBuysToBudget_shrinks_by_cap_price() {
         PlannedOrder buy = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 20,
-                new BigDecimal("105"), OrderTiming.AT_CLOSE, "DCA_BUY");
+                new BigDecimal("105"), OrderTiming.AT_CLOSE, "DCA_" + KEY);
         List<PlannedOrder> fitted = strategy.fitBuysToBudget(List.of(buy), new BigDecimal("1000"));
         assertThat(fitted).singleElement().extracting(PlannedOrder::quantity).isEqualTo(9);
     }
@@ -291,7 +294,7 @@ class DcaCycleOrderStrategyTest {
     @Test
     void fitBuysToBudget_returns_empty_below_one_share() {
         PlannedOrder buy = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 3,
-                new BigDecimal("105"), OrderTiming.AT_CLOSE, "DCA_BUY");
+                new BigDecimal("105"), OrderTiming.AT_CLOSE, "DCA_" + KEY);
         assertThat(strategy.fitBuysToBudget(List.of(buy), new BigDecimal("100"))).isEmpty();
     }
 

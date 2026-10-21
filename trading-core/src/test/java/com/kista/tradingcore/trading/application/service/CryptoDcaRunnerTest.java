@@ -12,7 +12,7 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
@@ -65,7 +65,7 @@ class CryptoDcaRunnerTest {
     List<Strategy> strategies = new java.util.ArrayList<>();
     List<Account> accounts = new java.util.ArrayList<>();
     Map<UUID, StrategyCycle> cycles = new HashMap<>();
-    Map<UUID, DcaConfig> configs = new HashMap<>();
+    Map<UUID, DcaStrategyConfig> configs = new HashMap<>();
 
     // 계좌·전략·사이클·설정을 한 번에 등록
     Strategy add(Account account, StrategyType type, boolean withConfig) {
@@ -74,8 +74,8 @@ class CryptoDcaRunnerTest {
         strategies.add(s);
         cycles.put(s.id(), new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
                 BigDecimal.ZERO, null, LocalDate.of(2026, 10, 1), null, null, null));
-        if (withConfig) configs.put(s.id(), new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET,
-                DcaFrequency.DAILY, null, null, List.of(), 13));
+        if (withConfig) configs.put(s.id(), com.kista.tradingcore.support.TradingFixtures.dcaConfig(
+                com.kista.tradingcore.support.TradingFixtures.cryptoDcaRule("k", OrderDirection.BUY, "10000", 13)));
         return s;
     }
 
@@ -103,7 +103,7 @@ class CryptoDcaRunnerTest {
         tick();
         verify(executor, times(1)).executeAccount(eq(exchange),
                 argThat((List<BatchContext> l) -> l.size() == 1 && l.get(0).strategy().id().equals(dca.id())),
-                argThat((Map<UUID, DcaConfig> m) -> m.keySet().equals(java.util.Set.of(dca.id()))), eq(NOW));
+                argThat((Map<UUID, DcaStrategyConfig> m) -> m.keySet().equals(java.util.Set.of(dca.id()))), eq(NOW));
     }
 
     @Test

@@ -32,8 +32,8 @@ class StrategyDcaConditionEntity extends BaseCreatedAtEntity {
     @Column(name = "id", nullable = false, columnDefinition = "UUID")
     private UUID id; // PK
 
-    @Column(name = "strategy_version_id", nullable = false, columnDefinition = "UUID")
-    private UUID strategyVersionId; // FK → strategy_dca_version (ON DELETE CASCADE)
+    @Column(name = "rule_id", nullable = false, columnDefinition = "UUID")
+    private UUID ruleId; // FK → strategy_dca_rule.id (ON DELETE CASCADE)
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder; // 입력 순서
@@ -52,9 +52,9 @@ class StrategyDcaConditionEntity extends BaseCreatedAtEntity {
     @Column(name = "threshold", precision = 10, scale = 2)
     private BigDecimal threshold; // SMA 외 기준값
 
-    static StrategyDcaConditionEntity of(UUID strategyVersionId, int sortOrder, DcaCondition c) {
+    static StrategyDcaConditionEntity of(UUID ruleId, int sortOrder, DcaCondition c) {
         StrategyDcaConditionEntity e = new StrategyDcaConditionEntity();
-        e.strategyVersionId = strategyVersionId;
+        e.ruleId = ruleId;
         e.sortOrder = sortOrder;
         e.indicator = c.indicator();
         e.operator = c.operator();

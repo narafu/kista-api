@@ -56,4 +56,7 @@ class DcaExecutionEntity extends BaseCreatedAtEntity {
 
     @Column(name = "detail", length = 500)
     private String detail; // 사람용 사유 상세
+
+    @Column(name = "rule_key", nullable = false, length = 36)
+    private String ruleKey; // 규칙 키 — ADD COLUMN이라 물리 순서상 맨 뒤(V12)
 }

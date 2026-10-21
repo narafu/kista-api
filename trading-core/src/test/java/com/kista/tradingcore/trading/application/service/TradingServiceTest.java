@@ -850,8 +850,8 @@ class TradingServiceTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), dca.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"),
                 null, LocalDate.now().minusDays(1), null, null, null);
-        lenient().when(dcaDetailPort.findActiveByStrategyIds(anyCollection())).thenReturn(Map.of(dca.id(), new DcaConfig(
-                OrderDirection.BUY, new BigDecimal("100"), orderType, DcaFrequency.DAILY, null, null)));
+        lenient().when(dcaDetailPort.findActiveByStrategyIds(anyCollection())).thenReturn(Map.of(dca.id(), com.kista.tradingcore.support.TradingFixtures.dcaConfig(
+                com.kista.tradingcore.support.TradingFixtures.stockDcaRule("BUY", OrderDirection.BUY, "100", orderType)))); // 키 "BUY" → leg DCA_BUY
         when(cycleHistoryPort.findLatestOneByStrategyId(dca.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         Order planned = new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),

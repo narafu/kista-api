@@ -71,14 +71,15 @@ class TradingCandidatePlannerDcaTest {
                 BigDecimal.ZERO, null, LocalDate.of(2026, 10, 1), null, null, null);
         ctx = new BatchContext(strategy, cycle, account, TradingFixtures.tradingUserProfile(account.userId()));
         planned = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 3,
-                new BigDecimal("91.48"), OrderTiming.AT_CLOSE, "DCA_BUY");
+                new BigDecimal("91.48"), OrderTiming.AT_CLOSE, "DCA_" + KEY);
     }
 
     static final BigDecimal REFERENCE = new BigDecimal("87.12"); // DCA 주문 기준가
+    static final String KEY = "11111111-1111-1111-1111-111111111111";
 
     private TradingCandidatePlanner.CyclePlanCandidate candidate() {
         return new TradingCandidatePlanner.CyclePlanCandidate(
-                new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(planned), false, REFERENCE);
+                new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(planned), false, Map.of("DCA_" + KEY, REFERENCE));
     }
 
     @Test
@@ -93,14 +94,14 @@ class TradingCandidatePlannerDcaTest {
                 .thenReturn(new TradingBalanceLoader.BalanceLoad(new AccountBalance(0, null, BigDecimal.ZERO), null));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
         BigDecimal premarket = new BigDecimal("95.00");
-        when(dcaRoundPlanner.plan(eq(ctx), eq(DAY), any(), eq(List.of()), eq(premarket)))
-                .thenReturn(Optional.of(new DcaDecision.Planned(planned, premarket)));
+        when(dcaRoundPlanner.plan(eq(ctx), eq(DAY), any(), eq(List.of()), eq(premarket), any()))
+                .thenReturn(List.of(new DcaDecision.Planned(planned, premarket)));
 
         List<TradingCandidatePlanner.CyclePlanCandidate> candidates = withPlanner.collectOpenCandidates(List.of(ctx),
                 Map.of(StrategyTicker.UPRO, new PriceSnapshot(premarket, REFERENCE)), null, DAY);
 
-        assertThat(candidates).singleElement().extracting(TradingCandidatePlanner.CyclePlanCandidate::dcaReferencePrice)
-                .isEqualTo(premarket);
+        assertThat(candidates).singleElement().extracting(TradingCandidatePlanner.CyclePlanCandidate::dcaReferencePrices)
+                .isEqualTo(Map.of("DCA_" + KEY, premarket));
     }
 
     @Test
@@ -108,7 +109,7 @@ class TradingCandidatePlannerDcaTest {
         when(allocator.allocate(any(), eq(DAY))).thenReturn(new TradingOrderBudgetAllocator.Allocation(
                 List.of(new TradingOrderBudgetAllocator.Candidate(ctx, List.of(planned))), List.of(), List.of()));
         Order saved = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO,
-                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", BigDecimal.valueOf(3), new BigDecimal("91.48"),
+                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.valueOf(3), new BigDecimal("91.48"),
                 OrderStatus.PLANNED, null, null, null);
         // 저장 전 재확인은 빈 목록, 저장 후 조회는 저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of(), List.of(saved));
@@ -117,7 +118,7 @@ class TradingCandidatePlannerDcaTest {
 
         assertThat(result.savedContexts()).contains(ctx);
         verify(orderPlanner).savePlannedOrders(List.of(planned), ctx.account(), ctx.currentCycle().id());
-        verify(recorder).recordOrdered(ctx, DAY, saved, REFERENCE);
+        verify(recorder).recordOrdered(ctx, DAY, KEY, saved, REFERENCE);
     }
 
     @Test
@@ -129,7 +130,7 @@ class TradingCandidatePlannerDcaTest {
         TradingCandidatePlanner.SaveAllocationResult result = planner.saveAllocatedOrders(List.of(candidate()), DAY);
 
         assertThat(result.savedContexts()).doesNotContain(ctx);
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), eq(REFERENCE));
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), eq(REFERENCE));
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
@@ -142,7 +143,7 @@ class TradingCandidatePlannerDcaTest {
 
         planner.saveAllocatedOrders(List.of(candidate()), DAY);
 
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 }

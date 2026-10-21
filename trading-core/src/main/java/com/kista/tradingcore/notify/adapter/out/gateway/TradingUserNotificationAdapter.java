@@ -97,11 +97,12 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     @Override
     public void notifyDcaRoundSkipped(TradingUserProfile profile, DcaRoundSkippedEvent e) {
         String direction = e.direction() == null ? "" : e.direction().getLabel() + " ";
+        String rule = e.ruleNumber() == null ? "" : " 규칙 " + e.ruleNumber();
         String text = """
                 ⏭️ <b>DCA 미주문</b> — %s%n\
-                %s %sDCA (%s)%n\
+                %s %sDCA%s (%s)%n\
                 사유: %s%s""".formatted(
-                TelegramHttpClient.escapeHtml(e.accountNickname()), e.ticker().name(), direction, e.tradeDate(), e.reason().getLabel(),
+                TelegramHttpClient.escapeHtml(e.accountNickname()), e.ticker().name(), direction, rule, e.tradeDate(), e.reason().getLabel(),
                 e.detail() == null ? "" : " — " + TelegramHttpClient.escapeHtml(e.detail()));
         notify(profile, "DCA 미주문", text);
     }

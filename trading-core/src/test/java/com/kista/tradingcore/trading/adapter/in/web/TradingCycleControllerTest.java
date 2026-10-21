@@ -10,7 +10,12 @@ import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionPage;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.domain.model.DcaSummary;
 import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -424,16 +429,36 @@ class TradingCycleControllerTest {
         verifyNoInteractions(vrReconfigure);
     }
 
-    private static final DcaConfig DCA_CONFIG =
-            new DcaConfig(OrderDirection.BUY,
-                    new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY, null, null);
+    private static final String KEY = "11111111-1111-1111-1111-111111111111";
 
-    private StrategyDetail dcaDetail() {
+    // 요청 JSON의 규칙 1개(ruleKey 없음)와 짝인 도메인 설정
+    private static final DcaStrategyConfig DCA_CONFIG = TradingFixtures.dcaConfig(
+            new DcaRule(null, OrderDirection.BUY, DcaFrequency.MONTHLY, null, null, OrderType.MOC, null,
+                    new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.REJECT, List.of()));
+
+    private static final String RULE_JSON = """
+            {"ruleKey":null,"direction":"BUY","frequency":"MONTHLY","dayOfWeek":null,"dayOfMonth":null,
+             "orderType":"MOC","executionHour":null,"sizing":{"type":"AMOUNT","amount":300,"percent":null},
+             "shortfall":"REJECT","conditions":%s}""";
+
+    private static String dcaBody(String conditions) {
+        return "{\"type\":\"DCA\",\"ticker\":\"UPRO\",\"dca\":{\"rules\":[" + RULE_JSON.formatted(conditions) + "]}}";
+    }
+
+    private static String configBody(String conditions) {
+        return "{\"rules\":[" + RULE_JSON.formatted(conditions) + "]}";
+    }
+
+    private StrategyDetail dcaDetail(DcaRule rule) {
         Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
         return new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.of(2026, 10, 20), null, false, null, 0, null,
-                new DcaSummary(DCA_CONFIG,
-                        LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null));
+                new DcaSummary(List.of(new DcaSummary.RuleSummary(rule,
+                        LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null)), new BigDecimal("2.5"), new BigDecimal("80.00")));
+    }
+
+    private StrategyDetail dcaDetail() {
+        return dcaDetail(DCA_CONFIG.rules().getFirst().withRuleKey(KEY));
     }
 
     @Test
@@ -454,25 +479,96 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amount":300,
-                                 "orderType":"MOC","frequency":"MONTHLY","dayOfWeek":null,"dayOfMonth":null,"conditions":[]}}
-                                """))
+                        .content(dcaBody("[]")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.type").value("DCA"))
-                .andExpect(jsonPath("$.dca.frequency").value("MONTHLY"))
-                .andExpect(jsonPath("$.dca.conditions").isEmpty())
-                .andExpect(jsonPath("$.dca.nextExecution.usSessionDate").value("2026-10-30"))
-                .andExpect(jsonPath("$.dca.nextExecution.kstTradeDate").value("2026-10-31"))
-                .andExpect(jsonPath("$.dca.lastExecution").doesNotExist())
+                .andExpect(jsonPath("$.dca.rules[0].ruleKey").value(KEY))
+                .andExpect(jsonPath("$.dca.rules[0].frequency").value("MONTHLY"))
+                .andExpect(jsonPath("$.dca.rules[0].sizing.type").value("AMOUNT"))
+                .andExpect(jsonPath("$.dca.rules[0].sizing.amount").value(300))
+                .andExpect(jsonPath("$.dca.rules[0].shortfall").value("REJECT"))
+                .andExpect(jsonPath("$.dca.rules[0].conditions").isEmpty())
+                .andExpect(jsonPath("$.dca.rules[0].nextExecution.usSessionDate").value("2026-10-30"))
+                .andExpect(jsonPath("$.dca.rules[0].nextExecution.kstTradeDate").value("2026-10-31"))
+                .andExpect(jsonPath("$.dca.rules[0].lastExecution").doesNotExist())
+                .andExpect(jsonPath("$.dca.currentHoldings").value(2.5))
+                .andExpect(jsonPath("$.dca.avgPrice").value(80.00))
                 .andExpect(jsonPath("$.todayOpenBatchMissed").value(false));
         ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
         verify(tradingCycle).register(any(), any(), captor.capture());
         assertThat(captor.getValue().dca()).isEqualTo(DCA_CONFIG);
     }
 
-    private static final String DCA_PREFIX = "{\"type\":\"DCA\",\"ticker\":\"UPRO\",\"dca\":{\"direction\":\"BUY\",\"amount\":300,"
-            + "\"orderType\":\"MOC\",\"frequency\":\"DAILY\",\"conditions\":";
+    @Test
+    void register_dca_decimalInitialHoldings_passesBigDecimal() throws Exception {
+        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
+
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"DCA\",\"ticker\":\"BTC\",\"initialHoldings\":\"0.01234567\",\"initialAvgPrice\":90000000,"
+                                + "\"dca\":{\"rules\":[" + RULE_JSON.formatted("[]") + "]}}"))
+                .andExpect(status().isCreated());
+        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
+        verify(tradingCycle).register(any(), any(), captor.capture());
+        assertThat(captor.getValue().initialHoldings()).isEqualByComparingTo("0.01234567");
+    }
+
+    @Test
+    void 구_단일규칙_필드만_보내면_400() throws Exception {
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amount":300,
+                                 "orderType":"MOC","frequency":"MONTHLY","conditions":[]}}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("rules는 필수입니다."));
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY"}
+                                """))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(tradingCycle);
+        verify(dcaConfig, never()).updateConfig(any(), any(), any());
+    }
+
+    @Test
+    void register_dca_stockRule_ignoresExecutionHour() throws Exception {
+        // R5: 주식 주문유형이면 executionHour는 무시(null 저장)
+        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(dcaBody("[]").replace("\"executionHour\":null", "\"executionHour\":9")))
+                .andExpect(status().isCreated());
+        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
+        verify(tradingCycle).register(any(), any(), captor.capture());
+        assertThat(captor.getValue().dca().rules().getFirst().executionHour()).isNull();
+    }
+
+    @Test
+    void register_dca_missingSizing_is_400() throws Exception {
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(dcaBody("[]").replace("\"sizing\":{\"type\":\"AMOUNT\",\"amount\":300,\"percent\":null},", "")))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(tradingCycle);
+    }
+
+    @Test
+    void register_dca_buyHoldingPercent_is_400() throws Exception {
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(dcaBody("[]").replace("{\"type\":\"AMOUNT\",\"amount\":300,\"percent\":null}",
+                                "{\"type\":\"HOLDING_PERCENT\",\"amount\":null,\"percent\":50}")))
+                .andExpect(status().isBadRequest());
+    }
 
     @Test
     void register_dca_with_conditions_passes_typed_conditions() throws Exception {
@@ -481,29 +577,14 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(DCA_PREFIX + "[{\"indicator\":\"RSI\",\"operator\":\"LTE\",\"threshold\":35},"
-                                + "{\"indicator\":\"SMA\",\"operator\":\"LT\",\"smaPeriod\":200}]}}"))
+                        .content(dcaBody("[{\"indicator\":\"RSI\",\"operator\":\"LTE\",\"threshold\":35},"
+                                + "{\"indicator\":\"SMA\",\"operator\":\"LT\",\"smaPeriod\":200}]")))
                 .andExpect(status().isCreated());
         ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
         verify(tradingCycle).register(any(), any(), captor.capture());
-        assertThat(captor.getValue().dca().conditions()).containsExactly(
+        assertThat(captor.getValue().dca().rules().getFirst().conditions()).containsExactly(
                 new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("35")),
                 new DcaCondition(DcaIndicator.SMA, DcaOperator.LT, 200, null));
-    }
-
-    @Test
-    void register_dca_with_fear_greed_passes_condition() throws Exception {
-        when(tradingCycle.register(any(), any(), any())).thenReturn(dcaDetail());
-
-        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(DCA_PREFIX + "[{\"indicator\":\"FEAR_GREED\",\"operator\":\"LTE\",\"threshold\":25}]}}"))
-                .andExpect(status().isCreated());
-        ArgumentCaptor<RegisterStrategyCommand> captor = ArgumentCaptor.forClass(RegisterStrategyCommand.class);
-        verify(tradingCycle).register(any(), any(), captor.capture());
-        assertThat(captor.getValue().dca().conditions()).containsExactly(
-                new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
     }
 
     @Test
@@ -511,7 +592,7 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(DCA_PREFIX + "[{\"indicator\":\"FEAR_GREED\",\"operator\":\"LTE\",\"threshold\":101}]}}"))
+                        .content(dcaBody("[{\"indicator\":\"FEAR_GREED\",\"operator\":\"LTE\",\"threshold\":101}]")))
                 .andExpect(status().isBadRequest());
     }
 
@@ -520,7 +601,7 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(DCA_PREFIX + "[{\"indicator\":\"SMA\",\"operator\":\"LT\",\"smaPeriod\":60}]}}"))
+                        .content(dcaBody("[{\"indicator\":\"SMA\",\"operator\":\"LT\",\"smaPeriod\":60}]")))
                 .andExpect(status().isBadRequest());
     }
 
@@ -529,30 +610,8 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(DCA_PREFIX + "[null]}}"))
+                        .content(dcaBody("[null]")))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void reconfigureDca_returns_typed_conditions() throws Exception {
-        DcaConfig cfg = new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.MONTHLY,
-                null, null, List.of(
-                new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("35")),
-                new DcaCondition(DcaIndicator.SMA, DcaOperator.LT, 200, null)));
-        Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.DCA,
-                StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
-        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(new StrategyDetail(strategy, BigDecimal.ZERO,
-                LocalDate.of(2026, 10, 20), null, false, null, 0, null,
-                new DcaSummary(cfg, LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null)));
-
-        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{" + DCA_PREFIX.substring(DCA_PREFIX.indexOf("\"direction")) + "[]}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dca.conditions[0].indicator").value("RSI"))
-                .andExpect(jsonPath("$.dca.conditions[0].threshold").value(35))
-                .andExpect(jsonPath("$.dca.conditions[1].smaPeriod").value(200));
     }
 
     @Test
@@ -560,11 +619,27 @@ class TradingCycleControllerTest {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"type":"DCA","ticker":"UPRO","dca":{"direction":"BUY","amount":300,"orderType":"MOC",
-                                 "frequency":"WEEKLY","dayOfWeek":"SATURDAY"}}
-                                """))
+                        .content(dcaBody("[]").replace("\"frequency\":\"MONTHLY\",\"dayOfWeek\":null",
+                                "\"frequency\":\"WEEKLY\",\"dayOfWeek\":\"SATURDAY\"")))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reconfigureDca_returns_typed_conditions() throws Exception {
+        DcaRule rule = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.REJECT, List.of(
+                new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("35")),
+                new DcaCondition(DcaIndicator.SMA, DcaOperator.LT, 200, null)));
+        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail(rule));
+
+        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(configBody("[]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dca.rules[0].conditions[0].indicator").value("RSI"))
+                .andExpect(jsonPath("$.dca.rules[0].conditions[0].threshold").value(35))
+                .andExpect(jsonPath("$.dca.rules[0].conditions[1].smaPeriod").value(200));
     }
 
     @Test
@@ -574,56 +649,52 @@ class TradingCycleControllerTest {
         mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY","conditions":[]}
-                                """))
+                        .content(configBody("[]")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dca.amount").value(300));
+                .andExpect(jsonPath("$.dca.rules[0].sizing.amount").value(300))
+                .andExpect(jsonPath("$.dca.amount").doesNotExist());
         verify(dcaConfig).updateConfig(CYCLE_ID, USER_ID, DCA_CONFIG);
     }
 
     @Test
-    void reconfigureDca_with_fear_greed_passes_condition() throws Exception {
+    void reconfigureDca_keepsRuleKey() throws Exception {
         when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
 
         mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY",
-                                 "conditions":[{"indicator":"FEAR_GREED","operator":"LTE","threshold":25}]}
-                                """))
+                        .content(configBody("[]").replace("\"ruleKey\":null", "\"ruleKey\":\"" + KEY + "\"")))
                 .andExpect(status().isOk());
-        ArgumentCaptor<DcaConfig> captor = ArgumentCaptor.forClass(DcaConfig.class);
+        ArgumentCaptor<DcaStrategyConfig> captor = ArgumentCaptor.forClass(DcaStrategyConfig.class);
         verify(dcaConfig).updateConfig(eq(CYCLE_ID), eq(USER_ID), captor.capture());
-        assertThat(captor.getValue().conditions()).containsExactly(
-                new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
+        assertThat(captor.getValue().rules().getFirst().ruleKey()).isEqualTo(KEY);
     }
 
     @Test
-    void reconfigureDca_directionChange_returns400() throws Exception {
-        doThrow(new IllegalArgumentException("DCA 방향은 변경할 수 없습니다"))
+    void reconfigureDca_unknownRuleKey_returns400() throws Exception {
+        doThrow(new IllegalArgumentException("존재하지 않는 규칙입니다"))
                 .when(dcaConfig).updateConfig(eq(CYCLE_ID), any(), any());
 
         mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"direction":"SELL","amount":300,"orderType":"MOC","frequency":"MONTHLY"}
-                                """))
-                .andExpect(status().isBadRequest());
+                        .content(configBody("[]").replace("\"ruleKey\":null", "\"ruleKey\":\"" + KEY + "\"")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("존재하지 않는 규칙입니다"));
     }
 
     @Test
     void lists_dca_executions() throws Exception {
         when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), eq(0), eq(20))).thenReturn(new DcaExecutionPage(List.of(
                 new DcaExecutionPage.Row(
-                        DcaExecution.skipped(CYCLE_ID, LocalDate.of(2026, 8, 31),
+                        DcaExecution.skipped(CYCLE_ID, KEY, LocalDate.of(2026, 8, 31),
                                 DcaSkipReason.CONDITION_NOT_MET, "RSI(14) 48.20 > 35", null),
-                        LocalDate.of(2026, 8, 30), null)), 0, 20, 1));
+                        LocalDate.of(2026, 8, 30), null, OrderDirection.SELL)), 0, 20, 1));
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].status").value("SKIPPED"))
+                .andExpect(jsonPath("$.content[0].ruleKey").value(KEY))
+                .andExpect(jsonPath("$.content[0].direction").value("SELL"))
                 .andExpect(jsonPath("$.content[0].skipReason").value("CONDITION_NOT_MET"))
                 .andExpect(jsonPath("$.content[0].kstTradeDate").value("2026-08-31"))
                 .andExpect(jsonPath("$.content[0].usSessionDate").value("2026-08-30"))
@@ -636,35 +707,5 @@ class TradingCycleControllerTest {
         when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), anyInt(), anyInt())).thenThrow(new SecurityException("소유권 불일치"));
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void reconfigureDca_legacyAmountUsdOnly_returns400() throws Exception {
-        // 구 번들(amountUsd만 전송) — 구 필드는 무시되고 amount 누락으로 거부된다
-        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"direction":"BUY","amountUsd":300,"orderType":"MOC","frequency":"MONTHLY"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("amount는 필수입니다."));
-        verify(dcaConfig, never()).updateConfig(any(), any(), any());
-    }
-
-    @Test
-    void reconfigureDca_responseCarriesAmountOnly() throws Exception {
-        when(tradingCycle.getById(CYCLE_ID, USER_ID)).thenReturn(dcaDetail());
-
-        mockMvc.perform(put("/api/trading-cycles/{id}/dca-config", CYCLE_ID)
-                        .with(csrf()).with(authentication(userToken(USER_ID)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"direction":"BUY","amount":300,"orderType":"MOC","frequency":"MONTHLY","conditions":[]}
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.dca.amount").value(300))
-                .andExpect(jsonPath("$.dca.amountUsd").doesNotExist());
-        verify(dcaConfig).updateConfig(CYCLE_ID, USER_ID, DCA_CONFIG);
     }
 }

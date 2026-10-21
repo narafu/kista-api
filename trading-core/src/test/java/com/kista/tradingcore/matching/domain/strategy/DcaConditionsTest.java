@@ -7,7 +7,11 @@ import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
 import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import org.junit.jupiter.api.Test;
 
@@ -20,15 +24,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DcaConditionsTest {
 
-    private static DcaConfig config(DcaCondition... conditions) {
-        return new DcaConfig(OrderDirection.BUY, new BigDecimal("300"), OrderType.MOC, DcaFrequency.DAILY, null, null, List.of(conditions));
+    private static DcaRule config(DcaCondition... conditions) {
+        return new DcaRule("k", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of(conditions));
     }
 
     private static List<BigDecimal> closes(String... v) {
         return java.util.Arrays.stream(v).map(BigDecimal::new).toList();
     }
 
-    private static Optional<DcaDecision.Skipped> check(DcaConfig c, List<BigDecimal> closes, DcaCycleOrderStrategy.DcaInputs.Holding h) {
+    private static Optional<DcaDecision.Skipped> check(DcaRule c, List<BigDecimal> closes, AccountBalance h) {
         BigDecimal ref = closes == null || closes.isEmpty() ? null : closes.getLast();
         return DcaConditions.check(c, closes, h, null, ref);
     }
@@ -50,8 +55,8 @@ class DcaConditionsTest {
 
     @Test
     void avgPriceWithFractionalHoldingEvaluates() {
-        DcaConfig c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
-        var holding = new DcaCycleOrderStrategy.DcaInputs.Holding(new BigDecimal("0.00012345"), new BigDecimal("1000"));
+        DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
+        var holding = new AccountBalance(new BigDecimal("0.00012345"), new BigDecimal("1000"), BigDecimal.ZERO);
         assertThat(check(c, closes("950"), holding)).isEmpty();
         assertThat(check(c, closes("951"), holding)).hasValueSatisfying(s -> {
             assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
@@ -61,13 +66,13 @@ class DcaConditionsTest {
 
     @Test
     void zeroHoldingPassesAvgPrice() {
-        DcaConfig c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
-        assertThat(check(c, closes("951"), new DcaCycleOrderStrategy.DcaInputs.Holding(BigDecimal.ZERO, null))).isEmpty();
+        DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
+        assertThat(check(c, closes("951"), new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO))).isEmpty();
     }
 
     @Test
     void smaShortHistoryIsDataUnavailable() {
-        DcaConfig c = config(new DcaCondition(DcaIndicator.SMA, DcaOperator.GTE, 200, null));
+        DcaRule c = config(new DcaCondition(DcaIndicator.SMA, DcaOperator.GTE, 200, null));
         List<BigDecimal> shortCloses = IntStream.range(0, 199).mapToObj(i -> new BigDecimal("100")).toList();
         assertThat(check(c, shortCloses, null)).hasValueSatisfying(s -> {
             assertThat(s.reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
@@ -77,8 +82,8 @@ class DcaConditionsTest {
 
     @Test
     void skipKeepsReferencePriceUnchanged() {
-        DcaConfig c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
-        var holding = new DcaCycleOrderStrategy.DcaInputs.Holding(BigDecimal.ONE, new BigDecimal("1000"));
+        DcaRule c = config(new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
+        var holding = new AccountBalance(BigDecimal.ONE, new BigDecimal("1000"), BigDecimal.ZERO);
         BigDecimal ref = new BigDecimal("123.45");
         // 조건 미충족 skip
         assertThat(DcaConditions.check(c, closes("951"), holding, null, ref))
@@ -90,7 +95,7 @@ class DcaConditionsTest {
 
     @Test
     void fearGreedConditionBoundary() {
-        DcaConfig c = config(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
+        DcaRule c = config(new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal("25")));
         assertThat(DcaConditions.check(c, closes("100"), null, new BigDecimal("25"), new BigDecimal("100"))).isEmpty();
         assertThat(DcaConditions.check(c, closes("100"), null, new BigDecimal("26"), new BigDecimal("100"))).hasValueSatisfying(s -> {
             assertThat(s.reason()).isEqualTo(DcaSkipReason.CONDITION_NOT_MET);
@@ -104,7 +109,7 @@ class DcaConditionsTest {
 
     @Test
     void rsiCondition() {
-        DcaConfig c = config(new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("30")));
+        DcaRule c = config(new DcaCondition(DcaIndicator.RSI, DcaOperator.LTE, null, new BigDecimal("30")));
         // 15개 연속 하락 → 상승 없음 RSI 0 → 통과
         List<BigDecimal> falling = IntStream.range(0, 15).mapToObj(i -> new BigDecimal(200 - i)).toList();
         assertThat(check(c, falling, null)).isEmpty();

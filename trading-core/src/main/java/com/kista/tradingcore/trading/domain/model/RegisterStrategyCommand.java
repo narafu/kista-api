@@ -3,7 +3,7 @@ package com.kista.tradingcore.trading.domain.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.kista.shared.kernel.StrategyType;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 
@@ -15,7 +15,7 @@ public record RegisterStrategyCommand(
         StrategyCycleSeedType cycleSeedType,        // null이면 NONE으로 처리
         int divisionCount,                           // 분할 수 (20/30/40), 0은 미입력 sentinel로 런타임 기본값 적용
         // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)
-        Integer initialHoldings,                      // 등록 시점 기존 보유 수량
+        BigDecimal initialHoldings,                   // 등록 시점 기존 보유 수량 (주식 정수, 코인 소수 8자리까지)
         BigDecimal initialAvgPrice,                   // 등록 시점 기존 평단가 (initialHoldings>0이면 필수)
         // VR 전략 전용 필드 (비VR 경로는 null)
         Integer intervalWeeks,                       // 리밸런싱 주기 (주 단위, 1 이상, VR 전용)
@@ -33,11 +33,11 @@ public record RegisterStrategyCommand(
         LocalDate scheduledStartDate,                  // 시작예정일 (null이면 오늘, 과거 거부)
         // VR: 초기 V값 직접 지정 (VR 전용, null/0 이하면 미지정 취급 — 평가금 기준으로 대체)
         BigDecimal initialVrValue,
-        DcaConfig dca                                  // DCA 전용 설정 (비DCA는 null)
+        DcaStrategyConfig dca                          // DCA 전용 규칙 설정 (비DCA는 null)
 ) {
     // 기존 20개 필드 호출부 호환용 — dca 생략 시 null
     public RegisterStrategyCommand(StrategyType type, StrategyTicker ticker, BigDecimal initialUsdDeposit,
-            StrategyCycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
+            StrategyCycleSeedType cycleSeedType, int divisionCount, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
             Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, Integer initialGradient,
             Integer gGraceWeeks, Integer gStepWeeks, Integer gMax, BigDecimal initialPoolLimitRate,
             Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor, LocalDate scheduledStartDate,
@@ -49,7 +49,7 @@ public record RegisterStrategyCommand(
 
     // 기존 19개 필드 호출부(테스트 등) 호환용 — initialVrValue 생략 시 null(미지정)
     public RegisterStrategyCommand(StrategyType type, StrategyTicker ticker, BigDecimal initialUsdDeposit,
-            StrategyCycleSeedType cycleSeedType, int divisionCount, Integer initialHoldings, BigDecimal initialAvgPrice,
+            StrategyCycleSeedType cycleSeedType, int divisionCount, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
             Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount, Integer initialGradient,
             Integer gGraceWeeks, Integer gStepWeeks, Integer gMax, BigDecimal initialPoolLimitRate,
             Integer pGraceWeeks, Integer pStepWeeks, BigDecimal poolLimitFloor, LocalDate scheduledStartDate) {

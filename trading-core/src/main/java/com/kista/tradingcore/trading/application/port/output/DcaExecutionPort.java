@@ -11,14 +11,14 @@ import java.util.UUID;
 
 public interface DcaExecutionPort {
 
-    // (strategyId, tradeDate) 최초 1회만 삽입 — 삽입했으면 true, UNIQUE 충돌이면 false
+    // (strategyId, ruleKey, tradeDate) 최초 1회만 삽입 — 삽입했으면 true, UNIQUE 충돌이면 false
     boolean insertIfAbsent(DcaExecution execution);
 
-    // 거래일 단건 조회
-    Optional<DcaExecution> find(UUID strategyId, LocalDate tradeDate);
+    // 규칙·거래일 단건 조회
+    Optional<DcaExecution> find(UUID strategyId, String ruleKey, LocalDate tradeDate);
 
-    // 전략별 최신 회차 1건 (배치 조회) — 키는 strategyId
-    Map<UUID, DcaExecution> findLatestByStrategyIds(Collection<UUID> strategyIds);
+    // 전략×규칙별 최신 회차 1건 (배치 조회) — strategyId → ruleKey → 최신 회차
+    Map<UUID, Map<String, DcaExecution>> findLatestByStrategyIds(Collection<UUID> strategyIds);
 
     // 회차 이력 페이지 (trade_date DESC)
     List<DcaExecution> findPage(UUID strategyId, int page, int size);

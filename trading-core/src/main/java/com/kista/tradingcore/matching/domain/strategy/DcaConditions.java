@@ -3,7 +3,6 @@ package com.kista.tradingcore.matching.domain.strategy;
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
 import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.DcaIndicators;
@@ -23,20 +22,17 @@ public final class DcaConditions {
     // 조건 1개 평가 결과 — passed=false면 detail이 skip 사유
     private record Evaluation(boolean passed, String detail) {}
 
-    // 전부 통과면 empty. 전일 종가 없음 → 지표 계산 불가 → 미충족 순. referencePrice는 skip 기록용(전일 종가 실패만 null)
-    public static Optional<DcaDecision.Skipped> check(DcaConfig config, List<BigDecimal> closes, DcaCycleOrderStrategy.DcaInputs.Holding holding,
-                                                      BigDecimal fearGreed, BigDecimal referencePrice) {
-        return check(config.conditions(), closes, holding, fearGreed, referencePrice);
-    }
+    // AVG_PRICE 평가용 보유 — 원장 수량·평단
+    private record Holding(BigDecimal quantity, BigDecimal avgPrice) {}
 
-    // 규칙 기반 — AVG_PRICE는 원장(ledger) 평단 기준
+    // 전부 통과면 empty. 전일 종가 없음 → 지표 계산 불가 → 미충족 순. AVG_PRICE는 원장(ledger) 평단 기준, referencePrice는 skip 기록용
     public static Optional<DcaDecision.Skipped> check(DcaRule rule, List<BigDecimal> closes, AccountBalance ledger,
                                                       BigDecimal fearGreed, BigDecimal referencePrice) {
-        var holding = ledger == null ? null : new DcaCycleOrderStrategy.DcaInputs.Holding(ledger.holdings(), ledger.avgPrice());
+        var holding = ledger == null ? null : new Holding(ledger.holdings(), ledger.avgPrice());
         return check(rule.conditions(), closes, holding, fearGreed, referencePrice);
     }
 
-    private static Optional<DcaDecision.Skipped> check(List<DcaCondition> conditions, List<BigDecimal> closes, DcaCycleOrderStrategy.DcaInputs.Holding holding,
+    private static Optional<DcaDecision.Skipped> check(List<DcaCondition> conditions, List<BigDecimal> closes, Holding holding,
                                                        BigDecimal fearGreed, BigDecimal referencePrice) {
         BigDecimal prevClose = closes == null || closes.isEmpty() ? null : closes.getLast();
         if (prevClose == null || prevClose.signum() <= 0) {
@@ -55,7 +51,7 @@ public final class DcaConditions {
 
     // 조건 1개 평가 — 지표 계산 불가면 empty
     private static Optional<Evaluation> evaluate(DcaCondition cond, List<BigDecimal> closes, BigDecimal prevClose,
-                                                 DcaCycleOrderStrategy.DcaInputs.Holding holding, BigDecimal fearGreed) {
+                                                 Holding holding, BigDecimal fearGreed) {
         String close = "전일 종가 " + money(prevClose);
         return switch (cond.indicator()) {
             case SMA -> DcaIndicators.sma(closes, cond.smaPeriod())
@@ -69,7 +65,7 @@ public final class DcaConditions {
     }
 
     // 보유 0은 통과 처리 — BUY는 첫 매수 허용, SELL은 뒤 단계 NO_HOLDINGS로 보고 (spec 5.2)
-    private static Optional<Evaluation> evaluateAvgPrice(DcaCondition cond, BigDecimal prevClose, DcaCycleOrderStrategy.DcaInputs.Holding holding, String close) {
+    private static Optional<Evaluation> evaluateAvgPrice(DcaCondition cond, BigDecimal prevClose, Holding holding, String close) {
         if (holding == null) return Optional.empty();
         if (holding.quantity().signum() <= 0) return Optional.of(new Evaluation(true, null));
         if (holding.avgPrice() == null || holding.avgPrice().signum() <= 0) return Optional.empty();

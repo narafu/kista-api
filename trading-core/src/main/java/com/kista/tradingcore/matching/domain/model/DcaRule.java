@@ -27,6 +27,7 @@ public record DcaRule(
         DcaShortfallPolicy shortfall, // 가용 부족 정책
         List<DcaCondition> conditions // 추가 조건 (AND, 최대 10개)
 ) {
+    public static final int MAX_CONDITIONS = 10; // 규칙당 조건 상한
     public static final BigDecimal CRYPTO_MIN_AMOUNT = new BigDecimal("5000"); // 업비트 KRW 마켓 최소 주문 금액
     // ponytail: 업비트 KRW 수수료율 고정 — 거래소별 수수료 조회가 필요해지면 확장
     public static final BigDecimal CRYPTO_FEE_FACTOR = new BigDecimal("1.0005"); // 1 + 수수료율 0.05%
@@ -53,7 +54,7 @@ public record DcaRule(
         if (!monthly && dayOfMonth != null) throw new IllegalArgumentException("dayOfMonth는 MONTHLY에서만 허용합니다");
         if (dayOfMonth != null && (dayOfMonth < 1 || dayOfMonth > 31)) throw new IllegalArgumentException("dayOfMonth는 1~31입니다");
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
-        if (conditions.size() > DcaConfig.MAX_CONDITIONS) throw new IllegalArgumentException("DCA 조건은 최대 " + DcaConfig.MAX_CONDITIONS + "개입니다.");
+        if (conditions.size() > MAX_CONDITIONS) throw new IllegalArgumentException("DCA 조건은 최대 " + MAX_CONDITIONS + "개입니다.");
     }
 
     // 계좌 시장별 규칙 — 등록·수정 시 계좌 증권사 시장으로 호출한다

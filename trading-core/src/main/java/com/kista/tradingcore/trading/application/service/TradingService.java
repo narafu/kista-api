@@ -324,9 +324,11 @@ class TradingService {
                 .filter(c -> c.strategy().isDca() && c.account().broker().supportsOpenAuctionOrders())
                 .toList();
         if (targets.isEmpty()) return;
-        Map<UUID, DcaConfig> configs = dcaDetailPort.findActiveByStrategyIds(targets.stream().map(c -> c.strategy().id()).toList());
+        Map<UUID, DcaStrategyConfig> configs = dcaDetailPort.findActiveByStrategyIds(targets.stream().map(c -> c.strategy().id()).toList());
+        // MOO 규칙이 하나라도 있는 전략 — 같은 전략의 MOC 규칙은 planner가 timing으로 거른다
         List<BatchContext> moo = targets.stream()
-                .filter(c -> configs.containsKey(c.strategy().id()) && configs.get(c.strategy().id()).timing() == OrderTiming.AT_OPEN)
+                .filter(c -> configs.containsKey(c.strategy().id()) && configs.get(c.strategy().id()).rules().stream()
+                        .anyMatch(r -> r.timing() == OrderTiming.AT_OPEN))
                 .toList();
         if (moo.isEmpty()) return;
         runState.critical(() -> {

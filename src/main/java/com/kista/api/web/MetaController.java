@@ -14,6 +14,8 @@ import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
@@ -57,6 +59,8 @@ public class MetaController {
                 toEnumMeta(DcaFrequency.values(), DcaFrequency::getLabel),
                 toEnumMeta(DcaOperator.values(), DcaOperator::getLabel),
                 toEnumMeta(DcaSkipReason.values(), DcaSkipReason::getLabel),
+                toEnumMeta(DcaSizingType.values(), DcaSizingType::getLabel),
+                toEnumMeta(DcaShortfallPolicy.values(), DcaShortfallPolicy::getLabel),
                 Arrays.stream(DcaIndicator.values()).map(DcaIndicatorMeta::from).toList()
         );
         return ResponseEntity.ok().cacheControl(CACHE).body(bundle);

@@ -24,8 +24,8 @@ public record TradingCycleRequest(
         StrategyCycleSeedType cycleSeedType,
         @Schema(description = "분할 수 (null이면 런타임 기본값)", example = "20")
         Integer divisionCount,
-        @Schema(description = "중간부터 시작 — 등록 시점 기존 보유 수량 (null/0이면 빈 포지션에서 시작)", example = "10")
-        Integer initialHoldings,
+        @Schema(description = "중간부터 시작 — 등록 시점 기존 보유 수량 (null/0이면 빈 포지션에서 시작, 주식 정수·코인 소수 8자리까지 — 숫자 또는 소수 문자열)", example = "10")
+        BigDecimal initialHoldings,
         @Schema(description = "중간부터 시작 — 등록 시점 기존 평단가 (initialHoldings>0이면 필수)", example = "45.50")
         BigDecimal initialAvgPrice,
         // VR 전용 필드 (비VR 등록 시 null — @NotNull 없음, 서비스 검증)

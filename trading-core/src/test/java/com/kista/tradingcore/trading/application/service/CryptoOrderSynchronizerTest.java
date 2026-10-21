@@ -13,7 +13,7 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult.State;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -49,6 +49,8 @@ import static org.mockito.Mockito.when;
 
 class CryptoOrderSynchronizerTest {
 
+    static final String KEY = "11111111-1111-1111-1111-111111111111";
+
     static final LocalDate TODAY = LocalDate.of(2026, 10, 18);
     static final BigDecimal PRICE = new BigDecimal("10000");
 
@@ -59,7 +61,7 @@ class CryptoOrderSynchronizerTest {
     CryptoOrderSynchronizer sync = new CryptoOrderSynchronizer(orderPort, recorder, publisher);
 
     BatchContext ctx;
-    Map<UUID, DcaConfig> configs;
+    Map<UUID, DcaStrategyConfig> configs;
     UUID orderId = UUID.randomUUID();
 
     @BeforeEach
@@ -70,13 +72,13 @@ class CryptoOrderSynchronizerTest {
         StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
                 BigDecimal.ZERO, null, LocalDate.of(2026, 10, 1), null, null, null);
         ctx = new BatchContext(strategy, cycle, account, TradingFixtures.tradingUserProfile(account.userId()));
-        configs = Map.of(strategy.id(), new DcaConfig(OrderDirection.BUY, PRICE, OrderType.MARKET, DcaFrequency.DAILY,
-                null, null, null, 13));
+        configs = Map.of(strategy.id(), com.kista.tradingcore.support.TradingFixtures.dcaConfig(
+                com.kista.tradingcore.support.TradingFixtures.cryptoDcaRule(KEY, OrderDirection.BUY, "10000", 13)));
     }
 
     Order order(OrderStatus status, LocalDate tradeDate, String externalId) {
         return new Order(orderId, ctx.account().id(), ctx.currentCycle().id(), tradeDate, StrategyTicker.BTC,
-                OrderType.MARKET, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA", new BigDecimal("0.0001"), PRICE,
+                OrderType.MARKET, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, new BigDecimal("0.0001"), PRICE,
                 status, externalId, null, null);
     }
 
@@ -96,7 +98,7 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         run(o, 13);
         InOrder io = inOrder(recorder, orderPort);
-        io.verify(recorder).recordOrdered(ctx, TODAY, o, PRICE);
+        io.verify(recorder).recordOrdered(ctx, TODAY, KEY, o, PRICE);
         io.verify(orderPort).markPlaced(orderId, "upbit-uuid");
         verify(exchange, never()).buyMarketByAmount(any(), any(), any(), any());
         verify(exchange, never()).sellMarketByVolume(any(), any(), any(), any());
@@ -118,7 +120,7 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(orderPort).markFailed(orderId);
-        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -127,7 +129,7 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 14);
         InOrder io = inOrder(recorder, orderPort);
-        io.verify(recorder).recordSkipped(ctx, TODAY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        io.verify(recorder).recordSkipped(ctx, TODAY, KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
         io.verify(orderPort).markFailed(orderId);
     }
 
@@ -136,14 +138,14 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.SUBMITTING, TODAY.minusDays(1), null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
-        verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
     }
 
     @Test
     void recordSkippedFailureLeavesOrderSubmitting() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
-        doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any());
+        doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any(), any());
         run(o, 14);
         verify(orderPort, never()).markFailed(any());
     }
@@ -152,7 +154,7 @@ class CryptoOrderSynchronizerTest {
     void recordOrderedFailureLeavesOrderSubmitting() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
-        doThrow(new RuntimeException("db")).when(recorder).recordOrdered(any(), any(), any(), any());
+        doThrow(new RuntimeException("db")).when(recorder).recordOrdered(any(), any(), any(), any(), any());
         run(o, 13);
         verify(orderPort, never()).markPlaced(any(), any());
     }
@@ -210,7 +212,7 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLANNED, TODAY, null);
         run(o, 14);
         InOrder io = inOrder(recorder, orderPort);
-        io.verify(recorder).recordSkipped(ctx, TODAY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        io.verify(recorder).recordSkipped(ctx, TODAY, KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
         io.verify(orderPort).cancelPlanned(orderId);
         verifyNoMoreInteractions(exchange);
     }
@@ -220,13 +222,13 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLANNED, TODAY, null);
         run(o, 13);
         verify(orderPort).cancelPlanned(orderId);
-        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any());
     }
 
     @Test
     void orderOfUnknownCycleIsUntouched() {
         Order o = new Order(orderId, ctx.account().id(), UUID.randomUUID(), TODAY, StrategyTicker.BTC, OrderType.MARKET,
-                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA", BigDecimal.ONE, PRICE, OrderStatus.SUBMITTING, null, null, null);
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.ONE, PRICE, OrderStatus.SUBMITTING, null, null, null);
         run(o, 13);
         verifyNoMoreInteractions(exchange);
     }

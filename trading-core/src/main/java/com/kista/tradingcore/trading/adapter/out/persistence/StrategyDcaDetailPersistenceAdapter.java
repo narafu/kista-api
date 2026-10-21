@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -19,62 +20,54 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class StrategyDcaDetailPersistenceAdapter implements StrategyDcaDetailPort {
 
-    private final StrategyDcaVersionJpaRepository jpaRepository;
-    private final StrategyDcaConditionJpaRepository conditionRepository; // 버전별 조건
+    private final StrategyDcaRuleJpaRepository ruleRepository;
+    private final StrategyDcaConditionJpaRepository conditionRepository; // 규칙별 조건
 
     @Override
     @Transactional
-    public DcaConfig save(UUID strategyVersionId, DcaConfig config) {
-        // find-or-create upsert — strategy_version_id PK 기준
-        StrategyDcaVersionEntity entity = PersistenceSupport.findOrCreate(
-                strategyVersionId, jpaRepository, StrategyDcaVersionEntity::new);
-        entity.setStrategyVersionId(strategyVersionId);
-        entity.setDirection(config.direction());
-        entity.setAmount(config.amount());
-        entity.setExecutionHour(config.executionHour() == null ? null : config.executionHour().shortValue());
-        entity.setOrderType(config.orderType());
-        entity.setFrequency(config.frequency());
-        entity.setDayOfWeek(config.dayOfWeek());
-        entity.setDayOfMonth(config.dayOfMonth());
-        StrategyDcaVersionEntity saved = jpaRepository.save(entity);
-        // 조건 교체 — 즉시 삭제 후 입력 순서대로 insert
-        conditionRepository.deleteAllByStrategyVersionId(strategyVersionId);
-        List<StrategyDcaConditionEntity> conditions = conditionRepository.saveAll(
-                IntStream.range(0, config.conditions().size())
-                        .mapToObj(i -> StrategyDcaConditionEntity.of(strategyVersionId, i, config.conditions().get(i)))
-                        .toList());
-        return toDomain(saved, conditions);
+    public DcaStrategyConfig save(UUID strategyVersionId, DcaStrategyConfig config) {
+        // 버전 규칙 교체 — 즉시 삭제(조건은 CASCADE) 후 입력 순서대로 insert
+        ruleRepository.deleteAllByStrategyVersionId(strategyVersionId);
+        List<DcaRule> rules = config.rules();
+        List<StrategyDcaRuleEntity> savedRules = ruleRepository.saveAll(IntStream.range(0, rules.size())
+                .mapToObj(i -> StrategyDcaRuleEntity.of(strategyVersionId, i, rules.get(i))).toList());
+        List<StrategyDcaConditionEntity> conditions = conditionRepository.saveAll(IntStream.range(0, rules.size())
+                .boxed()
+                .flatMap(i -> IntStream.range(0, rules.get(i).conditions().size()).mapToObj(j ->
+                        StrategyDcaConditionEntity.of(savedRules.get(i).getId(), j, rules.get(i).conditions().get(j))))
+                .toList());
+        return toDomain(savedRules, conditions);
     }
 
     @Override
-    public Optional<DcaConfig> findActiveByStrategyId(UUID strategyId) {
-        return jpaRepository.findActiveByStrategyId(strategyId).map(e -> toDomain(e,
-                conditionRepository.findByStrategyVersionIdInOrderBySortOrderAsc(List.of(e.getStrategyVersionId()))));
+    public Optional<DcaStrategyConfig> findActiveByStrategyId(UUID strategyId) {
+        return Optional.ofNullable(findActiveByStrategyIds(List.of(strategyId)).get(strategyId));
     }
 
     @Override
-    public Map<UUID, DcaConfig> findActiveByStrategyIds(Collection<UUID> strategyIds) {
+    public Map<UUID, DcaStrategyConfig> findActiveByStrategyIds(Collection<UUID> strategyIds) {
         if (strategyIds.isEmpty()) return Map.of();
-        // 활성 versionId 링크 → 엔티티 일괄 조회 → strategyId 키로 조립
-        var links = jpaRepository.findActiveLinks(strategyIds);
+        // 활성 versionId 링크 → 규칙·조건 일괄 조회(각 1회, N+1 방지) → strategyId 키로 조립
+        var links = ruleRepository.findActiveLinks(strategyIds);
         if (links.isEmpty()) return Map.of(); // 활성 버전이 없으면 후속 IN 쿼리 생략
-        Map<UUID, StrategyDcaVersionEntity> byVersion = jpaRepository
-                .findAllById(links.stream().map(StrategyDcaVersionJpaRepository.StrategyVersionLink::getStrategyVersionId).toList())
-                .stream().collect(Collectors.toMap(StrategyDcaVersionEntity::getStrategyVersionId, e -> e));
-        // 조건 1회 일괄 조회 후 버전별 그룹핑 (N+1 방지)
-        Map<UUID, List<StrategyDcaConditionEntity>> conditionsByVersion = conditionRepository
-                .findByStrategyVersionIdInOrderBySortOrderAsc(byVersion.keySet())
-                .stream().collect(Collectors.groupingBy(StrategyDcaConditionEntity::getStrategyVersionId));
+        List<StrategyDcaRuleEntity> rules = ruleRepository.findByStrategyVersionIdInOrderBySortOrderAsc(
+                links.stream().map(StrategyDcaRuleJpaRepository.StrategyVersionLink::getStrategyVersionId).toList());
+        List<StrategyDcaConditionEntity> conditions = conditionRepository.findByRuleIdInOrderBySortOrderAsc(
+                rules.stream().map(StrategyDcaRuleEntity::getId).toList());
+        Map<UUID, List<StrategyDcaRuleEntity>> rulesByVersion = rules.stream()
+                .collect(Collectors.groupingBy(StrategyDcaRuleEntity::getStrategyVersionId));
         return links.stream().collect(Collectors.toMap(
-                StrategyDcaVersionJpaRepository.StrategyVersionLink::getStrategyId,
-                l -> toDomain(byVersion.get(l.getStrategyVersionId()),
-                        conditionsByVersion.getOrDefault(l.getStrategyVersionId(), List.of()))));
+                StrategyDcaRuleJpaRepository.StrategyVersionLink::getStrategyId,
+                l -> toDomain(rulesByVersion.get(l.getStrategyVersionId()), conditions)));
     }
 
-    private DcaConfig toDomain(StrategyDcaVersionEntity e, List<StrategyDcaConditionEntity> conditions) {
-        return new DcaConfig(e.getDirection(), e.getAmount(), e.getOrderType(),
-                e.getFrequency(), e.getDayOfWeek(), e.getDayOfMonth(),
-                conditions.stream().map(StrategyDcaConditionEntity::toDomain).toList(),
-                e.getExecutionHour() == null ? null : e.getExecutionHour().intValue());
+    // 규칙(sort_order 순) + 조건(규칙별 sort_order 순) → 설정
+    private DcaStrategyConfig toDomain(List<StrategyDcaRuleEntity> rules, List<StrategyDcaConditionEntity> conditions) {
+        Map<UUID, List<StrategyDcaConditionEntity>> byRule = conditions.stream()
+                .collect(Collectors.groupingBy(StrategyDcaConditionEntity::getRuleId));
+        return new DcaStrategyConfig(rules.stream()
+                .map(r -> r.toDomain(byRule.getOrDefault(r.getId(), List.of()).stream()
+                        .map(StrategyDcaConditionEntity::toDomain).toList()))
+                .toList());
     }
 }

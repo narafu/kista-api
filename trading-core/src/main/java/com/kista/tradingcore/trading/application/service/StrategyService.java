@@ -233,18 +233,20 @@ class StrategyService implements StrategyUseCase {
 
         DcaSummary dcaSummary = null;
         if (strategy.isDca()) {
-            DcaExecution last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id())).get(strategy.id());
+            Map<String, DcaExecution> last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id()))
+                    .getOrDefault(strategy.id(), Map.of());
             dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
-                    .map(config -> buildDcaSummary(config, last, c, strategy.ticker().getMarket()))).orElse(null);
+                    .map(config -> buildDcaSummary(config, last, c, strategy.ticker().getMarket(), latestPos))).orElse(null);
         }
 
         return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
     }
 
-    // DCA 요약 — 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산
-    private DcaSummary buildDcaSummary(DcaConfig config, DcaExecution last, StrategyCycle cycle, Market market) {
-        LocalDateTime nowKst = LocalDateTime.now(TimeZones.KST);
-        return dcaSummaryAssembler.assemble(config, last, DcaSummaryAssembler.firstEligibleDate(cycle.startDate(), last, config, market, nowKst), market);
+    // DCA 요약 — 규칙별 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산 + 원장 보유·평단
+    private DcaSummary buildDcaSummary(DcaStrategyConfig config, Map<String, DcaExecution> lastByRule, StrategyCycle cycle,
+                                       Market market, Optional<CyclePosition> ledger) {
+        return dcaSummaryAssembler.assemble(config, lastByRule, cycle.startDate(), market, LocalDateTime.now(TimeZones.KST),
+                ledger.map(CyclePosition::holdings).orElse(null), ledger.map(CyclePosition::avgPrice).orElse(null));
     }
 
     // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
@@ -273,8 +275,8 @@ class StrategyService implements StrategyUseCase {
 
         // DCA만 설정·최근 회차 배치 조회 (각 1회)
         List<UUID> dcaIds = strategies.stream().filter(Strategy::isDca).map(Strategy::id).toList();
-        Map<UUID, DcaConfig> dcaConfigs = dcaIds.isEmpty() ? Map.of() : dcaDetailPort.findActiveByStrategyIds(dcaIds);
-        Map<UUID, DcaExecution> dcaLast = dcaIds.isEmpty() ? Map.of() : dcaExecutionPort.findLatestByStrategyIds(dcaIds);
+        Map<UUID, DcaStrategyConfig> dcaConfigs = dcaIds.isEmpty() ? Map.of() : dcaDetailPort.findActiveByStrategyIds(dcaIds);
+        Map<UUID, Map<String, DcaExecution>> dcaLast = dcaIds.isEmpty() ? Map.of() : dcaExecutionPort.findLatestByStrategyIds(dcaIds);
 
         List<UUID> positionIds = latestPositions.values().stream().map(CyclePosition::id).toList();
         Map<UUID, CyclePositionInfiniteDetail> infinitePositionDetails =
@@ -315,7 +317,8 @@ class StrategyService implements StrategyUseCase {
 
             DcaSummary dcaSummary = null;
             if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
-                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.get(strategy.id()), latestCycle.get(), strategy.ticker().getMarket());
+                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.getOrDefault(strategy.id(), Map.of()),
+                        latestCycle.get(), strategy.ticker().getMarket(), latestPos);
             }
 
             return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);

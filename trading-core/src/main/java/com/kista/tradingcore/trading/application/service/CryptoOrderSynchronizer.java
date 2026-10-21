@@ -4,7 +4,8 @@ import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
@@ -36,13 +37,13 @@ class CryptoOrderSynchronizer {
 
     // accountContexts: 한 계좌의 전략 컨텍스트들
     void sync(CryptoExchangePort exchange, List<BatchContext> accountContexts,
-              Map<UUID, DcaConfig> configsByStrategyId, LocalDateTime nowKst) {
+              Map<UUID, DcaStrategyConfig> configsByStrategyId, LocalDateTime nowKst) {
         if (accountContexts.isEmpty()) return;
         Map<UUID, BatchContext> byCycle = accountContexts.stream()
                 .collect(Collectors.toMap(c -> c.currentCycle().id(), Function.identity(), (a, b) -> a));
         for (Order order : orderPort.findOpenByAccountId(accountContexts.get(0).account().id())) {
             BatchContext ctx = byCycle.get(order.strategyCycleId());
-            DcaConfig config = ctx == null ? null : configsByStrategyId.get(ctx.strategy().id());
+            DcaStrategyConfig config = ctx == null ? null : configsByStrategyId.get(ctx.strategy().id());
             if (config == null) {
                 log.warn("코인 주문 동기화 건너뜀 — 매칭되는 전략 없음 orderId={}", order.id());
                 continue;
@@ -56,8 +57,9 @@ class CryptoOrderSynchronizer {
         }
     }
 
-    private void syncOne(CryptoExchangePort exchange, BatchContext ctx, DcaConfig config, Order order, LocalDateTime nowKst) {
+    private void syncOne(CryptoExchangePort exchange, BatchContext ctx, DcaStrategyConfig config, Order order, LocalDateTime nowKst) {
         var ref = ctx.account().brokerRef();
+        String ruleKey = ruleKeyOf(order);
         if (order.status() == OrderStatus.PLANNED) {
             // 저장만 되고 SUBMITTING 선점 전에 중단된 주문 — 전송된 적이 없어 조회 없이 취소
             skipIfNotRetryable(ctx, config, order, nowKst);
@@ -73,7 +75,7 @@ class CryptoOrderSynchronizer {
                 return;
             }
             // 이력 먼저, 상태 전이 나중 — recordOrdered 실패 시 SUBMITTING 유지(PLACED 경로는 이력을 쓰지 않음)
-            recorder.recordOrdered(ctx, order.tradeDate(), order, order.price());
+            recorder.recordOrdered(ctx, order.tradeDate(), ruleKey, order, order.price());
             orderPort.markPlaced(order.id(), found.get().uuid());
             settle(ctx, order, found.get());
             return;
@@ -82,12 +84,19 @@ class CryptoOrderSynchronizer {
         exchange.findOrderByUuid(ref, order.externalOrderId()).ifPresent(r -> settle(ctx, order, r));
     }
 
-    // 실행 시간대 안(오늘·같은 시각)이면 Task 7이 재시도하므로 기록 없음, 지났으면 미주문 기록
-    private void skipIfNotRetryable(BatchContext ctx, DcaConfig config, Order order, LocalDateTime nowKst) {
-        boolean retryable = order.tradeDate().equals(nowKst.toLocalDate()) && nowKst.getHour() == config.executionHour();
+    // 규칙 실행 시간대 안(오늘·같은 시각)이면 실행기가 재시도하므로 기록 없음, 지났거나 편집으로 규칙이 사라졌으면 미주문 기록
+    private void skipIfNotRetryable(BatchContext ctx, DcaStrategyConfig config, Order order, LocalDateTime nowKst) {
+        String ruleKey = ruleKeyOf(order);
+        Integer hour = config.rule(ruleKey).map(DcaRule::executionHour).orElse(null);
+        boolean retryable = order.tradeDate().equals(nowKst.toLocalDate()) && hour != null && nowKst.getHour() == hour;
         if (!retryable) {
-            recorder.recordSkipped(ctx, order.tradeDate(), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
+            recorder.recordSkipped(ctx, order.tradeDate(), ruleKey, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
         }
+    }
+
+    // 주문 leg "DCA_" + ruleKey → ruleKey
+    private static String ruleKeyOf(Order order) {
+        return order.orderLeg().substring("DCA_".length());
     }
 
     // 체결 수량이 있으면 FILLED 확정(+이벤트), 무체결 취소면 CANCELLED, 그 외(WAIT/WATCH)는 유지

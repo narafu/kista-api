@@ -9,6 +9,7 @@ import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.privacy.domain.model.PrivacyDates;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.shared.kernel.ReturnMetrics;
+import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
@@ -95,7 +96,8 @@ class BacktestService implements BacktestUseCase {
         if (command.seed() != null && command.seed().signum() < 0) {
             throw new IllegalArgumentException("시드(seed)는 0 이상이어야 합니다");
         }
-        int initialHoldings = BootstrapPosition.validate(command.initialHoldings(), command.initialAvgPrice());
+        int initialHoldings = BootstrapPosition.validate(command.initialHoldings() == null ? null : BigDecimal.valueOf(command.initialHoldings()),
+                command.initialAvgPrice(), Market.US_STOCK).intValueExact(); // 백테스트는 주식 전용 — 정수 보유
         boolean hasSeed = command.seed() != null && command.seed().signum() > 0;
         if (!hasSeed && initialHoldings <= 0) {
             throw new IllegalArgumentException("시드(seed) 또는 기존 보유(initialHoldings·initialAvgPrice) 중 하나는 있어야 합니다");

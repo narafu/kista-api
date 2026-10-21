@@ -1,6 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -18,8 +18,8 @@ public final class DcaSchedule {
 
     private DcaSchedule() {}
 
-    // usSession이 이 설정의 실행일인지 — 휴장일은 항상 false
-    public static boolean isExecutionDay(LocalDate usSession, DcaConfig config, Predicate<LocalDate> isOpen) {
+    // usSession이 이 규칙의 실행일인지 — 휴장일은 항상 false
+    public static boolean isExecutionDay(LocalDate usSession, DcaRule config, Predicate<LocalDate> isOpen) {
         return check(usSession, config, memoize(isOpen));
     }
 
@@ -29,7 +29,7 @@ public final class DcaSchedule {
         return d -> cache.computeIfAbsent(d, isOpen::test);
     }
 
-    private static boolean check(LocalDate usSession, DcaConfig config, Predicate<LocalDate> isOpen) {
+    private static boolean check(LocalDate usSession, DcaRule config, Predicate<LocalDate> isOpen) {
         if (!isOpen.test(usSession)) return false;
         return switch (config.frequency()) {
             case DAILY -> true;
@@ -47,7 +47,7 @@ public final class DcaSchedule {
     }
 
     // fromUsSession(포함) 이후 첫 실행일 — 상한 내 없으면 empty
-    public static Optional<LocalDate> nextExecutionDay(LocalDate fromUsSession, DcaConfig config, Predicate<LocalDate> isOpen) {
+    public static Optional<LocalDate> nextExecutionDay(LocalDate fromUsSession, DcaRule config, Predicate<LocalDate> isOpen) {
         Predicate<LocalDate> memo = memoize(isOpen);
         int closedStreak = 0;
         for (int i = 0; i < SEARCH_LIMIT_DAYS; i++) {

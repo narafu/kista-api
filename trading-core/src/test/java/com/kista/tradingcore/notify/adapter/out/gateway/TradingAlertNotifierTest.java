@@ -126,7 +126,7 @@ class TradingAlertNotifierTest {
         when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
         var event = new com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent(
                 userId, UUID.randomUUID(), accountNickname, StrategyTicker.UPRO,
-                com.kista.shared.kernel.OrderDirection.BUY, java.time.LocalDate.of(2026, 10, 14),
+                "rule-key", 2, com.kista.shared.kernel.OrderDirection.BUY, java.time.LocalDate.of(2026, 10, 14),
                 com.kista.shared.kernel.DcaSkipReason.BELOW_ONE_SHARE, "x");
 
         notifier().onDcaRoundSkipped(event);

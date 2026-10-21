@@ -4,7 +4,7 @@ import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -67,7 +67,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
 
         var strategyIds = targets.stream().map(Strategy::id).toList();
         Map<UUID, StrategyCycle> cyclesById = strategyCyclePort.findLatestByStrategyIds(strategyIds);
-        Map<UUID, DcaConfig> configsById = strategyDcaDetailPort.findActiveByStrategyIds(strategyIds);
+        Map<UUID, DcaStrategyConfig> configsById = strategyDcaDetailPort.findActiveByStrategyIds(strategyIds);
         Map<UUID, TradingUserProfile> profiles = tradingUserProfilePort.findAllByUserIds(
                 accountsById.values().stream().map(TradingAccount::userId).distinct().toList());
 
@@ -86,7 +86,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
         for (var entry : byAccount.entrySet()) {
             List<BatchContext> contexts = entry.getValue();
             // 이 계좌의 설정만 전달
-            Map<UUID, DcaConfig> accountConfigs = contexts.stream()
+            Map<UUID, DcaStrategyConfig> accountConfigs = contexts.stream()
                     .collect(Collectors.toMap(c -> c.strategy().id(), c -> configsById.get(c.strategy().id())));
             try {
                 var exchange = cryptoExchanges.of(contexts.get(0).account().broker());
@@ -107,7 +107,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
 
     // 조립 불가(사이클·설정·프로필 없음, 종료 사이클)는 예외 — 호출부가 알림 후 제외
     private BatchContext buildContext(Strategy strategy, Map<UUID, TradingAccount> accountsById,
-                                      Map<UUID, StrategyCycle> cyclesById, Map<UUID, DcaConfig> configsById,
+                                      Map<UUID, StrategyCycle> cyclesById, Map<UUID, DcaStrategyConfig> configsById,
                                       Map<UUID, TradingUserProfile> profiles) {
         StrategyCycle cycle = cyclesById.get(strategy.id());
         if (cycle == null) throw new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id());

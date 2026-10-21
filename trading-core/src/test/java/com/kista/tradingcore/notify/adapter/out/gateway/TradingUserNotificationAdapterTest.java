@@ -86,7 +86,7 @@ class TradingUserNotificationAdapterTest {
     void notifyDcaRoundSkipped_bodyContainsReasonDirectionAndDetail() {
         var event = new com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "내계좌", StrategyTicker.UPRO,
-                com.kista.shared.kernel.OrderDirection.SELL, java.time.LocalDate.of(2026, 10, 14),
+                "rule-key", 2, com.kista.shared.kernel.OrderDirection.SELL, java.time.LocalDate.of(2026, 10, 14),
                 com.kista.shared.kernel.DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주");
 
         adapter.notifyDcaRoundSkipped(LINKED_PROFILE, event);
@@ -95,7 +95,8 @@ class TradingUserNotificationAdapterTest {
         verify(restClient.post().uri(anyString())).body(captor.capture());
         String text = ((Map<String, String>) captor.getValue()).get("text");
         assertThat(text).contains("DCA 미주문").contains("내계좌").contains("UPRO")
-                .contains("2026-10-14").contains("보유 수량 없음").contains("판매가능수량 0주");
+                .contains("2026-10-14").contains("보유 수량 없음").contains("판매가능수량 0주")
+                .contains("매도 DCA 규칙 2"); // 방향·규칙 순번
     }
 
     @Test
@@ -104,7 +105,7 @@ class TradingUserNotificationAdapterTest {
         // parse_mode=HTML — 미이스케이프 '<'·'&'는 텔레그램 400으로 알림 유실, 닉네임은 마크업 주입 경로
         var event = new com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent(
                 UUID.randomUUID(), UUID.randomUUID(), "<b>A&B</b>", StrategyTicker.UPRO,
-                com.kista.shared.kernel.OrderDirection.BUY, java.time.LocalDate.of(2026, 10, 14),
+                "rule-key", 2, com.kista.shared.kernel.OrderDirection.BUY, java.time.LocalDate.of(2026, 10, 14),
                 com.kista.shared.kernel.DcaSkipReason.INSUFFICIENT_BALANCE, "예수금 부족(주문가능금액 < 1주 캡가)");
 
         adapter.notifyDcaRoundSkipped(LINKED_PROFILE, event);

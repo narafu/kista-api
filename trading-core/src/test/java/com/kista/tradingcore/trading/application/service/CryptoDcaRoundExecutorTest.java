@@ -15,7 +15,12 @@ import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
-import com.kista.tradingcore.matching.domain.model.DcaConfig;
+import com.kista.shared.kernel.DcaShortfallPolicy;
+import com.kista.shared.kernel.DcaSizingType;
+import com.kista.tradingcore.matching.domain.model.DcaRule;
+import com.kista.tradingcore.matching.domain.model.DcaSizing;
+import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
+import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.CryptoFearGreedIndexPort;
@@ -57,13 +62,14 @@ class CryptoDcaRoundExecutorTest {
     static final LocalDate TODAY = LocalDate.of(2026, 10, 18);
     static final LocalDateTime NOW = TODAY.atTime(13, 10);
     static final BigDecimal BTC_PRICE = new BigDecimal("30000000");
+    static final String KEY = "11111111-1111-1111-1111-111111111111";
 
     CryptoExchangePort exchange = mock(CryptoExchangePort.class);
     OrderPort orderPort = mock(OrderPort.class);
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
     DcaExecutionRecorder recorder = mock(DcaExecutionRecorder.class);
     CryptoFearGreedIndexPort fearGreed = mock(CryptoFearGreedIndexPort.class);
-    CryptoDcaRoundExecutor executor = new CryptoDcaRoundExecutor(fearGreed, orderPort, executionPort, recorder);
+    CryptoDcaRoundExecutor executor = new CryptoDcaRoundExecutor(fearGreed, orderPort, executionPort, recorder, new DcaCycleOrderStrategy());
 
     TradingAccount account;
 
@@ -73,7 +79,7 @@ class CryptoDcaRoundExecutorTest {
         when(exchange.getCompletedDailyCandles(any(), anyInt())).thenAnswer(i -> candles(TODAY.minusDays(1)));
         when(exchange.getCurrentPrices(any())).thenReturn(Map.of(StrategyTicker.BTC, BTC_PRICE, StrategyTicker.ETH, new BigDecimal("2000000")));
         when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of());
-        when(executionPort.find(any(), any())).thenReturn(Optional.empty());
+        when(executionPort.find(any(), any(), any())).thenReturn(Optional.empty());
         when(orderPort.save(any())).thenAnswer(i -> {
             Order o = i.getArgument(0);
             return new Order(UUID.randomUUID(), o.accountId(), o.strategyCycleId(), o.tradeDate(), o.ticker(), o.orderType(),
@@ -103,18 +109,18 @@ class CryptoDcaRoundExecutorTest {
         return new BatchContext(strategy, cycle, account, TradingFixtures.tradingUserProfile(account.userId()));
     }
 
-    DcaConfig config(OrderDirection direction, String amount, int hour) {
-        return new DcaConfig(direction, new BigDecimal(amount), OrderType.MARKET, DcaFrequency.DAILY, null, null, List.of(), hour);
+    DcaStrategyConfig config(OrderDirection direction, String amount, int hour) {
+        return TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(KEY, direction, amount, hour));
     }
 
-    void run(LocalDateTime now, Map<BatchContext, DcaConfig> entries) {
+    void run(LocalDateTime now, Map<BatchContext, DcaStrategyConfig> entries) {
         List<BatchContext> ctxs = new ArrayList<>(entries.keySet());
-        Map<UUID, DcaConfig> configs = new java.util.HashMap<>();
+        Map<UUID, DcaStrategyConfig> configs = new java.util.HashMap<>();
         entries.forEach((c, cfg) -> configs.put(c.strategy().id(), cfg));
         executor.executeAccount(exchange, ctxs, configs, now);
     }
 
-    void run(LocalDateTime now, BatchContext c, DcaConfig cfg) {
+    void run(LocalDateTime now, BatchContext c, DcaStrategyConfig cfg) {
         run(now, Map.of(c, cfg));
     }
 
@@ -134,7 +140,7 @@ class CryptoDcaRoundExecutorTest {
         balance("5002", "0");
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.BUY, "100000", 13));
-        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT), eq("주문 금액 4999 < 최소 5000"), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), eq(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT), eq("주문 금액 4999 < 최소 5000"), eq(BTC_PRICE));
         verify(orderPort, never()).save(any());
     }
 
@@ -144,7 +150,7 @@ class CryptoDcaRoundExecutorTest {
         BatchContext btc = ctx(StrategyTicker.BTC);
         BatchContext eth = ctx(StrategyTicker.ETH);
         // 순서 보장을 위해 LinkedHashMap 대신 두 번째 인자로 순차 전달
-        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
         m.put(btc, config(OrderDirection.BUY, "30000", 13));
         m.put(eth, config(OrderDirection.BUY, "30000", 13));
         run(NOW, m);
@@ -173,7 +179,7 @@ class CryptoDcaRoundExecutorTest {
         balance("0", "0");
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.SELL, "10000", 13));
-        verify(recorder).recordSkipped(c, TODAY, DcaSkipReason.NO_HOLDINGS, "보유 수량 0", BTC_PRICE);
+        verify(recorder).recordSkipped(c, TODAY, KEY, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", BTC_PRICE);
         verify(orderPort, never()).save(any());
     }
 
@@ -187,7 +193,7 @@ class CryptoDcaRoundExecutorTest {
 
         BatchContext c2 = ctx(StrategyTicker.BTC);
         run(TODAY.atTime(10, 10), c2, config(OrderDirection.BUY, "10000", 10));
-        verify(recorder).recordSkipped(eq(c2), eq(TODAY), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
+        verify(recorder).recordSkipped(eq(c2), eq(TODAY), eq(KEY), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
     }
 
     @Test
@@ -198,14 +204,14 @@ class CryptoDcaRoundExecutorTest {
 
     @Test
     void alreadyExecutedTodayDoesNothing() {
-        when(executionPort.find(any(), eq(TODAY))).thenReturn(Optional.of(mock(DcaExecution.class)));
+        when(executionPort.find(any(), any(), eq(TODAY))).thenReturn(Optional.of(mock(DcaExecution.class)));
         run(NOW, ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "10000", 13));
         verifyNoInteractions(exchange, recorder);
     }
 
     Order existing(BatchContext c, OrderStatus status) {
         return new Order(UUID.randomUUID(), account.id(), c.currentCycle().id(), TODAY, StrategyTicker.BTC, OrderType.MARKET,
-                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_BUY", BigDecimal.ONE, BTC_PRICE, status, null, null, null);
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.ONE, BTC_PRICE, status, null, null, null);
     }
 
     @Test
@@ -215,7 +221,7 @@ class CryptoDcaRoundExecutorTest {
             Order existing = existing(c, status);
             when(orderPort.findByStrategyId(c.strategy().id(), TODAY, TODAY)).thenReturn(List.of(existing));
             run(NOW, c, config(OrderDirection.BUY, "10000", 13));
-            verify(recorder).recordOrdered(c, TODAY, existing, BTC_PRICE);
+            verify(recorder).recordOrdered(c, TODAY, KEY, existing, BTC_PRICE);
         }
         verifyNoInteractions(exchange);
     }
@@ -246,12 +252,12 @@ class CryptoDcaRoundExecutorTest {
         when(exchange.buyMarketByAmount(any(), any(), any(), anyString())).thenThrow(new BrokerCredentialException());
         BatchContext btc = ctx(StrategyTicker.BTC);
         BatchContext eth = ctx(StrategyTicker.ETH);
-        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
         m.put(btc, config(OrderDirection.BUY, "10000", 13));
         m.put(eth, config(OrderDirection.BUY, "10000", 13));
         run(NOW, m);
-        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), eq(BTC_PRICE));
-        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
         verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
     }
 
@@ -259,7 +265,7 @@ class CryptoDcaRoundExecutorTest {
     void transientPlacementStillDeductsForNextStrategy() {
         balance("40000", "0");
         when(exchange.buyMarketByAmount(any(), eq(StrategyTicker.BTC), any(), anyString())).thenThrow(new StubBrokerApiException("timeout"));
-        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
         m.put(ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "30000", 13));
         m.put(ctx(StrategyTicker.ETH), config(OrderDirection.BUY, "30000", 13));
         run(NOW, m);
@@ -269,7 +275,7 @@ class CryptoDcaRoundExecutorTest {
     @Test
     void sellDeductsHoldingsForNextSellOfSameTicker() {
         balance("0", "0.0006");
-        Map<BatchContext, DcaConfig> m = new java.util.LinkedHashMap<>();
+        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
         m.put(ctx(StrategyTicker.BTC), config(OrderDirection.SELL, "10000", 13));
         m.put(ctx(StrategyTicker.BTC), config(OrderDirection.SELL, "10000", 13));
         run(NOW, m);
@@ -283,8 +289,8 @@ class CryptoDcaRoundExecutorTest {
         BatchContext btc = ctx(StrategyTicker.BTC);
         BatchContext eth = ctx(StrategyTicker.ETH);
         run(NOW, Map.of(btc, config(OrderDirection.BUY, "10000", 13), eth, config(OrderDirection.BUY, "10000", 13)));
-        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
-        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
     }
 
     @Test
@@ -299,7 +305,7 @@ class CryptoDcaRoundExecutorTest {
         when(exchange.getBalance(any())).thenThrow(new RuntimeException("timeout"));
         BatchContext c = ctx(StrategyTicker.BTC);
         run(TODAY.atTime(13, 50), c, config(OrderDirection.BUY, "10000", 13));
-        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), isNull());
     }
 
     @Test
@@ -319,7 +325,7 @@ class CryptoDcaRoundExecutorTest {
         verify(orderPort).markSubmitting(any());
         verify(orderPort, never()).markPlaced(any(), any());
         verify(orderPort, never()).markFailed(any());
-        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -328,7 +334,7 @@ class CryptoDcaRoundExecutorTest {
         when(exchange.buyMarketByAmount(any(), any(), any(), anyString())).thenThrow(StubBrokerApiException.rejected("insufficient"));
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.BUY, "10000", 13));
-        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), eq(BTC_PRICE));
         verify(orderPort).markFailed(any());
         verify(orderPort, never()).markPlaced(any(), any());
     }
@@ -340,7 +346,7 @@ class CryptoDcaRoundExecutorTest {
         run(NOW, c, config(OrderDirection.BUY, "10000", 13));
         var inOrder = org.mockito.Mockito.inOrder(orderPort, recorder);
         inOrder.verify(orderPort).markSubmitting(any());
-        inOrder.verify(recorder).recordOrdered(eq(c), eq(TODAY), any(Order.class), eq(BTC_PRICE));
+        inOrder.verify(recorder).recordOrdered(eq(c), eq(TODAY), eq(KEY), any(Order.class), eq(BTC_PRICE));
         inOrder.verify(orderPort).markPlaced(any(), eq("uuid-1"));
     }
 
@@ -349,9 +355,36 @@ class CryptoDcaRoundExecutorTest {
         balance("100000", "0");
         LocalDate feb28 = LocalDate.of(2026, 2, 28);
         when(exchange.getCompletedDailyCandles(any(), anyInt())).thenAnswer(i -> candles(feb28.minusDays(1)));
-        DcaConfig monthly = new DcaConfig(OrderDirection.BUY, new BigDecimal("10000"), OrderType.MARKET, DcaFrequency.MONTHLY,
-                null, 31, List.of(), 13);
+        DcaStrategyConfig monthly = TradingFixtures.dcaConfig(new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.MONTHLY, null, 31,
+                OrderType.MARKET, 13, new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("10000"), null), DcaShortfallPolicy.PARTIAL, List.of()));
         run(feb28.atTime(13, 10), ctx(StrategyTicker.BTC), monthly);
         verify(exchange).buyMarketByAmount(any(), any(), any(), anyString());
+    }
+
+    @Test
+    void sameTickRunsSellRulesBeforeBuyRulesAndEachOrders() {
+        balance("100000", "1");
+        String buyKey = "22222222-2222-2222-2222-222222222222";
+        BatchContext c = ctx(StrategyTicker.BTC);
+        // 입력 순서 BUY → SELL이어도 같은 틱은 SELL 먼저
+        run(NOW, c, TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(buyKey, OrderDirection.BUY, "10000", 13),
+                TradingFixtures.cryptoDcaRule(KEY, OrderDirection.SELL, "10000", 13)));
+        var inOrder = org.mockito.Mockito.inOrder(exchange);
+        inOrder.verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), any(), anyString());
+        inOrder.verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("10000")), anyString());
+        verify(recorder).recordOrdered(eq(c), eq(TODAY), eq(KEY), any(Order.class), eq(BTC_PRICE));
+        verify(recorder).recordOrdered(eq(c), eq(TODAY), eq(buyKey), any(Order.class), eq(BTC_PRICE));
+    }
+
+    @Test
+    void ruleAlreadyDecidedTodaySkipsOnlyThatRule() {
+        balance("100000", "0");
+        String buyKey2 = "22222222-2222-2222-2222-222222222222";
+        BatchContext c = ctx(StrategyTicker.BTC);
+        when(executionPort.find(c.strategy().id(), KEY, TODAY)).thenReturn(Optional.of(mock(DcaExecution.class)));
+        run(NOW, c, TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(KEY, OrderDirection.BUY, "10000", 13),
+                TradingFixtures.cryptoDcaRule(buyKey2, OrderDirection.BUY, "20000", 13)));
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("20000")), anyString());
+        verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
     }
 }

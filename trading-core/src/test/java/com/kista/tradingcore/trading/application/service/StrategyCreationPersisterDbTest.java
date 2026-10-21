@@ -91,15 +91,15 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
     }
 
     @Test
-    void persist_dca_savesDcaVersionRowAndZeroPosition() {
-        var config = new com.kista.tradingcore.matching.domain.model.DcaConfig(com.kista.shared.kernel.OrderDirection.BUY,
-                new BigDecimal("300"), com.kista.shared.kernel.OrderType.MOC, com.kista.shared.kernel.DcaFrequency.DAILY, null, null);
+    void persist_dca_savesDcaRuleRowAndZeroPosition() {
+        var config = com.kista.tradingcore.support.TradingFixtures.dcaConfig(com.kista.tradingcore.support.TradingFixtures.stockDcaRule(
+                "11111111-1111-1111-1111-111111111111", com.kista.shared.kernel.OrderDirection.BUY, "300", com.kista.shared.kernel.OrderType.MOC));
 
         persister.persist(accountId, StrategyType.DCA, StrategyTicker.UPRO, StrategyCycleSeedType.NONE, 20,
-                null, null, null, null, BigDecimal.ZERO, 0, null, null, BigDecimal.ZERO, null, LocalDate.now(), config);
+                null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, null, null, BigDecimal.ZERO, null, LocalDate.now(), config);
 
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM strategy_dca_version dv JOIN strategy_version sv ON sv.id = dv.strategy_version_id JOIN strategy s ON s.id = sv.strategy_id WHERE s.account_id = ?",
+                "SELECT count(*) FROM strategy_dca_rule dv JOIN strategy_version sv ON sv.id = dv.strategy_version_id JOIN strategy s ON s.id = sv.strategy_id WHERE s.account_id = ?",
                 Integer.class, accountId)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM cycle_position cp JOIN strategy_cycle sc ON sc.id = cp.strategy_cycle_id JOIN strategy s ON s.id = sc.strategy_id WHERE s.account_id = ?",
@@ -108,7 +108,7 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
 
     private void persistInfinite() {
         persister.persist(accountId, StrategyType.INFINITE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE, 20,
-                null, null, null, null, new BigDecimal("1000"), 0, null, null, BigDecimal.ZERO, null, LocalDate.now(), null);
+                null, null, null, null, new BigDecimal("1000"), BigDecimal.ZERO, null, null, BigDecimal.ZERO, null, LocalDate.now(), null);
     }
 
     private Integer countStrategyRows() {
