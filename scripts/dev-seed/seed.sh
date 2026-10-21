@@ -51,9 +51,16 @@ register() {
   if grep -qx "$key" <<<"$EXISTING"; then echo "전략 $key: 이미 존재"; return; fi
   resp=$(curl -sS -w '\n%{http_code}' -X POST "${AUTH[@]}" "$TRADING/api/accounts/$ACCOUNT/trading-cycles" -d "$body")
   if [[ ${resp##*$'\n'} == 201 ]]; then echo "전략 $key: 등록"; else echo "전략 $key: 실패 $resp" >&2; FAILED=1; fi
+  [[ $resp == *BROKER_CREDENTIAL_INVALID* ]] && CREDENTIAL_INVALID=1
+  return 0
 }
+CREDENTIAL_INVALID=0
 register INFINITE:SOXL '{"type":"INFINITE","ticker":"SOXL","initialUsdDeposit":5000,"initialHoldings":40,"initialAvgPrice":28.15}'
 register VR:TQQQ '{"type":"VR","ticker":"TQQQ","initialUsdDeposit":3000,"intervalWeeks":2,"bandWidth":15,"recurringAmount":0,"initialHoldings":30,"initialAvgPrice":70}'
+# MOCK 시세(Toss 관리자 키)의 OAuth 403 "IP address not allowed"도 BROKER_CREDENTIAL_INVALID(422)로 매핑된다 — 키보다 허용 IP 누락이 흔하다
+if (( CREDENTIAL_INVALID )); then
+  echo "힌트: trading-core 로그에 'IP address not allowed'가 있으면 Toss 허용 IP에 현재 공인 IP($(curl -fsS --max-time 3 https://api.ipify.org || echo '조회 실패'))를 추가 — 키 문제가 아님" >&2
+fi
 
 docker exec -i "$PG_CONTAINER" psql -q -U kista -d kistadb < "$DIR/dev-seed.sql"
 echo "SQL 시드 적용"
