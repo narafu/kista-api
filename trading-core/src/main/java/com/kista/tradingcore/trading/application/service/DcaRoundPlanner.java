@@ -113,8 +113,12 @@ class DcaRoundPlanner {
                 sellable = loadSellable(ctx, tradeDate);
                 sellableLoaded = true;
             }
-            BigDecimal sellableAfterReserved = sell && sellable != null
-                    ? BigDecimal.valueOf(sellable).subtract(plannedSell).max(BigDecimal.ZERO) : null;
+            // 가용 = min(판매가능 − 예약분, 원장 보유) − 앞 규칙 계획 SELL — 원장 쪽도 차감해야 규칙 합계가 원장을 넘지 않는다
+            BigDecimal sellableAfterReserved = null;
+            if (sell && sellable != null) {
+                BigDecimal cap = ledger == null ? BigDecimal.valueOf(sellable) : BigDecimal.valueOf(sellable).min(ledger.holdings());
+                sellableAfterReserved = cap.subtract(plannedSell).max(BigDecimal.ZERO);
+            }
             DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule,
                     strategy.ticker().getMarket(), loadCloses(strategy.ticker(), usSession), ledger, sellableAfterReserved,
                     loadFearGreed(rule), currentPrice, null));

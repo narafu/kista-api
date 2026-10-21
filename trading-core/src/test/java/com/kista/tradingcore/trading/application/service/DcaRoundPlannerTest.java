@@ -283,6 +283,19 @@ class DcaRoundPlannerTest {
                         org.assertj.core.groups.Tuple.tuple(OrderDirection.BUY, 3));
     }
 
+    @Test
+    void 같은_시점_매도_규칙_합계는_원장_보유를_넘지_않는다() {
+        // 원장 10 < 판매가능 100 — 두 PARTIAL SELL(각 8주 희망)은 8 + 2
+        config(stockDcaRule(KEY, OrderDirection.SELL, "697", OrderType.MOC),   // 697/87.12 → 8주
+                stockDcaRule(KEY2, OrderDirection.SELL, "697", OrderType.MOC));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        when(sellablePort.getSellableQuantity(StrategyTicker.UPRO, ctx.account().brokerRef())).thenReturn(new SellableQuantity("UPRO", 100));
+
+        List<DcaDecision.Planned> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
+
+        assertThat(plan).extracting(p -> p.order().quantity()).containsExactly(8, 2);
+    }
+
     private void fearGreedDca(String threshold) {
         dcaWith(OrderDirection.BUY, OrderType.MOC, new DcaCondition(DcaIndicator.FEAR_GREED, DcaOperator.LTE, null, new BigDecimal(threshold)));
     }
