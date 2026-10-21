@@ -72,6 +72,7 @@
 ### 수량 변수명 규칙
 - **보유 잔고 수량**: `holdings` (avgPrice와 짝), **주문/체결 수량**: `quantity` (단건 거래)
 - `privacy_trade_base_orders.quantity` — nullable (FIDA 수신 시 수량 미확정 허용)
+- 원장 `holdings`는 BigDecimal(`Quantities.normalize` — 정수 주식은 꼬리 0·지수 없이 정수 표기, JSON도 `5`)
 - 복합 수량 필드: `orderedQuantity`/`filledQuantity` (`orderedQty`/`filledQty` 금지)
 
 ### AES-256 암호화 컬럼 크기

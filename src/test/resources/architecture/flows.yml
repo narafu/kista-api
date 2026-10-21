@@ -198,7 +198,7 @@ flows:
         lane: trading
         to: [broker]
         title: 체결 내역 조회
-        desc: 오늘 체결 내역을 조회해 매매 전 잔고에 반영한 매매 후 잔고를 계산한다.
+        desc: 오늘 체결 내역을 조회해 매매 전 잔고에 반영한 매매 후 잔고를 계산한다. 자기 주문 체결만 원장에 반영한다(우리 주문 id에 속한 체결 — 접수 주문·당일 취소 주문의 부분 체결 포함). 사용자가 앱에서 직접 낸 외부 체결은 수동 정정으로만 반영된다.
         code: [ExecutionPort#getExecutions]
 
       - id: position
