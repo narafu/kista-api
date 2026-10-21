@@ -1,6 +1,6 @@
 # kista-api 모듈 결합도 재검토 — 결과 브리핑 (2026-10-01)
 
-2026-09-30 전면 리뷰(`2026-09-30-module-coupling-review.md`, 결함 F1~F10)에서 시작한 7단계 로드맵과 후속 2회의 최종 결과를 한 장으로 정리한다. 단계별 상세 경위는 `docs/agents/modulith-migration-history.md`의 "결합도 재검토 N단계" 절, 배포 주의사항은 `2026-09-30-module-coupling-handoff.md` §5가 SSOT다. 수치는 2026-10-01 코드 기준 실측값이다.
+2026-09-30 전면 리뷰(`2026-09-30-module-coupling-review.md`, 결함 F1~F10)에서 시작한 7단계 로드맵과 후속 2회의 최종 결과를 한 장으로 정리한다. 단계별 상세 경위는 `docs/agents/modulith-migration-history.md`의 "결합도 재검토 N단계" 절, 배포 주의사항(EPR 정리 등)은 모두 적용이 끝났고 현행 런북은 `docs/agents/docker-infra.md` "배포 직전 EPR 정리 런북"이다. 수치는 2026-10-01 코드 기준 실측값이다.
 
 진행 방식: 단계마다 구현 → 전체 컴파일·테스트 → 리뷰어 검수(`/code-review`, 보안 민감 단계는 high) → 커밋 → main 배포(헬스게이트). 되돌아가지 못하도록 단계마다 ArchUnit 잠금 규칙을 추가했다.
 
@@ -60,6 +60,5 @@
 ## 4. 참고
 
 - 리뷰(결함·이상적 설계·목표 수치): `docs/reviews/2026-09-30-module-coupling-review.md`
-- 인계 메모(단계 상태·배포 주의·후속 과제): `docs/reviews/2026-09-30-module-coupling-handoff.md`
 - 단계별 상세 경위: `docs/agents/modulith-migration-history.md` "결합도 재검토 1~7단계" 절
 - own-type 허용 원장: `docs/agents/own-type-ledger.md`
