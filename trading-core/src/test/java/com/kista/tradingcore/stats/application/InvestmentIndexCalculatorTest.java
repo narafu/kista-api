@@ -12,6 +12,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +44,25 @@ class InvestmentIndexCalculatorTest {
         assertThat(result).hasSize(29);
         assertThat(pointOn(result, FEBRUARY_27).investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
         assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+    }
+
+    @Test
+    void 시드_비점유_사이클의_일별_순투입액은_외부_현금흐름이라_지수를_흔들지_않는다() {
+        StrategyCycle dca = activeCycle(UUID.randomUUID(), "0", JANUARY_1);
+        LocalDate jan2 = JANUARY_1.plusDays(1);
+        LocalDate jan3 = JANUARY_1.plusDays(2);
+        // 1/1 BUY 100(시작일 — 평가값에 이미 포함), 1/2 BUY 100 추가(가격 불변), 1/3 가격 10% 상승
+        Map<UUID, TreeMap<LocalDate, BigDecimal>> invested = Map.of(dca.id(), new TreeMap<>(Map.of(
+                JANUARY_1, new BigDecimal("100"), jan2, new BigDecimal("200"))));
+
+        List<InvestmentPoint> result = calculator.calculate(
+                List.of(dca),
+                List.of(position(dca, JANUARY_1, "100"), position(dca, jan2, "200"), position(dca, jan3, "220")),
+                JANUARY_1, jan3, invested);
+
+        // 추가 매수 100은 수익이 아니다: 1/2 지수 100 유지, 1/3 +10%
+        assertThat(pointOn(result, jan2).investmentIndexUsd()).isEqualTo(new BigDecimal("100.0000000000"));
+        assertThat(pointOn(result, jan3).investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
     }
 
     @Test

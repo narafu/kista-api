@@ -27,11 +27,19 @@ public final class InvestmentIndexCalculator {
 
     public List<InvestmentPoint> calculate(List<StrategyCycle> cycles, List<CyclePosition> positions,
                                     LocalDate from, LocalDate to) {
+        return calculate(cycles, positions, from, to, Map.of());
+    }
+
+    // netInvestedByCycle: 시드 비점유 사이클(DCA)의 일자별 누적 순투입액 — 매수는 추가 투입(+), 매도는 회수(-)인 외부 현금흐름이다
+    public List<InvestmentPoint> calculate(List<StrategyCycle> cycles, List<CyclePosition> positions,
+                                    LocalDate from, LocalDate to,
+                                    Map<UUID, ? extends NavigableMap<LocalDate, BigDecimal>> netInvestedByCycle) {
         if (cycles.isEmpty() || from.isAfter(to)) {
             return List.of();
         }
 
         Map<LocalDate, BigDecimal> flows = buildExternalFlows(cycles, positions);
+        addOrderFlows(flows, cycles, netInvestedByCycle);
         // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
         List<DailyValuation> valuations = buildDailyValuations(cycles, positions, from, to, flows);
         return compoundDailyReturns(valuations, flows);
@@ -141,6 +149,27 @@ public final class InvestmentIndexCalculator {
             addExitFlow(flows, last, valuesByCycle.get(last.id()));
         }
         return flows;
+    }
+
+    // 누적 순투입액의 일간 증감을 외부 흐름에 더한다. 시작일 이전·당일분은 진입 흐름(시작일 평가액)에 이미 포함돼 제외한다.
+    private static void addOrderFlows(Map<LocalDate, BigDecimal> flows, List<StrategyCycle> cycles,
+                                      Map<UUID, ? extends NavigableMap<LocalDate, BigDecimal>> netInvestedByCycle) {
+        for (StrategyCycle cycle : cycles) {
+            NavigableMap<LocalDate, BigDecimal> cumulative = netInvestedByCycle.get(cycle.id());
+            if (cumulative == null) {
+                continue;
+            }
+            BigDecimal previous = BigDecimal.ZERO;
+            for (var entry : cumulative.entrySet()) {
+                BigDecimal delta = entry.getValue().subtract(previous);
+                previous = entry.getValue();
+                boolean afterEntry = entry.getKey().isAfter(cycle.startDate());
+                boolean beforeExit = cycle.endDate() == null || !entry.getKey().isAfter(cycle.endDate());
+                if (afterEntry && beforeExit) {
+                    flows.merge(entry.getKey(), delta, BigDecimal::add);
+                }
+            }
+        }
     }
 
     private static void addEntryFlow(Map<LocalDate, BigDecimal> flows, StrategyCycle cycle,

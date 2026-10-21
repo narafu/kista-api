@@ -20,6 +20,8 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -255,6 +257,18 @@ public class OrderPersistenceAdapter implements OrderPort {
         // FILLED/PARTIALLY_FILLED BUY 체결금액 합계 — 결과 없으면 ZERO (COALESCE 보장)
         BigDecimal result = repository.sumFilledBuyAmountByCycleId(strategyCycleId);
         return result != null ? result : BigDecimal.ZERO;
+    }
+
+    @Override
+    public Map<UUID, NavigableMap<LocalDate, BigDecimal>> findFilledNetInvestedByCycleIds(Collection<UUID> strategyCycleIds) {
+        if (strategyCycleIds.isEmpty()) return Map.of();
+        Map<UUID, NavigableMap<LocalDate, BigDecimal>> result = new java.util.HashMap<>();
+        Map<UUID, BigDecimal> running = new java.util.HashMap<>(); // 사이클별 누적 (거래일 오름차순 행을 순회)
+        for (var row : repository.findDailyNetInvestedByCycleIds(strategyCycleIds)) {
+            BigDecimal cumulative = running.merge(row.getCycleId(), row.getNet(), BigDecimal::add);
+            result.computeIfAbsent(row.getCycleId(), _ -> new TreeMap<>()).put(row.getTradeDate(), cumulative);
+        }
+        return result;
     }
 
     @Override

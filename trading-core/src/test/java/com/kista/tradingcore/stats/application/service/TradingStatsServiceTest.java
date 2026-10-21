@@ -11,6 +11,12 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import org.junit.jupiter.api.BeforeEach;
+import java.util.TreeMap;
+import java.util.NavigableMap;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +51,20 @@ class TradingStatsServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
+    @Mock OrderPort orderPort;
+    @Mock CycleOrderStrategies cycleOrderStrategies;
     @InjectMocks TradingStatsService statsService;
+
+    // 시드 점유 전략(기본)과 비점유 전략(DCA) 능력 stub — 전략 타입별 occupiesSeed 분기 검증용
+    @BeforeEach
+    void stubSeedCapability() {
+        CycleOrderStrategy seeded = org.mockito.Mockito.mock(CycleOrderStrategy.class);
+        CycleOrderStrategy seedless = org.mockito.Mockito.mock(CycleOrderStrategy.class);
+        lenient().when(seeded.occupiesSeed()).thenReturn(true);
+        lenient().when(seedless.occupiesSeed()).thenReturn(false);
+        lenient().when(cycleOrderStrategies.of(any())).thenReturn(seeded);
+        lenient().when(cycleOrderStrategies.of(StrategyType.DCA)).thenReturn(seedless);
+    }
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -375,19 +394,93 @@ class TradingStatsServiceTest {
         assertThat(curve.points().get(1).principal()).isEqualByComparingTo("500.00");
     }
 
-    @Test
-    void 요약은_DCA_전략_사이클을_제외한다() {
-        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
-                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+    private static final Strategy DCA_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA,
+            StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+
+    private void stubDcaOnly(StrategyCycle cycle, NavigableMap<LocalDate, BigDecimal> cumulative) {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
-        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY, dca)));
-        ArgumentCaptor<Collection<UUID>> idsCaptor = ArgumentCaptor.forClass(Collection.class);
-        when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of(
-                closedCycle("1000.00", "1100.00", "2026-01-01", "2026-01-31")));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(DCA_STRATEGY)));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        when(orderPort.findFilledNetInvestedByCycleIds(any())).thenReturn(Map.of(cycle.id(), cumulative));
+    }
 
-        statsService.getSummary(USER_ID);
+    // 자산 = 보유 1주 × 종가 (usdDeposit 0 — DCA는 시드를 점유하지 않는다)
+    private static CyclePosition holdingSnapshot(UUID cycleId, String closing, String createdAt) {
+        return new CyclePosition(UUID.randomUUID(), cycleId, BigDecimal.ZERO, new BigDecimal(closing),
+                new BigDecimal(closing), BigDecimal.ONE, Instant.parse(createdAt), null);
+    }
 
-        assertThat(idsCaptor.getValue()).containsExactly(STRATEGY.id());
+    @Test
+    void 요약은_DCA_전략_사이클도_포함한다() {
+        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "0", "2026-06-01");
+        stubDcaOnly(cycle, new TreeMap<>(Map.of(LocalDate.parse("2026-06-01"), new BigDecimal("100"))));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id())))
+                .thenReturn(Map.of(cycle.id(), holdingSnapshot(cycle.id(), "130.00", "2026-06-01T01:00:00Z")));
+
+        StatsSummary summary = statsService.getSummary(USER_ID);
+
+        assertThat(summary.byType()).extracting(StrategyTypeStats::type).containsExactly(StrategyType.DCA);
+        assertThat(summary.activePrincipal()).isEqualByComparingTo("100.00"); // 시드 0 + 누적 순투입 100
+        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("30.00"); // 평가 130 - 원금 100
+    }
+
+    @Test
+    void DCA_원금은_누적순투입액() {
+        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "0", "2026-06-01");
+        // 1일차 BUY 100, 2일차 BUY 100, 3일차 SELL 50 → 누적 100, 200, 150
+        stubDcaOnly(cycle, new TreeMap<>(Map.of(
+                LocalDate.parse("2026-06-01"), new BigDecimal("100"),
+                LocalDate.parse("2026-06-02"), new BigDecimal("200"),
+                LocalDate.parse("2026-06-03"), new BigDecimal("150"))));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                holdingSnapshot(cycle.id(), "100.00", "2026-06-01T01:00:00Z"),
+                holdingSnapshot(cycle.id(), "200.00", "2026-06-02T01:00:00Z"),
+                holdingSnapshot(cycle.id(), "150.00", "2026-06-03T01:00:00Z")));
+
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, null,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+
+        assertThat(curve.points()).extracting(EquityPoint::principal)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
+                .containsExactly(new BigDecimal("100"), new BigDecimal("200"), new BigDecimal("150"));
+        // 평가액이 원금과 같으면 손익 0
+        assertThat(curve.points()).allSatisfy(p -> assertThat(p.totalAsset()).isEqualByComparingTo(p.principal()));
+    }
+
+    @Test
+    void DCA_초기보유_원가가_시작원금() {
+        // 초기 보유 5주 × 평단 100 = 시작 원가 500, 이후 BUY 100 → 원금 600
+        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "500.00", "2026-06-01");
+        stubDcaOnly(cycle, new TreeMap<>(Map.of(LocalDate.parse("2026-06-01"), new BigDecimal("100"))));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                holdingSnapshot(cycle.id(), "600.00", "2026-06-01T01:00:00Z"),
+                holdingSnapshot(cycle.id(), "600.00", "2026-06-02T01:00:00Z"))); // 2일차는 체결 없음 → 누적 carry
+
+        EquityCurve curve = statsService.getEquityCurve(USER_ID, null,
+                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
+
+        assertThat(curve.points()).extracting(EquityPoint::principal)
+                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
+                .containsExactly(new BigDecimal("600"), new BigDecimal("600"));
+    }
+
+    @Test
+    void 합산_경로는_크립토_KRW_계좌를_제외하지만_사이클_성과_목록은_포함한다() {
+        UUID cryptoAccountId = UUID.randomUUID();
+        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null);
+        Strategy cryptoDca = new Strategy(UUID.randomUUID(), cryptoAccountId, StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(crypto));
+
+        // 합산(summary) — 계좌가 전부 제외되므로 전략 조회 자체가 없다
+        assertThat(statsService.getSummary(USER_ID).byType()).isEmpty();
+        verify(strategyPort, never()).findByAccountIds(any());
+
+        // 사이클 성과 목록은 사이클별 행(단일 통화)이라 포함
+        StrategyCycle cycle = activeCycle(cryptoDca.id(), "0", "2026-06-01");
+        when(strategyPort.findByAccountIds(List.of(cryptoAccountId))).thenReturn(Map.of(cryptoAccountId, List.of(cryptoDca)));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
+        assertThat(statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items()).hasSize(1);
     }
 
     @Test

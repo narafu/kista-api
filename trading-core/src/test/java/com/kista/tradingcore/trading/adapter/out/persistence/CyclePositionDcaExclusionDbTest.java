@@ -15,7 +15,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 사용자·계좌 단위 포지션 조회 3종이 DCA 전략의 cycle_position(공유 보유 스냅샷)을 제외하는지 실 DB로 검증
+// 대시보드 최근/계좌 커서 조회는 DCA cycle_position을 제외하고 통계 범위 조회는 포함하는지 실 DB로 검증
 @Execution(ExecutionMode.SAME_THREAD)
 class CyclePositionDcaExclusionDbTest extends DataJpaTestBase {
 
@@ -29,16 +29,17 @@ class CyclePositionDcaExclusionDbTest extends DataJpaTestBase {
         jdbc.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
         UUID infinitePos = insertPosition(accountId, "INFINITE");
-        insertPosition(accountId, "DCA");
-        insertPosition(accountId, "DCA");
+        UUID dcaPos1 = insertPosition(accountId, "DCA");
+        UUID dcaPos2 = insertPosition(accountId, "DCA");
 
         Instant from = Instant.EPOCH;
         Instant to = Instant.now().plusSeconds(3600);
 
         assertThat(repo.findRecentByUserId(userId, PageRequest.of(0, 10))).extracting(CyclePositionEntity::getId)
                 .containsExactly(infinitePos);
+        // 통계용 범위 조회는 DCA 포함 (원금을 누적 순투입액으로 계산해 통계에 포함)
         assertThat(repo.findByUserIdAndRange(userId, from, to)).extracting(CyclePositionEntity::getId)
-                .containsExactly(infinitePos);
+                .containsExactlyInAnyOrder(infinitePos, dcaPos1, dcaPos2);
         assertThat(repo.findByAccountIdWithCursor(accountId, from, to, PageRequest.of(0, 10)))
                 .extracting(CyclePositionEntity::getId).containsExactly(infinitePos);
     }

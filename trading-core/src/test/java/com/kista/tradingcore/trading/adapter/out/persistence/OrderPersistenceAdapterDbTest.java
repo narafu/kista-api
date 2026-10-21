@@ -232,6 +232,28 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
+    void findFilledNetInvestedByCycleIds_cumulatesBuyMinusSellPerTradeDate() {
+        LocalDate d1 = LocalDate.of(2026, 7, 1);
+        LocalDate d2 = d1.plusDays(1);
+        LocalDate d3 = d1.plusDays(2);
+        insertOrderForAccount(accountId, cycleId, d1, "SOXL", "BUY", "FILLED", 5, new BigDecimal("10.00"));            // +50
+        insertOrderForAccount(accountId, cycleId, d1, "SOXL", "BUY", "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // +30 (같은 날 합산)
+        insertOrderForAccount(accountId, cycleId, d2, "SOXL", "BUY", "FILLED", 1, new BigDecimal("20.00"));            // +20
+        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "SELL", "FILLED", 3, new BigDecimal("10.00"));           // -30
+        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "PLANNED", null, null);                          // 제외 (미체결)
+        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "CANCELLED", null, null);                        // 제외
+        insertOrderForAccount(accountId, otherCycleId, d1, "SOXL", "BUY", "FILLED", 10, new BigDecimal("30.00"));      // 다른 사이클
+
+        var result = adapter.findFilledNetInvestedByCycleIds(java.util.List.of(cycleId));
+
+        assertThat(result).containsOnlyKeys(cycleId);
+        assertThat(result.get(cycleId)).containsOnlyKeys(d1, d2, d3);
+        assertThat(result.get(cycleId).get(d1)).isEqualByComparingTo("80.00");
+        assertThat(result.get(cycleId).get(d2)).isEqualByComparingTo("100.00");
+        assertThat(result.get(cycleId).get(d3)).isEqualByComparingTo("70.00");
+    }
+
+    @Test
     void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_sumsOnlyMatchingReservations() {
         LocalDate databaseTradeDate = LocalDate.of(2026, 7, 14);
         LocalDate domainTradeDate = databaseTradeDate; // DB와 도메인이 같은 KST 일자

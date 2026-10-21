@@ -173,5 +173,27 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
               AND status IN ('FILLED', 'PARTIALLY_FILLED')
             """, nativeQuery = true)
     BigDecimal sumFilledBuyAmountByCycleId(@Param("strategyCycleId") UUID strategyCycleId);
-}
 
+    // 사이클·거래일별 순투입 체결금액(BUY +, SELL -) — 거래일 오름차순 (누적은 어댑터가 계산)
+    @Query(value = """
+            SELECT strategy_cycle_id AS cycleId, trade_date AS tradeDate,
+                   SUM(CASE WHEN direction = 'BUY' THEN filled_quantity * filled_price
+                            ELSE -filled_quantity * filled_price END) AS net
+            FROM orders
+            WHERE strategy_cycle_id IN (:cycleIds)
+              AND status IN ('FILLED', 'PARTIALLY_FILLED')
+              AND filled_quantity IS NOT NULL AND filled_price IS NOT NULL
+            GROUP BY strategy_cycle_id, trade_date
+            ORDER BY trade_date
+            """, nativeQuery = true)
+    List<DailyNetInvested> findDailyNetInvestedByCycleIds(@Param("cycleIds") Collection<UUID> cycleIds);
+
+    // findDailyNetInvestedByCycleIds 결과 행 투영
+    interface DailyNetInvested {
+        UUID getCycleId();
+
+        LocalDate getTradeDate();
+
+        BigDecimal getNet();
+    }
+}

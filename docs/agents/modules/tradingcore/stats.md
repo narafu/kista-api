@@ -18,5 +18,5 @@ com.kista.tradingcore.stats/ ← Spring Modulith 모듈(CLOSED) — 계좌·증�
 
 웹 슬라이스 테스트(`@WebMvcTest`)는 `@SpringBootConfiguration` 상향 탐색이 루트 `com.kista.tradingcore.TradingApplication`을 찾아 `@ContextConfiguration` 없이 동작한다. 예외 매핑은 앱셸 `tradingcore.web.TradingExceptionHandler`(프로세스 전역 advice)가 담당한다.
 
-### DCA 제외
-계좌 통계·포트폴리오·summary/equity-curve 집계는 DCA 전략을 포함하지 않는다(`TradingStatsService`/`InvestmentPointsQueryService`의 사이클 로드와 네이티브 포지션 쿼리에서 제외) — DCA는 브로커 실잔고 기반이라 사이클 포지션 이력이 없다.
+### DCA 포함
+summary/equity-curve/cycles/투자지수는 DCA 전략을 포함한다. 시드 비점유(`CycleOrderStrategy.occupiesSeed()=false`) 전략의 원금 = 사이클 `startAmount`(초기 보유 원가) + 누적 순투입액(`OrderPort.findFilledNetInvestedByCycleIds` — FILLED/PARTIALLY_FILLED BUY 체결금액 − SELL 체결금액, 수동 보정 포함, 일자별 누적, 사이클 일괄 조회). `InvestmentIndexCalculator`는 같은 순투입액의 일간 증감(시작일 당일·이전 제외)을 외부 현금흐름으로 받아 추가 매수를 수익으로 잡지 않는다. 통화가 섞이는 사용자 합산 경로(summary·equity-curve·PORTFOLIO 투자지수)는 크립토(KRW) 계좌를 제외하고(후속: 통화별 분리 집계), 사이클 성과 목록·STRATEGY 스코프는 단일 통화라 포함한다. 대시보드 최근 포지션·계좌 커서 조회(`findRecentByUserId`·`findByAccountIdWithCursor`)는 기존대로 DCA를 제외한다.

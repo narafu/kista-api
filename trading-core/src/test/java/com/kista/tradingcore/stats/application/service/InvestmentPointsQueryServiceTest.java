@@ -8,6 +8,11 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import org.junit.jupiter.api.BeforeEach;
+import java.util.TreeMap;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -49,7 +54,19 @@ class InvestmentPointsQueryServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
+    @Mock OrderPort orderPort;
+    @Mock CycleOrderStrategies cycleOrderStrategies;
     @InjectMocks InvestmentPointsQueryService service;
+
+    @BeforeEach
+    void stubSeedCapability() {
+        CycleOrderStrategy seeded = org.mockito.Mockito.mock(CycleOrderStrategy.class);
+        CycleOrderStrategy seedless = org.mockito.Mockito.mock(CycleOrderStrategy.class);
+        org.mockito.Mockito.lenient().when(seeded.occupiesSeed()).thenReturn(true);
+        org.mockito.Mockito.lenient().when(seedless.occupiesSeed()).thenReturn(false);
+        org.mockito.Mockito.lenient().when(cycleOrderStrategies.of(any())).thenReturn(seeded);
+        org.mockito.Mockito.lenient().when(cycleOrderStrategies.of(StrategyType.DCA)).thenReturn(seedless);
+    }
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
@@ -137,18 +154,42 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
-    void PORTFOLIO_scope는_DCA_전략을_제외한다() {
+    void PORTFOLIO_scope는_DCA_전략도_포함하고_순투입액을_계산기에_넘긴다() {
         Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID)));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY, dca)));
+        StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), dca.id(), null, BigDecimal.ZERO, null,
+                LocalDate.of(2026, 1, 5), null, Instant.parse("2026-01-05T00:00:00Z"), null);
         ArgumentCaptor<Set<UUID>> idsCaptor = ArgumentCaptor.forClass(Set.class);
-        when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of());
+        when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of(cycle));
+        when(orderPort.findFilledNetInvestedByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(),
+                new TreeMap<>(Map.of(LocalDate.of(2026, 1, 5), new BigDecimal("100"),
+                        LocalDate.of(2026, 1, 6), new BigDecimal("200")))));
+        when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
+                depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
+                depositSnapshot(cycle.id(), "200.00", "2026-01-06T01:00:00Z")));
+
+        InvestmentPointsResult result = service.fetch(USER_ID, InvestmentPointsQuery.Scope.PORTFOLIO, null,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
+
+        assertThat(idsCaptor.getValue()).containsExactlyInAnyOrder(STRATEGY_ID, dca.id());
+        // 추가 매수 100은 외부 투입이라 지수는 100 유지
+        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void PORTFOLIO_scope는_크립토_KRW_계좌를_제외한다() {
+        UUID cryptoAccountId = UUID.randomUUID();
+        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), crypto));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
 
         service.fetch(USER_ID, InvestmentPointsQuery.Scope.PORTFOLIO, null,
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
 
-        assertThat(idsCaptor.getValue()).containsExactly(STRATEGY_ID);
+        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(cryptoAccountId)));
     }
 
     @Test
