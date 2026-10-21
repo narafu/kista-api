@@ -35,7 +35,7 @@
 
 **Files:**
 - Create: `trading-core/src/test/java/com/kista/tradingcore/stats/domain/backtest/BacktestGoldenTest.java`
-- Create: `trading-core/src/test/resources/backtest-golden/{infinite,infinite-reverse,vr}.txt`
+- Create: `trading-core/src/test/resources/backtest-golden/{infinite,infinite-reverse,vr,privacy}.txt`
 
 **Interfaces:**
 - Consumes: `BacktestEngine.run(List<DailyCandle>, BacktestCommand)`, `BacktestEngine.Output`(`points()`, `tradeCount()`, `cycleCount()`, `warnings()`)
@@ -47,11 +47,14 @@
 - `infinite`: INFINITE SOXL, 분할 40, seed 10000, 리버스모드 진입이 없는 상승 구간 캔들
 - `infinite-reverse`: 분할 20, 리버스모드에 진입할 만큼 큰 하락 구간 캔들
 - `vr`: VR TQQQ, seed 2000, initialValue 1000, intervalWeeks 2, recurringAmount 100
+- `privacy`: PRIVACY SOXL. `BacktestEngine.run(candles, command, privacyBases)` 오버로드를 쓰고, 고정 `PrivacyTradeBase`를 5개 이상 넣는다(BUY·SELL 혼합, 보유 감소 매도 포함). Task 2가 `PrivacyStrategy`를 수정하므로 반드시 넣는다.
 
-`render(Output)`는 한 줄에 한 point를 쓴다. 형식은 `date|totalAsset(toPlainString, scale 2)`이고, 끝에 `trades=N cycles=M warnings=[...]`를 붙인다. 시스템 프로퍼티 `golden.update=true`면 리소스 파일을 쓰고, 아니면 비교한다.
+`render(Output)`는 한 줄에 한 point를 쓴다. 형식은 `date|totalAsset(toPlainString, scale 2)`이고, 끝에 `trades=N cycles=M warnings=[...]`를 붙인다.
+
+골든 파일 경로는 `trading-core/src/test/resources/backtest-golden/<scenario>.txt`다. trading-core 테스트의 `workingDir`가 루트이므로 이 상대경로로 읽고 쓴다. **파일이 없으면 현재 결과를 써 넣고, "골든 생성됨 — 재실행 필요" 메시지로 테스트를 실패시킨다.** 시스템 프로퍼티는 테스트 JVM에 전달되지 않으므로 쓰지 않는다.
 
 ```java
-@ParameterizedTest @ValueSource(strings = {"infinite", "infinite-reverse", "vr"})
+@ParameterizedTest @ValueSource(strings = {"infinite", "infinite-reverse", "vr", "privacy"})
 void 백테스트_결과가_골든과_같다(String scenario) {
     assertThat(render(engine.run(candles(scenario), command(scenario)))).isEqualTo(readGolden(scenario));
 }
@@ -59,8 +62,8 @@ void 백테스트_결과가_골든과_같다(String scenario) {
 
 - [ ] **Step 2: 현재 HEAD에서 골든 생성**
 
-Run: `./gradlew :trading-core:test --tests '*BacktestGoldenTest' -Dgolden.update=true 2>&1 | grep -E "FAILED|BUILD"`
-Expected: BUILD SUCCESSFUL. 파일 3개가 생기고, 각 파일은 비어 있지 않아야 한다. `infinite-reverse`의 경로가 실제로 리버스모드를 탔는지 확인한다. `warnings`나 trade 수로 확인하되, 안 탔으면 캔들 seed나 구간을 조정한다.
+Run: `./gradlew :trading-core:test --tests '*BacktestGoldenTest' 2>&1 | grep -E "FAILED|BUILD|골든 생성됨"`
+Expected: 첫 실행은 4건이 "골든 생성됨"으로 FAILED이고, 파일 4개가 생겨야 한다. 각 파일은 비어 있지 않아야 한다. `infinite-reverse`의 경로가 실제로 리버스모드를 탔는지 확인한다. `warnings`나 trade 수로 확인하되, 안 탔으면 캔들 seed나 구간을 조정한다.
 
 - [ ] **Step 3: 비교 모드로 통과 확인**
 
@@ -82,6 +85,7 @@ Expected: BUILD SUCCESSFUL
   - trading: `ExecutionFillMapper`, `TradingBalanceLoader`, `DcaRoundPlanner:171`
   - 그 외 컴파일러가 가리키는 곳
 - Test: `trading-core/src/test/.../matching/domain/model/AccountBalanceTest.java`와 컴파일이 깨지는 테스트들
+- **컴파일 경계:** Task 2가 끝나면 trading-core 전체(main과 test)가 컴파일되어야 한다. 그래서 trading 쪽 `AccountBalance.holdings()` int 소비처를 **임시로 `wholeShares()`에 연결**한다. 대상은 `CyclePosition.tradeSnapshot`·`toBalance`, `CycleCloser`, `VrReconfigureService`, `ManualTradeCorrectionService`, `CycleSnapshotCreator`, `TradingReporter` 등이다. `CyclePosition`과 DB는 int로 둔다. Task 3에서 이 소비처를 BigDecimal 의미(`signum`, `compareTo`, `multiply`)로 다시 바꾼다.
 
 **Interfaces:**
 - Produces:
@@ -214,6 +218,7 @@ Expected: BUILD SUCCESSFUL. `TradingApplicationContextLoadTest`가 V11을 적용
 }
 @Test void 보정_leg_주문_체결은_반영한다() { /* INFINITE_CORRECTION_01 leg, externalOrderId "C1" 체결 → 반영 */ }
 @Test void 체결_없는_자기_주문은_원장_불변() { /* executions 비어 있음 → holdings 그대로 */ }
+@Test void 개장배치_AT_OPEN_자기주문_체결도_반영한다() { /* prePlaced 주문 체결 → 반영 */ }
 ```
 
 - [ ] **Step 2: 실패 확인**
@@ -221,7 +226,7 @@ Expected: BUILD SUCCESSFUL. `TradingApplicationContextLoadTest`가 V11을 적용
 Run: `./gradlew :trading-core:test --tests '*TradingReporterTest' 2>&1 | grep -E "FAILED|BUILD"`
 Expected: `INFINITE_외부_체결은_원장에_반영하지_않는다` FAILED
 
-- [ ] **Step 3: 구현**: 자기 주문 ID 집합(`mainOrders`의 non-null `externalOrderId`)으로 executions를 거르는 코드를 분기 밖으로 옮긴다. 주석은 "원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 (spec 3장 원장 원칙)"으로 단다.
+- [ ] **Step 3: 구현**: 자기 주문 ID 집합(`mainOrders`의 non-null `externalOrderId`)으로 executions를 거르는 코드를 분기 밖으로 옮긴다. 먼저 `TradingService.java:220-243`에서 `mainOrders`가 어떤 쿼리로 채워지는지 확인한다. 거기에 `prePlaced`(개장 배치에서 접수된 주문), 같은 날 수동 실행 주문, 재개된 배치의 주문이 모두 들어가는지 보고, 확인 결과를 커밋 메시지 본문에 한 줄로 남긴다. 빠지는 종류가 있으면 이 Task에서 함께 포함시킨다. 주석은 "원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 (spec 3장 원장 원칙)"으로 단다.
 
 - [ ] **Step 4: 통과 확인** — Step 2 명령을 다시 실행했을 때 Expected: BUILD SUCCESSFUL
 

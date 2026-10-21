@@ -208,6 +208,7 @@
   - `DcaRoundPlanner`의 실행일·timing·당일 판정 여부·기존 주문 복구 로직을 옮긴다.
   - 일봉 캐시, 공포탐욕 TTL 메모, 판매가능수량 조회 로직도 옮긴다.
   - 같은 배치에서 앞 SELL 규칙의 수량을 예약분으로 차감하는 로직도 여기에 둔다.
+  - **collect는 부작용이 없다.** 이력 기록은 하지 않고, 입력 수집만 한다. 프리뷰도 이 경로를 타기 때문이다. 기존 주문 → ORDERED 복구 대상은 `DcaPlanInputs.recoveries`(ruleKey → 기존 Order)로 돌려준다. 실제 기록은 배치 쪽(`TradingCandidatePlanner`)이 `recordsRounds()` 경로에서 한다.
   - AVG_PRICE용 브로커 실잔고 조회는 삭제한다. 원장을 쓴다.
 - Modify: `CycleOrderComputer.compute(...)`. DCA면 `DcaPlanInputCollector`로 `PlanContext.dca`를 채운다.
 - Modify: `TradingCandidatePlanner`. `isDca()` 분기 6곳(L149·152·156·168·256·276·335)을 전략 능력 메서드로 대체한다.
@@ -226,17 +227,17 @@
 **Interfaces:**
 - Consumes: Task 2의 `StrategyDcaDetailPort`, `DcaExecutionPort`, `DcaExecutionRecorder`
 - Produces:
-  - `record PlanContext.DcaPlanInputs(List<DcaRuleInputs> dueRules)`
+  - `record PlanContext.DcaPlanInputs(List<DcaRuleInputs> dueRules, Map<String, Order> recoveries)` — recoveries를 커널에 넘기면 안 되므로, 커널 PlanContext에는 `dueRules`만 싣는다. recoveries는 collector 반환 타입 `DcaCollected(DcaPlanInputs inputs, Map<String, Order> recoveries)`로 분리한다. 커널이 trading `Order`를 모르게 하려는 것이다.
   - `OrderPlan(InfinitePosition position, VrPosition vrPosition, List<PlannedOrder> orders, List<DcaRuleDecision.Skipped> skips, Map<String, BigDecimal> referencePrices)`
   - `DcaPlanInputs DcaPlanInputCollector.collect(BatchContext ctx, LocalDate tradeDate, Set<OrderTiming> creatableTimings, List<Order> existingOrders, BigDecimal currentPrice, AccountBalance ledger)`
     - 판정할 규칙이 없으면 `dueRules`가 빈 목록이다.
-    - 복구(기존 주문으로 ORDERED 기록)는 collect 안에서 수행한다.
+    - 정확한 반환 타입은 `DcaCollected collect(...)`다. 복구 기록은 호출부가 한다.
 
 - [ ] **Step 1: 실패 테스트 작성**
   - `TradingCandidatePlannerTest`
     - `DCA_같은_MOO에_BUY와_SELL_규칙이_모두_주문된다`
     - `DCA_조건미충족_규칙은_skip_이력_나머지는_주문`
-  - `TradingPreviewServiceTest`: `DCA_주식_전략도_프리뷰에_포함`
+  - `TradingPreviewServiceTest`: `DCA_주식_전략도_프리뷰에_포함`, `프리뷰는_DCA_이력을_쓰지_않는다`(`DcaExecutionPort`·`DcaExecutionRecorder`와 상호작용이 없어야 한다)
   - `HexagonalArchitectureTest`: 기존 테스트가 그대로 통과해야 한다.
 - [ ] **Step 2: 실패 확인**
 - [ ] **Step 3: 구현** — `isDca()`를 grep했을 때 `trading/application/service`에 남는 곳이 0이어야 한다. `Strategy.isDca()`를 쓰는 곳은 `DcaConfigService`·`DcaExecutionQueryService`(DCA 전용 API 진입 검증)만 허용한다.
@@ -255,7 +256,7 @@
 - Modify: `CycleOrderStrategy`
   - `snapshotsBrokerBalance()`를 삭제한다.
   - `boolean occupiesSeed()`를 추가한다. 기본 true, DCA false다.
-- Modify: `PlannedOrder`. `boolean partialAllowed`를 추가한다. 기존 팩토리는 true이고, DCA REJECT 규칙 주문은 false다.
+- Modify: `PlannedOrder`. `boolean partialAllowed`를 추가한다. 기존 팩토리는 true이고, DCA REJECT 규칙 주문은 false다. 필드가 늘면 equals가 바뀌므로, allocator `mergeApproved`(`TradingOrderBudgetAllocator.java:241`)와 `TradingOrderSlots`의 equals·leg 대조가 깨지지 않는지 기존 VR 축소 회귀 테스트로 확인한다(testing.md "cap 예산 회귀").
 - Modify: `DcaCycleOrderStrategy.fitBuysToBudget`. 입력 순서대로 budget을 소진한다. `partialAllowed=false` 주문은 전량이 들어가면 승인하고, 아니면 제외한다. true 주문은 `floor(남은 budget / 캡가)`로 축소하고, 0이 되면 제외한다.
 - Modify: `TradingCandidatePlanner`. 승인 후보에서 원 후보 대비 빠진 DCA leg를 `INSUFFICIENT_BALANCE`(BUY)/`NO_HOLDINGS`(SELL)로 leg 단위 기록한다. 후보 전체 거절도 leg마다 기록한다.
 - Test: `TradingReporterTest`, `DcaCycleOrderStrategyTest`(fitBuysToBudget), `TradingCandidatePlannerTest`
@@ -288,13 +289,17 @@
   - 규칙 처리 순서는 SELL 먼저, BUY 나중이다.
   - 판정은 `decideRule`로 한다. 입력은 ledger(최신 `cycle_position.toBalance()`), sellable(`min(원장, 지갑 held)`), availableCash(지갑 krw)다.
   - 지갑 로컬 차감 규칙은 기존과 같다.
-- Modify: `OrderPort.markFilled`를 `boolean markFilledIfOpen(UUID orderId, BigDecimal filledQuantity, BigDecimal filledPrice, OrderStatus status)`로 바꾼다.
-  - `UPDATE … WHERE status IN ('PLACED','SUBMITTING','PARTIALLY_FILLED')`로 갱신하고, 갱신 건수가 1이면 true를 돌려준다.
-  - 기존 호출처를 전부 확인한다.
+- `OrderPort.markFilled`는 바꾸지 않는다. 주식 `TradingReporter.markFilledOrders`도 같은 메서드를 쓰기 때문이다.
 - Create: `trading-core/.../trading/application/service/CryptoLedgerRecorder.java` (`@Transactional`)
   - `boolean recordFill(BatchContext ctx, Order order, BigDecimal volume, BigDecimal avgPrice)`
-  - `markFilledIfOpen`이 true일 때만 원장을 반영한다: 최신 `cycle_position.toBalance().applyExecutions(fill).withUsdDeposit(ZERO)`로 계산한 값을 `CyclePosition.tradeSnapshot(cycleId, balance, avgPrice)`로 저장한다.
-  - 이 저장이 Review Focus 4의 멱등 보장이다.
+  - 순서:
+    1. `strategyCyclePort.lockForUpdate(cycleId)`로 사이클을 잠근다. 수동 보정과 같은 잠금이라 둘이 직렬화된다.
+    2. 주문을 다시 읽는다.
+    3. `delta = volume − 기존 filledQuantity(null=0)`를 계산한다.
+    4. `delta ≤ 0`이면 아무것도 하지 않고 false를 반환한다.
+    5. `delta > 0`이면 체결 금액 증분 `volume×avgPrice − 기존 filledQuantity×기존 filledPrice`로 Fill(delta, 증분 금액)을 만든다. 최신 `cycle_position.toBalance().applyExecutions(fill).withUsdDeposit(ZERO)`를 계산해 `CyclePosition.tradeSnapshot(cycleId, balance, avgPrice)`로 저장한다.
+    6. `orderPort.markFilled(...)`를 호출하고 true를 반환한다.
+  - 이 흐름이 Review Focus 4의 멱등 보장이다. 부분 체결 뒤 전량 체결이 와도 증분만 반영된다.
   - `closing_price`에는 체결 평균가를 기록한다.
 - Modify: `CryptoOrderSynchronizer.settle`. `markFilled`와 이벤트 발행을 `CryptoLedgerRecorder.recordFill`로 바꾸고, 이벤트는 true일 때만 발행한다.
 - Modify: `CryptoDcaRunner`. `findActiveByStrategyIds`의 반환 타입이 `DcaStrategyConfig`가 된 데 맞춘다.
@@ -302,13 +307,13 @@
 
 **Interfaces:**
 - Consumes: Task 1 `decideRule`, Task 2 ports, Plan 1 `AccountBalance(BigDecimal …)`
-- Produces: `CryptoLedgerRecorder.recordFill(...)`, `OrderPort.markFilledIfOpen(...)`
+- Produces: `CryptoLedgerRecorder.recordFill(...)`
 
 - [ ] **Step 1: 실패 테스트 작성**
   - `CryptoDcaRoundExecutorTest`
     - `같은틱_SELL_BUY_동시발동은_SELL먼저_각자_이력`(Review Focus 2)
     - `09시_매수체결후_10시_AVG_PRICE_매도는_갱신된_평단으로_판정`(spec 시나리오 3. 원장 stub으로 09시 이후 상태를 준다)
-  - `CryptoLedgerRecorderIT`: `같은_주문_두번_settle해도_원장은_1회_반영`(Review Focus 4)
+  - `CryptoLedgerRecorderIT`: `같은_주문_두번_settle해도_원장은_1회_반영`, `부분체결_후_전량체결은_증분만_반영`(Review Focus 4)
 - [ ] **Step 2: 실패 확인** · [ ] **Step 3: 구현** · [ ] **Step 4: 통과 확인**
   - `./gradlew :trading-core:test --tests '*Crypto*' 2>&1 | grep -E "FAILED|BUILD"`
   - `./gradlew :trading-core:integration --tests '*CryptoLedgerRecorderIT' 2>&1 | grep -E "FAILED|BUILD"`
