@@ -303,6 +303,54 @@ class DcaCycleOrderStrategyTest {
         assertThat(strategy.endsCycleOnLiquidation()).isFalse();
         assertThat(strategy.needsCapCheck(null, null)).isFalse();
         assertThat(strategy.allocationPriority()).isEqualTo(200);
-        assertThat(strategy.snapshotsBrokerBalance()).isTrue();
+        assertThat(strategy.occupiesSeed()).isFalse();
+    }
+
+    // 캡가 10 고정 BUY — partialAllowed=false는 REJECT 규칙
+    private static PlannedOrder buyAt10(String leg, int quantity, boolean partialAllowed) {
+        return PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, quantity,
+                BigDecimal.TEN, OrderTiming.AT_CLOSE, leg).withPartialAllowed(partialAllowed);
+    }
+
+    @Test
+    void 예산부족시_REJECT는_빠지고_PARTIAL은_축소() {
+        // budget 100: REJECT 8주(80) 전량 승인 → 남은 20으로 PARTIAL 5주를 2주로 축소
+        List<PlannedOrder> fitted = strategy.fitBuysToBudget(
+                List.of(buyAt10("DCA_A", 8, false), buyAt10("DCA_B", 5, true)), new BigDecimal("100"));
+        assertThat(fitted).extracting(PlannedOrder::orderLeg, PlannedOrder::quantity)
+                .containsExactly(org.assertj.core.api.Assertions.tuple("DCA_A", 8), org.assertj.core.api.Assertions.tuple("DCA_B", 2));
+    }
+
+    @Test
+    void REJECT_BUY가_통째로_안들어가면_제외() {
+        // budget 50: REJECT 8주(80)는 통째로 제외되고 예산을 소진하지 않아 뒤 PARTIAL 5주(50)는 전량
+        List<PlannedOrder> fitted = strategy.fitBuysToBudget(
+                List.of(buyAt10("DCA_A", 8, false), buyAt10("DCA_B", 5, true)), new BigDecimal("50"));
+        assertThat(fitted).extracting(PlannedOrder::orderLeg, PlannedOrder::quantity)
+                .containsExactly(org.assertj.core.api.Assertions.tuple("DCA_B", 5));
+    }
+
+    @Test
+    void PARTIAL_BUY_여럿은_합계가_예산을_넘지_않게_순서대로_소진() {
+        // 각 BUY를 전체 예산 기준으로 축소하면 8+8=160 > 100으로 후보 전체가 거절된다 — 앞에서부터 소진
+        List<PlannedOrder> fitted = strategy.fitBuysToBudget(
+                List.of(buyAt10("DCA_A", 8, true), buyAt10("DCA_B", 8, true), buyAt10("DCA_C", 3, true)), new BigDecimal("100"));
+        assertThat(fitted).extracting(PlannedOrder::orderLeg, PlannedOrder::quantity)
+                .containsExactly(org.assertj.core.api.Assertions.tuple("DCA_A", 8), org.assertj.core.api.Assertions.tuple("DCA_B", 2));
+        assertThat(AccountBalance.buyTotal(fitted)).isLessThanOrEqualTo(new BigDecimal("100"));
+    }
+
+    @Test
+    void plan은_REJECT_규칙_주문만_partialAllowed_false() {
+        DcaRule reject = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.REJECT, List.of());
+        DcaRule partial = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null,
+                OrderType.MOC, null, new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of());
+        List<DcaCycleOrderStrategy.DcaRuleInputs> due = java.util.stream.Stream.of(reject, partial)
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, HUNDRED, null, null, null, null, null))
+                .toList();
+        CycleOrderStrategy.OrderPlan plan = strategy.plan(new CycleOrderStrategy.PlanContext(null, StrategyTicker.UPRO, DAY, "t",
+                null, null, null, new CycleOrderStrategy.PlanContext.DcaPlanInputs(due))).orElseThrow();
+        assertThat(plan.orders()).extracting(PlannedOrder::partialAllowed).containsExactly(false, true);
     }
 }

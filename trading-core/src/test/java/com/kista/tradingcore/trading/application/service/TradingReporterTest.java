@@ -23,8 +23,6 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
@@ -62,8 +60,7 @@ class TradingReporterTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock CyclePositionPersistor cyclePositionPersistor;
     @Mock BrokerOrderCorrectionPort brokerOrderPort;
-    @Mock LiveBalancePort liveBalancePort;
-    // 실제 INFINITE·DCA 커널 — snapshotsBrokerBalance()만 읽는다
+    // 실제 INFINITE·DCA 커널 — occupiesSeed()만 읽는다
     CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
             new InfiniteCycleOrderStrategy(new InfiniteStrategy(), new ReverseInfiniteStrategy()), new DcaCycleOrderStrategy()));
     TradingReporter reporter;
@@ -102,7 +99,7 @@ class TradingReporterTest {
     @BeforeEach
     void setUp() {
         reporter = new TradingReporter(executionPort, brokerOrderPort, orderPort,
-                cyclePositionPersistor, eventPublisher, cycleStrategies, liveBalancePort);
+                cyclePositionPersistor, eventPublisher, cycleStrategies);
         // TRADING_ALERT 기본 활성 — USER/TOSS_USER 모두 notificationPrefs 비어있어 isNotificationEnabled()가 true 반환
     }
 
@@ -298,8 +295,8 @@ class TradingReporterTest {
     }
 
     @Test
-    void dca_report_uses_only_own_order_executions() {
-        // 매수 DCA 전략 — 같은 계좌·티커의 매도 DCA 체결("S-9")이 조회에 섞여 들어온다
+    void DCA_원장은_자기주문_체결로_갱신되고_usd_deposit은_0() {
+        // 같은 계좌·티커의 외부 체결("S-9")이 조회에 섞여 들어와도 자기 주문 BUY 3주만 원장에 반영
         Strategy dcaStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         BatchContext dcaCtx = new BatchContext(dcaStrategy, CYCLE, ACCOUNT, USER);
@@ -308,39 +305,32 @@ class TradingReporterTest {
                 2, new BigDecimal("21.00"), new BigDecimal("42.00"), "S-9");
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
                 .thenReturn(List.of(buyExecution("B-1", 3, "20.00"), foreignSell));
-        when(liveBalancePort.getLiveBalance(ACCOUNT_REF, StrategyTicker.SOXL))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("90.00"), new BigDecimal("5000.00")));
 
         reporter.recordAndNotify(TODAY, dcaCtx, BALANCE, CLOSE, orders, null);
 
-        // cycle_position은 브로커 스냅샷(보유·평단) + usd_deposit 0
+        // 10주@20 + 3주@20 → 13주@20, DCA는 시드를 점유하지 않아 usd_deposit 0
         ArgumentCaptor<AccountBalance> balanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
         verify(cyclePositionPersistor).saveCyclePosition(eq(TODAY), balanceCaptor.capture(), eq(dcaCtx), eq(CLOSE), isNull());
-        assertThat(balanceCaptor.getValue()).isEqualTo(new AccountBalance(10, new BigDecimal("90.00"), BigDecimal.ZERO));
-        // 리포트 이벤트는 자기 주문 BUY 3주 1건뿐 (반대 방향 DCA 체결 배제)
+        assertThat(balanceCaptor.getValue().wholeShares()).isEqualTo(13);
+        assertThat(balanceCaptor.getValue().avgPrice()).isEqualByComparingTo("20.00");
+        assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo("0");
+        // 리포트 이벤트는 자기 주문 BUY 3주 1건뿐
         ArgumentCaptor<TradingReportReadyEvent> eventCaptor = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().executions()).singleElement()
                 .satisfies(leg -> assertThat(leg.direction()).isEqualTo(OrderDirection.BUY));
-        assertThat(eventCaptor.getValue().report().totalSoldUsd()).isEqualByComparingTo("0");
         assertThat(eventCaptor.getValue().strategyId()).isEqualTo(dcaStrategy.id());
     }
 
     @Test
-    void dca_snapshot_failure_falls_back_to_internal_ledger_with_zero_deposit() {
-        Strategy dcaStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        BatchContext dcaCtx = new BatchContext(dcaStrategy, CYCLE, ACCOUNT, USER);
-        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
-                .thenReturn(List.of(buyExecution("B-1", 5, "20.00")));
-        when(liveBalancePort.getLiveBalance(ACCOUNT_REF, StrategyTicker.SOXL)).thenThrow(new RuntimeException("broker down"));
+    void 시드를_점유하는_전략은_usd_deposit을_유지한다() {
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
 
-        reporter.recordAndNotify(TODAY, dcaCtx, BALANCE, CLOSE, List.of(placedOrder(UUID.randomUUID(), "B-1", 5)), null);
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
 
         ArgumentCaptor<AccountBalance> balanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
-        verify(cyclePositionPersistor).saveCyclePosition(eq(TODAY), balanceCaptor.capture(), eq(dcaCtx), eq(CLOSE), isNull());
-        assertThat(balanceCaptor.getValue().wholeShares()).isEqualTo(15);
-        assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo("0");
+        verify(cyclePositionPersistor).saveCyclePosition(eq(TODAY), balanceCaptor.capture(), eq(CTX), eq(CLOSE), isNull());
+        assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo("1000.00");
     }
 
     @Test

@@ -17,7 +17,7 @@ com.kista.tradingcore.matching/  ← Spring Modulith 모듈(CLOSED) — 주문�
 매매 공식(변경 금지 SSOT)은 이 모듈이 소비하지만 `docs/agents/modules/tradingcore/trading-formulas.md`에 별도 보관한다(matching/trading 양쪽 shim에서 import).
 
 ### DCA 전략 (무조건 적립식, 단계 ①)
-- `DcaCycleOrderStrategy`(`matching.domain.strategy`): `decide(...)` 진입으로 `DcaDecision`(`Planned`/`Skipped`)을 돌려준다 — 공통 `plan` 경로는 쓰지 않는다. `snapshotsBrokerBalance()=true`(보유·평단 SSOT가 브로커 실잔고), `needsCapCheck=false`.
+- `DcaCycleOrderStrategy`(`matching.domain.strategy`): 주식은 공통 `plan`(규칙마다 `decideRule` → `DcaRuleDecision` `Planned`/`Skipped`), 코인은 `CryptoDcaRoundExecutor`가 `decideRule`을 직접 호출한다. `occupiesSeed()=false`(usd_deposit 0), `needsCapCheck=false`. REJECT 규칙 주문은 `PlannedOrder.partialAllowed=false` — `fitBuysToBudget`이 입력 순서대로 예산을 소진하며 REJECT는 전량 아니면 제외, PARTIAL은 `floor(남은 예산 / 캡가)`로 축소한다.
 - `DcaSchedule`: 빈도(`DcaFrequency`)별 실행일 판정. `DcaConfig`: 전략 버전의 DCA 설정 값 객체(티커 UPRO/QLD, 방향·금액·빈도·조건 목록 최대 10개). `DcaDecision.Skipped`는 `DcaSkipReason`을 담는다.
 - `DcaIndicators`(순수 계산): SMA는 마지막 N개 종가 평균, RSI는 기간 14 고정 Wilder 평활. 결과는 소수 둘째 자리 HALF_UP으로 반올림하며 데이터가 부족하면 빈 값을 돌려준다.
 - `DcaCondition` 검증: 지표는 `AVG_PRICE`·`SMA`·`RSI`·`FEAR_GREED`(0~100, 값은 `DcaInputs.fearGreed` — 플래너가 배치 시점 최신 CNN 값을 넣는다). SMA는 `smaPeriod` ∈ 20/50/120/200이고 threshold를 두지 않는다. RSI는 0~100, AVG_PRICE는 -100 초과, threshold는 소수 둘째 자리까지 허용한다.

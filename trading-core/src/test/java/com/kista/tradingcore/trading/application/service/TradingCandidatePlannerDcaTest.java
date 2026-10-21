@@ -198,13 +198,40 @@ class TradingCandidatePlannerDcaTest {
 
     @Test
     void rejected_dca_sell_records_no_holdings() throws Exception {
+        PlannedOrder sell = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.SELL, 3,
+                REFERENCE, OrderTiming.AT_CLOSE, "DCA_" + KEY);
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
         when(allocator.allocate(any(), eq(DAY))).thenReturn(new TradingOrderBudgetAllocator.Allocation(
-                List.of(), List.of(), List.of(new TradingOrderBudgetAllocator.Candidate(ctx, List.of(planned)))));
+                List.of(), List.of(), List.of(new TradingOrderBudgetAllocator.Candidate(ctx, List.of(sell)))));
 
-        planner.saveAllocatedOrders(List.of(candidate()), DAY);
+        planner.saveAllocatedOrders(List.of(new TradingCandidatePlanner.CyclePlanCandidate(
+                new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(sell), false,
+                Map.of("DCA_" + KEY, REFERENCE))), DAY);
 
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), any(), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(OrderDirection.SELL), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
+        verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
+    }
+
+    @Test
+    void 빠진_규칙만_INSUFFICIENT_BALANCE_이력() throws Exception {
+        // 같은 후보의 BUY 규칙 2건 중 allocator 축소안이 KEY만 담았다 — KEY2만 거절 이력, KEY는 ORDERED
+        PlannedOrder second = PlannedOrder.of(DAY, StrategyTicker.UPRO, OrderType.MOC, OrderDirection.BUY, 2,
+                new BigDecimal("91.48"), OrderTiming.AT_CLOSE, "DCA_" + KEY2).withPartialAllowed(false);
+        BigDecimal reference2 = new BigDecimal("88.00");
+        when(allocator.allocate(any(), eq(DAY))).thenReturn(new TradingOrderBudgetAllocator.Allocation(
+                List.of(new TradingOrderBudgetAllocator.Candidate(ctx, List.of(planned))), List.of(), List.of()));
+        Order saved = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO,
+                OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.valueOf(3), new BigDecimal("91.48"),
+                OrderStatus.PLANNED, null, null, null);
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of(), List.of(saved));
+
+        planner.saveAllocatedOrders(List.of(new TradingCandidatePlanner.CyclePlanCandidate(
+                new TradingCandidatePlanner.CycleState(ctx, null, null, null, null, null), List.of(planned, second), false,
+                Map.of("DCA_" + KEY, REFERENCE, "DCA_" + KEY2, reference2))), DAY);
+
+        verify(recorder).recordOrdered(ctx, DAY, KEY, saved, REFERENCE);
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY2), eq(OrderDirection.BUY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), anyString(), eq(reference2));
+        verify(recorder, never()).recordSkipped(any(), any(), eq(KEY), any(), any(), any(), any());
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 }

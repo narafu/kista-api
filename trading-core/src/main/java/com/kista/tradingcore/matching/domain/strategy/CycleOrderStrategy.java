@@ -85,8 +85,9 @@ public interface CycleOrderStrategy {
     // 계좌별 주문 예산 배정 우선순위 — 값이 작을수록 먼저 승인
     default int allocationPriority() { return 100; }
 
-    // 리포트 후 cycle_position을 내부 원장(applyExecutions) 대신 브로커 실잔고 스냅샷으로 기록할지 (DCA만 true — 매수·매도 DCA가 한 포지션 공유)
-    default boolean snapshotsBrokerBalance() { return false; }
+    // 시드(usd_deposit)를 점유하는지 (DCA만 false) — false면 리포트가 cycle_position.usd_deposit을 0으로 기록한다
+    // (calcFreeCash가 전략별 최신 usd_deposit을 점유 시드로 합산하므로 DCA는 계좌 여유 현금을 잠그지 않는다)
+    default boolean occupiesSeed() { return true; }
 
     // 계획 시점 지정가를 고정하는지 (DCA만 true) — true면 호출부가 예산 배정 전 현재가 기준 재캡(prepareForAllocation)을 건너뛴다
     default boolean fixesPricesAtPlan() { return false; }
