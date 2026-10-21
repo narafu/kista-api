@@ -2308,6 +2308,24 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     }
 
     @Test
+    @DisplayName("코인 DCA 전략 조회는 소수 보유 원장이어도 예외 없이 currentHoldings를 null로 둔다")
+    void getById_cryptoDca_fractionalHoldings_noException() {
+        Strategy dca = dcaStrategy(STRATEGY_ID, StrategyTicker.BTC);
+        CyclePosition fractional = new CyclePosition(null, CYCLE.id(), BigDecimal.ZERO, null, null,
+                new BigDecimal("0.00123"), null, null);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(fractional));
+        when(dcaDetailPort.findActiveByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(cryptoDcaConfig()));
+        when(dcaExecutionPort.findLatestByStrategyIds(List.of(STRATEGY_ID))).thenReturn(Map.of());
+
+        StrategyDetail detail = strategyService.getById(STRATEGY_ID, USER_ID);
+
+        assertThat(detail.currentHoldings()).isNull();
+    }
+
+    @Test
     @DisplayName("DCA 등록도 사용자 프로필(복제본)이 없으면 거부한다")
     void register_dca_rejectsWhenProfileMissing() {
         when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,

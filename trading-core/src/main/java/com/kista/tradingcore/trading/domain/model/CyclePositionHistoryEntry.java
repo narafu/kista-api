@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
+import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.StrategyTicker;
 
 // cycle_position + strategy_cycle + strategy join 조회 결과 (계좌·사이클 기준 이력 조회 전용)
@@ -17,6 +18,10 @@ public record CyclePositionHistoryEntry(
         BigDecimal holdings,             // 보유 수량
         Instant createdAt          // 기록 시각
 ) {
+    public CyclePositionHistoryEntry {
+        holdings = Quantities.normalize(holdings); // numeric(20,8) 꼬리 0 제거
+    }
+
     // 평가금액 = closingPrice × holdings (closingPrice 없으면 0)
     public BigDecimal marketValueUsd() {
         return closingPrice != null

@@ -338,7 +338,9 @@ class StrategyService implements StrategyUseCase {
                         pos.avgPrice(), pos.toBalance().wholeShares(), pos.usdDeposit(),
                         divisionCount == null ? 0 : divisionCount)).orElse(null);
 
-        Integer currentHoldings = latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
+        // 코인은 소수 원장이라 wholeShares()를 부르지 않는다(StrategyDetail도 코인 보유 수량은 싣지 않음)
+        Integer currentHoldings = strategy.ticker().getMarket() == Market.CRYPTO_KRW ? null
+                : latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
 
         return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary);
     }

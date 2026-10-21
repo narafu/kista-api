@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.CyclePositionInfiniteDetail;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -131,6 +132,11 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         entityManager.flush();
         entityManager.clear();
         assertThat(fractional.id()).isNotNull();
+        // 이력 조회 경로도 정규화(5.00000000이 아니라 5)
+        assertThat(cyclePositionAdapter.findByStrategyIdAndDateRange(strategy.id(),
+                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
+                .extracting(CyclePositionHistoryEntry::holdings)
+                .contains(new BigDecimal("5"));
         assertThat(cyclePositionAdapter.findLatestOne(cycle.id()).orElseThrow().holdings())
                 .isEqualTo(new BigDecimal("5"));
     }
