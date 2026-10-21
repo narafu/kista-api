@@ -99,10 +99,13 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         }
         boolean sell = rule.direction() == OrderDirection.SELL;
         boolean crypto = in.market() == Market.CRYPTO_KRW;
-        // 기준가 — SELL은 전일 종가, BUY는 주식 max(전일 종가, 현재가) / 코인 현재가(없으면 전일 종가)
-        BigDecimal basis = sell ? prevClose
-                : crypto ? (in.currentPrice() != null && in.currentPrice().signum() > 0 ? in.currentPrice() : prevClose)
+        // 기준가 — 코인은 현재가(없으면 전일 종가), 주식 SELL은 전일 종가, 주식 BUY는 max(전일 종가, 현재가)
+        BigDecimal basis = crypto ? (in.currentPrice() != null && in.currentPrice().signum() > 0 ? in.currentPrice() : prevClose)
+                : sell ? prevClose
                 : referencePriceForBuy(prevClose, in.currentPrice());
+        if (sell && in.ledger() == null) {
+            return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
+        }
         if (sell && in.sellableAfterReserved() == null) {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "판매가능수량 조회 실패", basis);
         }

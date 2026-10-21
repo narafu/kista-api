@@ -145,4 +145,18 @@ class DcaRuleDecisionTest {
         assertThat(skipped(decide(r, Market.US_STOCK, ledger("0", null), null, "50", null, null)).reason())
                 .isEqualTo(DcaSkipReason.BELOW_ONE_SHARE);
     }
+
+    @Test
+    void 크립토_SELL_기준가는_현재가() { // AMOUNT 10000 / 현재가 200000 = 0.05
+        DcaRule r = crypto(OrderDirection.SELL, amount("10000"), DcaShortfallPolicy.PARTIAL, List.of());
+        DcaRuleDecision.Planned p = planned(decide(r, Market.CRYPTO_KRW, ledger("1", "90000"), "1", "100000", "200000", null));
+        assertThat(p.referencePrice()).isEqualByComparingTo("200000");
+        assertThat(p.quantity()).isEqualByComparingTo("0.05");
+    }
+
+    @Test
+    void SELL인데_원장이_null이면_DATA_UNAVAILABLE() {
+        DcaRule r = stock(OrderDirection.SELL, amount("1000"), DcaShortfallPolicy.PARTIAL, List.of());
+        assertThat(skipped(decide(r, Market.US_STOCK, null, "5", "50", null, null)).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+    }
 }
