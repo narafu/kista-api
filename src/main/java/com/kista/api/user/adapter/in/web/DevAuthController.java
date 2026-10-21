@@ -38,6 +38,9 @@ public class DevAuthController {
     private static final UUID   DEV_USER_ID   = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID   DEV_ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final String DEV_KAKAO_ID  = "dev-test-user";
+    // E2E 전용 — dev 시드(...0001에만 적용)가 붙지 않아 "계좌 없음"에서 시작해야 하는 시나리오에 쓴다
+    private static final UUID   DEV_E2E_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000003");
+    private static final String DEV_E2E_KAKAO_ID = "dev-e2e-user";
 
     private final UserUseCase              userUseCase;
     private final JwtIssuerService         jwtIssuerService; // 자체 발급 ES256 JWT
@@ -61,14 +64,15 @@ public class DevAuthController {
     @SecurityRequirements // 자물쇠 아이콘 제거 (인증 없이 호출 가능)
     @PostMapping("/dev-token")
     public TokenResponse devToken(HttpServletRequest request, HttpServletResponse response) {
-        // 테스트 유저 생성 or 기존 유저 반환 (idempotent)
-        User user = userUseCase.register(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID, null);
-        activateOrResync(user);
-        // RT 발급 후 HttpOnly 쿠키 설정
-        String rawRt = tokenUseCase.issueRefreshToken(user.id(), request.getHeader("User-Agent"));
-        response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
-        String at = jwtIssuerService.issue(user.id(), user.role()); // role 클레임 포함 ES256 서명
-        return new TokenResponse(at, "bearer", jwtIssuerService.expiresInSeconds());
+        return issueUserToken(DEV_KAKAO_ID, "개발 테스트 유저", DEV_USER_ID, request, response);
+    }
+
+    @Operation(summary = "[DEV] E2E 전용 JWT 토큰 발급 — 로컬 프로파일 전용", description = "고정 UUID(00000000-…-0003) E2E 유저를 자동 생성·승인 후 JWT 반환. dev 시드가 적용되지 않는 빈 사용자.")
+    @ApiResponse(responseCode = "200", description = "토큰 발급 성공")
+    @SecurityRequirements // 자물쇠 아이콘 제거 (인증 없이 호출 가능)
+    @PostMapping("/dev-e2e-token")
+    public TokenResponse devE2eToken(HttpServletRequest request, HttpServletResponse response) {
+        return issueUserToken(DEV_E2E_KAKAO_ID, "E2E 테스트 유저", DEV_E2E_USER_ID, request, response);
     }
 
     @Operation(summary = "로컬 전용 ADMIN 테스트 토큰 발급")
@@ -85,11 +89,24 @@ public class DevAuthController {
             admin = userPort.save(admin.withRole(UserRole.ADMIN));
         }
         activateOrResync(admin);
-        // RT 발급 후 HttpOnly 쿠키 설정
-        String rawRt = tokenUseCase.issueRefreshToken(admin.id(), request.getHeader("User-Agent"));
+        return issueTokens(admin.id(), UserRole.ADMIN, request, response);
+    }
+
+    private TokenResponse issueUserToken(String kakaoId, String nickname, UUID userId,
+                                         HttpServletRequest request, HttpServletResponse response) {
+        // 테스트 유저 생성 or 기존 유저 반환 (idempotent)
+        User user = userUseCase.register(kakaoId, nickname, userId, null);
+        activateOrResync(user);
+        return issueTokens(user.id(), user.role(), request, response);
+    }
+
+    // RT 발급 후 HttpOnly 쿠키 설정 + role 클레임 포함 ES256 AT 반환 (TTL은 expiresInSeconds()로 통일)
+    private TokenResponse issueTokens(UUID userId, UserRole role,
+                                      HttpServletRequest request, HttpServletResponse response) {
+        String rawRt = tokenUseCase.issueRefreshToken(userId, request.getHeader("User-Agent"));
         response.addHeader(HttpHeaders.SET_COOKIE, cookieHelper.issue(rawRt).toString());
-        String at = jwtIssuerService.issue(admin.id(), UserRole.ADMIN); // ADMIN role ES256 서명
-        return new TokenResponse(at, "bearer", jwtIssuerService.expiresInSeconds()); // TTL을 expiresInSeconds()로 통일
+        String at = jwtIssuerService.issue(userId, role);
+        return new TokenResponse(at, "bearer", jwtIssuerService.expiresInSeconds());
     }
 
     // ACTIVE 전환(approve가 복제본 동기화 이벤트 발행) — 이미 ACTIVE면 approve()가 409라 대신 재동기화만 한다.

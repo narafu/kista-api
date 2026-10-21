@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,6 +62,7 @@ class DevAuthControllerTest {
 
     private static final UUID DEV_USER_ID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID DEV_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    private static final UUID DEV_E2E_ID   = UUID.fromString("00000000-0000-0000-0000-000000000003");
 
     private static final User MOCK_USER =
             DomainFixtures.userWithStatus(DEV_USER_ID, UserStatus.ACTIVE, UserRole.USER);
@@ -111,6 +113,23 @@ class DevAuthControllerTest {
                 .andExpect(status().isOk());
         verify(userUseCase).approve(DEV_USER_ID);
         verify(userSettingsUseCase, never()).resyncNotifyProfile(any());
+    }
+
+    @Test
+    void devE2eToken은_dev_유저와_다른_고정_E2E_유저로_토큰을_발급한다() throws Exception {
+        when(userUseCase.register(any(), any(), any(), any()))
+                .thenReturn(DomainFixtures.userWithStatus(DEV_E2E_ID, UserStatus.PENDING, UserRole.USER));
+        when(jwtIssuerService.issue(any(), any())).thenReturn("e2e-tok");
+
+        mockMvc.perform(post("/api/auth/dev-e2e-token")
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("e2e-tok"));
+        verify(userUseCase).register("dev-e2e-user", "E2E 테스트 유저", DEV_E2E_ID, null);
+        verify(userUseCase).approve(DEV_E2E_ID);
+        // dev 유저(...0001)가 아니라 E2E 유저로 RT·AT를 발급해야 한다
+        verify(tokenUseCase).issueRefreshToken(eq(DEV_E2E_ID), any());
+        verify(jwtIssuerService).issue(DEV_E2E_ID, UserRole.USER);
     }
 
     @Test
