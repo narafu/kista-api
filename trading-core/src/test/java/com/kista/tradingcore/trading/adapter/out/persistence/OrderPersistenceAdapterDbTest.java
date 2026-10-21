@@ -126,6 +126,14 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
+    void findCancelledByCycleAndDate_returnsOnlyCancelled() {
+        insertOrder(cycleId, "BUY", "CANCELLED", null, null);
+        insertOrder(cycleId, "BUY", "PLACED", null, null);
+
+        assertThat(adapter.findCancelledByCycleAndDate(cycleId, LocalDate.now())).hasSize(1);
+    }
+
+    @Test
     void findOpenByAccountIdReturnsPlannedSubmittingAndPlacedAcrossDates() {
         LocalDate today = LocalDate.of(2026, 10, 18);
         UUID otherAccountId = UUID.randomUUID();

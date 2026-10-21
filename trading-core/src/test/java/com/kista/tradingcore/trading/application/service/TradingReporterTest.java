@@ -249,6 +249,32 @@ class TradingReporterTest {
     }
 
     @Test
+    void 당일_취소된_자기_주문의_부분_체결은_원장에_반영한다() {
+        // mainOrders엔 없고(CANCELLED) 같은 주문번호 체결 2주가 조회에 남아 있다
+        Order cancelled = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), TODAY, StrategyTicker.SOXL,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
+                BigDecimal.valueOf(5), new BigDecimal("20.00"), OrderStatus.CANCELLED, "X1", null, null);
+        when(orderPort.findCancelledByCycleAndDate(CYCLE.id(), TODAY)).thenReturn(List.of(cancelled));
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("X1", 2, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("12");
+    }
+
+    @Test
+    void 수동_체결_보정_FILLED_주문의_같은_번호_체결은_이중_반영하지_않는다() {
+        // filledManual(FILLED·UNKNOWN_LEG)은 CANCELLED 조회에 안 잡히고 mainOrders에도 없다 → 필터로 제외
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("M1", 4, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("10");
+    }
+
+    @Test
     void 체결_없는_자기_주문은_원장_불변() {
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
 

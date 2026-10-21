@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -66,7 +67,11 @@ class TradingReporter {
         List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
         boolean snapshots = cycleStrategies.of(strategy.type()).snapshotsBrokerBalance();
         // 원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 (spec 3장 원장 원칙) — 자기 주문(externalOrderId) 체결만 사용
-        Set<String> ownIds = mainOrders.stream().map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
+        // 당일 취소·재주문된 주문(CANCELLED)도 부분 체결분이 있을 수 있어 자기 주문에 포함 — 수동 체결 보정 FILLED 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
+        // 외부 주문번호가 없는 체결은 우리 것이 아닌 것으로 본다 (ownIds에 null이 없어 걸러짐)
+        Set<String> ownIds = Stream.concat(mainOrders.stream(),
+                        orderPort.findCancelledByCycleAndDate(ctx.currentCycle().id(), today).stream())
+                .map(Order::externalOrderId).filter(Objects::nonNull).collect(Collectors.toSet());
         executions = executions.stream().filter(e -> ownIds.contains(e.externalOrderId())).toList();
         log.info("[{}] 체결 내역 {}건 조회", account.nickname(), executions.size());
 

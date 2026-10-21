@@ -79,6 +79,11 @@ public class OrderPersistenceAdapter implements OrderPort {
                 strategyCycleId, tradeDate, OrderStatus.PLACED));
     }
 
+    @Override
+    public List<Order> findCancelledByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
+        return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatus(
+                strategyCycleId, tradeDate, OrderStatus.CANCELLED));
+    }
 
     @Override
     @Transactional

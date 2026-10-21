@@ -26,6 +26,9 @@ public interface OrderPort {
     // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
     List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
+    // 특정 사이클·거래일의 CANCELLED 주문 조회 (당일 취소·재주문 전 부분 체결분의 원장 반영용 — 체결 필터의 자기 주문 판정)
+    List<Order> findCancelledByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
+
     // 증권사 접수 직전 선점 — PLANNED에서만 SUBMITTING 전이, 그 사이 취소·삭제·재캡됐으면 OrderStateConflictException(HTTP를 보내지 않는다)
     void markSubmitting(UUID orderId);
 
