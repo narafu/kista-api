@@ -38,8 +38,8 @@ class CyclePositionEntity extends BaseCreatedAtEntity {
     @Column(name = "avg_price", precision = 20, scale = 2)
     private BigDecimal avgPrice; // 평균 매입 단가 (holdings=0이면 null)
 
-    @Column(name = "holdings", nullable = false)
-    private int holdings; // 보유 수량 (양의 정수, 단주 단위)
+    @Column(name = "holdings", nullable = false, precision = 20, scale = 8)
+    private BigDecimal holdings; // 보유 수량 (소수 가능)
 
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨

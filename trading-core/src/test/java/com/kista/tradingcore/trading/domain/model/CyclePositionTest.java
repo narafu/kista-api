@@ -10,7 +10,7 @@ class CyclePositionTest {
 
     // 테스트용 포지션 생성 — 예수금 100
     private static CyclePosition position(BigDecimal closingPrice, BigDecimal avgPrice, int holdings) {
-        return new CyclePosition(null, null, new BigDecimal("100"), closingPrice, avgPrice, holdings, null, null);
+        return new CyclePosition(null, null, new BigDecimal("100"), closingPrice, avgPrice, BigDecimal.valueOf(holdings), null, null);
     }
 
     @Test

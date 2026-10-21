@@ -107,6 +107,35 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void save_holdings_numericRoundTrip_normalized() {
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
+        ));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
+        StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
+                null, strategy.id(), version.id(), new BigDecimal("1000.00"),
+                null, LocalDate.now(), null, null, null
+        ));
+        CyclePosition fractional = cyclePositionAdapter.save(new CyclePosition(
+                null, cycle.id(), new BigDecimal("900.00"), null, new BigDecimal("81300813.0081"),
+                new BigDecimal("0.00123"), null, null));
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(cyclePositionAdapter.findLatestOne(cycle.id()).orElseThrow().holdings())
+                .isEqualTo(new BigDecimal("0.00123"));
+
+        // 정수 5는 numeric(20,8) 왕복 뒤에도 5.00000000이 아니라 5로 정규화
+        cyclePositionAdapter.save(new CyclePosition(
+                null, cycle.id(), new BigDecimal("900.00"), null, BigDecimal.TEN, BigDecimal.valueOf(5), null, null));
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(fractional.id()).isNotNull();
+        assertThat(cyclePositionAdapter.findLatestOne(cycle.id()).orElseThrow().holdings())
+                .isEqualTo(new BigDecimal("5"));
+    }
+
+    @Test
     void findLatestByCycleId_returnsMostRecentDetailsFirst() {
         Strategy strategy = strategyAdapter.save(new Strategy(
                 null, accountId, StrategyType.INFINITE,
@@ -124,7 +153,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(older.id(), false));
         CyclePosition newer = cyclePositionAdapter.save(new CyclePosition(
                 null, cycle.id(), new BigDecimal("900.00"),
-                new BigDecimal("25.00"), new BigDecimal("24.00"), 5, null, null
+                new BigDecimal("25.00"), new BigDecimal("24.00"), BigDecimal.valueOf(5), null, null
         ));
         cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(newer.id(), true));
 
@@ -239,7 +268,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         CyclePosition posA = cyclePositionAdapter.save(CyclePosition.initialSnapshot(cycle.id(), new BigDecimal("1000.00")));
         CyclePosition posB = cyclePositionAdapter.save(new CyclePosition(
                 null, cycle.id(), new BigDecimal("900.00"),
-                new BigDecimal("25.00"), new BigDecimal("24.00"), 5, null, null
+                new BigDecimal("25.00"), new BigDecimal("24.00"), BigDecimal.valueOf(5), null, null
         ));
         cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(posA.id(), false));
         cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(posB.id(), true));

@@ -11,7 +11,7 @@ public record CycleHistoryResponse(
         @Schema(description = "종목 코드", example = "TQQQ")
         String ticker,           // 종목 코드 (TQQQ, SOXL 등)
         @Schema(description = "보유 수량")
-        int holdings,            // 보유 수량
+        BigDecimal holdings, // 보유 수량
         @Schema(description = "종가 (null 가능)")
         BigDecimal closingPrice, // 종가 (null 가능)
         @Schema(description = "평균 매입 단가 (보유수량 0이면 null)")

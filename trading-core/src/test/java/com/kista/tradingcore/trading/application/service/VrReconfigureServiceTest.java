@@ -97,7 +97,7 @@ class VrReconfigureServiceTest {
                 10, 52, 26, 15, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
         currentCycleVr = new StrategyCycleVrDetail(cycleId, new BigDecimal("1000.00"), 10, new BigDecimal("0.75"));
         latestPosition = new CyclePosition(UUID.randomUUID(), cycleId,
-                new BigDecimal("500.00"), new BigDecimal("95.00"), new BigDecimal("50.00"), 10, null, null);
+                new BigDecimal("500.00"), new BigDecimal("95.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), null, null);
         newCycleAfterReconfigure = new StrategyCycle(UUID.randomUUID(), strategyId, UUID.randomUUID(),
                 BigDecimal.valueOf(500), null, LocalDate.now(), null, null, null);
         currentPrice = new BigDecimal("120.00");
@@ -206,7 +206,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.pStepWeeks()).isEqualTo(currentDetail.pStepWeeks());
         assertThat(captured.poolLimitFloor()).isEqualByComparingTo(currentDetail.poolLimitFloor());
         // 자본 주입 없음 → holdings/usdDeposit 불변, V 이월
-        assertThat(captured.postBalance().wholeShares()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo(latestPosition.usdDeposit());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
 
@@ -265,7 +265,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("700.00"); // 500.00 + 200.00
-        assertThat(captured.postBalance().wholeShares()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         // 수량 주입 없으므로 V 이월 (증분 없음)
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
@@ -302,7 +302,7 @@ class VrReconfigureServiceTest {
 
         CapturedCall captured = captureReconfigureCall();
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo("350.00"); // 500.00 - 150.00
-        assertThat(captured.postBalance().wholeShares()).isEqualTo(latestPosition.holdings());
+        assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(latestPosition.avgPrice());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
     }

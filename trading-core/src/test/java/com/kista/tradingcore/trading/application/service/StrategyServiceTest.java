@@ -411,7 +411,7 @@ class StrategyServiceTest {
         verify(strategyCyclePort).save(cycleCaptor.capture());
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("874.50");
         verify(cyclePositionPort).save(argThat(p ->
-                p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings() == 0));
+                p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
         verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
     }
 
@@ -509,7 +509,7 @@ class StrategyServiceTest {
     @DisplayName("update() holdings가 있으면 시드 수정을 거절한다")
     void update_seed_with_holdings_throws() {
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), 10, null, null);
+                new BigDecimal("500"), new BigDecimal("110"), new BigDecimal("100"), BigDecimal.valueOf(10), null, null);
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -529,7 +529,7 @@ class StrategyServiceTest {
     @DisplayName("update() holdings가 0이면 strategy_cycle과 cycle_position 시작점을 함께 갱신한다")
     void update_seed_change_with_no_holdings() {
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000"), new BigDecimal("110"), null, 0, null, null);
+                new BigDecimal("1000"), new BigDecimal("110"), null, BigDecimal.valueOf(0), null, null);
 
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -567,7 +567,7 @@ class StrategyServiceTest {
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         CyclePosition opening = new CyclePosition(
                 UUID.randomUUID(), CYCLE_ID, new BigDecimal("1000.00"),
-                null, null, 0, null, null);
+                null, null, BigDecimal.valueOf(0), null, null);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(vrStrategy);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         lenient().when(strategyPort.save(any(Strategy.class))).thenReturn(vrStrategy);
@@ -880,7 +880,7 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), null, null, 0, null, null);
+                new BigDecimal("500"), null, null, BigDecimal.valueOf(0), null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile())); // balanceCheckEnabled=true
@@ -904,14 +904,14 @@ class StrategyServiceTest {
                 null, null, null, null, null, null, null, null, null);
         Account account = ownerAccount();
         CyclePosition reservedPosition = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("500"), null, null, 0, null, null);
+                new BigDecimal("500"), null, null, BigDecimal.valueOf(0), null, null);
         UUID newStrategyId = UUID.randomUUID();
         Strategy savedStrategy = new Strategy(newStrategyId, ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(UUID.randomUUID(), newStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("500"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), savedCycle.id(),
-                new BigDecimal("500"), null, null, 0, null, null);
+                new BigDecimal("500"), null, null, BigDecimal.valueOf(0), null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile())); // balanceCheckEnabled=true
@@ -952,7 +952,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                BigDecimal.ZERO, null, null, 0, null, null);
+                BigDecimal.ZERO, null, null, BigDecimal.valueOf(0), null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1004,7 +1004,7 @@ class StrategyServiceTest {
         verify(strategyCycleVrPort).save(argThat(cv -> cv.value().compareTo(new BigDecimal("99999")) == 0));
         // 실제 포지션(holdings=10, avgPrice=100)과 startAmount(전일종가 50×10=500.00)는 override와 무관
         verify(cyclePositionPort).save(argThat(p ->
-                p.holdings() == 10 && p.avgPrice().compareTo(new BigDecimal("100.00")) == 0));
+                p.holdings().compareTo(BigDecimal.valueOf(10)) == 0 && p.avgPrice().compareTo(new BigDecimal("100.00")) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("500.00")) == 0));
     }
 
@@ -1063,7 +1063,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("2000"), null, null, 0, null, null);
+                new BigDecimal("2000"), null, null, BigDecimal.valueOf(0), null, null);
         // recurringAmount=0 → 기본 poolLimitRate=0.75 (거치식) — poolLimit 달러 파생은 개장 pool(2000)×0.75=1500.00
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
                 vrCycleId, BigDecimal.ZERO, 10, new BigDecimal("0.75"));
@@ -1120,7 +1120,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("1000"), null, null, 0, null, null);
+                new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1135,7 +1135,7 @@ class StrategyServiceTest {
         assertThat(result.currentHoldings()).isEqualTo(0);
         // holdings=0 → CyclePosition.initialSnapshot(closingPrice도 null) 사용 검증, 시장가 조회는 건너뛴다
         verify(cyclePositionPort).save(argThat(p ->
-                p.strategyCycleId().equals(vrCycleId) && p.holdings() == 0
+                p.strategyCycleId().equals(vrCycleId) && p.holdings().signum() == 0
                         && p.avgPrice() == null && p.closingPrice() == null));
         verifyNoInteractions(brokerPricePort);
     }
@@ -1155,7 +1155,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                BigDecimal.ZERO, null, null, 0, null, null);
+                BigDecimal.ZERO, null, null, BigDecimal.valueOf(0), null, null);
         // recurringAmount=200(적립식) → 기본 poolLimitRate=1.0, 단 개장 pool=0이므로 파생 poolLimit은 0.00
         StrategyCycleVrDetail savedCycleVr = new StrategyCycleVrDetail(
                 vrCycleId, BigDecimal.ZERO, 10, BigDecimal.ONE);
@@ -1244,7 +1244,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("2000"), null, null, 0, null, null);
+                new BigDecimal("2000"), null, null, BigDecimal.valueOf(0), null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1341,7 +1341,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("1000"), null, null, 0, null, null);
+                new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1537,9 +1537,9 @@ class StrategyServiceTest {
         StrategyCycle vrCycle = new StrategyCycle(vrCycleId, vrStrategyId, vrVersionId,
                 new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition latestPos = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("700"), null, null, 0, null, null);
+                new BigDecimal("700"), null, null, BigDecimal.valueOf(0), null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
-                new BigDecimal("1000"), null, null, 0, null, null);
+                new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(vrVersionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
         // 총 시작금액 1600과 개장 USD pool 1000은 분리된다. poolLimit은 1000 × 0.50 = 500.00이다.
@@ -1615,7 +1615,7 @@ class StrategyServiceTest {
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
                 new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
         CyclePosition position = new CyclePosition(positionId, cycleId,
-                new BigDecimal("500.00"), null, new BigDecimal("20.00"), 10, null, null);
+                new BigDecimal("500.00"), null, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         StrategyVersion version = new StrategyVersion(versionId, strategyId, 1, null, null);
         StrategyInfiniteDetail infiniteDetail = new StrategyInfiniteDetail(versionId, 30);
         CyclePositionInfiniteDetail reverseDetail = new CyclePositionInfiniteDetail(positionId, true);
@@ -1658,7 +1658,7 @@ class StrategyServiceTest {
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
                 new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
-                new BigDecimal("1000.00"), null, null, 0, null, null);
+                new BigDecimal("1000.00"), null, null, BigDecimal.valueOf(0), null, null);
         StrategyVersion version = new StrategyVersion(versionId, strategyId, 1, null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
@@ -1709,7 +1709,7 @@ class StrategyServiceTest {
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2000.00"), null, LocalDate.now(), null, null, null);
         CyclePosition position = new CyclePosition(positionId, cycleId,
-                new BigDecimal("1500.00"), null, new BigDecimal("30.00"), 15, null, null);
+                new BigDecimal("1500.00"), null, new BigDecimal("30.00"), BigDecimal.valueOf(15), null, null);
 
         // 단건 경로
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
@@ -1862,7 +1862,7 @@ class StrategyServiceTest {
         // startAmount = 현금 1000 + 시장가 50.00×10 = 1500.00
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1500.00")) == 0));
         verify(cyclePositionPort).save(argThat(p ->
-                p.holdings() == 10
+                p.holdings().compareTo(BigDecimal.valueOf(10)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("45.50")) == 0
                         && p.closingPrice().compareTo(new BigDecimal("50.00")) == 0
                         && p.usdDeposit().compareTo(new BigDecimal("1000")) == 0));
@@ -1899,7 +1899,7 @@ class StrategyServiceTest {
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         verify(cyclePositionPort).save(argThat(p ->
-                p.holdings() == 20
+                p.holdings().compareTo(BigDecimal.valueOf(20)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("95.00")) == 0
                         && p.closingPrice().compareTo(new BigDecimal("100.00")) == 0));
         verify(cyclePositionInfiniteDetailPort, never()).save(any());
@@ -2222,7 +2222,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
         assertThat(detail.currentHoldings()).isZero();
-        verify(cyclePositionPort).save(argThat(p -> p.holdings() == 0 && p.usdDeposit().signum() == 0));
+        verify(cyclePositionPort).save(argThat(p -> p.holdings().signum() == 0 && p.usdDeposit().signum() == 0));
         verifyNoInteractions(marginPort, brokerPricePort);
     }
 

@@ -45,7 +45,7 @@ class CyclePositionPersistor {
 
         // 저장 전 이전 포지션 확인 — 0회차 매수 실패(holdings=0)와 진짜 청산(이전 holdings>0→현재 0) 구분
         List<CyclePosition> prevPositions = cyclePositionPort.findLatestByCycleId(currentCycle.id(), 1);
-        boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.getFirst().holdings() > 0;
+        boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.getFirst().toBalance().hasHoldings();
 
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
         CyclePosition savedPosition = cyclePositionPort.save(position);
@@ -59,7 +59,7 @@ class CyclePositionPersistor {
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
         // (0회차 매수 실패 케이스: startSnapshot→tradeSnapshot 모두 holdings=0이므로 여기서 걸림)
         // endsCycleOnLiquidation()=false인 전략(VR)은 holdings=0에 사이클 종료 미발동
-        if (position.holdings() == 0 && prevHadHoldings
+        if (!balance.hasHoldings() && prevHadHoldings
                 && cycleOrderStrategies.of(strategy.type()).endsCycleOnLiquidation()) {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);

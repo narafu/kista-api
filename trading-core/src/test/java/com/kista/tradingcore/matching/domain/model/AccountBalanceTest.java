@@ -34,6 +34,17 @@ class AccountBalanceTest {
         return fill(direction, String.valueOf(qty), price);
     }
 
+    // 체결금액을 직접 지정(price × qty가 아닌 값)
+    private static AccountBalance.Fill fillWithAmount(OrderDirection direction, String qty, String amountUsd) {
+        BigDecimal quantity = new BigDecimal(qty);
+        BigDecimal amount = new BigDecimal(amountUsd);
+        return new AccountBalance.Fill() {
+            @Override public OrderDirection direction() { return direction; }
+            @Override public BigDecimal quantity() { return quantity; }
+            @Override public BigDecimal amountUsd() { return amount; }
+        };
+    }
+
     private static AccountBalance.Fill fill(OrderDirection direction, String qty, String price) {
         BigDecimal quantity = new BigDecimal(qty);
         BigDecimal amount = new BigDecimal(price).multiply(quantity);
@@ -119,10 +130,19 @@ class AccountBalanceTest {
     @DisplayName("소수 체결을 원장에 반영")
     void fractionalFill_appliedToLedger() {
         AccountBalance result = new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO)
-                .applyExecutions(List.of(fill(OrderDirection.BUY, "0.00123", "100000")));
+                .applyExecutions(List.of(fillWithAmount(OrderDirection.BUY, "0.00123", "100000")));
         assertThat(result.holdings()).isEqualByComparingTo("0.00123");
-        // 체결금액 = 100000 × 0.00123 = 123 → 평단 = 123 / 0.00123 = 100000
-        assertThat(result.avgPrice()).isEqualByComparingTo("100000");
+        // 체결금액 100000 / 0.00123 = 81300813.0081
+        assertThat(result.avgPrice()).isEqualByComparingTo("81300813.0081");
+    }
+
+    @Test
+    @DisplayName("scale 있는 0 보유는 int 0 잔고와 같고 보유 없음으로 판정")
+    void scaledZeroHoldings_equalsIntZero() {
+        AccountBalance scaled = new AccountBalance(new BigDecimal("0.00000000"), null, BigDecimal.ZERO);
+        assertThat(scaled.wholeShares()).isZero();
+        assertThat(scaled.hasHoldings()).isFalse();
+        assertThat(scaled).isEqualTo(new AccountBalance(0, null, BigDecimal.ZERO));
     }
 
     @Test

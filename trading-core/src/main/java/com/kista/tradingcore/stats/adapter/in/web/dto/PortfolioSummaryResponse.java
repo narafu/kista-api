@@ -24,7 +24,7 @@ public record PortfolioSummaryResponse(
             @Schema(description = "종목코드")
             StrategyTicker ticker,             // pdno: 종목코드
             @Schema(description = "잔고수량")
-            int holdings,              // cblc_qty13: 잔고수량
+            BigDecimal holdings,       // cblc_qty13: 잔고수량
             @Schema(description = "평균단가 (USD)")
             BigDecimal avgPrice,       // avg_unpr3: 평균단가 (USD)
             @Schema(description = "현재가 (USD)")
@@ -63,7 +63,7 @@ public record PortfolioSummaryResponse(
     public static PortfolioSummaryResponse from(PresentBalanceResult balance) {
         List<PositionDto> positions = balance.items().stream()
                 .map(item -> new PositionDto(
-                        item.ticker(), item.holdings(), item.avgPrice(), item.currentPrice(),
+                        item.ticker(), BigDecimal.valueOf(item.holdings()), item.avgPrice(), item.currentPrice(),
                         item.evalAmountUsd(), item.profitLossUsd(), item.profitRate(), item.exchangeCode()
                 ))
                 .toList();

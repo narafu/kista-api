@@ -54,7 +54,7 @@ class PortfolioServiceTest {
         return new CyclePositionHistoryEntry(
                 UUID.randomUUID(), StrategyTicker.SOXL,
                 new BigDecimal("1000.00"), currentPrice,
-                new BigDecimal("25.00"), 30,
+                new BigDecimal("25.00"), BigDecimal.valueOf(30),
                 Instant.now());
     }
 }

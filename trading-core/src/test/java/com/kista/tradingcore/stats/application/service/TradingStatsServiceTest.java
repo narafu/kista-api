@@ -93,7 +93,7 @@ class TradingStatsServiceTest {
     // holdings=0 스냅샷 — 자산 = usdDeposit
     private static CyclePosition depositSnapshot(UUID cycleId, String deposit, String createdAt) {
         return new CyclePosition(UUID.randomUUID(), cycleId, new BigDecimal(deposit),
-                null, null, 0, Instant.parse(createdAt), null);
+                null, null, BigDecimal.valueOf(0), Instant.parse(createdAt), null);
     }
 
     @Test
@@ -123,7 +123,7 @@ class TradingStatsServiceTest {
         // 자산 = 500 + 10 × 55.00 = 1050 → 미실현 +50
         when(cyclePositionPort.findLatestByCycleIds(Set.of(active.id()))).thenReturn(Map.of(active.id(),
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("500.00"),
-                        new BigDecimal("55.00"), new BigDecimal("50.00"), 10, Instant.now(), null)));
+                        new BigDecimal("55.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), Instant.now(), null)));
 
         StatsSummary summary = statsService.getSummary(USER_ID);
 
@@ -180,9 +180,9 @@ class TradingStatsServiceTest {
         // KST 2026-06-02 (UTC 06-01 20:00 / 06-01 20:30) 스냅샷 2건 — 최신 건만 반영
         when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("900.00"),
-                        new BigDecimal("10.00"), null, 5, Instant.parse("2026-06-01T20:00:00Z"), null),
+                        new BigDecimal("10.00"), null, BigDecimal.valueOf(5), Instant.parse("2026-06-01T20:00:00Z"), null),
                 new CyclePosition(UUID.randomUUID(), active.id(), new BigDecimal("800.00"),
-                        new BigDecimal("10.00"), null, 20, Instant.parse("2026-06-01T20:30:00Z"), null)));
+                        new BigDecimal("10.00"), null, BigDecimal.valueOf(20), Instant.parse("2026-06-01T20:30:00Z"), null)));
         EquityCurve curve = statsService.getEquityCurve(
                 USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
 

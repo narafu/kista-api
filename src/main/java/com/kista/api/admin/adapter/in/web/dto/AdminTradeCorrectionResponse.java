@@ -18,7 +18,7 @@ public record AdminTradeCorrectionResponse(
         @Schema(description = "처리된 체결 건수")
         int processedCount,
         @Schema(description = "보정 후 최종 보유 수량")
-        int finalHoldings,
+        BigDecimal finalHoldings,
         @Schema(description = "보정 후 최종 평단가")
         BigDecimal finalAvgPrice,
         @Schema(description = "보정 후 최종 예수금 (USD)")

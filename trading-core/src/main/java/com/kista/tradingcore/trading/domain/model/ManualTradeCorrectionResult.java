@@ -12,7 +12,7 @@ public record ManualTradeCorrectionResult(
         UUID accountId,
         UUID strategyId,
         int processedCount,
-        int finalHoldings,
+        BigDecimal finalHoldings,
         BigDecimal finalAvgPrice,
         BigDecimal finalUsdDeposit,
         StrategyStatus strategyStatus,

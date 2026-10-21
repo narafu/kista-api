@@ -72,7 +72,7 @@ class InvestmentPointsQueryServiceTest {
 
     private static CyclePosition depositSnapshot(UUID cycleId, String deposit, String createdAt) {
         return new CyclePosition(UUID.randomUUID(), cycleId, new BigDecimal(deposit),
-                null, null, 0, Instant.parse(createdAt), null);
+                null, null, BigDecimal.valueOf(0), Instant.parse(createdAt), null);
     }
 
     @Test

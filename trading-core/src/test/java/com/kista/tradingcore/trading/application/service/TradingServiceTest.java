@@ -131,11 +131,11 @@ class TradingServiceTest {
 
     // CyclePosition 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
     static final CyclePosition NORMAL_HISTORY = new CyclePosition(
-            null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null);
+            null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
     static final CyclePosition FRESH_HISTORY = new CyclePosition(
-            null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), null, null, 0, null, null);
+            null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), null, null, BigDecimal.valueOf(0), null, null);
     static final CyclePosition LOW_HISTORY = new CyclePosition(
-            null, STRATEGY_CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 5, null, null);
+            null, STRATEGY_CYCLE.id(), new BigDecimal("10.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), BigDecimal.valueOf(5), null, null);
 
     static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(ACCOUNT.userId());
 
@@ -428,7 +428,7 @@ class TradingServiceTest {
 
         // 이력: holdings=1, avgPrice=체결가, closingPrice=종가 저장 (버그 #2 수정 검증)
         verify(cycleHistoryPort).save(argThat(h ->
-                h.holdings() == 1
+                h.holdings().compareTo(BigDecimal.valueOf(1)) == 0
                 && h.avgPrice() != null && h.avgPrice().compareTo(executionPrice) == 0
                 && h.closingPrice() != null && h.closingPrice().compareTo(closingPrice) == 0));
         // 알림: 보유 1주 (pre-trade 0주 아님) (버그 #1 수정 검증)
@@ -675,13 +675,13 @@ class TradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition vrHistory = new CyclePosition(null, vrCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
                 vrCycle.id(), new BigDecimal("1000.00"), PRICE);
         CyclePosition infiniteHistory = new CyclePosition(null, infiniteCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         CyclePosition privacyHistory = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
@@ -748,7 +748,7 @@ class TradingServiceTest {
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition vrHistory = new CyclePosition(null, vrCycle.id(), new BigDecimal("1000.00"),
-                new BigDecimal("100.00"), new BigDecimal("100.00"), 10, null, null);
+                new BigDecimal("100.00"), new BigDecimal("100.00"), BigDecimal.valueOf(10), null, null);
         CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
                 vrCycle.id(), new BigDecimal("1000.00"), new BigDecimal("100.00"));
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
@@ -1178,7 +1178,7 @@ class TradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
         Order buy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
@@ -1569,7 +1569,7 @@ class TradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
@@ -1601,7 +1601,7 @@ class TradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
@@ -1638,7 +1638,7 @@ class TradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
 
@@ -1665,7 +1665,7 @@ class TradingServiceTest {
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
                 new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
-                PRICE, new BigDecimal("20.00"), 10, null, null);
+                PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
 
@@ -1738,7 +1738,7 @@ class TradingServiceTest {
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
-                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         Order existingFirst = placedOrder(ACCOUNT, STRATEGY_CYCLE);
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
@@ -1820,7 +1820,7 @@ class TradingServiceTest {
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
-                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), 10, null, null);
+                null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE), StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
@@ -2013,7 +2013,7 @@ class TradingServiceTest {
         // VR 잔고 이력 — holdings=5, usdDeposit=$5000 (live 잔고 검증 통과용)
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
-                new BigDecimal("20.00"), 5, null, null);
+                new BigDecimal("20.00"), BigDecimal.valueOf(5), null, null);
         CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
                 vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"));
 
@@ -2337,7 +2337,7 @@ class TradingServiceTest {
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(pendingStrategy.id())).thenReturn(Optional.of(new CyclePosition(
-                null, pendingCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), 10, null, null)));
+                null, pendingCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"), new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null)));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
 
         service.resumeCloseReport(List.of(reported, pending, idle), PAST_DST);
@@ -2365,7 +2365,7 @@ class TradingServiceTest {
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(new CyclePosition(
-                null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, 10, null, null)));
+                null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of(
                 new Execution(today, StrategyTicker.SOXL, OrderDirection.BUY, 2, PRICE, PRICE.multiply(BigDecimal.TWO), "ORD-F")));
 
@@ -2387,7 +2387,7 @@ class TradingServiceTest {
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.TQQQ, PRICE));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(new CyclePosition(
-                null, vrCycle.id(), new BigDecimal("1000.00"), PRICE, PRICE, 10, null, null)));
+                null, vrCycle.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
 
         service.resumeCloseReport(List.of(new BatchContext(vr, vrCycle, ACCOUNT, USER)), PAST_DST);

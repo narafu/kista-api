@@ -95,10 +95,10 @@ class VrStrategyLifecycleTest {
         StrategyCycle latestCycle = new StrategyCycle(
                 cycleId, strategyId, versionId, new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
-                new BigDecimal("1000"), null, null, 0, null, null);
+                new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
         // 최신 포지션 pool(282.83)은 개장 pool(1000)과 달라야 currentPool이 개장값 재사용이 아님을 검증할 수 있다
         CyclePosition latestPosition = new CyclePosition(UUID.randomUUID(), cycleId,
-                new BigDecimal("282.83"), new BigDecimal("71.17"), null, 1, null, null);
+                new BigDecimal("282.83"), new BigDecimal("71.17"), null, BigDecimal.valueOf(1), null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
         // 총 시작금액 1600과 개장 USD pool 1000은 분리된다. poolLimit은 1000 × 0.50 = 500.00이다.
@@ -128,7 +128,7 @@ class VrStrategyLifecycleTest {
         StrategyCycle latestCycle = new StrategyCycle(
                 cycleId, strategyId, versionId, new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
-                new BigDecimal("1000"), null, null, 0, null, null);
+                new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
         StrategyVrDetail vrDetail = new StrategyVrDetail(versionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(

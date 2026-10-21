@@ -146,7 +146,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         if (withdrawShares < 0) {
             throw new IllegalArgumentException("인출 주식 수(withdrawShares)는 0 이상이어야 합니다");
         }
-        if (withdrawShares > latestPosition.holdings()) {
+        if (withdrawShares > latestPosition.toBalance().wholeShares()) {
             throw new IllegalArgumentException(
                     "인출 주식 수(withdrawShares)는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다");
         }
@@ -159,7 +159,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
                     "인출 예수금(withdrawDeposit)은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다");
         }
 
-        int holdingsAfterWithdrawal = latestPosition.holdings() - withdrawShares;
+        int holdingsAfterWithdrawal = latestPosition.toBalance().wholeShares() - withdrawShares; // VR은 주식 — 정수 수량
         int newHoldings = holdingsAfterWithdrawal + injectShares;
         BigDecimal newAvgPrice;
         if (injectShares > 0) {

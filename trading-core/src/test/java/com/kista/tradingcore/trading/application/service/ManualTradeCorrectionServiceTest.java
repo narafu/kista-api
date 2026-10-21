@@ -77,7 +77,7 @@ class ManualTradeCorrectionServiceTest {
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
                 null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
-                new BigDecimal("266.65"), new BigDecimal("223.41"), 2, Instant.now(), null);
+                new BigDecimal("266.65"), new BigDecimal("223.41"), BigDecimal.valueOf(2), Instant.now(), null);
         ManualTradeCorrectionCommand command = new ManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new ManualTradeCorrectionCommand.Fill(
@@ -115,7 +115,7 @@ class ManualTradeCorrectionServiceTest {
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
                 null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
-                new BigDecimal("266.65"), new BigDecimal("223.41"), 2, Instant.now(), null);
+                new BigDecimal("266.65"), new BigDecimal("223.41"), BigDecimal.valueOf(2), Instant.now(), null);
         ManualTradeCorrectionCommand command = new ManualTradeCorrectionCommand(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID,
                 List.of(new ManualTradeCorrectionCommand.Fill(
@@ -221,7 +221,7 @@ class ManualTradeCorrectionServiceTest {
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
                 null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
         CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
-                new BigDecimal("266.65"), new BigDecimal("223.41"), 2, Instant.now(), null);
+                new BigDecimal("266.65"), new BigDecimal("223.41"), BigDecimal.valueOf(2), Instant.now(), null);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);

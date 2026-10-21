@@ -3,6 +3,7 @@ package com.kista.shared.contract;
 import com.kista.shared.contract.privacy.FidaOrderRequest;
 import com.kista.shared.contract.privacy.PrivacyOrderAddRequest;
 import com.kista.shared.contract.stats.InvestmentPointsResponse;
+import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -62,6 +63,15 @@ class ContractWireFormatTest {
         assertThat(fida.isBuyQuantityValid()).isFalse();
         assertThat(add.isBuyQuantityValid()).isFalse();
         assertThat(new PrivacyOrderAddRequest(OrderDirection.SELL, OrderType.LOC, BigDecimal.ONE, null).isBuyQuantityValid()).isTrue();
+    }
+
+    @Test
+    @DisplayName("PortfolioCurrentResponse — 정수 보유수량은 \"holdings\":5로 직렬화된다")
+    void portfolio_current_holdings_serializes_as_integer() {
+        PortfolioCurrentResponse response = new PortfolioCurrentResponse(
+                StrategyTicker.SOXL, new BigDecimal("5"), BigDecimal.TEN, BigDecimal.ONE, BigDecimal.ONE);
+
+        assertThat(objectMapper.writeValueAsString(response)).contains("\"holdings\":5,");
     }
 
     @Test

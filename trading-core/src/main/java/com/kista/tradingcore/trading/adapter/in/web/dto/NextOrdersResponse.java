@@ -41,7 +41,7 @@ public record NextOrdersResponse(
             @Schema(description = "거래 종목")
             StrategyTicker ticker,           // 거래 종목
             @Schema(description = "보유 수량")
-            int holdings,            // 보유 수량
+            BigDecimal holdings,         // 보유 수량
             @Schema(description = "평균 매입가 (0회차: 전일종가)")
             BigDecimal averagePrice, // 평균 매입가 (0회차: 전일종가)
             @Schema(description = "통합주문가능금액")
@@ -62,7 +62,7 @@ public record NextOrdersResponse(
         public static PositionSnapshot from(InfinitePosition p) {
             return new PositionSnapshot(
                     p.ticker(),
-                    p.holdings(),
+                    BigDecimal.valueOf(p.holdings()),
                     p.averagePrice(),
                     p.usdDeposit(),
                     p.priceOffsetRate(),

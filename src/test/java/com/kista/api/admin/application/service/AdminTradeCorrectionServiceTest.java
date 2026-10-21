@@ -47,7 +47,7 @@ class AdminTradeCorrectionServiceTest {
                         LocalDate.of(2026, 7, 1), OrderDirection.SELL, 2,
                         new BigDecimal("267.37"), "MANUAL-1", "manual correction")));
         TradeCorrectionResponse result = new TradeCorrectionResponse(
-                USER_ID, ACCOUNT_ID, STRATEGY_ID, 1, 0,
+                USER_ID, ACCOUNT_ID, STRATEGY_ID, 1, BigDecimal.ZERO,
                 new BigDecimal("266.65"), new BigDecimal("7200.05"),
                 StrategyStatus.PAUSED, true, LocalDate.of(2026, 7, 1));
         when(tradingCommandPort.correctManualFills(any())).thenReturn(result);

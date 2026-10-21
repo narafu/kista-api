@@ -1,10 +1,10 @@
 package com.kista.tradingcore.trading.domain.model;
 
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.Quantities;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.StrategyTicker;
 

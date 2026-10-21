@@ -60,6 +60,6 @@ class MockSimulationDataAdapter implements MockSimulationDataPort {
     }
 
     private static PositionView toPositionView(CyclePosition position) {
-        return new PositionView(position.holdings(), position.avgPrice(), position.usdDeposit());
+        return new PositionView(position.holdings().intValueExact(), position.avgPrice(), position.usdDeposit());
     }
 }

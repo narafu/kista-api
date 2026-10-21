@@ -195,7 +195,7 @@ class StrategyService implements StrategyUseCase {
         CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 
-        if (latest.holdings() != 0) {
+        if (latest.holdings().signum() != 0) {
             throw new IllegalArgumentException("보유 수량이 있는 사이클은 시드를 수정할 수 없습니다");
         }
 
@@ -335,10 +335,10 @@ class StrategyService implements StrategyUseCase {
         // VR·DCA는 currentRound 없음 — INFINITE·PRIVACY만 계산
         Double currentRound = strategy.isVr() || strategy.isDca() ? null :
                 latestPosition.map(pos -> InfinitePosition.calcCurrentRound(
-                        pos.avgPrice(), pos.holdings(), pos.usdDeposit(),
+                        pos.avgPrice(), pos.toBalance().wholeShares(), pos.usdDeposit(),
                         divisionCount == null ? 0 : divisionCount)).orElse(null);
 
-        Integer currentHoldings = latestPosition.map(CyclePosition::holdings).orElse(null);
+        Integer currentHoldings = latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
 
         return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary);
     }

@@ -86,4 +86,20 @@ class CycleCloserTest {
         assertThat(result.ended()).isFalse();
         assertThat(result.endDate()).isNull();
     }
+
+    @Test
+    @DisplayName("holdings 0.00000000도 종료 대상이다")
+    void closeIfExhausted_scaledZeroHoldings_endsCycle() {
+        Strategy strategy = activeStrategy();
+        StrategyCycle cycle = currentCycle();
+        AccountBalance balance = new AccountBalance(new BigDecimal("0.00000000"), null, BigDecimal.valueOf(500));
+        LocalDate tradeDate = LocalDate.of(2026, 7, 17);
+        when(strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED))).thenReturn(strategy.withStatus(StrategyStatus.PAUSED));
+
+        CycleCloser.CycleEndResult result = CycleCloser.closeIfExhausted(
+                strategyCyclePort, strategyPort, strategy, cycle, balance, tradeDate);
+
+        assertThat(result.ended()).isTrue();
+        verify(strategyCyclePort).markEnded(cycle.id(), balance.usdDeposit(), tradeDate);
+    }
 }

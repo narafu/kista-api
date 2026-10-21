@@ -57,7 +57,7 @@ class CycleSnapshotCreatorTest {
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("1600.00");
         assertThat(cycleCaptor.getValue().startAmount().scale()).isEqualTo(2);
         assertThat(positionCaptor.getValue().usdDeposit()).isEqualByComparingTo("1000.00");
-        assertThat(positionCaptor.getValue().holdings()).isEqualTo(5);
+        assertThat(positionCaptor.getValue().holdings()).isEqualTo(new BigDecimal("5"));
     }
 
     @Test
@@ -85,7 +85,7 @@ class CycleSnapshotCreatorTest {
     void reconfigureVrCycle_injectionClosesOldCycleBeforeCapitalAndOpensNewCycleAfterCapital() {
         CyclePosition preAdjustment = new CyclePosition(
                 UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("500.00"),
-                new BigDecimal("95.00"), new BigDecimal("50.00"), 10, null, null);
+                new BigDecimal("95.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), null, null);
         AccountBalance postAdjustment = new AccountBalance(
                 12, new BigDecimal("51.6667"), new BigDecimal("700.00"));
 
@@ -99,7 +99,7 @@ class CycleSnapshotCreatorTest {
     void reconfigureVrCycle_withdrawalClosesOldCycleBeforeCapitalAndOpensNewCycleAfterCapital() {
         CyclePosition preAdjustment = new CyclePosition(
                 UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("500.00"),
-                new BigDecimal("95.00"), new BigDecimal("50.00"), 10, null, null);
+                new BigDecimal("95.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), null, null);
         AccountBalance postAdjustment = new AccountBalance(
                 6, new BigDecimal("50.00"), new BigDecimal("350.00"));
 

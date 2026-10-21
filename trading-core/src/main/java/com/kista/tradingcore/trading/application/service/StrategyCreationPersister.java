@@ -69,7 +69,7 @@ class StrategyCreationPersister {
 
         CyclePosition initialPosition = initialHoldings > 0
                 ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(
-                        cycle.id(), normalizedInitialUsdDeposit, initialHoldings, initialAvgPrice, marketPrice))
+                        cycle.id(), normalizedInitialUsdDeposit, BigDecimal.valueOf(initialHoldings), initialAvgPrice, marketPrice))
                 : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
 
         StrategyCycleVrDetail cycleVr = null;

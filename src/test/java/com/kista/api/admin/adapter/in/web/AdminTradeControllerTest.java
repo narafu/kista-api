@@ -224,7 +224,7 @@ class AdminTradeControllerTest {
                         UUID.fromString("00000000-0000-0000-0000-000000000020"),
                         UUID.fromString("00000000-0000-0000-0000-000000000030"),
                         1,
-                        0,
+                        java.math.BigDecimal.ZERO,
                         null,
                         new java.math.BigDecimal("7200.05"),
                         StrategyStatus.PAUSED,

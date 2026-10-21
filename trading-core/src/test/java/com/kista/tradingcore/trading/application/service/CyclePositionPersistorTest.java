@@ -105,11 +105,11 @@ class CyclePositionPersistorTest {
         StrategyCycle cycle = cycle(strategy.id());
         // 이전 포지션: holdings=5 (prevHadHoldings=true)
         CyclePosition prevPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), 5, Instant.now(), null);
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), BigDecimal.valueOf(5), Instant.now(), null);
         when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of(prevPos));
         // 포지션 저장 stub
         CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1050.00"), PRICE, null, 0, Instant.now(), null);
+                new BigDecimal("1050.00"), PRICE, null, BigDecimal.valueOf(0), Instant.now(), null);
         when(cyclePositionPort.save(any())).thenReturn(savedPos);
 
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1050.00"));
@@ -130,7 +130,7 @@ class CyclePositionPersistorTest {
         Strategy strategy = vrStrategy();
         StrategyCycle cycle = cycle(strategy.id());
         CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), 10, Instant.now(), null);
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), BigDecimal.valueOf(10), Instant.now(), null);
         when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of(savedPos));
         when(cyclePositionPort.save(any())).thenReturn(savedPos);
 
@@ -149,7 +149,7 @@ class CyclePositionPersistorTest {
         Strategy strategy = vrStrategy();
         StrategyCycle cycle = cycle(strategy.id());
         CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), 10, Instant.now(), null);
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), BigDecimal.valueOf(10), Instant.now(), null);
         when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of(savedPos));
         when(cyclePositionPort.save(any())).thenReturn(savedPos);
         AccountBalance balance = new AccountBalance(10, new BigDecimal("45.00"), new BigDecimal("1000.00"));
@@ -171,7 +171,7 @@ class CyclePositionPersistorTest {
         StrategyCycle cycle = cycle(strategy.id());
         // 이전 포지션: holdings=5
         CyclePosition prevPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), 5, Instant.now(), null);
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), BigDecimal.valueOf(5), Instant.now(), null);
         when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of(prevPos));
         // INFINITE 리버스모드 — empty 반환으로 기본값 사용
         when(cyclePositionInfiniteDetailPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of());
@@ -179,7 +179,7 @@ class CyclePositionPersistorTest {
                 .thenReturn(java.util.Optional.empty());
 
         CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1050.00"), PRICE, null, 0, Instant.now(), null);
+                new BigDecimal("1050.00"), PRICE, null, BigDecimal.valueOf(0), Instant.now(), null);
         when(cyclePositionPort.save(any())).thenReturn(savedPos);
 
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1050.00"));
@@ -209,7 +209,7 @@ class CyclePositionPersistorTest {
                 .thenReturn(java.util.Optional.empty());
 
         CyclePosition savedPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
-                new BigDecimal("1000.00"), PRICE, null, 0, Instant.now(), null);
+                new BigDecimal("1000.00"), PRICE, null, BigDecimal.valueOf(0), Instant.now(), null);
         when(cyclePositionPort.save(any())).thenReturn(savedPos);
 
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1000.00"));

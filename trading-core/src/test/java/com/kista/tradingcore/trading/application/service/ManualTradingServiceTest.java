@@ -94,7 +94,7 @@ class ManualTradingServiceTest {
     // DB 잔고 이력 — cycle_position 기반 (TradingBalanceLoader가 읽음)
     static final CyclePosition HISTORY = new CyclePosition(
             null, CYCLE.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"),
-            new BigDecimal("20.00"), 10, null, null
+            new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null
     );
 
     AccountBudgetLock budgetLock = spy(new AccountBudgetLock()); // 실제 락 + 구간 추적
@@ -429,7 +429,7 @@ class ManualTradingServiceTest {
         when(strategyCyclePort.requireLatestByStrategyId(privacy.id())).thenReturn(privacyCycle);
         when(cyclePositionPort.findLatestOneByStrategyId(privacy.id())).thenReturn(Optional.of(
                 new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"), new BigDecimal("22.00"),
-                        new BigDecimal("20.00"), 10, null, null)));
+                        new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null)));
         when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
         when(privacyBaseGuard.usable(base)).thenReturn(false);
 
@@ -453,7 +453,7 @@ class ManualTradingServiceTest {
         // VR 잔고 이력 — holdings=5
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
-                new BigDecimal("20.00"), 5, null, null);
+                new BigDecimal("20.00"), BigDecimal.valueOf(5), null, null);
         CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
                 vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"));
 

@@ -75,7 +75,7 @@ class TelegramBotServiceTest {
     @Test
     void status_command_returns_portfolio_info() {
         PortfolioCurrentResponse snap = new PortfolioCurrentResponse(
-                StrategyTicker.SOXL, 100, new BigDecimal("25.0000"),
+                StrategyTicker.SOXL, BigDecimal.valueOf(100), new BigDecimal("25.0000"),
                 new BigDecimal("1000.00"), new BigDecimal("26.00"));
         when(portfolioQueryPort.getCurrent(any())).thenReturn(snap);
 

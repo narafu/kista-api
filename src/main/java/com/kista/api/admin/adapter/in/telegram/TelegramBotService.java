@@ -128,11 +128,11 @@ class TelegramBotService {
                         PortfolioCurrentResponse s = portfolioQueryPort.getCurrent(userId);
                         // closingPrice가 null이면 평가액 0으로 처리
                         double marketValue = s.closingPrice() != null
-                                ? s.closingPrice().doubleValue() * s.holdings() : 0.0;
+                                ? s.closingPrice().multiply(s.holdings()).doubleValue() : 0.0;
                         double totalAsset = marketValue + (s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0);
                         double avgPrice = s.avgPrice() != null ? s.avgPrice().doubleValue() : 0.0;
-                        return "<b>포트폴리오 현황</b>%n보유: %d주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f".formatted(
-                                s.holdings(), avgPrice, marketValue,
+                        return "<b>포트폴리오 현황</b>%n보유: %s주 @ $%.4f%n평가액: $%.2f%n예수금: $%.2f%n총자산: $%.2f".formatted(
+                                s.holdings().toPlainString(), avgPrice, marketValue,
                                 s.usdDeposit() != null ? s.usdDeposit().doubleValue() : 0.0, totalAsset);
                     } catch (NoSuchElementException _) {
                         return "포트폴리오 데이터가 없습니다.";

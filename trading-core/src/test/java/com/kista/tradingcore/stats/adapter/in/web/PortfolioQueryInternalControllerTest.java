@@ -52,7 +52,7 @@ class PortfolioQueryInternalControllerTest {
         CyclePositionHistoryEntry entry = new CyclePositionHistoryEntry(
                 UUID.randomUUID(), StrategyTicker.TQQQ,
                 new BigDecimal("500.00"), new BigDecimal("105.00"), new BigDecimal("100.50"),
-                10, Instant.now());
+                BigDecimal.valueOf(10), Instant.now());
         given(portfolioUseCase.getCurrent(USER_ID)).willReturn(entry);
 
         mockMvc.perform(get("/api/internal/trading/stats/portfolio/current")

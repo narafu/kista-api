@@ -52,7 +52,7 @@ class PortfolioQueryHttpAdapterTest {
         PortfolioCurrentResponse current = adapter.getCurrent(userId);
 
         assertThat(current.ticker()).isEqualTo(StrategyTicker.TQQQ);
-        assertThat(current.holdings()).isEqualTo(10);
+        assertThat(current.holdings()).isEqualByComparingTo("10");
         assertThat(current.avgPrice()).isEqualByComparingTo("100.50");
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).contains("/api/internal/trading/stats/portfolio/current");

@@ -133,7 +133,7 @@ class CycleRotationServiceTest {
         StrategyCycle current = currentCycle(strategy.id(), maintainDeposit);
 
         // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
-        CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, 0, null, null);
+        CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, BigDecimal.valueOf(0), null, null);
         when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(lastPosition));
 
