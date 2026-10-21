@@ -19,9 +19,11 @@ import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.DcaSchedule;
 import com.kista.tradingcore.trading.application.port.output.CryptoFearGreedIndexPort;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Order;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +43,7 @@ import java.util.Set;
 import java.util.UUID;
 
 // 코인 DCA 회차 실행 — 한 계좌의 이번 틱 대상 전략×규칙을 decideRule 판정·시장가 주문·이력 기록까지 처리
-// ponytail: 최소 적응 단계 — 원장은 아직 지갑 잔고(Task 5에서 cycle_position 원장으로 전환)
+// 원장 = 최신 cycle_position(체결 동기화가 갱신), 매도 가용 = min(원장 − 같은 틱 앞 규칙 매도분, 지갑 매도 가능 수량)
 // HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder의 개별 트랜잭션. 계좌 단위 예외는 호출부(Task 8)가 격리
 @Slf4j
 @Component
@@ -62,6 +64,7 @@ class CryptoDcaRoundExecutor {
     private static final class Wallet {
         BigDecimal krw;                         // 원화 가용
         final Map<StrategyTicker, BigDecimal> held = new EnumMap<>(StrategyTicker.class); // 코인별 매도 가능 수량
+        final Map<UUID, BigDecimal> ledgerSold = new HashMap<>(); // 사이클별 같은 틱 앞 규칙 매도 수량 — 규칙 합계가 원장을 넘지 않게
     }
 
     private final CryptoFearGreedIndexPort fearGreedPort;
@@ -69,6 +72,7 @@ class CryptoDcaRoundExecutor {
     private final DcaExecutionPort dcaExecutionPort;
     private final DcaExecutionRecorder recorder;
     private final DcaCycleOrderStrategy dcaStrategy; // 규칙 판정 커널
+    private final CyclePositionPort cyclePositionPort; // 원장(최신 cycle_position)
 
     void executeAccount(CryptoExchangePort exchange, List<BatchContext> accountContexts,
                         Map<UUID, DcaStrategyConfig> configsByStrategyId, LocalDateTime nowKst) {
@@ -83,6 +87,9 @@ class CryptoDcaRoundExecutor {
         try {
             BrokerAccountRef ref = targets.get(0).ctx().account().brokerRef();
             CryptoBalance balance = exchange.getBalance(ref);
+            // 원장 — 사이클별 최신 cycle_position 1회 배치 조회. 행이 없으면(초기 보유 없는 첫 체결 전) 0
+            Map<UUID, CyclePosition> ledgers = cyclePositionPort.findLatestByCycleIds(
+                    targets.stream().map(t -> t.ctx().currentCycle().id()).distinct().toList());
             Map<StrategyTicker, BigDecimal> prices = exchange.getCurrentPrices(
                     targets.stream().map(t -> t.ctx().strategy().ticker()).distinct().toList());
             Wallet wallet = new Wallet();
@@ -99,17 +106,19 @@ class CryptoDcaRoundExecutor {
                     continue;
                 }
                 List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst, today);
-                // 원장 — 최소 적응 단계는 지갑 보유(total·평단). 미보유면 0
-                var h = balance.holdings().get(ticker);
-                AccountBalance ledger = h == null ? new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO)
-                        : new AccountBalance(h.total(), h.avgBuyPrice(), BigDecimal.ZERO);
+                UUID cycleId = ctx.currentCycle().id();
+                CyclePosition position = ledgers.get(cycleId);
+                AccountBalance ledger = position == null ? new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO) : position.toBalance();
+                // 매도 가용 — 원장에서 같은 틱 앞 규칙 매도분을 빼고 지갑 매도 가능 수량(로컬 차감)으로 상한
+                BigDecimal sellable = ledger.holdings().subtract(wallet.ledgerSold.getOrDefault(cycleId, BigDecimal.ZERO))
+                        .min(wallet.held.getOrDefault(ticker, BigDecimal.ZERO)).max(BigDecimal.ZERO);
                 BigDecimal fearGreed = null;
                 if (rule.hasIndicator(DcaIndicator.FEAR_GREED)) {
                     if (fearGreedMemo.isEmpty()) fearGreedMemo.add(fearGreedPort.latest());
                     fearGreed = fearGreedMemo.get(0).orElse(null);
                 }
                 DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule, Market.CRYPTO_KRW,
-                        closes, ledger, wallet.held.getOrDefault(ticker, BigDecimal.ZERO), fearGreed, price, wallet.krw));
+                        closes, ledger, sellable, fearGreed, price, wallet.krw));
                 if (decision instanceof DcaRuleDecision.Skipped s) {
                     recorder.recordSkipped(ctx, today, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
                     continue;
@@ -199,7 +208,10 @@ class CryptoDcaRoundExecutor {
             }
         }
         if (buy) wallet.krw = wallet.krw.subtract(amount.multiply(DcaRule.CRYPTO_FEE_FACTOR));
-        else wallet.held.merge(ticker, volume, BigDecimal::subtract);
+        else {
+            wallet.held.merge(ticker, volume, BigDecimal::subtract);
+            wallet.ledgerSold.merge(ctx.currentCycle().id(), volume, BigDecimal::add);
+        }
         return null;
     }
 

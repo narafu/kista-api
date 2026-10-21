@@ -25,7 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 // 코인 주문 동기화 — 신규 실행 전에 SUBMITTING(접수 결과 불명)을 identifier로 복구하고 PLACED의 체결을 확정. 거래소 확인 전 재주문 금지(중복 매수 방지)
-// HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder의 개별 트랜잭션
+// HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder·ledgerRecorder의 개별 트랜잭션
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -33,6 +33,7 @@ class CryptoOrderSynchronizer {
 
     private final OrderPort orderPort;
     private final DcaExecutionRecorder recorder;
+    private final CryptoLedgerRecorder ledgerRecorder; // 체결 확정 → 원장·주문 FILLED 기록(멱등)
     private final ApplicationEventPublisher eventPublisher;
 
     // accountContexts: 한 계좌의 전략 컨텍스트들
@@ -99,7 +100,7 @@ class CryptoOrderSynchronizer {
         return order.orderLeg().substring("DCA_".length());
     }
 
-    // 체결 수량이 있으면 FILLED 확정(+이벤트), 무체결 취소면 CANCELLED, 그 외(WAIT/WATCH)는 유지
+    // 체결 수량이 있으면 원장 반영·FILLED 확정(새 증분일 때만 이벤트), 무체결 취소면 CANCELLED, 그 외(WAIT/WATCH)는 유지
     private void settle(BatchContext ctx, Order order, CryptoOrderResult r) {
         boolean closed = r.state() == CryptoOrderResult.State.DONE || r.state() == CryptoOrderResult.State.CANCEL;
         if (!closed) return;
@@ -109,7 +110,7 @@ class CryptoOrderSynchronizer {
                 log.warn("체결 수량은 있으나 평균가 없음 — 건너뜀 orderId={}", order.id());
                 return;
             }
-            orderPort.markFilled(order.id(), volume, r.avgPrice(), OrderStatus.FILLED);
+            if (!ledgerRecorder.recordFill(ctx, order, volume, r.avgPrice())) return; // 이미 반영된 체결 — 알림 중복 방지
             eventPublisher.publishEvent(new CryptoOrderFilledEvent(ctx.account().userId(), ctx.account().id(), ctx.strategy().id(),
                     ctx.account().nickname(), order.ticker(), order.direction(), volume, r.avgPrice(),
                     volume.multiply(r.avgPrice()).setScale(0, RoundingMode.HALF_UP)));

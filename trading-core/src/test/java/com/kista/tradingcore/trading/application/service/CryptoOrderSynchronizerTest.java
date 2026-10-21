@@ -58,7 +58,8 @@ class CryptoOrderSynchronizerTest {
     OrderPort orderPort = mock(OrderPort.class);
     DcaExecutionRecorder recorder = mock(DcaExecutionRecorder.class);
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
-    CryptoOrderSynchronizer sync = new CryptoOrderSynchronizer(orderPort, recorder, publisher);
+    CryptoLedgerRecorder ledgerRecorder = mock(CryptoLedgerRecorder.class);
+    CryptoOrderSynchronizer sync = new CryptoOrderSynchronizer(orderPort, recorder, ledgerRecorder, publisher);
 
     BatchContext ctx;
     Map<UUID, DcaStrategyConfig> configs;
@@ -102,7 +103,7 @@ class CryptoOrderSynchronizerTest {
         io.verify(orderPort).markPlaced(orderId, "upbit-uuid");
         verify(exchange, never()).buyMarketByAmount(any(), any(), any(), any());
         verify(exchange, never()).sellMarketByVolume(any(), any(), any(), any());
-        verify(orderPort, never()).markFilled(any(), any(), any(), any());
+        verify(ledgerRecorder, never()).recordFill(any(), any(), any(), any());
     }
 
     @Test
@@ -111,7 +112,7 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
         run(o, 13);
         verify(orderPort).markPlaced(orderId, "upbit-uuid");
-        verify(orderPort).markFilled(orderId, new BigDecimal("0.0001"), new BigDecimal("150000000"), OrderStatus.FILLED);
+        verify(ledgerRecorder).recordFill(ctx, o, new BigDecimal("0.0001"), new BigDecimal("150000000"));
     }
 
     @Test
@@ -164,7 +165,7 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
         when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", null)));
         run(o, 13);
-        verify(orderPort, never()).markFilled(any(), any(), any(), any());
+        verify(ledgerRecorder, never()).recordFill(any(), any(), any(), any());
     }
 
     @Test
@@ -181,8 +182,9 @@ class CryptoOrderSynchronizerTest {
     void placedFilledIsMarkedAndEventPublished() {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
         when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.CANCEL, "0.0001", "150000000")));
+        when(ledgerRecorder.recordFill(any(), any(), any(), any())).thenReturn(true);
         run(o, 13);
-        verify(orderPort).markFilled(orderId, new BigDecimal("0.0001"), new BigDecimal("150000000"), OrderStatus.FILLED);
+        verify(ledgerRecorder).recordFill(ctx, o, new BigDecimal("0.0001"), new BigDecimal("150000000"));
         ArgumentCaptor<CryptoOrderFilledEvent> cap = ArgumentCaptor.forClass(CryptoOrderFilledEvent.class);
         verify(publisher).publishEvent(cap.capture());
         assertThat(cap.getValue().amountKrw()).isEqualByComparingTo("15000");
@@ -204,7 +206,16 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         run(o, 13);
         verify(orderPort, never()).markCancelled(any());
-        verify(orderPort, never()).markFilled(any(), any(), any(), any());
+        verify(ledgerRecorder, never()).recordFill(any(), any(), any(), any());
+    }
+
+    @Test
+    void 이미_반영된_체결이면_이벤트를_다시_내지_않는다() {
+        Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
+        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
+        when(ledgerRecorder.recordFill(any(), any(), any(), any())).thenReturn(false); // 증분 없음(재처리)
+        run(o, 13);
+        verify(publisher, never()).publishEvent(any(Object.class));
     }
 
     @Test

@@ -24,9 +24,15 @@ import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.CryptoFearGreedIndexPort;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.matching.domain.model.DcaCondition;
+import com.kista.shared.kernel.DcaIndicator;
+import com.kista.shared.kernel.DcaOperator;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -69,7 +75,8 @@ class CryptoDcaRoundExecutorTest {
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
     DcaExecutionRecorder recorder = mock(DcaExecutionRecorder.class);
     CryptoFearGreedIndexPort fearGreed = mock(CryptoFearGreedIndexPort.class);
-    CryptoDcaRoundExecutor executor = new CryptoDcaRoundExecutor(fearGreed, orderPort, executionPort, recorder, new DcaCycleOrderStrategy());
+    CyclePositionPort cyclePositionPort = mock(CyclePositionPort.class);
+    CryptoDcaRoundExecutor executor = new CryptoDcaRoundExecutor(fearGreed, orderPort, executionPort, recorder, new DcaCycleOrderStrategy(), cyclePositionPort);
 
     TradingAccount account;
 
@@ -97,9 +104,23 @@ class CryptoDcaRoundExecutorTest {
         return new CryptoOrderResult("uuid-1", identifier, CryptoOrderResult.State.WAIT, BigDecimal.ZERO, null, BigDecimal.ZERO);
     }
 
+    // 지갑 잔고 — 원장도 같은 보유(평단 1)로 맞춘다. 원장이 다른 케이스는 이후 ledger()로 덮는다
     void balance(String krw, String btcAvailable) {
         when(exchange.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal(krw), BigDecimal.ZERO,
                 Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(new BigDecimal(btcAvailable), BigDecimal.ZERO, new BigDecimal("1")))));
+        ledger(btcAvailable, "1");
+    }
+
+    // 모든 사이클의 최신 cycle_position(원장) stub
+    void ledger(String holdings, String avgPrice) {
+        org.mockito.Mockito.doAnswer(i -> {
+            Map<UUID, CyclePosition> m = new java.util.HashMap<>();
+            for (UUID id : i.<java.util.Collection<UUID>>getArgument(0)) {
+                m.put(id, CyclePosition.tradeSnapshot(id, new AccountBalance(new BigDecimal(holdings),
+                        avgPrice == null ? null : new BigDecimal(avgPrice), BigDecimal.ZERO), null));
+            }
+            return m;
+        }).when(cyclePositionPort).findLatestByCycleIds(any()); // doAnswer — 재stub 시 이전 answer가 null 인자로 호출되지 않게
     }
 
     BatchContext ctx(StrategyTicker ticker) {
@@ -362,7 +383,7 @@ class CryptoDcaRoundExecutorTest {
     }
 
     @Test
-    void sameTickRunsSellRulesBeforeBuyRulesAndEachOrders() {
+    void 같은틱_SELL_BUY_동시발동은_SELL먼저_각자_이력() {
         balance("100000", "1");
         String buyKey = "22222222-2222-2222-2222-222222222222";
         BatchContext c = ctx(StrategyTicker.BTC);
@@ -386,5 +407,50 @@ class CryptoDcaRoundExecutorTest {
                 TradingFixtures.cryptoDcaRule(buyKey2, OrderDirection.BUY, "20000", 13)));
         verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("20000")), anyString());
         verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
+    }
+
+    @Test
+    void 매도_가용량은_지갑이_아니라_원장_보유로_제한() {
+        balance("0", "1");
+        ledger("0.0002", "1"); // 지갑 1 BTC, 원장 0.0002
+        BatchContext c = ctx(StrategyTicker.BTC);
+        run(NOW, c, config(OrderDirection.SELL, "10000", 13));
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.0002")), anyString());
+    }
+
+    @Test
+    void 같은틱_매도규칙_합계는_원장_보유를_넘지_않는다() {
+        // 지갑은 넉넉하지만 원장 0.0005 — 앞 규칙 계획분 0.00033333을 원장 쪽에서도 빼야 둘째는 0.00016667(5,000원 이상)
+        balance("0", "1");
+        ledger("0.0005", "1");
+        String key2 = "22222222-2222-2222-2222-222222222222";
+        BatchContext c = ctx(StrategyTicker.BTC);
+        run(NOW, c, TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(KEY, OrderDirection.SELL, "10000", 13),
+                TradingFixtures.cryptoDcaRule(key2, OrderDirection.SELL, "10000", 13)));
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.00033333")), anyString());
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.00016667")), anyString());
+    }
+
+    @Test
+    void 원장_행이_없으면_0에서_시작해_매도는_NO_HOLDINGS() {
+        balance("0", "1");
+        org.mockito.Mockito.doReturn(Map.of()).when(cyclePositionPort).findLatestByCycleIds(any()); // 초기 보유 없는 크립토 DCA — 첫 체결 전
+        BatchContext c = ctx(StrategyTicker.BTC);
+        run(NOW, c, config(OrderDirection.SELL, "10000", 13));
+        verify(recorder).recordSkipped(c, TODAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", BTC_PRICE);
+        verify(exchange, never()).sellMarketByVolume(any(), any(), any(), anyString());
+    }
+
+    @Test
+    void 시나리오3_09시_매수체결후_10시_AVG_PRICE_매도는_갱신된_평단으로_판정() {
+        // 지갑 평단 200(전일 종가 100 기준 미충족)과 달리 09시 체결로 갱신된 원장 평단 90 → 종가 100 ≥ 평단 90 충족
+        when(exchange.getBalance(any())).thenReturn(new CryptoBalance(BigDecimal.ZERO, BigDecimal.ZERO,
+                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(BigDecimal.ONE, BigDecimal.ZERO, new BigDecimal("200")))));
+        ledger("1", "90");
+        BatchContext c = ctx(StrategyTicker.BTC);
+        DcaCondition aboveAvg = new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.GTE, null, BigDecimal.ZERO);
+        run(TODAY.atTime(10, 10), c, TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(KEY, OrderDirection.SELL, "10000", 10, aboveAvg)));
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), any(), anyString());
+        verify(recorder).recordOrdered(eq(c), eq(TODAY), eq(KEY), any(Order.class), eq(BTC_PRICE));
     }
 }
