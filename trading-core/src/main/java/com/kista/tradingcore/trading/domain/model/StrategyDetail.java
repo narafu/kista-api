@@ -18,7 +18,7 @@ public record StrategyDetail(
         DcaSummary dca          // DCA 전략만 non-null
 ) {
     public StrategyDetail {
-        // 코인 DCA는 cycle_position을 갱신하지 않아(초기 0 고정) 보유 수량을 싣지 않는다 — 실잔고는 crypto-portfolio
+        // 코인 DCA 원장은 소수 보유라 정수 필드에 싣지 않는다 — 소수 보유·평단은 dca.currentHoldings/avgPrice, 실잔고는 crypto-portfolio
         if (strategy.ticker().getMarket() == Market.CRYPTO_KRW) {
             currentHoldings = null;
         }

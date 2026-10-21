@@ -106,7 +106,7 @@ public class TradingCycleController {
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 
-    // DCA 설정 수정 — 새 버전 발급, 사이클 유지. 종목·방향 변경 불가
+    // DCA 설정 수정 — 새 버전 발급, 사이클 유지. 종목은 변경 불가(요청에 없음), 규칙별 방향 변경은 허용
     @Operation(summary = "DCA 설정 수정")
     @PutMapping("/api/trading-cycles/{id}/dca-config")
     public TradingCycleResponse reconfigureDca(
