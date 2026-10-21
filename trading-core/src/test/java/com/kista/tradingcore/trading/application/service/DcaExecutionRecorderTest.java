@@ -64,42 +64,42 @@ class DcaExecutionRecorderTest {
     @Test
     void publishes_skip_event_only_when_inserted() {
         when(port.insertIfAbsent(any())).thenReturn(true, false);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", null);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", null);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", null);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "판매가능수량 0주", null);
         verify(publisher, times(1)).publishEvent(any(DcaRoundSkippedEvent.class));
     }
 
     @Test
     void skip_event_carries_rule_key_direction_and_number() {
         when(port.insertIfAbsent(any())).thenReturn(true);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", null);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", null);
         org.mockito.ArgumentCaptor<DcaRoundSkippedEvent> captor = org.mockito.ArgumentCaptor.forClass(DcaRoundSkippedEvent.class);
         verify(publisher).publishEvent(captor.capture());
         assertThat(captor.getValue().ruleKey()).isEqualTo(KEY);
         assertThat(captor.getValue().direction()).isEqualTo(OrderDirection.SELL);
         assertThat(captor.getValue().ruleNumber()).isEqualTo(2); // 입력 순서 두 번째 규칙
-        verify(port).insertIfAbsent(argThat(e -> KEY.equals(e.ruleKey()) && e.tradeDate().equals(DAY)));
+        verify(port).insertIfAbsent(argThat(e -> KEY.equals(e.ruleKey()) && e.tradeDate().equals(DAY) && e.direction() == OrderDirection.SELL));
     }
 
     @Test
     void data_unavailable_also_alerts_admin_once() {
         when(port.insertIfAbsent(any())).thenReturn(true, false);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null);
         verify(publisher, times(1)).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
     void exchangeApiErrorAlsoNotifiesAdmin() {
         when(port.insertIfAbsent(any())).thenReturn(true);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", null);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", null);
         verify(publisher, times(1)).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
     void non_data_skip_does_not_alert_admin() {
         when(port.insertIfAbsent(any())).thenReturn(true);
-        recorder.recordSkipped(ctx, DAY, KEY, DcaSkipReason.BELOW_ONE_SHARE, "x", new BigDecimal("87.12"));
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.BELOW_ONE_SHARE, "x", new BigDecimal("87.12"));
         verify(publisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 }

@@ -94,5 +94,7 @@ CREATE TABLE trading.strategy_dca_condition (
 -- 5. 회차 이력을 규칙 단위로 — 1번에서 DCA 이력을 비웠으므로 NOT NULL 즉시 추가 가능.
 -- 컬럼 순서 규칙 예외: ADD COLUMN은 항상 맨 뒤(created_at 뒤)이므로 Entity 필드도 물리 순서대로 마지막에 둔다(V10과 같은 수용 예외)
 ALTER TABLE trading.dca_execution ADD COLUMN rule_key character varying(36) NOT NULL;
+-- 규칙 방향 — 규칙이 이후 편집으로 삭제돼도 이력·알림이 방향을 잃지 않도록 기록 시점 값을 저장
+ALTER TABLE trading.dca_execution ADD COLUMN direction character varying(20) NOT NULL;
 ALTER TABLE trading.dca_execution DROP CONSTRAINT uq_dca_execution_strategy_trade_date;
 ALTER TABLE trading.dca_execution ADD CONSTRAINT uq_dca_execution_strategy_rule_trade_date UNIQUE (strategy_id, rule_key, trade_date);

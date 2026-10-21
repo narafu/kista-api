@@ -40,7 +40,7 @@ class OrderQuantityNormalizationTest {
 
     @Test
     void dcaExecutionQuantityIsNormalized() {
-        DcaExecution e = DcaExecution.ordered(UUID.randomUUID(), "k", LocalDate.of(2026, 10, 17), UUID.randomUUID(),
+        DcaExecution e = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 10, 17), UUID.randomUUID(),
                 new BigDecimal("3.00000000"), new BigDecimal("50.00"));
         assertThat(e.quantity().toString()).isEqualTo("3");
     }

@@ -510,7 +510,7 @@ flows:
           계좌 증권사 시장(US_STOCK/CRYPTO_KRW)과 종목 시장이 다르면, 코인 계좌에 DCA 외 전략이면, DCA 주문유형·금액이 시장 규칙(코인 MARKET·5,000원 이상 정수, 주식 MOO|MOC)에 어긋나면 400.
         code: [AccountPort#requireOwnedAccount, StrategyCreationService#resolveCreationSettings, BootstrapPosition#validate,
                StrategyCreationService#resolveScheduledStart, StrategyCreationService#validateUniqueTicker, DcaStrategyConfig#requireCompatible]
-        fail: 위반이면 400(중복은 409 성격의 상태 오류). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다.
+        fail: 위반이면 400, 계좌+종목 중복은 409(DuplicateStrategyTickerException, 전 전략 유형 공통). DCA도 같은 계좌·종목 전략은 1개(매수·매도는 한 전략의 규칙)이고 런타임 정책(기본 비활성)이 켜져 있어야 등록된다. DCA 규칙 ruleKey는 서버가 발급한다.
 
       - id: balance
         lane: trading

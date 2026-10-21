@@ -106,8 +106,8 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void 같은_규칙_같은날_두번째는_insertIfAbsent_false() {
         LocalDate day = LocalDate.of(2026, 10, 14);
-        assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, day, DcaSkipReason.NO_HOLDINGS, null, null))).isTrue();
-        assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, day, DcaSkipReason.NO_HOLDINGS, null, null))).isFalse();
+        assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null))).isTrue();
+        assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null))).isFalse();
         assertThat(executions.find(strategyId, K1, day)).get().extracting(DcaExecution::skipReason).isEqualTo(DcaSkipReason.NO_HOLDINGS);
         assertThat(executions.count(strategyId)).isEqualTo(1);
     }
@@ -115,18 +115,30 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void 같은_전략_같은날_다른_규칙은_각각_기록() {
         LocalDate day = LocalDate.of(2026, 10, 14);
-        assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, day, DcaSkipReason.NO_HOLDINGS, null, null))).isTrue();
-        assertThat(executions.insertIfAbsent(DcaExecution.ordered(strategyId, K2, day, null, BigDecimal.ONE, new BigDecimal("10.00")))).isTrue();
+        assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null))).isTrue();
+        assertThat(executions.insertIfAbsent(DcaExecution.ordered(strategyId, K2, com.kista.shared.kernel.OrderDirection.BUY, day, null, BigDecimal.ONE, new BigDecimal("10.00")))).isTrue();
         assertThat(executions.count(strategyId)).isEqualTo(2);
         assertThat(executions.find(strategyId, K2, day)).get().extracting(DcaExecution::ruleKey).isEqualTo(K2);
         assertThat(executions.find(strategyId, K2, LocalDate.of(2026, 10, 15))).isEmpty();
     }
 
     @Test
+    void direction_round_trips_and_same_day_rules_page_without_overlap() {
+        LocalDate day = LocalDate.of(2026, 10, 14);
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, OrderDirection.SELL, day, DcaSkipReason.NO_HOLDINGS, null, null));
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null));
+        assertThat(executions.find(strategyId, K1, day)).get().extracting(DcaExecution::direction).isEqualTo(OrderDirection.SELL);
+        // 같은 거래일 두 행 — 크기 1 페이지 두 장이 겹치지 않고 둘 다 덮는다(id 2차 정렬)
+        var first = executions.findPage(strategyId, 0, 1);
+        var second = executions.findPage(strategyId, 1, 1);
+        assertThat(List.of(first.getFirst().ruleKey(), second.getFirst().ruleKey())).containsExactlyInAnyOrder(K1, K2);
+    }
+
+    @Test
     void page_and_latest_per_rule_are_trade_date_desc() {
-        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, LocalDate.of(2026, 10, 1), DcaSkipReason.NO_HOLDINGS, null, null));
-        executions.insertIfAbsent(DcaExecution.ordered(strategyId, K1, LocalDate.of(2026, 10, 2), null, BigDecimal.valueOf(3), new BigDecimal("87.12")));
-        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, LocalDate.of(2026, 9, 30), DcaSkipReason.NO_HOLDINGS, null, null));
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 10, 1), DcaSkipReason.NO_HOLDINGS, null, null));
+        executions.insertIfAbsent(DcaExecution.ordered(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 10, 2), null, BigDecimal.valueOf(3), new BigDecimal("87.12")));
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 9, 30), DcaSkipReason.NO_HOLDINGS, null, null));
         assertThat(executions.findPage(strategyId, 0, 10)).extracting(DcaExecution::tradeDate)
                 .containsExactly(LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 1), LocalDate.of(2026, 9, 30));
         var latest = executions.findLatestByStrategyIds(List.of(strategyId)).get(strategyId);

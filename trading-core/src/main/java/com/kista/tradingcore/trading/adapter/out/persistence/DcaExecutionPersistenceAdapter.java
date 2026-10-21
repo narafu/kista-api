@@ -31,7 +31,7 @@ class DcaExecutionPersistenceAdapter implements DcaExecutionPort {
         // native insert는 @UuidGenerator가 동작하지 않아 Hibernate의 v7 생성기를 직접 사용
         UUID id = UuidVersion7Strategy.INSTANCE.generateUuid(null);
         String detail = e.detail() != null && e.detail().length() > DETAIL_MAX ? e.detail().substring(0, DETAIL_MAX) : e.detail();
-        return jpaRepository.insertIgnoringConflict(id, e.strategyId(), e.ruleKey(), e.tradeDate(), e.status().name(),
+        return jpaRepository.insertIgnoringConflict(id, e.strategyId(), e.ruleKey(), e.direction().name(), e.tradeDate(), e.status().name(),
                 e.skipReason() != null ? e.skipReason().name() : null, e.orderId(), e.quantity(), e.referencePrice(), detail) == 1;
     }
 
@@ -51,7 +51,7 @@ class DcaExecutionPersistenceAdapter implements DcaExecutionPort {
 
     @Override
     public List<DcaExecution> findPage(UUID strategyId, int page, int size) {
-        return jpaRepository.findByStrategyIdOrderByTradeDateDesc(strategyId, PageRequest.of(page, size))
+        return jpaRepository.findByStrategyIdOrderByTradeDateDescIdDesc(strategyId, PageRequest.of(page, size))
                 .stream().map(this::toDomain).toList();
     }
 
@@ -61,7 +61,7 @@ class DcaExecutionPersistenceAdapter implements DcaExecutionPort {
     }
 
     private DcaExecution toDomain(DcaExecutionEntity e) {
-        return new DcaExecution(e.getId(), e.getStrategyId(), e.getRuleKey(), e.getTradeDate(), e.getStatus(), e.getSkipReason(),
+        return new DcaExecution(e.getId(), e.getStrategyId(), e.getRuleKey(), e.getDirection(), e.getTradeDate(), e.getStatus(), e.getSkipReason(),
                 e.getOrderId(), e.getQuantity(), e.getReferencePrice(), e.getDetail(), e.getCreatedAt());
     }
 }

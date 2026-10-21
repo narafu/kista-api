@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import jakarta.persistence.Column;
@@ -59,4 +60,8 @@ class DcaExecutionEntity extends BaseCreatedAtEntity {
 
     @Column(name = "rule_key", nullable = false, length = 36)
     private String ruleKey; // 규칙 키 — ADD COLUMN이라 물리 순서상 맨 뒤(V12)
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "direction", nullable = false, length = 20)
+    private OrderDirection direction; // 기록 시점 규칙 방향 (V12)
 }

@@ -2286,6 +2286,20 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     }
 
     @Test
+    @DisplayName("주식 초기보유가 int 범위를 넘으면 저장 전에 400")
+    void 주식_int_범위_초과_초기보유는_저장_전_400() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.BUY),
+                BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.ONE), new BigDecimal("40"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("허용 범위");
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("DCA도 같은 계좌·종목 두 번째 등록은 방향과 무관하게 거부한다")
     void DCA도_같은_계좌_종목_두번째_등록은_거부() {
         when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
@@ -2297,8 +2311,8 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.SELL))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("이미 해당 종목으로 등록된 전략이 있습니다");
+                .isInstanceOf(DuplicateStrategyTickerException.class)
+                .hasMessage("같은 계좌에 이미 해당 종목 전략이 있습니다.");
         verify(strategyPort, never()).save(any());
     }
 
@@ -2313,8 +2327,8 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.SELL))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("이미 해당 종목으로 등록된 전략이 있습니다");
+                .isInstanceOf(DuplicateStrategyTickerException.class)
+                .hasMessage("같은 계좌에 이미 해당 종목 전략이 있습니다.");
     }
 
     @Test
@@ -2326,8 +2340,8 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("이미 해당 종목으로 등록된 전략이 있습니다");
+                .isInstanceOf(DuplicateStrategyTickerException.class)
+                .hasMessage("같은 계좌에 이미 해당 종목 전략이 있습니다.");
     }
 
     @Test
@@ -2346,7 +2360,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     @DisplayName("DCA 전략 조회는 활성 설정·최근 회차·다음 실행일을 싣는다")
     void getById_dca_includesSummary() {
         Strategy dca = dcaStrategy(STRATEGY_ID, StrategyTicker.UPRO);
-        DcaExecution last = DcaExecution.skipped(STRATEGY_ID, DCA_KEY, LocalDate.of(2026, 9, 30),
+        DcaExecution last = DcaExecution.skipped(STRATEGY_ID, DCA_KEY, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 9, 30),
                 com.kista.shared.kernel.DcaSkipReason.CONDITION_NOT_MET, "상세", null);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());

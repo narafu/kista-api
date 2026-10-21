@@ -90,7 +90,7 @@ class CryptoOrderSynchronizer {
         Integer hour = config.rule(ruleKey).map(DcaRule::executionHour).orElse(null);
         boolean retryable = order.tradeDate().equals(nowKst.toLocalDate()) && hour != null && nowKst.getHour() == hour;
         if (!retryable) {
-            recorder.recordSkipped(ctx, order.tradeDate(), ruleKey, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
+            recorder.recordSkipped(ctx, order.tradeDate(), ruleKey, order.direction(), DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", order.price());
         }
     }
 

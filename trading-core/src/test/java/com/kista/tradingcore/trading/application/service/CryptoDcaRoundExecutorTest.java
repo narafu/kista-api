@@ -140,7 +140,7 @@ class CryptoDcaRoundExecutorTest {
         balance("5002", "0");
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.BUY, "100000", 13));
-        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), eq(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT), eq("주문 금액 4999 < 최소 5000"), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT), eq("주문 금액 4999 < 최소 5000"), eq(BTC_PRICE));
         verify(orderPort, never()).save(any());
     }
 
@@ -179,7 +179,7 @@ class CryptoDcaRoundExecutorTest {
         balance("0", "0");
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.SELL, "10000", 13));
-        verify(recorder).recordSkipped(c, TODAY, KEY, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", BTC_PRICE);
+        verify(recorder).recordSkipped(c, TODAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", BTC_PRICE);
         verify(orderPort, never()).save(any());
     }
 
@@ -193,7 +193,7 @@ class CryptoDcaRoundExecutorTest {
 
         BatchContext c2 = ctx(StrategyTicker.BTC);
         run(TODAY.atTime(10, 10), c2, config(OrderDirection.BUY, "10000", 10));
-        verify(recorder).recordSkipped(eq(c2), eq(TODAY), eq(KEY), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
+        verify(recorder).recordSkipped(eq(c2), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), any());
     }
 
     @Test
@@ -256,8 +256,8 @@ class CryptoDcaRoundExecutorTest {
         m.put(btc, config(OrderDirection.BUY, "10000", 13));
         m.put(eth, config(OrderDirection.BUY, "10000", 13));
         run(NOW, m);
-        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), eq(BTC_PRICE));
-        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
         verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
     }
 
@@ -289,8 +289,8 @@ class CryptoDcaRoundExecutorTest {
         BatchContext btc = ctx(StrategyTicker.BTC);
         BatchContext eth = ctx(StrategyTicker.ETH);
         run(NOW, Map.of(btc, config(OrderDirection.BUY, "10000", 13), eth, config(OrderDirection.BUY, "10000", 13)));
-        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
-        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(KEY), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(btc), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(eth), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.API_KEY_EXPIRED), anyString(), isNull());
     }
 
     @Test
@@ -305,7 +305,7 @@ class CryptoDcaRoundExecutorTest {
         when(exchange.getBalance(any())).thenThrow(new RuntimeException("timeout"));
         BatchContext c = ctx(StrategyTicker.BTC);
         run(TODAY.atTime(13, 50), c, config(OrderDirection.BUY, "10000", 13));
-        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), isNull());
     }
 
     @Test
@@ -325,7 +325,7 @@ class CryptoDcaRoundExecutorTest {
         verify(orderPort).markSubmitting(any());
         verify(orderPort, never()).markPlaced(any(), any());
         verify(orderPort, never()).markFailed(any());
-        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -334,7 +334,7 @@ class CryptoDcaRoundExecutorTest {
         when(exchange.buyMarketByAmount(any(), any(), any(), anyString())).thenThrow(StubBrokerApiException.rejected("insufficient"));
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.BUY, "10000", 13));
-        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), eq(BTC_PRICE));
+        verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), eq(BTC_PRICE));
         verify(orderPort).markFailed(any());
         verify(orderPort, never()).markPlaced(any(), any());
     }

@@ -135,7 +135,7 @@ class DcaRoundPlannerTest {
     void already_decided_today_skips_without_recording() {
         dca(OrderDirection.BUY, OrderType.MOC);
         when(executionPort.find(ctx.strategy().id(), KEY, TRADE_DATE))
-                .thenReturn(Optional.of(DcaExecution.skipped(ctx.strategy().id(), KEY, TRADE_DATE, DcaSkipReason.NO_HOLDINGS, null, null)));
+                .thenReturn(Optional.of(DcaExecution.skipped(ctx.strategy().id(), KEY, OrderDirection.BUY, TRADE_DATE, DcaSkipReason.NO_HOLDINGS, null, null)));
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
         verifyNoInteractions(candlePort, recorder);
     }
@@ -153,7 +153,7 @@ class DcaRoundPlannerTest {
     void existing_dca_order_with_execution_row_does_nothing() {
         dca(OrderDirection.BUY, OrderType.MOC);
         when(executionPort.find(ctx.strategy().id(), KEY, TRADE_DATE)).thenReturn(Optional.of(
-                DcaExecution.ordered(ctx.strategy().id(), KEY, TRADE_DATE, UUID.randomUUID(), BigDecimal.valueOf(3), null)));
+                DcaExecution.ordered(ctx.strategy().id(), KEY, OrderDirection.BUY, TRADE_DATE, UUID.randomUUID(), BigDecimal.valueOf(3), null)));
         Order existing = existingOrder(OrderTiming.AT_CLOSE, OrderType.MOC);
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(existing), null, ledger)).isEmpty();
         verify(recorder, never()).recordOrdered(any(), any(), any(), any(), any());
@@ -188,7 +188,7 @@ class DcaRoundPlannerTest {
         dca(OrderDirection.BUY, OrderType.MOC);
         when(candlePort.getDailyCandlesBefore(any(), any(), anyInt())).thenThrow(new RuntimeException("toss down"));
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(KEY), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), isNull());
+        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(KEY), any(), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), isNull());
     }
 
     @Test
@@ -197,7 +197,7 @@ class DcaRoundPlannerTest {
         when(sellablePort.getSellableQuantity(StrategyTicker.UPRO, ctx.account().brokerRef())).thenReturn(new SellableQuantity("UPRO", 5));
         when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(ctx.account().id(), TRADE_DATE, StrategyTicker.UPRO)).thenReturn(5);
         planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
-        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(KEY), eq(DcaSkipReason.NO_HOLDINGS), anyString(), any());
+        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(KEY), any(), eq(DcaSkipReason.NO_HOLDINGS), anyString(), any());
     }
 
     @Test
@@ -207,7 +207,7 @@ class DcaRoundPlannerTest {
                 new BrokerCandle(LocalDate.of(2026, 10, 9), null, null, null, new BigDecimal("87.12"), 0)));
         dca(OrderDirection.BUY, OrderType.MOC);
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(KEY), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), isNull());
+        verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(KEY), any(), eq(DcaSkipReason.DATA_UNAVAILABLE), anyString(), isNull());
     }
 
     @Test
@@ -251,7 +251,7 @@ class DcaRoundPlannerTest {
         dcaWith(OrderDirection.BUY, OrderType.MOC, new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.LTE, null, new BigDecimal("-5")));
         ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO); // 80×0.95=76 < 87.12 → 미충족
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(KEY), eq(DcaSkipReason.CONDITION_NOT_MET), anyString(), any());
+        verify(recorder).recordSkipped(any(), eq(TRADE_DATE), eq(KEY), any(), eq(DcaSkipReason.CONDITION_NOT_MET), anyString(), any());
     }
 
     @Test
@@ -259,7 +259,7 @@ class DcaRoundPlannerTest {
         // 장중 편집으로 새 버전이 됐어도 ruleKey가 같으면 오늘 판정 이력이 그대로 적용된다 — 신규 규칙(KEY2)만 판정
         config(stockDcaRule(KEY, OrderDirection.BUY, "600", OrderType.MOC), stockDcaRule(KEY2, OrderDirection.BUY, "300", OrderType.MOC));
         when(executionPort.find(ctx.strategy().id(), KEY, TRADE_DATE)).thenReturn(Optional.of(
-                DcaExecution.ordered(ctx.strategy().id(), KEY, TRADE_DATE, UUID.randomUUID(), BigDecimal.valueOf(3), null)));
+                DcaExecution.ordered(ctx.strategy().id(), KEY, OrderDirection.BUY, TRADE_DATE, UUID.randomUUID(), BigDecimal.valueOf(3), null)));
 
         List<DcaDecision.Planned> plan = planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
 
@@ -317,7 +317,7 @@ class DcaRoundPlannerTest {
         when(fearGreedPort.latest()).thenReturn(Optional.empty());
 
         assertThat(planner.plan(ctx, TRADE_DATE, EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
-        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(KEY), eq(DcaSkipReason.DATA_UNAVAILABLE), eq("공포탐욕지수 조회 실패"), any());
+        verify(recorder).recordSkipped(eq(ctx), eq(TRADE_DATE), eq(KEY), any(), eq(DcaSkipReason.DATA_UNAVAILABLE), eq("공포탐욕지수 조회 실패"), any());
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.domain.model;
 
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.Quantities;
 
 import java.math.BigDecimal;
@@ -13,6 +14,7 @@ public record DcaExecution(
         UUID id,                    // PK (null이면 생성)
         UUID strategyId,            // FK → strategy.id
         String ruleKey,             // 판정한 규칙 키 (strategy_dca_rule.rule_key)
+        OrderDirection direction,   // 기록 시점 규칙 방향 (규칙 삭제 후에도 보존)
         LocalDate tradeDate,        // KST 거래일
         Status status,              // ORDERED | SKIPPED
         DcaSkipReason skipReason,   // SKIPPED일 때만
@@ -25,14 +27,17 @@ public record DcaExecution(
     public enum Status { ORDERED, SKIPPED }
 
     public DcaExecution {
+        java.util.Objects.requireNonNull(direction, "direction"); // dca_execution.direction NOT NULL
         quantity = Quantities.normalize(quantity); // DB scale 8 → 정수 주식 수량 형태 유지
     }
 
-    public static DcaExecution ordered(UUID strategyId, String ruleKey, LocalDate tradeDate, UUID orderId, BigDecimal quantity, BigDecimal referencePrice) {
-        return new DcaExecution(null, strategyId, ruleKey, tradeDate, Status.ORDERED, null, orderId, quantity, referencePrice, null, null);
+    public static DcaExecution ordered(UUID strategyId, String ruleKey, OrderDirection direction, LocalDate tradeDate, UUID orderId,
+                                       BigDecimal quantity, BigDecimal referencePrice) {
+        return new DcaExecution(null, strategyId, ruleKey, direction, tradeDate, Status.ORDERED, null, orderId, quantity, referencePrice, null, null);
     }
 
-    public static DcaExecution skipped(UUID strategyId, String ruleKey, LocalDate tradeDate, DcaSkipReason reason, String detail, BigDecimal referencePrice) {
-        return new DcaExecution(null, strategyId, ruleKey, tradeDate, Status.SKIPPED, reason, null, null, referencePrice, detail, null);
+    public static DcaExecution skipped(UUID strategyId, String ruleKey, OrderDirection direction, LocalDate tradeDate,
+                                       DcaSkipReason reason, String detail, BigDecimal referencePrice) {
+        return new DcaExecution(null, strategyId, ruleKey, direction, tradeDate, Status.SKIPPED, reason, null, null, referencePrice, detail, null);
     }
 }

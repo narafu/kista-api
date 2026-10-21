@@ -33,9 +33,7 @@ class DcaExecutionQueryServiceTest {
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
     OrderPort orderPort = mock(OrderPort.class);
     MarketCalendarPort calendar = mock(MarketCalendarPort.class);
-    com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort dcaDetailPort =
-            mock(com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort.class);
-    DcaExecutionQueryService service = new DcaExecutionQueryService(strategyPort, accountPort, executionPort, orderPort, calendar, dcaDetailPort);
+    DcaExecutionQueryService service = new DcaExecutionQueryService(strategyPort, accountPort, executionPort, orderPort, calendar);
 
     @Test
     void joins_orders_and_us_session_dates() {
@@ -44,11 +42,9 @@ class DcaExecutionQueryServiceTest {
                 StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(dca);
         UUID orderId = UUID.randomUUID();
-        DcaExecution ordered = DcaExecution.ordered(strategyId, "buy-key", LocalDate.of(2026, 9, 30), orderId, BigDecimal.valueOf(3), null);
-        DcaExecution skipped = DcaExecution.skipped(strategyId, "sell-key", LocalDate.of(2026, 8, 31), DcaSkipReason.CONDITION_NOT_MET, "x", null);
-        DcaExecution removed = DcaExecution.skipped(strategyId, "removed-key", LocalDate.of(2026, 8, 30), DcaSkipReason.CONDITION_NOT_MET, "x", null);
-        when(dcaDetailPort.findActiveByStrategyId(strategyId)).thenReturn(java.util.Optional.of(com.kista.tradingcore.support.TradingFixtures.dcaConfig(
-                com.kista.tradingcore.support.TradingFixtures.stockDcaRule("sell-key", OrderDirection.SELL, "100", OrderType.MOC))));
+        DcaExecution ordered = DcaExecution.ordered(strategyId, "buy-key", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 9, 30), orderId, BigDecimal.valueOf(3), null);
+        DcaExecution skipped = DcaExecution.skipped(strategyId, "sell-key", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 8, 31), DcaSkipReason.CONDITION_NOT_MET, "x", null);
+        DcaExecution removed = DcaExecution.skipped(strategyId, "removed-key", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 8, 30), DcaSkipReason.CONDITION_NOT_MET, "x", null);
         when(executionPort.findPage(strategyId, 0, 20)).thenReturn(List.of(ordered, skipped, removed));
         when(executionPort.count(strategyId)).thenReturn(3L);
         when(calendar.usSessionDateOf(any())).thenAnswer(inv -> inv.<LocalDate>getArgument(0).minusDays(1));
@@ -62,9 +58,8 @@ class DcaExecutionQueryServiceTest {
         assertThat(page.content().get(0).order()).isEqualTo(order);
         assertThat(page.content().get(0).usSessionDate()).isEqualTo(LocalDate.of(2026, 9, 29));
         assertThat(page.content().get(1).order()).isNull();
-        // 방향 — 주문 있으면 주문 방향, 없으면 활성 규칙, 삭제된 규칙이면 null
-        assertThat(page.content()).extracting(DcaExecutionPage.Row::direction)
-                .containsExactly(OrderDirection.BUY, OrderDirection.SELL, null);
+        // 방향은 기록 시점 값 — 규칙 삭제 여부와 무관하게 설정 조회 없이 이력 행에서 나온다
+        assertThat(page.content()).extracting(r -> r.execution().direction()).doesNotContainNull();
     }
 
     @Test

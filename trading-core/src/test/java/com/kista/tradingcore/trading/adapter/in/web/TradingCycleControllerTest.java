@@ -515,6 +515,19 @@ class TradingCycleControllerTest {
     }
 
     @Test
+    void register_duplicateTicker_returns409WithUserDetail() throws Exception {
+        when(tradingCycle.register(any(), any(), any()))
+                .thenThrow(new com.kista.tradingcore.trading.domain.model.DuplicateStrategyTickerException());
+
+        mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(dcaBody("[]")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("같은 계좌에 이미 해당 종목 전략이 있습니다."));
+    }
+
+    @Test
     void 구_단일규칙_필드만_보내면_400() throws Exception {
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
@@ -687,9 +700,9 @@ class TradingCycleControllerTest {
     void lists_dca_executions() throws Exception {
         when(dcaExecutionQuery.list(eq(CYCLE_ID), any(), eq(0), eq(20))).thenReturn(new DcaExecutionPage(List.of(
                 new DcaExecutionPage.Row(
-                        DcaExecution.skipped(CYCLE_ID, KEY, LocalDate.of(2026, 8, 31),
+                        DcaExecution.skipped(CYCLE_ID, KEY, com.kista.shared.kernel.OrderDirection.SELL, LocalDate.of(2026, 8, 31),
                                 DcaSkipReason.CONDITION_NOT_MET, "RSI(14) 48.20 > 35", null),
-                        LocalDate.of(2026, 8, 30), null, OrderDirection.SELL)), 0, 20, 1));
+                        LocalDate.of(2026, 8, 30), null)), 0, 20, 1));
         mockMvc.perform(get("/api/trading-cycles/{id}/dca-executions", CYCLE_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].status").value("SKIPPED"))

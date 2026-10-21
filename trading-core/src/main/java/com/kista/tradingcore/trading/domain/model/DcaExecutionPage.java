@@ -1,7 +1,5 @@
 package com.kista.tradingcore.trading.domain.model;
 
-import com.kista.shared.kernel.OrderDirection;
-
 import java.time.LocalDate;
 import java.util.List;
 
@@ -11,7 +9,6 @@ public record DcaExecutionPage(List<Row> content, int page, int size, long total
     public record Row(
             DcaExecution execution,  // 회차 판정 결과
             LocalDate usSessionDate, // 대응하는 US 세션일
-            Order order,             // ORDERED 회차의 주문 (없으면 null)
-            OrderDirection direction // 규칙 방향 — 주문 방향 우선, 없으면 활성 규칙(삭제된 규칙이면 null)
+            Order order              // ORDERED 회차의 주문 (없으면 null)
     ) {}
 }

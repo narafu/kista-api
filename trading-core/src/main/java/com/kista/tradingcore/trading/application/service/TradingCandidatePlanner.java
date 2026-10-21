@@ -279,7 +279,7 @@ class TradingCandidatePlanner {
             Map<String, BigDecimal> prices = dcaReferencePrices.getOrDefault(candidate.ctx(), Map.of());
             batchGuard.runSafely("DCA 미주문 기록", candidate.ctx(), () -> {
                 for (PlannedOrder order : candidate.orders()) {
-                    dcaExecutionRecorder.recordSkipped(candidate.ctx(), tradeDate, dcaRuleKey(order.orderLeg()), reason, detail,
+                    dcaExecutionRecorder.recordSkipped(candidate.ctx(), tradeDate, dcaRuleKey(order.orderLeg()), order.direction(), reason, detail,
                             prices.get(order.orderLeg()));
                 }
                 return candidate.ctx();

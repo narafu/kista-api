@@ -12,6 +12,7 @@ import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.tradingcore.trading.domain.model.AlreadyOrderedTodayException;
+import com.kista.tradingcore.trading.domain.model.DuplicateStrategyTickerException;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.ManualTradingException;
 import com.kista.tradingcore.trading.domain.model.ManualTradingFailedException;
@@ -69,13 +70,15 @@ public class TradingExceptionHandler {
             Map.entry(ManualTradingException.class,           new Mapping(HttpStatus.CONFLICT,              "Conflict")),
             Map.entry(OrderCancelException.class,             new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ORDER_NOT_CANCELLABLE)),
             Map.entry(PrivacyTradeConflictException.class,    new Mapping(HttpStatus.CONFLICT,              "Conflict")),
+            // 등록 409는 이 의미 하나뿐이라 UI 분기용 code 없이 status로 충분 — detail이 사용자 문구
+            Map.entry(DuplicateStrategyTickerException.class, new Mapping(HttpStatus.CONFLICT,             "Conflict")),
             Map.entry(Account.DuplicateAccountException.class, new Mapping(HttpStatus.CONFLICT,             "Conflict", ErrorCode.DUPLICATE_ACCOUNT))
     );
 
     @ExceptionHandler({
             BrokerCredentialException.class, BrokerRateLimitException.class,
             ManualTradingException.class, DcaManualExecutionUnsupportedException.class, OrderCancelException.class,
-            PrivacyTradeConflictException.class, Account.DuplicateAccountException.class
+            PrivacyTradeConflictException.class, Account.DuplicateAccountException.class, DuplicateStrategyTickerException.class
     })
     public ProblemDetail handleTradingCoreExceptions(Exception ex) {
         Mapping m = ProblemDetailMappings.resolve(ex, MAPPINGS);

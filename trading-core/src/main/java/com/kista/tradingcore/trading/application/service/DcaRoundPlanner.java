@@ -132,7 +132,7 @@ class DcaRoundPlanner {
                     planned.add(new DcaDecision.Planned(order, p.referencePrice()));
                 }
                 case DcaRuleDecision.Skipped s ->
-                        recorder.recordSkipped(ctx, tradeDate, key, s.reason(), s.detail(), s.referencePrice());
+                        recorder.recordSkipped(ctx, tradeDate, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
             }
         }
         return planned;

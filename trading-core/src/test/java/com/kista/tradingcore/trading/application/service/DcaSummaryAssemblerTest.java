@@ -44,7 +44,7 @@ class DcaSummaryAssemblerTest {
         LocalDate today = LocalDate.of(2026, 10, 14);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(14, 0))).isEqualTo(today.plusDays(1));
-        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
+        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(10, 0))).isEqualTo(today.plusDays(1));
     }
 
@@ -66,7 +66,7 @@ class DcaSummaryAssemblerTest {
         LocalDate today = LocalDate.of(2026, 10, 14);
         // 13:00 정각 판정 전은 오늘, 같은 시각대에 이미 판정했으면 내일
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 0))).isEqualTo(today);
-        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
+        DcaExecution decided = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.ONE, BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, decided, CRYPTO_DAILY, Market.CRYPTO_KRW, today.atTime(13, 10))).isEqualTo(today.plusDays(1));
     }
 
@@ -120,7 +120,7 @@ class DcaSummaryAssemblerTest {
     @Test
     void firstEligibleDate_moves_to_next_day_when_today_already_decided() {
         LocalDate today = DstInfo.nextTradeDate();
-        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), "k", today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
+        DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
     }
 }

@@ -224,7 +224,7 @@ class StrategyCreationService {
     // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장 (DCA도 예외 없음 — 매수·매도는 한 전략의 규칙으로)
     private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {
         if (!strategyPort.findByAccountIdAndTicker(accountId, ticker).isEmpty()) {
-            throw new IllegalStateException("이미 해당 종목으로 등록된 전략이 있습니다: " + ticker);
+            throw new DuplicateStrategyTickerException(); // 409 — 전 전략 유형 공통
         }
     }
 

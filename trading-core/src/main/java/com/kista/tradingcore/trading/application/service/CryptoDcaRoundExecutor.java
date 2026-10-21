@@ -95,7 +95,7 @@ class CryptoDcaRoundExecutor {
                 StrategyTicker ticker = ctx.strategy().ticker();
                 BigDecimal price = prices.get(ticker);
                 if (price == null || price.signum() <= 0) {
-                    recorder.recordSkipped(ctx, today, key, DcaSkipReason.DATA_UNAVAILABLE, "현재가 조회 실패", null);
+                    recorder.recordSkipped(ctx, today, key, rule.direction(), DcaSkipReason.DATA_UNAVAILABLE, "현재가 조회 실패", null);
                     continue;
                 }
                 List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst, today);
@@ -111,7 +111,7 @@ class CryptoDcaRoundExecutor {
                 DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule, Market.CRYPTO_KRW,
                         closes, ledger, wallet.held.getOrDefault(ticker, BigDecimal.ZERO), fearGreed, price, wallet.krw));
                 if (decision instanceof DcaRuleDecision.Skipped s) {
-                    recorder.recordSkipped(ctx, today, key, s.reason(), s.detail(), s.referencePrice());
+                    recorder.recordSkipped(ctx, today, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
                     continue;
                 }
                 RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, wallet);
@@ -193,7 +193,7 @@ class CryptoDcaRoundExecutor {
                 // 접수 결과 불명 — SUBMITTING 유지(동기화기가 identifier로 복구), 이중 지출 방지 위해 차감은 성공과 동일
                 log.warn("코인 DCA 주문 결과 불명 orderId={}", order.id(), e);
             } else {
-                recorder.recordSkipped(ctx, today, key, failure.reason(), failureDetail(failure), price);
+                recorder.recordSkipped(ctx, today, key, rule.direction(), failure.reason(), failureDetail(failure), price);
                 orderPort.markFailed(order.id());
                 return failure == CryptoFailure.KEY_EXPIRED ? e : null;
             }
@@ -211,7 +211,7 @@ class CryptoDcaRoundExecutor {
             return;
         }
         for (Target t : remaining) {
-            recorder.recordSkipped(t.ctx(), today, t.rule().ruleKey(), failure.reason(), failureDetail(failure), null);
+            recorder.recordSkipped(t.ctx(), today, t.rule().ruleKey(), t.rule().direction(), failure.reason(), failureDetail(failure), null);
         }
     }
 

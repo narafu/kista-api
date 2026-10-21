@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 // holdings>0이면 avgPrice>0 필수, 음수 거부. null/0이면 빈 포지션(기존 동작). 주식은 정수 주, 코인은 소수 8자리까지
 public final class BootstrapPosition {
 
+    private static final BigDecimal MAX_STOCK_HOLDINGS = BigDecimal.valueOf(Integer.MAX_VALUE); // 주식 int 주수 상한
     private static final int CRYPTO_SCALE = 8; // 코인 수량 소수 자릿수 (orders·cycle_position numeric(20,8))
 
     private BootstrapPosition() {}
@@ -21,6 +22,10 @@ public final class BootstrapPosition {
             throw new IllegalArgumentException("평단가(initialAvgPrice)는 0 이상이어야 합니다");
         }
         BigDecimal normalized = holdings != null ? Quantities.normalize(holdings) : BigDecimal.ZERO;
+        // 주식은 int 주수로 소비된다(intValueExact) — 범위 초과는 저장 전에 400으로 거부
+        if (market != Market.CRYPTO_KRW && normalized.compareTo(MAX_STOCK_HOLDINGS) > 0) {
+            throw new IllegalArgumentException("주식 보유 수량(initialHoldings)이 허용 범위를 넘었습니다");
+        }
         if (market == Market.CRYPTO_KRW ? normalized.scale() > CRYPTO_SCALE : normalized.scale() > 0) {
             throw new IllegalArgumentException(market == Market.CRYPTO_KRW
                     ? "보유 수량(initialHoldings)은 소수 8자리까지 입력할 수 있습니다"

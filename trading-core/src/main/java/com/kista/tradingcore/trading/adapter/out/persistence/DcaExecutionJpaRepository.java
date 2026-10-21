@@ -17,7 +17,8 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
 
     Optional<DcaExecutionEntity> findByStrategyIdAndRuleKeyAndTradeDate(UUID strategyId, String ruleKey, LocalDate tradeDate);
 
-    List<DcaExecutionEntity> findByStrategyIdOrderByTradeDateDesc(UUID strategyId, Pageable pageable);
+    // 같은 거래일 다중 규칙 행의 페이지 경계 안정화 — id(UUIDv7) 2차 정렬
+    List<DcaExecutionEntity> findByStrategyIdOrderByTradeDateDescIdDesc(UUID strategyId, Pageable pageable);
 
     long countByStrategyId(UUID strategyId);
 
@@ -32,11 +33,11 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
     // UNIQUE(strategy_id, rule_key, trade_date) 충돌 시 무시 — 반환값 1이면 삽입
     @Modifying
     @Query(value = """
-            INSERT INTO dca_execution (id, strategy_id, rule_key, trade_date, status, skip_reason, order_id, quantity, reference_price, detail)
-            VALUES (:id, :strategyId, :ruleKey, :tradeDate, :status, :skipReason, :orderId, :quantity, :referencePrice, :detail)
+            INSERT INTO dca_execution (id, strategy_id, rule_key, direction, trade_date, status, skip_reason, order_id, quantity, reference_price, detail)
+            VALUES (:id, :strategyId, :ruleKey, :direction, :tradeDate, :status, :skipReason, :orderId, :quantity, :referencePrice, :detail)
             ON CONFLICT (strategy_id, rule_key, trade_date) DO NOTHING
             """, nativeQuery = true)
-    int insertIgnoringConflict(@Param("id") UUID id, @Param("strategyId") UUID strategyId, @Param("ruleKey") String ruleKey,
+    int insertIgnoringConflict(@Param("id") UUID id, @Param("strategyId") UUID strategyId, @Param("ruleKey") String ruleKey, @Param("direction") String direction,
                                @Param("tradeDate") LocalDate tradeDate,
                                @Param("status") String status, @Param("skipReason") String skipReason, @Param("orderId") UUID orderId,
                                @Param("quantity") BigDecimal quantity, @Param("referencePrice") BigDecimal referencePrice,

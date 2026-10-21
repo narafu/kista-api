@@ -2,8 +2,6 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.tradingcore.matching.domain.model.DcaRule;
-import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.event.DcaRoundSkippedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
@@ -18,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Optional;
 
 // DCA 규칙 회차 이력 기록 — UNIQUE(strategy, ruleKey, tradeDate) 삽입 성공 시에만 알림 이벤트를 발행해 재개·중복 진입 알림 중복을 차단
 @Component
@@ -32,19 +29,18 @@ class DcaExecutionRecorder {
     @Transactional
     public void recordOrdered(BatchContext ctx, LocalDate tradeDate, String ruleKey, Order order, BigDecimal referencePrice) {
         dcaExecutionPort.insertIfAbsent(
-                DcaExecution.ordered(ctx.strategy().id(), ruleKey, tradeDate, order.id(), order.quantity(), referencePrice));
+                DcaExecution.ordered(ctx.strategy().id(), ruleKey, order.direction(), tradeDate, order.id(), order.quantity(), referencePrice));
     }
 
     @Transactional
-    public void recordSkipped(BatchContext ctx, LocalDate tradeDate, String ruleKey, DcaSkipReason reason, String detail,
-                              BigDecimal referencePrice) {
+    // direction: 호출부가 규칙(판정 경로) 또는 주문(복구·배정 경로)에서 넘긴다 — 이력·알림 방향의 SSOT
+    public void recordSkipped(BatchContext ctx, LocalDate tradeDate, String ruleKey, OrderDirection direction, DcaSkipReason reason,
+                              String detail, BigDecimal referencePrice) {
         boolean inserted = dcaExecutionPort.insertIfAbsent(
-                DcaExecution.skipped(ctx.strategy().id(), ruleKey, tradeDate, reason, detail, referencePrice));
+                DcaExecution.skipped(ctx.strategy().id(), ruleKey, direction, tradeDate, reason, detail, referencePrice));
         if (!inserted) return;
-        // 알림 표기용 방향·순번 — 활성 규칙 기준, 편집으로 삭제된 규칙이면 null
-        Optional<DcaStrategyConfig> config = dcaDetailPort.findActiveByStrategyId(ctx.strategy().id());
-        OrderDirection direction = config.flatMap(c -> c.rule(ruleKey)).map(DcaRule::direction).orElse(null);
-        Integer ruleNumber = config.map(c -> c.ruleNumber(ruleKey)).orElse(null);
+        // 알림 표기용 규칙 순번만 활성 설정에서 조회(삽입 성공 시 1회) — 편집으로 삭제된 규칙이면 null(문구에서 생략)
+        Integer ruleNumber = dcaDetailPort.findActiveByStrategyId(ctx.strategy().id()).map(c -> c.ruleNumber(ruleKey)).orElse(null);
         eventPublisher.publishEvent(new DcaRoundSkippedEvent(ctx.account().userId(), ctx.strategy().id(), ctx.account().nickname(),
                 ctx.strategy().ticker(), ruleKey, ruleNumber, direction, tradeDate, reason, detail));
         if (reason == DcaSkipReason.DATA_UNAVAILABLE || reason == DcaSkipReason.EXCHANGE_API_ERROR) {

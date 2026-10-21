@@ -130,7 +130,7 @@ class TradingCandidatePlannerDcaTest {
         TradingCandidatePlanner.SaveAllocationResult result = planner.saveAllocatedOrders(List.of(candidate()), DAY);
 
         assertThat(result.savedContexts()).doesNotContain(ctx);
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), eq(REFERENCE));
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(OrderDirection.BUY), eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), eq(REFERENCE));
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
     }
@@ -143,7 +143,7 @@ class TradingCandidatePlannerDcaTest {
 
         planner.saveAllocatedOrders(List.of(candidate()), DAY);
 
-        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
+        verify(recorder).recordSkipped(eq(ctx), eq(DAY), eq(KEY), any(), eq(DcaSkipReason.NO_HOLDINGS), any(), eq(REFERENCE));
         verify(publisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 }

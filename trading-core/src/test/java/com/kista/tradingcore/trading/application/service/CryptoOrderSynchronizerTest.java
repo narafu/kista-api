@@ -120,7 +120,7 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(orderPort).markFailed(orderId);
-        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -129,7 +129,7 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 14);
         InOrder io = inOrder(recorder, orderPort);
-        io.verify(recorder).recordSkipped(ctx, TODAY, KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        io.verify(recorder).recordSkipped(ctx, TODAY, KEY, com.kista.shared.kernel.OrderDirection.BUY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
         io.verify(orderPort).markFailed(orderId);
     }
 
@@ -138,14 +138,14 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.SUBMITTING, TODAY.minusDays(1), null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
-        verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), KEY, com.kista.shared.kernel.OrderDirection.BUY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
     }
 
     @Test
     void recordSkippedFailureLeavesOrderSubmitting() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
         when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
-        doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any(), any());
+        doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any(), any(), any());
         run(o, 14);
         verify(orderPort, never()).markFailed(any());
     }
@@ -212,7 +212,7 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLANNED, TODAY, null);
         run(o, 14);
         InOrder io = inOrder(recorder, orderPort);
-        io.verify(recorder).recordSkipped(ctx, TODAY, KEY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
+        io.verify(recorder).recordSkipped(ctx, TODAY, KEY, com.kista.shared.kernel.OrderDirection.BUY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
         io.verify(orderPort).cancelPlanned(orderId);
         verifyNoMoreInteractions(exchange);
     }
@@ -222,7 +222,7 @@ class CryptoOrderSynchronizerTest {
         Order o = order(OrderStatus.PLANNED, TODAY, null);
         run(o, 13);
         verify(orderPort).cancelPlanned(orderId);
-        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any());
+        verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
