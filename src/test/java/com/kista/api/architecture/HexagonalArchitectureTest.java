@@ -89,7 +89,7 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("UsTradeDates는 4개 KIS/Toss/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
+    @DisplayName("UsTradeDates는 5개 KIS/Toss/Meritz/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
     void usTradeDates_must_only_be_used_by_allowlisted_adapters() {
         // constraints.md "시간 기준 정책" allowlist를 실제로 강제 — US 거래일 변환은 이 4개 어댑터 내부
         // 전용, 도메인·서비스·orders persistence에서 사용 금지. 클래스 단위 allowlist(메서드 단위 아님) —
@@ -102,6 +102,7 @@ class HexagonalArchitectureTest {
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.kis.KisTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.kis.KisPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.meritz.MeritzPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
                 .haveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates");
