@@ -232,10 +232,13 @@ class KisHttpClientTest {
 
         KisHttpClient client = newClient();
         // 실제로 20초를 기다리지 않기 위해 다음 슬롯이 이미 25초 뒤로 예약된 것처럼 내부 상태를 직접 주입
-        java.lang.reflect.Field field = KisHttpClient.class.getDeclaredField("nextSlotByAppKey");
+        java.lang.reflect.Field gateField = KisHttpClient.class.getDeclaredField("callGate");
+        gateField.setAccessible(true);
+        Object gate = gateField.get(client);
+        java.lang.reflect.Field field = gate.getClass().getDeclaredField("nextSlotByKey");
         field.setAccessible(true);
         @SuppressWarnings("unchecked")
-        var slots = (java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLong>) field.get(client);
+        var slots = (java.util.concurrent.ConcurrentHashMap<String, java.util.concurrent.atomic.AtomicLong>) field.get(gate);
         java.util.concurrent.atomic.AtomicLong slot = new java.util.concurrent.atomic.AtomicLong(System.nanoTime() + 25_000_000_000L);
         slots.put(ACCOUNT.appKey(), slot);
         long slotBefore = slot.get();

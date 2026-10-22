@@ -24,7 +24,7 @@ class KisAdminTokenCoordinator {
     // 관리자 토큰 식별용 nil UUID — 계좌 id는 v7이라 충돌하지 않는다. KisAuthApi가 이 id면 이 코디네이터로 라우팅
     static final UUID ADMIN_TOKEN_ID = new UUID(0L, 0L);
     private static final String KEY_PREFIX = "kis:admin:token:"; // Redis 키 접두사 — 뒤에 sha256(appKey) 앞 8자
-    private static final long EXPIRY_MARGIN_SECONDS = 60; // 만료 1분 전 무효화 — KisTokenCoordinator threshold와 동일
+    private static final long EXPIRY_MARGIN_SECONDS = 60; // 만료 1분 전 무효화 — DbTokenCoordinator threshold와 동일
 
     private final StringRedisTemplate redis;
     private final ReentrantLock lock = new ReentrantLock(); // JVM 내 동시 발급 방지

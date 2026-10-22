@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.tradingcore.broker.adapter.out.internal.DbTokenCoordinator;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
@@ -52,7 +53,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
     // getToken/recoverToken 전용 — JVM-local 더블체크락 + DB 캐시 조정 (Toss는 별도 Redis 분산 구현체).
     // TokenCoordinator 구현 빈이 2개(KIS/Toss)라 인터페이스로 주입하면 Spring이 모호해짐 —
     // TossAuthApi가 TossDistributedTokenCoordinator를 구체 타입으로 주입받는 것과 동일하게 구체 타입 사용
-    private final KisTokenCoordinator tokenCoordinator;
+    private final DbTokenCoordinator tokenCoordinator;
     // 관리자 시세 키 전용(ADMIN_TOKEN_ID) — accounts FK가 있는 broker_tokens를 못 써서 Redis 캐시 사용.
     // 키가 앱키별이라 TokenCoordinator 계약(accountId 기준)을 구현하지 않고 appKey를 받는 전용 메서드를 쓴다
     private final KisAdminTokenCoordinator adminCoordinator;

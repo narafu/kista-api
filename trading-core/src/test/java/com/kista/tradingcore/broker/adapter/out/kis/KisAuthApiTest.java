@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
+import com.kista.tradingcore.broker.adapter.out.internal.DbTokenCoordinator;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
@@ -33,7 +34,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class KisAuthApiTest {
 
     @Mock BrokerTokenCachePort brokerTokenCachePort;
-    @Mock KisTokenCoordinator tokenCoordinator;
+    @Mock DbTokenCoordinator tokenCoordinator;
     @Mock KisAdminTokenCoordinator adminCoordinator;
 
     RestClient.Builder restClientBuilder;

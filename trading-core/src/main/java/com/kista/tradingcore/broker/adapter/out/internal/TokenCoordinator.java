@@ -3,7 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.internal;
 import java.util.UUID;
 
 // 계좌 단위 브로커 access token 발급/복구를 조정하는 공통 계약.
-// 중복 발급 방지 메커니즘은 구현체마다 다르다 — KIS(KisTokenCoordinator)는 JVM-local 락 +
+// 중복 발급 방지 메커니즘은 구현체마다 다르다 — KIS·메리츠(DbTokenCoordinator)는 JVM-local 락 +
 // PostgreSQL broker_tokens 캐시, Toss(TossDistributedTokenCoordinator)는 Redis 분산 lease +
 // fencing generation CAS. KIS 관리자(시세 전용) 토큰(KisAdminTokenCoordinator, Redis 앱키별 키)은 계좌 id가
 // 없어 이 계약을 구현하지 않고 이 인터페이스의 중첩 타입(TokenIssuer 등)만 공유한다. 이 인터페이스는 "발급/복구" 연산의 형태만 통일한다 — 재시도 횟수·

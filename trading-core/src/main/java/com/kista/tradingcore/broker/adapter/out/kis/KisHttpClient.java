@@ -2,6 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
@@ -18,8 +19,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -98,9 +97,8 @@ class KisHttpClient {
 
     // 계좌(앱키) 단위 최소 호출 간격 게이트 — EGW00201은 accountId가 아닌 appKey 단위 제한이라 appKey로 키잉한다.
     // 조회·주문접수·취소 등 모든 KIS 호출이 executeWithRetry를 거치므로 이 한 지점이 전체 경로의 SSOT다.
-    private static final long MIN_CALL_INTERVAL_MILLIS = 350;  // 같은 앱키의 연속 호출 사이 최소 간격
-    private static final long MAX_QUEUE_WAIT_MILLIS = 20_000;  // 대량 배치가 슬롯을 선점 중이어도 이 이상은 기다리지 않고 즉시 실패(라이브 조회 무한 대기 방지)
-    private final ConcurrentHashMap<String, AtomicLong> nextSlotByAppKey = new ConcurrentHashMap<>();
+    // 최소 간격 350ms, 대량 배치가 슬롯을 선점 중이어도 20s 이상은 기다리지 않고 즉시 실패(라이브 조회 무한 대기 방지)
+    private final CallIntervalGate callGate = new CallIntervalGate(350, 20_000);
 
     // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
     // retryOnRateLimit=true: 조회(GET) 전용 — EGW00201 감지 시 추가 백오프 재시도까지 안전. false: 주문 접수/취소(POST) — 재시도 안 함(중복 위험 배제, 사전 게이트로만 방어)
@@ -164,36 +162,10 @@ class KisHttpClient {
                 : new KisApiException(message, e);
     }
 
-    // 같은 앱키로의 연속 호출 사이 최소 간격을 보장 — 락 없는 슬롯 예약(CAS 루프로 슬롯만 확정하고 대기는 락 밖에서
-    // 하므로 같은 앱키 호출끼리 sleep 동안 서로를 막지 않는다). System.nanoTime()은 상대 경과 시간
-    // 측정용이라 NTP 보정 등 벽시계 역행에 영향받지 않는다.
-    // 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않는다 — accumulateAndGet처럼 무조건 먼저 예약해버리면
-    // 거부된 호출도 대기열을 뒤로 밀어버려 반복 거부가 대기열을 무한히 미래로 누적시키는 회귀가 생긴다.
+    // 앱키 간격 게이트 위임 — 대기 상한 초과·인터럽트는 송신 전 실패라 확정 거절
     private void awaitAccountSlot(BrokerAccountRef account) {
-        AtomicLong nextSlot = nextSlotByAppKey.computeIfAbsent(account.appKey(), _ -> new AtomicLong(0));
-        long intervalNanos = MIN_CALL_INTERVAL_MILLIS * 1_000_000L;
-        long maxWaitNanos = MAX_QUEUE_WAIT_MILLIS * 1_000_000L;
-        while (true) {
-            long now = System.nanoTime();
-            long currentSlot = nextSlot.get();
-            long myTurn = Math.max(currentSlot, now);
-            long waitNanos = myTurn - now;
-            if (waitNanos > maxWaitNanos) {
-                throw KisApiException.rejected("KIS 계좌 호출 대기열 과다(" + (waitNanos / 1_000_000L)
-                        + "ms 대기 필요) — 요청 거부: accountId=" + account.id(), null);
-            }
-            if (!nextSlot.compareAndSet(currentSlot, myTurn + intervalNanos)) {
-                continue; // 동시 경쟁으로 CAS 실패 — 최신 슬롯으로 재계산
-            }
-            if (waitNanos <= 0) return;
-            try {
-                Thread.sleep(waitNanos / 1_000_000L);
-                return;
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-                throw KisApiException.rejected("KIS 호출 대기 중 인터럽트: accountId=" + account.id(), ie);
-            }
-        }
+        callGate.await(account.appKey(), reason -> KisApiException.rejected(
+                "KIS 계좌 호출 대기열 과다/인터럽트 — 요청 거부: " + reason + " accountId=" + account.id(), null));
     }
 
     // KIS 게이트웨이가 초당 거래건수 제한으로 접수 전 거부한 응답 — msg_cd 필드 디코딩 후 정확 매칭

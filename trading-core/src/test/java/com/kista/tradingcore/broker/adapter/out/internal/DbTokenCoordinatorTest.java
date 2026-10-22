@@ -1,6 +1,5 @@
-package com.kista.tradingcore.broker.adapter.out.kis;
+package com.kista.tradingcore.broker.adapter.out.internal;
 
-import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,18 +20,18 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("KisTokenCoordinator — obtain/recover")
-class KisTokenCoordinatorTest {
+@DisplayName("DbTokenCoordinator — obtain/recover")
+class DbTokenCoordinatorTest {
 
     @Mock BrokerTokenCachePort cachePort;
 
-    KisTokenCoordinator coordinator;
+    DbTokenCoordinator coordinator;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @BeforeEach
     void setUp() {
-        coordinator = new KisTokenCoordinator(cachePort);
+        coordinator = new DbTokenCoordinator(cachePort);
     }
 
     @Test

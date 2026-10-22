@@ -1,6 +1,5 @@
-package com.kista.tradingcore.broker.adapter.out.kis;
+package com.kista.tradingcore.broker.adapter.out.internal;
 
-import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,19 +11,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-// KIS 계좌 토큰 조정 — JVM-local 더블체크락 + PostgreSQL broker_tokens 캐시.
-// Toss(TossDistributedTokenCoordinator, Redis 분산 lease+fencing)와 같은 TokenCoordinator 계약을
-// 구현하지만 메커니즘은 다르다 — KIS 재발급은 이전 토큰을 무효화하지 않아(비파괴적) 인스턴스 간
+// account_id 키 broker_tokens 캐시 — 재발급이 이전 토큰을 무효화하지 않는 브로커(KIS·메리츠) 공용.
+// JVM-local 더블체크락 + PostgreSQL broker_tokens 캐시. Toss(TossDistributedTokenCoordinator, Redis 분산 lease+fencing)와
+// 같은 TokenCoordinator 계약을 구현하지만 메커니즘은 다르다 — 재발급이 비파괴적이라 인스턴스 간
 // 분산 조정이 불필요하다. 이 비대칭은 의도된 설계다(docs/agents/toss-api.md "토큰·인증", docs/agents/modules/broker.md adapter/out/internal 항목 참고).
 @Component
-class KisTokenCoordinator implements TokenCoordinator {
+public class DbTokenCoordinator implements TokenCoordinator {
 
     // 계좌별 락 — 같은 계좌 동시 호출이 토큰을 N번 발급하는 것 방지
     private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
     private final BrokerTokenCachePort cachePort;
 
     @Autowired
-    KisTokenCoordinator(BrokerTokenCachePort cachePort) {
+    public DbTokenCoordinator(BrokerTokenCachePort cachePort) {
         this.cachePort = cachePort;
     }
 
@@ -52,7 +51,7 @@ class KisTokenCoordinator implements TokenCoordinator {
         // accountId+rejectedToken 정확 일치 시만 무효화 — 이미 다른 스레드가 재발급했다면 no-op
         cachePort.invalidateToken(accountId, rejectedToken, OffsetDateTime.now(TimeZones.KST).minusHours(1));
         // 무효화로 캐시가 miss 상태가 되어 obtain이 신규 발급 경로로 재진입한다.
-        // KIS 재발급은 파괴적이지 않아 재사용 여부를 판별할 필요가 없어 항상 freshlyIssued=true로 보고한다.
+        // 재발급이 파괴적이지 않아 재사용 여부를 판별할 필요가 없어 항상 freshlyIssued=true로 보고한다.
         return new RecoveredToken(obtain(accountId, issuer), true);
     }
 
