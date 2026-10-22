@@ -20,7 +20,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Market;
-import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.trading.domain.model.Strategy;
 import java.util.Arrays;
 
 @Component
@@ -90,10 +90,10 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     @Override
     public List<CyclePositionHistoryEntry> findByStrategyIdAndDateRange(UUID strategyId, Instant from, Instant to) {
-        // ticker는 strategy에서 한 번만 조회
-        StrategyTicker ticker = strategyPort.findTickerById(strategyId);
+        // ticker·type은 strategy에서 한 번만 조회
+        Strategy strategy = strategyPort.findById(strategyId).orElse(null);
         return positionRepo.findByStrategyIdAndDateRange(strategyId, from, to).stream()
-                .map(e -> toEntry(e, ticker))
+                .map(e -> toEntry(e, strategy))
                 .toList();
     }
 
@@ -130,9 +130,9 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByStrategyIdWithCursor(UUID strategyId, Instant from,
                                                                        Instant cursor, int limit) {
-        StrategyTicker ticker = strategyPort.findTickerById(strategyId);
+        Strategy strategy = strategyPort.findById(strategyId).orElse(null);
         return positionRepo.findByStrategyIdWithCursor(strategyId, from, cursor, PageRequest.of(0, limit))
-                .stream().map(e -> toEntry(e, ticker)).toList();
+                .stream().map(e -> toEntry(e, strategy)).toList();
     }
 
     @Override
@@ -163,41 +163,37 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     // cycle_position 목록에서 strategy_cycle → strategy 경유 ticker 맵 구성
-    private Map<UUID, StrategyTicker> buildTickerMapFromPositions(List<CyclePositionEntity> entities) {
+    private Map<UUID, Strategy> buildStrategyMapFromPositions(List<CyclePositionEntity> entities) {
         Set<UUID> cycleIds = entities.stream()
                 .map(CyclePositionEntity::getStrategyCycleId)
                 .collect(Collectors.toSet());
         if (cycleIds.isEmpty()) return Map.of();
         // strategy_cycle 1회 조회 후 재사용 (이전: findAllById 3회 호출)
         List<StrategyCycleEntity> cycles = cycleRepo.findAllById(cycleIds);
-        // strategy_id → ticker
+        // strategy_id → strategy
         Set<UUID> strategyIds = cycles.stream()
                 .map(StrategyCycleEntity::getStrategyId)
                 .collect(Collectors.toSet());
-        Map<UUID, StrategyTicker> strategyTickerMap = strategyPort.findTickersByIds(strategyIds);
-        // cycleId → ticker 역매핑
-        return cycles.stream()
-                .collect(Collectors.toMap(
-                        StrategyCycleEntity::getId,
-                        sc -> strategyTickerMap.getOrDefault(sc.getStrategyId(), null)
-                ));
+        Map<UUID, Strategy> strategyMap = strategyPort.findAllByIds(strategyIds);
+        // cycleId → strategy 역매핑 (삭제된 전략은 키 없음 — toMap은 null 값을 허용하지 않는다)
+        Map<UUID, Strategy> result = new java.util.HashMap<>();
+        cycles.forEach(sc -> {
+            Strategy s = strategyMap.get(sc.getStrategyId());
+            if (s != null) result.put(sc.getId(), s);
+        });
+        return result;
     }
 
-    // 포지션 목록 → 히스토리 entry 목록 (ticker 맵 1회 구성 후 일괄 변환)
+    // 포지션 목록 → 히스토리 entry 목록 (전략 맵 1회 구성 후 일괄 변환)
     private List<CyclePositionHistoryEntry> toEntries(List<CyclePositionEntity> entities) {
-        Map<UUID, StrategyTicker> tickerMap = buildTickerMapFromPositions(entities);
-        return entities.stream().map(e -> toEntry(e, tickerMap)).toList();
+        Map<UUID, Strategy> strategyMap = buildStrategyMapFromPositions(entities);
+        return entities.stream().map(e -> toEntry(e, strategyMap.get(e.getStrategyCycleId()))).toList();
     }
 
-    // ticker 맵을 이용한 entry 변환
-    private CyclePositionHistoryEntry toEntry(CyclePositionEntity e,
-                                              Map<UUID, StrategyTicker> tickerMap) {
-        return toEntry(e, tickerMap.get(e.getStrategyCycleId()));
-    }
-
-    private CyclePositionHistoryEntry toEntry(CyclePositionEntity e, StrategyTicker ticker) {
+    // strategy가 없으면(삭제 등) ticker·type null
+    private CyclePositionHistoryEntry toEntry(CyclePositionEntity e, Strategy strategy) {
         return new CyclePositionHistoryEntry(
-                e.getId(), ticker,
+                e.getId(), strategy != null ? strategy.ticker() : null, strategy != null ? strategy.type() : null,
                 e.getUsdDeposit(), e.getClosingPrice(), e.getAvgPrice(),
                 e.getHoldings(), e.getCreatedAt()
         );

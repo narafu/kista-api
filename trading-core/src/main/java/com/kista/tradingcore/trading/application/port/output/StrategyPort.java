@@ -36,16 +36,11 @@ public interface StrategyPort {
     // strategy_cycle.id → strategyId + strategy.type 배치 조회 (관리자 거래내역용 — admin이 자체 조립)
     Map<UUID, StrategySummary> findSummariesByCycleIds(Collection<UUID> cycleIds);
 
-    // strategyId 집합 → ticker 배치 조회 (com.kista.tradingcore.trading의 CyclePositionPersistenceAdapter가 StrategyEntity 직접 접근 불가라 포트 경유)
-    Map<UUID, StrategyTicker> findTickersByIds(Collection<UUID> strategyIds);
+    // strategyId 집합 → 전략 배치 조회 (CyclePositionPersistenceAdapter가 이력 entry에 ticker·type을 싣는다 — StrategyEntity 직접 접근 불가라 포트 경유)
+    Map<UUID, Strategy> findAllByIds(Collection<UUID> strategyIds);
 
     // 같은 계좌·종목의 전략 — 등록 중복 규칙(DCA는 방향별 공존) 판정용
     List<Strategy> findByAccountIdAndTicker(UUID accountId, StrategyTicker ticker);
-
-    // 단건 ticker 조회 — 없으면 null (배치는 findTickersByIds 사용)
-    default StrategyTicker findTickerById(UUID id) {
-        return findById(id).map(Strategy::ticker).orElse(null);
-    }
 
     // 시스템 자동 일시중지(사이클 재등록 실패 등) — 사용자 승인 흐름을 거치지 않는 강제 전이
     default void pause(UUID strategyId) {

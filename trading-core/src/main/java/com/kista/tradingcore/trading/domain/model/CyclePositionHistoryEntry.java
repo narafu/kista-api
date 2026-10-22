@@ -7,11 +7,13 @@ import java.time.Instant;
 import java.util.UUID;
 import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 
 // cycle_position + strategy_cycle + strategy join 조회 결과 (계좌·사이클 기준 이력 조회 전용)
 public record CyclePositionHistoryEntry(
         UUID id,
         StrategyTicker ticker,    // strategy.ticker
+        StrategyType strategyType, // strategy.type (전략 없으면 null)
         BigDecimal usdDeposit,     // 통합주문가능금액
         BigDecimal closingPrice,   // 종가 (null 가능)
         BigDecimal avgPrice,       // 평균 매입 단가 (holdings=0이면 null)

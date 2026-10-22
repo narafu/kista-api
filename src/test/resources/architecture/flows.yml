@@ -824,7 +824,7 @@ flows:
         title: 계좌 상세(잔고·전략·거래 이력)
         desc: >-
           계좌 상세 화면(AccountDetailContent)은 서버에서 계좌·전략 목록·전략별 다음 주문 미리보기와 증권사 실시간 포트폴리오(GET /api/accounts/{id}/portfolio)를 채운다.
-          모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history — DCA 포함, USD 표시라 업비트 계좌는 빈 목록).
+          모의계좌는 포트폴리오 조회를 건너뛴다. 거래 탭(TradesTab)은 계좌의 사이클 포지션 이력을 커서 페이지로 보여 준다(GET /api/accounts/{id}/cycle-history — DCA 포함·행마다 strategyType, USD 표시라 업비트 계좌는 빈 목록).
           증거금(GET .../margin)도 같은 경로로 증권사에서 읽는다.
           업비트 계좌는 /portfolio 대신 코인 포트폴리오(GET /api/accounts/{id}/crypto-portfolio — 원화 예수금·코인별 보유·평단·현재가·평가액)를 부른다.
         code: [StatisticsController#getPresentBalance, StatisticsController#getMargin, DashboardController#getCycleHistory, AccountStatisticsService#getPresentBalance, AccountStatisticsService#getByAccount, CryptoPortfolioController#getCryptoPortfolio, CryptoPortfolioService#getCryptoPortfolio]

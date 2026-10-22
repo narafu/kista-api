@@ -90,10 +90,10 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     @Override
-    public Map<UUID, StrategyTicker> findTickersByIds(Collection<UUID> strategyIds) {
+    public Map<UUID, Strategy> findAllByIds(Collection<UUID> strategyIds) {
         if (strategyIds.isEmpty()) return Map.of();
         return jpaRepository.findAllById(strategyIds).stream()
-                .collect(Collectors.toMap(StrategyEntity::getId, StrategyEntity::getTicker));
+                .collect(Collectors.toMap(StrategyEntity::getId, this::toDomain));
     }
 
     private Strategy toDomain(StrategyEntity e) {

@@ -3,6 +3,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.stats.application.usecase.PortfolioUseCase;
@@ -50,7 +51,7 @@ class PortfolioQueryInternalControllerTest {
     @Test
     void 현재_포트폴리오_현황을_조회한다() throws Exception {
         CyclePositionHistoryEntry entry = new CyclePositionHistoryEntry(
-                UUID.randomUUID(), StrategyTicker.TQQQ,
+                UUID.randomUUID(), StrategyTicker.TQQQ, StrategyType.VR,
                 new BigDecimal("500.00"), new BigDecimal("105.00"), new BigDecimal("100.50"),
                 BigDecimal.valueOf(10), Instant.now());
         given(portfolioUseCase.getCurrent(USER_ID)).willReturn(entry);

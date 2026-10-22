@@ -137,6 +137,17 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
                 .extracting(CyclePositionHistoryEntry::holdings)
                 .contains(new BigDecimal("5"));
+        // 이력 entry는 전략 ticker·type을 싣는다 — 단건(전략) 경로와 배치(계좌) 경로 모두
+        assertThat(cyclePositionAdapter.findByStrategyIdAndDateRange(strategy.id(),
+                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
+                .allSatisfy(e -> assertThat(e.strategyType()).isEqualTo(StrategyType.INFINITE));
+        assertThat(cyclePositionAdapter.findByAccountId(accountId,
+                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60)))
+                .isNotEmpty()
+                .allSatisfy(e -> {
+                    assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
+                    assertThat(e.strategyType()).isEqualTo(StrategyType.INFINITE);
+                });
         // 저장 순서(생성 시각)에 기대지 않고 저장한 행 id로 직접 확인
         assertThat(cyclePositionAdapter.findLatestByCycleId(cycle.id(), 10))
                 .filteredOn(p -> p.id().equals(integral.id()))

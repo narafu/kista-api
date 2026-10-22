@@ -2,6 +2,7 @@ package com.kista.tradingcore.stats.application.service;
 
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import org.junit.jupiter.api.DisplayName;
@@ -52,7 +53,7 @@ class PortfolioServiceTest {
 
     private CyclePositionHistoryEntry entry(BigDecimal currentPrice) {
         return new CyclePositionHistoryEntry(
-                UUID.randomUUID(), StrategyTicker.SOXL,
+                UUID.randomUUID(), StrategyTicker.SOXL, StrategyType.INFINITE,
                 new BigDecimal("1000.00"), currentPrice,
                 new BigDecimal("25.00"), BigDecimal.valueOf(30),
                 Instant.now());
