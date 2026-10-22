@@ -19,6 +19,15 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가) + LOC 매수②((unitAmount − averagePrice×매수①수량)×(1+priceOffsetRate)/referencePrice, 기준가) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
 - **후반 unitAmount>usdDeposit**: MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
 
+### 리버스모드 별지점 (변경 금지)
+```
+starPointPrice = 현재 사이클 최신 cycle_position 5건(STAR_POINT_WINDOW)의 closingPrice 평균  (scale=2, HALF_UP — null·0 이하 종가 제외, 남는 값이 없으면 null)
+LOC 매도 가격 = starPointPrice, 쿼터매수 LOC 가격 = starPointPrice − 0.01(TICK_SIZE)
+```
+- 리버스모드 첫날은 별지점 없이 MOC 매도만 낸다 — 별지점은 2일차부터 계산(`CycleOrderComputer.computeStarPointPrice`)
+- 백테스트(`BacktestEngine.STAR_POINT_WINDOW`)도 같은 5개 윈도우 — 두 값은 함께 바꾼다
+- 최신 N건 조회는 Pageable이 건수를 정하는 파생 쿼리로 한다. `findTopN…` 같은 숫자 없는 `Top`/`First`는 PartTree가 1건으로 고정해 별지점이 종가 1개로 계산된 적이 있다(`RepositoryLimitingQueryTest`가 재발 차단)
+
 ### VR 공식 (변경 금지 — 단위 테스트로 검증)
 ```
 lowerBand = V × (1 − bandWidth/100)  (scale=2, HALF_UP)
