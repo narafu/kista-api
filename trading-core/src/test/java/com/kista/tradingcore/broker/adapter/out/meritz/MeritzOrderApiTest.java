@@ -105,6 +105,30 @@ class MeritzOrderApiTest {
     }
 
     @Test
+    void place_priced_type_with_null_price_throws_without_sending() {
+        OrderInstruction noPrice = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.SELL, OrderType.LOC, 30, null);
+        assertThatThrownBy(() -> api.place(noPrice, ACCOUNT)).isInstanceOf(IllegalArgumentException.class);
+        server.verify(); // 요청 기대 없음 → 송신됐으면 실패
+    }
+
+    @Test
+    void place_market_sell_with_null_price_sends_zero() {
+        server.expect(requestTo(ORDERS + "sell")).andExpect(jsonPath("$.oder_cls_code").value("34"))
+                .andExpect(jsonPath("$.ovrs_stck_oder_prc").value("0"))
+                .andRespond(ok(orderResponse("0", 2700586)));
+        OrderInstruction moc = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.SELL, OrderType.MOC, 30, null);
+        assertThat(api.place(moc, ACCOUNT).externalOrderId()).isEqualTo("2700586");
+        server.verify();
+    }
+
+    @Test
+    void place_null_quantity_throws_without_sending() {
+        OrderInstruction noQty = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LOC, null, new BigDecimal("82.11"));
+        assertThatThrownBy(() -> api.place(noQty, ACCOUNT)).isInstanceOf(IllegalArgumentException.class);
+        server.verify();
+    }
+
+    @Test
     void place_warning_1_resends_once_with_confirm_yes() {
         server.expect(requestTo(ORDERS + "buy")).andExpect(jsonPath("$.warn_cnfr_yn").doesNotExist())
                 .andRespond(ok(orderResponse("1", 0)));
@@ -175,6 +199,25 @@ class MeritzOrderApiTest {
 
         api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT);
         server.verify();
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1,05", "2,01", "4,31", "5,32", "6,33", "7,34", "8,35", "9,36", "A,37", "B,38"})
+    void cancel_maps_aspr_type_to_order_class(String aspr, String cls) {
+        expectToday(todayRow(2700586, aspr, 5, 5, 0));
+        server.expect(requestTo(ORDERS + "cancel")).andExpect(jsonPath("$.oder_cls_code").value(cls))
+                .andRespond(ok(orderResponse("0", 2700999)));
+
+        api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT);
+        server.verify();
+    }
+
+    @Test
+    void cancel_unknown_aspr_type_is_rejected_without_sending() {
+        expectToday(todayRow(2700586, "Z", 5, 5, 0));
+        assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
+                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isTrue());
+        server.verify(); // cancel POST 없음
     }
 
     @Test

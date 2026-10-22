@@ -63,13 +63,17 @@ class MeritzOrderApi {
 
     OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
         boolean buy = instruction.direction() == OrderDirection.BUY;
-        String price = formatPrice(instruction.price());
-        // 유형 → [oder_cls_code, oder_cond_cls_code, 가격]
+        // 수량 누락은 송신 전 차단 — "null" 문자열 전송 방지
+        if (instruction.quantity() == null || instruction.quantity() <= 0) {
+            throw new IllegalArgumentException("Meritz 주문 수량이 없습니다: " + instruction.quantity());
+        }
+        // 유형 → [oder_cls_code, oder_cond_cls_code, 가격] — 지정가 계열만 단가, 시장가 매도만 "0"
+        BigDecimal p = instruction.price();
         String[] m = switch (instruction.orderType()) {
-            case LOC -> new String[]{"32", "7", price};                                      // LOC
-            case MOC -> buy ? new String[]{"32", "7", price} : new String[]{"34", "7", MARKET_PRICE}; // 매수 MOC는 LOC 캡
-            case LIMIT -> new String[]{"01", "0", price};                                    // 지정가
-            case MOO -> buy ? new String[]{"01", "0", price} : new String[]{"05", "0", MARKET_PRICE}; // 개장 후 지정가 근사 / 시장가 매도
+            case LOC -> new String[]{"32", "7", formatPrice(p)};                                      // LOC
+            case MOC -> buy ? new String[]{"32", "7", formatPrice(p)} : new String[]{"34", "7", MARKET_PRICE}; // 매수 MOC는 LOC 캡
+            case LIMIT -> new String[]{"01", "0", formatPrice(p)};                                    // 지정가
+            case MOO -> buy ? new String[]{"01", "0", formatPrice(p)} : new String[]{"05", "0", MARKET_PRICE}; // 개장 후 지정가 근사 / 시장가 매도
             case MARKET -> throw new IllegalArgumentException("MARKET 주문은 코인 거래소 전용입니다"); // 주식 경로 도달 불가 방어
         };
         Map<String, String> body = new LinkedHashMap<>();
@@ -199,7 +203,9 @@ class MeritzOrderApi {
     }
 
     // 소수 2자리 반올림 — 메리츠 한도(4자리) 이내
+    // 가격 지정 주문의 단가 누락은 송신 전 차단 — "0"으로 보내면 사실상 무가격 주문이 된다
     private static String formatPrice(BigDecimal price) {
-        return price == null ? MARKET_PRICE : price.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        if (price == null) throw new IllegalArgumentException("Meritz 지정가 계열 주문 단가가 없습니다");
+        return price.setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 }
