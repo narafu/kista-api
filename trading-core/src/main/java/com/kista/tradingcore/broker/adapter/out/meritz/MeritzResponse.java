@@ -69,6 +69,7 @@ record MeritzResponse(
 
     // "417.0000000000" 같은 소수 표기 정수 수량
     static int wholeQuantity(String s) {
+        if (s == null || s.isBlank()) return 0; // 누락은 0
         return new BigDecimal(s.trim()).setScale(0, RoundingMode.DOWN).intValueExact();
     }
 

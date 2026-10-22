@@ -226,7 +226,7 @@ class KisHttpClientTest {
     }
 
     @Test
-    @DisplayName("같은 appKey 대기열이 대기 상한(MAX_QUEUE_WAIT_MILLIS)을 넘으면 대기 없이 즉시 KisApiException")
+    @DisplayName("같은 appKey 대기열이 대기 상한(20s)을 넘으면 대기 없이 즉시 KisApiException")
     void throwsImmediately_whenQueueWaitExceedsCap() throws Exception {
         when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
 

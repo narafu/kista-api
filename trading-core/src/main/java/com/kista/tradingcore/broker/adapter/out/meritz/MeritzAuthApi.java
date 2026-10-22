@@ -10,6 +10,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.meritz.MeritzApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.UUID;
 
 // 메리츠 토큰 발급·연결 테스트 — OAuth는 RestClient 직접 사용(MeritzHttpClient → 이 클래스 의존이라 순환 회피)
@@ -85,6 +87,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
         MeritzResponse res = MeritzResponse.parse(objectMapper, body, "GET " + CURRENCIES_PATH);
         if (!res.success()) {
             log.debug("Meritz 연결 테스트 조회 실패: rsp_cd={}, msg={}", res.rspCd(), res.rspMsg());
+            if (MeritzResponse.RATE_LIMITED.equals(res.rspCd())) throw new BrokerRateLimitException(); // 한도 초과는 키 오류가 아님
             throw MeritzResponse.PERMISSION_DENIED_CODES.contains(res.rspCd())
                     ? new BrokerPermissionDeniedException() : new BrokerCredentialException();
         }
@@ -117,7 +120,12 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
         String accessToken = text(json, "access_token");
         String expiresDate = text(json, "expires_date");
         if (accessToken != null && expiresDate != null) {
-            return new Token(accessToken, LocalDateTime.parse(expiresDate, EXPIRY_FORMAT).atZone(TimeZones.KST).toOffsetDateTime());
+            try {
+                return new Token(accessToken, LocalDateTime.parse(expiresDate, EXPIRY_FORMAT).atZone(TimeZones.KST).toOffsetDateTime());
+            } catch (DateTimeParseException e) {
+                // 만료일 형식 이상 — 발송 전 단계 실패로 분류되도록 MeritzApiException으로 감싼다
+                throw new MeritzApiException(null, "Meritz 토큰 만료일 해석 불가", e, MeritzApiException.Conflict.NONE, false);
+            }
         }
         String code = text(json, "error_code") != null ? text(json, "error_code") : text(json, "rsp_cd");
         log.warn("Meritz 토큰 발급 실패: code={}", code); // 본문엔 토큰이 없지만 메시지 원문은 로그에 남기지 않는다

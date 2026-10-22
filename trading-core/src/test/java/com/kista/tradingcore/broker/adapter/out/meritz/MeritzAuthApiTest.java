@@ -6,6 +6,8 @@ import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
+import com.kista.tradingcore.broker.domain.model.meritz.MeritzApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,6 +70,23 @@ class MeritzAuthApiTest {
 
         assertThat(issued.accessToken()).isEqualTo("tok");
         assertThat(issued.expiresInSeconds()).isCloseTo(600L, within(5L));
+    }
+
+    @Test
+    void malformed_expires_date_is_meritz_api_exception() {
+        tokenResponse("not-a-date");
+
+        assertThatThrownBy(() -> authApi.issue("key", "sec")).isInstanceOf(MeritzApiException.class);
+    }
+
+    @Test
+    void verify_account_rate_limited_is_rate_limit_exception() {
+        tokenResponse(LocalDateTime.now(TimeZones.KST).plusHours(12).format(FMT));
+        server.expect(requestTo(BASE + "/accounts/v1/me/overseas/currencies"))
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"rsp_cd\":\"EGW00200\",\"rsp_msg\":\"한도\"}"));
+
+        assertThatThrownBy(() -> authApi.verifyAccount("key", "sec", null)).isInstanceOf(BrokerRateLimitException.class);
     }
 
     @Test

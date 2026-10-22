@@ -743,7 +743,7 @@ flows:
         title: 암호화 저장
         desc: 계좌번호·앱 키·시크릿을 AES-256으로 암호화해 저장하고, 중복 확인용으로 계좌번호(메리츠·업비트는 앱 키·access key)의 HMAC 해시도 함께 저장한다. 저장되면 201과 마스킹된 계좌 정보를 돌려주고 화면은 계좌 상세로 이동한다.
         code: [AccountPersistenceAdapter#save]
-        state: "accounts +1 (업비트: account_no NULL·api_key_expires_at)"
+        state: "accounts +1 (업비트·메리츠: account_no NULL·api_key_expires_at)"
 
       - id: rename
         lane: ui
@@ -763,7 +763,7 @@ flows:
           저장 후 옛 키로 발급된 토큰 캐시(KIS broker_tokens·Toss Redis canonical — 진행 중 발급은 generation 증가로 fence)를 지운다(Redis 실패는 로그만 남기고 TTL 만료에 맡긴다). 신규 등록이 꺼진 증권사도 키 교체는 할 수 있다. 모의계좌는 키가 없어 불가.
         code: [AccountController#updateCredentials, AccountService#updateCredentials, BrokerConnectionTesters#of, AccountTokenEvictionPort#evict]
         state: "accounts.app_key·secret_key·api_key_expires_at 갱신 · broker_tokens·Toss Redis 토큰 삭제"
-        fail: 키 오류 422(BROKER_CREDENTIAL_INVALID·BROKER_IP_NOT_ALLOWED·BROKER_PERMISSION_DENIED), 다른 계좌 키는 400(Toss)·409(업비트 DUPLICATE_ACCOUNT), 모의계좌 400, 남의 계좌 403.
+        fail: 키 오류 422(BROKER_CREDENTIAL_INVALID·BROKER_IP_NOT_ALLOWED·BROKER_PERMISSION_DENIED), 다른 계좌 키는 400(Toss)·409(업비트·메리츠 DUPLICATE_ACCOUNT), 모의계좌 400, 남의 계좌 403.
 
       - id: delete
         lane: trading

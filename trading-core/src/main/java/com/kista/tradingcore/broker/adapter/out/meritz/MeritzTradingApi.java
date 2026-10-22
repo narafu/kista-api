@@ -83,10 +83,8 @@ class MeritzTradingApi {
 
     List<MarginItem> getMargin(BrokerAccountRef account) {
         EstimateRow usd = estimateRow(account, "USD");
-        BigDecimal able = usd == null ? null : MeritzResponse.decimal(usd.orderable());
-        if (able == null) able = BigDecimal.ZERO;
-        BigDecimal rate = usd == null ? null : MeritzResponse.decimal(usd.rate());
-        return List.of(new MarginItem(Currency.USD, able, able, able, rate == null ? BigDecimal.ZERO : rate));
+        BigDecimal able = orZero(usd == null ? null : usd.orderable());
+        return List.of(new MarginItem(Currency.USD, able, able, able, orZero(usd == null ? null : usd.rate())));
     }
 
     SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
