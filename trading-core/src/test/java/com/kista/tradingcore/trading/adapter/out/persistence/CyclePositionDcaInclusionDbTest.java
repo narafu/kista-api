@@ -11,37 +11,43 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 대시보드 최근/계좌 커서 조회는 DCA cycle_position을 제외하고 통계 범위 조회는 포함하는지 실 DB로 검증
+// 사용자 최근/계좌 커서 조회가 DCA cycle_position을 포함하되 원화 코인(CRYPTO_KRW) 계좌는 제외하는지 실 DB로 검증
 @Execution(ExecutionMode.SAME_THREAD)
-class CyclePositionDcaExclusionDbTest extends DataJpaTestBase {
+class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired CyclePositionJpaRepository repo;
 
     @Test
-    void user_and_account_queries_exclude_dca_positions() {
+    void user_and_account_queries_include_dca_but_exclude_krw_crypto_accounts() {
         UUID userId = UUID.randomUUID();
-        UUID accountId = UUID.randomUUID();
-        jdbc.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
-                accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
+        UUID accountId = insertAccount(userId, "KIS");
+        UUID upbitAccountId = insertAccount(userId, "UPBIT");
         UUID infinitePos = insertPosition(accountId, "INFINITE");
-        UUID dcaPos1 = insertPosition(accountId, "DCA");
-        UUID dcaPos2 = insertPosition(accountId, "DCA");
+        UUID dcaPos = insertPosition(accountId, "DCA");
+        insertPosition(upbitAccountId, "DCA"); // 원화 코인 DCA — USD 표시 화면에서 제외
 
         Instant from = Instant.EPOCH;
         Instant to = Instant.now().plusSeconds(3600);
+        List<String> excluded = List.of("UPBIT");
 
-        assertThat(repo.findRecentByUserId(userId, PageRequest.of(0, 10))).extracting(CyclePositionEntity::getId)
-                .containsExactly(infinitePos);
-        // 통계용 범위 조회는 DCA 포함 (원금을 누적 순투입액으로 계산해 통계에 포함)
-        assertThat(repo.findByUserIdAndRange(userId, from, to)).extracting(CyclePositionEntity::getId)
-                .containsExactlyInAnyOrder(infinitePos, dcaPos1, dcaPos2);
-        assertThat(repo.findByAccountIdWithCursor(accountId, from, to, PageRequest.of(0, 10)))
-                .extracting(CyclePositionEntity::getId).containsExactly(infinitePos);
+        assertThat(repo.findRecentByUserId(userId, excluded, PageRequest.of(0, 10))).extracting(CyclePositionEntity::getId)
+                .containsExactlyInAnyOrder(infinitePos, dcaPos);
+        assertThat(repo.findByAccountIdWithCursor(accountId, excluded, from, to, PageRequest.of(0, 10)))
+                .extracting(CyclePositionEntity::getId).containsExactlyInAnyOrder(infinitePos, dcaPos);
+        assertThat(repo.findByAccountIdWithCursor(upbitAccountId, excluded, from, to, PageRequest.of(0, 10))).isEmpty();
+    }
+
+    private UUID insertAccount(UUID userId, String broker) {
+        UUID accountId = UUID.randomUUID();
+        jdbc.update("INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now())",
+                accountId, userId, "테스트계좌", broker, "74420614", "01", "key", "secret");
+        return accountId;
     }
 
     // strategy → version → cycle → position 체인을 만들고 position id를 반환

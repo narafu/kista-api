@@ -214,21 +214,23 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
-    void sumFilledBuyAmountByCycleId_sumsOnlyFilledAndPartiallyFilledBuy() {
+    void sumFilledBuyAmountByCycleId_sumsFilledBuyIncludingCancelledPartialFill() {
         // 대상 사이클: FILLED BUY 2건 + PARTIALLY_FILLED BUY 1건 + FILLED SELL 1건 + PLANNED BUY 1건
         insertOrder(cycleId, "BUY",  "FILLED",           5, new BigDecimal("10.00")); // 50.00
         insertOrder(cycleId, "BUY",  "FILLED",           3, new BigDecimal("20.00")); // 60.00
         insertOrder(cycleId, "BUY",  "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // 30.00
         insertOrder(cycleId, "SELL", "FILLED",           4, new BigDecimal("25.00")); // 제외 (SELL)
-        insertOrder(cycleId, "BUY",  "PLANNED",          null, null);                 // 제외 (status 불일치)
+        insertOrder(cycleId, "BUY",  "PLANNED",          null, null);                 // 제외 (미체결)
+        insertOrder(cycleId, "BUY",  "CANCELLED",        1, new BigDecimal("10.00")); // 10.00 (취소 전 부분 체결)
+        insertOrder(cycleId, "BUY",  "CANCELLED",        null, null);                 // 제외 (무체결 취소)
 
         // 타 사이클: FILLED BUY 1건 — cycle_id 필터로 제외
         insertOrder(otherCycleId, "BUY", "FILLED", 10, new BigDecimal("30.00")); // 제외 (다른 사이클)
 
-        // 기대값: 50.00 + 60.00 + 30.00 = 140.00
+        // 기대값: 50.00 + 60.00 + 30.00 + 10.00 = 150.00
         BigDecimal result = adapter.sumFilledBuyAmountByCycleId(cycleId);
 
-        assertThat(result).isEqualByComparingTo(new BigDecimal("140.00"));
+        assertThat(result).isEqualByComparingTo(new BigDecimal("150.00"));
     }
 
     @Test
@@ -242,6 +244,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         insertOrderForAccount(accountId, cycleId, d3, "SOXL", "SELL", "FILLED", 3, new BigDecimal("10.00"));           // -30
         insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "PLANNED", null, null);                          // 제외 (미체결)
         insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "CANCELLED", null, null);                        // 제외
+        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "CANCELLED", 1, new BigDecimal("10.00"));        // +10 (취소 전 부분 체결)
         insertOrderForAccount(accountId, otherCycleId, d1, "SOXL", "BUY", "FILLED", 10, new BigDecimal("30.00"));      // 다른 사이클
 
         var result = adapter.findFilledNetInvestedByCycleIds(java.util.List.of(cycleId));
@@ -250,7 +253,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(result.get(cycleId)).containsOnlyKeys(d1, d2, d3);
         assertThat(result.get(cycleId).get(d1)).isEqualByComparingTo("80.00");
         assertThat(result.get(cycleId).get(d2)).isEqualByComparingTo("100.00");
-        assertThat(result.get(cycleId).get(d3)).isEqualByComparingTo("70.00");
+        assertThat(result.get(cycleId).get(d3)).isEqualByComparingTo("80.00");
     }
 
     @Test
@@ -300,14 +303,16 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
 
         insertOrderForAccount(accountId, cycleId, "BUY", "FILLED", 5, new BigDecimal("10.00"));           // 포함 (50.00)
         insertOrderForAccount(secondAccountId, cycleId, "SELL", "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // 포함 (30.00)
-        insertOrderForAccount(accountId, cycleId, "BUY", "PLANNED", null, null);                          // 제외 (status 불일치)
+        insertOrderForAccount(accountId, cycleId, "BUY", "PLANNED", null, null);                          // 제외 (미체결)
+        insertOrderForAccount(accountId, cycleId, "BUY", "CANCELLED", 1, new BigDecimal("10.00"));        // 포함 (취소 전 부분 체결)
+        insertOrderForAccount(accountId, cycleId, "BUY", "CANCELLED", null, null);                        // 제외 (무체결 취소)
         insertOrderForAccount(otherUserAccountId, cycleId, "BUY", "FILLED", 10, new BigDecimal("30.00")); // 제외 (다른 유저)
         insertOrderForAccount(deletedAccountId, cycleId, "BUY", "FILLED", 1, new BigDecimal("5.00"));     // 제외 (삭제된 계좌)
 
         var result = adapter.findFilledByUser(userId, LocalDate.now().minusDays(1), LocalDate.now().plusDays(1));
 
-        assertThat(result).hasSize(2);
-        assertThat(result).extracting(o -> o.accountId()).containsExactlyInAnyOrder(accountId, secondAccountId);
+        assertThat(result).hasSize(3);
+        assertThat(result).extracting(o -> o.accountId()).containsExactlyInAnyOrder(accountId, accountId, secondAccountId);
     }
 
     // ── 접수 선점(SUBMITTING) — spec 2026-10-16 §3.1·§3.4 ──

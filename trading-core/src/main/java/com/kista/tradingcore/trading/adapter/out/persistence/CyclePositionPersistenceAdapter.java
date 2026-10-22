@@ -18,11 +18,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyTicker;
+import java.util.Arrays;
 
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CyclePositionPersistenceAdapter implements CyclePositionPort {
+
+    // 사용자 합산·계좌 이력 화면은 USD 표시 전제 — 원화 코인 계좌는 제외 (통계 합산 경로의 CRYPTO_KRW 제외 원칙과 동일)
+    private static final List<String> NON_USD_BROKERS = Arrays.stream(Broker.values())
+            .filter(b -> b.getMarket() == Market.CRYPTO_KRW).map(Enum::name).toList();
 
     private final CyclePositionJpaRepository positionRepo;
     private final StrategyCycleJpaRepository cycleRepo;     // strategy_cycle 조인: 현재 사이클 조회
@@ -37,7 +44,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     public List<CyclePosition> findLatestByStrategyId(UUID strategyId, int limit) {
         // 현재 사이클(latest strategy_cycle) 의 최신 포지션 N건 반환
         return cycleRepo.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
-                .map(sc -> positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(
+                .map(sc -> positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(
                         sc.getId(), PageRequest.of(0, limit)))
                 .orElse(List.of())
                 .stream()
@@ -48,7 +55,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePosition> findLatestByCycleId(UUID cycleId, int limit) {
         // strategy_cycle_id 기준 최신 N건 직접 조회 (리버스모드 별지점 계산용)
-        return positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
+        return positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -92,7 +99,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     @Override
     public List<CyclePositionHistoryEntry> findRecentByUser(UUID userId, int limit) {
-        return toEntries(positionRepo.findRecentByUserId(userId, PageRequest.of(0, limit)));
+        return toEntries(positionRepo.findRecentByUserId(userId, NON_USD_BROKERS, PageRequest.of(0, limit)));
     }
 
     @Override
@@ -117,7 +124,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePositionHistoryEntry> findByAccountIdWithCursor(UUID accountId, Instant from,
                                                                       Instant cursor, int limit) {
-        return toEntries(positionRepo.findByAccountIdWithCursor(accountId, from, cursor, PageRequest.of(0, limit)));
+        return toEntries(positionRepo.findByAccountIdWithCursor(accountId, NON_USD_BROKERS, from, cursor, PageRequest.of(0, limit)));
     }
 
     @Override
@@ -131,7 +138,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public void updateCycleStartSnapshot(UUID strategyId, BigDecimal newDeposit) {
         CyclePositionEntity latest = cycleRepo.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
-                .flatMap(sc -> positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(
+                .flatMap(sc -> positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(
                         sc.getId(), PageRequest.of(0, 1)).stream().findFirst())
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 

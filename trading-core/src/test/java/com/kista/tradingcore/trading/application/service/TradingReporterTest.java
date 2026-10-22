@@ -258,6 +258,25 @@ class TradingReporterTest {
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(), null);
 
         assertThat(savedHoldings()).isEqualByComparingTo("12");
+        // 원금 집계(filled_quantity > 0)도 같은 체결을 보도록 상태는 CANCELLED 유지한 채 체결분 기록
+        verify(orderPort).markFilled(cancelled.id(), BigDecimal.valueOf(2), new BigDecimal("20.00"), OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void 리포트_재개로_mainOrders에_섞인_취소_주문도_CANCELLED를_유지한다() {
+        // 재개 경로는 상태 무관 당일 주문을 mainOrders로 넘기므로 같은 취소 주문이 양쪽에 들어온다
+        Order cancelled = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), TODAY, StrategyTicker.SOXL,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
+                BigDecimal.valueOf(5), new BigDecimal("20.00"), OrderStatus.CANCELLED, "X1", null, null);
+        when(orderPort.findCancelledByCycleAndDate(CYCLE.id(), TODAY)).thenReturn(List.of(cancelled));
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF))
+                .thenReturn(List.of(buyExecution("X1", 2, "20.00")));
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(cancelled), null);
+
+        assertThat(savedHoldings()).isEqualByComparingTo("12");
+        verify(orderPort).markFilled(cancelled.id(), BigDecimal.valueOf(2), new BigDecimal("20.00"), OrderStatus.CANCELLED);
+        verify(orderPort, never()).markFilled(eq(cancelled.id()), any(), any(), eq(OrderStatus.PARTIALLY_FILLED));
     }
 
     @Test

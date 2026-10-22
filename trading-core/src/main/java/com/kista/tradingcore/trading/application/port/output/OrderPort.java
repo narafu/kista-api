@@ -81,10 +81,10 @@ public interface OrderPort {
     // 계좌·거래일·종목 기준 PLANNED/SUBMITTING/PLACED SELL 예약 수량 합계 (판매가능수량 중복 배정 방지용)
     int sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(UUID accountId, LocalDate tradeDate, StrategyTicker ticker);
 
-    // 계좌 기준 FILLED/PARTIALLY_FILLED 주문 조회 (일별 거래내역 달력용)
+    // 계좌 기준 체결 주문 조회(filled_quantity > 0 — 취소 전 부분 체결된 CANCELLED 포함) (일별 거래내역 달력용)
     List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to);
 
-    // 유저 기준 FILLED/PARTIALLY_FILLED 주문 조회 (대시보드 배치 조회 — 보유 계좌 전체 합산, 1회 조회)
+    // 유저 기준 체결 주문 조회(filled_quantity > 0 — 취소 전 부분 체결된 CANCELLED 포함) (대시보드 배치 조회 — 보유 계좌 전체 합산, 1회 조회)
     List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to);
 
     // 전략 기준 기간 내 주문 전체 조회 (사용자 주문내역 탭용) — strategy_cycle을 통한 JOIN 필요
@@ -96,7 +96,7 @@ public interface OrderPort {
     // AT_OPEN + PLANNED 주문 조회 (개장 스케쥴러·수동 실행 선접수용)
     List<Order> findAtOpenPlannedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 사이클 기준 FILLED/PARTIALLY_FILLED BUY 체결금액 합계 (VR 전략 누적 매수금 계산용)
+    // 사이클 기준 BUY 체결금액 합계(취소 전 부분 체결된 CANCELLED 포함) (VR 전략 누적 매수금 계산용)
     BigDecimal sumFilledBuyAmountByCycleId(UUID strategyCycleId);
 
     // id 목록 일괄 조회 (DCA 회차 이력의 주문 조인용)
@@ -105,7 +105,7 @@ public interface OrderPort {
     // 계좌의 미완료(PLANNED·SUBMITTING·PLACED) 주문 — 날짜 무관(자정 넘김 대비), 거래일·생성 시각 오름차순 (코인 주문 동기화용)
     List<Order> findOpenByAccountId(UUID accountId);
 
-    // 사이클별 일자(KST 거래일)별 누적 순투입액 = Σ(BUY 체결금액) − Σ(SELL 체결금액), FILLED/PARTIALLY_FILLED 전체(수동 보정 포함).
+    // 사이클별 일자(KST 거래일)별 누적 순투입액 = Σ(BUY 체결금액) − Σ(SELL 체결금액), 체결 주문 전체(수동 보정·취소 전 부분 체결 포함).
     // 체결 주문이 없는 사이클은 키 없음 (DCA 원금 계산용 — 통계 N+1 방지 일괄 조회)
     Map<UUID, NavigableMap<LocalDate, BigDecimal>> findFilledNetInvestedByCycleIds(Collection<UUID> strategyCycleIds);
 }

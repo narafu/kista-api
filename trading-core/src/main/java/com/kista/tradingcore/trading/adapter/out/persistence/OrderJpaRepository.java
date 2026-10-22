@@ -105,35 +105,33 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("to") LocalDate to,
             @Param("ticker") String ticker);
 
-    // 유저 기준 기간+상태 복합 조건 조회 (account 경유 JOIN — 대시보드 배치 조회용, 계좌 구분 없이 전체 합산)
+    // 유저 기준 기간 체결 주문 조회 — 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함) (account 경유 JOIN — 대시보드 배치 조회용, 계좌 구분 없이 전체 합산)
     @Query(value = """
             SELECT o.* FROM orders o
             JOIN accounts a ON o.account_id = a.id
             WHERE a.user_id = :userId
               AND o.trade_date BETWEEN :from AND :to
-              AND o.status IN :statuses
+              AND o.filled_quantity > 0
               AND a.deleted_at IS NULL
             ORDER BY o.trade_date DESC, o.created_at DESC
             """, nativeQuery = true)
-    List<OrderEntity> findByUserIdAndTradeDateBetweenAndStatusIn(
+    List<OrderEntity> findFilledByUserIdAndTradeDateBetween(
             @Param("userId") UUID userId,
             @Param("from") LocalDate from,
-            @Param("to") LocalDate to,
-            @Param("statuses") List<String> statuses);
+            @Param("to") LocalDate to);
 
-    // 계좌·날짜범위·상태 복합 조건 조회 (daily-trades DB 전환용) — 최신순
+    // 계좌·날짜범위 체결 주문 조회 (daily-trades) — 최신순, 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함)
     @Query(value = """
             SELECT * FROM orders
             WHERE account_id = :accountId
               AND trade_date BETWEEN :from AND :to
-              AND status IN :statuses
+              AND filled_quantity > 0
             ORDER BY trade_date DESC, created_at DESC
             """, nativeQuery = true)
-    List<OrderEntity> findByAccountIdAndTradeDateBetweenAndStatusIn(
+    List<OrderEntity> findFilledByAccountIdAndTradeDateBetween(
             @Param("accountId") UUID accountId,
             @Param("from") LocalDate from,
-            @Param("to") LocalDate to,
-            @Param("statuses") List<String> statuses);
+            @Param("to") LocalDate to);
 
     // 전략 기준 기간 내 주문 전체 조회 — strategy_cycle 경유 JOIN
     @Query(value = """
@@ -163,26 +161,25 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             """, nativeQuery = true)
     List<LocalDate> findDistinctTradeDatesByStrategyId(@Param("strategyId") UUID strategyId);
 
-    // 사이클 기준 FILLED/PARTIALLY_FILLED BUY 체결금액 합계 (VR 전략 누적 매수금 계산용)
+    // 사이클 기준 BUY 체결금액 합계 (VR 전략 누적 매수금 계산용) — 체결 판정은 filled_quantity > 0 (취소 전 부분 체결된 CANCELLED 포함)
     // orders 테이블은 soft-delete 없음 — deleted_at 조건 불필요
     @Query(value = """
             SELECT COALESCE(SUM(filled_quantity * filled_price), 0)
             FROM orders
             WHERE strategy_cycle_id = :strategyCycleId
               AND direction = 'BUY'
-              AND status IN ('FILLED', 'PARTIALLY_FILLED')
+              AND filled_quantity > 0
             """, nativeQuery = true)
     BigDecimal sumFilledBuyAmountByCycleId(@Param("strategyCycleId") UUID strategyCycleId);
 
-    // 사이클·거래일별 순투입 체결금액(BUY +, SELL -) — 거래일 오름차순 (누적은 어댑터가 계산)
+    // 사이클·거래일별 순투입 체결금액(BUY +, SELL -) — 거래일 오름차순 (누적은 어댑터가 계산), 취소 전 부분 체결된 CANCELLED 포함
     @Query(value = """
             SELECT strategy_cycle_id AS cycleId, trade_date AS tradeDate,
                    SUM(CASE WHEN direction = 'BUY' THEN filled_quantity * filled_price
                             ELSE -filled_quantity * filled_price END) AS net
             FROM orders
             WHERE strategy_cycle_id IN (:cycleIds)
-              AND status IN ('FILLED', 'PARTIALLY_FILLED')
-              AND filled_quantity IS NOT NULL AND filled_price IS NOT NULL
+              AND filled_quantity > 0 AND filled_price IS NOT NULL
             GROUP BY strategy_cycle_id, trade_date
             ORDER BY trade_date
             """, nativeQuery = true)

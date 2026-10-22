@@ -16,7 +16,7 @@ import java.util.UUID;
 interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, UUID> {
 
     // strategy_cycle_id 기준 최신 N건 — 건수는 Pageable이 정한다(Top/First를 붙이면 PartTree가 1건으로 고정) (@SQLRestriction: deleted_at IS NULL 자동 적용)
-    List<CyclePositionEntity> findByStrategyCycleIdOrderByCreatedAtDesc(UUID strategyCycleId, Pageable pageable);
+    List<CyclePositionEntity> findTopNByStrategyCycleIdOrderByCreatedAtDesc(UUID strategyCycleId, Pageable pageable);
 
     // strategy_cycle_id 기준 개장 포지션 1건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
     Optional<CyclePositionEntity> findTop1ByStrategyCycleIdOrderByCreatedAtAsc(UUID strategyCycleId);
@@ -71,17 +71,19 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     // 전체 이력 최근 N건 — 대시보드·텔레그램 현황용 (@SQLRestriction 적용)
     List<CyclePositionEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    // 사용자 스코프 최근 N건 (대시보드 — 본인 데이터만, native, DCA 제외: 같은 보유 스냅샷을 중복 기록)
+    // 사용자 스코프 최근 N건 (관리자 /status — 본인 데이터만, native, DCA 포함·USD 표시 전제라 excludedBrokers(원화 코인) 계좌 제외)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
             JOIN accounts a ON s.account_id = a.id
-            WHERE a.user_id = :userId AND s.type <> 'DCA'
+            WHERE a.user_id = :userId AND a.broker NOT IN (:excludedBrokers)
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
-    List<CyclePositionEntity> findRecentByUserId(@Param("userId") UUID userId, Pageable pageable);
+    List<CyclePositionEntity> findRecentByUserId(@Param("userId") UUID userId,
+                                                 @Param("excludedBrokers") Collection<String> excludedBrokers,
+                                                 Pageable pageable);
 
     // 사용자 스코프 범위 조회 (통계 — created_at 오름차순, native, DCA 포함: DCA도 자기 원장 스냅샷을 가진다)
     @Query(value = """
@@ -109,18 +111,20 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     List<CyclePositionEntity> findByCycleIdsAndRange(
             @Param("cycleIds") Set<UUID> cycleIds, @Param("from") Instant from, @Param("to") Instant to);
 
-    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy JOIN, DCA 제외)
+    // 계좌 기준 커서 페이지네이션 (native — strategy_cycle → strategy → accounts JOIN, DCA 포함·USD 표시 전제라 excludedBrokers(원화 코인) 계좌 제외)
     @Query(value = """
             SELECT cp.* FROM cycle_position cp
             JOIN strategy_cycle sc ON cp.strategy_cycle_id = sc.id
             JOIN strategy s ON sc.strategy_id = s.id
-            WHERE s.account_id = :accountId AND s.type <> 'DCA'
+            JOIN accounts a ON s.account_id = a.id
+            WHERE s.account_id = :accountId AND a.broker NOT IN (:excludedBrokers)
               AND cp.created_at >= :from AND cp.created_at < :cursor
               AND cp.deleted_at IS NULL AND sc.deleted_at IS NULL AND s.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
     List<CyclePositionEntity> findByAccountIdWithCursor(
             @Param("accountId") UUID accountId,
+            @Param("excludedBrokers") Collection<String> excludedBrokers,
             @Param("from") Instant from,
             @Param("cursor") Instant cursor,
             Pageable pageable);

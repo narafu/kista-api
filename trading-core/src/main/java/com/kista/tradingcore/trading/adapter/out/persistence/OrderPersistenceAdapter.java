@@ -218,20 +218,12 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findFilledByAccount(UUID accountId, LocalDate from, LocalDate to) {
-        return toDomainList(repository.findByAccountIdAndTradeDateBetweenAndStatusIn(
-                accountId,
-                from,
-                to,
-                List.of(OrderStatus.FILLED.name(), OrderStatus.PARTIALLY_FILLED.name())));
+        return toDomainList(repository.findFilledByAccountIdAndTradeDateBetween(accountId, from, to));
     }
 
     @Override
     public List<Order> findFilledByUser(UUID userId, LocalDate from, LocalDate to) {
-        return toDomainList(repository.findByUserIdAndTradeDateBetweenAndStatusIn(
-                userId,
-                from,
-                to,
-                List.of(OrderStatus.FILLED.name(), OrderStatus.PARTIALLY_FILLED.name())));
+        return toDomainList(repository.findFilledByUserIdAndTradeDateBetween(userId, from, to));
     }
 
     @Override
@@ -254,7 +246,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public BigDecimal sumFilledBuyAmountByCycleId(UUID strategyCycleId) {
-        // FILLED/PARTIALLY_FILLED BUY 체결금액 합계 — 결과 없으면 ZERO (COALESCE 보장)
+        // BUY 체결금액 합계(취소 전 부분 체결 포함) — 결과 없으면 ZERO (COALESCE 보장)
         BigDecimal result = repository.sumFilledBuyAmountByCycleId(strategyCycleId);
         return result != null ? result : BigDecimal.ZERO;
     }
