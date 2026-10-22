@@ -155,7 +155,7 @@ class HexagonalArchitectureTest {
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("com.kista.tradingcore.broker..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..");
+                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..");
         rule.check(classes);
     }
 

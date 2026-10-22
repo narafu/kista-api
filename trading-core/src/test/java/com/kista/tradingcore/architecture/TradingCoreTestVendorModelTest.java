@@ -31,7 +31,7 @@ class TradingCoreTestVendorModelTest {
                         "com.kista.tradingcore.trading..", "com.kista.tradingcore.web..", "com.kista.tradingcore.stats..",
                         "com.kista.tradingcore.account..", "com.kista.tradingcore.privacy..", "com.kista.tradingcore.marketcalendar..", "com.kista.tradingcore.matching..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..");
+                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..");
         rule.check(testClasses);
     }
 }

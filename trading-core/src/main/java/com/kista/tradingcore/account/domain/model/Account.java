@@ -24,9 +24,9 @@ public record Account(
         this(id, userId, nickname, accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, null);
     }
 
-    // 전역 중복 판정 키 SSOT — 업비트는 계좌번호가 없어 access key, 그 외는 계좌번호
+    // 전역 중복 판정 키 SSOT — 업비트·메리츠는 계좌번호가 없어 앱키, 그 외는 계좌번호
     public static String dedupeKeyOf(Broker broker, String accountNo, String appKey) {
-        return broker == Broker.UPBIT ? appKey : accountNo;
+        return broker == Broker.UPBIT || broker == Broker.MERITZ ? appKey : accountNo;
     }
 
     public String dedupeKey() {

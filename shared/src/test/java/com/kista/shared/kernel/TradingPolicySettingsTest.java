@@ -16,7 +16,7 @@ class TradingPolicySettingsTest {
         TradingPolicySettings settings = TradingPolicySettings.defaults();
 
         assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
-        assertThat(settings.brokers().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != Broker.UPBIT)); // UPBIT만 기본 비활성
+        assertThat(settings.brokers().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != Broker.UPBIT && e.getKey() != Broker.MERITZ)); // UPBIT·MERITZ만 기본 비활성
         assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
         assertThat(settings.strategies().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != StrategyType.DCA)); // DCA만 기본 비활성
         assertThat(settings.strategy(StrategyType.INFINITE).divisionCount())
@@ -33,6 +33,13 @@ class TradingPolicySettingsTest {
         assertThat(upbit.enabled()).isFalse();
         assertThat(upbit.allowedIp()).isEqualTo("168.107.63.152");
         assertThat(TradingPolicySettings.defaults().brokers().get(Broker.KIS).allowedIp()).isNull();
+    }
+
+    @Test
+    void defaults_disable_meritz() {
+        BrokerSettings meritz = TradingPolicySettings.defaults().brokers().get(Broker.MERITZ);
+        assertThat(meritz.enabled()).isFalse();
+        assertThat(meritz.allowedIp()).isNull();
     }
 
     @Test

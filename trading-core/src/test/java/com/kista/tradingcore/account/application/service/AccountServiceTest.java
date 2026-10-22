@@ -111,6 +111,37 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("메리츠 등록: 계좌번호를 무시하고 키만 받으며 키가 비면 400")
+    void register_meritz_ignores_account_no_and_requires_keys() {
+        when(brokerEnabledPort.enabled(Broker.MERITZ)).thenReturn(true);
+        when(connectionTesters.of(Broker.MERITZ)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.register(userId,
+                new RegisterAccountCommand("메리츠", "123", "ak", "sk", Broker.MERITZ));
+
+        assertThat(saved.accountNo()).isNull();
+        verify(connectionTester).verifyAccount("ak", "sk", null);
+        verify(accountPort).existsByDedupeKey("ak");
+        assertThatThrownBy(() -> accountService.register(userId,
+                new RegisterAccountCommand("메리츠", null, " ", "sk", Broker.MERITZ)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다");
+    }
+
+    @Test
+    @DisplayName("키 수정: 메리츠 새 키가 다른 계좌에 있으면 409")
+    void update_credentials_meritz_rejects_key_used_by_other_account() {
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(
+                new Account(accountId, userId, "메리츠", null, "old", "sk", null, Broker.MERITZ, null));
+        when(accountPort.existsByDedupeKey("taken")).thenReturn(true);
+
+        assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk")))
+                .isInstanceOf(Account.DuplicateAccountException.class);
+    }
+
+    @Test
     @DisplayName("업비트 계좌(계좌번호 null)를 가진 사용자가 KIS 계좌를 등록해도 NPE가 나지 않는다")
     void register_kis_whenUserAlreadyHasUpbitAccount_doesNotNpe() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
