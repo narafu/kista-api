@@ -250,6 +250,38 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(cyclePositionAdapter.findLatestByCycleIds(List.of())).isEmpty();
     }
 
+    // ===== findLatestByCycleId / findLatestByStrategyId — limit 만큼 최신순 반환 (별지점 5거래일 윈도우) =====
+
+    @Test
+    void findLatestByCycleId_returnsUpToLimitNewestFirstExcludingDeleted() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(10, ChronoUnit.HOURS);
+        UUID cycleId = insertCycleChain(accountId, false, false);
+        List<UUID> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            ids.add(insertPosition(cycleId, new BigDecimal(i + 1), base.plus(i, ChronoUnit.HOURS), false));
+        }
+        insertPosition(cycleId, new BigDecimal("99.00"), base.plus(7, ChronoUnit.HOURS), true); // 삭제된 최신 — 제외
+
+        assertThat(cyclePositionAdapter.findLatestByCycleId(cycleId, 5))
+                .extracting(CyclePosition::id)
+                .containsExactly(ids.get(5), ids.get(4), ids.get(3), ids.get(2), ids.get(1));
+    }
+
+    @Test
+    void findLatestByStrategyId_returnsUpToLimitNewestFirst() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(10, ChronoUnit.HOURS);
+        UUID cycleId = insertCycleChain(accountId, false, false);
+        UUID strategyId = jdbcTemplate.queryForObject(
+                "SELECT strategy_id FROM strategy_cycle WHERE id = ?", UUID.class, cycleId);
+        insertPosition(cycleId, new BigDecimal("1.00"), base, false);
+        UUID middle = insertPosition(cycleId, new BigDecimal("2.00"), base.plus(1, ChronoUnit.HOURS), false);
+        UUID newest = insertPosition(cycleId, new BigDecimal("3.00"), base.plus(2, ChronoUnit.HOURS), false);
+
+        assertThat(cyclePositionAdapter.findLatestByStrategyId(strategyId, 2))
+                .extracting(CyclePosition::id)
+                .containsExactly(newest, middle);
+    }
+
     @Test
     void findFirstOne_skipsSoftDeletedOpeningPosition() {
         Instant openingAt = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(2, ChronoUnit.HOURS);

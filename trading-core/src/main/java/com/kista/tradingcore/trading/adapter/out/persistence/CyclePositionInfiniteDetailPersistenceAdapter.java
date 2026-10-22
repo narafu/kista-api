@@ -27,7 +27,7 @@ class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfi
 
     @Override
     public List<CyclePositionInfiniteDetail> findLatestByCycleId(UUID cycleId, int limit) {
-        return jpaRepository.findTopNByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
+        return jpaRepository.findByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
                 .stream()
                 .map(this::toDomain)
                 .toList();

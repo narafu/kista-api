@@ -37,7 +37,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     public List<CyclePosition> findLatestByStrategyId(UUID strategyId, int limit) {
         // 현재 사이클(latest strategy_cycle) 의 최신 포지션 N건 반환
         return cycleRepo.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
-                .map(sc -> positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(
+                .map(sc -> positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(
                         sc.getId(), PageRequest.of(0, limit)))
                 .orElse(List.of())
                 .stream()
@@ -48,7 +48,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public List<CyclePosition> findLatestByCycleId(UUID cycleId, int limit) {
         // strategy_cycle_id 기준 최신 N건 직접 조회 (리버스모드 별지점 계산용)
-        return positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
+        return positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -131,7 +131,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public void updateCycleStartSnapshot(UUID strategyId, BigDecimal newDeposit) {
         CyclePositionEntity latest = cycleRepo.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
-                .flatMap(sc -> positionRepo.findTopNByStrategyCycleIdOrderByCreatedAtDesc(
+                .flatMap(sc -> positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(
                         sc.getId(), PageRequest.of(0, 1)).stream().findFirst())
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 

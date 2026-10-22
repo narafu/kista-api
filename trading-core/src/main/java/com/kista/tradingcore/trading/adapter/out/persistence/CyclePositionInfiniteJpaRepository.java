@@ -18,7 +18,7 @@ interface CyclePositionInfiniteJpaRepository extends JpaRepository<CyclePosition
               AND cpi.deleted_at IS NULL
             ORDER BY cp.created_at DESC
             """, nativeQuery = true)
-    List<CyclePositionInfiniteEntity> findTopNByStrategyCycleIdOrderByCreatedAtDesc(
+    List<CyclePositionInfiniteEntity> findByStrategyCycleIdOrderByCreatedAtDesc(
             @Param("cycleId") UUID cycleId,
             Pageable pageable);
 }

@@ -15,8 +15,8 @@ import java.util.UUID;
 
 interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, UUID> {
 
-    // strategy_cycle_id 기준 최신 N건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
-    List<CyclePositionEntity> findTopNByStrategyCycleIdOrderByCreatedAtDesc(UUID strategyCycleId, Pageable pageable);
+    // strategy_cycle_id 기준 최신 N건 — 건수는 Pageable이 정한다(Top/First를 붙이면 PartTree가 1건으로 고정) (@SQLRestriction: deleted_at IS NULL 자동 적용)
+    List<CyclePositionEntity> findByStrategyCycleIdOrderByCreatedAtDesc(UUID strategyCycleId, Pageable pageable);
 
     // strategy_cycle_id 기준 개장 포지션 1건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
     Optional<CyclePositionEntity> findTop1ByStrategyCycleIdOrderByCreatedAtAsc(UUID strategyCycleId);
