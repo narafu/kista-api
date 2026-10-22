@@ -59,5 +59,6 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - **매매·스케쥴러·주문 로직 작업 시 필수 Read**: `docs/agents/workflow.md` — 스케쥴러 실행 흐름, MarketSession(DIRECT|BLOCKED), BuyOrderPriceCapper 보정 주문, orders/cycle_position 기록 테이블 구분
 - KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
 - 토스증권 API 작업: `docs/agents/toss-api.md`
+- 메리츠 API 작업: `docs/agents/meritz-api.md`
 - Docker/배포/인프라 작업: `docs/agents/docker-infra.md`
 - 배치 스케줄러 실행 시각: `docs/agents/scheduler-time-table.md`

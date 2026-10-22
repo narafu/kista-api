@@ -9,8 +9,8 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
 - `KisHttpClient.buildHeaders(token, appKey, appSecret, trId)`(static) — 계좌별 자격증명으로 헤더 구성. 계좌 기반 헬퍼 `post(trId, …, BrokerAccountRef, …)`/`tradingGet`/`pricingGet`는 `BrokerAccountRef`를 받아 토큰 확보·헤더·401 재시도를 일괄 처리
-- `KisAuthApi.getToken(UUID accountId, String appKey, String appSecret)` — account_id 기반 독립 토큰 캐시 (`broker_tokens` PK = account_id UUID). `KisHttpClient`가 **구체 타입으로 직접 주입**받음(어댑터 패키지 내부 협력). 내부는 `KisTokenCoordinator.obtain`(JVM 내 로컬 락) + `BrokerTokenCachePort`(DB)
-- 토큰 관리는 `KisAuthApi`만 담당; 만료 1분 전부터 재발급 (경계값 EGW00123 방지, `KisAuthApi`의 DB 유효 토큰 조회 기준 `now+1분`), `KisTokenCoordinator`의 JVM-local 락으로 동시 요청 경합 차단
+- `KisAuthApi.getToken(UUID accountId, String appKey, String appSecret)` — account_id 기반 독립 토큰 캐시 (`broker_tokens` PK = account_id UUID). `KisHttpClient`가 **구체 타입으로 직접 주입**받음(어댑터 패키지 내부 협력). 내부는 `DbTokenCoordinator.obtain`(JVM 내 로컬 락) + `BrokerTokenCachePort`(DB)
+- 토큰 관리는 `KisAuthApi`만 담당; 만료 1분 전부터 재발급 (경계값 EGW00123 방지, `KisAuthApi`의 DB 유효 토큰 조회 기준 `now+1분`), `DbTokenCoordinator`의 JVM-local 락으로 동시 요청 경합 차단
 - `KisHttpClient`는 401이 발생한 요청의 access token을 함께 전달해 **DB에 그 토큰이 아직 저장된 경우에만** `INVALIDATED_TOKEN`으로 조건부 갱신한 뒤 최신 토큰으로 1회 재시도한다. 느리게 도착한 stale 401이 동시 요청이 이미 재발급한 신규 토큰을 무효화하지 않도록 `accountId + rejectedAccessToken` 일치가 필수다.
 - **`KisAuthApi`는 `KisHttpClient` 빈 미주입** — `kisRestClient`(RestClient) 직접 사용 (순환 의존 방지, 정적 헬퍼 `splitAccountNo`/`buildHeaders`만 참조)
 - `BrokerConnectionTestPort` 구현 (`verifyCredentials`/`verifyAccount`): `verifyCredentials(appKey, secretKey, accountId)` — accountId=null이면 캐시 저장 생략(등록 전 사전 검증), 성공 토큰은 90초 단기 캐시(EGW00133 회피)

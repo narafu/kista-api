@@ -1,7 +1,7 @@
 ## com.kista.tradingcore.account (`:trading-core`)
 
 com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 계좌 자격증명·브로커 연결. "domain"·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter internal
-  domain/model/       ← Account(`apiKeyExpiresAt` — 업비트 키 만료, `dedupeKey()` — 업비트 access key·그 외 계좌번호 = 전역 중복 판정 키 SSOT, `withCredentials`)/RegisterAccountCommand/UpdateAccountCommand. `Account.Broker` nested enum 없음 — `sharedkernel.Broker` 참조. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
+  domain/model/       ← Account(`apiKeyExpiresAt` — 업비트 키 만료, `dedupeKey()` — 업비트·메리츠 appKey(계좌번호 없는 브로커)·그 외 계좌번호 = 전역 중복 판정 키 SSOT, `withCredentials`)/RegisterAccountCommand/UpdateAccountCommand. `Account.Broker` nested enum 없음 — `sharedkernel.Broker` 참조. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
   application/usecase/ ← AccountUseCase(조회/등록/수정/삭제/증권사 연결 테스트)
   application/port/output/ ← AccountPort/BrokerEnabledPort(account가 정의, 정책 소유자인 trading `TradingPolicyService`가 구현 — 포트 역전)/AccountOpenOrderCancelPort(계좌 삭제 전 미체결 주문 취소 — account 정의, 주문 소유자인 trading `AccountOpenOrderCanceller`가 구현, 실패 건수>0이면 `AccountService.delete()`가 삭제 중단)
   application/event/  ← AccountDeletedEvent(UUID accountId) — `AccountService.delete()`(NOT_SUPPORTED — 증권사 취소 HTTP 뒤 `AccountDeletionWriter`가 증권사 토큰 제거(broker `AccountTokenEvictionPort`)·계좌 소프트 삭제·발행을 한 트랜잭션으로)가 발행, trading `application.service.support.AccountCascadeListener`가 AFTER_COMMIT 구독해 cycle_position → strategy_cycle → strategy 순으로 소프트 삭제(EPR 추적)
