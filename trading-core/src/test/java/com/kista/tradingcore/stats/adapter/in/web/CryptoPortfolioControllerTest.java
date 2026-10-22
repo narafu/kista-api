@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.kista.shared.support.WebMvcTestSupport.*;
@@ -66,6 +67,28 @@ class CryptoPortfolioControllerTest {
         when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenThrow(new IllegalArgumentException("코인 계좌가 아닙니다."));
 
         mockMvc.perform(get("/api/accounts/{id}/crypto-portfolio", ACCOUNT_ID).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsKrwCryptoPricesWithoutExponent() throws Exception {
+        when(useCase.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.ETH, StrategyTicker.BTC)))
+                .thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("1.5E+8"), StrategyTicker.ETH, new BigDecimal("5000000")));
+
+        String body = mockMvc.perform(get("/api/accounts/{id}/crypto-prices", ACCOUNT_ID).param("tickers", "ETH,BTC,ETH")
+                        .with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prices[0].ticker").value("BTC"))
+                .andExpect(jsonPath("$.prices[1].ticker").value("ETH"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("\"price\":150000000").doesNotContain("E+");
+    }
+
+    @Test
+    void unknownTickerReturns400() throws Exception {
+        mockMvc.perform(get("/api/accounts/{id}/crypto-prices", ACCOUNT_ID).param("tickers", "DOGE")
+                        .with(authentication(userToken(USER_ID))))
                 .andExpect(status().isBadRequest());
     }
 }

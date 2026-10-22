@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 // 코인 계좌 잔고 → KRW 평가 포트폴리오 (거래소 실잔고가 SSOT, DB 포지션 없음)
@@ -29,10 +30,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
 
     @Override
     public CryptoPortfolio getCryptoPortfolio(UUID accountId, UUID requesterId) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (account.broker().getMarket() != Market.CRYPTO_KRW) {
-            throw new IllegalArgumentException("코인 계좌가 아닙니다. 주식 계좌는 /portfolio를 사용하세요.");
-        }
+        Account account = requireCryptoAccount(accountId, requesterId);
         CryptoExchangePort exchange = exchanges.of(account.broker());
         CryptoBalance balance = BrokerCallGuard.wrap("코인 잔고 조회", () -> exchange.getBalance(account.toBrokerRef()));
         // 보유 코인이 없으면 시세 조회 생략
@@ -43,6 +41,25 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
                 .map(e -> toHolding(e.getKey(), e.getValue(), prices.get(e.getKey())))
                 .toList();
         return new CryptoPortfolio(balance.krwAvailable().add(balance.krwLocked()), holdings);
+    }
+
+    @Override
+    public Map<StrategyTicker, BigDecimal> getCurrentPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
+        // 종목 검증은 거래소 호출 전 — guard 안에서 매핑 누락 IAE가 나면 5xx로 바뀐다
+        if (tickers.isEmpty() || tickers.stream().anyMatch(t -> t.getMarket() != Market.CRYPTO_KRW)) {
+            throw new IllegalArgumentException("코인 종목을 1개 이상 지정해주세요.");
+        }
+        Account account = requireCryptoAccount(accountId, requesterId);
+        CryptoExchangePort exchange = exchanges.of(account.broker());
+        return BrokerCallGuard.wrap("코인 시세 조회", () -> exchange.getCurrentPrices(Set.copyOf(tickers)));
+    }
+
+    private Account requireCryptoAccount(UUID accountId, UUID requesterId) {
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        if (account.broker().getMarket() != Market.CRYPTO_KRW) {
+            throw new IllegalArgumentException("코인 계좌가 아닙니다. 주식 계좌는 /portfolio를 사용하세요.");
+        }
+        return account;
     }
 
     private static CryptoPortfolio.Holding toHolding(StrategyTicker ticker, CryptoBalance.Holding h, BigDecimal price) {

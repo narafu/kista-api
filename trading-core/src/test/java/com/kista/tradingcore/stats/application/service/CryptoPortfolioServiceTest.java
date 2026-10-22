@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -89,6 +90,39 @@ class CryptoPortfolioServiceTest {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
 
         assertThatThrownBy(() -> service.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(exchanges);
+    }
+
+    @Test
+    void currentPricesQueryAccountExchangeWithoutBalance() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+        when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
+        when(upbit.getCurrentPrices(Set.of(StrategyTicker.ETH))).thenReturn(Map.of(StrategyTicker.ETH, new BigDecimal("5000000")));
+
+        assertThat(service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.ETH)))
+                .containsEntry(StrategyTicker.ETH, new BigDecimal("5000000"));
+        verify(upbit, never()).getBalance(any());
+    }
+
+    @Test
+    void currentPricesRejectStockTickerBeforeExchangeCall() {
+        assertThatThrownBy(() -> service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.BTC, StrategyTicker.TQQQ)))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(accountPort, exchanges);
+    }
+
+    @Test
+    void currentPricesRejectEmptyTickers() {
+        assertThatThrownBy(() -> service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void currentPricesRejectStockAccount() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
+
+        assertThatThrownBy(() -> service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.BTC)))
+                .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(exchanges);
     }
 }
