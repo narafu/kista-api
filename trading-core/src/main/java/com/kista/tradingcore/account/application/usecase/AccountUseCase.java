@@ -28,6 +28,6 @@ public interface AccountUseCase {
     void deleteAllByUserId(UUID userId);
 
     // --- 증권사 연결 테스트 ---
-    // accountId null 허용 — null이면 캐시 저장 생략 (등록 전 사전 검증). 실패 시 BrokerCredentialException throw
-    void test(Broker broker, String appKey, String appSecret, UUID accountId);
+    // accountId null 허용 — null이면 캐시 저장 생략 (등록 전 사전 검증). non-null이면 userId 소유·같은 증권사여야 하고, 저장 키와 다르면 캐시 생략. 실패 시 BrokerCredentialException throw
+    void test(UUID userId, Broker broker, String appKey, String appSecret, UUID accountId);
 }

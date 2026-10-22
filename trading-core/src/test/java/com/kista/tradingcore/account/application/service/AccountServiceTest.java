@@ -162,7 +162,7 @@ class AccountServiceTest {
         when(brokerEnabledPort.enabled(Broker.UPBIT)).thenReturn(true);
         when(connectionTesters.of(Broker.UPBIT)).thenReturn(connectionTester);
 
-        accountService.test(Broker.UPBIT, "ak", "sk", null);
+        accountService.test(userId, Broker.UPBIT, "ak", "sk", null);
 
         verify(connectionTester).verifyCredentials("ak", "sk", null);
     }
@@ -374,8 +374,9 @@ class AccountServiceTest {
     void test_enabledKis_verifiesCredentials() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
         when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.kisAccount(accountId, userId));
 
-        accountService.test(Broker.KIS, "key", "secret", accountId);
+        accountService.test(userId, Broker.KIS, "key", "secret", accountId);
 
         verify(connectionTester).verifyCredentials("key", "secret", accountId);
     }
@@ -385,10 +386,60 @@ class AccountServiceTest {
     void test_enabledToss_verifiesCredentials() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
         when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.tossAccount(accountId, userId));
 
-        accountService.test(Broker.TOSS, "key", "secret", accountId);
+        accountService.test(userId, Broker.TOSS, "key", "secret", accountId);
 
         verify(connectionTester).verifyCredentials("key", "secret", accountId);
+    }
+
+    @Test
+    @DisplayName("연결 테스트: 타인 소유 accountId면 SecurityException, 테스터 미호출")
+    void test_unownedAccount_throwsAndSkipsTester() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(TradingFixtures.kisAccount(accountId, UUID.randomUUID()));
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenCallRealMethod();
+
+        assertThatThrownBy(() -> accountService.test(userId, Broker.KIS, "key", "secret", accountId))
+                .isInstanceOf(SecurityException.class);
+
+        verify(connectionTester, never()).verifyCredentials(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("연결 테스트: 존재하지 않는 accountId면 NoSuchElementException, 테스터 미호출")
+    void test_missingAccount_throwsAndSkipsTester() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenThrow(new NoSuchElementException());
+
+        assertThatThrownBy(() -> accountService.test(userId, Broker.KIS, "key", "secret", accountId))
+                .isInstanceOf(NoSuchElementException.class);
+
+        verify(connectionTester, never()).verifyCredentials(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("연결 테스트: 계좌 증권사와 요청 증권사가 다르면 IllegalArgumentException")
+    void test_brokerMismatch_throws() {
+        when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.kisAccount(accountId, userId));
+
+        assertThatThrownBy(() -> accountService.test(userId, Broker.TOSS, "key", "secret", accountId))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(connectionTester, never()).verifyCredentials(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("연결 테스트: 저장 키와 다른 appKey면 accountId 없이 검증 (토큰 캐시 미기록)")
+    void test_differentAppKey_verifiesWithoutAccountId() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.kisAccount(accountId, userId));
+
+        accountService.test(userId, Broker.KIS, "other-key", "secret", accountId);
+
+        verify(connectionTester).verifyCredentials("other-key", "secret", null);
     }
 
     @Test
@@ -396,7 +447,7 @@ class AccountServiceTest {
     void test_disabledKis_throwsValidationException() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(false);
 
-        assertThatThrownBy(() -> accountService.test(Broker.KIS, "key", "secret", accountId))
+        assertThatThrownBy(() -> accountService.test(userId, Broker.KIS, "key", "secret", accountId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("KIS");
 
@@ -408,7 +459,7 @@ class AccountServiceTest {
     void test_disabledToss_throwsValidationException() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(false);
 
-        assertThatThrownBy(() -> accountService.test(Broker.TOSS, "key", "secret", accountId))
+        assertThatThrownBy(() -> accountService.test(userId, Broker.TOSS, "key", "secret", accountId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("TOSS");
 

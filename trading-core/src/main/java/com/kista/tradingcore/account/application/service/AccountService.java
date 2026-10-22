@@ -170,9 +170,20 @@ class AccountService implements AccountUseCase {
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
-    public void test(Broker broker, String appKey, String appSecret, UUID accountId) {
+    public void test(UUID userId, Broker broker, String appKey, String appSecret, UUID accountId) {
         requireBrokerEnabled(broker);
-        connectionTesters.of(broker).verifyCredentials(appKey, appSecret, accountId);
+        connectionTesters.of(broker).verifyCredentials(appKey, appSecret, tokenCacheTarget(userId, broker, appKey, accountId));
+    }
+
+    // 토큰을 캐시할 계좌 결정 — 남의 계좌 ID로 토큰 캐시를 덮어쓰거나 유효 토큰 존재를 엿보지 못하게 소유권을 검증한다
+    private UUID tokenCacheTarget(UUID userId, Broker broker, String appKey, UUID accountId) {
+        if (accountId == null) return null;
+        Account account = accountPort.requireOwnedAccount(accountId, userId); // 없으면 404, 타인 소유면 403
+        if (account.broker() != broker) {
+            throw new IllegalArgumentException("계좌의 증권사와 연결 테스트 증권사가 일치하지 않습니다.");
+        }
+        // 저장된 키와 다른 키를 시험하면 그 계좌의 토큰 캐시를 건드리지 않는다
+        return appKey != null && appKey.equals(account.appKey()) ? accountId : null;
     }
 
     private void requireBrokerEnabled(Broker broker) {
