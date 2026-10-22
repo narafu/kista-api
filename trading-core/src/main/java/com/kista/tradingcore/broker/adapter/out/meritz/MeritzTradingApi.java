@@ -62,7 +62,7 @@ class MeritzTradingApi {
             @JsonProperty("oder_date") String orderDate,          // US 거래일 yyyyMMdd
             @JsonProperty("oder_no") String orderNo,
             @JsonProperty("seln_byov_clcd") String side,          // 1 매도 / 2 매수
-            @JsonProperty("ovrs_stck_symb_iscd") String symbol,
+            @JsonProperty("iscd") String symbol,                  // 접미사 포함(SOXL.AX)
             @JsonProperty("oder_rctf_cncl_cls_code") String kind, // 0 원주문 / 1 정정 / 2 취소
             @JsonProperty("cntg_dqty") String filledQty,
             @JsonProperty("cntg_crnc_prc") String filledPrice,
@@ -120,7 +120,7 @@ class MeritzTradingApi {
         p.add("cntg_cls_code", "0");
         List<Execution> result = new ArrayList<>();
         for (HistoryRow r : http.getAllPages(HISTORY_PATH, account, p, HistoryRow.class)) {
-            if (!"0".equals(r.kind()) || !ticker.name().equals(r.symbol())) continue; // 원주문·해당 종목만
+            if (!"0".equals(r.kind()) || !ticker.name().equals(baseSymbol(r.symbol()))) continue; // 원주문·해당 종목만
             int qty = MeritzResponse.wholeQuantity(r.filledQty());
             if (qty <= 0) continue;
             LocalDate usDate = LocalDate.parse(r.orderDate(), DateTimeFormatter.BASIC_ISO_DATE);
@@ -133,6 +133,13 @@ class MeritzTradingApi {
 
     private List<HoldingRow> holdings(BrokerAccountRef account) {
         return http.getAllPages(HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingRow.class);
+    }
+
+    // 내역 행 심볼은 접미사 포함(SOXL.AX) — 첫 점 앞만 비교
+    private static String baseSymbol(String iscd) {
+        if (iscd == null) return null;
+        int dot = iscd.indexOf('.');
+        return dot < 0 ? iscd : iscd.substring(0, dot);
     }
 
     private HoldingRow findHolding(BrokerAccountRef account, StrategyTicker ticker) {

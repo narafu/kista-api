@@ -64,6 +64,7 @@ class MeritzPriceApiTest {
                 .andExpect(queryParam("mrkt_div_code", "OV"))
                 .andExpect(queryParam("mrkt_cls_code", "AX"))
                 .andExpect(queryParam("iscd", "SOXL"))
+                .andExpect(queryParam("dely_rltm_cls_code", "0"))
                 .andExpect(queryParam("mod_stpr_cls_code", "1"))
                 .andExpect(queryParam("from", "20261022"))
                 .andExpect(queryParam("to", "20261022"))

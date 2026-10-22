@@ -123,10 +123,10 @@ class MeritzTradingApiTest {
 
     @Test
     void executions_convert_us_dates_and_filter_filled() {
-        String row = "{\"oder_date\":\"20260901\",\"oder_no\":1295619,\"seln_byov_clcd\":\"2\",\"ovrs_stck_symb_iscd\":\"SOXL\","
+        String row = "{\"oder_date\":\"20260901\",\"oder_no\":1295619,\"seln_byov_clcd\":\"2\",\"iscd\":\"SOXL.AX\","
                 + "\"oder_rctf_cncl_cls_code\":\"0\",\"cntg_dqty\":\"36.0000000000\",\"cntg_crnc_prc\":\"106.04440000\",\"cntg_camt\":\"3817.6000\"}";
         String unfilled = row.replace("36.0000000000", "0").replace("1295619", "1");
-        String other = row.replace("\"SOXL\"", "\"TQQQ\"").replace("1295619", "2");
+        String other = row.replace("\"SOXL.AX\"", "\"TQQQ.OQ\"").replace("1295619", "2");
         String cancel = row.replace("\"oder_rctf_cncl_cls_code\":\"0\"", "\"oder_rctf_cncl_cls_code\":\"2\"").replace("1295619", "3");
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/trading/v1/overseas/orders/history")))
                 .andExpect(queryParam("oder_sta_date", "20260901"))

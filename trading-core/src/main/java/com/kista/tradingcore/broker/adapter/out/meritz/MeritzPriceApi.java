@@ -102,6 +102,7 @@ class MeritzPriceApi {
             p.add("mrkt_div_code", "OV");
             p.add("mrkt_cls_code", exchangeRegistry.marketCode(ticker));
             p.add("iscd", ticker.name());
+            p.add("dely_rltm_cls_code", "0"); // 실시간
             p.add("mod_stpr_cls_code", "1"); // 수정주가 반영
             p.add("from", expected);
             p.add("to", expected);
