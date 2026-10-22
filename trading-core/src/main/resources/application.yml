@@ -93,6 +93,9 @@ toss:
   admin-client-id: ${TOSS_ADMIN_CLIENT_ID:}
   admin-client-secret: ${TOSS_ADMIN_CLIENT_SECRET:}
 
+meritz:
+  base-url: https://openapi.imeritz.com:9443  # 앱키마다 계좌 1개 — 서버 공용 시크릿 없음
+
 upbit: # 사용자별 키라 서버 공용 시크릿 없음 — 요청마다 계좌 자격증명으로 JWT 서명
   base-url: https://api.upbit.com
 
