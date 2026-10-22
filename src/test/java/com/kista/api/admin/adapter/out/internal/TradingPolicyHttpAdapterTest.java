@@ -21,7 +21,7 @@ class TradingPolicyHttpAdapterTest {
 
     private static final String POLICY_JSON = """
             {
-              "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":false},"MOCK":{"enabled":true},"UPBIT":{"enabled":false,"allowedIp":"168.107.63.152"}},
+              "brokers":{"KIS":{"enabled":true},"TOSS":{"enabled":false},"MOCK":{"enabled":true},"UPBIT":{"enabled":false,"allowedIp":"168.107.63.152"},"MERITZ":{"enabled":false}},
               "strategies":{
                 "INFINITE":{"enabled":true,"ticker":{"customizable":true,"allowedValues":["MAGX","USD","TQQQ","SOXL"],"defaultValue":"SOXL"},"divisionCount":{"customizable":true,"allowedValues":[20,30,40],"defaultValue":20}},
                 "PRIVACY":{"enabled":false,"ticker":{"customizable":false,"allowedValues":["SOXL"],"defaultValue":"SOXL"}},
