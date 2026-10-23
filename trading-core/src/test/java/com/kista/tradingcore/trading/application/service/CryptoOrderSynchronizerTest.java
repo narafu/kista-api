@@ -15,6 +15,7 @@ import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult.State;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
+import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -264,5 +266,26 @@ class CryptoOrderSynchronizerTest {
         when(exchange.findOrderByClientOrderId(any(), eq(o.ticker()), eq(o.id().toString()))).thenReturn(Optional.empty());
         run(o, 13);
         verify(exchange).findOrderByClientOrderId(ctx.account().brokerRef(), o.ticker(), o.id().toString());
+    }
+
+    @Test
+    void submittingLookupFailureKeepsSubmittingAndNeverSends() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
+        when(exchange.findOrderByClientOrderId(any(), eq(o.ticker()), eq(o.id().toString()))).thenThrow(new StubBrokerApiException("502"));
+        run(o, 13);
+        verify(orderPort, never()).markFailed(any());
+        verify(orderPort, never()).markPlaced(any(), any());
+        verify(exchange, never()).buyMarketByAmount(any(), any(), any(), any());
+        verify(exchange, never()).sellMarketByVolume(any(), any(), any(), any());
+    }
+
+    @Test
+    void submittingNotFoundFailsWithoutResend() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
+        when(exchange.findOrderByClientOrderId(any(), eq(o.ticker()), eq(o.id().toString()))).thenReturn(Optional.empty());
+        run(o, 13);
+        verify(orderPort, times(1)).markFailed(orderId);
+        verify(exchange, never()).buyMarketByAmount(any(), any(), any(), any());
+        verify(exchange, never()).sellMarketByVolume(any(), any(), any(), any());
     }
 }

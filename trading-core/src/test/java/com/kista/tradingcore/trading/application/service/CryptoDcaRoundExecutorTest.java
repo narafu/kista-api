@@ -83,6 +83,9 @@ class CryptoDcaRoundExecutorTest {
     // 업비트 KRW 규칙과 같은 값 — broker adapter 상수를 import하지 않는다
     static final CryptoTradingRules UPBIT_LIKE = new CryptoTradingRules(new BigDecimal("0.0005"), FeeSide.QUOTE_SURCHARGE, new BigDecimal("5000"), new BigDecimal("0.00000001"));
 
+    // 바이낸스 BTCUSDT 규칙과 같은 값 — broker adapter 상수를 import하지 않는다
+    static final CryptoTradingRules BINANCE_LIKE = new CryptoTradingRules(new BigDecimal("0.001"), FeeSide.RECEIVED_ASSET, new BigDecimal("5"), new BigDecimal("0.00001"));
+
     TradingAccount account;
 
     @BeforeEach
@@ -473,5 +476,35 @@ class CryptoDcaRoundExecutorTest {
         run(TODAY.atTime(10, 10), c, TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(KEY, OrderDirection.SELL, "10000", 10, aboveAvg)));
         verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), any(), anyString());
         verify(recorder).recordOrdered(eq(c), eq(TODAY), eq(KEY), any(Order.class), eq(BTC_PRICE));
+    }
+
+    @Test
+    void binanceAccountBuysWithTwoDecimalUsdt() {
+        account = TradingFixtures.binanceTradingAccount(UUID.randomUUID(), UUID.randomUUID());
+        when(exchange.getTradingRules(any())).thenReturn(BINANCE_LIKE);
+        when(exchange.getCurrentPrices(any())).thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("65000")));
+        balance("100", "0");
+        run(NOW, ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "10.50", 13));
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("10.50")), anyString()); // scale 2 — 10 아님
+    }
+
+    @Test
+    void transientBuyKeepsSubmittingAndNextTickDoesNotResend() {
+        balance("100000", "0");
+        when(exchange.buyMarketByAmount(any(), any(), any(), anyString())).thenThrow(new StubBrokerApiException("502"));
+        BatchContext c = ctx(StrategyTicker.BTC);
+        DcaStrategyConfig cfg = config(OrderDirection.BUY, "10000", 13);
+        // 1틱 — 결과 불명이라 실패 처리 없이 SUBMITTING 유지
+        run(NOW, c, cfg);
+        verify(orderPort, never()).markFailed(any());
+        verify(orderPort, org.mockito.Mockito.times(1)).markSubmitting(any());
+        // 2틱(같은 시각) — 저장소가 그 주문을 SUBMITTING으로 돌려준다
+        Order stuck = new Order(UUID.randomUUID(), c.account().id(), c.currentCycle().id(), TODAY, StrategyTicker.BTC,
+                com.kista.shared.kernel.OrderType.MARKET, com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY,
+                "DCA_" + KEY, new BigDecimal("0.0001"), BTC_PRICE, OrderStatus.SUBMITTING, null, null, null);
+        when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of(stuck));
+        run(NOW, c, cfg);
+        verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
+        verify(exchange, never()).sellMarketByVolume(any(), any(), any(), anyString());
     }
 }

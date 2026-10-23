@@ -10,6 +10,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
+import com.kista.tradingcore.broker.domain.model.CryptoOrderResult.State;
 import com.kista.tradingcore.broker.domain.model.binance.BinanceApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
@@ -17,17 +18,20 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
-// 바이낸스 현물 CryptoExchangePort — 조회(잔고·시세·완성 일봉·거래 규칙). 주문 메서드는 Task 4에서 채운다
+// 바이낸스 현물 CryptoExchangePort — 조회(잔고·시세·완성 일봉·거래 규칙)와 시장가 주문·주문 조회
 @Component
 class BinanceExchangeAdapter implements CryptoExchangePort {
 
     static final BigDecimal STANDARD_FEE_RATE = new BigDecimal("0.001"); // 현물 표준 taker 0.1% — RECEIVED_ASSET이라 커널 판정에 쓰이지 않음, 실제 수수료는 체결 내역
 
+    private static final int ORDER_NOT_FOUND = -2013; // 주문 없음
+    private static final int ORDER_ARCHIVED = -2026;  // 90일 지난 무체결 종료 주문
     private static final int MAX_COUNT = 999;               // klines limit ≤ 1000, 진행 중 봉 1개 여유
     private static final long DAY_MILLIS = 86_400_000L;     // 일봉 길이(ms)
 
@@ -127,22 +131,106 @@ class BinanceExchangeAdapter implements CryptoExchangePort {
 
     @Override
     public CryptoOrderResult buyMarketByAmount(BrokerAccountRef account, StrategyTicker ticker, BigDecimal quoteAmount, String clientOrderId) {
-        throw new UnsupportedOperationException("Task 4");
+        if (quoteAmount.signum() <= 0) throw new IllegalArgumentException("매수 금액은 0보다 커야 합니다: " + quoteAmount);
+        LinkedHashMap<String, String> query = orderParams(ticker, "BUY", clientOrderId);
+        query.put("quoteOrderQty", quoteAmount.stripTrailingZeros().toPlainString()); // 견적 자산 금액 — 지수 표기 금지
+        return placeOrder(account, ticker, query);
     }
 
     @Override
     public CryptoOrderResult sellMarketByVolume(BrokerAccountRef account, StrategyTicker ticker, BigDecimal volume, String clientOrderId) {
-        throw new UnsupportedOperationException("Task 4");
+        // LOT_SIZE step 내림 — 보유 초과·-1013 방지
+        BigDecimal qty = volume.setScale(getTradingRules(ticker).quantityScale(), RoundingMode.DOWN);
+        if (qty.signum() <= 0) throw new IllegalArgumentException("매도 수량이 최소 단위 미만입니다: " + volume);
+        LinkedHashMap<String, String> query = orderParams(ticker, "SELL", clientOrderId);
+        query.put("quantity", qty.toPlainString());
+        return placeOrder(account, ticker, query);
+    }
+
+    private LinkedHashMap<String, String> orderParams(StrategyTicker ticker, String side, String clientOrderId) {
+        LinkedHashMap<String, String> query = new LinkedHashMap<>();
+        query.put("symbol", registry.symbolOf(ticker));
+        query.put("side", side);
+        query.put("type", "MARKET"); // 시장가
+        query.put("newClientOrderId", BinanceClientOrderIds.toWire(clientOrderId)); // 조회와 같은 전송 형태 — 불일치 시 -2013 → 이중 매수
+        query.put("newOrderRespType", "FULL"); // 체결 내역(fills) 포함 응답
+        return query;
+    }
+
+    // 전송 — 예외는 http 클라이언트가 확정 거절/결과 불명으로 분류. 재전송 금지(호출부 책임)
+    private CryptoOrderResult placeOrder(BrokerAccountRef account, StrategyTicker ticker, LinkedHashMap<String, String> query) {
+        OrderRow o = http.postSigned("/api/v3/order", query, account, new ParameterizedTypeReference<>() {});
+        return toResult(o, o.fills() == null ? List.of() : o.fills(), registry.baseAssetOf(ticker));
     }
 
     @Override
     public Optional<CryptoOrderResult> findOrderByExchangeOrderId(BrokerAccountRef account, StrategyTicker ticker, String exchangeOrderId) {
-        throw new UnsupportedOperationException("Task 4");
+        LinkedHashMap<String, String> query = new LinkedHashMap<>();
+        query.put("symbol", registry.symbolOf(ticker));
+        query.put("orderId", exchangeOrderId);
+        try {
+            return Optional.of(lookup(account, ticker, query));
+        } catch (BinanceApiException e) {
+            if (Integer.valueOf(ORDER_NOT_FOUND).equals(e.code())) return Optional.empty();
+            // 90일 지난 무체결 종료 주문 — empty면 PLACED가 영구 정체하므로 취소로 확정
+            if (Integer.valueOf(ORDER_ARCHIVED).equals(e.code())) {
+                return Optional.of(new CryptoOrderResult(exchangeOrderId, null, State.CANCEL, BigDecimal.ZERO, BigDecimal.ZERO, null, BigDecimal.ZERO, null));
+            }
+            throw e;
+        }
     }
 
     @Override
     public Optional<CryptoOrderResult> findOrderByClientOrderId(BrokerAccountRef account, StrategyTicker ticker, String clientOrderId) {
-        throw new UnsupportedOperationException("Task 4");
+        LinkedHashMap<String, String> query = new LinkedHashMap<>();
+        query.put("symbol", registry.symbolOf(ticker));
+        query.put("origClientOrderId", BinanceClientOrderIds.toWire(clientOrderId));
+        try {
+            return Optional.of(lookup(account, ticker, query));
+        } catch (BinanceApiException e) {
+            // 오직 -2013/-2026만 "없음"(-2026은 무체결 종료 확정 — 동기화기가 FAILED 처리, 재전송 없음). 5xx·-1006/-1007·I/O는 그대로 던진다
+            if (Integer.valueOf(ORDER_NOT_FOUND).equals(e.code()) || Integer.valueOf(ORDER_ARCHIVED).equals(e.code())) return Optional.empty();
+            throw e;
+        }
+    }
+
+    // 주문 조회 + (닫힌 주문이고 체결이 있을 때만) myTrades로 수수료 확정
+    private CryptoOrderResult lookup(BrokerAccountRef account, StrategyTicker ticker, LinkedHashMap<String, String> query) {
+        OrderRow o = http.getSigned("/api/v3/order", query, account, new ParameterizedTypeReference<>() {});
+        String base = registry.baseAssetOf(ticker);
+        CryptoOrderResult open = toResult(o, List.of(), base);
+        boolean closed = open.state() == State.DONE || open.state() == State.CANCEL;
+        if (!closed || o.executedQty().signum() <= 0) return open; // 열린 주문은 weight를 쓰지 않는다
+        LinkedHashMap<String, String> tradeQuery = new LinkedHashMap<>();
+        tradeQuery.put("symbol", registry.symbolOf(ticker));
+        tradeQuery.put("orderId", String.valueOf(o.orderId()));
+        List<FillRow> trades = http.getSigned("/api/v3/myTrades", tradeQuery, account, new ParameterizedTypeReference<>() {});
+        BigDecimal tradedQty = trades.stream().map(FillRow::qty).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (tradedQty.compareTo(o.executedQty()) != 0) {
+            // 접수 직후 일부만 보이는 경우 — 순수량을 잘못 확정하지 않고 다음 틱에 재시도
+            throw new BinanceApiException(200, null, "Binance 체결 내역 불일치: orderId=" + o.orderId(), null, false);
+        }
+        return toResult(o, trades, base);
+    }
+
+    static CryptoOrderResult toResult(OrderRow o, List<FillRow> fills, String baseAsset) {
+        State state = switch (o.status()) {
+            case "NEW", "PENDING_NEW", "PARTIALLY_FILLED", "PENDING_CANCEL" -> State.WAIT;
+            case "FILLED" -> State.DONE;
+            case "CANCELED", "EXPIRED", "EXPIRED_IN_MATCH", "REJECTED" -> State.CANCEL;
+            default -> throw new BinanceApiException(200, null, "Binance 알 수 없는 주문 상태: " + o.status(), null, false);
+        };
+        BigDecimal executed = o.executedQty();
+        BigDecimal avgPrice = executed.signum() > 0
+                ? o.cummulativeQuoteQty().divide(executed, 8, RoundingMode.HALF_UP).stripTrailingZeros() : null;
+        BigDecimal paidFee = fills.stream().map(FillRow::commission).reduce(BigDecimal.ZERO, BigDecimal::add);
+        // ponytail: 자산 혼합 수수료(BNB 부족 시 BNB+BTC)는 첫 자산만 표기 — 원장은 아래 base 차감으로 정확
+        String feeAsset = fills.isEmpty() ? null : fills.getFirst().commissionAsset();
+        // 받는 자산(base)으로 낸 수수료만 순수량에서 차감 — SELL(USDT)·BNB 수수료는 net == executed
+        BigDecimal baseFee = fills.stream().filter(f -> baseAsset.equals(f.commissionAsset()))
+                .map(FillRow::commission).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new CryptoOrderResult(String.valueOf(o.orderId()), BinanceClientOrderIds.fromWire(o.clientOrderId()), state,
+                executed, executed.subtract(baseFee), avgPrice, paidFee, feeAsset);
     }
 
     record AccountRow(List<BalanceRow> balances) {}                                  // GET /api/v3/account
@@ -150,5 +238,7 @@ class BinanceExchangeAdapter implements CryptoExchangePort {
     record PriceRow(String symbol, BigDecimal price) {}                              // GET /api/v3/ticker/price
     record ExchangeInfoRow(List<SymbolRow> symbols) {}                               // GET /api/v3/exchangeInfo
     record SymbolRow(String symbol, String status, List<FilterRow> filters) {}       // 심볼 상태·필터
+    record OrderRow(String symbol, long orderId, String clientOrderId, String status, BigDecimal executedQty, BigDecimal cummulativeQuoteQty, List<FillRow> fills) {} // GET/POST /api/v3/order
+    record FillRow(BigDecimal price, BigDecimal qty, BigDecimal commission, String commissionAsset) {} // FULL fills·myTrades 공통
     record FilterRow(String filterType, BigDecimal stepSize, BigDecimal minNotional) {} // LOT_SIZE.stepSize / NOTIONAL.minNotional
 }
