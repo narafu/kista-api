@@ -1,5 +1,7 @@
 # 바이낸스 현물 DCA 연동 (Phase 2) Implementation Plan
 
+> 상태: 완료 (2026-10-23, 커밋 0c3c923e)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `Broker.BINANCE`를 추가한다. 바이낸스 현물(BTCUSDT·ETHUSDT) 계좌 등록(연결 테스트 포함)부터 코인 DCA 실행·동기화·원장 반영·알림·포트폴리오까지 업비트와 같은 경로로 동작하게 한다. 관리자 정책 기본값은 비활성이다. 백엔드 쪽 API 계약 expand(포트폴리오 중립 필드·`currency`, 브로커 메타 최소 금액·자릿수, SSE 통화)를 같이 낸다.
