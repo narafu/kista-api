@@ -29,7 +29,7 @@ class UpbitAuthApi implements BrokerConnectionTestPort {
 
     @Override
     public void verifyCredentials(String appKey, String secretKey) {
-        // 등록 계좌 id만으로 호출돼 키가 비면 서명 전에 거부 — null 서명 방지
+        // 키가 비어 있으면 JWT 서명 전에 거부 — null 키로 서명하지 않는다
         if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) throw new BrokerCredentialException();
         fetchAccounts(auth(appKey, secretKey)); // 실패는 UpbitHttpClient가 422(IP/권한/키)·429·503으로 매핑
     }

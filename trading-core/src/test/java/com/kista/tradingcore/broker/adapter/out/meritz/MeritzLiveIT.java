@@ -88,7 +88,7 @@ class MeritzLiveIT {
         assertThat(sellable).isNotNull();
         assertThat(buyable).isNotNull();
         assertThat(present).isNotNull();
-        assertThat(executions).isNotNull();
+        assertThat(executions).isNotEmpty(); // 실계좌에 체결 이력이 있다 — 비면 조회 결함
 
         System.out.printf("[MeritzLive] price=%s prevClose=%s closing=%s holdings=%d usdDeposit=%s sellable=%d buyable=%s executions30d=%d%n",
                 price, prevClose, closing, balance.holdings(), balance.usdDeposit(), sellable.quantity(), buyable, executions.size());
@@ -125,11 +125,13 @@ class MeritzLiveIT {
         long cancelStart = System.currentTimeMillis();
         MeritzOrderApi.OrderRow after = pollRow(orderNo, true);
         assertThat(after).as("취소 후 당일 목록").isNotNull();
+        // 필드 누락을 0으로 취급하지 않는다 — 값이 있어야 하고 그 값이 0이어야 한다
+        assertThat(after.todayCancelable()).as("취소 가능 수량 필드").isNotBlank();
         assertThat(MeritzResponse.wholeQuantity(after.todayCancelable())).isZero();
         System.out.printf("[MeritzLive] %s cancelReflected=%dms%n", type, System.currentTimeMillis() - cancelStart);
     }
 
-    // 당일 목록에서 주문번호 행을 찾는다 — cancelledOnly면 취소 가능 수량 0이 될 때까지 대기. 없으면 마지막 관측 행(또는 null)
+    // 당일 목록에서 주문번호 행을 찾는다 — cancelledOnly면 취소 가능 수량 필드가 존재하고 0이 될 때까지 대기(누락은 미반영으로 계속 대기). 없으면 마지막 관측 행(또는 null)
     private MeritzOrderApi.OrderRow pollRow(String orderNo, boolean cancelledOnly) throws InterruptedException {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("cntg_cls_code", "0");
@@ -140,10 +142,16 @@ class MeritzLiveIT {
             for (MeritzOrderApi.OrderRow r : http.getAllPages("/trading/v1/overseas/orders/today", account, params, MeritzOrderApi.OrderRow.class)) {
                 if (r.orderNo() != null && new BigDecimal(r.orderNo().trim()).compareTo(new BigDecimal(orderNo)) == 0) last = r;
             }
-            if (last != null && (!cancelledOnly || MeritzResponse.wholeQuantity(last.todayCancelable()) == 0)) return last;
+            if (last != null && (!cancelledOnly || cancelReflected(last))) return last;
             Thread.sleep(500);
         } while (System.currentTimeMillis() < deadline);
         return last;
+    }
+
+    // 취소 반영 — 취소 가능 수량 필드가 있고 값이 0 (누락은 반영 아님)
+    private static boolean cancelReflected(MeritzOrderApi.OrderRow r) {
+        String q = r.todayCancelable();
+        return q != null && !q.isBlank() && MeritzResponse.wholeQuantity(q) == 0;
     }
 
     // KST 오늘 기준 직전 평일 — 휴장일이면 값이 없을 수 있어 단순 평일 계산만 한다
