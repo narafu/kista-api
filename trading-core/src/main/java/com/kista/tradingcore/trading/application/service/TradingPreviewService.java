@@ -55,7 +55,7 @@ class TradingPreviewService {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 코인 DCA는 실행 루프(CryptoDcaRoundExecutor) 전용이라 미리보기 경로가 없다 — 주식 DCA는 plan() 정규 경로로 미리보기
-        if (account.broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException();
+        if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException();
         // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
         Map<UUID, RuntimeException> failures = new HashMap<>();
         NextOrdersPreview preview = previewBatch(strategy.accountId(), requesterId, failures).get(strategyId);
@@ -82,7 +82,7 @@ class TradingPreviewService {
         TradingAccount account = TradingAccount.from(ownedAccount);
         LocalDate today = DstInfo.nextTradeDate();
         // 코인 전략(전부 DCA)은 미리보기·경쟁 시뮬레이션 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
-        List<Strategy> strategies = ownedAccount.broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
+        List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
         List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
