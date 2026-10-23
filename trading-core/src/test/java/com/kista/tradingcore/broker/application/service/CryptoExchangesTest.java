@@ -17,9 +17,12 @@ class CryptoExchangesTest {
     void routesBySupportedBrokerAndRejectsStockBrokers() {
         CryptoExchangePort upbit = mock(CryptoExchangePort.class);
         when(upbit.supports()).thenReturn(Broker.UPBIT);
-        CryptoExchanges exchanges = new CryptoExchanges(List.of(upbit));
+        CryptoExchangePort binance = mock(CryptoExchangePort.class);
+        when(binance.supports()).thenReturn(Broker.BINANCE);
+        CryptoExchanges exchanges = new CryptoExchanges(List.of(upbit, binance));
 
         assertThat(exchanges.of(Broker.UPBIT)).isSameAs(upbit);
+        assertThat(exchanges.of(Broker.BINANCE)).isSameAs(binance);
         assertThatThrownBy(() -> exchanges.of(Broker.KIS)).isInstanceOf(IllegalArgumentException.class);
     }
 }
