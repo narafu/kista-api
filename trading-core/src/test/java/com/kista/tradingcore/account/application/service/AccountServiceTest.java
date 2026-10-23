@@ -347,7 +347,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.register(userId, registerCmd()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("KIS");
+                .hasMessage("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다.");
 
         verifyNoInteractions(connectionTesters);
         verify(accountPort, never()).save(any());
@@ -363,7 +363,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.register(userId, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("TOSS");
+                .hasMessage("토스증권 신규 계좌 등록이 비활성화되어 있습니다.");
 
         verifyNoInteractions(connectionTesters);
         verify(accountPort, never()).save(any());
@@ -398,7 +398,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.test(Broker.KIS, "key", "secret"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("KIS");
+                .hasMessage("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다.");
 
         verifyNoInteractions(connectionTesters);
     }
@@ -410,7 +410,7 @@ class AccountServiceTest {
 
         assertThatThrownBy(() -> accountService.test(Broker.TOSS, "key", "secret"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("TOSS");
+                .hasMessage("토스증권 신규 계좌 등록이 비활성화되어 있습니다.");
 
         verifyNoInteractions(connectionTesters);
     }

@@ -81,7 +81,7 @@ class AccountControllerTest {
     @Test
     void testConnection_disabledBroker_returns400() throws Exception {
         // 서비스의 증권사 비활성 검증 예외는 사용자 입력 오류로 노출한다.
-        doThrow(new IllegalArgumentException("KIS 증권사 신규 계좌 등록이 비활성화되어 있습니다"))
+        doThrow(new IllegalArgumentException("한국투자증권 신규 계좌 등록이 비활성화되어 있습니다."))
                 .when(accountUseCase).test(any(), anyString(), anyString());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
@@ -180,7 +180,7 @@ class AccountControllerTest {
     void register_disabledBroker_returns400() throws Exception {
         // 신규 계좌 등록도 연결 테스트와 동일한 사용자 입력 오류 응답을 사용한다.
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
-                .thenThrow(new IllegalArgumentException("TOSS 증권사 신규 계좌 등록이 비활성화되어 있습니다"));
+                .thenThrow(new IllegalArgumentException("토스증권 신규 계좌 등록이 비활성화되어 있습니다."));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)

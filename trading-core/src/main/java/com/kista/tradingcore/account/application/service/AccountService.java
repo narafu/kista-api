@@ -178,7 +178,7 @@ class AccountService implements AccountUseCase {
     private void requireBrokerEnabled(Broker broker) {
         // 연결 검증 전에 차단해 비활성 증권사 자격증명이 외부 API로 전달되지 않게 한다.
         if (!brokerEnabledPort.enabled(broker)) {
-            throw new IllegalArgumentException(broker + " 증권사 신규 계좌 등록이 비활성화되어 있습니다");
+            throw new IllegalArgumentException(broker.getLabel() + " 신규 계좌 등록이 비활성화되어 있습니다."); // 사용자 노출 문구 — enum 코드 대신 한국어 라벨
         }
     }
 
