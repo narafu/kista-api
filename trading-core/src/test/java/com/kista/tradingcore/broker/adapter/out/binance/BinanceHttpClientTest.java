@@ -124,6 +124,26 @@ class BinanceHttpClientTest {
     }
 
     @Test
+    void ioFailureDoesNotLeakSignedUri() {
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(BinanceHttpClient.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> appender = new ch.qos.logback.core.read.ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            server.expect(anything()).andRespond(withException(new SocketTimeoutException("Read timed out")));
+            assertThatThrownBy(() -> client.getSigned("/api/v3/account", params(), AUTH, MAP))
+                    .isInstanceOfSatisfying(BinanceApiException.class, e -> {
+                        assertThat(e.getMessage()).doesNotContain("signature=");
+                        assertThat(e.getCause()).isInstanceOf(SocketTimeoutException.class);
+                        assertThat(e.getCause().getMessage()).doesNotContain("signature=");
+                    });
+            assertThat(appender.list).isNotEmpty().allSatisfy(ev -> assertThat(ev.getFormattedMessage()).doesNotContain("signature="));
+        } finally {
+            logger.detachAppender(appender);
+        }
+    }
+
+    @Test
     void ioFailureIsUnknown() {
         server.expect(anything()).andRespond(withException(new SocketTimeoutException()));
         assertThatThrownBy(() -> client.getSigned("/api/v3/account", params(), AUTH, MAP))

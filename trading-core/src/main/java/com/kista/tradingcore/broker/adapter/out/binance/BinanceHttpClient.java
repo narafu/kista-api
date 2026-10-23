@@ -112,8 +112,10 @@ class BinanceHttpClient {
             throw translate(e, action);
         } catch (RestClientException e) {
             // I/O 실패 — 접수 여부 불명(rejected=false)
-            log.warn("Binance {} 통신 실패: {}", action, e.getMessage());
-            throw new BinanceApiException(0, null, "Binance " + action + " 통신 실패", e, false);
+            // 메시지에 서명 포함 요청 URI가 실리므로 로그에는 클래스명만, cause는 URI 없는 최하위 원인만 남긴다
+            Throwable root = e.getMostSpecificCause();
+            log.warn("Binance {} 통신 실패: {} ({})", action, e.getClass().getSimpleName(), root.getClass().getSimpleName());
+            throw new BinanceApiException(0, null, "Binance " + action + " 통신 실패", root == e ? null : root, false);
         }
     }
 

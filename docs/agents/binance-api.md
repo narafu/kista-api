@@ -5,9 +5,9 @@
 ### 기본 사실
 - Base `https://api.binance.com`(프로퍼티 `binance.base-url`, 기본값은 `BinanceHttpClient`의 `@Value` — yml에는 없다). 테스트넷은 `https://testnet.binance.vision`. `BinanceConfig`의 `binanceRestClient`는 baseUrl이 없다 — 서명된 절대 URI를 그대로 보내 템플릿 재인코딩(서명 불일치)을 피한다. 타임아웃 connect 3s·read 10s.
 - 계좌번호가 없다: 키 쌍(`appKey`=API key, `secretKey`)만 쓰고 `accountNo`는 null이다. `Broker.isKeyOnlyCredentials()=true`라 중복 판정 키는 appKey(`Account.dedupeKey()`)이고, 키 만료일이 없어 `apiKeyExpiring=false`(`ApiKeyExpiryScheduler` 대상 아님)다. 시크릿은 서명에 필수다.
-- 서명: HMAC-SHA256 hex, 헤더 `X-MBX-APIKEY`. 모든 파라미터는 **query string**에 넣고(POST 포함) body는 비운다 — 서명 경로를 1개로 만든다. payload = 호출 파라미터 + `recvWindow=5000` + `timestamp`(`Clock.millis()`) 순서이고, **퍼센트 인코딩된 그 문자열이 곧 서명 대상**이다(2026-01 이후 -1022 규칙). `signature`는 마지막에 붙인다. 공개 시세·exchangeInfo는 서명 없음.
+- 서명: HMAC-SHA256 hex, 헤더 `X-MBX-APIKEY`. 모든 파라미터는 **query string**에 넣고(POST 포함) body는 비운다 — 서명 경로를 1개로 만든다. payload = 호출 파라미터 + `recvWindow=5000` + `timestamp`(`Clock.millis()`) 순서이고, **퍼센트 인코딩된 그 문자열이 곧 서명 대상**이다(2026-01 이후 -1022 규칙, 공식 문서 기준, 미실측). `signature`는 마지막에 붙인다. 공개 시세·exchangeInfo는 서명 없음.
 - 키/시크릿이 비어 있으면 호출 전에 `BrokerCredentialException`이다.
-- 레이트: IP 단위. 성공 요청은 weight 0(2026-04 변경)이라 `X-MBX-USED-WEIGHT-1M` 로깅은 생략하고 429/418만 `BrokerRateLimitException`으로 매핑한다.
+- 레이트: IP 단위. 성공 요청은 weight 0(2026-04 변경, 공식 문서 기준, 미실측)이라 `X-MBX-USED-WEIGHT-1M` 로깅은 생략하고 429/418만 `BrokerRateLimitException`으로 매핑한다.
 
 ### 엔드포인트
 | 용도 | 호출 | 서명 | 필수 파라미터·메모 |
@@ -85,3 +85,8 @@
 - `myTrades` 반영 지연(Memory→Database) — 동기화기는 10분 뒤 조회하고 불일치면 예외 → 다음 틱 재시도로 방어한다. 실제 지연은 미실측.
 - -1021 빈도 — OCI 시각 오차 실측 없음. 운영 로그에 -1021이 보이면 `/api/v3/time` 오프셋 보정을 추가한다.
 - 운영 서버에서 서명 요청·IP 허용 목록 동작 — 공개 `ping`만 확인했다. 실키 등록 시 확인한다.
+
+### 배포·롤백
+- **kista-api(root)와 kista-trading은 같은 릴리스로 배포한다.** `TradingPolicySettings`의 `immutableEnumMap`이 누락·미지의 broker 키를 거부하므로, 이미지가 어긋나면 교체 구간에 관리자 정책 GET/PUT이 실패한다(MERITZ도 같은 동시 배포에 의존했다).
+- **롤백 위험**: 관리자가 정책을 저장해 JSON에 BINANCE가 들어갔거나 BINANCE 계좌가 생기면, kista-trading을 BINANCE 이전 이미지로 되돌릴 수 없다. `TradingPolicySettingsPersistenceAdapter.deserialize`가 예외를 던지고 `accounts.broker='BINANCE'`는 읽을 수 없다.
+- BINANCE는 실키로 1회 검증(연결 테스트·실주문 경로는 미검증)한 뒤에만 관리자가 활성화한다.

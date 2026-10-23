@@ -204,6 +204,7 @@ class BinanceExchangeAdapter implements CryptoExchangePort {
         LinkedHashMap<String, String> tradeQuery = new LinkedHashMap<>();
         tradeQuery.put("symbol", registry.symbolOf(ticker));
         tradeQuery.put("orderId", String.valueOf(o.orderId()));
+        // ponytail: limit 미지정(기본 500) — 체결 500건 초과 주문은 Σqty 검사가 매 틱 실패해 PLACED로 남는다. fromId 페이지네이션으로 확장
         List<FillRow> trades = http.getSigned("/api/v3/myTrades", tradeQuery, account, new ParameterizedTypeReference<>() {});
         BigDecimal tradedQty = trades.stream().map(FillRow::qty).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (tradedQty.compareTo(o.executedQty()) != 0) {

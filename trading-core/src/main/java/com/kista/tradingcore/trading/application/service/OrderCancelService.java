@@ -89,7 +89,7 @@ class OrderCancelService {
                 log.info("PLANNED 주문 {}건 삭제 — cycleId={}, tradeDate={}", plannedCount, currentCycle.id(), tradeDate);
                 cancelledCount += plannedCount;
             }
-            // 코인 거래소은 증권사 취소 대상이 없다 — 체결 확인 중 주문은 위에서 이미 거부했으므로 PLANNED 삭제만 하고 넘어간다
+            // 코인 거래소는 증권사 취소 대상이 없다 — 체결 확인 중 주문은 위에서 이미 거부했으므로 PLANNED 삭제만 하고 넘어간다
             if (account.broker().isCryptoExchange()) {
                 continue;
             }
