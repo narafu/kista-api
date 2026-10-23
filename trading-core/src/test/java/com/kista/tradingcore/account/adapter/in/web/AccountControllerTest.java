@@ -69,7 +69,7 @@ class AccountControllerTest {
 
     @Test
     void testConnection_failure_returns422() throws Exception {
-        doThrow(new BrokerCredentialException()).when(accountUseCase).test(any(), any(), anyString(), anyString(), any());
+        doThrow(new BrokerCredentialException()).when(accountUseCase).test(any(), anyString(), anyString());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class AccountControllerTest {
     void testConnection_disabledBroker_returns400() throws Exception {
         // 서비스의 증권사 비활성 검증 예외는 사용자 입력 오류로 노출한다.
         doThrow(new IllegalArgumentException("KIS 증권사 신규 계좌 등록이 비활성화되어 있습니다"))
-                .when(accountUseCase).test(any(), any(), anyString(), anyString(), any());
+                .when(accountUseCase).test(any(), anyString(), anyString());
 
         mockMvc.perform(post("/api/accounts/connection-tests")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -158,7 +158,7 @@ class AccountControllerTest {
                         .content("{\"broker\":\"UPBIT\",\"appKey\":\"testkey1234\",\"appSecret\":\"testsecret1234\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
                 .andExpect(status().isNoContent());
-        verify(accountUseCase).test(eq(UUID.fromString(USER_ID)), eq(Broker.UPBIT), eq("testkey1234"), eq("testsecret1234"), any());
+        verify(accountUseCase).test(eq(Broker.UPBIT), eq("testkey1234"), eq("testsecret1234"));
     }
 
     @Test

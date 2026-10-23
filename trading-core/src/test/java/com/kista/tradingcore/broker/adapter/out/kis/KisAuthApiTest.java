@@ -33,7 +33,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 @DisplayName("KisAuthApi 단위 테스트")
 class KisAuthApiTest {
 
-    @Mock BrokerTokenCachePort brokerTokenCachePort;
     @Mock DbTokenCoordinator tokenCoordinator;
     @Mock KisAdminTokenCoordinator adminCoordinator;
 
@@ -49,7 +48,7 @@ class KisAuthApiTest {
         // baseUrl은 이제 RestClient(=KisConfig 빈)에 고정 — 테스트도 KisConfig와 동일하게 builder에 설정
         restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        api = new KisAuthApi(restClientBuilder.build(), brokerTokenCachePort, tokenCoordinator, adminCoordinator);
+        api = new KisAuthApi(restClientBuilder.build(), tokenCoordinator, adminCoordinator);
     }
 
     private void expectOAuthToken(String accessToken, String expiredAt) {
@@ -153,34 +152,12 @@ class KisAuthApiTest {
     class ConnectionTests {
 
         @Test
-        @DisplayName("KIS OAuth 2xx 응답 시 정상 완료 — accountId null이면 캐시 저장 생략")
-        void verifyCredentials_whenKisReturns2xx_completesWithoutCaching() {
+        @DisplayName("KIS OAuth 2xx 응답 시 정상 완료")
+        void verifyCredentials_whenKisReturns2xx_completes() {
             expectOAuthToken("tok", "2099-12-31 23:59:59");
 
-            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", null));
-            verifyNoInteractions(brokerTokenCachePort);
+            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret"));
             server.verify();
-        }
-
-        @Test
-        @DisplayName("accountId 있고 캐시 미스 시 KIS 호출 후 토큰 캐시 저장")
-        void verifyCredentials_whenAccountIdPresentAndCacheMiss_savesTokenToCache() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.empty());
-            expectOAuthToken("tok", "2099-12-31 23:59:59");
-
-            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", ACCOUNT_ID));
-            verify(brokerTokenCachePort).saveToken(eq(ACCOUNT_ID), eq("tok"), any());
-            server.verify();
-        }
-
-        @Test
-        @DisplayName("accountId 있고 캐시 히트 시 KIS 호출 없이 정상 완료")
-        void verifyCredentials_whenAccountIdPresentAndCacheHit_completesWithoutKisCall() {
-            when(brokerTokenCachePort.findValidToken(eq(ACCOUNT_ID), any())).thenReturn(Optional.of("cached-token"));
-
-            assertThatNoException().isThrownBy(() -> api.verifyCredentials("appKey", "appSecret", ACCOUNT_ID));
-            verify(brokerTokenCachePort, never()).saveToken(any(), any(), any());
-            server.verify(); // 등록된 expectation 없음 — KIS 호출 없었음을 함께 확인
         }
 
         @Test
@@ -188,7 +165,7 @@ class KisAuthApiTest {
         void verifyCredentials_whenKisReturns4xx_throwsInvalidBrokerKeyException() {
             expectOAuthTokenFails();
 
-            assertThatThrownBy(() -> api.verifyCredentials("badKey", "badSecret", null))
+            assertThatThrownBy(() -> api.verifyCredentials("badKey", "badSecret"))
                     .isInstanceOf(BrokerCredentialException.class);
             server.verify();
         }

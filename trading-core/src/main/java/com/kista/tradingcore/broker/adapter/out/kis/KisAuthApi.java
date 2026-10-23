@@ -8,7 +8,6 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
-import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
 import com.kista.shared.kernel.Broker;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +27,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -48,8 +46,6 @@ class KisAuthApi implements BrokerConnectionTestPort {
     private record TempTokenEntry(String token, Instant expiresAt) {}
 
     private final RestClient kisRestClient; // baseUrl은 KisConfig가 빈 생성 시점에 고정 — 여기선 상대 경로만 다룬다
-    // verifyCredentials/verifyAccount(계좌 등록 전, accountId 없을 수 있음) 전용 — 코디네이터를 거치지 않는 단순 캐시 접근
-    private final BrokerTokenCachePort brokerTokenCachePort;
     // getToken/recoverToken 전용 — JVM-local 더블체크락 + DB 캐시 조정 (Toss는 별도 Redis 분산 구현체).
     // TokenCoordinator 구현 빈이 2개(KIS/Toss)라 인터페이스로 주입하면 Spring이 모호해짐 —
     // TossAuthApi가 TossDistributedTokenCoordinator를 구체 타입으로 주입받는 것과 동일하게 구체 타입 사용
@@ -99,26 +95,11 @@ class KisAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
-        // 유효 캐시 토큰이 있으면 재발급 없이 성공 — KIS 발급 알림 및 횟수 제한 방지
-        if (accountId != null) {
-            Optional<String> cached = brokerTokenCachePort.findValidToken(accountId, OffsetDateTime.now(KST).plusMinutes(1));
-            if (cached.isPresent()) {
-                log.debug("KIS 연결 테스트: 캐시 토큰 유효 — KIS 호출 생략 (accountId={})", accountId);
-                return;
-            }
-        }
+    public void verifyCredentials(String appKey, String secretKey) {
         try {
-            // 캐시 미스 시 KIS OAuth 호출 — 성공 시 accountId 있으면 영구 캐시, null이면 단기 캐시 저장
+            // KIS OAuth 호출 — 어느 계좌 캐시에도 저장하지 않고 단기 캐시에만 둬 직후 계좌번호 검증의 재발급을 막는다 (EGW00133)
             TokenResponse response = issueOAuthToken(appKey, secretKey);
-            if (accountId != null) {
-                // 계좌 ID가 있으면 발급된 토큰을 캐시에 저장 — 직후 실 API 호출 시 재발급 방지
-                OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-                brokerTokenCachePort.saveToken(accountId, response.accessToken(), expiresAt);
-            } else {
-                // accountId 없음(등록 전) — 단기 캐시에 저장해 계좌번호 검증 시 재발급 방지 (EGW00133)
-                tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
-            }
+            tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
         } catch (HttpStatusCodeException e) {
             throw kisKeyException(e, "KIS 연결 테스트");
         } catch (RestClientException e) {

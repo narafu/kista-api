@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.UUID;
 
 // 업비트 연결 테스트 — /v1/accounts로 키·허용 IP·자산조회 권한 검증, /v1/api_keys로 해당 키 만료일 조회(토큰 캐시 없음)
 @Component
@@ -29,7 +28,7 @@ class UpbitAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
+    public void verifyCredentials(String appKey, String secretKey) {
         // 등록 계좌 id만으로 호출돼 키가 비면 서명 전에 거부 — null 서명 방지
         if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) throw new BrokerCredentialException();
         fetchAccounts(auth(appKey, secretKey)); // 실패는 UpbitHttpClient가 422(IP/권한/키)·429·503으로 매핑

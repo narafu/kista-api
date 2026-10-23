@@ -64,13 +64,13 @@ class UpbitAuthApiTest {
         server.expect(requestTo(BASE_URL + "/v1/accounts")).andRespond(withStatus(HttpStatus.UNAUTHORIZED)
                 .contentType(MediaType.APPLICATION_JSON).body("{\"error\":{\"name\":\"no_authorization_ip\",\"message\":\"x\"}}"));
 
-        assertThatThrownBy(() -> api.verifyCredentials("my-key", "s", null)).isInstanceOf(BrokerIpNotAllowedException.class);
+        assertThatThrownBy(() -> api.verifyCredentials("my-key", "s")).isInstanceOf(BrokerIpNotAllowedException.class);
     }
 
     @Test
     void verifyCredentialsWithoutKeys_rejectedBeforeSigning() {
         // 등록 계좌 id만으로 테스트(키 null)해도 서명에 null이 들어가면 안 된다 — HTTP 호출 없이 422
-        assertThatThrownBy(() -> api.verifyCredentials(null, null, java.util.UUID.randomUUID()))
+        assertThatThrownBy(() -> api.verifyCredentials(null, null))
                 .isInstanceOf(com.kista.tradingcore.broker.domain.model.BrokerCredentialException.class);
         server.verify();
     }

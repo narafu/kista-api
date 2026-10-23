@@ -56,7 +56,7 @@ class MeritzLiveIT {
         BrokerTokenCachePort cache = new InMemoryTokenCache();
         RestClient rest = new MeritzConfig().meritzRestClient("https://openapi.imeritz.com:9443");
         JsonMapper mapper = JsonMapper.builder().build();
-        authApi = new MeritzAuthApi(rest, mapper, cache, new DbTokenCoordinator(cache));
+        authApi = new MeritzAuthApi(rest, mapper, new DbTokenCoordinator(cache));
         http = new MeritzHttpClient(rest, authApi, mapper);
         MeritzExchangeRegistry registry = new MeritzExchangeRegistry();
         adapter = new MeritzBrokerAdapter(new MeritzTradingApi(http), new MeritzOrderApi(http, registry),
@@ -68,7 +68,7 @@ class MeritzLiveIT {
     void read_capabilities_work() {
         String appKey = account.appKey();
         String secret = account.secretKey();
-        authApi.verifyCredentials(appKey, secret, null);
+        authApi.verifyCredentials(appKey, secret);
         authApi.verifyAccount(appKey, secret, null);
 
         BigDecimal price = adapter.getPrice(TICKER, account);

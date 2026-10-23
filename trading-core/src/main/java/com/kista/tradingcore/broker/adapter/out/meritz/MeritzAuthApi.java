@@ -5,7 +5,6 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.adapter.out.internal.DbTokenCoordinator;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.application.port.output.BrokerConnectionTestPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
@@ -28,7 +27,6 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.UUID;
 
 // 메리츠 토큰 발급·연결 테스트 — OAuth는 RestClient 직접 사용(MeritzHttpClient → 이 클래스 의존이라 순환 회피)
 @Slf4j
@@ -41,7 +39,6 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
 
     private final RestClient meritzRestClient;          // baseUrl 고정 (MeritzConfig)
     private final ObjectMapper objectMapper;            // 응답 본문 파싱
-    private final BrokerTokenCachePort brokerTokenCachePort; // verifyCredentials 발급 토큰 저장
     // TokenCoordinator 구현 빈이 여럿이라 구체 타입 주입(KisAuthApi와 동일)
     private final DbTokenCoordinator tokenCoordinator;
 
@@ -66,10 +63,8 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
-        Token token = issueToken(appKey, secretKey);
-        // 계좌가 있으면 발급 토큰을 캐시 — 직후 실 API 호출 시 재발급 생략
-        if (accountId != null) brokerTokenCachePort.saveToken(accountId, token.accessToken(), token.expiresAt());
+    public void verifyCredentials(String appKey, String secretKey) {
+        issueToken(appKey, secretKey); // 토큰 발급 성공 여부만 확인 — 어느 계좌 캐시에도 저장하지 않는다
     }
 
     @Override

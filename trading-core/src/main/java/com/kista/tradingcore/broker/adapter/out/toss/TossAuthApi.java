@@ -85,8 +85,8 @@ class TossAuthApi implements BrokerConnectionTestPort {
     }
 
     @Override
-    public void verifyCredentials(String appKey, String secretKey, UUID accountId) {
-        // Toss는 자격증명 단독 검증 엔드포인트가 없어 accounts 조회로 검증 (accountId 미사용 — 캐시 저장 없음)
+    public void verifyCredentials(String appKey, String secretKey) {
+        // Toss는 자격증명 단독 검증 엔드포인트가 없어 accounts 조회로 검증 (토큰 캐시 저장 없음)
         String token = issueOAuthToken(appKey, secretKey).accessToken();
         fetchAccountSeq(token);
     }

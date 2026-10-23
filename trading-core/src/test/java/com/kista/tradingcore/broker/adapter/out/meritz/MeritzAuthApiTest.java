@@ -40,7 +40,6 @@ class MeritzAuthApiTest {
     private static final String BASE = "https://meritz.test";
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    @Mock BrokerTokenCachePort cachePort;
     @Mock DbTokenCoordinator coordinator;
 
     private MockRestServiceServer server;
@@ -50,7 +49,7 @@ class MeritzAuthApiTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
         server = MockRestServiceServer.bindTo(builder).build();
-        authApi = new MeritzAuthApi(builder.build(), JsonMapper.builder().build(), cachePort, coordinator);
+        authApi = new MeritzAuthApi(builder.build(), JsonMapper.builder().build(), coordinator);
     }
 
     private void tokenResponse(String expiresDate) {
@@ -99,13 +98,12 @@ class MeritzAuthApiTest {
     }
 
     @Test
-    void verify_credentials_saves_token_when_account_known() {
-        UUID accountId = UUID.randomUUID();
+    void verify_credentials_only_issues_token() {
         tokenResponse(LocalDateTime.now(TimeZones.KST).plusHours(12).format(FMT));
 
-        authApi.verifyCredentials("key", "sec", accountId);
+        authApi.verifyCredentials("key", "sec");
 
-        verify(cachePort).saveToken(eq(accountId), eq("tok"), any(OffsetDateTime.class));
+        server.verify(); // 토큰 발급만 하고 어느 계좌 캐시에도 저장하지 않는다
     }
 
     @Test

@@ -703,12 +703,12 @@ flows:
         desc: >-
           kista-ui 프록시가 kista-api를 거치지 않고 kista-trading으로 POST /api/accounts/connection-tests를 보낸다.
           신규 등록이 꺼진 증권사면 증권사 호출 없이 먼저 거부해 자격증명이 외부로 나가지 않게 한다.
-          기존 계좌 ID를 함께 보내면 요청자 소유·같은 증권사인지 확인하고, 저장된 키와 같을 때만 발급 토큰을 그 계좌 캐시에 저장한다(다른 키면 캐시하지 않는다).
+          요청에 계좌 ID가 없어 어느 계좌의 토큰 캐시도 읽거나 쓰지 않는다.
           KIS는 OAuth 토큰 발급으로, 메리츠는 토큰 발급과 외화잔고 조회로, Toss는 계좌 조회로, MOCK은 아무것도 호출하지 않고 통과시킨다. 업비트는 /v1/accounts로 키·허용 IP·자산조회 권한을 확인한다.
         code: [AccountController#testConnection, AccountService#test, BrokerConnectionTesters#of, KisAuthApi#verifyCredentials, TossAuthApi#verifyCredentials, MeritzAuthApi#verifyCredentials, UpbitAuthApi#verifyCredentials]
         fail: >-
           자격증명이 틀리면 422(BROKER_CREDENTIAL_INVALID)로 화면의 연결 테스트가 실패 표시된다. KIS 토큰 발급 1분 1회 제한에 걸리면 429.
-          증권사 신규 등록이 꺼져 있거나 계좌 ID의 증권사가 요청과 다르면 400, 계좌 ID가 없으면 404, 타인 계좌면 403. 업비트 허용 IP 미등록은 422(BROKER_IP_NOT_ALLOWED), 권한 부족은 422(BROKER_PERMISSION_DENIED).
+          증권사 신규 등록이 꺼져 있으면 400. 업비트 허용 IP 미등록은 422(BROKER_IP_NOT_ALLOWED), 권한 부족은 422(BROKER_PERMISSION_DENIED).
 
       - id: register
         lane: ui
