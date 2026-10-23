@@ -79,6 +79,18 @@ class ApiKeyExpirySchedulerTest {
     }
 
     @Test
+    void meritzAccountWithExpiryIsIgnored() {
+        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
+        // 키 전용 브로커여도 만료 점검 대상은 업비트뿐이다
+        Account meritz = new Account(UUID.randomUUID(), UUID.randomUUID(), "메리츠", "n", "a", "s", null, Broker.MERITZ, now, now.plus(Duration.ofDays(7)));
+        when(accountPort.findAll()).thenReturn(List.of(meritz));
+
+        scheduler.publishDue();
+
+        org.mockito.Mockito.verifyNoInteractions(publisher);
+    }
+
+    @Test
     void lockNameAndDuration() throws Exception {
         scheduler.run();
         verify(lock).tryRun(eq("api-key-expiry"), eq(Duration.ofMinutes(30)), any());

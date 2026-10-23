@@ -46,7 +46,7 @@ class AccountService implements AccountUseCase {
         Broker broker = cmd.broker() != null ? cmd.broker() : Broker.KIS;
         requireBrokerEnabled(broker);
 
-        // MOCK은 서버가 합성 자격증명 생성, UPBIT·MERITZ는 계좌번호 없이 키만, 그 외 브로커는 계좌번호 필수
+        // MOCK은 서버가 합성 자격증명 생성, 키 전용 브로커(계좌번호 없음)는 키만, 그 외 브로커는 계좌번호 필수
         String accountNo = cmd.accountNo();
         String appKey = cmd.appKey();
         String secretKey = cmd.secretKey();
@@ -54,7 +54,7 @@ class AccountService implements AccountUseCase {
             if (accountNo == null || accountNo.isBlank()) accountNo = generateMockAccountNo();
             if (appKey == null || appKey.isBlank()) appKey = "MOCK";
             if (secretKey == null || secretKey.isBlank()) secretKey = "MOCK";
-        } else if (broker == Broker.UPBIT || broker == Broker.MERITZ) {
+        } else if (broker.isKeyOnlyCredentials()) {
             accountNo = null; // 업비트·메리츠는 앱키에 계좌가 묶여 계좌번호를 받지 않는다 — 요청에 와도 무시(저장 안 함)
             if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) {
                 throw new IllegalArgumentException("API 키와 시크릿은 필수입니다");
@@ -117,7 +117,7 @@ class AccountService implements AccountUseCase {
             throw new IllegalArgumentException("모의계좌는 API 키를 바꿀 수 없습니다.");
         }
         // 업비트·메리츠는 앱키가 곧 중복 판정 키 — 다른 계좌가 이미 쓰는 키면 거부(같은 키 재입력은 허용)
-        if ((account.broker() == Broker.UPBIT || account.broker() == Broker.MERITZ) && !cmd.appKey().equals(account.appKey())
+        if (account.broker().isKeyOnlyCredentials() && !cmd.appKey().equals(account.appKey())
                 && accountPort.existsByDedupeKey(cmd.appKey())) {
             throw new Account.DuplicateAccountException(cmd.appKey());
         }

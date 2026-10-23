@@ -56,7 +56,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
 
     private Account requireCryptoAccount(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        if (account.broker().getMarket() != Market.CRYPTO_KRW) {
+        if (!account.broker().isCryptoExchange()) {
             throw new IllegalArgumentException("코인 계좌가 아닙니다. 주식 계좌는 /portfolio를 사용하세요.");
         }
         return account;

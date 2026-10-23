@@ -67,7 +67,7 @@ class StrategyCreationService {
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
         // 코인 계좌는 DCA 전용 — 정책 조회보다 먼저 거부한다
-        if (account.broker().getMarket() == Market.CRYPTO_KRW && cmd.type() != StrategyType.DCA) {
+        if (account.broker().isCryptoExchange() && cmd.type() != StrategyType.DCA) {
             throw new IllegalArgumentException("코인 계좌는 DCA 전략만 등록할 수 있습니다.");
         }
         ResolvedCreation resolved = resolveCreationSettings(cmd);
