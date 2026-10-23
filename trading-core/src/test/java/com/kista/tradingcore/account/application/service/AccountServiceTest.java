@@ -397,6 +397,7 @@ class AccountServiceTest {
     @DisplayName("연결 테스트: 타인 소유 accountId면 SecurityException, 테스터 미호출")
     void test_unownedAccount_throwsAndSkipsTester() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester); // 회귀 시 NPE가 아니라 never() 단언으로 실패하게 한다
         when(accountPort.findByIdOrThrow(accountId)).thenReturn(TradingFixtures.kisAccount(accountId, UUID.randomUUID()));
         when(accountPort.requireOwnedAccount(accountId, userId)).thenCallRealMethod();
 
@@ -410,6 +411,7 @@ class AccountServiceTest {
     @DisplayName("연결 테스트: 존재하지 않는 accountId면 NoSuchElementException, 테스터 미호출")
     void test_missingAccount_throwsAndSkipsTester() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester); // 회귀 시 NPE가 아니라 never() 단언으로 실패하게 한다
         when(accountPort.requireOwnedAccount(accountId, userId)).thenThrow(new NoSuchElementException());
 
         assertThatThrownBy(() -> accountService.test(userId, Broker.KIS, "key", "secret", accountId))
@@ -422,6 +424,7 @@ class AccountServiceTest {
     @DisplayName("연결 테스트: 계좌 증권사와 요청 증권사가 다르면 IllegalArgumentException")
     void test_brokerMismatch_throws() {
         when(brokerEnabledPort.enabled(Broker.TOSS)).thenReturn(true);
+        when(connectionTesters.of(Broker.TOSS)).thenReturn(connectionTester); // 회귀 시 NPE가 아니라 never() 단언으로 실패하게 한다
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(TradingFixtures.kisAccount(accountId, userId));
 
         assertThatThrownBy(() -> accountService.test(userId, Broker.TOSS, "key", "secret", accountId))
