@@ -193,6 +193,20 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
+    void excludesBinanceAccount() {
+        UUID cryptoAccountId = UUID.randomUUID();
+        Account crypto = new Account(cryptoAccountId, USER_ID, "바이낸스", "n", "k", "s", null, Broker.BINANCE, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), crypto));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
+
+        service.fetch(USER_ID, InvestmentPointsQuery.Scope.PORTFOLIO, null,
+                LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23));
+
+        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(cryptoAccountId)));
+    }
+
+    @Test
     void from이_없으면_사이클_시작일_중_최소값을_effectiveFrom으로_쓴다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
         when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(USER_ID));

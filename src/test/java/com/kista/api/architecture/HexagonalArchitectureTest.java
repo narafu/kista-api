@@ -150,14 +150,14 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.kis/toss/upbit)을 참조하지 않는다 — 벤더 타입 침투 차단")
+    @DisplayName("broker 밖에서는 벤더 전용 도메인 모델(domain.model.kis/toss/upbit/meritz/binance)을 참조하지 않는다 — 벤더 타입 침투 차단")
     void vendor_models_must_not_leak_outside_broker() {
         // KIS/Toss 전용 타입(KisApiException/TossCandle 등)은 broker 어댑터 전용이다 — 소비자는 벤더 중립 타입
         // (BrokerApiException/BrokerCandle 등)만 안다. 신규 브로커 추가가 "구현체 1개 추가"로 끝나도록 잠근다.
         ArchRule rule = noClasses()
                 .that().resideOutsideOfPackage("com.kista.tradingcore.broker..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..");
+                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..", "com.kista.tradingcore.broker.domain.model.binance..");
         rule.check(classes);
     }
 

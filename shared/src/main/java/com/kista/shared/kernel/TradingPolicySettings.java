@@ -19,7 +19,7 @@ public record TradingPolicySettings(
         validateTickersWithinCapability(strategies);
     }
 
-    public static final String UPBIT_ALLOWED_IP = "168.107.63.152"; // OCI Reserved IPv4 — 업비트 API 키 허용 IP 안내값
+    public static final String SERVER_EGRESS_IP = "168.107.63.152"; // OCI Reserved IPv4 — 거래소 API 키 허용 IP 안내값(업비트·바이낸스)
 
     // 현재 운영 동작을 보존하는 기본값 — 저장 행이 없을 때와 신규 enum 상수 백필에 쓰인다
     public static TradingPolicySettings defaults() {
@@ -27,7 +27,8 @@ public record TradingPolicySettings(
         for (Broker broker : Broker.values()) {
             brokers.put(broker, new BrokerSettings(true, null));
         }
-        brokers.put(Broker.UPBIT, new BrokerSettings(false, UPBIT_ALLOWED_IP)); // 단계 배포 — 운영자가 관리자 설정에서 켠다
+        brokers.put(Broker.UPBIT, new BrokerSettings(false, SERVER_EGRESS_IP)); // 단계 배포 — 운영자가 관리자 설정에서 켠다
+        brokers.put(Broker.BINANCE, new BrokerSettings(false, SERVER_EGRESS_IP)); // 단계 배포 — 운영자가 관리자 설정에서 켠다
         brokers.put(Broker.MERITZ, new BrokerSettings(false, null)); // 베타 API·모의계좌 없음 — 운영자가 본인 계좌 검증 후 켠다
         Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
         strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,

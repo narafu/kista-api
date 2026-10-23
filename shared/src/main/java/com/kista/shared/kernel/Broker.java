@@ -12,7 +12,8 @@ public enum Broker {
     KIS("한국투자증권", "한투", Market.US_STOCK, false, false),  // 한국투자증권 Open API
     MOCK("모의계좌",    "모의", Market.US_STOCK, false, false),  // 증권사 연동 없는 DB 기반 모의매매
     UPBIT("업비트",     "업비트", Market.CRYPTO_KRW, true, true), // 업비트 Open API (KRW 마켓 코인)
-    MERITZ("메리츠증권", "메리츠", Market.US_STOCK, true, false); // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
+    MERITZ("메리츠증권", "메리츠", Market.US_STOCK, true, false), // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
+    BINANCE("바이낸스", "바이낸스", Market.CRYPTO_USDT, true, false); // 바이낸스 현물 USDT 마켓 (API key/secret HMAC, 계좌번호 없음·키 만료일 없음)
 
     private final String label;      // 한국어 전체 이름
     private final String shortLabel; // UI 모바일 약칭

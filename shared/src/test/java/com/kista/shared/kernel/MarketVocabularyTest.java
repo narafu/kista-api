@@ -72,9 +72,11 @@ class MarketVocabularyTest {
     void brokerCapabilityFlags() {
         assertThat(Broker.UPBIT.isKeyOnlyCredentials()).isTrue();
         assertThat(Broker.MERITZ.isKeyOnlyCredentials()).isTrue();
+        assertThat(Broker.BINANCE.isKeyOnlyCredentials()).isTrue();
+        assertThat(Broker.BINANCE.getCurrency()).isEqualTo(Currency.USDT);
         for (Broker b : new Broker[]{Broker.KIS, Broker.TOSS, Broker.MOCK}) assertThat(b.isKeyOnlyCredentials()).isFalse();
         assertThat(Arrays.stream(Broker.values()).filter(Broker::isApiKeyExpiring)).containsExactly(Broker.UPBIT);
-        assertThat(Arrays.stream(Broker.values()).filter(Broker::isCryptoExchange)).containsExactly(Broker.UPBIT);
+        assertThat(Arrays.stream(Broker.values()).filter(Broker::isCryptoExchange)).containsExactly(Broker.UPBIT, Broker.BINANCE);
         for (Broker b : Broker.values()) assertThat(b.getCurrency()).isEqualTo(b.getMarket().quoteCurrency());
     }
 }

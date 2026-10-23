@@ -96,4 +96,18 @@ class TradingPolicySettingsPersistenceAdapterTest {
         assertThat(loaded.brokers().get(Broker.KIS).allowedIp()).isNull();
         assertThat(loaded.brokerEnabled(Broker.KIS)).isTrue();
     }
+
+    @Test
+    @DisplayName("BINANCE 키가 없는 기존 행은 defaults(BINANCE 비활성·허용 IP)로 보충된다")
+    void loadBackfillsBinanceAsDisabled() throws Exception {
+        ObjectNode root = (ObjectNode) objectMapper.valueToTree(TradingPolicySettings.defaults());
+        ((ObjectNode) root.get("brokers")).remove("BINANCE");
+        when(repository.findById(TradingPolicySettingsPersistenceAdapter.SETTING_KEY)).thenReturn(Optional.of(
+                new TradingPolicySettingsEntity(TradingPolicySettingsPersistenceAdapter.SETTING_KEY, objectMapper.writeValueAsString(root))));
+
+        TradingPolicySettings loaded = adapter.load();
+
+        assertThat(loaded.brokerEnabled(Broker.BINANCE)).isFalse();
+        assertThat(loaded.brokers().get(Broker.BINANCE).allowedIp()).isEqualTo("168.107.63.152");
+    }
 }

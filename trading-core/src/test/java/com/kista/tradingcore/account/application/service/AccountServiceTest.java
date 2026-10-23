@@ -131,6 +131,26 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("바이낸스 등록: 계좌번호를 무시하고 키만 받으며 키가 비면 400")
+    void register_binance_ignores_account_no_and_requires_keys() {
+        when(brokerEnabledPort.enabled(Broker.BINANCE)).thenReturn(true);
+        when(connectionTesters.of(Broker.BINANCE)).thenReturn(connectionTester);
+        when(connectionTester.verifyAccount("ak", "sk", null)).thenReturn(new BrokerAccountVerification(null, null));
+        when(accountPort.countByUserId(userId)).thenReturn(0);
+        when(accountPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Account saved = accountService.register(userId,
+                new RegisterAccountCommand("바이낸스", "123", "ak", "sk", Broker.BINANCE));
+
+        assertThat(saved.accountNo()).isNull();
+        verify(connectionTester).verifyAccount("ak", "sk", null);
+        verify(accountPort).existsByDedupeKey("ak");
+        assertThatThrownBy(() -> accountService.register(userId,
+                new RegisterAccountCommand("바이낸스", null, " ", "sk", Broker.BINANCE)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다");
+    }
+
+    @Test
     @DisplayName("키 수정: 메리츠 새 키가 다른 계좌에 있으면 409")
     void update_credentials_meritz_rejects_key_used_by_other_account() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(
