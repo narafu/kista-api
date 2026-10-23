@@ -18,7 +18,7 @@ public enum Broker {
     private final String label;      // 한국어 전체 이름
     private final String shortLabel; // UI 모바일 약칭
     private final Market market;     // 거래 시장 — 종목 시장과 일치해야 전략 생성 가능
-    private final boolean keyOnlyCredentials; // 앱키만으로 인증(시크릿·계좌번호 불필요) — 업비트·메리츠
+    private final boolean keyOnlyCredentials; // 계좌번호 없이 앱키가 계좌를 식별(중복 판정 키=appKey) — 업비트·메리츠·바이낸스
     private final boolean apiKeyExpiring;      // API 키 만료가 있는 거래소 — 업비트
 
     // 계좌 기준 통화 (주문 금액 단위) — 시장의 견적 통화에서 파생

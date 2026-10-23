@@ -60,5 +60,6 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
 - 토스증권 API 작업: `docs/agents/toss-api.md`
 - 메리츠 API 작업: `docs/agents/meritz-api.md`
+- 바이낸스 API 작업: `docs/agents/binance-api.md`
 - Docker/배포/인프라 작업: `docs/agents/docker-infra.md`
 - 배치 스케줄러 실행 시각: `docs/agents/scheduler-time-table.md`
