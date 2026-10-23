@@ -8,6 +8,8 @@ KISTA 사용자 전체가 업비트(KRW 마켓)와 같은 방식으로 바이낸
 
 이번 작업은 "두 번째 코인 거래소"를 붙이는 일이지만, 현재 코드는 코인 = 업비트 = KRW 전제가 리터럴로 흩어져 있다(api 약 20곳, kista-ui 약 25곳 — 아래 "일반화 대상"). 사용자는 비용이 크더라도 구조를 제대로 고치는 쪽을 선호한다. 그래서 **바이낸스를 붙이기 전에 행동 변경 없는 구조 개선 단계(Phase 0)를 먼저 둔다** — 그 뒤엔 바이낸스(나아가 빗썸·다른 USDT 거래소)가 "구현체 + enum 상수" 추가만으로 붙어야 한다.
 
+운영 방침(사용자, 2026-10-23): 미국주식은 메리츠증권, 크립토는 **바이낸스가 중심**이다. 토스증권은 대시보드 중심이고 업비트·빗썸·한국투자증권은 옵션이라 향후 없앨 수 있다. 그래서 일반화의 기준은 "업비트 동작 보존 + 바이낸스가 1급"이다 — 중립 이름·계약은 바이낸스 쪽(USDT 소수 금액, 받은 자산 수수료, 순수량)을 자연스럽게 표현하고, 업비트 고유 개념(KRW 정수, 견적 통화 추가 수수료, KRW-USDT 참조 시세)은 업비트 구현체·시장 capability 안에 가둬 업비트 제거가 어댑터 패키지·enum 상수·정책 기본값 정리로 끝나게 한다.
+
 ## 목표
 
 - `Broker.BINANCE` 계좌 등록(API key/secret, 연결 테스트), 바이낸스 현물 BTCUSDT·ETHUSDT DCA 등록·실행·동기화·원장 반영·알림.
@@ -79,7 +81,7 @@ KISTA 사용자 전체가 업비트(KRW 마켓)와 같은 방식으로 바이낸
 
 ### 4. 거래소 포트 정리 (Phase 0)
 
-- `CryptoExchangePort`에서 김치 프리미엄용 `getUsdtKrwPrice()`·`getCompletedUsdtKrwDailyCandles()`를 분리해 별도 참조 시세 포트로 옮긴다(소비자 `CryptoMarketIndicatorService`만, 구현 업비트). 그러지 않으면 바이낸스 구현이 예외를 던지는 메서드를 갖게 된다.
+- `CryptoExchangePort`에서 김치 프리미엄용 `getUsdtKrwPrice()`·`getCompletedUsdtKrwDailyCandles()`를 분리해 별도 참조 시세 포트로 옮긴다(소비자 `CryptoMarketIndicatorService`만). 그러지 않으면 바이낸스 구현이 예외를 던지는 메서드를 갖게 된다. 구현은 업비트 **거래 어댑터가 아니라 공개 시세 전용 어댑터**(계좌·키 불필요, 기존 `stats.adapter.out.binance.BinanceMarketDataAdapter`와 같은 패턴 — stats 소유)로 둔다. 업비트 거래(계좌 등록)를 없애도 김프 지표는 업비트 공개 시세로 계속 동작한다. 같은 이유로 김프 지표의 코인 현재가·일봉(`exchanges.of(Broker.UPBIT)`)도 이 공개 시세 어댑터로 옮긴다.
 - 원화 이름을 견적 통화 중립으로: `buyMarketByAmount(…, krwAmount, …)` → quote 금액, `CryptoBalance.krwAvailable/krwLocked` → quote 가용·잠금, `CryptoOrderResult` 주석·`CryptoPortfolio` 필드.
 - 주문 조회에 종목을 넘긴다: 바이낸스 `GET /api/v3/order`는 `symbol`이 필수라 현재 시그니처 `findOrderByIdentifier(account, identifier)`·`findOrderByUuid(account, uuid)`로는 구현 불가. `Order.ticker()`가 있으므로 동기화기에서 전달.
 - 일봉 신선도("KST 09:00 마감 → 09시 이후 오늘−1, 이전 오늘−2", `CryptoDcaRoundExecutor.java:172-174`)를 실행기에서 포트 계약으로 옮긴다. 포트는 "완성된 최신 봉의 KST 일자" 계약을 지키고, 실행기는 기대 일자를 포트에서 받거나 계약 문서화된 규칙을 쓴다. 바이낸스 1d 봉은 UTC 00:00 시작 = KST 09:00이라 업비트와 경계가 같다(구현 시 `openTime`으로 확인).
