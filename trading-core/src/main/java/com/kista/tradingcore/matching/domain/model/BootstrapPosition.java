@@ -27,7 +27,7 @@ public final class BootstrapPosition {
             throw new IllegalArgumentException("주식 보유 수량(initialHoldings)이 허용 범위를 넘었습니다");
         }
         if (market.isCrypto() ? normalized.scale() > CRYPTO_SCALE : normalized.scale() > 0) {
-            throw new IllegalArgumentException(market == Market.CRYPTO_KRW
+            throw new IllegalArgumentException(market.isCrypto()
                     ? "보유 수량(initialHoldings)은 소수 8자리까지 입력할 수 있습니다"
                     : "주식 보유 수량(initialHoldings)은 정수여야 합니다");
         }
