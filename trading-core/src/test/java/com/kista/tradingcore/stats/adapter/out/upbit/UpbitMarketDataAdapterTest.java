@@ -89,4 +89,31 @@ class UpbitMarketDataAdapterTest {
         assertThat(adapter.getCompletedKrwDailyCloses(StrategyTicker.BTC, 1)).extracting(DatedValue::date)
                 .containsExactly(LocalDate.of(2026, 10, 16));
     }
+
+    // firstDay(KST 09:00)에서 하루씩 과거로 n개 — utc는 -9h
+    private static String candleRows(LocalDate firstDay, int n) {
+        return "[" + java.util.stream.IntStream.range(0, n).mapToObj(i -> {
+            java.time.LocalDateTime kst = firstDay.minusDays(i).atTime(9, 0);
+            return "{\"candle_date_time_kst\":\"%s\",\"candle_date_time_utc\":\"%s\",\"trade_price\":%d}"
+                    .formatted(kst, kst.minusHours(9), 100 + i);
+        }).collect(java.util.stream.Collectors.joining(",")) + "]";
+    }
+
+    @Test
+    void pagesWithUnencodedToWhenCountExceeds200() {
+        // 1차: 10-17(진행 중)부터 200행 → 가장 오래된 봉의 utc = 그날 00:00:00
+        LocalDate first = LocalDate.of(2026, 10, 17);
+        LocalDate oldest = first.minusDays(199);
+        server.expect(requestTo("https://api.upbit.com/v1/candles/days?market=KRW-BTC&count=200"))
+                .andRespond(withSuccess(candleRows(first, 200), MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.upbit.com/v1/candles/days?market=KRW-BTC&count=200&to=" + oldest + "T00:00:00"))
+                .andRespond(withSuccess(candleRows(oldest.minusDays(1), 200), MediaType.APPLICATION_JSON));
+
+        List<DatedValue> closes = adapter.getCompletedKrwDailyCloses(StrategyTicker.BTC, 250);
+
+        assertThat(closes).hasSize(250);
+        assertThat(closes.getLast().date()).isEqualTo(LocalDate.of(2026, 10, 16));
+        assertThat(closes).extracting(DatedValue::date).doesNotHaveDuplicates().isSorted();
+        server.verify();
+    }
 }

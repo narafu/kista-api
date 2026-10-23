@@ -101,11 +101,9 @@ class UpbitMarketDataAdapter implements UpbitMarketDataPort {
         for (int page = 0; page < MAX_PAGES && completed.size() < count; page++) {
             // 첫 페이지는 진행 중 봉 1개를 버릴 여유(count+1), 이후 페이지는 최대치
             int pageCount = page == 0 ? Math.min(count + 1, MAX_CANDLES) : MAX_CANDLES;
-            List<CandleRow> rows = to == null
-                    ? restClient.get().uri(BASE + "/v1/candles/days?market={m}&count={c}", market, pageCount)
-                            .retrieve().body(new ParameterizedTypeReference<>() {})
-                    : restClient.get().uri(BASE + "/v1/candles/days?market={m}&count={c}&to={t}", market, pageCount, to)
-                            .retrieve().body(new ParameterizedTypeReference<>() {});
+            // to의 콜론이 %3A로 인코딩되지 않게 URL에 직접 이어 붙인다(기존 broker 어댑터와 같은 wire 형식) — 내부 생성 값
+            String url = BASE + "/v1/candles/days?market=" + market + "&count=" + pageCount + (to == null ? "" : "&to=" + to);
+            List<CandleRow> rows = restClient.get().uri(url).retrieve().body(new ParameterizedTypeReference<>() {});
             if (rows == null || rows.isEmpty()) break; // 상장 이력 소진
             // 진행 중 봉 포함 여부가 문서에 없어 직접 보장 — 시작+1일(다음날 09:00)이 지나야 완성
             rows.stream().filter(r -> !r.startKst().plusDays(1).isAfter(now))
