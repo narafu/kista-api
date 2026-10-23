@@ -47,6 +47,20 @@ class CryptoTradeNotifierTest {
         verify(realtime).notifyTrade(org.mockito.ArgumentMatchers.eq(userId), msg.capture());
         assertThat(msg.getValue().quantity()).isEqualByComparingTo("0.00012345");
         assertThat(msg.getValue().kind()).isEqualTo(TradeEventMessage.Kind.BUY);
+        assertThat(msg.getValue().currency()).isEqualTo(Currency.KRW);
+    }
+
+    @Test
+    void usdtEventCarriesUsdtCurrency() {
+        when(profiles.findByUserId(userId)).thenReturn(Optional.of(new TradingUserProfile(userId, Map.of(), false, null, null)));
+        CryptoOrderFilledEvent usdt = new CryptoOrderFilledEvent(userId, UUID.randomUUID(), UUID.randomUUID(), "바낸",
+                StrategyTicker.BTC, OrderDirection.SELL, new BigDecimal("0.00015985"), new BigDecimal("65000"), new BigDecimal("10.39"), Currency.USDT);
+
+        notifier.onCryptoOrderFilled(usdt);
+
+        ArgumentCaptor<TradeEventMessage> msg = ArgumentCaptor.forClass(TradeEventMessage.class);
+        verify(realtime).notifyTrade(org.mockito.ArgumentMatchers.eq(userId), msg.capture());
+        assertThat(msg.getValue().currency()).isEqualTo(Currency.USDT);
     }
 
     @Test

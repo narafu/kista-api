@@ -106,7 +106,7 @@ class AdminTradeControllerTest {
                         accountId,
                         UUID.fromString("00000000-0000-0000-0000-000000000010"),
                         "1234-56",
-                        Broker.TOSS,
+                        Broker.BINANCE,
                         java.time.Instant.parse("2026-07-01T00:00:00Z")
                 )
         ));
@@ -154,7 +154,8 @@ class AdminTradeControllerTest {
                 .andExpect(jsonPath("$[0].ownerNickname").value("privacy-user"))
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].direction").value("SELL"))
-                .andExpect(jsonPath("$[0].price").value(267.37));
+                .andExpect(jsonPath("$[0].price").value(267.37))
+                .andExpect(jsonPath("$[0].currency").value("USDT"));
     }
 
     @Test

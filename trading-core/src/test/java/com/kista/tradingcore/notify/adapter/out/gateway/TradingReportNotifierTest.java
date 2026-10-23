@@ -107,6 +107,7 @@ class TradingReportNotifierTest {
         verify(realtimeNotificationPort, times(1)).notifyTrade(eq(PROFILE.userId()), captor.capture());
         assertThat(captor.getValue().accountId()).isEqualTo(ACCOUNT_ID);
         assertThat(captor.getValue().strategyId()).isEqualTo(STRATEGY_ID);
+        assertThat(captor.getValue().currency()).isEqualTo(com.kista.shared.kernel.Currency.USD);
     }
 
     @Test

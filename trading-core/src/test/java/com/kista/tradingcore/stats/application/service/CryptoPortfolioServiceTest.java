@@ -7,6 +7,10 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
+import com.kista.tradingcore.trading.application.port.output.*;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.stats.domain.model.CryptoPortfolio;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,11 +38,15 @@ class CryptoPortfolioServiceTest {
     @Mock AccountPort accountPort;
     @Mock CryptoExchanges exchanges;
     @Mock CryptoExchangePort upbit;
+    @Mock CryptoExchangePort binance;
+    @Mock StrategyPort strategyPort;
+    @Mock StrategyCyclePort strategyCyclePort;
+    @Mock CyclePositionPort cyclePositionPort;
     CryptoPortfolioService service;
 
     @BeforeEach
     void setUp() {
-        service = new CryptoPortfolioService(accountPort, exchanges);
+        service = new CryptoPortfolioService(accountPort, exchanges, strategyPort, strategyCyclePort, cyclePositionPort);
     }
 
     @Test
@@ -58,6 +66,56 @@ class CryptoPortfolioServiceTest {
             assertThat(h.evalAmount()).isEqualByComparingTo("225000");
         });
         assertThat(p.totalAsset()).isEqualByComparingTo("1230000");
+    }
+
+    @Test
+    void binanceUsesUsdtScaleAndLedgerAvg() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.binanceAccount(ACCOUNT_ID, USER_ID));
+        when(exchanges.of(Broker.BINANCE)).thenReturn(binance);
+        when(binance.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal("100.125"), BigDecimal.ZERO,
+                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(new BigDecimal("0.00015985"), BigDecimal.ZERO, null))));
+        when(binance.getCurrentPrices(Set.of(StrategyTicker.BTC))).thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("65000.555")));
+        Strategy strategy = mock(Strategy.class);
+        StrategyCycle cycle = mock(StrategyCycle.class);
+        CyclePosition position = mock(CyclePosition.class);
+        UUID strategyId = UUID.randomUUID(), cycleId = UUID.randomUUID();
+        when(strategy.id()).thenReturn(strategyId);
+        when(cycle.id()).thenReturn(cycleId);
+        when(position.avgPrice()).thenReturn(new BigDecimal("65000"));
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of(strategy));
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(java.util.Optional.of(cycle));
+        when(cyclePositionPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, position));
+
+        CryptoPortfolio p = service.getCryptoPortfolio(ACCOUNT_ID, USER_ID);
+
+        assertThat(p.currency()).isEqualTo(Currency.USDT);
+        assertThat(p.holdings().getFirst().avgBuyPrice()).isEqualByComparingTo("65000");
+        // 0.00015985 × 65000.555 = 10.3903… → scale 2 HALF_UP
+        assertThat(p.holdings().getFirst().evalAmount()).isEqualTo(new BigDecimal("10.39"));
+    }
+
+    @Test
+    void exchangeAvgPriceWinsAndLedgerIsNotQueried() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+        when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
+        when(upbit.getBalance(any())).thenReturn(new CryptoBalance(BigDecimal.TEN, BigDecimal.ZERO,
+                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(new BigDecimal("0.001"), BigDecimal.ZERO, new BigDecimal("150000000")))));
+        when(upbit.getCurrentPrices(Set.of(StrategyTicker.BTC))).thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("150000000")));
+
+        assertThat(service.getCryptoPortfolio(ACCOUNT_ID, USER_ID).holdings().getFirst().avgBuyPrice()).isEqualByComparingTo("150000000");
+        verifyNoInteractions(strategyPort);
+    }
+
+    @Test
+    void noStrategyLeavesAvgNull() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.binanceAccount(ACCOUNT_ID, USER_ID));
+        when(exchanges.of(Broker.BINANCE)).thenReturn(binance);
+        when(binance.getBalance(any())).thenReturn(new CryptoBalance(BigDecimal.TEN, BigDecimal.ZERO,
+                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(new BigDecimal("0.001"), BigDecimal.ZERO, null))));
+        when(binance.getCurrentPrices(Set.of(StrategyTicker.BTC))).thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("65000")));
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
+
+        assertThat(service.getCryptoPortfolio(ACCOUNT_ID, USER_ID).holdings().getFirst().avgBuyPrice()).isNull();
     }
 
     @Test

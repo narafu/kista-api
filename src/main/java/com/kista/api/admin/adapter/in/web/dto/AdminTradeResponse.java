@@ -46,7 +46,9 @@ public record AdminTradeResponse(
         @Schema(description = "체결 수량 (미체결 시 null)")
         BigDecimal filledQuantity,
         @Schema(description = "체결 가격 (미체결 시 null)")
-        BigDecimal filledPrice
+        BigDecimal filledPrice,
+        @Schema(description = "price·filledPrice 통화 (Currency name, 계좌를 찾지 못하면 null)", nullable = true, example = "USDT")
+        String currency
 ) {
     public static AdminTradeResponse from(OrderResponse t, Map<UUID, AccountSummaryResponse> accountMap,
                                           Map<UUID, UserSummary> userMap,
@@ -65,6 +67,7 @@ public record AdminTradeResponse(
                 t.tradeDate(), t.ticker().name(),
                 t.direction().name(), t.orderType().name(), t.timing().name(),
                 t.quantity(), t.price(), t.status().name(),
-                t.externalOrderId(), t.filledQuantity(), t.filledPrice());
+                t.externalOrderId(), t.filledQuantity(), t.filledPrice(),
+                account != null ? account.broker().getCurrency().name() : null);
     }
 }

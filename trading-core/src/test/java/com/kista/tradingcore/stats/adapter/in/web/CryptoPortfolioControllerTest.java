@@ -43,6 +43,11 @@ class CryptoPortfolioControllerTest {
 
         mockMvc.perform(get("/api/accounts/{id}/crypto-portfolio", ACCOUNT_ID).with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currency").value("KRW"))
+                .andExpect(jsonPath("$.cash").value(1000))
+                .andExpect(jsonPath("$.totalAsset").value(226000))
+                .andExpect(jsonPath("$.holdings[0].evalAmount").value(225000))
+                .andExpect(jsonPath("$.holdings[0].evalAmountKrw").value(225000))
                 .andExpect(jsonPath("$.krwCash").value(1000))
                 .andExpect(jsonPath("$.holdings[0].ticker").value("BTC"))
                 .andExpect(jsonPath("$.holdings[0].quantity").value(0.0015))

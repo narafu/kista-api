@@ -31,8 +31,8 @@ class CryptoTradeNotifier {
         double price = e.avgPrice().doubleValue();
         double amount = e.amount().doubleValue();
         TradeEventMessage msg = e.direction() == OrderDirection.SELL
-                ? TradeEventMessage.sell(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId())
-                : TradeEventMessage.buy(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId());
+                ? TradeEventMessage.sell(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId(), e.currency())
+                : TradeEventMessage.buy(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId(), e.currency());
         realtimeNotificationPort.notifyTrade(profile.userId(), msg);
     }
 }

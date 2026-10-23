@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.application.port.output.TradingUserProfileP
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort;
 import com.kista.tradingcore.notify.application.port.output.TradingUserNotificationPort;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import com.kista.shared.kernel.OrderDirection;
@@ -43,9 +44,9 @@ class TradingReportNotifier {
         for (TradeLegSummary e : event.executions()) {
             TradeEventMessage tradeEvent = e.direction() == OrderDirection.SELL
                     ? TradeEventMessage.sell(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
-                            event.accountNickname(), event.accountId(), event.strategyId())
+                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD)
                     : TradeEventMessage.buy(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
-                            event.accountNickname(), event.accountId(), event.strategyId());
+                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD); // 주식 체결 리포트 — US_STOCK 견적 통화
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", event.accountNickname(), event.executions().size());

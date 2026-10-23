@@ -14,9 +14,14 @@ public record BrokerMeta(
         @Schema(description = "거래 시장", example = "CRYPTO_KRW")
         String market,      // Market name()
         @Schema(description = "계좌 기준 통화", example = "KRW")
-        String currency     // Currency name()
+        String currency,    // Currency name()
+        @Schema(description = "시장 최소 주문 금액 (견적 통화, plain 문자열 — 0은 하한 없음)", example = "5000")
+        String minOrderAmount, // Market.minOrderAmount() plain 문자열
+        @Schema(description = "주문 금액 소수 자릿수 (KRW 0, USDT 2)", example = "0")
+        int amountScale     // Market.amountScale()
 ) {
     public static BrokerMeta from(Broker b) {
-        return new BrokerMeta(b.name(), b.getLabel(), b.getShortLabel(), b.getMarket().name(), b.getCurrency().name());
+        return new BrokerMeta(b.name(), b.getLabel(), b.getShortLabel(), b.getMarket().name(), b.getCurrency().name(),
+                b.getMarket().minOrderAmount().toPlainString(), b.getMarket().amountScale());
     }
 }
