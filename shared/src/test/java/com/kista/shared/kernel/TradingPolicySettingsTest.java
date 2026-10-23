@@ -16,7 +16,7 @@ class TradingPolicySettingsTest {
         TradingPolicySettings settings = TradingPolicySettings.defaults();
 
         assertThat(settings.brokers()).containsOnlyKeys(Broker.values());
-        assertThat(settings.brokers().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != Broker.UPBIT && e.getKey() != Broker.MERITZ)); // UPBIT·MERITZ만 기본 비활성
+        assertThat(settings.brokers().entrySet()).allMatch(e -> java.util.Set.of(Broker.UPBIT, Broker.MERITZ, Broker.BINANCE).contains(e.getKey()) != e.getValue().enabled()); // UPBIT·MERITZ·BINANCE만 기본 비활성
         assertThat(settings.strategies()).containsOnlyKeys(StrategyType.values());
         assertThat(settings.strategies().entrySet()).allMatch(e -> e.getValue().enabled() == (e.getKey() != StrategyType.DCA)); // DCA만 기본 비활성
         assertThat(settings.strategy(StrategyType.INFINITE).divisionCount())
@@ -33,6 +33,13 @@ class TradingPolicySettingsTest {
         assertThat(upbit.enabled()).isFalse();
         assertThat(upbit.allowedIp()).isEqualTo("168.107.63.152");
         assertThat(TradingPolicySettings.defaults().brokers().get(Broker.KIS).allowedIp()).isNull();
+    }
+
+    @Test
+    void binanceDefaultsToDisabledWithServerIp() {
+        BrokerSettings b = TradingPolicySettings.defaults().brokers().get(Broker.BINANCE);
+        assertThat(b.enabled()).isFalse();
+        assertThat(b.allowedIp()).isEqualTo("168.107.63.152");
     }
 
     @Test

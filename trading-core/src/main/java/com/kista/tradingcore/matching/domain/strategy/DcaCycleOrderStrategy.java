@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.CryptoTradingRules;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
@@ -30,10 +31,15 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     // 규칙 단위 판정 입력 — closes: 전일까지 종가(null=조회 실패), ledger: 원장(AVG_PRICE·보유비율 기준),
     // sellableAfterReserved: SELL만(브로커 판매가능수량 − 예약분 − 앞 규칙 계획분, null=조회 실패),
-    // currentPrice: 현재가(null=조회 실패), availableCash: 크립토 BUY만(지갑 원화) — 주식은 null(allocator가 판정)
+    // currentPrice: 현재가(null=조회 실패), availableCash: 크립토 BUY만(지갑 견적 통화) — 주식은 null(allocator가 판정),
+    // tradingRules: 크립토 필수(거래소 수수료·최소 금액·수량 단위), 주식은 null
     public record DcaRuleInputs(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
                                 BigDecimal sellableAfterReserved, BigDecimal fearGreed, BigDecimal currentPrice,
-                                BigDecimal availableCash) {}
+                                BigDecimal availableCash, CryptoTradingRules tradingRules) {
+        public DcaRuleInputs {
+            if (market.isCrypto() && tradingRules == null) throw new IllegalArgumentException("코인 시장은 거래 규칙이 필요합니다");
+        }
+    }
 
     @Override
     public StrategyType cycleType() {
@@ -73,7 +79,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     private static DcaRuleInputs withSellable(DcaRuleInputs in, BigDecimal sellable) {
         return new DcaRuleInputs(in.rule(), in.market(), in.closes(), in.ledger(), sellable, in.fearGreed(),
-                in.currentPrice(), in.availableCash());
+                in.currentPrice(), in.availableCash(), in.tradingRules());
     }
 
     // 규칙 1개 판정 — 데이터 → 조건 → 보유(SELL) → 규모 → 부족 정책 → 최소 단위
@@ -86,7 +92,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null);
         }
         boolean sell = rule.direction() == OrderDirection.SELL;
-        boolean crypto = in.market() == Market.CRYPTO_KRW;
+        boolean crypto = in.market().isCrypto();
         // 기준가 — 코인은 현재가(없으면 전일 종가), 주식 SELL은 전일 종가, 주식 BUY는 max(전일 종가, 현재가)
         BigDecimal basis = crypto ? (in.currentPrice() != null && in.currentPrice().signum() > 0 ? in.currentPrice() : prevClose)
                 : sell ? prevClose
@@ -102,7 +108,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             DcaDecision.Skipped s = notMet.get();
             return new DcaRuleDecision.Skipped(key, s.reason(), s.detail(), s.referencePrice());
         }
-        int scale = crypto ? 8 : 0; // 코인 수량 소수 8자리, 주식 정수
+        int scale = crypto ? in.tradingRules().quantityScale() : 0; // 코인 수량은 거래소 수량 단위, 주식 정수
         BigDecimal quantity;
         BigDecimal notional = null;
         if (sell) {
@@ -121,11 +127,12 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             quantity = want.min(available);
         } else if (crypto) {
             if (in.availableCash() == null) {
-                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원화 잔고 조회 실패", basis);
+                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "주문 가능 잔고 조회 실패", basis);
             }
-            // 업비트 금액 주문은 정수 원 — 수수료 포함 지출이 지갑을 넘지 않게 가용 금액을 역산
-            BigDecimal affordable = in.availableCash().divide(DcaRule.CRYPTO_FEE_FACTOR, 0, RoundingMode.FLOOR);
-            BigDecimal want = rule.sizing().amount().setScale(0, RoundingMode.FLOOR);
+            // 금액은 계좌 통화 소수 자릿수 — 수수료 포함 지출이 지갑을 넘지 않게 가용 금액을 역산
+            int amountScale = in.market().amountScale();
+            BigDecimal affordable = in.tradingRules().affordableAmount(in.availableCash(), amountScale);
+            BigDecimal want = rule.sizing().amount().setScale(amountScale, RoundingMode.FLOOR);
             if (want.compareTo(affordable) > 0 && rule.shortfall() == DcaShortfallPolicy.REJECT) {
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.INSUFFICIENT_BALANCE,
                         "필요 " + DcaConditions.plain(want) + " > 가용 " + DcaConditions.plain(affordable), basis);
@@ -137,9 +144,11 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         }
         if (crypto) {
             BigDecimal value = notional != null ? notional : quantity.multiply(basis);
-            if (value.compareTo(DcaRule.CRYPTO_MIN_AMOUNT) < 0) {
+            BigDecimal minNotional = in.tradingRules().minNotional();
+            if (value.compareTo(minNotional) < 0) {
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.BELOW_MIN_ORDER_AMOUNT,
-                        "주문 금액 " + value.setScale(0, RoundingMode.FLOOR).toPlainString() + " < 최소 5000", basis);
+                        "주문 금액 " + value.setScale(in.market().amountScale(), RoundingMode.FLOOR).toPlainString()
+                                + " < 최소 " + minNotional.toPlainString(), basis);
             }
         } else if (quantity.signum() == 0) {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.BELOW_ONE_SHARE,

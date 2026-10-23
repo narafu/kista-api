@@ -2163,6 +2163,18 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     }
 
     @Test
+    @DisplayName("주식 계좌에 코인 종목은 시장 불일치로 거부된다 — 중간부터 시작 소수 보유보다 시장 검증이 먼저")
+    void register_btcOnKisAccount_rejectedAsMarketMismatch() {
+        stubDcaPolicyWithCrypto();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));
+
+        // 시장 검증이 BootstrapPosition보다 늦으면 "정수여야" 문구가 먼저 나온다
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                dcaCommand(StrategyTicker.BTC, cryptoDcaConfig(), new BigDecimal("0.5"), new BigDecimal("100"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("계좌와 종목의 시장이 다릅니다: BTC");
+    }
+
+    @Test
     @DisplayName("코인 계좌는 DCA 외 전략을 등록할 수 없다")
     void register_cryptoAccount_rejectsNonDca() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
@@ -2388,7 +2400,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         CyclePosition fractional = new CyclePosition(null, CYCLE.id(), BigDecimal.ZERO, null, null,
                 new BigDecimal("0.00123"), null, null);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
-        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID)); // 시장은 계좌 브로커에서
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(fractional));
         when(dcaDetailPort.findActiveByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(

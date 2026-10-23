@@ -95,66 +95,80 @@ class AdminTradeControllerTest {
                 .andExpect(jsonPath("$").isArray());
     }
 
-    @Test
-    void listStrategyOrders_adminRole_returns200() throws Exception {
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
+    private static final UUID ORDER_ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
+    private static final UUID ORDER_STRATEGY_ID = UUID.fromString("00000000-0000-0000-0000-000000000030");
+
+    // 전략 주문 조회 공통 스텁 — 계좌(broker)·사용자·주문(ticker)·전략 요약
+    private void stubStrategyOrders(Broker broker, StrategyTicker ticker) {
+        UUID accountId = ORDER_ACCOUNT_ID;
+        UUID strategyId = ORDER_STRATEGY_ID;
         UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
+        UUID ownerId = UUID.fromString("00000000-0000-0000-0000-000000000010");
         // 단일 계좌/사용자 조회 — 전체 풀스캔 대신 findAccount/findUser 사용
         when(adminQuery.findAccount(accountId)).thenReturn(Optional.of(
                 new com.kista.shared.contract.account.AccountSummaryResponse(
-                        accountId,
-                        UUID.fromString("00000000-0000-0000-0000-000000000010"),
-                        "1234-56",
-                        Broker.TOSS,
-                        java.time.Instant.parse("2026-07-01T00:00:00Z")
-                )
-        ));
-        when(adminUser.findUser(UUID.fromString("00000000-0000-0000-0000-000000000010"))).thenReturn(Optional.of(
+                        accountId, ownerId, "1234-56", broker, java.time.Instant.parse("2026-07-01T00:00:00Z"))));
+        when(adminUser.findUser(ownerId)).thenReturn(Optional.of(
                 new com.kista.api.user.domain.model.UserSummary(
-                        UUID.fromString("00000000-0000-0000-0000-000000000010"),
-                        "privacy-user",
-                        UserStatus.ACTIVE,
-                        UserRole.USER,
-                        java.time.Instant.parse("2026-07-01T00:00:00Z")
-                )
-        ));
+                        ownerId, "privacy-user", UserStatus.ACTIVE, UserRole.USER, java.time.Instant.parse("2026-07-01T00:00:00Z"))));
         when(adminQuery.listStrategyOrders(accountId, strategyId, LocalDate.of(2026, 7, 1))).thenReturn(List.of(
                 new OrderResponse(
-                        UUID.fromString("00000000-0000-0000-0000-000000000050"),
-                        accountId,
-                        cycleId,
-                        LocalDate.of(2026, 7, 1),
-                        StrategyTicker.SOXL,
-                        OrderType.LIMIT,
-                        OrderTiming.AT_OPEN,
-                        OrderDirection.SELL,
-                        "SELL_01",
-                        BigDecimal.valueOf(2),
-                        new BigDecimal("267.37"),
-                        OrderStatus.PLACED,
-                        "BROKER-1",
-                        null,
-                        null
-                )
-        ));
+                        UUID.fromString("00000000-0000-0000-0000-000000000050"), accountId, cycleId, LocalDate.of(2026, 7, 1),
+                        ticker, OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, "SELL_01",
+                        BigDecimal.valueOf(2), new BigDecimal("267.37"), OrderStatus.PLACED, "BROKER-1", null, null)));
         when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId)))
-                .thenReturn(java.util.Map.of(
-                        cycleId,
-                        new com.kista.shared.contract.trading.StrategySummaryResponse(strategyId, StrategyType.PRIVACY)
-                ));
+                .thenReturn(java.util.Map.of(cycleId,
+                        new com.kista.shared.contract.trading.StrategySummaryResponse(strategyId, StrategyType.PRIVACY)));
+    }
 
-        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", accountId, strategyId)
+    @Test
+    void listStrategyOrders_adminRole_returns200() throws Exception {
+        stubStrategyOrders(Broker.TOSS, StrategyTicker.SOXL);
+
+        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", ORDER_ACCOUNT_ID, ORDER_STRATEGY_ID)
                         .param("tradeDate", "2026-07-01")
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].accountId").value(accountId.toString()))
-                .andExpect(jsonPath("$[0].strategyId").value(strategyId.toString()))
+                .andExpect(jsonPath("$[0].accountId").value(ORDER_ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$[0].strategyId").value(ORDER_STRATEGY_ID.toString()))
                 .andExpect(jsonPath("$[0].strategyType").value("PRIVACY"))
                 .andExpect(jsonPath("$[0].ownerNickname").value("privacy-user"))
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
                 .andExpect(jsonPath("$[0].direction").value("SELL"))
-                .andExpect(jsonPath("$[0].price").value(267.37));
+                .andExpect(jsonPath("$[0].price").value(267.37))
+                .andExpect(jsonPath("$[0].currency").value("USD"));
+    }
+
+    @Test
+    void listStrategyOrders_binanceAccount_currencyUsdt() throws Exception {
+        stubStrategyOrders(Broker.BINANCE, StrategyTicker.BTC);
+
+        mockMvc.perform(get("/api/admin/accounts/{accountId}/strategies/{strategyId}/orders", ORDER_ACCOUNT_ID, ORDER_STRATEGY_ID)
+                        .param("tradeDate", "2026-07-01")
+                        .with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].ticker").value("BTC"))
+                .andExpect(jsonPath("$[0].currency").value("USDT"));
+    }
+
+    @Test
+    void listTrades_accountNotInMap_currencyNull() throws Exception {
+        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
+        UUID cycleId = UUID.fromString("00000000-0000-0000-0000-000000000040");
+        // 계좌 목록이 비어 accountMap에 없음 → 통화를 알 수 없어 null
+        when(adminQuery.listAccounts(null, null)).thenReturn(List.of());
+        when(adminUser.listAll(null, null)).thenReturn(List.of());
+        when(adminQuery.listTrades(null, null)).thenReturn(List.of(
+                new OrderResponse(UUID.fromString("00000000-0000-0000-0000-000000000050"), accountId, cycleId,
+                        LocalDate.of(2026, 7, 1), StrategyTicker.SOXL, OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
+                        "SELL_01", BigDecimal.valueOf(2), new BigDecimal("267.37"), OrderStatus.PLACED, "BROKER-1", null, null)));
+        when(adminQuery.getStrategySummariesByCycleIds(java.util.Set.of(cycleId))).thenReturn(java.util.Map.of());
+
+        mockMvc.perform(get("/api/admin/trades").with(authentication(adminToken(ADMIN_UUID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].ticker").value("SOXL"))
+                .andExpect(jsonPath("$[0].currency").doesNotExist());
     }
 
     @Test

@@ -1,12 +1,9 @@
 package com.kista.tradingcore.stats.application.service;
 
-import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
-import com.kista.tradingcore.broker.application.service.CryptoExchanges;
-import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
+import com.kista.tradingcore.stats.application.port.output.UpbitMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
 import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.CryptoMarketMetricsPort;
@@ -51,7 +48,7 @@ class CryptoMarketIndicatorServiceTest {
     static final Instant NOW = Instant.parse("2026-10-19T03:00:00Z");
     static final LocalDate TODAY = LocalDate.of(2026, 10, 19);
 
-    CryptoExchangePort upbit = mock(CryptoExchangePort.class);
+    UpbitMarketDataPort upbit = mock(UpbitMarketDataPort.class);
     BinanceMarketDataPort binance = mock(BinanceMarketDataPort.class);
     HistoricalFxRatePort fx = mock(HistoricalFxRatePort.class);
     BlockHeightPort blockHeight = mock(BlockHeightPort.class);
@@ -70,17 +67,15 @@ class CryptoMarketIndicatorServiceTest {
 
     @BeforeEach
     void setUp() {
-        CryptoExchanges exchanges = mock(CryptoExchanges.class); // 생성자가 package-private라 mock으로 대체
-        when(exchanges.of(Broker.UPBIT)).thenReturn(upbit);
-        service = new CryptoMarketIndicatorService(exchanges, binance, fx, blockHeight, coinbase, brokerStats,
+        service = new CryptoMarketIndicatorService(upbit, binance, fx, blockHeight, coinbase, brokerStats,
                 cmc, hashrates, movableClock);
         stubAllOk();
     }
 
     // 어제까지 n일 일봉
-    static List<CryptoCandle> candles(int n, String close) {
-        List<CryptoCandle> list = new ArrayList<>();
-        for (int i = n; i >= 1; i--) list.add(new CryptoCandle(TODAY.minusDays(i), new BigDecimal(close)));
+    static List<DatedValue> candles(int n, String close) {
+        List<DatedValue> list = new ArrayList<>();
+        for (int i = n; i >= 1; i--) list.add(new DatedValue(TODAY.minusDays(i), new BigDecimal(close)));
         return list;
     }
 
@@ -93,10 +88,10 @@ class CryptoMarketIndicatorServiceTest {
 
     void stubAllOk() {
         when(upbit.getUsdtKrwPrice()).thenReturn(new BigDecimal("1450"));
-        when(upbit.getCompletedUsdtKrwDailyCandles(anyInt())).thenReturn(candles(400, "1450"));
-        when(upbit.getCurrentPrices(anyCollection())).thenReturn(
+        when(upbit.getCompletedUsdtKrwDailyCloses(anyInt())).thenReturn(candles(400, "1450"));
+        when(upbit.getKrwPrices(anyCollection())).thenReturn(
                 Map.of(StrategyTicker.BTC, new BigDecimal("150000000"), StrategyTicker.ETH, new BigDecimal("150000000")));
-        when(upbit.getCompletedDailyCandles(any(), anyInt())).thenReturn(candles(400, "150000000"));
+        when(upbit.getCompletedKrwDailyCloses(any(), anyInt())).thenReturn(candles(400, "150000000"));
         when(brokerStats.currentExchangeRate()).thenReturn(new ExchangeRateQuote(new BigDecimal("1401"), new BigDecimal("1400")));
         when(fx.getUsdKrwRates(any(), any())).thenReturn(Map.of(TODAY.minusDays(410), new BigDecimal("1400")));
         when(binance.getSpotPrice(any())).thenReturn(new BigDecimal("100000"));

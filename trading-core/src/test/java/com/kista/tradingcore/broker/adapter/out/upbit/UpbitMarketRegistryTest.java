@@ -15,7 +15,7 @@ class UpbitMarketRegistryTest {
 
     @Test
     void everyCryptoTickerHasKrwMarket() {
-        Arrays.stream(StrategyTicker.values()).filter(t -> t.getMarket() == Market.CRYPTO_KRW)
+        Arrays.stream(StrategyTicker.values()).filter(t -> t.tradableOn(Market.CRYPTO_KRW))
                 .forEach(t -> assertThat(registry.marketOf(t)).isEqualTo("KRW-" + t.name()));
     }
 

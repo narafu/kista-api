@@ -1,5 +1,7 @@
 # 코인 거래소 일반화 (바이낸스 Phase 0+1) Implementation Plan
 
+> 상태: 완료 (2026-10-23, 커밋 87af22fe)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** "코인 = 업비트 = KRW" 리터럴 전제를 `shared.kernel` capability(시장·통화·거래소)와 거래소 포트 계약으로 바꾼다(Phase 0). 이어서 BTC·ETH가 여러 시장에서 거래되도록 종목↔시장 관계를 바꾸고, 시장은 계좌에서 정하게 한다(Phase 1). 업비트·KIS·Toss·메리츠·MOCK의 관찰 가능한 동작은 바뀌지 않고, 기존 테스트는 전부 통과해야 한다.

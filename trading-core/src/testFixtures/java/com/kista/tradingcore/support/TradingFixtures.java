@@ -44,9 +44,24 @@ public final class TradingFixtures {
         return new Account(id, userId, "업비트", null, "access-key", "secret-key", null, Broker.UPBIT, null);
     }
 
+    // 기본 바이낸스 계좌 — 계좌번호 없음(API key가 중복 판정 키)
+    public static Account binanceAccount(UUID id, UUID userId) {
+        return new Account(id, userId, "바이낸스", null, "binance-key", "binance-secret", null, Broker.BINANCE, null);
+    }
+
     // 배치 경로용 KIS 계좌 투영 — kisAccount와 동일 값
     public static TradingAccount tradingAccount(UUID id, UUID userId) {
         return TradingAccount.from(kisAccount(id, userId));
+    }
+
+    // 배치 경로용 업비트 계좌 투영 — upbitAccount와 동일 값
+    public static TradingAccount upbitTradingAccount(UUID id, UUID userId) {
+        return TradingAccount.from(upbitAccount(id, userId));
+    }
+
+    // 배치 경로용 바이낸스 계좌 투영 — binanceAccount와 동일 값
+    public static TradingAccount binanceTradingAccount(UUID id, UUID userId) {
+        return TradingAccount.from(binanceAccount(id, userId));
     }
 
     // 배치 경로용 Toss 계좌 투영 — tossAccount와 동일 값

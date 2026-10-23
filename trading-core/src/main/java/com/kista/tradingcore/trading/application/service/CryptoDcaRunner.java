@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
@@ -60,7 +59,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
         if (dcaStrategies.isEmpty()) return;
         Map<UUID, TradingAccount> accountsById = accountPort.findAll().stream()
                 .map(TradingAccount::from)
-                .filter(a -> a.broker().getMarket() == Market.CRYPTO_KRW)
+                .filter(a -> a.broker().isCryptoExchange())
                 .collect(Collectors.toMap(TradingAccount::id, a -> a));
         List<Strategy> targets = dcaStrategies.stream().filter(s -> accountsById.containsKey(s.accountId())).toList();
         if (targets.isEmpty()) return;

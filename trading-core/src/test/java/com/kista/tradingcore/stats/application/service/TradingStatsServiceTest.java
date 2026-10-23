@@ -484,6 +484,20 @@ class TradingStatsServiceTest {
     }
 
     @Test
+    void aggregateExcludesBinanceAccount() {
+        UUID binanceAccountId = UUID.randomUUID();
+        Account binance = new Account(binanceAccountId, USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null);
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), binance));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
+
+        statsService.getSummary(USER_ID);
+
+        verify(strategyPort).findByAccountIds(List.of(ACCOUNT_ID));
+        verify(strategyPort, never()).findByAccountIds(argThat(ids -> ids.contains(binanceAccountId)));
+    }
+
+    @Test
     void 요약_전략유형비교는_모의계좌_사이클을_제외한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",

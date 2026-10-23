@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.domain.model;
 
-import com.kista.shared.kernel.Market;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,7 +18,7 @@ public record StrategyDetail(
 ) {
     public StrategyDetail {
         // 코인 DCA 원장은 소수 보유라 정수 필드에 싣지 않는다 — 소수 보유·평단은 dca.currentHoldings/avgPrice, 실잔고는 crypto-portfolio
-        if (strategy.ticker().getMarket() == Market.CRYPTO_KRW) {
+        if (strategy.ticker().isCrypto()) {
             currentHoldings = null;
         }
     }

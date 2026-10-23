@@ -28,9 +28,6 @@ public record DcaRule(
         List<DcaCondition> conditions // 추가 조건 (AND, 최대 10개)
 ) {
     public static final int MAX_CONDITIONS = 10; // 규칙당 조건 상한
-    public static final BigDecimal CRYPTO_MIN_AMOUNT = new BigDecimal("5000"); // 업비트 KRW 마켓 최소 주문 금액
-    // ponytail: 업비트 KRW 수수료율 고정 — 거래소별 수수료 조회가 필요해지면 확장
-    public static final BigDecimal CRYPTO_FEE_FACTOR = new BigDecimal("1.0005"); // 1 + 수수료율 0.05%
 
     public DcaRule {
         Objects.requireNonNull(direction, "direction");
@@ -59,12 +56,19 @@ public record DcaRule(
 
     // 계좌 시장별 규칙 — 등록·수정 시 계좌 증권사 시장으로 호출한다
     public void requireCompatible(Market accountMarket) {
-        if (accountMarket == Market.CRYPTO_KRW) {
+        if (accountMarket.isCrypto()) {
             if (orderType != OrderType.MARKET) throw new IllegalArgumentException("코인 DCA 주문유형은 MARKET만 허용합니다");
             if (sizing.type() == DcaSizingType.AMOUNT) {
                 BigDecimal amount = sizing.amount();
-                if (amount.stripTrailingZeros().scale() > 0) throw new IllegalArgumentException("코인 DCA 금액은 원 단위 정수여야 합니다");
-                if (amount.compareTo(CRYPTO_MIN_AMOUNT) < 0) throw new IllegalArgumentException("코인 DCA 금액은 5,000원 이상이어야 합니다");
+                int scale = accountMarket.amountScale(); // 견적 통화 소수 자릿수
+                if (amount.stripTrailingZeros().scale() > scale) {
+                    throw new IllegalArgumentException(scale == 0 ? "코인 DCA 금액은 원 단위 정수여야 합니다"
+                            : "코인 DCA 금액은 소수 " + scale + "자리까지 입력할 수 있습니다");
+                }
+                if (amount.compareTo(accountMarket.minOrderAmount()) < 0) {
+                    throw new IllegalArgumentException("코인 DCA 금액은 "
+                            + accountMarket.quoteCurrency().format(accountMarket.minOrderAmount()) + " 이상이어야 합니다");
+                }
             }
         } else if (orderType == OrderType.MARKET) {
             throw new IllegalArgumentException("주식 DCA 주문유형은 MOO 또는 MOC만 허용합니다");

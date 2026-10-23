@@ -2,6 +2,8 @@ package com.kista.tradingcore.broker.adapter.out.upbit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.CryptoTradingRules;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
@@ -24,7 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-// 업비트 CryptoExchangePort — 잔고·시세·일봉·시장가 주문·주문 조회
+// 업비트 CryptoExchangePort — 잔고·시세·일봉·시장가 주문·주문 조회 (김프용 공개 시세는 stats UpbitMarketDataAdapter)
 @Slf4j
 @Component
 class UpbitExchangeAdapter implements CryptoExchangePort {
@@ -32,6 +34,10 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     private static final int MAX_CANDLES = 200; // 업비트 일봉 1회 최대 개수
     private static final int MAX_COUNT = 400;   // 페이징으로 지원하는 최대 일봉 개수
     private static final int MAX_PAGES = 3;     // 400봉 + 진행 중 봉을 덮는 최대 요청 수
+
+    // 업비트 KRW 마켓 고정 규칙 — 수수료 0.05% 원화 가산, 최소 5,000원, 수량 1e-8
+    static final CryptoTradingRules TRADING_RULES = new CryptoTradingRules(
+            new BigDecimal("0.0005"), FeeSide.QUOTE_SURCHARGE, new BigDecimal("5000"), new BigDecimal("0.00000001"));
 
     private final UpbitHttpClient http;          // JWT 서명·오류 매핑 공통
     private final UpbitMarketRegistry registry;  // StrategyTicker ↔ KRW-XXX
@@ -54,15 +60,20 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     }
 
     @Override
+    public CryptoTradingRules getTradingRules(StrategyTicker ticker) {
+        return TRADING_RULES;
+    }
+
+    @Override
     public CryptoBalance getBalance(BrokerAccountRef account) {
         List<AccountRow> rows = http.get("/v1/accounts", new LinkedHashMap<>(), account, new ParameterizedTypeReference<>() {});
-        BigDecimal krwAvailable = BigDecimal.ZERO;
-        BigDecimal krwLocked = BigDecimal.ZERO;
+        BigDecimal quoteAvailable = BigDecimal.ZERO;
+        BigDecimal quoteLocked = BigDecimal.ZERO;
         Map<StrategyTicker, CryptoBalance.Holding> holdings = new EnumMap<>(StrategyTicker.class);
         for (AccountRow row : rows) {
             if ("KRW".equals(row.currency())) {
-                krwAvailable = row.balance();
-                krwLocked = row.locked();
+                quoteAvailable = row.balance();
+                quoteLocked = row.locked();
                 continue;
             }
             // KRW 기준 평단인 지원 코인만 — 그 외 코인은 전략 대상이 아니라 제외
@@ -70,7 +81,7 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
             registry.tickerOfCurrency(row.currency()).ifPresent(t ->
                     holdings.put(t, new CryptoBalance.Holding(row.balance(), row.locked(), row.avgBuyPrice())));
         }
-        return new CryptoBalance(krwAvailable, krwLocked, holdings);
+        return new CryptoBalance(quoteAvailable, quoteLocked, holdings);
     }
 
     @Override
@@ -85,24 +96,8 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     }
 
     @Override
-    public BigDecimal getUsdtKrwPrice() {
-        LinkedHashMap<String, String> query = new LinkedHashMap<>();
-        query.put("markets", UpbitMarketRegistry.USDT_MARKET);
-        List<TickerRow> rows = http.getPublic("/v1/ticker", query, new ParameterizedTypeReference<>() {});
-        if (rows == null || rows.isEmpty()) {
-            throw new UpbitApiException(0, null, "Upbit USDT 시세 응답이 비어 있습니다: market=" + UpbitMarketRegistry.USDT_MARKET, null, false);
-        }
-        return rows.getFirst().tradePrice();
-    }
-
-    @Override
     public List<CryptoCandle> getCompletedDailyCandles(StrategyTicker ticker, int count) {
         return completedDailyCandles(registry.marketOf(ticker), count);
-    }
-
-    @Override
-    public List<CryptoCandle> getCompletedUsdtKrwDailyCandles(int count) {
-        return completedDailyCandles(UpbitMarketRegistry.USDT_MARKET, count);
     }
 
     private List<CryptoCandle> completedDailyCandles(String market, int count) {
@@ -134,19 +129,19 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     }
 
     @Override
-    public CryptoOrderResult buyMarketByAmount(BrokerAccountRef account, StrategyTicker ticker, BigDecimal krwAmount, String identifier) {
-        if (krwAmount.signum() <= 0) throw new IllegalArgumentException("매수 금액은 0보다 커야 합니다: " + krwAmount);
+    public CryptoOrderResult buyMarketByAmount(BrokerAccountRef account, StrategyTicker ticker, BigDecimal quoteAmount, String clientOrderId) {
+        if (quoteAmount.signum() <= 0) throw new IllegalArgumentException("매수 금액은 0보다 커야 합니다: " + quoteAmount);
         LinkedHashMap<String, String> body = new LinkedHashMap<>();
         body.put("market", registry.marketOf(ticker));
         body.put("side", "bid");
         body.put("ord_type", "price"); // 시장가 매수 — price=총액, volume 생략
-        body.put("price", krwAmount.stripTrailingZeros().toPlainString());
-        body.put("identifier", identifier);
+        body.put("price", quoteAmount.stripTrailingZeros().toPlainString());
+        body.put("identifier", clientOrderId);
         return toResult(http.post("/v1/orders", body, account, new ParameterizedTypeReference<OrderRow>() {}));
     }
 
     @Override
-    public CryptoOrderResult sellMarketByVolume(BrokerAccountRef account, StrategyTicker ticker, BigDecimal volume, String identifier) {
+    public CryptoOrderResult sellMarketByVolume(BrokerAccountRef account, StrategyTicker ticker, BigDecimal volume, String clientOrderId) {
         // 소수 8자리 내림 — 보유 수량 초과 방지
         BigDecimal floored = volume.setScale(8, RoundingMode.DOWN);
         if (floored.signum() <= 0) throw new IllegalArgumentException("매도 수량은 0보다 커야 합니다: " + volume);
@@ -155,18 +150,20 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
         body.put("side", "ask");
         body.put("ord_type", "market"); // 시장가 매도 — volume 필수, price 생략
         body.put("volume", floored.stripTrailingZeros().toPlainString());
-        body.put("identifier", identifier);
+        body.put("identifier", clientOrderId);
         return toResult(http.post("/v1/orders", body, account, new ParameterizedTypeReference<OrderRow>() {}));
     }
 
     @Override
-    public Optional<CryptoOrderResult> findOrderByUuid(BrokerAccountRef account, String uuid) {
-        return findOrder(account, "uuid", uuid);
+    public Optional<CryptoOrderResult> findOrderByExchangeOrderId(BrokerAccountRef account, StrategyTicker ticker, String exchangeOrderId) {
+        // 업비트 조회는 uuid/identifier만으로 충분
+        return findOrder(account, "uuid", exchangeOrderId);
     }
 
     @Override
-    public Optional<CryptoOrderResult> findOrderByIdentifier(BrokerAccountRef account, String identifier) {
-        return findOrder(account, "identifier", identifier);
+    public Optional<CryptoOrderResult> findOrderByClientOrderId(BrokerAccountRef account, StrategyTicker ticker, String clientOrderId) {
+        // 업비트 조회는 uuid/identifier만으로 충분
+        return findOrder(account, "identifier", clientOrderId);
     }
 
     private Optional<CryptoOrderResult> findOrder(BrokerAccountRef account, String key, String value) {
@@ -186,9 +183,10 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
         BigDecimal volume = trades.stream().map(TradeRow::volume).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal funds = trades.stream().map(TradeRow::funds).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal avg = volume.signum() > 0 ? funds.divide(volume, 8, RoundingMode.HALF_UP).stripTrailingZeros() : null;
-        return new CryptoOrderResult(o.uuid(), o.identifier(), parseState(o),
-                o.executedVolume() == null ? BigDecimal.ZERO : o.executedVolume(), avg,
-                o.paidFee() == null ? BigDecimal.ZERO : o.paidFee());
+        BigDecimal executed = o.executedVolume() == null ? BigDecimal.ZERO : o.executedVolume();
+        // 순 체결 수량 = 체결 수량, 수수료 자산 = KRW(KRW 마켓 수수료는 원화)
+        return new CryptoOrderResult(o.uuid(), o.identifier(), parseState(o), executed, executed, avg,
+                o.paidFee() == null ? BigDecimal.ZERO : o.paidFee(), "KRW");
     }
 
     // 알 수 없는 state는 접수 여부 불명이라 rejected=false 예외로 올린다

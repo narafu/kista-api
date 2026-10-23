@@ -31,6 +31,8 @@ import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
+import com.kista.shared.kernel.CryptoTradingRules;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
@@ -78,11 +80,18 @@ class CryptoDcaRoundExecutorTest {
     CyclePositionPort cyclePositionPort = mock(CyclePositionPort.class);
     CryptoDcaRoundExecutor executor = new CryptoDcaRoundExecutor(fearGreed, orderPort, executionPort, recorder, new DcaCycleOrderStrategy(), cyclePositionPort);
 
+    // 업비트 KRW 규칙과 같은 값 — broker adapter 상수를 import하지 않는다
+    static final CryptoTradingRules UPBIT_LIKE = new CryptoTradingRules(new BigDecimal("0.0005"), FeeSide.QUOTE_SURCHARGE, new BigDecimal("5000"), new BigDecimal("0.00000001"));
+
+    // 바이낸스 BTCUSDT 규칙과 같은 값 — broker adapter 상수를 import하지 않는다
+    static final CryptoTradingRules BINANCE_LIKE = new CryptoTradingRules(new BigDecimal("0.001"), FeeSide.RECEIVED_ASSET, new BigDecimal("5"), new BigDecimal("0.00001"));
+
     TradingAccount account;
 
     @BeforeEach
     void setUp() {
-        account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+        when(exchange.getTradingRules(any())).thenReturn(UPBIT_LIKE);
+        account = TradingFixtures.upbitTradingAccount(UUID.randomUUID(), UUID.randomUUID());
         when(exchange.getCompletedDailyCandles(any(), anyInt())).thenAnswer(i -> candles(TODAY.minusDays(1)));
         when(exchange.getCurrentPrices(any())).thenReturn(Map.of(StrategyTicker.BTC, BTC_PRICE, StrategyTicker.ETH, new BigDecimal("2000000")));
         when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of());
@@ -101,7 +110,7 @@ class CryptoDcaRoundExecutorTest {
     }
 
     static CryptoOrderResult placed(String identifier) {
-        return new CryptoOrderResult("uuid-1", identifier, CryptoOrderResult.State.WAIT, BigDecimal.ZERO, null, BigDecimal.ZERO);
+        return new CryptoOrderResult("uuid-1", identifier, CryptoOrderResult.State.WAIT, BigDecimal.ZERO, BigDecimal.ZERO, null, BigDecimal.ZERO, "KRW");
     }
 
     // 지갑 잔고 — 원장도 같은 보유(평단 1)로 맞춘다. 원장이 다른 케이스는 이후 ledger()로 덮는다
@@ -163,6 +172,21 @@ class CryptoDcaRoundExecutorTest {
         run(NOW, c, config(OrderDirection.BUY, "100000", 13));
         verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT), eq("주문 금액 4999 < 최소 5000"), eq(BTC_PRICE));
         verify(orderPort, never()).save(any());
+    }
+
+    @Test
+    void receivedAssetFeeSideDebitsWalletWithoutSurcharge() {
+        // 업비트 계좌지만 규칙만 RECEIVED_ASSET으로 바꿔 지갑 차감 규칙을 격리 검증 — 시장(KRW, scale 0)은 계좌에서
+        when(exchange.getTradingRules(any())).thenReturn(new CryptoTradingRules(new BigDecimal("0.0005"), FeeSide.RECEIVED_ASSET, new BigDecimal("5000"), new BigDecimal("0.00000001")));
+        balance("20000", "0");
+        BatchContext btc = ctx(StrategyTicker.BTC);
+        BatchContext eth = ctx(StrategyTicker.ETH);
+        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
+        m.put(btc, config(OrderDirection.BUY, "15000", 13));
+        m.put(eth, config(OrderDirection.BUY, "5000", 13));
+        run(NOW, m);
+        // QUOTE_SURCHARGE였다면 잔액 4992.5 → ETH 4990 < 5000 미달. RECEIVED_ASSET은 잔액 5000 → ETH 5000 주문
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.ETH), eq(new BigDecimal("5000")), anyString());
     }
 
     @Test
@@ -452,5 +476,35 @@ class CryptoDcaRoundExecutorTest {
         run(TODAY.atTime(10, 10), c, TradingFixtures.dcaConfig(TradingFixtures.cryptoDcaRule(KEY, OrderDirection.SELL, "10000", 10, aboveAvg)));
         verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), any(), anyString());
         verify(recorder).recordOrdered(eq(c), eq(TODAY), eq(KEY), any(Order.class), eq(BTC_PRICE));
+    }
+
+    @Test
+    void binanceAccountBuysWithTwoDecimalUsdt() {
+        account = TradingFixtures.binanceTradingAccount(UUID.randomUUID(), UUID.randomUUID());
+        when(exchange.getTradingRules(any())).thenReturn(BINANCE_LIKE);
+        when(exchange.getCurrentPrices(any())).thenReturn(Map.of(StrategyTicker.BTC, new BigDecimal("65000")));
+        balance("100", "0");
+        run(NOW, ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "10.50", 13));
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("10.50")), anyString()); // scale 2 — 10 아님
+    }
+
+    @Test
+    void transientBuyKeepsSubmittingAndNextTickDoesNotResend() {
+        balance("100000", "0");
+        when(exchange.buyMarketByAmount(any(), any(), any(), anyString())).thenThrow(new StubBrokerApiException("502"));
+        BatchContext c = ctx(StrategyTicker.BTC);
+        DcaStrategyConfig cfg = config(OrderDirection.BUY, "10000", 13);
+        // 1틱 — 결과 불명이라 실패 처리 없이 SUBMITTING 유지
+        run(NOW, c, cfg);
+        verify(orderPort, never()).markFailed(any());
+        verify(orderPort, org.mockito.Mockito.times(1)).markSubmitting(any());
+        // 2틱(같은 시각) — 저장소가 그 주문을 SUBMITTING으로 돌려준다
+        Order stuck = new Order(UUID.randomUUID(), c.account().id(), c.currentCycle().id(), TODAY, StrategyTicker.BTC,
+                com.kista.shared.kernel.OrderType.MARKET, com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY,
+                "DCA_" + KEY, new BigDecimal("0.0001"), BTC_PRICE, OrderStatus.SUBMITTING, null, null, null);
+        when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of(stuck));
+        run(NOW, c, cfg);
+        verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
+        verify(exchange, never()).sellMarketByVolume(any(), any(), any(), anyString());
     }
 }

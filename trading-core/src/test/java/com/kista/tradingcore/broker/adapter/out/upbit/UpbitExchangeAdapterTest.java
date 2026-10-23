@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.upbit;
 
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
@@ -48,6 +49,15 @@ class UpbitExchangeAdapterTest {
     }
 
     @Test
+    void tradingRulesAreUpbitKrwConstants() {
+        var rules = adapter.getTradingRules(StrategyTicker.BTC);
+        assertThat(rules.feeRate()).isEqualByComparingTo("0.0005");
+        assertThat(rules.feeSide()).isEqualTo(FeeSide.QUOTE_SURCHARGE);
+        assertThat(rules.minNotional()).isEqualByComparingTo("5000");
+        assertThat(rules.quantityStep()).isEqualByComparingTo("0.00000001");
+    }
+
+    @Test
     void supportsUpbit() {
         assertThat(adapter.supports()).isEqualTo(Broker.UPBIT);
     }
@@ -64,8 +74,8 @@ class UpbitExchangeAdapterTest {
 
         CryptoBalance balance = adapter.getBalance(ACCOUNT);
 
-        assertThat(balance.krwAvailable()).isEqualByComparingTo("1000000");
-        assertThat(balance.krwLocked()).isEqualByComparingTo("5000");
+        assertThat(balance.quoteAvailable()).isEqualByComparingTo("1000000");
+        assertThat(balance.quoteLocked()).isEqualByComparingTo("5000");
         assertThat(balance.holdings()).containsOnlyKeys(StrategyTicker.BTC);
         assertThat(balance.holdings().get(StrategyTicker.BTC).available()).isEqualByComparingTo("0.00123456");
         assertThat(balance.holdings().get(StrategyTicker.BTC).avgBuyPrice()).isEqualByComparingTo("150000000");
@@ -99,40 +109,6 @@ class UpbitExchangeAdapterTest {
         assertThat(candles).extracting(CryptoCandle::kstDate)
                 .containsExactly(LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 16));
         assertThat(candles.getLast().close()).isEqualByComparingTo("151000000");
-    }
-
-    @Test
-    void USDT_원화_현재가를_KRW_USDT_마켓으로_조회한다() {
-        server.expect(requestTo(BASE_URL + "/v1/ticker?markets=KRW-USDT"))
-                .andExpect(headerDoesNotExist("Authorization"))
-                .andRespond(withSuccess("[{\"market\":\"KRW-USDT\",\"trade_price\":1452.0}]", MediaType.APPLICATION_JSON));
-
-        assertThat(adapter.getUsdtKrwPrice()).isEqualByComparingTo("1452");
-    }
-
-    @Test
-    void USDT_원화_현재가_응답이_비면_예외를_던진다() {
-        server.expect(requestTo(BASE_URL + "/v1/ticker?markets=KRW-USDT"))
-                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
-
-        assertThatThrownBy(() -> adapter.getUsdtKrwPrice())
-                .isInstanceOf(UpbitApiException.class);
-    }
-
-    @Test
-    void USDT_원화_완성_일봉은_진행중_봉을_제외한다() {
-        server.expect(requestTo(BASE_URL + "/v1/candles/days?market=KRW-USDT&count=3"))
-                .andRespond(withSuccess("""
-                        [{"candle_date_time_kst":"2026-10-17T09:00:00","trade_price":1455},
-                         {"candle_date_time_kst":"2026-10-16T09:00:00","trade_price":1450},
-                         {"candle_date_time_kst":"2026-10-15T09:00:00","trade_price":1448}]
-                        """, MediaType.APPLICATION_JSON));
-
-        List<CryptoCandle> candles = adapter.getCompletedUsdtKrwDailyCandles(2);
-
-        assertThat(candles).extracting(CryptoCandle::kstDate)
-                .containsExactly(LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 16));
-        assertThat(candles.getLast().close()).isEqualByComparingTo("1450");
     }
 
     // startKst = firstDay(KST 09:00)에서 하루씩 과거로 n개 — utc는 -9h
@@ -231,7 +207,7 @@ class UpbitExchangeAdapterTest {
 
         CryptoOrderResult r = adapter.buyMarketByAmount(ACCOUNT, StrategyTicker.BTC, new BigDecimal("10000"), "id-1");
 
-        assertThat(r.uuid()).isEqualTo("u-1");
+        assertThat(r.exchangeOrderId()).isEqualTo("u-1");
         assertThat(r.state()).isEqualTo(CryptoOrderResult.State.WAIT);
         assertThat(r.avgPrice()).isNull();
     }
@@ -246,7 +222,7 @@ class UpbitExchangeAdapterTest {
                         {"uuid":"u-2","identifier":"id-2","state":"wait","executed_volume":"0","paid_fee":"0"}
                         """));
 
-        assertThat(adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.ETH, new BigDecimal("0.00123456"), "id-2").uuid())
+        assertThat(adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.ETH, new BigDecimal("0.00123456"), "id-2").exchangeOrderId())
                 .isEqualTo("u-2");
     }
 
@@ -259,11 +235,25 @@ class UpbitExchangeAdapterTest {
                                    {"price":"151000000","volume":"0.0001","funds":"15100"}]}
                         """, MediaType.APPLICATION_JSON));
 
-        CryptoOrderResult r = adapter.findOrderByIdentifier(ACCOUNT, "id-1").orElseThrow();
+        CryptoOrderResult r = adapter.findOrderByClientOrderId(ACCOUNT, StrategyTicker.BTC, "id-1").orElseThrow();
 
         assertThat(r.state()).isEqualTo(CryptoOrderResult.State.DONE);
         assertThat(r.executedVolume()).isEqualByComparingTo("0.0002");
         assertThat(r.avgPrice()).isEqualByComparingTo("150500000");
+    }
+
+    @Test
+    void upbitNetVolumeEqualsExecutedAndFeeAssetIsKrw() {
+        server.expect(requestTo(BASE_URL + "/v1/order?identifier=id-1"))
+                .andRespond(withSuccess("""
+                        {"uuid":"u-1","identifier":"id-1","state":"done","executed_volume":"0.0002","paid_fee":"5",
+                         "trades":[{"price":"150000000","volume":"0.0002","funds":"30000"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        CryptoOrderResult r = adapter.findOrderByClientOrderId(ACCOUNT, StrategyTicker.BTC, "id-1").orElseThrow();
+
+        assertThat(r.netExecutedVolume()).isEqualByComparingTo(r.executedVolume());
+        assertThat(r.feeAsset()).isEqualTo("KRW");
     }
 
     @Test
@@ -272,7 +262,7 @@ class UpbitExchangeAdapterTest {
                 .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"error\":{\"name\":\"order_not_found\",\"message\":\"주문을 찾지 못했습니다.\"}}"));
 
-        assertThat(adapter.findOrderByUuid(ACCOUNT, "missing")).isEmpty();
+        assertThat(adapter.findOrderByExchangeOrderId(ACCOUNT, StrategyTicker.BTC, "missing")).isEmpty();
     }
 
     @Test
@@ -301,7 +291,7 @@ class UpbitExchangeAdapterTest {
                 .andExpect(header("Authorization", expected))
                 .andRespond(withSuccess("{\"uuid\":\"u\",\"identifier\":\"id-1\",\"state\":\"wait\"}", MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.findOrderByIdentifier(ACCOUNT, "id-1")).isPresent();
+        assertThat(adapter.findOrderByClientOrderId(ACCOUNT, StrategyTicker.BTC, "id-1")).isPresent();
     }
 
     private void expectOrder(String json, String state) {

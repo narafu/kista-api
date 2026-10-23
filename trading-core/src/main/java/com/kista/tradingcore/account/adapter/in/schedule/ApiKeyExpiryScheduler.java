@@ -1,6 +1,5 @@
 package com.kista.tradingcore.account.adapter.in.schedule;
 
-import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.account.application.event.ApiKeyExpiringEvent;
@@ -37,7 +36,7 @@ public class ApiKeyExpiryScheduler {
 
     void publishDue() {
         LocalDate today = LocalDate.now(clock.withZone(TimeZones.KST));
-        accountPort.findAll().stream().filter(a -> a.broker() == Broker.UPBIT && a.apiKeyExpiresAt() != null).forEach(a -> {
+        accountPort.findAll().stream().filter(a -> a.broker().isApiKeyExpiring() && a.apiKeyExpiresAt() != null).forEach(a -> {
             LocalDate expiresOn = a.apiKeyExpiresAt().atZone(TimeZones.KST).toLocalDate();
             long daysLeft = ChronoUnit.DAYS.between(today, expiresOn);
             if (NOTIFY_DAYS_LEFT.contains(daysLeft)) {

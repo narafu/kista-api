@@ -1,5 +1,6 @@
 package com.kista.shared.contract.notify;
 
+import com.kista.shared.kernel.Currency;
 import tools.jackson.databind.annotation.JsonSerialize;
 
 import java.math.BigDecimal;
@@ -19,20 +20,21 @@ public record TradeEventMessage(
         String accountNickname, // 계좌 별칭
         String message,         // 부가 메시지 (INFO/FAIL)
         UUID accountId,         // 이벤트 대상 계좌 (UI 캐시 선별 무효화용)
-        UUID strategyId         // 이벤트 대상 전략 — 전략 무관 INFO/FAIL·구버전 EPR 재발행분은 null
+        UUID strategyId,        // 이벤트 대상 전략 — 전략 무관 INFO/FAIL·구버전 EPR 재발행분은 null
+        Currency currency       // price·amount 통화 — 구버전 메시지·INFO/FAIL은 null (UI는 USD로 해석)
 ) {
     // 실시간 매매 알림 종류 — Jackson은 name()으로 직렬화 ("BUY"/"SELL"/"INFO"/"FAIL")
     public enum Kind { BUY, SELL, INFO, FAIL }
 
     // BUY 체결 이벤트 팩토리 메서드
     public static TradeEventMessage buy(String ticker, BigDecimal quantity, double price, double amount, String nickname,
-                                        UUID accountId, UUID strategyId) {
-        return new TradeEventMessage(Kind.BUY, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId);
+                                        UUID accountId, UUID strategyId, Currency currency) {
+        return new TradeEventMessage(Kind.BUY, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId, currency);
     }
 
     // SELL 체결 이벤트 팩토리 메서드
     public static TradeEventMessage sell(String ticker, BigDecimal quantity, double price, double amount, String nickname,
-                                         UUID accountId, UUID strategyId) {
-        return new TradeEventMessage(Kind.SELL, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId);
+                                         UUID accountId, UUID strategyId, Currency currency) {
+        return new TradeEventMessage(Kind.SELL, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId, currency);
     }
 }

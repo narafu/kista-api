@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.BuyCompetitionPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
@@ -29,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyTicker;
 
 @Slf4j
@@ -53,9 +53,9 @@ class TradingPreviewService {
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         // 코인 DCA는 실행 루프(CryptoDcaRoundExecutor) 전용이라 미리보기 경로가 없다 — 주식 DCA는 plan() 정규 경로로 미리보기
-        if (strategy.ticker().getMarket() == Market.CRYPTO_KRW) throw new DcaManualExecutionUnsupportedException();
+        if (TradingAccount.from(account).brokerRef().broker().isCryptoExchange()) throw new DcaManualExecutionUnsupportedException();
         // 계산 실패로 생략된 전략은 404(사이클 없음)로 오인되지 않도록 원래 예외를 그대로 전파
         Map<UUID, RuntimeException> failures = new HashMap<>();
         NextOrdersPreview preview = previewBatch(strategy.accountId(), requesterId, failures).get(strategyId);
@@ -78,11 +78,11 @@ class TradingPreviewService {
     // failures: 재시도까지 실패해 결과에서 생략된 전략의 예외 — 단건 preview가 원인을 그대로 응답하도록 수집
     private Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId, Map<UUID, RuntimeException> failures) {
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
-        TradingAccount account = TradingAccount.from(accountPort.requireOwnedAccount(accountId, requesterId));
+        Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
+        TradingAccount account = TradingAccount.from(ownedAccount);
         LocalDate today = DstInfo.nextTradeDate();
         // 코인 전략(전부 DCA)은 미리보기·경쟁 시뮬레이션 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
-        List<Strategy> strategies = strategyPort.findByAccountId(accountId).stream()
-                .filter(s -> s.ticker().getMarket() != Market.CRYPTO_KRW).toList();
+        List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
         List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();

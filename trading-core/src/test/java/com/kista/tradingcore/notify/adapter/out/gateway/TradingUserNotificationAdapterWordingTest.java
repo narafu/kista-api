@@ -41,7 +41,16 @@ class TradingUserNotificationAdapterWordingTest {
         adapter.notifyCryptoTrade(profile, new com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent(
                 profile.userId(), UUID.randomUUID(), UUID.randomUUID(), "업비트", com.kista.shared.kernel.StrategyTicker.BTC,
                 com.kista.shared.kernel.OrderDirection.BUY, new java.math.BigDecimal("0.00012345"),
-                new java.math.BigDecimal("150000000"), new java.math.BigDecimal("15000")));
+                new java.math.BigDecimal("150000000"), new java.math.BigDecimal("15000"), com.kista.shared.kernel.Currency.KRW));
         verify(telegram).sendMessage("chat", "[업비트] BTC 매수 체결 — 수량 0.00012345, 평균가 150,000,000원, 금액 15,000원", "tok");
+    }
+
+    @Test
+    void cryptoTradeWordingUsdt() {
+        adapter.notifyCryptoTrade(profile, new com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent(
+                profile.userId(), UUID.randomUUID(), UUID.randomUUID(), "바낸", com.kista.shared.kernel.StrategyTicker.BTC,
+                com.kista.shared.kernel.OrderDirection.BUY, new java.math.BigDecimal("0.00016"),
+                new java.math.BigDecimal("65000.123"), new java.math.BigDecimal("10.40"), com.kista.shared.kernel.Currency.USDT));
+        verify(telegram).sendMessage("chat", "[바낸] BTC 매수 체결 — 수량 0.00016, 평균가 65,000.12 USDT, 금액 10.40 USDT", "tok");
     }
 }

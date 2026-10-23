@@ -1,5 +1,7 @@
 package com.kista.tradingcore.trading.application.event;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -15,6 +17,12 @@ public record CryptoOrderFilledEvent(
         StrategyTicker ticker,    // 종목
         OrderDirection direction, // 매수/매도
         BigDecimal filledQuantity, // 체결 수량
-        BigDecimal avgPrice,      // 체결 평균가 (KRW)
-        BigDecimal amountKrw      // 체결 금액 = 수량 × 평균가, 원 단위 HALF_UP
-) {}
+        BigDecimal avgPrice,      // 체결 평균가 (계좌 통화)
+        @JsonAlias("amountKrw") BigDecimal amount, // 체결 금액 = 수량 × 평균가, 계좌 통화 scale HALF_UP
+        Currency currency         // 계좌 통화
+) {
+    public CryptoOrderFilledEvent {
+        // EPR 구 row 호환 — currency 추가 전 발행분은 전부 업비트(KRW)
+        if (currency == null) currency = Currency.KRW;
+    }
+}

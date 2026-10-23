@@ -24,14 +24,14 @@ class TradingCoreTestVendorModelTest {
     }
 
     @Test
-    @DisplayName("broker 밖 trading-core 테스트도 벤더 전용 도메인 모델(domain.model.kis/toss/upbit)을 참조하지 않는다")
+    @DisplayName("broker 밖 trading-core 테스트도 벤더 전용 도메인 모델(domain.model.kis/toss/upbit/meritz/binance)을 참조하지 않는다")
     void tests_outside_broker_must_not_use_vendor_models() {
         ArchRule rule = noClasses()
                 .that().resideInAnyPackage(
                         "com.kista.tradingcore.trading..", "com.kista.tradingcore.web..", "com.kista.tradingcore.stats..",
                         "com.kista.tradingcore.account..", "com.kista.tradingcore.privacy..", "com.kista.tradingcore.marketcalendar..", "com.kista.tradingcore.matching..")
                 .should().dependOnClassesThat()
-                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..");
+                .resideInAnyPackage("com.kista.tradingcore.broker.domain.model.kis..", "com.kista.tradingcore.broker.domain.model.toss..", "com.kista.tradingcore.broker.domain.model.upbit..", "com.kista.tradingcore.broker.domain.model.meritz..", "com.kista.tradingcore.broker.domain.model.binance..");
         rule.check(testClasses);
     }
 }

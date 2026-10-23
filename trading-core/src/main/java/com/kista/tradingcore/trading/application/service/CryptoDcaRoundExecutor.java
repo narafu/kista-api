@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.CryptoTradingRules;
 import com.kista.shared.kernel.DcaIndicator;
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
@@ -62,7 +62,7 @@ class CryptoDcaRoundExecutor {
 
     // 한 틱 안의 로컬 차감 지갑 — 같은 계좌 후속 규칙이 이미 쓴 원화·보유 수량을 보게 한다(매도 대금은 더하지 않음 — 보수적)
     private static final class Wallet {
-        BigDecimal krw;                         // 원화 가용
+        BigDecimal quote;                       // 견적 통화 가용
         final Map<StrategyTicker, BigDecimal> held = new EnumMap<>(StrategyTicker.class); // 코인별 매도 가능 수량
         final Map<UUID, BigDecimal> ledgerSold = new HashMap<>(); // 사이클별 같은 틱 앞 규칙 매도 수량 — 규칙 합계가 원장을 넘지 않게
     }
@@ -82,6 +82,7 @@ class CryptoDcaRoundExecutor {
 
         // ponytail: 캔들·공포탐욕 메모는 호출(계좌) 단위 — 계좌 수만큼 재조회, 계좌가 늘면 틱 단위 메모로 승격
         Map<StrategyTicker, List<CryptoCandle>> candleMemo = new HashMap<>();
+        Map<StrategyTicker, CryptoTradingRules> rulesMemo = new HashMap<>(); // 종목별 거래 규칙 — 조회 실패는 기존 조회 실패 경로
         List<Optional<BigDecimal>> fearGreedMemo = new ArrayList<>(1); // 비어 있으면 미조회
         int i = 0;
         try {
@@ -93,7 +94,7 @@ class CryptoDcaRoundExecutor {
             Map<StrategyTicker, BigDecimal> prices = exchange.getCurrentPrices(
                     targets.stream().map(t -> t.ctx().strategy().ticker()).distinct().toList());
             Wallet wallet = new Wallet();
-            wallet.krw = balance.krwAvailable();
+            wallet.quote = balance.quoteAvailable();
             balance.holdings().forEach((t, h) -> wallet.held.put(t, h.available()));
             for (; i < targets.size(); i++) {
                 BatchContext ctx = targets.get(i).ctx();
@@ -105,6 +106,7 @@ class CryptoDcaRoundExecutor {
                     recorder.recordSkipped(ctx, today, key, rule.direction(), DcaSkipReason.DATA_UNAVAILABLE, "현재가 조회 실패", null);
                     continue;
                 }
+                CryptoTradingRules rules = rulesMemo.computeIfAbsent(ticker, exchange::getTradingRules);
                 List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst, today);
                 UUID cycleId = ctx.currentCycle().id();
                 CyclePosition position = ledgers.get(cycleId);
@@ -117,13 +119,13 @@ class CryptoDcaRoundExecutor {
                     if (fearGreedMemo.isEmpty()) fearGreedMemo.add(fearGreedPort.latest());
                     fearGreed = fearGreedMemo.get(0).orElse(null);
                 }
-                DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule, Market.CRYPTO_KRW,
-                        closes, ledger, sellable, fearGreed, price, wallet.krw));
+                DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule,
+                        ctx.account().brokerRef().broker().getMarket(), closes, ledger, sellable, fearGreed, price, wallet.quote, rules));
                 if (decision instanceof DcaRuleDecision.Skipped s) {
                     recorder.recordSkipped(ctx, today, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
                     continue;
                 }
-                RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, wallet);
+                RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, wallet, rules);
                 if (keyExpired != null) {
                     // 키 만료는 계좌 단위 문제 — 남은 규칙은 주문·HTTP 없이 일괄 미주문 기록
                     handleFailure(targets.subList(i + 1, targets.size()), keyExpired, nowKst, today);
@@ -169,8 +171,8 @@ class CryptoDcaRoundExecutor {
                                     Map<StrategyTicker, List<CryptoCandle>> memo, LocalDateTime now, LocalDate today) {
         List<CryptoCandle> candles = memo.computeIfAbsent(ticker, t -> exchange.getCompletedDailyCandles(t, CANDLE_COUNT));
         if (candles.isEmpty()) return null;
-        // 업비트 일봉은 KST 09:00 마감 — 09시 전에는 아직 어제 봉이 완성되지 않아 그제가 마지막
-        LocalDate expected = now.getHour() >= 9 ? today.minusDays(1) : today.minusDays(2);
+        // 일봉은 KST 09:00 마감(CryptoCandle 계약) — 09시 전에는 아직 어제 봉이 완성되지 않아 그제가 마지막
+        LocalDate expected = CryptoCandle.latestCompletedKstDate(now);
         if (!candles.getLast().kstDate().equals(expected)) return null;
         return candles.stream().map(CryptoCandle::close).toList();
     }
@@ -178,28 +180,28 @@ class CryptoDcaRoundExecutor {
     // 판정된 계획 → 주문 저장·선점·전송. 지갑은 같은 틱 후속 규칙을 위한 로컬 차감 대상
     // 반환: 키 만료로 확정 거절되면 그 예외(호출부가 남은 규칙을 일괄 처리), 그 외 null
     private RuntimeException place(CryptoExchangePort exchange, BatchContext ctx, DcaRule rule, LocalDate today,
-                                   DcaRuleDecision.Planned plan, Wallet wallet) {
+                                   DcaRuleDecision.Planned plan, Wallet wallet, CryptoTradingRules rules) {
         StrategyTicker ticker = ctx.strategy().ticker();
         boolean buy = rule.direction() == OrderDirection.BUY;
         BigDecimal price = plan.referencePrice();
         BigDecimal volume = Quantities.normalize(plan.quantity());             // 추정(BUY)·실제(SELL) 수량 — 꼬리 0 제거(거래소 전송 형태 유지)
-        BigDecimal amount = buy ? plan.notional() : volume.multiply(price);   // 주문 금액(원) — BUY는 정수 원
+        BigDecimal amount = buy ? plan.notional() : volume.multiply(price);   // 주문 금액(견적 통화) — BUY는 계좌 통화 자릿수
         String key = rule.ruleKey();
         Order order = orderPort.save(Order.cryptoMarket(ctx.account().id(), ctx.currentCycle().id(), today, ticker,
                 rule.direction(), rule.orderLeg(), rule.timing(), volume, price));
         orderPort.markSubmitting(order.id());
-        String identifier = order.id().toString();
+        String clientOrderId = order.id().toString();
         var ref = ctx.account().brokerRef();
         try {
-            CryptoOrderResult result = buy ? exchange.buyMarketByAmount(ref, ticker, amount, identifier)
-                    : exchange.sellMarketByVolume(ref, ticker, volume, identifier);
+            CryptoOrderResult result = buy ? exchange.buyMarketByAmount(ref, ticker, amount, clientOrderId)
+                    : exchange.sellMarketByVolume(ref, ticker, volume, clientOrderId);
             // 이력 먼저(멱등), 상태 전이 나중 — 사이 중단돼도 다음 틱이 무해하게 재처리
             recorder.recordOrdered(ctx, today, key, order, price);
-            orderPort.markPlaced(order.id(), result.uuid());
+            orderPort.markPlaced(order.id(), result.exchangeOrderId());
         } catch (RuntimeException e) {
             CryptoFailure failure = CryptoFailure.classify(e);
             if (failure == CryptoFailure.TRANSIENT) {
-                // 접수 결과 불명 — SUBMITTING 유지(동기화기가 identifier로 복구), 이중 지출 방지 위해 차감은 성공과 동일
+                // 접수 결과 불명 — SUBMITTING 유지(동기화기가 clientOrderId로 복구), 이중 지출 방지 위해 차감은 성공과 동일
                 log.warn("코인 DCA 주문 결과 불명 orderId={}", order.id(), e);
             } else {
                 recorder.recordSkipped(ctx, today, key, rule.direction(), failure.reason(), failureDetail(failure), price);
@@ -207,7 +209,7 @@ class CryptoDcaRoundExecutor {
                 return failure == CryptoFailure.KEY_EXPIRED ? e : null;
             }
         }
-        if (buy) wallet.krw = wallet.krw.subtract(amount.multiply(DcaRule.CRYPTO_FEE_FACTOR));
+        if (buy) wallet.quote = wallet.quote.subtract(rules.quoteSpendFor(amount));
         else {
             wallet.held.merge(ticker, volume, BigDecimal::subtract);
             wallet.ledgerSold.merge(ctx.currentCycle().id(), volume, BigDecimal::add);

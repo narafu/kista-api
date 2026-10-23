@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
+import com.kista.tradingcore.broker.domain.model.BrokerWithdrawalEnabledException;
 import com.kista.shared.platform.web.ErrorCode;
 import com.kista.shared.platform.web.ProblemDetailMappings;
 import com.kista.shared.platform.web.ProblemDetailMappings.Mapping;
@@ -59,6 +60,7 @@ public class TradingExceptionHandler {
     private static final String BROKER_UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요."; // 503 응답 detail
 
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
+            Map.entry(BrokerWithdrawalEnabledException.class, new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker Withdrawal Enabled", ErrorCode.BROKER_WITHDRAWAL_ENABLED)),
             Map.entry(BrokerIpNotAllowedException.class,      new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker IP Not Allowed", ErrorCode.BROKER_IP_NOT_ALLOWED)),
             Map.entry(BrokerPermissionDeniedException.class,  new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker Permission Denied", ErrorCode.BROKER_PERMISSION_DENIED)),
             Map.entry(BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),

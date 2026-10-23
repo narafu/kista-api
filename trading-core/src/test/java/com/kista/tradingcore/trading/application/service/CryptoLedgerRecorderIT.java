@@ -139,4 +139,23 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
         // 평단 = (0.0004×1억 + 0.0006×1.1억) / 0.001 = 1.06억 — 누적 금액 기준 증분
         assertThat(latest.avgPrice()).isEqualByComparingTo(avgAll);
     }
+
+    @Test
+    void 원가는_순수량_곱하기_체결평균가_수수료_제외() {
+        Order order = placedBuy();
+        BigDecimal netVolume = new BigDecimal("0.00015985"); // 수수료 차감 후 순수량
+        BigDecimal fillAvg = new BigDecimal("65000");
+
+        assertThat(recorder.recordFill(ctx, order, netVolume, fillAvg)).isTrue();
+
+        // 평단은 체결 평균가 그대로 — 수수료 포함 실지출(10.40/순수량 ≈ 65061)로 부풀지 않는다
+        assertThat(latest()).satisfies(p -> {
+            assertThat(p.holdings()).isEqualByComparingTo("0.00015985");
+            assertThat(p.avgPrice()).isEqualByComparingTo("65000");
+        });
+        assertThat(orderPort.findById(order.id())).get().satisfies(o -> {
+            assertThat(o.filledQuantity()).isEqualByComparingTo("0.00015985");
+            assertThat(o.filledPrice()).isEqualByComparingTo("65000");
+        });
+    }
 }

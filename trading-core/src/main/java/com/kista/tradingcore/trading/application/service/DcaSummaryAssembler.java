@@ -34,7 +34,7 @@ class DcaSummaryAssembler {
 
     // fromKstTradeDate(포함)부터 첫 실행 예정일 — 코인은 24/7 KST 단일 기준(휴장·US 세션 변환 없음)
     DcaSummary.RuleSummary assembleRule(DcaRule rule, DcaExecution last, LocalDate fromKstTradeDate, Market market) {
-        if (market == Market.CRYPTO_KRW) {
+        if (market.isCrypto()) {
             return DcaSchedule.nextExecutionDay(fromKstTradeDate, rule, d -> true)
                     .map(kst -> new DcaSummary.RuleSummary(rule, kst, kst, last))
                     .orElseGet(() -> new DcaSummary.RuleSummary(rule, null, null, last));
@@ -49,7 +49,7 @@ class DcaSummaryAssembler {
     // 주식: TradingService.filterScheduledStart가 시작일 당일을 제외(tradeDate.isAfter(startDate)) — 오늘 회차 판정이 끝났으면 다음 날부터
     // 코인: 시작일 제외 없음 — 실행 시각대의 마지막 틱(HH:50)까지는 판정 전이면 남은 틱이 오늘 실행하므로 오늘, 그 뒤이거나 오늘 이미 판정했으면 내일부터
     static LocalDate firstEligibleDate(LocalDate cycleStartDate, DcaExecution last, DcaRule rule, Market market, LocalDateTime nowKst) {
-        if (market == Market.CRYPTO_KRW) {
+        if (market.isCrypto()) {
             LocalDate today = nowKst.toLocalDate();
             int hour = nowKst.getHour();
             boolean hourPassed = hour > rule.executionHour()

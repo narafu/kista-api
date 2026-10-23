@@ -111,10 +111,20 @@ class MetaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].market").value(org.hamcrest.Matchers.contains("CRYPTO_KRW")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].currency").value(org.hamcrest.Matchers.contains("KRW")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].market").value(org.hamcrest.Matchers.contains("CRYPTO_USDT")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].currency").value(org.hamcrest.Matchers.contains("USDT")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].label").value(org.hamcrest.Matchers.contains("바이낸스")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].minOrderAmount").value(org.hamcrest.Matchers.contains("5")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='BINANCE')].amountScale").value(org.hamcrest.Matchers.contains(2)))
+                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].minOrderAmount").value(org.hamcrest.Matchers.contains("5000")))
+                .andExpect(jsonPath("$.brokers[?(@.code=='UPBIT')].amountScale").value(org.hamcrest.Matchers.contains(0)))
+                .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].minOrderAmount").value(org.hamcrest.Matchers.contains("0")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
                 .andExpect(jsonPath("$.brokers[?(@.code=='KIS')].description").value(org.hamcrest.Matchers.contains("한투")))
                 .andExpect(jsonPath("$.tickers[?(@.code=='BTC')].market").value(org.hamcrest.Matchers.contains("CRYPTO_KRW")))
                 .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
+                .andExpect(jsonPath("$.tickers[?(@.code=='BTC')].markets[*]").value(org.hamcrest.Matchers.containsInAnyOrder("CRYPTO_KRW", "CRYPTO_USDT")))
+                .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].markets[*]").value(org.hamcrest.Matchers.contains("US_STOCK")))
                 .andExpect(jsonPath("$.dcaSkipReasons[?(@.code=='API_KEY_EXPIRED')].label").value(org.hamcrest.Matchers.contains("API 키 만료")));
     }
 }

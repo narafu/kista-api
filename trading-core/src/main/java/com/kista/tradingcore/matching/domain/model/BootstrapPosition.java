@@ -23,11 +23,11 @@ public final class BootstrapPosition {
         }
         BigDecimal normalized = holdings != null ? Quantities.normalize(holdings) : BigDecimal.ZERO;
         // 주식은 int 주수로 소비된다(intValueExact) — 범위 초과는 저장 전에 400으로 거부
-        if (market != Market.CRYPTO_KRW && normalized.compareTo(MAX_STOCK_HOLDINGS) > 0) {
+        if (!market.isCrypto() && normalized.compareTo(MAX_STOCK_HOLDINGS) > 0) {
             throw new IllegalArgumentException("주식 보유 수량(initialHoldings)이 허용 범위를 넘었습니다");
         }
-        if (market == Market.CRYPTO_KRW ? normalized.scale() > CRYPTO_SCALE : normalized.scale() > 0) {
-            throw new IllegalArgumentException(market == Market.CRYPTO_KRW
+        if (market.isCrypto() ? normalized.scale() > CRYPTO_SCALE : normalized.scale() > 0) {
+            throw new IllegalArgumentException(market.isCrypto()
                     ? "보유 수량(initialHoldings)은 소수 8자리까지 입력할 수 있습니다"
                     : "주식 보유 수량(initialHoldings)은 정수여야 합니다");
         }

@@ -71,7 +71,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private DailyTransactionResult toDailyTransactionResult(List<Order> filled) {
         List<DailyTransaction> items = filled.stream()
                 // 일별 체결 요약(DailyTransaction)은 주식 정수 수량 계약 — 코인 체결은 1차에서 대시보드 집계 밖
-                .filter(o -> o.ticker().getMarket() == Market.US_STOCK)
+                .filter(o -> !o.ticker().isCrypto())
                 .filter(o -> o.filledQuantity() != null && o.filledQuantity().signum() > 0)
                 .map(o -> {
                     BigDecimal price = o.filledPrice() != null ? o.filledPrice() : o.price();
