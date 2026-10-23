@@ -43,7 +43,7 @@ class DcaCycleOrderStrategyTest {
                                    BigDecimal fearGreed, String currentPrice) {
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, closes, ledger,
                 sellable == null ? null : BigDecimal.valueOf(sellable), fearGreed,
-                currentPrice == null ? null : new BigDecimal(currentPrice), null));
+                currentPrice == null ? null : new BigDecimal(currentPrice), null, null));
     }
 
     private DcaRuleDecision decide(DcaRule r, String prevClose, Integer sellable) {
@@ -347,7 +347,7 @@ class DcaCycleOrderStrategyTest {
         DcaRule partial = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null,
                 OrderType.MOC, null, new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("300"), null), DcaShortfallPolicy.PARTIAL, List.of());
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = java.util.stream.Stream.of(reject, partial)
-                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, HUNDRED, null, null, null, null, null))
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, HUNDRED, null, null, null, null, null, null))
                 .toList();
         CycleOrderStrategy.OrderPlan plan = strategy.plan(new CycleOrderStrategy.PlanContext(null, StrategyTicker.UPRO, DAY, "t",
                 null, null, null, new CycleOrderStrategy.PlanContext.DcaPlanInputs(due))).orElseThrow();

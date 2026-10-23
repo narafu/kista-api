@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.upbit;
 
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
@@ -45,6 +46,15 @@ class UpbitExchangeAdapterTest {
         server = MockRestServiceServer.bindTo(builder).build();
         UpbitHttpClient http = new UpbitHttpClient(builder.build(), JsonMapper.builder().build(), () -> "n");
         adapter = new UpbitExchangeAdapter(http, new UpbitMarketRegistry(), CLOCK);
+    }
+
+    @Test
+    void tradingRulesAreUpbitKrwConstants() {
+        var rules = adapter.getTradingRules(StrategyTicker.BTC);
+        assertThat(rules.feeRate()).isEqualByComparingTo("0.0005");
+        assertThat(rules.feeSide()).isEqualTo(FeeSide.QUOTE_SURCHARGE);
+        assertThat(rules.minNotional()).isEqualByComparingTo("5000");
+        assertThat(rules.quantityStep()).isEqualByComparingTo("0.00000001");
     }
 
     @Test

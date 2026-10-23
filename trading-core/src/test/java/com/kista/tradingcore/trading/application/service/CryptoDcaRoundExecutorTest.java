@@ -31,6 +31,8 @@ import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
+import com.kista.shared.kernel.CryptoTradingRules;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
@@ -78,11 +80,15 @@ class CryptoDcaRoundExecutorTest {
     CyclePositionPort cyclePositionPort = mock(CyclePositionPort.class);
     CryptoDcaRoundExecutor executor = new CryptoDcaRoundExecutor(fearGreed, orderPort, executionPort, recorder, new DcaCycleOrderStrategy(), cyclePositionPort);
 
+    // 업비트 KRW 규칙과 같은 값 — broker adapter 상수를 import하지 않는다
+    static final CryptoTradingRules UPBIT_LIKE = new CryptoTradingRules(new BigDecimal("0.0005"), FeeSide.QUOTE_SURCHARGE, new BigDecimal("5000"), new BigDecimal("0.00000001"));
+
     TradingAccount account;
 
     @BeforeEach
     void setUp() {
-        account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+        when(exchange.getTradingRules(any())).thenReturn(UPBIT_LIKE);
+        account = TradingFixtures.upbitTradingAccount(UUID.randomUUID(), UUID.randomUUID());
         when(exchange.getCompletedDailyCandles(any(), anyInt())).thenAnswer(i -> candles(TODAY.minusDays(1)));
         when(exchange.getCurrentPrices(any())).thenReturn(Map.of(StrategyTicker.BTC, BTC_PRICE, StrategyTicker.ETH, new BigDecimal("2000000")));
         when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of());
@@ -163,6 +169,21 @@ class CryptoDcaRoundExecutorTest {
         run(NOW, c, config(OrderDirection.BUY, "100000", 13));
         verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT), eq("주문 금액 4999 < 최소 5000"), eq(BTC_PRICE));
         verify(orderPort, never()).save(any());
+    }
+
+    @Test
+    void receivedAssetFeeSideDebitsWalletWithoutSurcharge() {
+        // 업비트 계좌지만 규칙만 RECEIVED_ASSET으로 바꿔 지갑 차감 규칙을 격리 검증 — 시장(KRW, scale 0)은 계좌에서
+        when(exchange.getTradingRules(any())).thenReturn(new CryptoTradingRules(new BigDecimal("0.0005"), FeeSide.RECEIVED_ASSET, new BigDecimal("5000"), new BigDecimal("0.00000001")));
+        balance("20000", "0");
+        BatchContext btc = ctx(StrategyTicker.BTC);
+        BatchContext eth = ctx(StrategyTicker.ETH);
+        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
+        m.put(btc, config(OrderDirection.BUY, "15000", 13));
+        m.put(eth, config(OrderDirection.BUY, "5000", 13));
+        run(NOW, m);
+        // QUOTE_SURCHARGE였다면 잔액 4992.5 → ETH 4990 < 5000 미달. RECEIVED_ASSET은 잔액 5000 → ETH 5000 주문
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.ETH), eq(new BigDecimal("5000")), anyString());
     }
 
     @Test

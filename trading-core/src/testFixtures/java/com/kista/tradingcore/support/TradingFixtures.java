@@ -49,6 +49,11 @@ public final class TradingFixtures {
         return TradingAccount.from(kisAccount(id, userId));
     }
 
+    // 배치 경로용 업비트 계좌 투영 — upbitAccount와 동일 값
+    public static TradingAccount upbitTradingAccount(UUID id, UUID userId) {
+        return TradingAccount.from(upbitAccount(id, userId));
+    }
+
     // 배치 경로용 Toss 계좌 투영 — tossAccount와 동일 값
     public static TradingAccount tossTradingAccount(UUID id, UUID userId) {
         return TradingAccount.from(tossAccount(id, userId));

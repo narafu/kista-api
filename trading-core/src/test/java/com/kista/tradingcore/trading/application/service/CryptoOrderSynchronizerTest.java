@@ -67,7 +67,7 @@ class CryptoOrderSynchronizerTest {
 
     @BeforeEach
     void setUp() {
-        TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
+        TradingAccount account = TradingFixtures.upbitTradingAccount(UUID.randomUUID(), UUID.randomUUID());
         Strategy strategy = new Strategy(UUID.randomUUID(), account.id(), StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),

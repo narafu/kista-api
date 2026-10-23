@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.application.port.output;
 
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.CryptoTradingRules;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
@@ -20,6 +21,9 @@ public interface CryptoExchangePort {
 
     // 원화 가용·잠금 + 지원 코인 보유·평단
     CryptoBalance getBalance(BrokerAccountRef account);
+
+    // 종목별 실행 규칙(수수료·차감 쪽·최소 명목가·수량 step) — 계좌 불필요, 조회 실패는 예외
+    CryptoTradingRules getTradingRules(StrategyTicker ticker);
 
     // 현재가 (KRW) — 공개 시세, 계좌 불필요
     Map<StrategyTicker, BigDecimal> getCurrentPrices(Collection<StrategyTicker> tickers);

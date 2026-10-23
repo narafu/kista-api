@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.CryptoTradingRules;
 import com.kista.shared.kernel.DcaIndicator;
-import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
@@ -82,6 +82,7 @@ class CryptoDcaRoundExecutor {
 
         // ponytail: 캔들·공포탐욕 메모는 호출(계좌) 단위 — 계좌 수만큼 재조회, 계좌가 늘면 틱 단위 메모로 승격
         Map<StrategyTicker, List<CryptoCandle>> candleMemo = new HashMap<>();
+        Map<StrategyTicker, CryptoTradingRules> rulesMemo = new HashMap<>(); // 종목별 거래 규칙 — 조회 실패는 기존 조회 실패 경로
         List<Optional<BigDecimal>> fearGreedMemo = new ArrayList<>(1); // 비어 있으면 미조회
         int i = 0;
         try {
@@ -105,6 +106,7 @@ class CryptoDcaRoundExecutor {
                     recorder.recordSkipped(ctx, today, key, rule.direction(), DcaSkipReason.DATA_UNAVAILABLE, "현재가 조회 실패", null);
                     continue;
                 }
+                CryptoTradingRules rules = rulesMemo.computeIfAbsent(ticker, exchange::getTradingRules);
                 List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst, today);
                 UUID cycleId = ctx.currentCycle().id();
                 CyclePosition position = ledgers.get(cycleId);
@@ -117,13 +119,13 @@ class CryptoDcaRoundExecutor {
                     if (fearGreedMemo.isEmpty()) fearGreedMemo.add(fearGreedPort.latest());
                     fearGreed = fearGreedMemo.get(0).orElse(null);
                 }
-                DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule, Market.CRYPTO_KRW,
-                        closes, ledger, sellable, fearGreed, price, wallet.krw));
+                DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule,
+                        ctx.account().brokerRef().broker().getMarket(), closes, ledger, sellable, fearGreed, price, wallet.krw, rules));
                 if (decision instanceof DcaRuleDecision.Skipped s) {
                     recorder.recordSkipped(ctx, today, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
                     continue;
                 }
-                RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, wallet);
+                RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, wallet, rules);
                 if (keyExpired != null) {
                     // 키 만료는 계좌 단위 문제 — 남은 규칙은 주문·HTTP 없이 일괄 미주문 기록
                     handleFailure(targets.subList(i + 1, targets.size()), keyExpired, nowKst, today);
@@ -178,12 +180,12 @@ class CryptoDcaRoundExecutor {
     // 판정된 계획 → 주문 저장·선점·전송. 지갑은 같은 틱 후속 규칙을 위한 로컬 차감 대상
     // 반환: 키 만료로 확정 거절되면 그 예외(호출부가 남은 규칙을 일괄 처리), 그 외 null
     private RuntimeException place(CryptoExchangePort exchange, BatchContext ctx, DcaRule rule, LocalDate today,
-                                   DcaRuleDecision.Planned plan, Wallet wallet) {
+                                   DcaRuleDecision.Planned plan, Wallet wallet, CryptoTradingRules rules) {
         StrategyTicker ticker = ctx.strategy().ticker();
         boolean buy = rule.direction() == OrderDirection.BUY;
         BigDecimal price = plan.referencePrice();
         BigDecimal volume = Quantities.normalize(plan.quantity());             // 추정(BUY)·실제(SELL) 수량 — 꼬리 0 제거(거래소 전송 형태 유지)
-        BigDecimal amount = buy ? plan.notional() : volume.multiply(price);   // 주문 금액(원) — BUY는 정수 원
+        BigDecimal amount = buy ? plan.notional() : volume.multiply(price);   // 주문 금액(견적 통화) — BUY는 계좌 통화 자릿수
         String key = rule.ruleKey();
         Order order = orderPort.save(Order.cryptoMarket(ctx.account().id(), ctx.currentCycle().id(), today, ticker,
                 rule.direction(), rule.orderLeg(), rule.timing(), volume, price));
@@ -207,7 +209,7 @@ class CryptoDcaRoundExecutor {
                 return failure == CryptoFailure.KEY_EXPIRED ? e : null;
             }
         }
-        if (buy) wallet.krw = wallet.krw.subtract(amount.multiply(DcaRule.CRYPTO_FEE_FACTOR));
+        if (buy) wallet.krw = wallet.krw.subtract(rules.quoteSpendFor(amount));
         else {
             wallet.held.merge(ticker, volume, BigDecimal::subtract);
             wallet.ledgerSold.merge(ctx.currentCycle().id(), volume, BigDecimal::add);

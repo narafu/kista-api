@@ -2,6 +2,8 @@ package com.kista.tradingcore.broker.adapter.out.upbit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.CryptoTradingRules;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
@@ -33,6 +35,10 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     private static final int MAX_COUNT = 400;   // 페이징으로 지원하는 최대 일봉 개수
     private static final int MAX_PAGES = 3;     // 400봉 + 진행 중 봉을 덮는 최대 요청 수
 
+    // 업비트 KRW 마켓 고정 규칙 — 수수료 0.05% 원화 가산, 최소 5,000원, 수량 1e-8
+    static final CryptoTradingRules TRADING_RULES = new CryptoTradingRules(
+            new BigDecimal("0.0005"), FeeSide.QUOTE_SURCHARGE, new BigDecimal("5000"), new BigDecimal("0.00000001"));
+
     private final UpbitHttpClient http;          // JWT 서명·오류 매핑 공통
     private final UpbitMarketRegistry registry;  // StrategyTicker ↔ KRW-XXX
     private final Clock clock;                   // 진행 중 일봉 판정 — 테스트에서 고정
@@ -51,6 +57,11 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     @Override
     public Broker supports() {
         return Broker.UPBIT;
+    }
+
+    @Override
+    public CryptoTradingRules getTradingRules(StrategyTicker ticker) {
+        return TRADING_RULES;
     }
 
     @Override

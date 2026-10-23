@@ -1,5 +1,7 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.CryptoTradingRules;
+import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
@@ -20,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class DcaRuleDecisionTest {
 
@@ -41,8 +44,18 @@ class DcaRuleDecisionTest {
 
     private static AccountBalance ledger(String holdings, String avg) { return new AccountBalance(bd(holdings), bd(avg), BigDecimal.ZERO); }
 
+    private static final CryptoTradingRules UPBIT_LIKE = new CryptoTradingRules(new BigDecimal("0.0005"), FeeSide.QUOTE_SURCHARGE, new BigDecimal("5000"), new BigDecimal("0.00000001"));
+    private static final CryptoTradingRules BINANCE_LIKE = new CryptoTradingRules(new BigDecimal("0.001"), FeeSide.RECEIVED_ASSET, new BigDecimal("5"), new BigDecimal("0.00001"));
+
     private DcaRuleDecision decide(DcaRule r, Market m, AccountBalance ledger, String sellable, String close, String current, String cash) {
-        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(close)), ledger, bd(sellable), null, bd(current), bd(cash)));
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(close)), ledger, bd(sellable), null, bd(current), bd(cash),
+                m.isCrypto() ? UPBIT_LIKE : null));
+    }
+
+    // 종가 [currentPrice]·원장 0 헬퍼 — 시장·거래 규칙을 직접 지정
+    private DcaRuleDecision decideWith(DcaRule r, Market m, CryptoTradingRules rules, String availableCash, String currentPrice) {
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(currentPrice)), ledger("0", null), null, null,
+                bd(currentPrice), bd(availableCash), rules));
     }
 
     private DcaRuleDecision stockSell(DcaRule r, String ledgerQty, String sellable) {
@@ -158,5 +171,28 @@ class DcaRuleDecisionTest {
     void SELL인데_원장이_null이면_DATA_UNAVAILABLE() {
         DcaRule r = stock(OrderDirection.SELL, amount("1000"), DcaShortfallPolicy.PARTIAL, List.of());
         assertThat(skipped(decide(r, Market.US_STOCK, null, "5", "50", null, null)).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+    }
+
+    @Test
+    void 크립토_USDT_BUY는_소수2자리_금액을_유지한다() {
+        DcaRule r = crypto(OrderDirection.BUY, amount("10.5"), DcaShortfallPolicy.REJECT, List.of());
+        DcaRuleDecision.Planned p = planned(decideWith(r, Market.CRYPTO_USDT, BINANCE_LIKE, "100", "65000"));
+        assertThat(p.notional()).isEqualTo(new BigDecimal("10.50"));
+        assertThat(p.quantity()).isEqualTo(new BigDecimal("0.00016")); // 10.50/65000=0.000161538… → step 0.00001 FLOOR
+    }
+
+    @Test
+    void 크립토_USDT_최소금액_미달_문구() {
+        DcaRule r = crypto(OrderDirection.BUY, amount("10"), DcaShortfallPolicy.PARTIAL, List.of());
+        DcaRuleDecision.Skipped s = skipped(decideWith(r, Market.CRYPTO_USDT, BINANCE_LIKE, "4.99", "65000"));
+        assertThat(s.reason()).isEqualTo(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT);
+        assertThat(s.detail()).isEqualTo("주문 금액 4.99 < 최소 5");
+    }
+
+    @Test
+    void 크립토_입력은_거래규칙_필수() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new DcaCycleOrderStrategy.DcaRuleInputs(
+                crypto(OrderDirection.BUY, amount("5000"), DcaShortfallPolicy.REJECT, List.of()), Market.CRYPTO_KRW,
+                List.of(BigDecimal.TEN), null, null, null, BigDecimal.TEN, BigDecimal.TEN, null));
     }
 }

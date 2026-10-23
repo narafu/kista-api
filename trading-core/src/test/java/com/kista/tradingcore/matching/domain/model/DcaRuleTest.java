@@ -3,6 +3,7 @@ package com.kista.tradingcore.matching.domain.model;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
+import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 class DcaRuleTest {
@@ -65,5 +67,23 @@ class DcaRuleTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new DcaStrategyConfig(List.of(a, a)));
         DcaRule n = rule(null, OrderDirection.BUY, OrderType.MOC, null, amount("100"));
         assertThat(new DcaStrategyConfig(List.of(n, n)).rules()).hasSize(2);
+    }
+
+    @Test
+    void usdtMarketAllowsTwoDecimalsAndMin5() {
+        DcaRule ok = rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("10.50"));
+        assertThatCode(() -> ok.requireCompatible(Market.CRYPTO_USDT)).doesNotThrowAnyException();
+        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("10.505")).requireCompatible(Market.CRYPTO_USDT))
+                .withMessage("코인 DCA 금액은 소수 2자리까지 입력할 수 있습니다");
+        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4.99")).requireCompatible(Market.CRYPTO_USDT))
+                .withMessage("코인 DCA 금액은 5.00 USDT 이상이어야 합니다");
+    }
+
+    @Test
+    void krwMarketKeepsUpbitMessages() {
+        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("5000.5")).requireCompatible(Market.CRYPTO_KRW))
+                .withMessage("코인 DCA 금액은 원 단위 정수여야 합니다");
+        assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4999")).requireCompatible(Market.CRYPTO_KRW))
+                .withMessage("코인 DCA 금액은 5,000원 이상이어야 합니다");
     }
 }
