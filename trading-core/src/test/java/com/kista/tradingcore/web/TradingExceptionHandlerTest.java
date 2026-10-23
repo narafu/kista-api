@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
+import com.kista.tradingcore.broker.domain.model.BrokerWithdrawalEnabledException;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.platform.web.ErrorCode;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
@@ -195,6 +196,14 @@ class TradingExceptionHandlerTest {
         assertThat(detail.getStatus()).isEqualTo(422);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_PERMISSION_DENIED.name());
         assertThat(detail.getDetail()).isEqualTo("거래소 API 키에 필요한 권한이 없습니다.");
+    }
+
+    @Test
+    void withdrawalEnabledMapsTo422WithCode() {
+        var detail = handler.handleTradingCoreExceptions(new BrokerWithdrawalEnabledException());
+        assertThat(detail.getStatus()).isEqualTo(422);
+        assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_WITHDRAWAL_ENABLED.name());
+        assertThat(detail.getDetail()).isEqualTo("출금 권한이 켜진 API 키는 등록할 수 없습니다.");
     }
 
     @Test
