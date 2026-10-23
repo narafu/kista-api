@@ -8,16 +8,27 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum Broker {
-    TOSS("토스증권",    "토스", Market.US_STOCK, Currency.USD),  // 토스증권 Open API
-    KIS("한국투자증권", "한투", Market.US_STOCK, Currency.USD),  // 한국투자증권 Open API
-    MOCK("모의계좌",    "모의", Market.US_STOCK, Currency.USD),  // 증권사 연동 없는 DB 기반 모의매매
-    UPBIT("업비트",     "업비트", Market.CRYPTO_KRW, Currency.KRW), // 업비트 Open API (KRW 마켓 코인)
-    MERITZ("메리츠증권", "메리츠", Market.US_STOCK, Currency.USD); // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
+    TOSS("토스증권",    "토스", Market.US_STOCK, false, false),  // 토스증권 Open API
+    KIS("한국투자증권", "한투", Market.US_STOCK, false, false),  // 한국투자증권 Open API
+    MOCK("모의계좌",    "모의", Market.US_STOCK, false, false),  // 증권사 연동 없는 DB 기반 모의매매
+    UPBIT("업비트",     "업비트", Market.CRYPTO_KRW, true, true), // 업비트 Open API (KRW 마켓 코인)
+    MERITZ("메리츠증권", "메리츠", Market.US_STOCK, true, false); // 메리츠증권 Open API (해외주식, 앱키에 계좌 종속)
 
     private final String label;      // 한국어 전체 이름
     private final String shortLabel; // UI 모바일 약칭
     private final Market market;     // 거래 시장 — 종목 시장과 일치해야 전략 생성 가능
-    private final Currency currency; // 계좌 기준 통화 (주문 금액 단위)
+    private final boolean keyOnlyCredentials; // 앱키만으로 인증(시크릿·계좌번호 불필요) — 업비트·메리츠
+    private final boolean apiKeyExpiring;      // API 키 만료가 있는 거래소 — 업비트
+
+    // 계좌 기준 통화 (주문 금액 단위) — 시장의 견적 통화에서 파생
+    public Currency getCurrency() {
+        return market.quoteCurrency();
+    }
+
+    // 코인 거래소 여부
+    public boolean isCryptoExchange() {
+        return market.isCrypto();
+    }
 
     // 개장 경매 주문(MOO/LOO)을 개장 전에 접수할 수 있는 증권사 — KIS만 31/32 지원, Toss·MOCK은 개장 후 지정가 근사
     public boolean supportsOpenAuctionOrders() {
