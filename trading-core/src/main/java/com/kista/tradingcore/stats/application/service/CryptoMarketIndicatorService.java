@@ -1,18 +1,15 @@
 package com.kista.tradingcore.stats.application.service;
 
-import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.platform.cache.TtlResultCache;
-import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
-import com.kista.tradingcore.broker.application.service.CryptoExchanges;
-import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
 import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.CryptoMarketMetricsPort;
 import com.kista.tradingcore.stats.application.port.output.HashrateHistoryPort;
 import com.kista.tradingcore.stats.application.port.output.HistoricalFxRatePort;
+import com.kista.tradingcore.stats.application.port.output.UpbitMarketDataPort;
 import com.kista.tradingcore.stats.application.usecase.BrokerStatisticsUseCase;
 import com.kista.tradingcore.stats.application.usecase.CryptoMarketIndicatorUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoHashRibbons;
@@ -60,7 +57,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private static final List<StrategyTicker> TICKERS = Arrays.stream(StrategyTicker.values())
             .filter(t -> t.getMarket() == Market.CRYPTO_KRW).toList();
 
-    private final CryptoExchangePort upbit; // 업비트 (국내 기준가)
+    private final UpbitMarketDataPort upbit; // 업비트 공개 시세 (국내 기준가 — 김프)
     private final BinanceMarketDataPort binance; // 바이낸스 (해외 기준가·선물)
     private final HistoricalFxRatePort fxRates; // 과거 공식 환율
     private final BlockHeightPort blockHeight; // BTC 블록 높이 (반감기)
@@ -72,17 +69,17 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final TtlResultCache cache; // 결과 캐시 (single-flight, 정상 10분·전부 실패 1분)
 
     @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
-    CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
+    CryptoMarketIndicatorService(UpbitMarketDataPort upbit, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
                                  BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics,
                                  CryptoMarketMetricsPort cmc, HashrateHistoryPort hashrates) {
-        this(exchanges, binance, fxRates, blockHeight, coinbase, brokerStatistics, cmc, hashrates, Clock.systemUTC());
+        this(upbit, binance, fxRates, blockHeight, coinbase, brokerStatistics, cmc, hashrates, Clock.systemUTC());
     }
 
-    CryptoMarketIndicatorService(CryptoExchanges exchanges, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
+    CryptoMarketIndicatorService(UpbitMarketDataPort upbit, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
                                  BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics,
                                  CryptoMarketMetricsPort cmc, HashrateHistoryPort hashrates, Clock clock) {
         this.cache = new TtlResultCache(clock);
-        this.upbit = exchanges.of(Broker.UPBIT);
+        this.upbit = upbit;
         this.binance = binance;
         this.fxRates = fxRates;
         this.blockHeight = blockHeight;
@@ -114,10 +111,10 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
         // (a) 업비트 USDT 현재가·일봉
         BigDecimal usdtPrice;
-        List<CryptoCandle> usdtCandles;
+        List<DatedValue> usdtCandles;
         try {
             usdtPrice = upbit.getUsdtKrwPrice();
-            usdtCandles = upbit.getCompletedUsdtKrwDailyCandles(MAX_DAYS);
+            usdtCandles = upbit.getCompletedUsdtKrwDailyCloses(MAX_DAYS);
         } catch (Exception e) {
             log.warn("업비트 USDT 시세 조회 실패", e);
             usdtPrice = null;
@@ -161,7 +158,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         // 바이낸스 데이터는 UTC 일자 키가 스펙 — KST 단일 기준의 명시적 예외
         Instant fundingFrom = today.atStartOfDay().toInstant(ZoneOffset.UTC).minus(Duration.ofDays(MAX_DAYS));
         // 현재가는 전 종목 한 번에 조회 — 실패하면 김프 섹션만 null
-        Map<StrategyTicker, BigDecimal> krwPrices = upbitOk ? guard("업비트 현재가", () -> upbit.getCurrentPrices(TICKERS)) : null;
+        Map<StrategyTicker, BigDecimal> krwPrices = upbitOk ? guard("업비트 현재가", () -> upbit.getKrwPrices(TICKERS)) : null;
         List<TickerIndicators> tickers = new ArrayList<>();
         List<DatedValue> btcCloses = null; // Hash Ribbons 가격 모멘텀용 — 실패하면 섹션 null
         for (StrategyTicker t : TICKERS) {
@@ -173,7 +170,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
             KimchiPremium kimchi = null;
             if (upbitOk && krwPrices != null && closes != null && spot != null) {
                 final BigDecimal tetherPrice = usdtPrice;
-                final List<CryptoCandle> usdtC = usdtCandles;
+                final List<DatedValue> usdtC = usdtCandles;
                 final BigDecimal fxNow = fxCurrent;
                 final Map<LocalDate, BigDecimal> fxMap = fxByDate;
                 kimchi = guard("김프 " + t, () -> kimchi(t, spot, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap));
@@ -227,13 +224,13 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         return values.stream().filter(v -> v.date().isBefore(today)).toList();
     }
 
-    private KimchiPremium kimchi(StrategyTicker t, BigDecimal spot, List<DatedValue> binanceCloses, BigDecimal krw, BigDecimal usdtPrice, List<CryptoCandle> usdtCandles,
+    private KimchiPremium kimchi(StrategyTicker t, BigDecimal spot, List<DatedValue> binanceCloses, BigDecimal krw, BigDecimal usdtPrice, List<DatedValue> usdtCandles,
                                  BigDecimal fxCurrent, Map<LocalDate, BigDecimal> fxByDate) {
         // 환율 장애면 official 없이 tether 기준만
         BigDecimal official = fxCurrent == null ? null : CryptoPremiums.premiumPercent(krw, spot.multiply(fxCurrent));
         BigDecimal tether = CryptoPremiums.premiumPercent(krw, spot.multiply(usdtPrice));
         List<DatedPremiumPair> history = CryptoPremiums.kimchiHistory(
-                upbit.getCompletedDailyCandles(t, MAX_DAYS), usdtCandles,
+                upbit.getCompletedKrwDailyCloses(t, MAX_DAYS), usdtCandles,
                 binanceCloses, fxByDate); // 장기 일봉 — 날짜 교집합만 쓰므로 길이 무관
         return new KimchiPremium(new PremiumPair(official, tether), history);
     }

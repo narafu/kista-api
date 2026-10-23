@@ -40,6 +40,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -86,7 +87,7 @@ class CryptoOrderSynchronizerTest {
 
     CryptoOrderResult result(State state, String volume, String avg) {
         return new CryptoOrderResult("upbit-uuid", orderId.toString(), state, new BigDecimal(volume),
-                avg == null ? null : new BigDecimal(avg), BigDecimal.ZERO);
+                new BigDecimal(volume), avg == null ? null : new BigDecimal(avg), BigDecimal.ZERO, "KRW");
     }
 
     void run(Order o, int hour) {
@@ -97,7 +98,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void submittingFoundOnExchangeIsRecoveredWithoutResubmit() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         run(o, 13);
         InOrder io = inOrder(recorder, orderPort);
         io.verify(recorder).recordOrdered(ctx, TODAY, KEY, o, PRICE);
@@ -110,7 +111,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void submittingAlreadyFilledIsSettledInSameTick() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
         run(o, 13);
         verify(orderPort).markPlaced(orderId, "upbit-uuid");
         verify(ledgerRecorder).recordFill(ctx, o, new BigDecimal("0.0001"), new BigDecimal("150000000"));
@@ -119,7 +120,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void submittingOrderNotFoundBeforeHourEndsIsFailedThenRetried() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(orderPort).markFailed(orderId);
         verify(recorder, never()).recordSkipped(any(), any(), any(), any(), any(), any(), any());
@@ -128,7 +129,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void submittingOrderNotFoundAfterHourIsSkipped() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.empty());
         run(o, 14);
         InOrder io = inOrder(recorder, orderPort);
         io.verify(recorder).recordSkipped(ctx, TODAY, KEY, com.kista.shared.kernel.OrderDirection.BUY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
@@ -138,7 +139,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void submittingOrderOfPastDayIsSkippedEvenInHour() {
         Order o = order(OrderStatus.SUBMITTING, TODAY.minusDays(1), null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.empty());
         run(o, 13);
         verify(recorder).recordSkipped(ctx, TODAY.minusDays(1), KEY, com.kista.shared.kernel.OrderDirection.BUY, DcaSkipReason.EXCHANGE_API_ERROR, "주문 접수 확인 실패", PRICE);
     }
@@ -146,7 +147,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void recordSkippedFailureLeavesOrderSubmitting() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.empty());
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.empty());
         doThrow(new RuntimeException("db")).when(recorder).recordSkipped(any(), any(), any(), any(), any(), any(), any());
         run(o, 14);
         verify(orderPort, never()).markFailed(any());
@@ -155,7 +156,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void recordOrderedFailureLeavesOrderSubmitting() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         doThrow(new RuntimeException("db")).when(recorder).recordOrdered(any(), any(), any(), any(), any());
         run(o, 13);
         verify(orderPort, never()).markPlaced(any(), any());
@@ -164,7 +165,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void filledWithoutAvgPriceIsSkipped() {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
-        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", null)));
+        when(exchange.findOrderByExchangeOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", null)));
         run(o, 13);
         verify(ledgerRecorder, never()).recordFill(any(), any(), any(), any());
     }
@@ -172,7 +173,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void transientLookupFailureLeavesSubmitting() {
         Order o = order(OrderStatus.SUBMITTING, TODAY, null);
-        when(exchange.findOrderByIdentifier(any(), anyString())).thenThrow(new RuntimeException("timeout"));
+        when(exchange.findOrderByClientOrderId(any(), any(), anyString())).thenThrow(new RuntimeException("timeout"));
         run(o, 13);
         verifyNoMoreInteractions(recorder);
         verify(orderPort, never()).markFailed(any());
@@ -182,7 +183,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void placedFilledIsMarkedAndEventPublished() {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
-        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.CANCEL, "0.0001", "150000000")));
+        when(exchange.findOrderByExchangeOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.CANCEL, "0.0001", "150000000")));
         when(ledgerRecorder.recordFill(any(), any(), any(), any())).thenReturn(true);
         run(o, 13);
         verify(ledgerRecorder).recordFill(ctx, o, new BigDecimal("0.0001"), new BigDecimal("150000000"));
@@ -196,7 +197,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void placedCancelledWithoutFillIsCancelled() {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
-        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.CANCEL, "0", null)));
+        when(exchange.findOrderByExchangeOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.CANCEL, "0", null)));
         run(o, 13);
         verify(orderPort).markCancelled(orderId);
         verify(publisher, never()).publishEvent(any(Object.class));
@@ -205,7 +206,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void placedStillWaitingIsLeftAlone() {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
-        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
+        when(exchange.findOrderByExchangeOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.WAIT, "0", null)));
         run(o, 13);
         verify(orderPort, never()).markCancelled(any());
         verify(ledgerRecorder, never()).recordFill(any(), any(), any(), any());
@@ -214,7 +215,7 @@ class CryptoOrderSynchronizerTest {
     @Test
     void 이미_반영된_체결이면_이벤트를_다시_내지_않는다() {
         Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
-        when(exchange.findOrderByUuid(any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
+        when(exchange.findOrderByExchangeOrderId(any(), any(), anyString())).thenReturn(Optional.of(result(State.DONE, "0.0001", "150000000")));
         when(ledgerRecorder.recordFill(any(), any(), any(), any())).thenReturn(false); // 증분 없음(재처리)
         run(o, 13);
         verify(publisher, never()).publishEvent(any(Object.class));
@@ -244,5 +245,24 @@ class CryptoOrderSynchronizerTest {
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.ONE, PRICE, OrderStatus.SUBMITTING, null, null, null);
         run(o, 13);
         verifyNoMoreInteractions(exchange);
+    }
+
+    @Test
+    void ledgerUsesNetExecutedVolume() {
+        Order o = order(OrderStatus.PLACED, TODAY, "upbit-uuid");
+        when(exchange.findOrderByExchangeOrderId(any(), eq(o.ticker()), anyString())).thenReturn(Optional.of(
+                new CryptoOrderResult("upbit-uuid", orderId.toString(), State.DONE, new BigDecimal("0.0001"), new BigDecimal("0.0000999"),
+                        new BigDecimal("150000000"), new BigDecimal("0.0000001"), "BTC")));
+        when(ledgerRecorder.recordFill(any(), any(), any(), any())).thenReturn(true);
+        run(o, 13);
+        verify(ledgerRecorder).recordFill(ctx, o, new BigDecimal("0.0000999"), new BigDecimal("150000000"));
+    }
+
+    @Test
+    void lookupsPassOrderTicker() {
+        Order o = order(OrderStatus.SUBMITTING, TODAY, null);
+        when(exchange.findOrderByClientOrderId(any(), eq(o.ticker()), eq(o.id().toString()))).thenReturn(Optional.empty());
+        run(o, 13);
+        verify(exchange).findOrderByClientOrderId(ctx.account().brokerRef(), o.ticker(), o.id().toString());
     }
 }

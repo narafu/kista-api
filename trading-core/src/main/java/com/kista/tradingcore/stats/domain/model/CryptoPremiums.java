@@ -1,7 +1,5 @@
 package com.kista.tradingcore.stats.domain.model;
 
-import com.kista.tradingcore.broker.domain.model.CryptoCandle;
-
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -40,11 +38,11 @@ public final class CryptoPremiums {
     }
 
     // 세 시계열 날짜 교집합만, 오래된 순
-    public static List<DatedPremiumPair> kimchiHistory(List<CryptoCandle> upbitCoin, List<CryptoCandle> upbitUsdt,
+    public static List<DatedPremiumPair> kimchiHistory(List<DatedValue> upbitCoin, List<DatedValue> upbitUsdt,
                                                        List<DatedValue> binanceCloses, Map<LocalDate, BigDecimal> fxByDate) {
-        Map<LocalDate, BigDecimal> usdt = closeByDate(upbitUsdt);
+        Map<LocalDate, BigDecimal> usdt = byDate(upbitUsdt);
         Map<LocalDate, BigDecimal> binance = byDate(binanceCloses);
-        return closeByDate(upbitCoin).entrySet().stream()
+        return byDate(upbitCoin).entrySet().stream()
                 .filter(e -> usdt.containsKey(e.getKey()) && binance.containsKey(e.getKey()))
                 .map(e -> {
                     LocalDate date = e.getKey();
@@ -57,8 +55,8 @@ public final class CryptoPremiums {
     }
 
     // 환율이 있는 날만 USDT 원화가 vs 공식 환율 프리미엄
-    public static List<DatedValue> usdtPremiumHistory(List<CryptoCandle> upbitUsdt, Map<LocalDate, BigDecimal> fxByDate) {
-        return closeByDate(upbitUsdt).entrySet().stream()
+    public static List<DatedValue> usdtPremiumHistory(List<DatedValue> upbitUsdt, Map<LocalDate, BigDecimal> fxByDate) {
+        return byDate(upbitUsdt).entrySet().stream()
                 .filter(e -> fxByDate.containsKey(e.getKey()))
                 .map(e -> new DatedValue(e.getKey(), premiumPercent(e.getValue(), fxByDate.get(e.getKey()))))
                 .toList();
@@ -91,10 +89,5 @@ public final class CryptoPremiums {
     // 날짜 키 값 맵 (날짜 오름차순)
     private static Map<LocalDate, BigDecimal> byDate(List<DatedValue> values) {
         return values.stream().collect(Collectors.toMap(DatedValue::date, DatedValue::value, (a, b) -> b, TreeMap::new));
-    }
-
-    // 날짜 키 종가 맵 (날짜 오름차순)
-    private static Map<LocalDate, BigDecimal> closeByDate(List<CryptoCandle> candles) {
-        return candles.stream().collect(Collectors.toMap(CryptoCandle::kstDate, CryptoCandle::close, (a, b) -> b, TreeMap::new));
     }
 }

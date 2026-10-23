@@ -68,7 +68,7 @@ class CryptoOrderSynchronizer {
             return;
         }
         if (order.status() == OrderStatus.SUBMITTING) {
-            var found = exchange.findOrderByIdentifier(ref, order.id().toString());
+            var found = exchange.findOrderByClientOrderId(ref, order.ticker(), order.id().toString());
             if (found.isEmpty()) {
                 // 거래소에 없음이 확인됐으므로 실패 처리 — 이력(멱등 insertIfAbsent)을 먼저 남기고 상태를 전이해 중간 실패 시 다음 틱이 무해하게 재처리
                 skipIfNotRetryable(ctx, config, order, nowKst);
@@ -77,12 +77,12 @@ class CryptoOrderSynchronizer {
             }
             // 이력 먼저, 상태 전이 나중 — recordOrdered 실패 시 SUBMITTING 유지(PLACED 경로는 이력을 쓰지 않음)
             recorder.recordOrdered(ctx, order.tradeDate(), ruleKey, order, order.price());
-            orderPort.markPlaced(order.id(), found.get().uuid());
+            orderPort.markPlaced(order.id(), found.get().exchangeOrderId());
             settle(ctx, order, found.get());
             return;
         }
         // PLACED
-        exchange.findOrderByUuid(ref, order.externalOrderId()).ifPresent(r -> settle(ctx, order, r));
+        exchange.findOrderByExchangeOrderId(ref, order.ticker(), order.externalOrderId()).ifPresent(r -> settle(ctx, order, r));
     }
 
     // 규칙 실행 시간대 안(오늘·같은 시각)이면 실행기가 재시도하므로 기록 없음, 지났거나 편집으로 규칙이 사라졌으면 미주문 기록
@@ -110,7 +110,7 @@ class CryptoOrderSynchronizer {
                 log.warn("체결 수량은 있으나 평균가 없음 — 건너뜀 orderId={}", order.id());
                 return;
             }
-            if (!ledgerRecorder.recordFill(ctx, order, volume, r.avgPrice())) return; // 이미 반영된 체결 — 알림 중복 방지
+            if (!ledgerRecorder.recordFill(ctx, order, r.netExecutedVolume(), r.avgPrice())) return; // 이미 반영된 체결 — 알림 중복 방지
             // 체결 금액은 계좌 통화 자릿수로 반올림
             Currency currency = ctx.account().brokerRef().broker().getCurrency();
             eventPublisher.publishEvent(new CryptoOrderFilledEvent(ctx.account().userId(), ctx.account().id(), ctx.strategy().id(),

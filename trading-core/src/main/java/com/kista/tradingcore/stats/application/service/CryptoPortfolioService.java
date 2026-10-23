@@ -41,7 +41,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> toHolding(e.getKey(), e.getValue(), prices.get(e.getKey()), currency))
                 .toList();
-        return new CryptoPortfolio(currency, balance.krwAvailable().add(balance.krwLocked()), holdings);
+        return new CryptoPortfolio(currency, balance.quoteAvailable().add(balance.quoteLocked()), holdings);
     }
 
     @Override

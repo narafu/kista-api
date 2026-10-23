@@ -1,6 +1,5 @@
 package com.kista.tradingcore.stats.domain.model;
 
-import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -47,8 +46,8 @@ class CryptoPremiumsTest {
 
     @Test
     void 김프_추이는_세_시계열_날짜_교집합만_쓴다() {
-        List<CryptoCandle> coin = List.of(new CryptoCandle(SUN, bd("147000000")), new CryptoCandle(SAT, bd("100000000")));
-        List<CryptoCandle> usdt = List.of(new CryptoCandle(SAT, bd("1400")), new CryptoCandle(SUN, bd("1400")));
+        List<DatedValue> coin = List.of(new DatedValue(SUN, bd("147000000")), new DatedValue(SAT, bd("100000000")));
+        List<DatedValue> usdt = List.of(new DatedValue(SAT, bd("1400")), new DatedValue(SUN, bd("1400")));
         // 진행 중 봉(MON)은 Upbit에 없다
         List<DatedValue> binance = List.of(new DatedValue(SAT, bd("70000")), new DatedValue(SUN, bd("100000")),
                 new DatedValue(MON, bd("101000")));
@@ -80,7 +79,7 @@ class CryptoPremiumsTest {
     @Test
     void 환율이_없는_날은_official만_null이다() {
         List<DatedPremiumPair> result = CryptoPremiums.kimchiHistory(
-                List.of(new CryptoCandle(SAT, bd("147000000"))), List.of(new CryptoCandle(SAT, bd("1400"))),
+                List.of(new DatedValue(SAT, bd("147000000"))), List.of(new DatedValue(SAT, bd("1400"))),
                 List.of(new DatedValue(SAT, bd("100000"))), Map.of());
 
         assertThat(result).hasSize(1);
@@ -93,10 +92,10 @@ class CryptoPremiumsTest {
         BigDecimal fx = bd("1380");
         BigDecimal usdtKrw = bd("1410");
         DatedPremiumPair p = CryptoPremiums.kimchiHistory(
-                List.of(new CryptoCandle(SAT, bd("147000000"))), List.of(new CryptoCandle(SAT, usdtKrw)),
+                List.of(new DatedValue(SAT, bd("147000000"))), List.of(new DatedValue(SAT, usdtKrw)),
                 List.of(new DatedValue(SAT, bd("100000"))), Map.of(SAT, fx)).get(0);
         BigDecimal usdtPremium = CryptoPremiums.usdtPremiumHistory(
-                List.of(new CryptoCandle(SAT, usdtKrw)), Map.of(SAT, fx)).get(0).value();
+                List.of(new DatedValue(SAT, usdtKrw)), Map.of(SAT, fx)).get(0).value();
 
         double official = 1 + p.official().doubleValue() / 100;
         double product = (1 + p.tether().doubleValue() / 100) * (1 + usdtPremium.doubleValue() / 100);
@@ -106,7 +105,7 @@ class CryptoPremiumsTest {
     @Test
     void usdt_프리미엄은_환율이_있는_날만_계산한다() {
         List<DatedValue> result = CryptoPremiums.usdtPremiumHistory(
-                List.of(new CryptoCandle(SAT, bd("1428")), new CryptoCandle(SUN, bd("1428"))), Map.of(SAT, bd("1400")));
+                List.of(new DatedValue(SAT, bd("1428")), new DatedValue(SUN, bd("1428"))), Map.of(SAT, bd("1400")));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).date()).isEqualTo(SAT);

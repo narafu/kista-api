@@ -107,7 +107,7 @@ class CryptoDcaRoundExecutorTest {
     }
 
     static CryptoOrderResult placed(String identifier) {
-        return new CryptoOrderResult("uuid-1", identifier, CryptoOrderResult.State.WAIT, BigDecimal.ZERO, null, BigDecimal.ZERO);
+        return new CryptoOrderResult("uuid-1", identifier, CryptoOrderResult.State.WAIT, BigDecimal.ZERO, BigDecimal.ZERO, null, BigDecimal.ZERO, "KRW");
     }
 
     // 지갑 잔고 — 원장도 같은 보유(평단 1)로 맞춘다. 원장이 다른 케이스는 이후 ledger()로 덮는다
