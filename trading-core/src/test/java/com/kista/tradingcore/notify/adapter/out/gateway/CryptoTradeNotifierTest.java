@@ -1,6 +1,7 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
 import com.kista.shared.contract.notify.TradeEventMessage;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
@@ -32,7 +33,7 @@ class CryptoTradeNotifierTest {
     CryptoTradeNotifier notifier = new CryptoTradeNotifier(userPort, realtime, profiles);
     UUID userId = UUID.randomUUID();
     CryptoOrderFilledEvent event = new CryptoOrderFilledEvent(userId, UUID.randomUUID(), UUID.randomUUID(), "업비트",
-            StrategyTicker.BTC, OrderDirection.BUY, new BigDecimal("0.00012345"), new BigDecimal("150000000"), new BigDecimal("18518"));
+            StrategyTicker.BTC, OrderDirection.BUY, new BigDecimal("0.00012345"), new BigDecimal("150000000"), new BigDecimal("18518"), Currency.KRW);
 
     @Test
     void sendsTelegramAndSse() {

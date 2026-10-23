@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
@@ -16,7 +17,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -111,9 +111,11 @@ class CryptoOrderSynchronizer {
                 return;
             }
             if (!ledgerRecorder.recordFill(ctx, order, volume, r.avgPrice())) return; // 이미 반영된 체결 — 알림 중복 방지
+            // 체결 금액은 계좌 통화 자릿수로 반올림
+            Currency currency = ctx.account().brokerRef().broker().getCurrency();
             eventPublisher.publishEvent(new CryptoOrderFilledEvent(ctx.account().userId(), ctx.account().id(), ctx.strategy().id(),
                     ctx.account().nickname(), order.ticker(), order.direction(), volume, r.avgPrice(),
-                    volume.multiply(r.avgPrice()).setScale(0, RoundingMode.HALF_UP)));
+                    currency.round(volume.multiply(r.avgPrice())), currency));
         } else if (r.state() == CryptoOrderResult.State.CANCEL) {
             orderPort.markCancelled(order.id());
         }

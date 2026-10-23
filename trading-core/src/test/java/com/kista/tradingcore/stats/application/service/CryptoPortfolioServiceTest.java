@@ -1,6 +1,7 @@
 package com.kista.tradingcore.stats.application.service;
 
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
@@ -50,12 +51,13 @@ class CryptoPortfolioServiceTest {
 
         CryptoPortfolio p = service.getCryptoPortfolio(ACCOUNT_ID, USER_ID);
 
-        assertThat(p.krwCash()).isEqualByComparingTo("1005000");
+        assertThat(p.currency()).isEqualTo(Currency.KRW);
+        assertThat(p.cash()).isEqualByComparingTo("1005000");
         assertThat(p.holdings()).singleElement().satisfies(h -> {
             assertThat(h.quantity()).isEqualByComparingTo("0.0015");
-            assertThat(h.evalAmountKrw()).isEqualByComparingTo("225000");
+            assertThat(h.evalAmount()).isEqualByComparingTo("225000");
         });
-        assertThat(p.totalAssetKrw()).isEqualByComparingTo("1230000");
+        assertThat(p.totalAsset()).isEqualByComparingTo("1230000");
     }
 
     @Test
@@ -70,9 +72,9 @@ class CryptoPortfolioServiceTest {
 
         assertThat(p.holdings()).singleElement().satisfies(h -> {
             assertThat(h.currentPrice()).isNull();
-            assertThat(h.evalAmountKrw()).isNull();
+            assertThat(h.evalAmount()).isNull();
         });
-        assertThat(p.totalAssetKrw()).isEqualByComparingTo("1000");
+        assertThat(p.totalAsset()).isEqualByComparingTo("1000");
     }
 
     @Test

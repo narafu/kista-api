@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -14,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,13 +34,14 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
         CryptoExchangePort exchange = exchanges.of(account.broker());
         CryptoBalance balance = BrokerCallGuard.wrap("코인 잔고 조회", () -> exchange.getBalance(account.toBrokerRef()));
         // 보유 코인이 없으면 시세 조회 생략
+        Currency currency = account.broker().getCurrency();
         Map<StrategyTicker, BigDecimal> prices = balance.holdings().isEmpty() ? Map.of()
                 : BrokerCallGuard.wrap("코인 시세 조회", () -> exchange.getCurrentPrices(balance.holdings().keySet()));
         List<CryptoPortfolio.Holding> holdings = balance.holdings().entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .map(e -> toHolding(e.getKey(), e.getValue(), prices.get(e.getKey())))
+                .map(e -> toHolding(e.getKey(), e.getValue(), prices.get(e.getKey()), currency))
                 .toList();
-        return new CryptoPortfolio(balance.krwAvailable().add(balance.krwLocked()), holdings);
+        return new CryptoPortfolio(currency, balance.krwAvailable().add(balance.krwLocked()), holdings);
     }
 
     @Override
@@ -62,10 +63,10 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
         return account;
     }
 
-    private static CryptoPortfolio.Holding toHolding(StrategyTicker ticker, CryptoBalance.Holding h, BigDecimal price) {
+    private static CryptoPortfolio.Holding toHolding(StrategyTicker ticker, CryptoBalance.Holding h, BigDecimal price, Currency currency) {
         BigDecimal quantity = h.total();
-        // 시세 없으면 평가액 null, 있으면 원 단위(scale 0) HALF_UP 반올림
-        BigDecimal eval = price == null ? null : quantity.multiply(price).setScale(0, RoundingMode.HALF_UP);
+        // 시세 없으면 평가액 null, 있으면 계좌 통화 scale HALF_UP 반올림
+        BigDecimal eval = price == null ? null : currency.round(quantity.multiply(price));
         return new CryptoPortfolio.Holding(ticker, quantity, h.avgBuyPrice(), price, eval);
     }
 }

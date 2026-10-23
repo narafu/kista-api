@@ -14,8 +14,8 @@ public record CryptoPortfolioResponse(
         @Schema(description = "총자산 (KRW) = 예수금 + 평가액 합") @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal totalAssetKrw
 ) {
     public static CryptoPortfolioResponse from(CryptoPortfolio p) {
-        return new CryptoPortfolioResponse(p.krwCash(),
-                p.holdings().stream().map(CryptoHoldingResponse::from).toList(), p.totalAssetKrw());
+        return new CryptoPortfolioResponse(p.cash(),
+                p.holdings().stream().map(CryptoHoldingResponse::from).toList(), p.totalAsset());
     }
 
     public record CryptoHoldingResponse(
@@ -26,7 +26,7 @@ public record CryptoPortfolioResponse(
             @Schema(description = "평가액 (KRW, 원 단위 HALF_UP, 시세 없으면 null)", nullable = true) @JsonSerialize(using = PlainDecimalSerializer.class) BigDecimal evalAmountKrw
     ) {
         static CryptoHoldingResponse from(CryptoPortfolio.Holding h) {
-            return new CryptoHoldingResponse(h.ticker().name(), h.quantity(), h.avgBuyPrice(), h.currentPrice(), h.evalAmountKrw());
+            return new CryptoHoldingResponse(h.ticker().name(), h.quantity(), h.avgBuyPrice(), h.currentPrice(), h.evalAmount());
         }
     }
 }

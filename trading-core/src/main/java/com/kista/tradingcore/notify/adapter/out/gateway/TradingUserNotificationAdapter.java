@@ -16,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 // Telegram은 직접 발송, FCM은 root에 Redis Pub/Sub으로 위임(fcm_device_tokens가 users FK라
 // trading-core가 직접 조회할 수 없음). 메시지 문구는 root의 구 TelegramUserNotificationAdapter(삭제 전
@@ -110,24 +109,20 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     @Override
     public void notifyCryptoTrade(TradingUserProfile profile, CryptoOrderFilledEvent e) {
         String side = e.direction() == OrderDirection.SELL ? "매도" : "매수";
-        String text = "[%s] %s %s 체결 — 수량 %s, 평균가 %s원, 금액 %s원".formatted(
+        String text = "[%s] %s %s 체결 — 수량 %s, 평균가 %s, 금액 %s".formatted(
                 TelegramHttpClient.escapeHtml(e.accountNickname()), e.ticker().name(), side,
-                e.filledQuantity().toPlainString(), krw(e.avgPrice()), krw(e.amountKrw()));
+                e.filledQuantity().toPlainString(), e.currency().format(e.avgPrice()), e.currency().format(e.amount()));
         notify(profile, "코인 체결", text);
     }
 
     @Override
     public void notifyApiKeyExpiring(TradingUserProfile profile, ApiKeyExpiringEvent e) {
         String nickname = TelegramHttpClient.escapeHtml(e.accountNickname());
+        String label = e.broker().getLabel();
         String text = e.daysLeft() == 0
-                ? "[%s] 업비트 API 키가 오늘 만료됩니다. 키를 새로 발급해 교체해 주세요.".formatted(nickname)
-                : "[%s] 업비트 API 키가 %d일 후(%s) 만료됩니다.".formatted(nickname, e.daysLeft(), e.expiresOn());
+                ? "[%s] %s API 키가 오늘 만료됩니다. 키를 새로 발급해 교체해 주세요.".formatted(nickname, label)
+                : "[%s] %s API 키가 %d일 후(%s) 만료됩니다.".formatted(nickname, label, e.daysLeft(), e.expiresOn());
         notify(profile, "API 키 만료", text);
-    }
-
-    // 원화 표기 — 정수 반올림 + 천 단위 콤마
-    private static String krw(BigDecimal v) {
-        return "%,d".formatted(v.setScale(0, RoundingMode.HALF_UP).longValueExact());
     }
 
     // 계좌 닉네임(사용자 입력)·DCA 사유 상세("주문가능금액 < 1주 캡가" 등)는 parse_mode=HTML이라 이스케이프 — 미이스케이프 '<'·'&'는 텔레그램 400으로 알림 유실

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
@@ -187,7 +188,8 @@ class CryptoOrderSynchronizerTest {
         verify(ledgerRecorder).recordFill(ctx, o, new BigDecimal("0.0001"), new BigDecimal("150000000"));
         ArgumentCaptor<CryptoOrderFilledEvent> cap = ArgumentCaptor.forClass(CryptoOrderFilledEvent.class);
         verify(publisher).publishEvent(cap.capture());
-        assertThat(cap.getValue().amountKrw()).isEqualByComparingTo("15000");
+        assertThat(cap.getValue().amount()).isEqualByComparingTo("15000");
+        assertThat(cap.getValue().currency()).isEqualTo(Currency.KRW);
         assertThat(cap.getValue().strategyId()).isEqualTo(ctx.strategy().id());
     }
 

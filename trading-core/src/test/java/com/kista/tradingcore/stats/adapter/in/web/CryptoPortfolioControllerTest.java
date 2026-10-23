@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.application.usecase.CryptoPortfolioUseCase;
 import com.kista.tradingcore.stats.domain.model.CryptoPortfolio;
@@ -36,7 +37,7 @@ class CryptoPortfolioControllerTest {
 
     @Test
     void returnsKrwPortfolio() throws Exception {
-        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(new BigDecimal("1000"),
+        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(Currency.KRW, new BigDecimal("1000"),
                 List.of(new CryptoPortfolio.Holding(StrategyTicker.BTC, new BigDecimal("0.0015"), new BigDecimal("140000000"),
                         new BigDecimal("150000000"), new BigDecimal("225000")))));
 
@@ -51,7 +52,7 @@ class CryptoPortfolioControllerTest {
     @Test
     void jsonNumbersArePlainDecimalsWithoutExponent() throws Exception {
         // stripTrailingZeros 정규화 값(5E-7, 1.505E+8)이 지수 표기로 나가면 안 된다
-        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(new BigDecimal("1E+3"),
+        when(useCase.getCryptoPortfolio(ACCOUNT_ID, USER_ID)).thenReturn(new CryptoPortfolio(Currency.KRW, new BigDecimal("1E+3"),
                 List.of(new CryptoPortfolio.Holding(StrategyTicker.BTC, new BigDecimal("5E-7"), new BigDecimal("1.505E+8"),
                         new BigDecimal("1.505E+8"), new BigDecimal("75")))));
 
