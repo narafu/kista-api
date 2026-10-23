@@ -1,5 +1,4 @@
 package com.kista.tradingcore.trading.application.service;
-import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
 import com.kista.shared.kernel.OrderStatus;
@@ -62,7 +61,7 @@ class ReorderService implements ReorderUseCase {
 
         SelectionChain.validate(command.userId(), account, strategy, sourceOrder);
         // 재주문은 주식 정수 수량 전용 — 코인 주문(소수 수량)은 관리자 재주문 대상이 아니다
-        if (sourceOrder.ticker().getMarket() != Market.US_STOCK) {
+        if (account.broker().isCryptoExchange()) {
             throw new IllegalArgumentException("코인 주문은 재주문할 수 없습니다.");
         }
         if (!sourceOrder.strategyCycleId().equals(currentCycle.id())) {

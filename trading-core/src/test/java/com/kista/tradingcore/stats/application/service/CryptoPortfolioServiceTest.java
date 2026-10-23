@@ -108,13 +108,15 @@ class CryptoPortfolioServiceTest {
 
     @Test
     void currentPricesRejectStockTickerBeforeExchangeCall() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
         assertThatThrownBy(() -> service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of(StrategyTicker.BTC, StrategyTicker.TQQQ)))
                 .isInstanceOf(IllegalArgumentException.class);
-        verifyNoInteractions(accountPort, exchanges);
+        verifyNoInteractions(exchanges);
     }
 
     @Test
     void currentPricesRejectEmptyTickers() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
         assertThatThrownBy(() -> service.getCurrentPrices(ACCOUNT_ID, USER_ID, List.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }

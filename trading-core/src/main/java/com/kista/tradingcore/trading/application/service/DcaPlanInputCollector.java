@@ -113,7 +113,7 @@ class DcaPlanInputCollector {
                         : ledger == null ? BigDecimal.valueOf(loaded) : BigDecimal.valueOf(loaded).min(ledger.holdings());
                 sellableLoaded = true;
             }
-            due.add(new DcaCycleOrderStrategy.DcaRuleInputs(rule, strategy.ticker().getMarket(),
+            due.add(new DcaCycleOrderStrategy.DcaRuleInputs(rule, ctx.account().brokerRef().broker().getMarket(),
                     loadCloses(strategy.ticker(), usSession), ledger, sell ? sellable : null,
                     loadFearGreed(rule), currentPrice, null, null));
         }

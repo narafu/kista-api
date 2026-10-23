@@ -78,7 +78,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
             boolean isLastFill = i == command.fills().size() - 1;
 
             // fill 1건 반영: 검증 → FILLED 주문 이력 → 잔고 재계산 → 포지션 스냅샷
-            validateQuantity(fill, strategy);
+            validateQuantity(fill, account.broker().getMarket());
             validateSellQuantity(fill, balance);
             manualOrders.add(toManualOrder(fill, account, currentCycle, strategy));
             balance = applyFillAndSnapshot(fill, balance, currentCycle, occupiesSeed);
@@ -126,8 +126,8 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     }
 
     // 수량 단위 검증 — 주식은 정수, 코인은 소수 8자리까지 (원장 normalize 기준)
-    private static void validateQuantity(ManualTradeCorrectionCommand.Fill fill, Strategy strategy) {
-        boolean crypto = strategy.ticker().getMarket() == Market.CRYPTO_KRW;
+    private static void validateQuantity(ManualTradeCorrectionCommand.Fill fill, Market market) {
+        boolean crypto = market.isCrypto();
         int scale = Quantities.normalize(fill.quantity()).scale();
         if (crypto ? scale > CRYPTO_SCALE : scale > 0) {
             throw new IllegalArgumentException(crypto ? "코인 체결 수량은 소수 8자리까지 입력할 수 있습니다"

@@ -55,7 +55,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private static final int FX_MARGIN_DAYS = 7; // Frankfurter 창 앞 여유 — 주말·연휴 직전 영업일 환율 확보
     private static final String USDT = "USDT"; // 코인베이스 테더 보정용 자산 코드 (StrategyTicker에 넣지 않는다)
     private static final List<StrategyTicker> TICKERS = Arrays.stream(StrategyTicker.values())
-            .filter(t -> t.getMarket() == Market.CRYPTO_KRW).toList();
+            .filter(t -> t.tradableOn(Market.CRYPTO_KRW)).toList(); // 업비트 KRW 참조 시세 대상
 
     private final UpbitMarketDataPort upbit; // 업비트 공개 시세 (국내 기준가 — 김프)
     private final BinanceMarketDataPort binance; // 바이낸스 (해외 기준가·선물)

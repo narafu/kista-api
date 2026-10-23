@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
@@ -139,31 +140,36 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByUserId(UUID userId) {
-        List<UUID> accountIds = accountPort.findByUserId(userId).stream().map(Account::id).toList();
+        List<Account> accounts = accountPort.findByUserId(userId);
+        List<UUID> accountIds = accounts.stream().map(Account::id).toList();
+        Map<UUID, Market> marketByAccountId = accounts.stream()
+                .collect(Collectors.toMap(Account::id, a -> a.broker().getMarket())); // 이미 조회한 계좌에서 시장 맵 구성
         Map<UUID, List<Strategy>> strategiesByAccount = strategyPort.findByAccountIds(accountIds);
         List<Strategy> strategies = accountIds.stream()
                 .flatMap(id -> strategiesByAccount.getOrDefault(id, List.of()).stream())
                 .toList();
-        return toDetails(strategies);
+        return toDetails(strategies, marketByAccountId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
-        accountPort.requireOwnedAccount(accountId, requesterId);
-        return toDetails(strategyPort.findByAccountId(accountId));
+        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
+        return toDetails(strategyPort.findByAccountId(accountId), Map.of(accountId, account.broker().getMarket()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public StrategyDetail getById(UUID strategyId, UUID requesterId) {
-        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
-        return toDetail(strategy);
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        return toDetail(strategy, account.broker().getMarket());
     }
 
     @Override
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
-        Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (strategy.isVr() && cmd.newSeed() != null) {
             throw new IllegalArgumentException("VR 전략의 시드/시작금액은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
         }
@@ -183,7 +189,7 @@ class StrategyService implements StrategyUseCase {
         }
 
         log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);
-        return toDetail(saved);
+        return toDetail(saved, account.broker().getMarket());
     }
 
     // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
@@ -205,7 +211,7 @@ class StrategyService implements StrategyUseCase {
     }
 
     // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다. (단건 경로 — 단건 port 호출로 입력 구성 후 assemble 위임)
-    private StrategyDetail toDetail(Strategy strategy) {
+    private StrategyDetail toDetail(Strategy strategy, Market market) {
         var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
         Optional<CyclePosition> openingPosition = strategy.isVr()
                 ? latestCycle.map(cycle -> cyclePositionPort.findFirstOne(cycle.id())
@@ -236,7 +242,7 @@ class StrategyService implements StrategyUseCase {
             Map<String, DcaExecution> last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id()))
                     .getOrDefault(strategy.id(), Map.of());
             dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
-                    .map(config -> buildDcaSummary(config, last, c, strategy.ticker().getMarket(), latestPos))).orElse(null);
+                    .map(config -> buildDcaSummary(config, last, c, market, latestPos))).orElse(null);
         }
 
         return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
@@ -250,7 +256,7 @@ class StrategyService implements StrategyUseCase {
     }
 
     // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
-    private List<StrategyDetail> toDetails(List<Strategy> strategies) {
+    private List<StrategyDetail> toDetails(List<Strategy> strategies, Map<UUID, Market> marketByAccountId) {
         if (strategies.isEmpty()) return List.of();
         List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
 
@@ -318,7 +324,7 @@ class StrategyService implements StrategyUseCase {
             DcaSummary dcaSummary = null;
             if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
                 dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.getOrDefault(strategy.id(), Map.of()),
-                        latestCycle.get(), strategy.ticker().getMarket(), latestPos);
+                        latestCycle.get(), marketByAccountId.get(strategy.accountId()), latestPos);
             }
 
             return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
@@ -342,7 +348,7 @@ class StrategyService implements StrategyUseCase {
                         divisionCount == null ? 0 : divisionCount)).orElse(null);
 
         // 코인은 소수 원장이라 wholeShares()를 부르지 않는다(StrategyDetail도 코인 보유 수량은 싣지 않음)
-        Integer currentHoldings = strategy.ticker().getMarket() == Market.CRYPTO_KRW ? null
+        Integer currentHoldings = strategy.ticker().isCrypto() ? null
                 : latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
 
         return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary);

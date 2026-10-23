@@ -42,10 +42,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class StrategyCreationService {
 
-    // 계좌 시장(증권사)과 종목 시장 일치 + DCA 규칙의 시장별 규칙(주문유형·금액·요일)
+    // 계좌 시장에서 종목 거래 가능 + DCA 규칙의 시장별 규칙(주문유형·금액·요일)
     private void validateMarket(Account account, DcaStrategyConfig dca, StrategyTicker ticker) {
         Market market = account.broker().getMarket();
-        if (ticker.getMarket() != market) {
+        if (!ticker.tradableOn(market)) {
             throw new IllegalArgumentException("계좌와 종목의 시장이 다릅니다: " + ticker);
         }
         if (dca != null) dca.requireCompatible(market);
@@ -79,12 +79,13 @@ class StrategyCreationService {
         DcaStrategyConfig dcaConfig = dca ? cmd.dca().withAssignedKeys(Set.of()) : null;
 
         StrategyTicker resolvedTicker = resolved.ticker();
+        // 시장 검증이 중간부터 시작(보유 자릿수) 검증보다 먼저 — 시장 불일치가 자릿수 문구에 가려지지 않게 한다
+        validateMarket(account, dcaConfig, resolvedTicker);
         // 중간부터 시작 입력 검증 (전 전략 공통) — holdings>0이면 avgPrice>0 필수, 음수 거부, 주식 정수·코인 소수 8자리
-        BigDecimal initialHoldings = BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice(), resolvedTicker.getMarket());
+        BigDecimal initialHoldings = BootstrapPosition.validate(cmd.initialHoldings(), cmd.initialAvgPrice(), account.broker().getMarket());
         boolean bootstrap = initialHoldings.signum() > 0;
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
-        validateMarket(account, dcaConfig, resolvedTicker);
 
         // 종목 중복 + 잔고 검증
         validateUniqueTicker(accountId, resolvedTicker);
@@ -134,12 +135,12 @@ class StrategyCreationService {
             return new StrategyDetail(persisted.strategy(), persisted.initialPosition().usdDeposit(), persisted.cycle().startDate(), null, false, null, initialHoldings.intValueExact(), vrSummary, null);
         }
         if (dca) {
-            Market market = persisted.strategy().ticker().getMarket();
+            Market market = account.broker().getMarket();
             CyclePosition ledger = persisted.initialPosition();
             DcaSummary summary = dcaSummaryAssembler.assemble(dcaConfig, Map.of(), persisted.cycle().startDate(), market,
                     LocalDateTime.now(TimeZones.KST), ledger.holdings(), ledger.avgPrice());
             // 코인은 소수 원장이라 정수 보유 수량을 싣지 않는다(DCA 블록이 원장 보유를 싣는다)
-            Integer holdings = market == Market.CRYPTO_KRW ? null : initialHoldings.intValueExact();
+            Integer holdings = market.isCrypto() ? null : initialHoldings.intValueExact();
             return new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, holdings, null, summary);
         }
         return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings.intValueExact(), null, null);

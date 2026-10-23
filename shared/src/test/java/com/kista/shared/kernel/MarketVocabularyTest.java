@@ -21,11 +21,15 @@ class MarketVocabularyTest {
     }
 
     @Test
-    void cryptoTickersAreDcaOnlyCryptoMarket() {
-        assertThat(StrategyTicker.BTC.getMarket()).isEqualTo(Market.CRYPTO_KRW);
-        assertThat(StrategyTicker.ETH.getMarket()).isEqualTo(Market.CRYPTO_KRW);
+    void cryptoTickersTradeOnBothCryptoMarkets() {
+        assertThat(StrategyTicker.BTC.getMarkets()).containsExactly(Market.CRYPTO_KRW, Market.CRYPTO_USDT);
+        assertThat(StrategyTicker.ETH.tradableOn(Market.CRYPTO_USDT)).isTrue();
+        assertThat(StrategyTicker.BTC.tradableOn(Market.US_STOCK)).isFalse();
+        assertThat(StrategyTicker.SOXL.getMarkets()).containsExactly(Market.US_STOCK);
+        assertThat(StrategyTicker.SOXL.tradableOn(Market.CRYPTO_USDT)).isFalse();
+        assertThat(StrategyTicker.BTC.isCrypto()).isTrue();
+        assertThat(StrategyTicker.SOXL.isCrypto()).isFalse();
         assertThat(StrategyTicker.BTC.getTargetProfitRate()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(StrategyTicker.SOXL.getMarket()).isEqualTo(Market.US_STOCK);
         assertThat(StrategyType.DCA.availableTickers()).contains(StrategyTicker.BTC, StrategyTicker.ETH);
         assertThat(StrategyType.INFINITE.availableTickers()).doesNotContain(StrategyTicker.BTC, StrategyTicker.ETH);
         assertThat(StrategyType.DCA.capability().orderTypes()).containsExactly(OrderType.MOO, OrderType.MOC, OrderType.MARKET);

@@ -46,11 +46,12 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
 
     @Override
     public Map<StrategyTicker, BigDecimal> getCurrentPrices(UUID accountId, UUID requesterId, List<StrategyTicker> tickers) {
-        // 종목 검증은 거래소 호출 전 — guard 안에서 매핑 누락 IAE가 나면 5xx로 바뀐다
-        if (tickers.isEmpty() || tickers.stream().anyMatch(t -> t.getMarket() != Market.CRYPTO_KRW)) {
+        // 소유권·코인 계좌 검증 후 종목 검증 — 둘 다 거래소 호출 전 (guard 안에서 매핑 누락 IAE가 나면 5xx로 바뀐다)
+        Account account = requireCryptoAccount(accountId, requesterId);
+        Market market = account.broker().getMarket();
+        if (tickers.isEmpty() || tickers.stream().anyMatch(t -> !t.tradableOn(market))) {
             throw new IllegalArgumentException("코인 종목을 1개 이상 지정해주세요.");
         }
-        Account account = requireCryptoAccount(accountId, requesterId);
         CryptoExchangePort exchange = exchanges.of(account.broker());
         return BrokerCallGuard.wrap("코인 시세 조회", () -> exchange.getCurrentPrices(Set.copyOf(tickers)));
     }
