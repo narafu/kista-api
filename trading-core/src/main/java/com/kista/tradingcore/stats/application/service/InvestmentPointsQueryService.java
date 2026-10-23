@@ -7,7 +7,7 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -57,7 +57,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
         } else {
             List<UUID> accountIds = accountPort.findByUserId(userId).stream()
                     // 포트폴리오 합산은 통화 구분이 없어 크립토(KRW) 계좌를 뺀다 — 주식 USD와 섞이면 지수가 깨진다(후속: 통화별 분리)
-                    .filter(a -> a.broker() != Broker.MOCK && a.broker().getMarket() != Market.CRYPTO_KRW)
+                    .filter(a -> a.broker() != Broker.MOCK && a.broker().getCurrency() == Currency.USD)
                     .map(Account::id)
                     .toList();
             strategies = accountIds.isEmpty() ? List.of() : strategyPort.findByAccountIds(accountIds).values().stream()

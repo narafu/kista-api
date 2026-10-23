@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.kista.shared.kernel.Broker;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import java.util.Arrays;
 
@@ -27,9 +27,9 @@ import java.util.Arrays;
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
-    // 사용자 합산·계좌 이력 화면은 USD 표시 전제 — 원화 코인 계좌는 제외 (통계 합산 경로의 CRYPTO_KRW 제외 원칙과 동일)
+    // 사용자 합산·계좌 이력 화면은 USD 표시 전제 — USD 견적 아님(코인 KRW·USDT 등)은 제외 (통계 합산 경로의 USD 포함식 필터와 동일)
     private static final List<String> NON_USD_BROKERS = Arrays.stream(Broker.values())
-            .filter(b -> b.getMarket() == Market.CRYPTO_KRW).map(Enum::name).toList();
+            .filter(b -> b.getCurrency() != Currency.USD).map(Enum::name).toList();
 
     private final CyclePositionJpaRepository positionRepo;
     private final StrategyCycleJpaRepository cycleRepo;     // strategy_cycle 조인: 현재 사이클 조회

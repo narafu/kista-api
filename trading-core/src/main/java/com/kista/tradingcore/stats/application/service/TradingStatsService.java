@@ -15,7 +15,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -176,7 +176,8 @@ class TradingStatsService implements TradingStatsUseCase {
     // 사이클 성과 목록은 사이클별 행(계좌 단일 통화)이고 이력 확인이 목적이라 모의·크립토도 포함(aggregate=false)한다.
     private List<CycleView> loadCycles(UUID userId, boolean aggregate) {
         List<UUID> accountIds = accountPort.findByUserId(userId).stream()
-                .filter(a -> !aggregate || (a.broker() != Broker.MOCK && a.broker().getMarket() != Market.CRYPTO_KRW))
+                // USD 합산 — 견적 통화가 USD인 계좌만(코인 KRW·USDT 제외)
+                .filter(a -> !aggregate || (a.broker() != Broker.MOCK && a.broker().getCurrency() == Currency.USD))
                 .map(Account::id)
                 .toList();
         if (accountIds.isEmpty()) return List.of();
