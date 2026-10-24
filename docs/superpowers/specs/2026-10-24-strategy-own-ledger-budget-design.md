@@ -184,6 +184,7 @@
 - `UserResponse.balanceCheckEnabled` 삭제, `PATCH /api/settings/balance-check` 삭제. 설정 화면의 `BalanceCheckSetting`을 제거한다.
 - 전략 폼: `balanceCheckEnabled` 분기를 제거한다. 시드는 항상 직접 입력할 수 있게 하고, 시드 미리보기의 가용 예수금(null 가능)을 참고값과 비율 채우기 보조로 쓴다. 초과하면 경고만 띄운다.
 - 미리보기 `NextOrdersResponse`: `competition`·`sellSufficiency`를 제거하고 자기 원장 경고 필드를 추가한다.
+- 전략 카드(사용자 승인 UI 개선): 오른쪽 금액은 사이클 시작 시드라서 "시작 시드" 라벨을 붙인다. "예수금 부족" 배지에는 `ledgerCheck`의 남은 원장과 필요 금액을 함께 보여준다(예: "원장 $177 / 필요 $304"). 시작 시드가 남은 현금처럼 읽히는 문제를 해결하려는 것이다.
 - 재주문 예산 조회 `ReorderBuyBudget` 응답이 사이클별 값으로 바뀐다. 재주문 BUY가 원장을 넘으면 409로 차단된다.
 - DCA 규칙 폼의 부족 정책(PARTIAL/REJECT)은 유지하되, 매도·코인에만 적용된다는 안내를 추가한다.
 - 수동 실행 409 문구가 바뀐다(문구 매핑을 쓰는 경우 확인).

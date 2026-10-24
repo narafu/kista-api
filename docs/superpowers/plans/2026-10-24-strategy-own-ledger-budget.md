@@ -395,3 +395,4 @@
   - `ledgerCheck`, `availableCash`, `ReorderBuyBudget.cycleRemaining`
   - `balanceCheckEnabled`와 `PATCH /api/settings/balance-check` 삭제
   - 409 문구 변경
+  - 전략 카드 UI 개선(사용자 승인): 금액에 "시작 시드" 라벨, "예수금 부족" 배지에 `ledgerCheck.remainingLedger`와 `requiredBuyUsd`를 표시한다.
