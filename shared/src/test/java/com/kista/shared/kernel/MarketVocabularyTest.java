@@ -39,7 +39,7 @@ class MarketVocabularyTest {
     void newSkipReasonsHaveKoreanLabels() {
         assertThat(DcaSkipReason.BELOW_MIN_ORDER_AMOUNT.getLabel()).isEqualTo("최소 주문 금액 미달");
         assertThat(DcaSkipReason.EXCHANGE_API_ERROR.getLabel()).isEqualTo("거래소 API 오류");
-        assertThat(DcaSkipReason.API_KEY_EXPIRED.getLabel()).isEqualTo("API 키 만료");
+        assertThat(DcaSkipReason.API_KEY_EXPIRED.getLabel()).isEqualTo("API 키 인증 실패");
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.binance;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.tradingcore.broker.domain.model.binance.BinanceApiException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,6 +24,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.client.ExpectedCount.never;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
@@ -46,6 +48,11 @@ class BinanceHttpClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
         client = new BinanceHttpClient(builder.build(), JsonMapper.builder().build(), BASE,
                 Clock.fixed(Instant.ofEpochMilli(NOW), ZoneOffset.UTC));
+    }
+
+    @AfterEach
+    void verifyServer() {
+        server.verify(); // 기대한 요청이 모두 나갔는지 — 모든 테스트 공통
     }
 
     @Test
@@ -79,6 +86,16 @@ class BinanceHttpClientTest {
     }
 
     @Test
+    void percentEncodesParamsAndSignsExactlyEncodedQuery() {
+        // [ " , 는 퍼센트 인코딩 — 서명 대상도 인코딩된 문자열 그대로(payload = params + recvWindow + timestamp)
+        String payload = "symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%5D&recvWindow=5000&timestamp=1499827319559";
+        server.expect(requestTo(BASE + "/api/v3/ticker/price?" + payload + "&signature=" + BinanceHttpClient.sign("sk", payload)))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{}", APPLICATION_JSON));
+        client.getSigned("/api/v3/ticker/price", params("symbols", "[\"BTCUSDT\",\"ETHUSDT\"]"), AUTH, MAP);
+    }
+
+    @Test
     void publicGetHasNoSignature() {
         server.expect(requestTo(BASE + "/api/v3/exchangeInfo?symbol=BTCUSDT"))
                 .andExpect(headerDoesNotExist("X-MBX-APIKEY"))
@@ -105,7 +122,7 @@ class BinanceHttpClientTest {
     void errorMapping(int status, Integer code, String kind) {
         String body = code == null ? "<html>" : "{\"code\":" + code + ",\"msg\":\"x\"}";
         server.expect(anything()).andRespond(withStatus(HttpStatusCode.valueOf(status)).contentType(APPLICATION_JSON).body(body));
-        Throwable e = org.assertj.core.api.Assertions.catchThrowable(() -> client.getSigned("/api/v3/account", params(), AUTH, MAP));
+        Throwable e = catchThrowable(() -> client.getSigned("/api/v3/account", params(), AUTH, MAP));
         switch (kind) {
             case "CREDENTIAL" -> assertThat(e).isExactlyInstanceOf(BrokerCredentialException.class);
             case "RATE" -> assertThat(e).isExactlyInstanceOf(BrokerRateLimitException.class);

@@ -2,6 +2,7 @@ package com.kista.shared.kernel;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Locale;
 import java.util.Optional;
 
 // 통화 — broker(KIS crcy_cd 파싱)와 계좌 응답(broker 파생 통화)이 공유하는 어휘. broker.domain.model에서 승격(복제 금지)
@@ -28,7 +29,7 @@ public enum Currency {
 
     // 표기: KRW는 "15,000원", 그 외는 "10.50 USDT"
     public String format(BigDecimal amount) {
-        String number = ("%,." + amountScale + "f").formatted(round(amount));
+        String number = String.format(Locale.ROOT, "%,." + amountScale + "f", round(amount)); // 기본 로케일 무관 — 콤마 그룹·점 소수
         return this == KRW ? number + "원" : number + " " + name();
     }
 

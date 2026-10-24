@@ -6,6 +6,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerWithdrawalEnabledException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,11 @@ class BinanceAuthApiTest {
                 Clock.fixed(Instant.ofEpochMilli(1_700_000_000_000L), ZoneOffset.UTC)));
     }
 
+    @AfterEach
+    void verifyServer() {
+        server.verify(); // 모든 테스트가 apiRestrictions 호출을 소비했는지
+    }
+
     private void respond(boolean ip, boolean read, boolean trade, boolean withdraw) {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/sapi/v1/account/apiRestrictions?")))
                 .andRespond(withSuccess("{\"ipRestrict\":%s,\"enableReading\":%s,\"enableSpotAndMarginTrading\":%s,\"enableWithdrawals\":%s,\"createTime\":1}"
@@ -54,6 +60,13 @@ class BinanceAuthApiTest {
     @Test
     void withdrawalEnabledIsRejected() {
         respond(true, true, true, true);
+        assertThatThrownBy(() -> api.verifyAccount("ak", "sk", null)).isExactlyInstanceOf(BrokerWithdrawalEnabledException.class);
+    }
+
+    @Test
+    void withdrawalCheckPrecedesIpRestrictionCheck() {
+        // ipRestrict=false + enableWithdrawals=true → 출금 판정이 먼저
+        respond(false, true, true, true);
         assertThatThrownBy(() -> api.verifyAccount("ak", "sk", null)).isExactlyInstanceOf(BrokerWithdrawalEnabledException.class);
     }
 

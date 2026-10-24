@@ -47,11 +47,11 @@ class CryptoPortfolioControllerTest {
                 .andExpect(jsonPath("$.cash").value(1000))
                 .andExpect(jsonPath("$.totalAsset").value(226000))
                 .andExpect(jsonPath("$.holdings[0].evalAmount").value(225000))
-                .andExpect(jsonPath("$.holdings[0].evalAmountKrw").value(225000))
-                .andExpect(jsonPath("$.krwCash").value(1000))
+                .andExpect(jsonPath("$.holdings[0].evalAmountKrw").doesNotExist())
+                .andExpect(jsonPath("$.krwCash").doesNotExist())
                 .andExpect(jsonPath("$.holdings[0].ticker").value("BTC"))
                 .andExpect(jsonPath("$.holdings[0].quantity").value(0.0015))
-                .andExpect(jsonPath("$.totalAssetKrw").value(226000));
+                .andExpect(jsonPath("$.totalAssetKrw").doesNotExist());
     }
 
     @Test
@@ -65,7 +65,7 @@ class CryptoPortfolioControllerTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         assertThat(body).doesNotContain("E").doesNotContain("e+")
-                .contains("\"quantity\":0.0000005").contains("\"avgBuyPrice\":150500000").contains("\"krwCash\":1000");
+                .contains("\"quantity\":0.0000005").contains("\"avgBuyPrice\":150500000").contains("\"cash\":1000");
     }
 
     @Test

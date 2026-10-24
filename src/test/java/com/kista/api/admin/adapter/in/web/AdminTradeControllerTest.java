@@ -69,6 +69,8 @@ class AdminTradeControllerTest {
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID ORDER_ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
+    private static final UUID ORDER_STRATEGY_ID = UUID.fromString("00000000-0000-0000-0000-000000000030");
 
     @Test
     void listTrades_anonymous_returns401() throws Exception {
@@ -94,9 +96,6 @@ class AdminTradeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }
-
-    private static final UUID ORDER_ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000020");
-    private static final UUID ORDER_STRATEGY_ID = UUID.fromString("00000000-0000-0000-0000-000000000030");
 
     // 전략 주문 조회 공통 스텁 — 계좌(broker)·사용자·주문(ticker)·전략 요약
     private void stubStrategyOrders(Broker broker, StrategyTicker ticker) {
