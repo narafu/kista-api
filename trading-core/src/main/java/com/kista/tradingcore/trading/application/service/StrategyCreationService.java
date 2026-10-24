@@ -11,6 +11,8 @@ import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
+import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
+import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.shared.kernel.*;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.tradingcore.trading.application.port.output.*;
@@ -62,6 +64,7 @@ class StrategyCreationService {
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
     private final DcaSummaryAssembler dcaSummaryAssembler;      // DCA 등록 응답의 다음 실행일 요약
+    private final PrivacyTradePort privacyTradePort;            // PRIVACY 중간부터 시작 — FIDA 기준값으로 시작금액 산출
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
@@ -117,12 +120,19 @@ class StrategyCreationService {
 
         int divisionCount = resolved.divisionCount();
 
+        // startAmount = 현금 + 시장가×보유수량(DCA는 평단×보유 = 초기 투입 원가) — VR도 총 시작자산을 동일하게 보존한다(vrValue override와 무관)
+        // PRIVACY 중간부터 시작만 FIDA 기준 배수로 환산한다 — 매매표 배수(startAmount ÷ currentCycleStart)가 보유 비율과 맞도록
+        BigDecimal depositOrZero = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
+        BigDecimal startAmount = cmd.type() == StrategyType.PRIVACY && bootstrap
+                ? privacyBootstrapStartAmount(depositOrZero, initialHoldings)
+                : depositOrZero.add(initialStockValue);
+
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
         // (증권사 호출은 위에서 이미 끝났으므로 트랜잭션이 HTTP 대기를 물지 않는다)
         StrategyCreationPersister.Persisted persisted = creationPersister.persist(
                 accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
                 resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), ramp,
-                initialUsdDeposit, initialHoldings, cmd.initialAvgPrice(), marketPrice, initialStockValue,
+                initialUsdDeposit, initialHoldings, cmd.initialAvgPrice(), marketPrice, startAmount,
                 vrValue, scheduledStart, dcaConfig);
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
@@ -144,6 +154,26 @@ class StrategyCreationService {
             return new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, holdings, null, summary);
         }
         return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings.intValueExact(), null, null);
+    }
+
+    // PRIVACY 중간부터 시작 시작금액 — 원가 기준 자산 비율로 배수를 구해 FIDA 사이클 시작금액에 곱한다
+    // 배수 = (예수금 + 보유×FIDA 평단) ÷ (FIDA 사이클 시작금액 + 실현손익), 소수 2자리 버림(PrivacyStrategy 배수 산출과 동일)
+    // 예: 3,445.25 + 417×125.95 = 55,966.40 ÷ (14,434.58 − 454.07) = 4.00배 → 57,738.32
+    private BigDecimal privacyBootstrapStartAmount(BigDecimal initialUsdDeposit, BigDecimal initialHoldings) {
+        PrivacyCurrentBase base = privacyTradePort.findSeedPreviewBase()
+                .orElseThrow(() -> new IllegalArgumentException("PRIVACY 기준 매매표가 없어 중간부터 시작할 수 없습니다."));
+        BigDecimal fidaBookValue = base.currentCycleStart().add(base.currentCycleRealizedPnl());
+        if (base.avgPrice() == null || fidaBookValue.signum() <= 0) {
+            throw new IllegalArgumentException("PRIVACY 기준 매매표에 보유 평단이 없어 중간부터 시작할 수 없습니다.");
+        }
+        BigDecimal userBookValue = initialUsdDeposit.add(initialHoldings.multiply(base.avgPrice()));
+        BigDecimal multiple = userBookValue.divide(fidaBookValue, 2, RoundingMode.FLOOR);
+        log.info("[PRIVACY] 중간부터 시작 배수: userBookValue={}, fidaBookValue={}, multiple={}", userBookValue, fidaBookValue, multiple);
+        if (multiple.signum() <= 0) {
+            throw new IllegalArgumentException("보유 자산이 PRIVACY 기준 매매표 대비 너무 적어 중간부터 시작할 수 없습니다.");
+        }
+        // CEILING — 매매 시 startAmount ÷ currentCycleStart를 FLOOR로 되돌리므로 반올림 내림이면 배수가 0.01 낮아진다
+        return multiple.multiply(base.currentCycleStart()).setScale(2, RoundingMode.CEILING);
     }
 
     // VR V값 우선순위 — 초기 V 직접 입력(>0)이 있으면 그 값을, 없으면 평가금(전일종가×보유수량)을 사용한다.

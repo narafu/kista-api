@@ -126,7 +126,8 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
                 .findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
                         PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL)
                 .map(e -> new PrivacyCurrentBase(e.getTicker(), e.getCurrentCycleStart(),
-                        PrivacyDates.tradeDateOf(e.getReleaseDate()))); // 발행일 → 적용 거래일
+                        PrivacyDates.tradeDateOf(e.getReleaseDate()), // 발행일 → 적용 거래일
+                        e.getCurrentCycleRealizedPnl(), e.getAvgPrice()));
     }
 
     @Override

@@ -120,7 +120,8 @@ class StrategyServiceTest {
                 new StrategyCreationPersister(strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
                         vrStrategyLifecycle, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
                         dcaDetailPort),
-                dcaSummaryAssembler);
+                dcaSummaryAssembler,
+                privacyTradePort);
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort,
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
@@ -1892,6 +1893,10 @@ class StrategyServiceTest {
         when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
         when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
         when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
+        // FIDA 원가 자산 = 1,000.03 + (−0.03) = 1,000.00, 사용자 원가 자산 = 200 + 20×95.05 = 2,101 → 2.10배
+        // 2.10 × 1,000.03 = 2,100.063 → CEILING 2,100.07 (HALF_UP 2,100.06이면 매매 시 FLOOR 역산이 2.09배)
+        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(new com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase(
+                StrategyTicker.SOXL, new BigDecimal("1000.03"), null, new BigDecimal("-0.03"), new BigDecimal("95.05"))));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
         when(cyclePositionPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -1902,8 +1907,32 @@ class StrategyServiceTest {
                 p.holdings().compareTo(BigDecimal.valueOf(20)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("95.00")) == 0
                         && p.closingPrice().compareTo(new BigDecimal("100.00")) == 0));
+        // 시작금액은 시장가 평가(200 + 20×100 = 2,200)가 아니라 FIDA 기준 배수 환산값
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2100.07")) == 0));
         verify(cyclePositionInfiniteDetailPort, never()).save(any());
         assertThat(result.currentHoldings()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("PRIVACY register() 중간부터 시작 — FIDA 기준표가 없으면 IllegalArgumentException")
+    void register_privacy_bootstrap_withoutBase_throws() {
+        Account account = ownerAccount();
+        StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
+                StrategyType.PRIVACY, null, new BigDecimal("200"), null, 0,
+                BigDecimal.valueOf(20), new BigDecimal("95.00"), null, null, null,
+                null, null, null, null, null, null, null, null, null);
+
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(marginPort.getUsdBuyableAmount(account.toBrokerRef())).thenReturn(new BigDecimal("5000"));
+        when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of());
+        when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
+        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(strategyPort, never()).save(any());
     }
 
     @Test

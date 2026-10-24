@@ -95,7 +95,7 @@ class StrategySeedPreviewServiceTest {
     @Test
     void privacy_with_base_returns_min_seed() {
         // given: 기준매매표 있음, currentCycleStart = 5000.00
-        PrivacyCurrentBase base = new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("5000.00"), null);
+        PrivacyCurrentBase base = new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("5000.00"), null, BigDecimal.ZERO, null);
         when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(base));
 
         var result = service.strategySeedPreview(accountId, userId, StrategyType.PRIVACY, StrategyTicker.SOXL, 0);

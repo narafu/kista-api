@@ -43,7 +43,7 @@ class StrategyCreationPersister {
     Persisted persist(UUID accountId, StrategyType type, StrategyTicker ticker, StrategyCycleSeedType seedType,
                       int divisionCount, Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount,
                       VrRampParams ramp, BigDecimal initialUsdDeposit, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
-                      BigDecimal marketPrice, BigDecimal initialStockValue, BigDecimal vrValue, LocalDate scheduledStart,
+                      BigDecimal marketPrice, BigDecimal startAmount, BigDecimal vrValue, LocalDate scheduledStart,
                       DcaStrategyConfig dca) {
         // strategy → strategy_versions → 전략 타입별 detail 순 저장
         Strategy saved = strategyPort.save(new Strategy(null, accountId, type, StrategyStatus.ACTIVE, ticker, seedType));
@@ -62,9 +62,8 @@ class StrategyCreationPersister {
         }
 
         // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
-        // startAmount = 현금 + 시장가×보유수량(DCA는 평단×보유 = 초기 투입 원가) — VR도 총 시작자산을 동일하게 보존한다(vrValue override와 무관)
+        // startAmount 산출 규칙은 호출부(StrategyCreationService) 소유
         BigDecimal normalizedInitialUsdDeposit = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
-        BigDecimal startAmount = normalizedInitialUsdDeposit.add(initialStockValue);
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), version.id(), startAmount, scheduledStart));
 
         // DCA는 marketPrice 없음(closingPrice null) — 시작 원장 = 초기 보유·평단, 예수금 0

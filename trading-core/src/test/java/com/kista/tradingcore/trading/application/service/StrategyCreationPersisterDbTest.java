@@ -108,7 +108,7 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
 
     private void persistInfinite() {
         persister.persist(accountId, StrategyType.INFINITE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE, 20,
-                null, null, null, null, new BigDecimal("1000"), BigDecimal.ZERO, null, null, BigDecimal.ZERO, null, LocalDate.now(), null);
+                null, null, null, null, new BigDecimal("1000"), BigDecimal.ZERO, null, null, new BigDecimal("1000"), null, LocalDate.now(), null);
     }
 
     private Integer countStrategyRows() {

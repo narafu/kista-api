@@ -37,7 +37,7 @@ class PrivacyTradeBaseTest {
     @Test
     @DisplayName("PrivacyCurrentBase: currentCycleStart=null이면 생성 실패")
     void privacyCurrentBase_nullCurrentCycleStart_throws() {
-        assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, null, LocalDate.now()))
+        assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, null, LocalDate.now(), BigDecimal.ZERO, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("currentCycleStart 이상");
     }
@@ -45,7 +45,7 @@ class PrivacyTradeBaseTest {
     @Test
     @DisplayName("PrivacyCurrentBase: currentCycleStart<=0이면 생성 실패")
     void privacyCurrentBase_nonPositiveCurrentCycleStart_throws() {
-        assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("-1"), LocalDate.now()))
+        assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("-1"), LocalDate.now(), BigDecimal.ZERO, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("currentCycleStart 이상");
     }
