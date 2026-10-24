@@ -35,7 +35,7 @@ class UserNotifyProfilePersistenceAdapterTest {
     }
 
     private UserNotifyProfileEntity entity(UUID userId, String prefsJson, boolean active) {
-        return new UserNotifyProfileEntity(userId, prefsJson, true, active, null, null, Instant.now(), null);
+        return new UserNotifyProfileEntity(userId, prefsJson, active, null, null, Instant.now(), null);
     }
 
     @Test
@@ -47,7 +47,6 @@ class UserNotifyProfilePersistenceAdapterTest {
         TradingUserProfile profile = adapter().findByUserId(USER_ID).orElseThrow();
 
         assertThat(profile.userId()).isEqualTo(USER_ID);
-        assertThat(profile.balanceCheckEnabled()).isTrue();
         assertThat(profile.isNotificationEnabled(NotificationType.MARKET_ALERT)).isFalse();
         assertThat(profile.isNotificationEnabled(NotificationType.TRADING_ALERT)).isTrue(); // 미설정=활성
     }
@@ -92,7 +91,7 @@ class UserNotifyProfilePersistenceAdapterTest {
     @DisplayName("암호문으로 저장된 telegramBotToken을 복호화해 평문으로 투영한다")
     void findByUserId_decryptsTelegramBotToken() {
         UserNotifyProfileEntity withTelegram = new UserNotifyProfileEntity(
-                USER_ID, "{}", true, true, "cipher-text", "chat-1", Instant.now(), NotificationChannel.TELEGRAM);
+                USER_ID, "{}", true, "cipher-text", "chat-1", Instant.now(), NotificationChannel.TELEGRAM);
         when(repository.findById(USER_ID)).thenReturn(Optional.of(withTelegram));
         when(crypto.decrypt("cipher-text")).thenReturn("plain-token");
 
@@ -116,7 +115,7 @@ class UserNotifyProfilePersistenceAdapterTest {
     void markDeleted_비활성_tombstone으로_토큰과_chatId를_지운다() {
         UUID userId = UUID.randomUUID();
         when(repository.findById(userId)).thenReturn(Optional.of(new UserNotifyProfileEntity(
-                userId, "{}", true, true, "cipher", "chat", Instant.EPOCH, NotificationChannel.ALL)));
+                userId, "{}", true, "cipher", "chat", Instant.EPOCH, NotificationChannel.ALL)));
 
         adapter().markDeleted(userId);
 

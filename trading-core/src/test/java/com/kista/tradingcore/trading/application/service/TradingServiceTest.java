@@ -162,7 +162,7 @@ class TradingServiceTest {
 
     @BeforeEach
     void setUp() {
-        // USER(TradingUserProfile) — balanceCheckEnabled=true, notificationPrefs 비어있어 isNotificationEnabled()도 기본 true(활성)
+        // USER(TradingUserProfile) — notificationPrefs 비어있어 isNotificationEnabled()도 기본 true(활성)
 
         // 헬퍼 컴포넌트는 실제 인스턴스로 생성 — 기존 mock(cycleHistoryPort, infiniteStrategy 등)이 그대로 동작
         runState = new TradingBatchRunState();

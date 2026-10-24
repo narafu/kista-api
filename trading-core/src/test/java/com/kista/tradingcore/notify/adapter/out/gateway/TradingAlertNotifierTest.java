@@ -42,7 +42,7 @@ class TradingAlertNotifierTest {
     private final UUID userId = UUID.randomUUID();
     private final UUID accountId = UUID.randomUUID();
     private final String accountNickname = "테스트계좌";
-    private final TradingUserProfile profile = new TradingUserProfile(userId, Map.of(), true, "token", "chat");
+    private final TradingUserProfile profile = new TradingUserProfile(userId, Map.of(), "token", "chat");
 
     private TradingAlertNotifier notifier() {
         return new TradingAlertNotifier(notifyPort, userNotificationPort, userProfilePort);

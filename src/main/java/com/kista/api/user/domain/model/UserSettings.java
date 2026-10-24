@@ -10,7 +10,6 @@ import com.kista.shared.kernel.NotificationType;
 
 public record UserSettings(
         UUID userId,
-        @With boolean balanceCheckEnabled,
         @With Map<NotificationType, Boolean> notificationPrefs,
         @With List<String> strategySuggestions // 자산 등록 폼 운용전략 추천 목록 (자유입력을 돕는 값일 뿐 값 제한 아님)
 ) {
@@ -26,6 +25,6 @@ public record UserSettings(
     }
 
     public static UserSettings defaultFor(UUID userId) {
-        return new UserSettings(userId, true, Map.of(), DEFAULT_STRATEGY_SUGGESTIONS);
+        return new UserSettings(userId, Map.of(), DEFAULT_STRATEGY_SUGGESTIONS);
     }
 }

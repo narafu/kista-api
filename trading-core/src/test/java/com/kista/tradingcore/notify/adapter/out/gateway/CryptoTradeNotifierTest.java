@@ -37,7 +37,7 @@ class CryptoTradeNotifierTest {
 
     @Test
     void sendsTelegramAndSse() {
-        TradingUserProfile p = new TradingUserProfile(userId, Map.of(), false, null, null);
+        TradingUserProfile p = new TradingUserProfile(userId, Map.of(), null, null);
         when(profiles.findByUserId(userId)).thenReturn(Optional.of(p));
 
         notifier.onCryptoOrderFilled(event);
@@ -52,7 +52,7 @@ class CryptoTradeNotifierTest {
 
     @Test
     void usdtEventCarriesUsdtCurrency() {
-        when(profiles.findByUserId(userId)).thenReturn(Optional.of(new TradingUserProfile(userId, Map.of(), false, null, null)));
+        when(profiles.findByUserId(userId)).thenReturn(Optional.of(new TradingUserProfile(userId, Map.of(), null, null)));
         CryptoOrderFilledEvent usdt = new CryptoOrderFilledEvent(userId, UUID.randomUUID(), UUID.randomUUID(), "바낸",
                 StrategyTicker.BTC, OrderDirection.SELL, new BigDecimal("0.00015985"), new BigDecimal("65000"), new BigDecimal("10.39"), Currency.USDT);
 
@@ -65,7 +65,7 @@ class CryptoTradeNotifierTest {
 
     @Test
     void tradingAlertOffSkipsTelegramButKeepsSse() {
-        TradingUserProfile p = new TradingUserProfile(userId, Map.of(NotificationType.TRADING_ALERT, false), false, null, null);
+        TradingUserProfile p = new TradingUserProfile(userId, Map.of(NotificationType.TRADING_ALERT, false), null, null);
         when(profiles.findByUserId(userId)).thenReturn(Optional.of(p));
 
         notifier.onCryptoOrderFilled(event);

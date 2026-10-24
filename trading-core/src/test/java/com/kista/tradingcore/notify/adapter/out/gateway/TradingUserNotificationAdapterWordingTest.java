@@ -18,7 +18,7 @@ class TradingUserNotificationAdapterWordingTest {
 
     TelegramHttpClient telegram = mock(TelegramHttpClient.class);
     TradingUserNotificationAdapter adapter = new TradingUserNotificationAdapter(telegram, mock(RedisPushNotificationPublisher.class));
-    TradingUserProfile profile = new TradingUserProfile(UUID.randomUUID(), Map.of(), false, "tok", "chat");
+    TradingUserProfile profile = new TradingUserProfile(UUID.randomUUID(), Map.of(), "tok", "chat");
 
     private ApiKeyExpiringEvent event(int daysLeft) {
         return new ApiKeyExpiringEvent(profile.userId(), UUID.randomUUID(), "업비트", Broker.UPBIT, LocalDate.of(2026, 10, 25), daysLeft);

@@ -44,7 +44,7 @@ class TradingReportNotifierTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
     private static final String ACCOUNT_NICKNAME = "테스트계좌";
-    private static final TradingUserProfile PROFILE = new TradingUserProfile(USER_ID, Map.of(), true, "token", "chat");
+    private static final TradingUserProfile PROFILE = new TradingUserProfile(USER_ID, Map.of(), "token", "chat");
     private static final LocalDate TODAY = LocalDate.of(2026, 7, 30);
     private static final TradingReport REPORT = new TradingReport(
             TODAY, StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("100.00"), new BigDecimal("50.00"));

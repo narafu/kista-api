@@ -1193,7 +1193,7 @@ flows:
           Redis Stream으로 보낸다. kista-trading이 받아 자기 DB의 user_notify_profile 복제본을 덮어쓴다(토큰은 다시 암호화).
           매매 서버는 이 복제본만 보고 텔레그램을 직접 보낸다.
         code: [UserNotifyProfilePublisher#publishStatusChanged, UserNotifyProfilePublisher#publishSettingsChanged, UserEventStreamPublisher#onProfileChanged, UserNotifyProfileStreamConsumer, UserEventStreamBridge#handleProfileChangedRecord, UserNotifyProfileSyncListener#onProfileChanged]
-        cond: 텔레그램 연결·해제, 알림 채널, 알림 종류·잔고검증 설정이 바뀐 때(닉네임 변경은 제외)
+        cond: 텔레그램 연결·해제, 알림 채널, 알림 종류 설정이 바뀐 때(닉네임 변경은 제외)
         state: "trading.user_notify_profile upsert (알림 종류·알림 채널·텔레그램 토큰·chatId)"
         fail: >-
           전달·반영이 실패하면 양쪽 event_publication이 FAILED로 남아 각 프로세스가 10분마다 재발행하고(처음 발견 회차에 관리자 알림),

@@ -3,6 +3,7 @@ package com.kista.api.web;
 import com.kista.api.notify.application.port.output.NotifyPort;
 import com.kista.api.user.application.usecase.GetUserSettingsQuery;
 import com.kista.api.user.application.usecase.UserSettingsUseCase;
+import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.platform.redis.RedisStreamConfig;
 import org.junit.jupiter.api.AfterEach;
@@ -53,6 +54,7 @@ class UserEventResubmitEndToEndIT {
     void tearDown() {
         jdbcTemplate.update("DELETE FROM public.event_publication WHERE serialized_event LIKE ?", "%" + userId + "%");
         jdbcTemplate.update("DELETE FROM user_settings WHERE user_id = ?", userId);
+        jdbcTemplate.update("DELETE FROM user_notification_prefs WHERE user_id = ?", userId);
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
         // 재발행으로 들어간 테스트 메시지 제거 — 로컬 trading-core가 소비해도 없는 사용자라 무해하지만 남기지 않는다
         redisTemplate.<String, String>opsForStream().range(RedisStreamConfig.USER_DELETED_STREAM, Range.unbounded()).stream()
@@ -78,16 +80,16 @@ class UserEventResubmitEndToEndIT {
                 .anyMatch(r -> r.getValue().get("payload").contains(userId.toString()));
     }
 
-    // 트랜잭션 밖이던 잔고검증 토글 — Redis 장애여도 설정 변경은 성공하고(500 아님) 복제본 이벤트는 FAILED로 남아 재발행 대상이 된다
+    // 트랜잭션 밖이던 설정 변경 — Redis 장애여도 설정 변경은 성공하고(500 아님) 복제본 이벤트는 FAILED로 남아 재발행 대상이 된다
     @Test
-    void 잔고검증_토글은_Redis_장애에도_성공하고_이벤트는_FAILED로_남는다() {
+    void 알림설정_변경은_Redis_장애에도_성공하고_이벤트는_FAILED로_남는다() {
         jdbcTemplate.update("INSERT INTO users (id, kakao_id, status, role, notification_channel, created_at, updated_at) VALUES (?, ?, 'ACTIVE', 'USER', 'TELEGRAM', now(), now())",
                 userId, "kakao_" + userId);
         doThrow(new RedisConnectionFailureException("redis down")).doCallRealMethod().when(redisTemplate).opsForStream();
 
-        userSettingsUseCase.updateBalanceCheck(userId, false);
+        userSettingsUseCase.updateNotificationPref(userId, NotificationType.TRADING_ALERT, false);
 
-        assertThat(getUserSettingsQuery.getByUserId(userId).balanceCheckEnabled()).isFalse();
+        assertThat(getUserSettingsQuery.getByUserId(userId).isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
         assertThat(jdbcTemplate.queryForObject("SELECT status FROM public.event_publication WHERE serialized_event LIKE ? AND listener_id LIKE ?",
                 String.class, "%" + userId + "%", "%UserEventStreamPublisher%")).isEqualTo("FAILED");
     }

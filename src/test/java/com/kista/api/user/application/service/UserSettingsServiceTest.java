@@ -2,16 +2,12 @@ package com.kista.api.user.application.service;
 
 import com.kista.shared.kernel.NotificationType;
 import com.kista.api.user.domain.model.UserSettings;
-import com.kista.api.user.application.port.output.ActiveStrategyCountPort;
 import com.kista.api.user.application.port.output.UserSettingsPort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -20,7 +16,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -30,9 +25,7 @@ import static org.mockito.Mockito.when;
 class UserSettingsServiceTest {
 
     @Mock UserSettingsPort userSettingsPort;
-    @Mock ActiveStrategyCountPort activeStrategyCountPort;
     @Mock UserNotifyProfilePublisher userNotifyProfilePublisher;
-    @Spy TransactionTemplate transactionTemplate = new TransactionTemplate(mock(PlatformTransactionManager.class)); // 콜백을 실제로 실행
     @InjectMocks UserSettingsService service;
 
     private final UUID USER_ID = UUID.randomUUID();
@@ -41,13 +34,12 @@ class UserSettingsServiceTest {
     void getByUserId_returns_defaults_when_no_record() {
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(UserSettings.defaultFor(USER_ID));
         UserSettings result = service.getByUserId(USER_ID);
-        assertThat(result.balanceCheckEnabled()).isTrue();
         assertThat(result.isNotificationEnabled(NotificationType.TRADING_ALERT)).isTrue();
     }
 
     @Test
     void getByUserId_returns_stored_settings() {
-        UserSettings stored = new UserSettings(USER_ID, false, Map.of(NotificationType.TRADING_ALERT, false),
+        UserSettings stored = new UserSettings(USER_ID, Map.of(NotificationType.TRADING_ALERT, false),
                 UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(stored);
         assertThat(service.getByUserId(USER_ID)).isSameAs(stored);
@@ -55,7 +47,7 @@ class UserSettingsServiceTest {
 
     @Test
     void updateNotificationPref_saves_updated_pref() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        UserSettings existing = new UserSettings(USER_ID, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.updateNotificationPref(USER_ID, NotificationType.TRADING_ALERT, false);
@@ -65,44 +57,8 @@ class UserSettingsServiceTest {
     }
 
     @Test
-    void updateBalanceCheck_saves_updated_value() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
-        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
-        when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenReturn(0L);
-
-        service.updateBalanceCheck(USER_ID, false);
-
-        verify(userSettingsPort).save(argThat(s -> !s.balanceCheckEnabled()));
-        // 저장·발행은 트랜잭션 안 — 발행 실패가 EPR FAILED로 남아 재발행되도록(트랜잭션 밖 발행은 요청 500)
-        verify(transactionTemplate).executeWithoutResult(any());
-    }
-
-    @Test
-    void updateBalanceCheck_활성전략_조회가_실패해도_설정_변경은_완료된다() {
-        // 경고 로그 전용 trading-core 호출 — 장애가 사용자 설정 변경을 막지 않는다
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
-        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
-        when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenThrow(new RuntimeException("trading-core down"));
-
-        service.updateBalanceCheck(USER_ID, false);
-
-        verify(userSettingsPort).save(argThat(s -> !s.balanceCheckEnabled()));
-        verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s -> !s.balanceCheckEnabled()));
-    }
-
-    @Test
-    void updateBalanceCheck_값이_같으면_활성전략을_조회하지_않는다() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
-        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
-
-        service.updateBalanceCheck(USER_ID, true);
-
-        verifyNoInteractions(activeStrategyCountPort);
-    }
-
-    @Test
     void updateStrategySuggestions_saves_updated_list() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        UserSettings existing = new UserSettings(USER_ID, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.updateStrategySuggestions(USER_ID, List.of("커스텀전략"));
@@ -111,7 +67,7 @@ class UserSettingsServiceTest {
     }
     @Test
     void updateNotificationPref_변경_시_UserNotifyProfileChangedEvent_발행을_위임한다() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        UserSettings existing = new UserSettings(USER_ID, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.updateNotificationPref(USER_ID, NotificationType.TRADING_ALERT, false);
@@ -122,20 +78,8 @@ class UserSettingsServiceTest {
     }
 
     @Test
-    void updateBalanceCheck_변경_시_UserNotifyProfileChangedEvent_발행을_위임한다() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
-        when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
-        when(activeStrategyCountPort.countActiveByUserId(USER_ID)).thenReturn(0L);
-
-        service.updateBalanceCheck(USER_ID, false);
-
-        verify(userNotifyProfilePublisher).publishSettingsChanged(argThat(s ->
-                s.userId().equals(USER_ID) && !s.balanceCheckEnabled()));
-    }
-
-    @Test
     void resyncNotifyProfile_저장_없이_현재_설정으로_발행만_한다() {
-        UserSettings existing = new UserSettings(USER_ID, false, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        UserSettings existing = new UserSettings(USER_ID, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.resyncNotifyProfile(USER_ID);
@@ -146,7 +90,7 @@ class UserSettingsServiceTest {
 
     @Test
     void updateStrategySuggestions는_프로필_대상_필드가_아니라_발행하지_않는다() {
-        UserSettings existing = new UserSettings(USER_ID, true, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
+        UserSettings existing = new UserSettings(USER_ID, Map.of(), UserSettings.DEFAULT_STRATEGY_SUGGESTIONS);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(existing);
 
         service.updateStrategySuggestions(USER_ID, List.of("커스텀전략"));

@@ -30,7 +30,7 @@ class CycleLifecycleNotifierTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final String ACCOUNT_NICKNAME = "테스트계좌";
-    private static final TradingUserProfile PROFILE = new TradingUserProfile(USER_ID, Map.of(), true, "token", "chat");
+    private static final TradingUserProfile PROFILE = new TradingUserProfile(USER_ID, Map.of(), "token", "chat");
 
     @Test
     void onCycleCompleted_notifiesUserOfCycleCompletion() {

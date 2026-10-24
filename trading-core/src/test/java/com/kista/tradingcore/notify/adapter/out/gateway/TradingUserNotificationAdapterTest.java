@@ -35,9 +35,9 @@ class TradingUserNotificationAdapterTest {
 
     static final UUID USER_ID = UUID.randomUUID();
     static final TradingUserProfile LINKED_PROFILE =
-            new TradingUserProfile(USER_ID, Map.of(), true, "bot-token", "chat-123");
+            new TradingUserProfile(USER_ID, Map.of(), "bot-token", "chat-123");
     static final TradingUserProfile UNLINKED_PROFILE =
-            new TradingUserProfile(USER_ID, Map.of(), true, null, null);
+            new TradingUserProfile(USER_ID, Map.of(), null, null);
 
     @BeforeEach
     void setUp() {
@@ -56,7 +56,7 @@ class TradingUserNotificationAdapterTest {
     @Test
     void notifyMarketOpen_channelWithoutTelegram_skipsTelegramButStillPublishesEvent() {
         // 봇이 연결돼 있어도 알림 채널이 FCM이면 텔레그램은 보내지 않는다
-        adapter.notifyMarketOpen(new TradingUserProfile(USER_ID, Map.of(), true, "bot-token", "chat-123", NotificationChannel.FCM));
+        adapter.notifyMarketOpen(new TradingUserProfile(USER_ID, Map.of(), "bot-token", "chat-123", NotificationChannel.FCM));
 
         verifyNoInteractions(restClient);
         verify(pushNotificationPublisher).publish(new UserPushNotificationRequestedEvent(USER_ID, "장 개시", "🟢 미국 장이 열렸습니다."));

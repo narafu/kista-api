@@ -40,7 +40,7 @@ public class AuthController {
     private final JwtIssuerService jwtIssuerService;
     private final JwtDecoder jwtDecoder; // AT 파싱용 — logout 시 jti 추출
     private final RefreshTokenCookieHelper cookieHelper;
-    private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse.balanceCheckEnabled 조회용
+    private final GetUserSettingsQuery getUserSettingsQuery; // UserResponse 알림 설정·추천 목록 조회용
 
 
     // 카카오 OAuth 인가 코드로 로그인 — AT(body) + RT(HttpOnly 쿠키) 발급

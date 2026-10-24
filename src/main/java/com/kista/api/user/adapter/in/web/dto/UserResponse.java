@@ -27,8 +27,6 @@ public record UserResponse(
         String telegramBotUsername,
         @Schema(description = "알림 채널 (TELEGRAM/FCM/ALL/NONE)", example = "TELEGRAM")
         NotificationChannel notificationChannel,
-        @Schema(description = "전략 등록·재등록 시 실잔고 검증 여부 (false=바이패스)", example = "true")
-        boolean balanceCheckEnabled,
         @Schema(description = "알림 타입별 on/off (예: {\"TRADING_ALERT\": true})")
         Map<String, Boolean> notificationPrefs,
         @Schema(description = "반려 사유 (REJECTED 상태에서만 의미, null 가능)")
@@ -50,7 +48,6 @@ public record UserResponse(
                 user.role(),
                 user.telegramBotUsername(),
                 user.notificationChannel(),
-                settings.balanceCheckEnabled(),
                 prefs,
                 maskedRejectReason,
                 settings.strategySuggestions()
