@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum StrategyCycleSeedType {
-    NONE("OFF"),        // holdings 0 → 전략 PAUSE
-    MAINTAIN("ON(유지)"), // 종료 후 동일 initialUsdDeposit으로 재등록
-    MAX("ON(MAX)");     // 종료 후 마지막 usdDeposit을 initialUsdDeposit으로 재등록
+    NONE("연속 안 함"), // holdings 0 → 전략 PAUSE
+    MAINTAIN("시드 유지"), // 종료 후 동일 initialUsdDeposit으로 재등록
+    MAX("시드 MAX");    // 종료 후 마지막 usdDeposit을 initialUsdDeposit으로 재등록
 
     private final String label; // 한국어 표시 이름
 }

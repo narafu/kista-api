@@ -54,7 +54,7 @@ public class MetaController {
                 toEnumMeta(Market.values(), Market::getLabel),
                 toEnumMeta(FinanceAccount.Type.values(), FinanceAccount.Type::getLabel),
                 toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel),
-                toEnumMeta(OrderType.values(), Enum::name),
+                toEnumMeta(OrderType.values(), OrderType::getLabel),
                 toEnumMeta(OrderDirection.values(), OrderDirection::getLabel),
                 toEnumMeta(DcaFrequency.values(), DcaFrequency::getLabel),
                 toEnumMeta(DcaOperator.values(), DcaOperator::getLabel),

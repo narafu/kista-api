@@ -74,7 +74,8 @@ class MetaControllerTest {
                         .with(authentication(userToken(DEV_USER_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cycleSeedTypes").isArray())
-                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(StrategyCycleSeedType.values().length));
+                .andExpect(jsonPath("$.cycleSeedTypes.length()").value(StrategyCycleSeedType.values().length))
+                .andExpect(jsonPath("$.cycleSeedTypes[?(@.code=='MAINTAIN')].label").value(org.hamcrest.Matchers.contains("시드 유지")));
     }
 
     @Test
@@ -90,7 +91,8 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].frequencies").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("DAILY", "WEEKLY", "MONTHLY"))))
                 .andExpect(jsonPath("$.strategyTypes[?(@.code=='DCA')].conditionIndicators").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.contains("AVG_PRICE", "SMA", "RSI", "FEAR_GREED"))))
                 .andExpect(jsonPath("$.orderTypes.length()").value(com.kista.shared.kernel.OrderType.values().length))
-                .andExpect(jsonPath("$.orderTypes[?(@.code=='MOO')].label").value(org.hamcrest.Matchers.contains("MOO")))
+                .andExpect(jsonPath("$.orderTypes[?(@.code=='MOO')].label").value(org.hamcrest.Matchers.contains("MOO(시가시장가)")))
+                .andExpect(jsonPath("$.orderTypes[0].code").value("LOC"))
                 .andExpect(jsonPath("$.orderDirections[0].label").value("매수"))
                 .andExpect(jsonPath("$.dcaFrequencies[2].code").value("MONTHLY"))
                 .andExpect(jsonPath("$.dcaOperators[0].label").value("이하"))

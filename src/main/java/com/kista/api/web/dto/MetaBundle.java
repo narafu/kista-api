@@ -24,7 +24,7 @@ public record MetaBundle(
         @Schema(description = "재무 카테고리 유형 목록")
         List<EnumMeta> financeCategoryTypes,   // 재무 카테고리 유형 목록
         @Schema(description = "주문 유형 목록")
-        List<EnumMeta> orderTypes,             // 주문 유형 목록 (label은 name — OrderType에 label 없음)
+        List<EnumMeta> orderTypes,             // 주문 유형 목록 (상수 순서 = UI 필터 순서)
         @Schema(description = "주문 방향 목록")
         List<EnumMeta> orderDirections,        // 주문 방향 목록
         @Schema(description = "DCA 실행 주기 목록")
