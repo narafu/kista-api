@@ -4,6 +4,7 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.application.usecase.ReorderBuyBudgetQuery;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -25,6 +26,7 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
 
     private final OrderPort orderPort;
     private final StrategyCyclePort strategyCyclePort;
+    private final StrategyPort strategyPort;
     private final StrategyLedgerBudget ledgerBudget;
 
     static final int MAX_ORDERS = 50; // 일괄 조회 상한 — 일괄 재주문 폼 한 화면 분량
@@ -54,6 +56,8 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
         sources.stream().map(Order::strategyCycleId).distinct().forEach(cycleId -> {
             StrategyCycle cycle = strategyCyclePort.findById(cycleId)
                     .orElseThrow(() -> new IllegalArgumentException("전략 사이클을 찾을 수 없습니다."));
+            // DCA(시드 비점유) 사이클은 상한 없음 — 키를 생략해 UI가 무제한으로 본다
+            if (!ledgerBudget.applies(strategyPort.findByIdOrThrow(cycle.strategyId()).type())) return;
             cycles.put(cycleId, new ReorderBuyBudget.CycleBudget(ledgerBudget.remaining(cycle, date)));
         });
         return new ReorderBuyBudget(cycles, sourceRefunds);

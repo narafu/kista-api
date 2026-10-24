@@ -43,11 +43,16 @@ class StrategyLedgerBudget {
         return ledger.subtract(committed);
     }
 
+    // 원장 상한 적용 대상 여부 — DCA처럼 시드를 점유하지 않는 전략은 상한 제외(fit·재주문 공용)
+    boolean applies(StrategyType type) {
+        return cycleOrderStrategies.of(type).occupiesSeed();
+    }
+
     // BUY 총액이 budget을 넘으면 전략 축소안(1회)을 시도하고, 그래도 넘으면 BUY 전체를 제거(SELL 유지)한다
     LedgerFit fit(StrategyType type, List<PlannedOrder> orders, BigDecimal budget) {
         CycleOrderStrategy strategy = cycleOrderStrategies.of(type);
         BigDecimal required = AccountBalance.buyTotal(orders);
-        if (!strategy.occupiesSeed() || required.compareTo(budget) <= 0) {
+        if (!applies(type) || required.compareTo(budget) <= 0) {
             return new LedgerFit(orders, required, false, false);
         }
         List<PlannedOrder> buys = orders.stream().filter(o -> o.direction() == OrderDirection.BUY).toList();

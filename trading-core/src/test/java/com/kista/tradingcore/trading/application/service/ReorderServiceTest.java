@@ -362,6 +362,7 @@ class ReorderServiceTest {
     void immediateBuyOverLedgerRejected409() {
         // 원본 PLACED BUY 200은 remaining에 이미 차감돼 있어 환불 200을 더한 300이 상한 — 500은 초과
         stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
         when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("100"));
 
         assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
@@ -379,6 +380,7 @@ class ReorderServiceTest {
     void immediateBuyWithinLedgerProceeds() {
         // remaining 300 + 원본 환불 200 = 500 — 정확히 상한이면 통과
         stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
         when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("300"));
         Order saved = stubSaved();
         when(orderSubmitter.submit(eq(saved), any(), any()))
@@ -392,11 +394,26 @@ class ReorderServiceTest {
     void sellOriginBuyReorderGetsNoRefund() {
         // 원본이 SELL이면 환불 0 — remaining 400 < 500이라 거절
         stubCommon(plannedOrder());
+        when(ledgerBudget.applies(any())).thenReturn(true);
         when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("400"));
 
         assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
                 .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingException.class);
         verify(orderPort, never()).cancelPlanned(any());
+    }
+
+    @Test
+    void dcaBuyReorderSkipsLedgerCap() {
+        // DCA는 시드 비점유(usd_deposit 0) — remaining이 음수여도 통과
+        stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(false);
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.PLACED, "NEW-EXT-1"));
+
+        assertThat(reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.PLACED);
+        verify(ledgerBudget, never()).remaining(any(), any());
     }
 
     // --- 헬퍼 ---

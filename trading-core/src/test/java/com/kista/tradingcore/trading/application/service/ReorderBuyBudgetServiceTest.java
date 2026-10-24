@@ -7,6 +7,9 @@ import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.shared.kernel.*;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.ReorderBuyBudget;
@@ -34,10 +37,11 @@ class ReorderBuyBudgetServiceTest {
 
     @Mock OrderPort orderPort;
     @Mock StrategyCyclePort strategyCyclePort;
+    @Mock StrategyPort strategyPort;
     @Mock StrategyLedgerBudget ledgerBudget;
 
     private ReorderBuyBudgetService service() {
-        return new ReorderBuyBudgetService(orderPort, strategyCyclePort, ledgerBudget);
+        return new ReorderBuyBudgetService(orderPort, strategyCyclePort, strategyPort, ledgerBudget);
     }
 
     private Order order(UUID cycleId, OrderDirection dir, OrderStatus status, LocalDate date) {
@@ -51,10 +55,19 @@ class ReorderBuyBudgetServiceTest {
 
     // 원본 주문과 사이클을 stub — 사이클별 remaining 반환
     private void stubCycle(UUID cycleId, String remaining) {
-        StrategyCycle cycle = new StrategyCycle(cycleId, UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("1000"),
+        stubCycle(cycleId, remaining, true);
+    }
+
+    private void stubCycle(UUID cycleId, String remaining, boolean applies) {
+        UUID strategyId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(ledgerBudget.applies(StrategyType.PRIVACY)).thenReturn(applies);
+        StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, UUID.randomUUID(), new BigDecimal("1000"),
                 null, DATE, null, java.time.Instant.now(), null);
         when(strategyCyclePort.findById(cycleId)).thenReturn(Optional.of(cycle));
-        when(ledgerBudget.remaining(cycle, DATE)).thenReturn(new BigDecimal(remaining));
+        if (applies) when(ledgerBudget.remaining(cycle, DATE)).thenReturn(new BigDecimal(remaining));
     }
 
     private void stubOrders(Order... sources) {
@@ -80,6 +93,19 @@ class ReorderBuyBudgetServiceTest {
         assertThat(r.sourceRefunds().get(a.id())).isEqualByComparingTo("200");
         assertThat(r.sourceRefunds().get(b.id())).isEqualByComparingTo("200");
         assertThat(r.sourceRefunds().get(a2.id())).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void nonSeedCycleOmittedFromCycles() {
+        UUID c = UUID.randomUUID();
+        Order a = order(c, OrderDirection.BUY, OrderStatus.PLANNED, DATE);
+        stubOrders(a);
+        stubCycle(c, "0", false);
+
+        ReorderBuyBudget r = service().query(List.of(a.id()), null);
+
+        assertThat(r.cycles()).isEmpty();
+        assertThat(r.sourceRefunds().get(a.id())).isEqualByComparingTo("200");
     }
 
     @Test

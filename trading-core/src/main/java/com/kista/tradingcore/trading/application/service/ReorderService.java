@@ -102,7 +102,9 @@ class ReorderService implements ReorderUseCase {
 
         // 1-1. BUY는 전략 원장 상한 검증 — 원본 취소 전에 (거절 시 취소·증권사 호출 없음, 축소 없는 단건)
         // remaining이 같은 거래일 PLANNED·PLACED BUY 원본을 이미 차감했으므로 취소로 풀리는 환급분만 더한다
-        if (direction == OrderDirection.BUY) {
+        // ponytail: AccountBudgetLock 없이 검사 — 락이 cancelSource 증권사 호출까지 걸리게 돼 동시 배치와 같은 사이클에서 경합 가능. 필요하면 검사+저장을 락으로 감싼다
+        // DCA(시드 비점유)는 원장 상한 제외
+        if (direction == OrderDirection.BUY && ledgerBudget.applies(strategy.type())) {
             BigDecimal limit = ledgerBudget.remaining(currentCycle, tradeDate)
                     .add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate));
             if (price.multiply(BigDecimal.valueOf(quantity)).compareTo(limit) > 0) {
