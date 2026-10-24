@@ -54,6 +54,17 @@
 - 거절 시 기존 `InsufficientBalanceEvent`(사용자 알림, `userId` non-null)를 재사용하되 문구를 "전략 원장 예수금 부족"으로 바꾼다. 관리자 알림은 없다.
 - 상한 판정은 순수 계산이다. live 조회도, 계좌 단위 락도 필요 없다. 위치는 builder 재량이다(`TradingCandidatePlanner`에서 allocator를 대체하는 작은 컴포넌트, 또는 `matching` 커널의 순수 함수).
 
+### 4.1a INFINITE 최종회차 판정 확장 (사용자 승인 공식 변경)
+
+- 문제: 후반 매수 수량은 `max(1, floor(unitAmount / referencePrice))`라 최소 1주가 보장된다. `unitAmount ≤ 원장 < referencePrice`이면 1주 금액이 원장을 넘어, §4.1 상한에 매일 거절된다. 최종회차 판정은 `unitAmount > usdDeposit`이라 리버스로도 넘어가지 못하는 교착이 생긴다. 손실이 누적된 소액 시드 사이클에서 드물게 발생한다.
+- 변경: `InfinitePosition.isFinalRound()` = `unitAmount > usdDeposit` **또는** `referencePrice > usdDeposit`(남은 원장으로 기준가 1주도 못 사는 상태).
+- 영향: 이 판정을 쓰는 두 곳이 함께 바뀐다.
+  - 그날 주문: 후반 LOC 매수·매도 대신 MOC 매도(holdings/4)만 낸다.
+  - 다음 날 상태: 리버스 진입(`nextReverseMode`).
+  - 백테스트가 같은 판정을 쓰는지 확인하고 일치시킨다.
+- `trading-formulas.md`의 "후반 unitAmount>usdDeposit" 문구를 함께 갱신한다. 변경 금지 SSOT지만 사용자가 승인한 변경이다.
+- 검증: 예시(기준가 $30, 분할 20, 총자산 $440, 원장 $25)에서 최종회차가 true이고 MOC 매도만 나오는지. 기존 경계(`unitAmount > usdDeposit`)의 테스트는 그대로 통과해야 한다.
+
 ### 4.2 접수 직전 재캡
 
 - `TradingOrderExecutor.applyCap`의 live 예산 가드(계좌 PLANNED BUY 합계 → `LiveBalancePort`)를 **자기 원장 상한**으로 바꾼다. 예산은 `자기 원장 − 같은 사이클의 스코프 밖 BUY(PLANNED·SUBMITTING·PLACED)`이다.
@@ -188,6 +199,12 @@
 - 미리보기는 원장 부족만 표시하고 실잔고 부족은 표시하지 않는다. 실잔고 부족은 접수 때 증권사 거절과 사용자 알림으로만 드러난다(사용자 확인).
 
 ## 9. 범위 밖 후속
+
+- INFINITE 보정 주문과 cap 점검 결과(공식 변경이 필요해 별도 결정 대상):
+  - 보정 주문이 cap 발동 시에만 붙어 하락 폭 5% 경계에서 매수가 계단식으로 바뀜. 의도 여부 확인
+  - `earlyBuyQuantity2` 최소 1주 보장으로 회차 금액 초과 가능
+  - 보정 가격 HALF_UP 반올림으로 `(N+1)×가격`이 `unitAmount`를 수 센트 넘을 수 있음(FLOOR가 의도에 부합)
+  - cap 배수 1.05의 근거를 문서화
 
 - MOCK LIMIT 체결가 개선(종가 기준 체결, 지정가 이하 체결 반영)
 - 원장과 FIDA·실계좌의 괴리 보정 도구
