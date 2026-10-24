@@ -136,7 +136,7 @@ class ManualTradingService {
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요
-        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today, plan.position(), plan.vrPosition(), dst);
+        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle, today, plan.position(), plan.vrPosition(), dst);
 
         // 저장된 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
@@ -156,15 +156,15 @@ class ManualTradingService {
     // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
-    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, UUID cycleId, LocalDate today,
+    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, StrategyCycle cycle, LocalDate today,
                                                InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
         if (Instant.now().isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
-            if (orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today).isEmpty()) return;
+            if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
             // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
             BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
             log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
-            orderExecutor.placeAtOpenOrders(today, account, cycleId, currentPrice, position, vrPosition, strategy);
+            orderExecutor.placeAtOpenOrders(today, account, cycle, currentPrice, position, vrPosition, strategy);
         }
     }
 

@@ -11,7 +11,6 @@ import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
@@ -37,7 +36,6 @@ class TradingOrderExecutor {
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final CycleOrderStrategies cycleOrderStrategies;
     private final StrategyLedgerBudget ledgerBudget;            // 재캡이 BUY 총액을 늘릴 때만 사이클 원장 잔여 조회
-    private final StrategyCyclePort strategyCyclePort;          // 원장 조회용 현재 사이클
     private final AccountBudgetLock accountBudgetLock;          // 계좌별 재캡 예산 산정 직렬화 — 후보 계획 승인+저장과 같은 락
     private final OrderSubmitter orderSubmitter;                // 건별 선점 → 접수 → PLACED/FAILED 기록
     private final OrderSubmissionReconciler reconciler;         // 접수 전 잔류 SUBMITTING 대사(Toss 멱등 재요청·알림)
@@ -48,11 +46,11 @@ class TradingOrderExecutor {
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
     // AT_OPEN PLANNED만 재조회해 접수한다 — 동일 사이클에 공존 가능한 AT_CLOSE PLANNED(미도래)는 건드리지 않는다
     // (findPlannedByCycleAndDate를 그대로 쓰면 접수 전 AT_CLOSE 주문까지 캡 재산정 대상이 되는 버그가 발생함)
-    List<Order> placeAtOpenOrders(LocalDate tradeDate, TradingAccount account, UUID strategyCycleId,
+    List<Order> placeAtOpenOrders(LocalDate tradeDate, TradingAccount account, StrategyCycle cycle,
                                   BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
-        reconciler.reconcile(strategyCycleId, tradeDate, account);
-        applyCap(true, tradeDate, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
-        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(strategyCycleId, tradeDate);
+        reconciler.reconcile(cycle.id(), tradeDate, account);
+        applyCap(true, tradeDate, account, cycle, currentPrice, position, vrPosition, strategy);
+        List<Order> atOpenOrders = orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), tradeDate);
         if (atOpenOrders.isEmpty()) {
             log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
             return List.of();
@@ -66,11 +64,11 @@ class TradingOrderExecutor {
 
     // BuyOrderPriceCapper.capIfNeeded 적용 여부는 전략의 needsCapCheck()로 결정 — position/vrPosition
     // null 가드는 applyCap에 있다 (capIfNeeded는 @Transactional이라 내부에 두면 skip 케이스마다 빈 트랜잭션이 열림)
-    List<Order> placeOrders(LocalDate today, TradingAccount account, UUID strategyCycleId,
+    List<Order> placeOrders(LocalDate today, TradingAccount account, StrategyCycle cycle,
                             BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
-        reconciler.reconcile(strategyCycleId, today, account);
-        applyCap(false, today, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
-        List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
+        reconciler.reconcile(cycle.id(), today, account);
+        applyCap(false, today, account, cycle, currentPrice, position, vrPosition, strategy);
+        List<Order> planned = orderPort.findPlannedByCycleAndDate(cycle.id(), today);
         PlaceResult result = placeEach(planned, account);
         reportInsufficient(result, today, account, strategy);
         List<Order> placed = result.placed();
@@ -80,10 +78,10 @@ class TradingOrderExecutor {
 
     // AT_OPEN/AT_CLOSE 공용 BUY 가격 캡 디스패치 — needsCapCheck() skip 가드를 여기서 걸어
     // BuyOrderPriceCapper.capIfNeeded(@Transactional)가 skip 케이스에 호출되지 않도록 한다(빈 트랜잭션 오픈 방지)
-    private void applyCap(boolean atOpen, LocalDate date, TradingAccount account, UUID strategyCycleId,
+    private void applyCap(boolean atOpen, LocalDate date, TradingAccount account, StrategyCycle cycle,
                           BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         try {
-            capWithBudget(atOpen, date, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
+            capWithBudget(atOpen, date, account, cycle, currentPrice, position, vrPosition, strategy);
         } catch (OrderStateConflictException | PessimisticLockingFailureException e) {
             // 재캡 대상 BUY가 그 사이 사용자 취소·정리됨(또는 일시중지 일괄 삭제와 행 잠금 데드락) —
             // 재캡 트랜잭션은 통째로 롤백, 남은 PLANNED를 그대로 접수한다
@@ -91,12 +89,12 @@ class TradingOrderExecutor {
         }
     }
 
-    private void capWithBudget(boolean atOpen, LocalDate date, TradingAccount account, UUID strategyCycleId,
+    private void capWithBudget(boolean atOpen, LocalDate date, TradingAccount account, StrategyCycle cycle,
                                BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, Strategy strategy) {
         if (currentPrice == null) return;
         CycleOrderStrategy orderStrategy = cycleOrderStrategies.of(strategy.type());
         if (!orderStrategy.needsCapCheck(position, vrPosition)) return;
-        if (!buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
+        if (!buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, cycle.id(),
                 currentPrice, position, vrPosition, strategy.ticker(), null)) return;
 
         // 재캡이 BUY 총액을 늘림 — 사이클 원장 잔여(같은 날 PLANNED·SUBMITTING·PLACED BUY 차감 후)를 예산으로 재시도한다.
@@ -104,8 +102,7 @@ class TradingOrderExecutor {
         // 같은 계좌의 "원장 조회 → 재캡 커밋"을 직렬화해 동시 재캡끼리 같은 여유분을 이중 사용하지 않게 한다(접수는 락 밖 — 병렬 유지)
         try {
             accountBudgetLock.call(account.id(), () -> {
-                StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
-                return buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
+                return buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, cycle.id(),
                         currentPrice, position, vrPosition, strategy.ticker(), ledgerBudget.remaining(cycle, date));
             });
         } catch (InterruptedException _) {

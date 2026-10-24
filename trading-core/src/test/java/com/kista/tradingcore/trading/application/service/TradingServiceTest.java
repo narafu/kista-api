@@ -185,7 +185,7 @@ class TradingServiceTest {
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
         StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, cycleStrategies);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, ledgerBudget, strategyCyclePort,
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, ledgerBudget,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerOrderPort, eventPublisher),
                 new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher),
                 eventPublisher, mock(DcaExecutionRecorder.class));
@@ -705,7 +705,6 @@ class TradingServiceTest {
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("80.00")));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
         when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
-        when(strategyCyclePort.requireLatestByStrategyId(vr.id())).thenReturn(vrCycle); // 재캡 원장 예산 조회용(원장=시작금액 1000)
         when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(vrCycle.strategyVersionId()))
                 .thenReturn(Optional.of(vrDetail));
