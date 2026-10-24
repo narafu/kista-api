@@ -151,9 +151,4 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
         return result;
     }
 
-    @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        return tossHoldingsApi.getBalance(account, ticker);
-    }
-
 }

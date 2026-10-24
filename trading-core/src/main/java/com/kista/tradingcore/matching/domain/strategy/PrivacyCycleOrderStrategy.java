@@ -28,9 +28,6 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     public StrategyType cycleType() { return StrategyType.PRIVACY; }
 
     @Override
-    public int allocationPriority() { return 2; }
-
-    @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
         PlanContext.PrivacyInputs inputs = ctx.privacy();
         // 기준매매표 없으면 전략 차원 skip — 서비스는 OrderPlan absent로 skip 처리

@@ -155,6 +155,20 @@ class CycleRotationServiceTest {
     }
 
     @Test
+    @DisplayName("MAX — 원장이 0 이하면 새 사이클 없이 PAUSED하고 관리자에게 알린다")
+    void max_zeroLedger_pausesWithoutCreatingCycle() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "0");
+
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
+
+        verify(strategyPort).pause(strategy.id());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
+        verify(eventPublisher).publishEvent(any(InsufficientBalanceEvent.class));
+    }
+
+    @Test
     @DisplayName("MAX — 재등록 도중 예외 발생 시 전략 PAUSED 후 재throw (좀비 사이클 방지)")
     void max_createCycleFails_pausesStrategyAndRethrows() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);

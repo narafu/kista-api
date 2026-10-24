@@ -46,9 +46,6 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public boolean tracksReverseMode() { return true; }
 
     @Override
-    public int allocationPriority() { return 1; }
-
-    @Override
     public boolean canSkipOrderComputation(List<PlannedOrder> existingOrders, Set<OrderTiming> creatableTimings) {
         List<PlannedOrder> targetOrders = existingOrders.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))

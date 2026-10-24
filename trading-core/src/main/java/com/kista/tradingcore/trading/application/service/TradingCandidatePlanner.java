@@ -311,7 +311,7 @@ class TradingCandidatePlanner {
                 saved.add(ctx);
                 continue;
             }
-            Optional<BatchContext> savedCtx = batchGuard.runSafely("계획 주문 저장", ctx, () -> {
+            Optional<BatchContext> savedCtx = batchGuard.runSafely("원장 판정·계획 주문 저장", ctx, () -> {
                 // 저장 직전 원장 잔여 — 위 재확인으로 걸러진 신규 주문만 판정하므로 이미 저장된 슬롯은 remaining에서 한 번만 빠진다
                 StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(ctx.strategy().type(), fresh.get(),
                         ledgerBudget.remaining(ctx.currentCycle(), tradeDate));

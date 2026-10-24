@@ -159,4 +159,16 @@ class StrategySeedPreviewServiceTest {
         assertThat(result.availableCash()).isNull();
         assertThat(result.minSeed()).isNotNull(); // 가용 예수금 실패가 미리보기를 막지 않는다
     }
+
+    @Test
+    void cryptoAccountHasNullAvailableCashWithoutMarginCall() {
+        stubInfinitePrice();
+        Account crypto = new Account(accountId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null);
+        when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(crypto);
+
+        var result = service.strategySeedPreview(accountId, userId, StrategyType.INFINITE, StrategyTicker.SOXL, 20);
+
+        assertThat(result.availableCash()).isNull();
+        verify(marginPort, never()).getUsdBuyableAmount(any());
+    }
 }

@@ -100,9 +100,4 @@ public class MeritzBrokerAdapter implements BrokerCapabilitiesPort {
     public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         return priceApi.getClosingPrices(tickers, tradeDate, account);
     }
-
-    @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        return tradingApi.getBalance(account, ticker);
-    }
 }

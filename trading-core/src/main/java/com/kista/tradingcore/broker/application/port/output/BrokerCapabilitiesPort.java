@@ -5,5 +5,5 @@ public interface BrokerCapabilitiesPort extends BrokerAdapterPort,
         PortfolioPort, MarginPort, SellableQuantityPort,
         BrokerOrderCorrectionPort,
         ExecutionPort,
-        BrokerPricePort, LiveBalancePort {
+        BrokerPricePort {
 }

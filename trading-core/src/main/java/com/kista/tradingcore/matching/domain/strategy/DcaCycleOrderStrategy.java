@@ -174,9 +174,6 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
     public boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) { return false; } // 계획 시점 캡가 고정
 
     @Override
-    public int allocationPriority() { return 200; } // 기존 전략 예산 우선 보장
-
-    @Override
     public boolean occupiesSeed() { return false; } // 시드 없이 규칙 금액만 매매
 
     @Override

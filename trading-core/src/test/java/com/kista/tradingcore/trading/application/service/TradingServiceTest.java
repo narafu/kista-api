@@ -17,7 +17,6 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
@@ -36,7 +35,6 @@ import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalend
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
@@ -92,7 +90,6 @@ class TradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
     @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
-    @Mock LiveBalancePort liveBalancePort;
     @Mock DcaPlanInputCollector dcaInputCollector; // DCA 입력 수집 — 기존 시나리오는 DCA 전략이 없어 미사용
     @Mock DcaExecutionRecorder dcaExecutionRecorder;
     @Mock StrategyDcaDetailPort dcaDetailPort; // 개장 전 접수 대상(KIS DCA MOO) 판별
@@ -195,10 +192,6 @@ class TradingServiceTest {
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, brokerOrderPort, orderPort,
                 positionPersistor, eventPublisher, cycleStrategies);
-        // 계좌 기준 테스트 — live 잔고 체크 시 liveBalancePort.getLiveBalance() 호출
-        // lenient: live 체크에 도달하지 않는 테스트(휴장·기존 주문 존재 등)는 미호출
-        lenient().when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), any()))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 100));
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
@@ -529,7 +522,8 @@ class TradingServiceTest {
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(new BigDecimal("500.00"), prevClose)));
-        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(LOW_HISTORY)); // usdDeposit=10
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(LOW_HISTORY));
+        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(LOW_HISTORY)); // 원장 usdDeposit=10
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(bigBuy.toPlanned()));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
@@ -670,7 +664,7 @@ class TradingServiceTest {
         // 전략 원장 부족 알림 1건 — failedCount=0, partiallyPlaced=false
         verify(eventPublisher).publishEvent(
                 new InsufficientBalanceEvent(USER.userId(), ACCOUNT.id(), ACCOUNT.nickname(), 0, null, StrategyTicker.SOXL, StrategyType.PRIVACY, 0, false));
-        verifyNoInteractions(liveBalancePort, sellableQuantityPort); // 계획 단계는 증권사 잔고·판매가능수량을 조회하지 않는다
+        verifyNoInteractions(sellableQuantityPort); // 계획 단계는 판매가능수량을 조회하지 않는다
     }
 
     // Task 4: AT_OPEN 접수 경로(placeOpenOrders)도 AT_CLOSE 접수(placeAll)와 동일한 BUY cap 정책을 적용해야 한다.
@@ -904,7 +898,8 @@ class TradingServiceTest {
                 .thenReturn(List.of(bigBuy.toPlanned()));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
                 .thenReturn(List.of());
-        // 원장 부족: BUY $50,000 > 전략 원장
+        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(NORMAL_HISTORY)); // 원장 usdDeposit=1000
+        // 원장 부족: BUY $50,000 > 전략 원장 $1,000
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
@@ -912,6 +907,9 @@ class TradingServiceTest {
         verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(USER.userId(), ACCOUNT.id(), ACCOUNT.nickname(), 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 0, false));
         // 저장 없음
         verify(orderPort, never()).saveAll(any());
+        // 기존 주문이 없는 사이클은 접수·포지션 저장·리포트 모두 호출되지 않는다
+        verify(cycleHistoryPort, never()).save(any());
+        verify(orderPort, never()).findPlannedByCycleAndDate(any(), any());
         // 증권사 접수 없음
         verify(brokerOrderPort, never()).place(any(), any());
     }

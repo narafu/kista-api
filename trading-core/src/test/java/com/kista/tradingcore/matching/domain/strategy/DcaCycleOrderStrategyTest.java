@@ -278,7 +278,6 @@ class DcaCycleOrderStrategyTest {
     void policy_flags() {
         assertThat(strategy.endsCycleOnLiquidation()).isFalse();
         assertThat(strategy.needsCapCheck(null, null)).isFalse();
-        assertThat(strategy.allocationPriority()).isEqualTo(200);
         assertThat(strategy.occupiesSeed()).isFalse();
     }
 }

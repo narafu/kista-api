@@ -115,9 +115,4 @@ public class KisBrokerAdapter implements BrokerCapabilitiesPort {
     public Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
         return kisPriceApi.getClosingPrices(tickers, tradeDate, account);
     }
-
-    @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        return kisTradingApi.getBalance(account, ticker);
-    }
 }

@@ -120,7 +120,7 @@ public class BacktestEngine {
             // (3) 전략별 하루 처리 — 사이클 판정 후 오늘 주문 생성 + 접수 전 BUY 가격 캡 보정
             List<PlannedOrder> planned = planner.planFor(candle, nextSession);
 
-            // (4) 접수 전 BUY 예산 검증 — 운영 TradingOrderBudgetAllocator와 동일: BUY 지정가 합계(보정 주문 포함)가
+            // (4) 접수 전 BUY 예산 검증 — 운영 StrategyLedgerBudget과 동일: BUY 지정가 합계(보정 주문 포함)가
             // 예수금을 넘으면 그 날 BUY를 전부 거절하고 SELL만 접수한다(마지막 캔들 주문은 체결 기회가 없어 판정 생략)
             if (nextSession != null && AccountBalance.buyTotal(planned).compareTo(state.availableCash()) > 0) {
                 planned = planned.stream().filter(o -> o.direction() != BUY).toList();

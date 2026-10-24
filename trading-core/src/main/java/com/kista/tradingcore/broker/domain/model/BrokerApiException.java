@@ -45,7 +45,7 @@ public abstract class BrokerApiException extends RuntimeException {
     }
 
     public boolean isInsufficientFunds() {
-        return insufficientFunds;
+        return rejected && insufficientFunds;
     }
 
     public boolean isRejected() {

@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @Component
 @Slf4j
 class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
-        BrokerOrderCorrectionPort, ExecutionPort, BrokerPricePort, LiveBalancePort {
+        BrokerOrderCorrectionPort, ExecutionPort, BrokerPricePort {
 
     private final Map<Broker, BrokerCapabilitiesPort> adapters;
     private final AdminMarketPricePort adminPrices; // 관리자 키 시세(Toss → KIS), 부분 결과
@@ -142,10 +142,5 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
             log.warn("계좌 시세 보충 실패, 관리자 부분 결과 반환 (누락 {}): {}", missing, e.getMessage());
         }
         return result;
-    }
-
-    @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        return of(account).getLiveBalance(account, ticker);
     }
 }
