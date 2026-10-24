@@ -35,6 +35,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   - 주문 접수(`TradingOrderExecutor.placeEach()`)는 자체 페이싱 없이 이 공통 게이트에 의존한다 — 취소 경로(`OrderCancelService.cancelByCycle`)도 같은 `KisHttpClient.post()`를 거치므로 별도 처리 불필요. (`TradingReporter.cancelUnresolvedOrders`는 Toss 전용 분기라 KIS에는 처음부터 해당 없음)
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
 - `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 `TradingOrderBudgetAllocator`에서 BUY·SELL을 독립 검증하며, BUY는 cap·correction 반영 최종 총액과 기존 PLANNED 금액을(예산 초과 시 전략 `fitBuysToBudget`으로 INFINITE 보정 주문·VR 꼬리 단을 덜어낸 안이 담기면 그 안으로 승인), SELL은 계좌·거래일·종목별 기존 PLANNED/PLACED 예약 수량을 각각 반영한다. 수동 SELL도 기존 예약 수량과 신규 수량의 합을 검증한다.
+  - 주문 접수 응답이 `APBK0988`이면 `KisApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `isRejected()` 의미 불변). BUY만 잔고 부족으로 취급해 사용자 알림 대상이 되고, SELL의 APBK0988은 판매가능수량 문제라 관리자 알림을 유지한다(방향 판단은 `OrderSubmitter`). 다른 msg_cd는 분류하지 않는다.
 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
 - 지원 범위: 1970~2029년 — 2026년 기준 최대 3년 선제 적재 가능

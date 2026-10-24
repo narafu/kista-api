@@ -70,3 +70,7 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 - **`DstInfo.marketOpen` 필드를 그대로 쓰면 안 됨**: 이 필드는 "오늘 날짜" 고정이라 자정~개장 전(00:00~22:30 KST) 사이 호출 시 실제 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킴 — `lastSessionOpenInstant()`가 `nextTradeDate()`와 같은 패턴으로 날짜 롤백 처리한 버전이므로 이걸 사용
 - `TossPriceApi.prevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
 - 캔들 배열 인덱스로 확정 종가를 추측하지 말 것 — `count=1`+`before` 방식만 사용 (인덱스 추측은 장마감 후 최신 캔들 오인·프리마켓 구간 stale 버그를 냈음)
+
+### 잔고 부족 거절 분류
+- 주문 POST가 HTTP 422 + `error.code = insufficient-buying-power`이면 `TossApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `TossHttpClient`가 판정). 출처: 공식 문서 `openapi.tossinvest.com/openapi-docs/overview.md`.
+- `insufficient-sellable-quantity`(SELL)·`idempotency-key-conflict` 등 다른 422 코드는 분류하지 않는다. BUY 여부 판단은 호출자(`OrderSubmitter`) 몫.

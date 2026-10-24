@@ -8,12 +8,17 @@ public class KisApiException extends BrokerApiException {
         super("KIS", message, cause, Conflict.NONE);
     }
 
-    private KisApiException(String message, Throwable cause, boolean rejected) {
-        super("KIS", message, cause, Conflict.NONE, rejected);
+    private KisApiException(String message, Throwable cause, boolean rejected, boolean insufficientFunds) {
+        super("KIS", message, cause, Conflict.NONE, rejected, insufficientFunds);
     }
 
     // 증권사가 접수하지 않았음이 확실한 실패(송신 전 실패·응답 거부)
     public static KisApiException rejected(String message, Throwable cause) {
-        return new KisApiException(message, cause, true);
+        return new KisApiException(message, cause, true, false);
+    }
+
+    // 확정 거절 중 잔고·가능수량 부족(APBK0988)
+    public static KisApiException rejectedInsufficientFunds(String message, Throwable cause) {
+        return new KisApiException(message, cause, true, true);
     }
 }
