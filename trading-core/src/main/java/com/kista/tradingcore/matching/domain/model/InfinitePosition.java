@@ -89,9 +89,9 @@ public record InfinitePosition(
         return priceOffsetRate().compareTo(BigDecimal.ZERO) > 0;
     }
 
-    // 마지막 회차(매도 소진 구간) — unitAmount > usdDeposit ⟺ A·Q > 19·usdDeposit ⟺ currentRound > 19
+    // 마지막 회차(매도 소진 구간) — unitAmount > usdDeposit ⟺ currentRound > 19, 또는 기준가 1주도 원장을 넘어 매수 불가
     public boolean isFinalRound() {
-        return unitAmount().compareTo(usdDeposit()) > 0;
+        return unitAmount().compareTo(usdDeposit()) > 0 || referencePrice().compareTo(usdDeposit()) > 0;
     }
 
     // 체결 후 리버스모드 상태 전이 — prevReverseMode: 이전 상태

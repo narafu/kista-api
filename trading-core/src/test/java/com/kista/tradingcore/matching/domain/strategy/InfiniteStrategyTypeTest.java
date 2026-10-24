@@ -74,6 +74,19 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
+    @DisplayName("buildOrders 후반 기준가 1주>원장: MOC 매도 1건만")
+    void lateStageOneShareOverDepositEmitsMocSellOnly() {
+        // unitAmount=22 <= usdDeposit=25 이지만 기준가(≈34) > 25 → 1주도 못 사므로 최종회차
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("41.5"), new BigDecimal("25"));
+        InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("40"), 20);
+
+        List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
+
+        assertThat(orders).extracting(PlannedOrder::orderLeg).containsExactly("INFINITE_MOC_SELL");
+        assertThat(orders.getFirst().quantity()).isEqualTo(2); // 10/4
+    }
+
+    @Test
     @DisplayName("buildOrders 후반 unitAmount>usdDeposit: MOC 매도 1건만")
     void buildOrders_backHalf_insufficientDeposit() {
         // averagePrice=5, holdings=200, usdDeposit=50 → totalAssets=1050, unitAmount=52.50, currentRound≈19.05 (후반), unitAmount(52.50)>usdDeposit(50)
