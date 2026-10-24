@@ -130,6 +130,7 @@ class AdminTradeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].accountId").value(ORDER_ACCOUNT_ID.toString()))
                 .andExpect(jsonPath("$[0].strategyId").value(ORDER_STRATEGY_ID.toString()))
+                .andExpect(jsonPath("$[0].strategyCycleId").value("00000000-0000-0000-0000-000000000040"))
                 .andExpect(jsonPath("$[0].strategyType").value("PRIVACY"))
                 .andExpect(jsonPath("$[0].ownerNickname").value("privacy-user"))
                 .andExpect(jsonPath("$[0].ticker").value("SOXL"))
