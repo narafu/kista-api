@@ -136,7 +136,7 @@ flows:
         desc: >-
           전략 공식으로 주문을 계산하고, 오늘 아직 없는 AT_CLOSE 슬롯만 후보로 남긴다. BUY는 현재가×1.05 cap을 미리 적용한다.
           계좌별 실시간 잔고·판매가능수량 안에서 VR → INFINITE → PRIVACY → DCA 순서로 예산을 배정하고, 승인된 주문을 PLANNED로 저장한다.
-        code: [TradingCandidatePlanner#planAll, TradingOrderBudgetAllocator#allocate]
+        code: [TradingCandidatePlanner#planAll, StrategyLedgerBudget#fit]
         state: "orders → PLANNED · trading_batch_run → PLANNED"
         fail: 예산이 부족해 거절된 전략은 사용자에게 잔고 부족을 알린다. 계좌나 사이클 하나가 실패해도 그 단위만 격리하고 나머지는 계속 진행한다.
 
@@ -358,7 +358,7 @@ flows:
         desc: >-
           전략 공식으로 주문을 계산하되 오늘 아직 없는 AT_OPEN 슬롯만 후보로 남긴다(INFINITE 매도, VR 사다리 — PRIVACY는 AT_OPEN 주문이 없다).
           계좌별 잔고 안에서 예산을 배정해 PLANNED로 저장한다. AT_CLOSE는 개장 가격으로 cap이 굳지 않도록 여기서 만들지 않는다.
-        code: [TradingCandidatePlanner#collectOpenCandidates, TradingCandidatePlanner#saveAllocatedOrders, TradingOrderBudgetAllocator#allocate]
+        code: [TradingCandidatePlanner#collectOpenCandidates, TradingCandidatePlanner#saveAllocatedOrders, StrategyLedgerBudget#fit]
         state: "orders → PLANNED (AT_OPEN)"
         fail: 예산 부족으로 거절된 전략은 사용자에게 잔고 부족을 알린다. 전략 하나가 실패해도 그 전략만 격리한다.
 
@@ -983,7 +983,7 @@ flows:
           BUY는 현재가×1.05 상한을 미리 적용한 뒤, 계좌 락 안에서 실시간 예수금·판매가능수량으로 승인 여부를 판단하고 승인된 주문을 PLANNED로 저장한다.
           같은 계좌의 배치 승인과 같은 여유분을 이중으로 쓰지 않도록 배치와 같은 계좌 락을 쓴다. 현재가 조회가 실패하면 상한 없이 진행한다.
           배치와 달리 일부만 승인하지 않고, BUY나 SELL이 하나라도 거절되면 전체를 거부한다.
-        code: [BuyOrderPriceCapper#prepareForAllocation, TradingOrderBudgetAllocator#allocate, TradingOrderPlanner#savePlannedOrders]
+        code: [BuyOrderPriceCapper#prepareForAllocation, StrategyLedgerBudget#fit, TradingOrderPlanner#savePlannedOrders]
         state: "orders → PLANNED"
         fail: 예수금 부족이면 409 "예수금이 부족합니다", 판매가능수량 부족이면 409 "보유 수량이 부족합니다". 아무것도 저장되지 않는다.
 

@@ -118,7 +118,7 @@ class ManualTradingServiceTest {
         StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, cycleStrategies);
 
         // ManualTradingService 필드 목록에 orderPlanner가 포함돼 있다(배치 TradingCandidatePlanner와 동일하게
-        // allocator 승인 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
+        // 원장 통과 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 priceFetcher, planBuilder, priceCapper, ledgerBudget,
@@ -191,6 +191,32 @@ class ManualTradingServiceTest {
                 .isInstanceOf(ManualTradingException.class)
                 .hasMessage("전략 원장 예수금이 부족합니다.");
         verify(orderPort, never()).saveAll(anyList());
+    }
+
+    @Test
+    void ledgerQueryFailure_notifiesAdminAndThrowsManualTradingFailed() {
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(planned(OrderDirection.BUY, 1, "20.00", "INFINITE_BUY_01")));
+        when(cyclePositionPort.findLatestOne(CYCLE.id())).thenThrow(new RuntimeException("DB 오류"));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingFailedException.class);
+
+        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    @Test
+    void ledgerQueryBrokerTypedFailure_propagatesAsIs() {
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(planned(OrderDirection.BUY, 1, "20.00", "INFINITE_BUY_01")));
+        RuntimeException brokerFailure = new com.kista.tradingcore.support.StubBrokerApiException("Toss", "Toss API 오류",
+                com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.NONE);
+        when(cyclePositionPort.findLatestOne(CYCLE.id())).thenThrow(brokerFailure);
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isSameAs(brokerFailure);
+
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test

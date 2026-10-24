@@ -38,7 +38,7 @@ class ManualTradingService {
     private final StrategyLedgerBudget ledgerBudget;          // 전략 자기 원장 상한 — 배치 TradingCandidatePlanner와 같은 판정
     private final TradingOrderPlanner orderPlanner;            // 원장 통과분 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
     private final TradingOrderExecutor orderExecutor;
-    private final AccountBudgetLock budgetLock;              // 승인+저장 구간 계좌 직렬화 — 배치 allocator·재캡과 같은 락
+    private final AccountBudgetLock budgetLock;              // 원장 판정+저장 구간 계좌 직렬화 — 배치 원장 판정·재캡과 같은 락
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
     private final MarketCalendarPort marketCalendarPort;   // 휴장일 수동 실행 차단 — 배치가 접수하지 않는 죽은 PLANNED·휴장일 즉시 접수 방지
 
