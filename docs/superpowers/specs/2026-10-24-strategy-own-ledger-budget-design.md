@@ -79,9 +79,11 @@
   - `OrderSubmitter.rejected()`는 잔고 부족이면 관리자 `TradingErrorEvent`를 생략하고, 사용자 알림 대상으로 기록한다. FAILED 기록은 같다.
   - 그 외 거절과 결과 불명은 지금처럼 관리자 알림을 보낸다.
 - **알림 집계**: 사용자 알림은 **전략 × 거래일 × 접수 패스당 1건**이다. 접수 루프가 끝난 뒤 잔고 부족으로 FAILED된 주문을 모아 이벤트 1건을 발행하고, 실패 건수와 일부 접수 여부를 담는다. VR 사다리 10단이 다 거절돼도 알림은 1건이다.
-- **증권사별 잔고 부족 코드**: 공식 문서나 실측으로 확인된 것만 넣는다. 추정으로 넣지 않는다.
-  - KIS: `msg_cd = APBK0988`("주문수량이 가능수량보다 큽니다", `docs/agents/kis-api.md:37`). 매수 금액 초과와 매도 수량 초과를 모두 포함하므로 문구는 "주문 가능 금액·수량 초과"로 쓴다. 비슷한 코드가 더 있는지 문서로 조사한다.
-  - Toss·Meritz·Binance·Upbit: 구현 첫 태스크로 공식 문서를 조사한다. 확인되지 않으면 분류하지 않는다(관리자 알림 유지). 그 경우 사용자에게는 알림이 가지 않는다는 갭을 해당 `*-api.md`에 기록한다.
+- **증권사별 잔고 부족 코드**(2026-10-24 조사):
+  - Toss: `422` + `error.code = insufficient-buying-power` "주문 가능 금액이 부족합니다."(공식 overview `openapi.tossinvest.com/openapi-docs/overview.md`, 공식 OpenAPI JSON) — **분류**
+  - KIS: `msg_cd = APBK0988`(레포 `kis-api.md:37`과 과거 운영 사례 기록. 공식 포털은 로그인이 필요하고, 공식 GitHub에는 `APBK` 코드표가 없음) — **분류**. 매수 금액 초과와 매도 수량 초과를 모두 포함하지만 BUY 방향만 분류하므로 문제없다.
+  - Meritz: 공식 문서와 GitHub에서 찾지 못함 — **분류 안 함**(관리자 알림 유지). `meritz-api.md`에 갭으로 기록한다.
+  - Binance `-2010`, Upbit `insufficient_funds_bid`: 코인 DCA 경로라 범위 밖.
 - **잔고 부족 분류는 BUY만** 한다(설계자 판단). SELL `APBK0988`은 판매가능수량 검증이 없어진 뒤로는 대부분 원장과 실보유의 괴리라 데이터 이상 신호다. 그래서 관리자 알림을 유지한다. `BrokerApiException`만으로는 방향을 알 수 없으므로 `OrderSubmitter`가 주문 방향과 함께 판정한다.
 - **알림 이벤트**(설계자 판단): `InsufficientBalanceEvent`에 실패 건수와 일부 접수 여부 필드를 추가해 재사용한다. 재주문 즉시 접수는 API 응답으로 결과가 바로 보이므로 별도 알림을 보내지 않는다.
 - **접수 순서 보장 없음**(설계자 판단): 지금도 `TradingService.placeAll`은 context 순서로 접수하며, 우선순위 정렬은 allocator 안에만 있었다. 실계좌 현금이 모자랄 때 어느 전략이 거절될지는 접수 순서에 달려 있으며, 이를 허용한다. `BuyPriorityOrdering`과 `allocationPriority()`는 소비처가 사라지므로 삭제한다.
@@ -90,13 +92,7 @@
 
 - DCA는 원장을 쓰지 않는다(`occupiesSeed()=false`, `usd_deposit` 항상 0). 그래서 자기 원장 상한 대상이 아니다.
 - **사용자 결정:** DCA도 다른 전략처럼 오늘 규칙대로 전량 주문한다. 예산 판정이나 live 잔고 조회는 하지 않는다. 부족하면 증권사가 거절하고 FAILED로 기록한다.
-- 그 결과 부족 정책 `DcaShortfallPolicy`(PARTIAL "가용만큼 주문" / REJECT "주문하지 않음")가 의미를 잃으므로 **제거**한다. 제거 대상:
-  - sharedkernel enum
-  - DCA 규칙 도메인 필드, `PlannedOrder.partialAllowed`(DCA 전용이면 함께 제거)
-  - `DcaCycleOrderStrategy.fitBuysToBudget` override
-  - 메타 라벨, 요청·응답 DTO
-  - DB 컬럼(trading 스키마)
-  - kista-ui 선택지
+- 부족 정책 `DcaShortfallPolicy`(PARTIAL/REJECT)는 **유지**한다. 주식 SELL(가용 보유 대비)과 코인 BUY(지갑 잔고 대비)에서 계속 쓰인다. 이번에 없애는 것은 **주식 BUY에서의 효과**뿐이다: `PlannedOrder.partialAllowed`와 `DcaCycleOrderStrategy.fitBuysToBudget` override를 삭제한다. DB 컬럼, API, 메타는 그대로 둔다. UI에는 정책이 매도·코인에만 적용된다는 안내만 추가한다.
 - 감수 사항: DCA는 원장이 없어서, 공유 계좌에서는 다른 전략 현금으로도 살 수 있다. 실계좌 현금이 모자라면 증권사가 거절한다.
 - DCA 주문이 증권사 잔고 부족으로 FAILED되면 회차 기록이 끊기지 않도록 `DcaRoundSkippedEvent(INSUFFICIENT_BALANCE)` skip 이력을 남긴다. 사용자 알림도 이 이벤트 경로 하나로 보내 §4.3 알림과 중복되지 않게 한다.
 - 잔고 부족으로 분류되지 않는 거절은 skip 이력 없이 FAILED만 남고 관리자 알림이 간다(기존 동작).
@@ -158,7 +154,7 @@
 | `BuyPriorityOrdering`, `CycleOrderStrategy.allocationPriority()` | 삭제 |
 | `OrderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker` | DCA 입력 수집기만 남으면 유지, 미사용이면 삭제 |
 | `OrderPort.sumPlannedBuyByAccountAndDate` | 계좌 단위 합계라 소비처가 사라지면 삭제(사이클 단위 합계로 대체) |
-| `DcaShortfallPolicy`와 DCA `fitBuysToBudget` | 삭제(§4.4) |
+| `PlannedOrder.partialAllowed`, DCA `fitBuysToBudget` | 삭제(§4.4). `DcaShortfallPolicy`는 유지 |
 | `AccountBudgetLock` | 예산 용도는 사라지지만 배치·수동 실행 중복 저장 방지(저장 직전 `excludeExisting` 재검사) 역할로 유지. 이름 변경은 builder 재량 |
 | `LiveBalancePort`, `SellableQuantityPort` | DCA·통계 등 남은 소비처 확인 후 미사용 메서드만 정리 |
 | `MockBrokerAdapter.getLiveBalance`의 원장 합산 | 계획 경로 소비처가 사라지므로 남은 소비처(통계 등) 확인 후 정리 |
@@ -189,7 +185,7 @@
 - 전략 폼: `balanceCheckEnabled` 분기를 제거한다. 시드는 항상 직접 입력할 수 있게 하고, 시드 미리보기의 가용 예수금(null 가능)을 참고값과 비율 채우기 보조로 쓴다. 초과하면 경고만 띄운다.
 - 미리보기 `NextOrdersResponse`: `competition`·`sellSufficiency`를 제거하고 자기 원장 경고 필드를 추가한다.
 - 재주문 예산 조회 `ReorderBuyBudget` 응답이 사이클별 값으로 바뀐다. 재주문 BUY가 원장을 넘으면 409로 차단된다.
-- DCA 규칙 폼에서 부족 정책(PARTIAL/REJECT) 선택지를 제거한다.
+- DCA 규칙 폼의 부족 정책(PARTIAL/REJECT)은 유지하되, 매도·코인에만 적용된다는 안내를 추가한다.
 - 수동 실행 409 문구가 바뀐다(문구 매핑을 쓰는 경우 확인).
 - 배포 순서: API 응답에서 필드를 제거하는 변경이므로 UI가 새 필드를 쓰고 옛 필드를 optional로 다루도록 먼저 배포하거나, API와 동시에 배포한다. builder가 결정한다.
 
