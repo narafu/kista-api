@@ -515,11 +515,10 @@ flows:
       - id: balance
         lane: trading
         to: [broker]
-        title: 잔고 검증
-        desc: 잔고 검증 토글이 켜져 있으면 "증권사 USD 매수가능금액 − 기존 전략들의 예수금 합"보다 시드가 크지 않은지 확인한다.
-        code: [StrategyCreationService#validateBalanceIfRequired, MarginPort#getUsdBuyableAmount]
-        cond: 잔고 검증 ON이고 시드가 있을 때
-        fail: 한도 초과면 거부한다.
+        title: 사용자 복제본 확인
+        desc: 매매 배치가 이 전략을 돌릴 수 있도록 사용자 알림·활성 복제본이 있는지 확인한다. 시드가 가용 예수금을 넘어도 막지 않는다(시드 미리보기가 경고만 한다).
+        code: [TradingUserProfilePort#findByUserId]
+        fail: 복제본이 없으면 404로 거부한다.
 
       - id: bootstrap-price
         lane: trading
@@ -1709,7 +1708,7 @@ lifecycles:
         to: PAUSED
         title: 사이클 종료 후 다음 사이클을 열지 않음
         desc: >-
-          청산으로 사이클이 끝났을 때 연속 정책이 NONE이거나, 잔고가 유지 시드에 못 미치거나, 증권사 잔고 조회·사이클 재등록이 실패하면
+          청산으로 사이클이 끝났을 때 연속 정책이 NONE이거나 사이클 재등록이 실패하면
           좀비 사이클을 막으려고 전략을 멈춘다.
         code: [CycleRotationService#rotate, StrategyPort#pause]
         tag: 시스템

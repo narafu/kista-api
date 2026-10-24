@@ -3,6 +3,9 @@ package com.kista.tradingcore.trading.application.service.support;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
+import com.kista.tradingcore.broker.application.port.output.MarginPort;
+import com.kista.shared.kernel.Broker;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
@@ -20,6 +23,7 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +37,7 @@ import java.util.UUID;
 // 전략(사이클) 기준 조회 전용 — 시드 미리보기, 거래 이력, 주문 내역 (stats에서 이관됐던 전략 소유 read)
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StrategyHistoryQueryService {
 
     private final AccountPort accountPort;
@@ -42,6 +47,7 @@ public class StrategyHistoryQueryService {
     private final CycleOrderStrategies cycleStrategies;
     private final PrivacyTradePort privacyTradePort;
     private final BrokerPricePort brokerPricePort;
+    private final MarginPort marginPort; // 가용 예수금 경고용 USD 매수가능금액 조회
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
     // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
@@ -59,7 +65,7 @@ public class StrategyHistoryQueryService {
                 ? privacyTradePort.findSeedPreviewBase().orElse(null)
                 : null;
         if (strategy.requiresPrivacyBase() && currentBase == null) {
-            return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE");
+            return new StrategySeedPreview(ticker.name(), null, null, "NO_PRIVACY_BASE", null);
         }
         // PrivacyCycleOrderStrategy.minRequiredDeposit()은 currentCycleStart만 사용 — 나머지 필드는 빈 값
         PrivacyPlan privacyPlan = currentBase != null
@@ -75,7 +81,24 @@ public class StrategyHistoryQueryService {
                 : price;
         BigDecimal minSeed = strategy.minRequiredDeposit(price, privacyPlan, divisionCount);
 
-        return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null);
+        return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null, calcAvailableCash(account));
+    }
+
+    // 가용 예수금 = 증권사 USD 매수가능금액 − 계좌 내 전략별 최신 원장(usd_deposit) 합 — 등록 차단이 아닌 폼 경고용
+    // MOCK은 마진이 고정값이라 무의미, 조회 실패는 미리보기를 막지 않고 null
+    private BigDecimal calcAvailableCash(Account account) {
+        if (account.broker() == Broker.MOCK) return null;
+        try {
+            BigDecimal reserved = strategyPort.findByAccountId(account.id()).stream()
+                    .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())
+                            .map(CyclePosition::usdDeposit)
+                            .orElse(BigDecimal.ZERO))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return marginPort.getUsdBuyableAmount(account.toBrokerRef()).subtract(reserved);
+        } catch (Exception e) {
+            log.warn("[accountId={}] 가용 예수금 조회 실패 — 경고 생략: {}", account.id(), e.getMessage());
+            return null;
+        }
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션

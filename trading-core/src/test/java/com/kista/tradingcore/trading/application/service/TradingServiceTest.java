@@ -92,7 +92,6 @@ class TradingServiceTest {
     @Mock PrivacyTradePort privacyTradePort;
     @Mock com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
     @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
-    @Mock com.kista.tradingcore.broker.application.port.output.MarginPort kisMarginBrokerPort; // CycleRotationService 위임용
     @Mock LiveBalancePort liveBalancePort;
     @Mock DcaPlanInputCollector dcaInputCollector; // DCA 입력 수집 — 기존 시나리오는 DCA 전략이 없어 미사용
     @Mock DcaExecutionRecorder dcaExecutionRecorder;
@@ -178,7 +177,7 @@ class TradingServiceTest {
                 cycleStrategies, cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCycleVrPort, strategyVrDetailPort, orderPort);
         CycleRotationService rotationService = new CycleRotationService(
-                kisMarginBrokerPort, cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
+                cyclePort, strategyVersionPort, strategyInfiniteDetailPort,
                 cycleHistoryPort, cycleSnapshotCreator, eventPublisher, cycleStrategies);
 
 
@@ -1767,7 +1766,6 @@ class TradingServiceTest {
         when(orderPort.findPlacedByCycleAndDate(eq(maintainCycle.id()), any())).thenReturn(List.of(placedOrder(ACCOUNT, maintainCycle)));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
         // MAINTAIN은 KIS 실잔고 확인 필수 — initDeposit 이상이면 재등록
-        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(initDeposit);
 
         service.executeBatch(List.of(new BatchContext(maintainStrategy, maintainCycle, ACCOUNT, USER)), PAST_DST);
 
@@ -1799,7 +1797,6 @@ class TradingServiceTest {
         when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
         when(orderPort.findPlacedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of(placedOrder(ACCOUNT, maxCycle)));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
-        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(marginAmount);
 
         service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
 
@@ -1810,13 +1807,11 @@ class TradingServiceTest {
     }
 
     @Test
-    void executeBatch_MAX_belowMinRequired_skipsRotationAndNotifiesInsufficientBalance() throws InterruptedException {
-        // PRICE=22, minRequired = 22 × (20 × 2.2) = 968
-        // actualBalance=500, maintainSeed=500 → targetSeed=500 < 968 → notifyInsufficientBalance
-        BigDecimal marginAmount = new BigDecimal("500.00");
+    void executeBatch_MAINTAIN_belowMinRequired_rotatesWithReducedSeedAndNotifiesAdmin() throws InterruptedException {
+        // PRICE=22, minRequired = 968 — MAINTAIN 시드 min(500, 원장 1000)=500 미달이어도 축소 시드로 재등록하고 관리자에게만 알린다
         Strategy maxStrategy = new Strategy(
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
         StrategyCycle maxCycle = new StrategyCycle(
                 UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
 
@@ -1830,11 +1825,11 @@ class TradingServiceTest {
         when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
         when(orderPort.findPlacedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of(placedOrder(ACCOUNT, maxCycle)));
         when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
-        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(marginAmount);
 
         service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
 
-        verify(strategyCyclePort, never()).save(any());
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(
+                eq(maxStrategy.id()), any(UUID.class), eq(new BigDecimal("500.00")), eq(PRICE));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
                 && ibe.userId() == null && ACCOUNT.id().equals(ibe.accountId()) && ibe.usdDeposit() != null && ibe.ticker() == StrategyTicker.SOXL));
     }
@@ -1960,34 +1955,6 @@ class TradingServiceTest {
                 timing, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal(amount),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_" + ticker + "_" + timing + "_BUY_" + amount.replace(".", "_"));
-    }
-
-    @Test
-    void executeBatch_MAX_marginFails_skipsRotationAndNotifiesError() throws InterruptedException {
-        Strategy maxStrategy = new Strategy(
-                UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
-        StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
-        RuntimeException kisError = new RuntimeException("KIS 증거금 조회 실패");
-
-        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
-        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        when(cycleHistoryPort.findLatestOneByStrategyId(maxStrategy.id())).thenReturn(Optional.of(FRESH_HISTORY));
-        // 사이클 종료 판정: 이전 포지션 holdings > 0 → 진짜 청산으로 판단 (limit 무관, CycleOrderComputer=2, Reporter=1)
-        when(cycleHistoryPort.findLatestByCycleId(eq(maxCycle.id()), anyInt())).thenReturn(List.of(NORMAL_HISTORY));
-        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of(placedOrder(ACCOUNT, maxCycle)));
-        when(orderPort.findPlannedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of());
-        when(orderPort.findPlacedByCycleAndDate(eq(maxCycle.id()), any())).thenReturn(List.of(placedOrder(ACCOUNT, maxCycle)));
-        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
-        when(kisMarginBrokerPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(kisError);
-
-        service.executeBatch(List.of(new BatchContext(maxStrategy, maxCycle, ACCOUNT, USER)), PAST_DST);
-
-        verify(strategyCyclePort, never()).save(any());
-        // rotateCycleIfConsecutive 내부 catch → notifyError (executeBatch 바깥 catch와 별개)
-        verify(eventPublisher, atLeastOnce()).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee && tee.userId() == null));
     }
 
     // ── filterScheduledStart 경계 테스트 (executeBatch/placeOpenOrders 공통) ───────

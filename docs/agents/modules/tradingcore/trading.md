@@ -54,7 +54,7 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 
 ### 잔고검증 토글 (balanceCheckEnabled)
 - 원본은 root user의 `UserSettings`(`com.kista.api.user.domain.model`)이고, trading-core는 복제본 `TradingUserProfile.balanceCheckEnabled`(`TradingUserProfilePort`)를 읽는다
-- ON이면 `StrategyCreationService.validateBalanceIfRequired`(등록)·`CycleRotationService`(수정) 시드 검증에서 "KIS 가용금액 − 기존 활성 전략 점유 시드" 한도 초과를 `IllegalArgumentException`으로 차단
+- 등록·사이클 재등록은 더 이상 이 토글로 차단하지 않는다 — 등록은 시드 미리보기 `availableCash`(= KIS 가용금액 − 계좌 내 전략 원장 합, MOCK·조회 실패 null) 경고만, `CycleRotationService`는 증권사 조회 없이 원장 기준(MAX=원장, MAINTAIN=min(startAmount, 원장))으로 시드를 정한다
 - 설정 미존재 시 `UserSettings.defaultFor(userId)` — `balanceCheckEnabled=true`, 빈 notificationPrefs
 
 ### 스케쥴러 주문 예산 배정 (상세 규칙 SSOT → workflow.md)

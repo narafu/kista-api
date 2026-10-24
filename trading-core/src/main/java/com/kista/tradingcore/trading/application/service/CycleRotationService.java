@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
-import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
@@ -12,7 +11,6 @@ import com.kista.tradingcore.trading.domain.model.StrategyInfiniteDetail;
 import com.kista.tradingcore.trading.domain.model.StrategyVersion;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,19 +18,17 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyDefaults;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
-// NONE → 전략 PAUSED / MAINTAIN → 동일 startAmount 유지 / MAX → 내부 원장 기준 최대 시드
+// NONE → 전략 PAUSED / MAX → 내부 원장 / MAINTAIN → min(시작 시드, 직전 사이클 최종 원장) — 증권사 잔고 조회 없음
 // package-private — application/service 패키지 전용
 @Service
 @RequiredArgsConstructor
 @Slf4j
 class CycleRotationService {
 
-    private final MarginPort marginPort; // USD 매수가능금액 조회 (MAX 재등록)
     private final StrategyPort strategyPort;                   // 시스템 자동 일시중지(사이클 재등록 실패)에도 사용
     private final StrategyVersionPort strategyVersionPort;     // 활성 전략 버전 조회/종료
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
@@ -51,23 +47,11 @@ class CycleRotationService {
             return;
         }
 
-        BigDecimal maintainSeed = currentCycle.startAmount(); // MAINTAIN 기준 시드
-        BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle); // MAX 기준 시드 (내부 원장)
-
-        // 잔고검증 정책 — ON: 증권사 실잔고 조회, OFF: 내부 원장만 사용
-        Optional<BigDecimal> balanceOpt = resolveAvailableBalance(userProfile, account, strategy, maintainSeed, maxSeed);
-        if (balanceOpt.isEmpty()) {
-            // 증권사 조회 실패 — 내부에서 notifyError 완료. 여기서 PAUSED하지 않으면 사이클은 이미
-            // markEnded로 종료된 채 전략만 ACTIVE로 남아 후속 사이클 없는 좀비 상태가 되고,
-            // BatchContextFactory가 이후 배치마다 동일 경고를 무한 반복한다
-            strategyPort.pause(strategy.id());
-            log.warn("[strategyId={}] 증권사 잔고 조회 실패 → PAUSED (좀비 사이클 방지)", strategy.id());
-            return;
-        }
-        BigDecimal actualBalance = balanceOpt.get();
-
-        BigDecimal targetSeed = resolveTargetSeed(strategy, actualBalance, maintainSeed, maxSeed);
-        if (targetSeed == null) return; // maintainSeed도 부족 — PAUSED 처리 완료
+        // 시드는 전략 자신의 원장(마지막 CyclePosition.usdDeposit)만으로 정한다 — 원장 이상으로 키울 수 없으므로 부족 분기가 없다
+        BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle);
+        BigDecimal targetSeed = strategy.cycleSeedType() == StrategyCycleSeedType.MAX
+                ? maxSeed
+                : currentCycle.startAmount().min(maxSeed); // MAINTAIN: 손실 뒤엔 남은 돈으로, 수익 뒤엔 원래 시드로
 
         BigDecimal minRequired;
         try {
@@ -104,59 +88,10 @@ class CycleRotationService {
                 strategy.type(), strategy.ticker(), targetSeed)); // 사용자 알림 이벤트
     }
 
-    // MAX/MAINTAIN 공통 목표 시드 결정 — maintainSeed 미달 시 PAUSED 처리 후 null 반환
-    private BigDecimal resolveTargetSeed(Strategy strategy, BigDecimal actualBalance,
-                                         BigDecimal maintainSeed, BigDecimal maxSeed) {
-        if (strategy.cycleSeedType() == StrategyCycleSeedType.MAX && actualBalance.compareTo(maxSeed) >= 0) {
-            return maxSeed;
-        }
-        if (actualBalance.compareTo(maintainSeed) >= 0) {
-            if (strategy.cycleSeedType() == StrategyCycleSeedType.MAX) {
-                log.warn("[strategyId={}] MAX 잔고 부족 → MAINTAIN으로 강등: actual={}, max={}",
-                        strategy.id(), actualBalance, maxSeed);
-            }
-            return maintainSeed;
-        }
-        // 실잔고가 maintainSeed에도 못 미침 → PAUSE
-        log.warn("[strategyId={}] MAINTAIN 잔고 부족 → PAUSED: actual={}, maintain={}",
-                strategy.id(), actualBalance, maintainSeed);
-        strategyPort.pause(strategy.id());
-        return null;
-    }
-
-    // 잔고검증 설정에 따라 가용 잔고 결정 — 가용 잔고를 반환, 증권사 조회 실패·오류 시 Optional.empty() (호출부는 rotate 중단)
-    private Optional<BigDecimal> resolveAvailableBalance(TradingUserProfile userProfile, TradingAccount account, Strategy strategy,
-                                                          BigDecimal maintainSeed, BigDecimal maxSeed) {
-        if (!userProfile.balanceCheckEnabled()) {
-            // OFF: 내부 원장만 사용 (증권사 조회 없음)
-            return Optional.of(strategy.cycleSeedType() == StrategyCycleSeedType.MAX ? maxSeed : maintainSeed);
-        }
-        // ON: 증권사 실잔고 조회
-        return Optional.ofNullable(fetchUsdBalance(strategy, account));
-    }
-
     // 마지막 CyclePosition의 usdDeposit = MAX 시드의 내부 원장 기준
     private BigDecimal calcLastPositionDeposit(Strategy strategy, StrategyCycle currentCycle) {
         return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .map(CyclePosition::usdDeposit)
                 .orElse(currentCycle.startAmount()); // fallback: 현재 사이클 시드
-    }
-
-    // 브로커별 USD 매수가능금액 조회 — 실패 시 notifyError 후 null 반환
-    private BigDecimal fetchUsdBalance(Strategy strategy, TradingAccount account) {
-        try {
-            BigDecimal usdAmount = marginPort.getUsdBuyableAmount(account.brokerRef());
-            if (usdAmount == null || usdAmount.compareTo(BigDecimal.ZERO) == 0) {
-                log.warn("[strategyId={}] 재등록 — USD 잔고 없음 (0 또는 null)", strategy.id());
-                eventPublisher.publishEvent(new TradingErrorEvent(null,
-                        "재등록 실패: USD 잔고 없음 strategyId=" + strategy.id()));
-                return null;
-            }
-            return usdAmount;
-        } catch (Exception e) {
-            log.error("[strategyId={}] 재등록 — USD 잔고 조회 실패: {}", strategy.id(), e.getMessage());
-            eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-            return null;
-        }
     }
 }

@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -10,11 +9,9 @@ import com.kista.tradingcore.trading.domain.model.StrategyInfiniteDetail;
 import com.kista.tradingcore.trading.domain.model.StrategyVersion;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.trading.domain.strategy.*;
 import com.kista.tradingcore.matching.domain.strategy.*;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
-import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +38,6 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CycleRotationService 단위 테스트")
 class CycleRotationServiceTest {
-    @Mock MarginPort marginPort;
     @Mock StrategyPort strategyPort;
     @Mock StrategyVersionPort strategyVersionPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
@@ -57,9 +53,7 @@ class CycleRotationServiceTest {
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
 
     static final TradingAccount ACCOUNT = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());
-    static final BrokerAccountRef ACCOUNT_REF = ACCOUNT.brokerRef();
 
-    // 잔고검증 ON(기본값) — 증권사 실잔고 경로로 진행
     static final TradingUserProfile USER = TradingFixtures.tradingUserProfile(ACCOUNT.userId());
 
     @BeforeEach
@@ -68,7 +62,7 @@ class CycleRotationServiceTest {
         CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
                 new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy),
                 new PrivacyCycleOrderStrategy(privacyStrategy)));
-        service = new CycleRotationService(marginPort, strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
+        service = new CycleRotationService(strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
                 cyclePositionPort, cycleSnapshotCreator, eventPublisher, cycleStrategies);
         lenient().when(strategyVersionPort.findActiveByStrategyId(any()))
                 .thenReturn(Optional.of(new StrategyVersion(STRATEGY_VERSION_ID, null, 1, null, null)));
@@ -88,101 +82,76 @@ class CycleRotationServiceTest {
     }
 
 
+    private void stubLedger(Strategy strategy, StrategyCycle current, String ledger) {
+        when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(
+                new CyclePosition(UUID.randomUUID(), current.id(), new BigDecimal(ledger), null, null, BigDecimal.valueOf(0), null, null)));
+    }
+
     @Test
-    @DisplayName("MAINTAIN — 기존 initialUsdDeposit 유지하여 재등록")
-    void maintain_keepsExistingDeposit() {
-        // minRequired = 22 × 44 = 968 — 기존 1000 통과
-        BigDecimal deposit = new BigDecimal("1000.00");
+    @DisplayName("MAINTAIN — 원장이 시드보다 크면(수익) 시드를 유지한다")
+    void maintainAfterProfitKeepsStartAmount() {
+        // minRequired = 22 × 44 = 968 — 시드 1000 통과
         Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
-        StrategyCycle current = currentCycle(strategy.id(), deposit);
-        // MAINTAIN도 실잔고 확인 — actual >= maintainSeed 이면 재등록
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("1500.00"));
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "1200");
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        // StrategyCycle + CyclePosition 원자적 저장 위임 검증
-        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, deposit, PRICE);
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), PRICE);
         verify(eventPublisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 
     @Test
-    @DisplayName("MAINTAIN — 최소금액 미달이어도 축소된 시드로 재등록 진행 + 잔고부족 알림")
+    @DisplayName("MAINTAIN — 원장이 시드보다 작으면(손실) 원장으로 시작한다")
+    void maintainUsesMinOfStartAmountAndLedger() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "800");
+
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
+
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, new BigDecimal("800"), PRICE);
+    }
+
+    @Test
+    @DisplayName("MAINTAIN — 최소금액 미달이어도 축소된 시드로 재등록 진행 + 관리자 알림")
     void maintain_belowMinRequired_registersAnywayAndNotifies() {
         // minRequired = 22 × 44 = 968 — 기존 500은 미달
-        // actual(600) >= maintainSeed(500) → targetSeed=500, 500 < minRequired(968)이어도 재등록은 차단하지 않음
         BigDecimal deposit = new BigDecimal("500.00");
         Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
         StrategyCycle current = currentCycle(strategy.id(), deposit);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("600.00"));
+        stubLedger(strategy, current, "600");
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof InsufficientBalanceEvent ibe
-                && ACCOUNT.id().equals(ibe.accountId()) && ibe.usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == StrategyTicker.SOXL));
+                && ibe.userId() == null && ACCOUNT.id().equals(ibe.accountId())
+                && ibe.usdDeposit().compareTo(deposit) == 0 && ibe.ticker() == StrategyTicker.SOXL));
         verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, deposit, PRICE);
     }
 
     @Test
-    @DisplayName("MAX — 내부 원장 maxSeed 기준으로 재등록 (KIS 잔고는 검증용)")
-    void max_resolvesDepositFromKisMargin() {
-        // maxSeed = 마지막 CyclePosition.usdDeposit = 1500 (내부 원장)
-        // KIS actual(2000) >= maxSeed(1500) → targetSeed = 1500 (NOT 2000)
-        BigDecimal maintainDeposit = new BigDecimal("1000.00");
-        BigDecimal maxSeedDeposit = new BigDecimal("1500.00");
-        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
-        StrategyCycle current = currentCycle(strategy.id(), maintainDeposit);
-
-        // 마지막 CyclePosition이 있어야 maxSeed가 currentCycle.initialUsdDeposit fallback이 아닌 실제 값 사용
-        CyclePosition lastPosition = new CyclePosition(UUID.randomUUID(), current.id(), maxSeedDeposit, null, null, BigDecimal.valueOf(0), null, null);
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
-        when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.of(lastPosition));
+    @DisplayName("MAINTAIN — 직전 포지션이 없으면 시드로 대체한다")
+    void maintain_noPosition_usesStartAmount() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAINTAIN);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenReturn(Optional.empty());
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        // KIS 잔고(2000) >= maxSeed(1500) → maxSeedDeposit으로 재등록
-        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, maxSeedDeposit, PRICE);
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), PRICE);
     }
 
     @Test
-    @DisplayName("MAX — KIS 잔고 조회 실패 시 재등록 중단 + 관리자 오류 알림")
-    void max_kisLookupFails_abortsAndNotifiesError() {
+    @DisplayName("MAX — 내부 원장 기준으로 재등록한다")
+    void maxUsesLedger() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        RuntimeException kisError = new RuntimeException("KIS 잔고 조회 실패");
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(kisError);
+        stubLedger(strategy, current, "1200");
 
         service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
 
-        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.userId() == null && tee.message().equals(kisError.getMessage())));
-        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("MAX — USD 잔고 행이 없으면 재등록 중단 + 오류 알림")
-    void max_noUsdMarginRow_abortsAndNotifiesError() {
-        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
-        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        // USD 잔고 없음 → router가 BigDecimal.ZERO 반환
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(BigDecimal.ZERO);
-
-        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
-
-        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
-                && tee.userId() == null));
-        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("MAX — 증권사 잔고 조회 실패 시 전략 PAUSED (좀비 사이클 방지)")
-    void max_kisLookupFails_pausesStrategy() {
-        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
-        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenThrow(new RuntimeException("KIS 잔고 조회 실패"));
-
-        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
-
-        verify(strategyPort).pause(strategy.id());
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, new BigDecimal("1200"), PRICE);
     }
 
     @Test
@@ -190,7 +159,6 @@ class CycleRotationServiceTest {
     void max_createCycleFails_pausesStrategyAndRethrows() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         RuntimeException boom = new RuntimeException("사이클 생성 실패");
         when(cycleSnapshotCreator.createCycleAndSnapshot(eq(strategy.id()), eq(STRATEGY_VERSION_ID), any(), eq(PRICE)))
                 .thenThrow(boom);
@@ -207,7 +175,6 @@ class CycleRotationServiceTest {
     void max_listenerFailsAfterCycleCreated_doesNotPause() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        when(marginPort.getUsdBuyableAmount(ACCOUNT_REF)).thenReturn(new BigDecimal("2000.00"));
         doThrow(new RuntimeException("리스너 실패")).when(eventPublisher).publishEvent(any(Object.class));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(

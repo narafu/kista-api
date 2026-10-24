@@ -6,7 +6,6 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
@@ -55,11 +54,9 @@ class StrategyCreationService {
 
     private final StrategyPort strategyPort;
     private final VrStrategyDetailUseCase vrStrategyLifecycle;
-    private final CyclePositionPort cyclePositionPort;
     private final AccountPort accountPort;
-    private final TradingUserProfilePort tradingUserProfilePort;
+    private final TradingUserProfilePort tradingUserProfilePort; // 사용자 복제본 존재 확인용
     private final BrokerPricePort brokerPricePort;
-    private final MarginPort marginPort;
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
@@ -90,10 +87,12 @@ class StrategyCreationService {
         // 시작예정일 검증 — 기본값 오늘(KST), 과거 거부
         LocalDate scheduledStart = resolveScheduledStart(cmd);
 
-        // 종목 중복 + 잔고 검증
+        // 종목 중복 검증 (잔고 초과는 차단하지 않는다 — 시드 미리보기의 가용 예수금 경고로 안내)
         validateUniqueTicker(accountId, resolvedTicker);
+        // 사용자 복제본이 없으면 배치가 이 전략을 돌릴 수 없다 — 등록 단계에서 거부
+        tradingUserProfilePort.findByUserId(userId)
+                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
         BigDecimal initialUsdDeposit = dca ? BigDecimal.ZERO : cmd.initialUsdDeposit(); // DCA는 예수금 시드 없음
-        validateBalanceIfRequired(account, accountId, userId, initialUsdDeposit, !dca);
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
@@ -257,32 +256,5 @@ class StrategyCreationService {
         if (!strategyPort.findByAccountIdAndTicker(accountId, ticker).isEmpty()) {
             throw new DuplicateStrategyTickerException(); // 409 — 전 전략 유형 공통
         }
-    }
-
-    // 잔고 검증 활성 시: 새 시드는 증권사 가용금액에서 기존 전략 점유 시드를 뺀 예수금 한도 내
-    private void validateBalanceIfRequired(Account account, UUID accountId, UUID userId, BigDecimal initialUsdDeposit,
-                                           boolean compareFreeCash) {
-        TradingUserProfile userProfile = tradingUserProfilePort.findByUserId(userId) // 사용자 존재 확인 겸용
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-        if (compareFreeCash && userProfile.balanceCheckEnabled() && initialUsdDeposit != null) {
-            BigDecimal freeCash = calcFreeCash(account, accountId);
-            if (initialUsdDeposit.compareTo(freeCash) > 0) {
-                throw new IllegalArgumentException(
-                        "다른 전략이 사용 중인 시드를 제외한 예수금(" + freeCash + ")을 초과했습니다");
-            }
-        }
-    }
-
-    // 예수금 = 증권사 USD 매수가능금액 - 기존 전략들이 보유한 미투자 현금(usdDeposit) 합
-    private BigDecimal calcFreeCash(Account account, UUID accountId) {
-        BigDecimal kisUsdAmount = marginPort.getUsdBuyableAmount(account.toBrokerRef());
-
-        BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
-                .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())
-                        .map(CyclePosition::usdDeposit)
-                        .orElse(BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return kisUsdAmount.subtract(reserved);
     }
 }
