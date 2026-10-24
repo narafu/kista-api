@@ -65,10 +65,8 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             switch (decideRule(adjusted)) {
                 case DcaRuleDecision.Planned p -> {
                     if (sell) plannedSell = plannedSell.add(p.quantity());
-                    // REJECT 규칙은 allocator 예산 부족 시 축소하지 않고 통째로 제외(fitBuysToBudget)
                     orders.add(PlannedOrder.of(ctx.tradeDate(), ctx.ticker(), rule.orderType(), rule.direction(),
-                            p.quantity().intValueExact(), p.limitPrice(), rule.timing(), rule.orderLeg())
-                            .withPartialAllowed(rule.shortfall() != DcaShortfallPolicy.REJECT));
+                            p.quantity().intValueExact(), p.limitPrice(), rule.timing(), rule.orderLeg()));
                     referencePrices.put(rule.orderLeg(), p.referencePrice());
                 }
                 case DcaRuleDecision.Skipped s -> skips.add(s);
@@ -186,22 +184,4 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public boolean recordsRounds() { return true; }
-
-    // 예산 부족 시 입력 순서대로 budget 소진 — 브로커가 지정가×수량으로 주문가능금액을 검증하므로 캡가 기준
-    // REJECT(partialAllowed=false)는 전량이 들어가면 승인·아니면 제외, PARTIAL은 floor(남은 budget / 캡가)로 축소(0이면 제외)
-    @Override
-    public List<PlannedOrder> fitBuysToBudget(List<PlannedOrder> buyOrders, BigDecimal budget) {
-        List<PlannedOrder> fitted = new ArrayList<>();
-        BigDecimal remaining = budget;
-        for (PlannedOrder o : buyOrders) {
-            int affordable = remaining.signum() <= 0 ? 0 : remaining.divide(o.price(), 0, RoundingMode.FLOOR).intValue();
-            int quantity = o.partialAllowed() ? Math.min(o.quantity(), affordable)
-                    : o.quantity() <= affordable ? o.quantity() : 0;
-            if (quantity == 0) continue;
-            PlannedOrder kept = quantity == o.quantity() ? o : o.withQuantity(quantity);
-            fitted.add(kept);
-            remaining = remaining.subtract(kept.price().multiply(BigDecimal.valueOf(quantity)));
-        }
-        return List.copyOf(fitted);
-    }
 }
