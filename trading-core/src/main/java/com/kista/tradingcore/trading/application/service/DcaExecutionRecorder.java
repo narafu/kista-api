@@ -9,6 +9,8 @@ import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPo
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -36,18 +38,25 @@ class DcaExecutionRecorder {
     // direction: 호출부가 규칙(판정 경로) 또는 주문(복구·배정 경로)에서 넘긴다 — 이력·알림 방향의 SSOT
     public void recordSkipped(BatchContext ctx, LocalDate tradeDate, String ruleKey, OrderDirection direction, DcaSkipReason reason,
                               String detail, BigDecimal referencePrice) {
+        recordSkipped(ctx.strategy(), ctx.account(), tradeDate, ruleKey, direction, reason, detail, referencePrice);
+    }
+
+    // BatchContext 없이 호출하는 접수 단계(TradingOrderExecutor)용 — strategy·account만 필요
+    @Transactional
+    public void recordSkipped(Strategy strategy, TradingAccount account, LocalDate tradeDate, String ruleKey, OrderDirection direction,
+                              DcaSkipReason reason, String detail, BigDecimal referencePrice) {
         boolean inserted = dcaExecutionPort.insertIfAbsent(
-                DcaExecution.skipped(ctx.strategy().id(), ruleKey, direction, tradeDate, reason, detail, referencePrice));
+                DcaExecution.skipped(strategy.id(), ruleKey, direction, tradeDate, reason, detail, referencePrice));
         if (!inserted) return;
         // 알림 표기용 규칙 순번만 활성 설정에서 조회(삽입 성공 시 1회) — 편집으로 삭제된 규칙이면 null(문구에서 생략)
-        Integer ruleNumber = dcaDetailPort.findActiveByStrategyId(ctx.strategy().id()).map(c -> c.ruleNumber(ruleKey)).orElse(null);
-        eventPublisher.publishEvent(new DcaRoundSkippedEvent(ctx.account().userId(), ctx.strategy().id(), ctx.account().nickname(),
-                ctx.strategy().ticker(), ruleKey, ruleNumber, direction, tradeDate, reason, detail));
+        Integer ruleNumber = dcaDetailPort.findActiveByStrategyId(strategy.id()).map(c -> c.ruleNumber(ruleKey)).orElse(null);
+        eventPublisher.publishEvent(new DcaRoundSkippedEvent(account.userId(), strategy.id(), account.nickname(),
+                strategy.ticker(), ruleKey, ruleNumber, direction, tradeDate, reason, detail));
         if (reason == DcaSkipReason.DATA_UNAVAILABLE || reason == DcaSkipReason.EXCHANGE_API_ERROR) {
             // 시세·수량 조회·거래소 API 실패는 사용자 미주문 알림과 별개로 관리자에게도 알린다 (spec 5.7)
             String label = reason == DcaSkipReason.DATA_UNAVAILABLE ? "[DCA 데이터 실패]" : "[DCA 거래소 오류]";
             eventPublisher.publishEvent(new TradingErrorEvent(null,
-                    label + " strategyId=" + ctx.strategy().id() + ", " + ctx.strategy().ticker() + ", rule=" + ruleKey + ", " + tradeDate + " — " + detail));
+                    label + " strategyId=" + strategy.id() + ", " + strategy.ticker() + ", rule=" + ruleKey + ", " + tradeDate + " — " + detail));
         }
     }
 }

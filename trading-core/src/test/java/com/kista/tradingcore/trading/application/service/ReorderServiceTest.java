@@ -233,6 +233,17 @@ class ReorderServiceTest {
     }
 
     @Test
+    void immediateInsufficientFundsReturnsFailedWithoutAlert() {
+        stubCommon(plannedOrder());
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.INSUFFICIENT_FUNDS, null));
+
+        assertThat(reorder(command(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.FAILED);
+    }
+
+    @Test
     void immediate_unknown_returnsSubmitting() {
         // 결과 불명 — 재시도가 중복 주문을 내지 않도록 SUBMITTING으로 응답(런북 정정 대상)
         stubCommon(plannedOrder());

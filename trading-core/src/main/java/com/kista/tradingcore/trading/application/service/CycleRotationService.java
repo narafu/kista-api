@@ -98,7 +98,7 @@ class CycleRotationService {
         if (minRequired != null && targetSeed.compareTo(minRequired) < 0) {
             log.warn("[strategyId={}] 최소금액 미달 — 축소된 시드로 재등록 진행: {} < {}", strategy.id(), targetSeed, minRequired);
             eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
-                    0, targetSeed, strategy.ticker(), null));
+                    0, targetSeed, strategy.ticker(), null, 0, false));
         }
         eventPublisher.publishEvent(new NewCycleStartedEvent(userProfile.userId(), account.id(), account.nickname(),
                 strategy.type(), strategy.ticker(), targetSeed)); // 사용자 알림 이벤트

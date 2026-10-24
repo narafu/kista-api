@@ -1,5 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
@@ -12,6 +14,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +37,8 @@ class TradingOrderExecutor {
     private final AccountBudgetLock accountBudgetLock;          // 계좌별 재캡 예산 산정 직렬화 — allocator 승인+저장과 같은 락
     private final OrderSubmitter orderSubmitter;                // 건별 선점 → 접수 → PLACED/FAILED 기록
     private final OrderSubmissionReconciler reconciler;         // 접수 전 잔류 SUBMITTING 대사(Toss 멱등 재요청·알림)
+    private final ApplicationEventPublisher eventPublisher;     // 잔고 부족 거절 사용자 알림(InsufficientBalanceEvent)
+    private final DcaExecutionRecorder dcaRecorder;             // 회차 판정 전략(DCA)은 알림 대신 회차 skip 기록
 
     // AT_OPEN PLANNED 주문 접수 — 개장 스케쥴러 선접수 + 개장 후 수동실행 공용
     // BUY cap 보정을 AT_OPEN 스코프(BuyOrderPriceCapper.capIfNeeded(mode, atOpen=true, ...))로 적용한 뒤
@@ -48,7 +53,9 @@ class TradingOrderExecutor {
             log.info("[{}] 개장 선접수할 주문 없음", account.nickname());
             return List.of();
         }
-        List<Order> placed = placeEach(atOpenOrders, account);
+        PlaceResult result = placeEach(atOpenOrders, account);
+        reportInsufficient(result, tradeDate, account, strategy);
+        List<Order> placed = result.placed();
         log.info("[{}] 개장 주문 {}건 선접수 (성공/{} 시도)", account.nickname(), placed.size(), atOpenOrders.size());
         return placed;
     }
@@ -60,7 +67,9 @@ class TradingOrderExecutor {
         reconciler.reconcile(strategyCycleId, today, account);
         applyCap(false, today, account, strategyCycleId, currentPrice, position, vrPosition, strategy);
         List<Order> planned = orderPort.findPlannedByCycleAndDate(strategyCycleId, today);
-        List<Order> placed = placeEach(planned, account);
+        PlaceResult result = placeEach(planned, account);
+        reportInsufficient(result, today, account, strategy);
+        List<Order> placed = result.placed();
         log.info("[{}] 주문 {}건 접수 (성공/{} 시도)", account.nickname(), placed.size(), planned.size());
         return placed;
     }
@@ -112,8 +121,9 @@ class TradingOrderExecutor {
 
     // 주문 목록을 개별 접수 — 건별로 선점(SUBMITTING) 후 접수, 실패·선점 경합 주문은 건너뛰고 다음 주문 계속
     // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
-    private List<Order> placeEach(List<Order> orders, TradingAccount account) {
+    private PlaceResult placeEach(List<Order> orders, TradingAccount account) {
         List<Order> placed = new ArrayList<>();
+        List<Order> insufficient = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {
             // 주문 간격이 이미 충분히 벌어져(정상적인 왕복 지연) 게이트가 대기 없이 즉시 반환하는 경우
             // 아래 체크만으로는 놓친다 — 매 주문 시도 전에 별도로 확인한다
@@ -125,6 +135,8 @@ class TradingOrderExecutor {
             OrderSubmitter.Submission submission = orderSubmitter.submit(p, account.brokerRef(), account.nickname());
             if (submission.outcome() == OrderSubmitter.Outcome.PLACED) {
                 placed.add(p.withPlaced(submission.externalOrderId()));
+            } else if (submission.outcome() == OrderSubmitter.Outcome.INSUFFICIENT_FUNDS) {
+                insufficient.add(p);
             }
             // KisHttpClient의 호출 간격 게이트가 대기 중 인터럽트를 감지하면 확정 거절로 전파한다 — 이 주문만
             // FAILED로 남기고 나머지 주문은 중단한다
@@ -133,6 +145,30 @@ class TradingOrderExecutor {
                 break;
             }
         }
-        return placed;
+        return new PlaceResult(placed, insufficient);
+    }
+
+    // 접수 결과 — placed: 접수 성공, insufficient: 증권사 잔고 부족으로 거절된 BUY
+    private record PlaceResult(List<Order> placed, List<Order> insufficient) {}
+
+    private static final String DCA_LEG_PREFIX = "DCA_"; // DCA 주문 leg = "DCA_" + ruleKey
+
+    // 잔고 부족 거절을 사용자 알림으로 전달 — 전략당 1건(DCA는 회차 skip 기록), 알림 실패가 접수 결과를 막지 않게 격리
+    private void reportInsufficient(PlaceResult result, LocalDate tradeDate, TradingAccount account, Strategy strategy) {
+        if (result.insufficient().isEmpty()) return;
+        try {
+            if (cycleOrderStrategies.of(strategy.type()).recordsRounds()) {
+                for (Order order : result.insufficient()) {
+                    if (!order.orderLeg().startsWith(DCA_LEG_PREFIX)) continue;
+                    dcaRecorder.recordSkipped(strategy, account, tradeDate, order.orderLeg().substring(DCA_LEG_PREFIX.length()),
+                            order.direction(), DcaSkipReason.INSUFFICIENT_BALANCE, "증권사 주문 가능 금액 부족", order.price());
+                }
+                return;
+            }
+            eventPublisher.publishEvent(new InsufficientBalanceEvent(account.userId(), account.id(), account.nickname(),
+                    0, null, strategy.ticker(), strategy.type(), result.insufficient().size(), !result.placed().isEmpty()));
+        } catch (Exception e) {
+            log.error("[{}] 잔고 부족 알림 처리 실패: {}", account.nickname(), e.getMessage());
+        }
     }
 }

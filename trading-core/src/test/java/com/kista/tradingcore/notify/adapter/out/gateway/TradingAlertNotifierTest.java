@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -70,10 +71,10 @@ class TradingAlertNotifierTest {
         BigDecimal usdDeposit = new BigDecimal("100.00");
 
         notifier().onInsufficientBalance(new InsufficientBalanceEvent(null, accountId, accountNickname,
-                0, usdDeposit, StrategyTicker.SOXL, null));
+                0, usdDeposit, StrategyTicker.SOXL, null, 0, false));
 
         verify(notifyPort).notifyInsufficientBalance(0, usdDeposit, StrategyTicker.SOXL);
-        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any());
+        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any(), anyInt(), anyBoolean());
     }
 
     @Test
@@ -81,10 +82,20 @@ class TradingAlertNotifierTest {
         when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
 
         notifier().onInsufficientBalance(
-                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE));
+                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 0, false));
 
-        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL);
+        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 0, false);
         verify(notifyPort, never()).notifyInsufficientBalance(anyInt(), any(), any());
+    }
+
+    @Test
+    void onInsufficientBalance_userPath_forwardsFailedCountAndPartialFlag() {
+        when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
+
+        notifier().onInsufficientBalance(
+                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 2, true));
+
+        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 2, true);
     }
 
     @Test

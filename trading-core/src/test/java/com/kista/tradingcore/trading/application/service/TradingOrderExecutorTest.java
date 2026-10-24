@@ -16,7 +16,10 @@ import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
+import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
+import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import org.mockito.InOrder;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -60,6 +63,7 @@ class TradingOrderExecutorTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock LiveBalancePort liveBalancePort;
     @Mock OrderSubmissionReconciler reconciler;
+    @Mock DcaExecutionRecorder dcaRecorder;
 
     static final LocalDate TODAY = LocalDate.now();
 
@@ -93,12 +97,14 @@ class TradingOrderExecutorTest {
     static final CycleOrderStrategies CYCLE_STRATEGIES = new CycleOrderStrategies(List.of(
             new InfiniteCycleOrderStrategy(null, null),
             new PrivacyCycleOrderStrategy(null),
-            new VrCycleOrderStrategy(null)));
+            new VrCycleOrderStrategy(null),
+            new DcaCycleOrderStrategy()));
 
     private TradingOrderExecutor executor() {
         // 실제 OrderSubmitter로 선점→접수→기록 경로까지 끝까지 검증
         return new TradingOrderExecutor(orderPort, buyOrderPriceCapper, CYCLE_STRATEGIES, liveBalancePort,
-                new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerPort, eventPublisher), reconciler);
+                new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerPort, eventPublisher), reconciler,
+                eventPublisher, dcaRecorder);
     }
 
     private Order planned(UUID id, OrderDirection direction, String price, int quantity) {
@@ -114,6 +120,42 @@ class TradingOrderExecutorTest {
     private static OrderInstruction instructionOf(Order order) {
         return new OrderInstruction(order.ticker(), order.direction(), order.orderType(), order.quantity().intValueExact(), order.price(),
                 order.id().toString());
+    }
+
+    @Test
+    @DisplayName("BUY 3건 중 2건 잔고 부족이면 InsufficientBalanceEvent가 전략당 정확히 1건(failedCount=2, 일부 접수)")
+    void insufficientFundsPublishesOneEventPerCall() {
+        Order a = planned(UUID.randomUUID(), OrderDirection.BUY, "50.00", 1);
+        Order b = planned(UUID.randomUUID(), OrderDirection.BUY, "49.00", 1);
+        Order c = planned(UUID.randomUUID(), OrderDirection.BUY, "48.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(a, b, c));
+        when(brokerPort.place(eq(instructionOf(a)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-1"));
+        when(brokerPort.place(eq(instructionOf(b)), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+        when(brokerPort.place(eq(instructionOf(c)), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).hasSize(1);
+        verify(eventPublisher, times(1)).publishEvent(any(InsufficientBalanceEvent.class));
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(ACCOUNT.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
+                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 2, true));
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
+    }
+
+    @Test
+    @DisplayName("DCA 전략은 InsufficientBalanceEvent 없이 실패 leg마다 INSUFFICIENT_BALANCE 회차 skip을 기록")
+    void dcaInsufficientFundsRecordsSkipInsteadOfEvent() {
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.userId(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Order o = planned(UUID.randomUUID(), OrderDirection.BUY, "50.00", 1).withLeg("DCA_rule-1");
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(o));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, null, null, dca);
+
+        verify(dcaRecorder).recordSkipped(eq(dca), eq(ACCOUNT), eq(TODAY), eq("rule-1"), eq(OrderDirection.BUY),
+                eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), any());
+        verify(eventPublisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 
     @Test

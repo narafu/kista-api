@@ -61,11 +61,15 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     }
 
     @Override
-    public void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker) {
-        String text = """
-                ⚠️ <b>예수금 부족</b> — %s%n\
-                [%s] %s 장 마감 전 예수금 확인 바랍니다.""".formatted(
-                TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name());
+    public void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker,
+                                          int failedCount, boolean partiallyPlaced) {
+        String account = TelegramHttpClient.escapeHtml(accountNickname);
+        // 증권사 거절(failedCount>0)과 전략 원장 상한 거절(0)은 원인·조치가 달라 문구를 나눈다
+        String text = failedCount > 0
+                ? "⚠️ <b>증권사 주문 가능 금액 부족</b> — %s %s %s 매수 %d건 실패%s. 예수금 확인 바랍니다.".formatted(
+                        account, ticker.name(), strategyType.name(), failedCount, partiallyPlaced ? " (일부 접수)" : "")
+                : "⚠️ <b>전략 원장 예수금 부족</b> — %s %s %s 오늘 매수 주문을 내지 않았습니다.".formatted(
+                        account, ticker.name(), strategyType.name());
         notify(profile, "예수금 부족", text);
     }
 

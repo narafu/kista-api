@@ -72,13 +72,25 @@ class TradingUserNotificationAdapterTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void notifyInsufficientBalance_bodyContainsAccountAndStrategyInfo() {
-        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL);
+    void notifyInsufficientBalance_brokerRejection_bodyContainsFailedCountAndPartialNote() {
+        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 2, true);
 
         var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
         verify(restClient.post().uri(anyString())).body(captor.capture());
         String text = ((Map<String, String>) captor.getValue()).get("text");
-        assertThat(text).contains("예수금 부족").contains("내계좌").contains("INFINITE").contains("SOXL");
+        assertThat(text).contains("증권사 주문 가능 금액 부족").contains("내계좌").contains("INFINITE").contains("SOXL")
+                .contains("매수 2건 실패 (일부 접수)").contains("예수금 확인 바랍니다.");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void notifyInsufficientBalance_ledgerCap_bodyExplainsNoOrderToday() {
+        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 0, false);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("전략 원장 예수금 부족").contains("내계좌").contains("오늘 매수 주문을 내지 않았습니다.");
     }
 
     @Test
