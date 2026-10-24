@@ -70,6 +70,37 @@ class DcaExecutionRecorderTest {
     }
 
     @Test
+    void orderRejected_publishesOnlyWhenOrderedRowTransitioned() {
+        com.kista.tradingcore.trading.domain.model.Order order = new com.kista.tradingcore.trading.domain.model.Order(UUID.randomUUID(),
+                ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO, OrderType.LOC,
+                com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.ONE, new BigDecimal("10.00"),
+                com.kista.shared.kernel.OrderStatus.FAILED, null, null, null);
+        when(port.markOrderedSkipped(any(), any(), any(), any(), any(), any())).thenReturn(true);
+
+        recorder.recordOrderRejected(ctx.strategy(), ctx.account(), DAY, KEY, order, DcaSkipReason.INSUFFICIENT_BALANCE, "부족");
+
+        verify(port).markOrderedSkipped(ctx.strategy().id(), KEY, DAY, order.id(), DcaSkipReason.INSUFFICIENT_BALANCE, "부족");
+        verify(publisher, times(1)).publishEvent(any(DcaRoundSkippedEvent.class));
+        verify(port, never()).insertIfAbsent(any());
+    }
+
+    @Test
+    void orderRejected_noOrderedRow_fallsBackToInsertThenAdminAlert() {
+        com.kista.tradingcore.trading.domain.model.Order order = new com.kista.tradingcore.trading.domain.model.Order(UUID.randomUUID(),
+                ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO, OrderType.LOC,
+                com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.ONE, new BigDecimal("10.00"),
+                com.kista.shared.kernel.OrderStatus.FAILED, null, null, null);
+        when(port.markOrderedSkipped(any(), any(), any(), any(), any(), any())).thenReturn(false);
+        when(port.insertIfAbsent(any())).thenReturn(true, false);
+
+        recorder.recordOrderRejected(ctx.strategy(), ctx.account(), DAY, KEY, order, DcaSkipReason.INSUFFICIENT_BALANCE, "부족");
+        verify(publisher, times(1)).publishEvent(any(DcaRoundSkippedEvent.class)); // 삽입 폴백 성공 → 사용자 알림
+
+        recorder.recordOrderRejected(ctx.strategy(), ctx.account(), DAY, KEY, order, DcaSkipReason.INSUFFICIENT_BALANCE, "부족");
+        verify(publisher, times(1)).publishEvent(any(TradingErrorEvent.class)); // 전이·삽입 모두 불가 → 관리자 알림
+    }
+
+    @Test
     void skip_event_carries_rule_key_direction_and_number() {
         when(port.insertIfAbsent(any())).thenReturn(true);
         recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", null);

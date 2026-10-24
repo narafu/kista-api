@@ -143,6 +143,34 @@ class TradingOrderExecutorTest {
     }
 
     @Test
+    @DisplayName("모든 BUY가 잔고 부족이면 SELL이 접수돼도 partiallyPlaced=false")
+    void allBuysFailWithSellPlaced_notPartiallyPlaced() {
+        Order buy = planned(UUID.randomUUID(), OrderDirection.BUY, "50.00", 1);
+        Order sell = planned(UUID.randomUUID(), OrderDirection.SELL, "60.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(buy, sell));
+        when(brokerPort.place(eq(instructionOf(buy)), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+        when(brokerPort.place(eq(instructionOf(sell)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-S"));
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION, null, INFINITE_STRATEGY);
+
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(ACCOUNT.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
+                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, false));
+    }
+
+    @Test
+    @DisplayName("잔고 부족 알림 처리 중 예외가 나면 관리자 TradingErrorEvent로 알린다")
+    void reportFailure_publishesAdminError() {
+        Order b = planned(UUID.randomUUID(), OrderDirection.BUY, "50.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(b));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+        doThrow(new IllegalStateException("boom")).when(eventPublisher).publishEvent(any(InsufficientBalanceEvent.class));
+
+        executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, POSITION, null, INFINITE_STRATEGY);
+
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.message().contains("잔고 부족 알림 실패")));
+    }
+
+    @Test
     @DisplayName("DCA 전략은 InsufficientBalanceEvent 없이 실패 leg마다 INSUFFICIENT_BALANCE 회차 skip을 기록")
     void dcaInsufficientFundsRecordsSkipInsteadOfEvent() {
         Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.userId(), StrategyType.DCA, StrategyStatus.ACTIVE,
@@ -153,8 +181,8 @@ class TradingOrderExecutorTest {
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, null, null, null, dca);
 
-        verify(dcaRecorder).recordSkipped(eq(dca), eq(ACCOUNT), eq(TODAY), eq("rule-1"), eq(OrderDirection.BUY),
-                eq(DcaSkipReason.INSUFFICIENT_BALANCE), any(), any());
+        verify(dcaRecorder).recordOrderRejected(eq(dca), eq(ACCOUNT), eq(TODAY), eq("rule-1"), eq(o),
+                eq(DcaSkipReason.INSUFFICIENT_BALANCE), any());
         verify(eventPublisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
     }
 

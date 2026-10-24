@@ -1,6 +1,8 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -160,15 +162,19 @@ class TradingOrderExecutor {
             if (cycleOrderStrategies.of(strategy.type()).recordsRounds()) {
                 for (Order order : result.insufficient()) {
                     if (!order.orderLeg().startsWith(DCA_LEG_PREFIX)) continue;
-                    dcaRecorder.recordSkipped(strategy, account, tradeDate, order.orderLeg().substring(DCA_LEG_PREFIX.length()),
-                            order.direction(), DcaSkipReason.INSUFFICIENT_BALANCE, "증권사 주문 가능 금액 부족", order.price());
+                    dcaRecorder.recordOrderRejected(strategy, account, tradeDate, order.orderLeg().substring(DCA_LEG_PREFIX.length()),
+                            order, DcaSkipReason.INSUFFICIENT_BALANCE, "증권사 주문 가능 금액 부족");
                 }
                 return;
             }
             eventPublisher.publishEvent(new InsufficientBalanceEvent(account.userId(), account.id(), account.nickname(),
-                    0, null, strategy.ticker(), strategy.type(), result.insufficient().size(), !result.placed().isEmpty()));
+                    0, null, strategy.ticker(), strategy.type(), result.insufficient().size(),
+                    result.placed().stream().anyMatch(o -> o.direction() == OrderDirection.BUY))); // 접수된 BUY가 있을 때만 일부 접수
         } catch (Exception e) {
+            // 관리자 이벤트는 이미 억제됐으므로 여기서 실패하면 아무도 모른다 — 관리자에게 알린다
             log.error("[{}] 잔고 부족 알림 처리 실패: {}", account.nickname(), e.getMessage());
+            eventPublisher.publishEvent(new TradingErrorEvent(null, "[잔고 부족 알림 실패] %s %s %s — %s"
+                    .formatted(account.nickname(), strategy.ticker(), strategy.type(), e.getMessage())));
         }
     }
 }
