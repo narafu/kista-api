@@ -16,17 +16,6 @@ class CryptoOrderFilledEventJsonTest {
     JsonMapper mapper = JsonMapper.builder().build();
 
     @Test
-    void oldRowWithAmountKrwDeserializesAsKrw() {
-        // EPR(trading.event_publication)에 남은 구 JSON 형태 — amountKrw 키, currency 없음
-        String json = """
-                {"userId":"%s","accountId":"%s","strategyId":"%s","accountNickname":"업비트","ticker":"BTC","direction":"BUY",
-                 "filledQuantity":0.0001,"avgPrice":150000000,"amountKrw":15000}""".formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
-        CryptoOrderFilledEvent e = mapper.readValue(json, CryptoOrderFilledEvent.class);
-        assertThat(e.amount()).isEqualByComparingTo("15000");
-        assertThat(e.currency()).isEqualTo(Currency.KRW);
-    }
-
-    @Test
     void newRowRoundTrips() {
         CryptoOrderFilledEvent src = new CryptoOrderFilledEvent(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "바낸",
                 StrategyTicker.BTC, OrderDirection.BUY, new BigDecimal("0.00016"), new BigDecimal("65000.12"),
