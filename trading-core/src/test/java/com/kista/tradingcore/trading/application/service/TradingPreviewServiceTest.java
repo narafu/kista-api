@@ -71,6 +71,7 @@ class TradingPreviewServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 생성자에 브로커 잔고·판매가능수량 포트가 없다 — 미리보기는 브로커를 조회하지 않음을 컴파일 타임에 고정
         service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, ledgerBudget, priceFetcher);
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
@@ -190,16 +191,6 @@ class TradingPreviewServiceTest {
         verify(planBuilder, never()).build(any(), any(), any(), any(), anyString(), any());
     }
 
- 
- 
-    // 회귀 테스트 — INFINITE AT_OPEN SELL이 오늘 이미 접수(PLACED)됐는데, planBuilder가 매번 처음부터
-    // 재계산하는 특성상 동일 SELL을 다시 제시한다. 기존 주문과 겹치는 슬롯은 신규 필요분에서 제외해야
-    // sellSufficiencySimulator가 "이미 접수된 수량 + 그걸 다시 계산한 수량"을 이중으로 합산하지 않는다.
- 
-    // 일부만 이미 접수된 경우 — 신규 leg만 sellSufficiencySimulator에 전달돼야 한다
- 
- 
- 
     @Test
     void preview_returnsSkip_whenPlanBuilderSkips() {
         when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
@@ -393,23 +384,6 @@ class TradingPreviewServiceTest {
 
         assertThat(service.preview(STRATEGY.id(), ACCOUNT.userId()).ledgerCheck()).isNull();
         verify(ledgerBudget, never()).fit(any(), any(), any());
-    }
-
-    // 미리보기는 브로커 잔고·판매가능수량을 조회하지 않는다 — 서비스가 해당 포트에 의존하지 않음을 잠근다
-    @Test
-    void previewDoesNotQueryBroker() {
-        var liveBalancePort = mock(com.kista.tradingcore.broker.application.port.output.LiveBalancePort.class);
-        var sellableQuantityPort = mock(com.kista.tradingcore.broker.application.port.output.SellableQuantityPort.class);
-        PlannedOrder buy = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
-                OrderDirection.BUY, 1, new BigDecimal("10.00"));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
-                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
-        lenient().when(ledgerBudget.applies(any())).thenReturn(true);
-        lenient().when(ledgerBudget.fit(any(), any(), any())).thenReturn(new StrategyLedgerBudget.LedgerFit(List.of(buy), BigDecimal.TEN, false, false));
-
-        service.preview(STRATEGY.id(), ACCOUNT.userId());
-
-        verifyNoInteractions(liveBalancePort, sellableQuantityPort);
     }
 
     static final Strategy STOCK_DCA = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
