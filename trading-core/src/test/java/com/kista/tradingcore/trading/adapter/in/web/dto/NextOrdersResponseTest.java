@@ -1,102 +1,37 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
-import com.kista.tradingcore.trading.domain.model.BuyCompetitionPreview;
+import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
-import com.kista.tradingcore.trading.domain.model.SellSufficiencyPreview;
-import com.kista.tradingcore.trading.domain.model.Strategy;
-import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import com.kista.shared.kernel.StrategyType;
 
 class NextOrdersResponseTest {
 
     @Test
-    void from_mapsCompetitionAsNull_whenPreviewCompetitionIsNull() {
+    void from_mapsLedgerCheckAsNull_whenPreviewLedgerCheckIsNull() {
         NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null);
+                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null);
 
-        NextOrdersResponse response = NextOrdersResponse.from(preview);
-
-        assertThat(response.competition()).isNull();
-        assertThat(response.sellSufficiency()).isNull();
+        assertThat(NextOrdersResponse.from(preview).ledgerCheck()).isNull();
     }
 
     @Test
-    void from_mapsCompetitionFields_whenPreviewCompetitionExists() {
-        UUID competitorId = UUID.randomUUID();
-        BuyCompetitionPreview competition = new BuyCompetitionPreview(
-                false, new BigDecimal("1000.00"), new BigDecimal("200.00"), new BigDecimal("900.00"),
-                List.of(new BuyCompetitionPreview.CompetingStrategy(
-                        competitorId, StrategyType.VR, StrategyTicker.TQQQ, new BigDecimal("900.00"), 0)),
-                List.of(), false);
+    void from_mapsLedgerCheckFields() {
+        LedgerCheckPreview check = new LedgerCheckPreview(
+                new BigDecimal("177.61"), new BigDecimal("304.32"), false, true);
         NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, competition, null);
+                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, check);
 
-        NextOrdersResponse response = NextOrdersResponse.from(preview);
+        NextOrdersResponse.LedgerCheckSummary summary = NextOrdersResponse.from(preview).ledgerCheck();
 
-        assertThat(response.competition()).isNotNull();
-        assertThat(response.competition().sufficientBudget()).isFalse();
-        assertThat(response.competition().availableDeposit()).isEqualByComparingTo("1000.00");
-        assertThat(response.competition().blockedByHigherPriority()).hasSize(1);
-        assertThat(response.competition().blockedByHigherPriority().getFirst().strategyId()).isEqualTo(competitorId);
-        assertThat(response.competition().blockedByHigherPriority().getFirst().type()).isEqualTo(StrategyType.VR);
-        assertThat(response.competition().liveBalanceUnavailable()).isFalse();
-    }
-
-    @Test
-    void from_mapsLiveBalanceUnavailable_whenCompetitionUnavailable() {
-        BuyCompetitionPreview competition = BuyCompetitionPreview.unavailable(new BigDecimal("200.00"));
-        NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, competition, null);
-
-        NextOrdersResponse response = NextOrdersResponse.from(preview);
-
-        assertThat(response.competition().liveBalanceUnavailable()).isTrue();
-        assertThat(response.competition().availableDeposit()).isNull();
-    }
-
-    @Test
-    void from_mapsSellSufficiencyAsNull_whenPreviewSellSufficiencyIsNull() {
-        NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null);
-
-        NextOrdersResponse response = NextOrdersResponse.from(preview);
-
-        assertThat(response.sellSufficiency()).isNull();
-    }
-
-    @Test
-    void from_mapsSellSufficiencyFields_whenPreviewSellSufficiencyExists() {
-        SellSufficiencyPreview sellSufficiency = new SellSufficiencyPreview(false, 5, 3, 3, false);
-        NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, sellSufficiency);
-
-        NextOrdersResponse response = NextOrdersResponse.from(preview);
-
-        assertThat(response.sellSufficiency()).isNotNull();
-        assertThat(response.sellSufficiency().sufficientQuantity()).isFalse();
-        assertThat(response.sellSufficiency().sellableQuantity()).isEqualTo(5);
-        assertThat(response.sellSufficiency().reservedQuantity()).isEqualTo(3);
-        assertThat(response.sellSufficiency().requiredQuantity()).isEqualTo(3);
-        assertThat(response.sellSufficiency().liveQuantityUnavailable()).isFalse();
-    }
-
-    @Test
-    void from_mapsLiveQuantityUnavailable_whenSellSufficiencyUnavailable() {
-        SellSufficiencyPreview sellSufficiency = SellSufficiencyPreview.unavailable(3);
-        NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, sellSufficiency);
-
-        NextOrdersResponse response = NextOrdersResponse.from(preview);
-
-        assertThat(response.sellSufficiency().liveQuantityUnavailable()).isTrue();
-        assertThat(response.sellSufficiency().sellableQuantity()).isEqualTo(0);
+        assertThat(summary.remainingLedger()).isEqualByComparingTo("177.61");
+        assertThat(summary.requiredBuyUsd()).isEqualByComparingTo("304.32");
+        assertThat(summary.sufficient()).isFalse();
+        assertThat(summary.trimmed()).isTrue();
     }
 }
