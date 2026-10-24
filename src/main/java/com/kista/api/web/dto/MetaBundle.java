@@ -27,12 +27,16 @@ public record MetaBundle(
         List<EnumMeta> orderTypes,             // 주문 유형 목록 (상수 순서 = UI 필터 순서)
         @Schema(description = "주문 방향 목록")
         List<EnumMeta> orderDirections,        // 주문 방향 목록
+        @Schema(description = "주문 상태 목록")
+        List<EnumMeta> orderStatuses,          // 주문 상태 목록
         @Schema(description = "DCA 실행 주기 목록")
         List<EnumMeta> dcaFrequencies,         // DCA 실행 주기 목록
         @Schema(description = "DCA 조건 연산자 목록")
         List<EnumMeta> dcaOperators,           // DCA 조건 연산자 목록
         @Schema(description = "DCA 회차 미주문 사유 목록")
         List<EnumMeta> dcaSkipReasons,         // DCA 미주문 사유 목록
+        @Schema(description = "DCA 회차 판정 상태 목록")
+        List<EnumMeta> dcaExecutionStatuses,   // DCA 회차 판정 상태 목록 (주문됨·건너뜀)
         @Schema(description = "DCA 규칙 규모 유형 목록")
         List<EnumMeta> dcaSizingTypes,         // DCA 규모 유형 목록 (고정 금액·보유 비율)
         @Schema(description = "DCA 규칙 부족 정책 목록")

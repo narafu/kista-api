@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.shared.kernel.DcaExecutionStatus;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.platform.persistence.BaseCreatedAtEntity;
@@ -40,7 +41,7 @@ class DcaExecutionEntity extends BaseCreatedAtEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private DcaExecution.Status status; // ORDERED | SKIPPED
+    private DcaExecutionStatus status; // ORDERED | SKIPPED
 
     @Enumerated(EnumType.STRING)
     @Column(name = "skip_reason", length = 30)

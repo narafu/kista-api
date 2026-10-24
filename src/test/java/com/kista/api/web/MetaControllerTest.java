@@ -94,6 +94,11 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.orderTypes[?(@.code=='MOO')].label").value(org.hamcrest.Matchers.contains("MOO(시가시장가)")))
                 .andExpect(jsonPath("$.orderTypes[0].code").value("LOC"))
                 .andExpect(jsonPath("$.orderDirections[0].label").value("매수"))
+                .andExpect(jsonPath("$.orderStatuses[*].code").value(org.hamcrest.Matchers.contains(
+                        "PLANNED", "SUBMITTING", "PLACED", "FILLED", "PARTIALLY_FILLED", "FAILED", "CANCELLED")))
+                .andExpect(jsonPath("$.orderStatuses[?(@.code=='PARTIALLY_FILLED')].label").value(org.hamcrest.Matchers.contains("부분체결")))
+                .andExpect(jsonPath("$.dcaExecutionStatuses[*].code").value(org.hamcrest.Matchers.contains("ORDERED", "SKIPPED")))
+                .andExpect(jsonPath("$.dcaExecutionStatuses[1].label").value("건너뜀"))
                 .andExpect(jsonPath("$.dcaFrequencies[2].code").value("MONTHLY"))
                 .andExpect(jsonPath("$.dcaOperators[0].label").value("이하"))
                 .andExpect(jsonPath("$.dcaSkipReasons[0].code").value("DATA_UNAVAILABLE"))

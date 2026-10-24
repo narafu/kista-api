@@ -11,6 +11,7 @@ import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.domain.model.FinanceCategory;
 import com.kista.api.finance.domain.model.Market;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.DcaExecutionStatus;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
@@ -18,6 +19,7 @@ import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,9 +58,11 @@ public class MetaController {
                 toEnumMeta(FinanceCategory.Type.values(), FinanceCategory.Type::getLabel),
                 toEnumMeta(OrderType.values(), OrderType::getLabel),
                 toEnumMeta(OrderDirection.values(), OrderDirection::getLabel),
+                toEnumMeta(OrderStatus.values(), OrderStatus::getLabel),
                 toEnumMeta(DcaFrequency.values(), DcaFrequency::getLabel),
                 toEnumMeta(DcaOperator.values(), DcaOperator::getLabel),
                 toEnumMeta(DcaSkipReason.values(), DcaSkipReason::getLabel),
+                toEnumMeta(DcaExecutionStatus.values(), DcaExecutionStatus::getLabel),
                 toEnumMeta(DcaSizingType.values(), DcaSizingType::getLabel),
                 toEnumMeta(DcaShortfallPolicy.values(), DcaShortfallPolicy::getLabel),
                 Arrays.stream(DcaIndicator.values()).map(DcaIndicatorMeta::from).toList()
