@@ -171,4 +171,14 @@ class StrategySeedPreviewServiceTest {
         assertThat(result.availableCash()).isNull();
         verify(marginPort, never()).getUsdBuyableAmount(any());
     }
+
+    @Test
+    void nullMarginGivesNullAvailableCash() {
+        stubInfinitePrice();
+        when(marginPort.getUsdBuyableAmount(any(BrokerAccountRef.class))).thenReturn(null);
+
+        var result = service.strategySeedPreview(accountId, userId, StrategyType.INFINITE, StrategyTicker.SOXL, 20);
+
+        assertThat(result.availableCash()).isNull();
+    }
 }

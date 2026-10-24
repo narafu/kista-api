@@ -8,7 +8,7 @@
 
 - `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`의 `tossRestClient`(RestClient) 빈 주입
 - API 클래스 6개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`, `TossMarketApi`
-- `TossBrokerAdapter`: `BrokerCapabilitiesPort`(어댑터 식별 + 공통 7개 Port) + `BrokerStatisticsPort`(통계 5개 Port) 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
+- `TossBrokerAdapter`: `BrokerCapabilitiesPort`(어댑터 식별 + 공통 6개 Port) + `BrokerStatisticsPort`(통계 5개 Port) 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
   - 통계 capability(`BrokerStatisticsPort`로 묶임, 현재 Toss만 구현 — 벤더 중립 `BrokerCandle`/`BrokerStockInfo`/`ExchangeRateQuote`/`MarketCalendarDay`/`BrokerAccountInfo` 반환): `CandlePort`, `ExchangeRatePort`, `StockInfoPort`, `BrokerMarketCalendarPort`, `BrokerAccountPort`
 
 ### 계좌번호 포맷

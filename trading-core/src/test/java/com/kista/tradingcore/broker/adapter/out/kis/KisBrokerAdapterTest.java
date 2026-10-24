@@ -49,7 +49,7 @@ class KisBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("공통 7개 Capability Port를 모두 구현한다")
+    @DisplayName("공통 6개 Capability Port를 모두 구현한다")
     void implementsAllCommonCapabilityPorts() {
         KisBrokerAdapter adapter = adapter();
 

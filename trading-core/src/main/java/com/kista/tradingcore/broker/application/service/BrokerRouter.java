@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-// 공통 7개 Port 라우터 — account.broker()로 어댑터를 골라 위임 (@Primary라 소비처는 Port 인터페이스만 주입)
+// 공통 6개 Port 라우터 — account.broker()로 어댑터를 골라 위임 (@Primary라 소비처는 Port 인터페이스만 주입)
 // 현재가·전일종가·확정종가는 관리자 시세 우선(AdminMarketPricePort) — 누락 종목만 계좌 기준 어댑터로 조회한다. 스냅샷은 계좌 어댑터 그대로
 // BrokerCapabilitiesPort/BrokerAdapterPort는 구현하지 않는다 — 구현하면 자기 자신이 List<BrokerCapabilitiesPort>에 수집됨
 @Primary

@@ -13,7 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-// KIS 증권사 어댑터 — 공통 7개 Port 구현 (BrokerPricePort + LiveBalancePort 추가)
+// KIS 증권사 어댑터 — 공통 6개 Port 구현
 @Component
 @RequiredArgsConstructor
 public class KisBrokerAdapter implements BrokerCapabilitiesPort {
