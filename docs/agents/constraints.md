@@ -27,9 +27,9 @@
 
 **(b) 주장 시 증거 의무**: "외부 계약에 묶여있다"는 서술만으로는 통과 못 한다 — 그 값이 실제로 wire 포맷 변환 코드(어댑터의 switch/if 매핑, 예: `KisOrderApi.resolveOrderDvsn` 류)에서 소비되는지 grep으로 확인하고 그 파일:라인을 근거로 남길 것(enum 값 자체엔 계약이 없고 매핑은 어댑터가 담당하는 경우가 많다). 새 own-type 복제·게이트 판정을 문서에 적을 때는 이 확인을 거치지 않은 "~로 보인다/추정된다" 식 단정을 넣지 말 것.
 
-**포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`AccountOpenOrderCancelPort`(account 정의·trading `AccountOpenOrderCanceller` 구현 — 주문 소유자)/`ActiveStrategyCountPort`(user 정의·`com.kista.api.user.adapter.out.internal.ActiveStrategyCountAdapter` 구현 — trading-core 내부 HTTP 호출)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingcore.stats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingcore.stats.application.port.output` 소유 일반 출력 포트다. `TradingUserProfilePort`도 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다.
+**포트 역전(DIP)은 값 타입 복제가 아니므로 이 게이트·아래 목록에 포함하지 않는다** — "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계이며 own-type 인스턴스 번호를 부여하지 않는다: `ApprovalPolicyPort`(user 정의·admin 구현)/`BrokerEnabledPort`(account 정의·trading `TradingPolicyService` 구현 — 정책 소유자)/`AccountOpenOrderCancelPort`(account 정의·trading `AccountOpenOrderCanceller` 구현 — 주문 소유자)/`MockSimulationDataPort`(broker 정의·trading 구현). `HistoricalCandlePort`는 이 목록이 아니다 — 구현(`tradingcore.stats.adapter.out.alpaca.AlpacaCandleAdapter`)·소비(`BacktestService`)가 모두 trading-core라 `com.kista.tradingcore.stats.application.port.output` 소유 일반 출력 포트다. `TradingUserProfilePort`도 trading이 정의하고 trading 자신이 구현하므로 포트 역전이 아니다.
 
-**제3자(정의자도 데이터 소유자도 아닌 모듈, 예: web) 구현을 새 설계의 선례로 삼지 말 것** — root(`:api`)는 `:trading-core`를 컴파일 의존하지 않으므로 trading-core 정의 인터페이스를 root가 구현할 수 없다(스타일 문제가 아니라 컴파일 불가). trading-core는 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `user.adapter.out.internal.ActiveStrategyCountAdapter` — trading-core 내부 HTTP 호출).
+**제3자(정의자도 데이터 소유자도 아닌 모듈, 예: web) 구현을 새 설계의 선례로 삼지 말 것** — root(`:api`)는 `:trading-core`를 컴파일 의존하지 않으므로 trading-core 정의 인터페이스를 root가 구현할 수 없다(스타일 문제가 아니라 컴파일 불가). trading-core는 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `TradingCommandHttpAdapter` — trading-core 내부 HTTP 호출).
 
 **복제본을 쓸 때의 필수 조건 2가지**(user_notify_profile 사례에서 실측):
 - **(a) 신규 복제 테이블은 마이그레이션에서 기존 데이터를 반드시 백필한다.** 복제본이 비면 소비처가 빈 결과를 정상 응답으로 받아 기능이 멈춘다. `TradingUserProfilePort` 3개 메서드의 실제 실패 양상이 서로 다르다는 점에 주의: `findAllByUserIds()` 빈 맵 → `BatchContextFactory`가 전략마다 `NoSuchElementException`을 던지고 잡아 `errorReportPort.reportError()`로 관리자 알림을 내보낸다(**시끄럽게** 전면 중단 — 전략 수만큼 알림이 쏟아진다). `findByUserId()` 빈 Optional → 전략 등록이 "사용자를 찾을 수 없습니다"로 거부된다. `findAllActive()` 빈 리스트 → `MarketEventNotifier`가 **조용히** 아무에게도 안 보낸다(예외·로그 없음). 셋 중 마지막이 발견이 가장 늦다.
@@ -54,7 +54,7 @@
 - **내부 API 경유 한계**: root 내부 API 어댑터는 trading-core 응답의 status만 보고 `Admin*` 예외를 되살린다 — root 테이블이 같은 코드를 다시 붙인다. 같은 status에 서로 다른 코드가 실려 오는 경로가 생기면 `InternalApiErrorDetails`가 `code`도 읽어 전달하도록 확장한다
 
 ### 모듈 문서가 SSOT인 규칙 (해당 모듈 작업 시 자동 로드, 그 외엔 직접 Read)
-- Account ↔ Strategy 분리·스케쥴러 주문 예산 배정, 런타임 매매 정책 적용 → `modules/tradingcore/trading.md`
+- Account ↔ Strategy 분리·전략 원장 상한, 런타임 매매 정책 적용 → `modules/tradingcore/trading.md`
 - 매매 공식·VR 공식(변경 금지 — 단위 테스트로 검증) → `modules/tradingcore/trading-formulas.md`
 - 런타임 설정 API 엔드포인트 규칙 → `modules/api/admin.md`
 
