@@ -110,7 +110,7 @@ public class AdminTradeController {
     }
 
     // BUY 재주문 예산 조회 — UI 경고용, 서버 차단 없음
-    @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문 1~50건. 남은 예산 = liveOrderable − plannedBuy + 재주문할 원본들의 sourceRefunds 합. live 조회 실패 시 liveOrderable은 null입니다.")
+    @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문 1~50건. 원본 주문의 BUY 재주문 가용액 = cycleRemaining[원본 strategyCycleId] + 해당 원본의 sourceRefunds. DCA 사이클은 원장 상한이 없어 cycleRemaining에 키가 없습니다.")
     @GetMapping("/trades/reorder-buy-budget")
     public ReorderBuyBudgetResponse getReorderBuyBudget(
             @RequestParam List<UUID> orderIds,

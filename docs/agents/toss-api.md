@@ -8,7 +8,7 @@
 
 - `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`의 `tossRestClient`(RestClient) 빈 주입
 - API 클래스 6개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`, `TossMarketApi`
-- `TossBrokerAdapter`: `BrokerCapabilitiesPort`(어댑터 식별 + 공통 7개 Port) + `BrokerStatisticsPort`(통계 5개 Port) 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
+- `TossBrokerAdapter`: `BrokerCapabilitiesPort`(어댑터 식별 + 공통 6개 Port) + `BrokerStatisticsPort`(통계 5개 Port) 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
   - 통계 capability(`BrokerStatisticsPort`로 묶임, 현재 Toss만 구현 — 벤더 중립 `BrokerCandle`/`BrokerStockInfo`/`ExchangeRateQuote`/`MarketCalendarDay`/`BrokerAccountInfo` 반환): `CandlePort`, `ExchangeRatePort`, `StockInfoPort`, `BrokerMarketCalendarPort`, `BrokerAccountPort`
 
 ### 계좌번호 포맷
@@ -38,7 +38,7 @@
 - **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙).
 
 ### 판매 가능 수량 — 보유 수량 사용
-- `SellableQuantityPort` 계약은 "미체결 매도를 빼지 않은 보유 수량"(KIS `ovrs_cblc_qty`·Mock 최신 포지션과 동일)이고, 소비처(`TradingOrderBudgetAllocator`·`DcaPlanInputCollector`·수동 SELL 검증)가 DB PLANNED/SUBMITTING/PLACED SELL 예약을 직접 뺀다
+- `SellableQuantityPort` 계약은 "미체결 매도를 빼지 않은 보유 수량"(KIS `ovrs_cblc_qty`·Mock 최신 포지션과 동일)이고, 소비처(`DcaPlanInputCollector`·수동 SELL 검증)가 DB PLANNED/SUBMITTING/PLACED SELL 예약을 직접 뺀다
 - Toss `/api/v1/sellable-quantity`는 미체결 매도를 이미 뺀 순수량이다 — 2026-10-17 실계좌 실측: SOXL 보유 30·미체결 매도 1주 → 29(취소 후 30). 그대로 쓰면 PLACED SELL을 이중 차감해 매도 배정이 줄어든다. 그래서 `TossHoldingsApi.getSellableQuantity`는 `/api/v1/holdings`의 `quantity`를 쓴다. 같은 날 KIS 실측: 보유 12·PLACED SELL 12 → `ovrs_cblc_qty`=12, `ord_psbl_qty`=0(코드는 `ovrs_cblc_qty` 사용 — 정합)
 - 한계: kista 밖에서 낸 미체결 매도는 총량 기준에서 빠지지 않아 배정이 과다할 수 있고, 그 경우 증권사가 접수를 거절한다(KIS와 동일)
 
@@ -70,3 +70,7 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 - **`DstInfo.marketOpen` 필드를 그대로 쓰면 안 됨**: 이 필드는 "오늘 날짜" 고정이라 자정~개장 전(00:00~22:30 KST) 사이 호출 시 실제 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킴 — `lastSessionOpenInstant()`가 `nextTradeDate()`와 같은 패턴으로 날짜 롤백 처리한 버전이므로 이걸 사용
 - `TossPriceApi.prevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
 - 캔들 배열 인덱스로 확정 종가를 추측하지 말 것 — `count=1`+`before` 방식만 사용 (인덱스 추측은 장마감 후 최신 캔들 오인·프리마켓 구간 stale 버그를 냈음)
+
+### 잔고 부족 거절 분류
+- 주문 POST가 HTTP 422 + `error.code = insufficient-buying-power`이면 `TossApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `TossHttpClient`가 판정). 출처: 공식 문서 `openapi.tossinvest.com/openapi-docs/overview.md`.
+- `insufficient-sellable-quantity`(SELL)·`idempotency-key-conflict` 등 다른 422 코드는 분류하지 않는다. BUY 여부 판단은 호출자(`OrderSubmitter`) 몫.

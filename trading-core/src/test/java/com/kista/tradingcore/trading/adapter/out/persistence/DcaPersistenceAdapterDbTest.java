@@ -78,6 +78,25 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
+    void markOrderedSkipped_transitionsOnlyMatchingOrderedRow() {
+        LocalDate day = LocalDate.of(2026, 10, 14);
+        UUID orderId = UUID.randomUUID();
+        assertThat(executions.insertIfAbsent(DcaExecution.ordered(strategyId, K1, OrderDirection.BUY, day, orderId, BigDecimal.ONE, new BigDecimal("10.00")))).isTrue();
+
+        // 다른 주문 id는 전이하지 않는다
+        assertThat(executions.markOrderedSkipped(strategyId, K1, day, UUID.randomUUID(), DcaSkipReason.INSUFFICIENT_BALANCE, "부족")).isFalse();
+        assertThat(executions.markOrderedSkipped(strategyId, K1, day, orderId, DcaSkipReason.INSUFFICIENT_BALANCE, "부족")).isTrue();
+        // 재호출은 이미 SKIPPED라 0행
+        assertThat(executions.markOrderedSkipped(strategyId, K1, day, orderId, DcaSkipReason.INSUFFICIENT_BALANCE, "부족")).isFalse();
+
+        em.clear();
+        DcaExecution row = executions.find(strategyId, K1, day).orElseThrow();
+        assertThat(row.status()).isEqualTo(com.kista.shared.kernel.DcaExecutionStatus.SKIPPED);
+        assertThat(row.skipReason()).isEqualTo(DcaSkipReason.INSUFFICIENT_BALANCE);
+        assertThat(row.detail()).isEqualTo("부족");
+    }
+
+    @Test
     void saves_and_loads_multiple_rules_in_input_order() {
         DcaRule sellPercent = new DcaRule(K2, OrderDirection.SELL, DcaFrequency.WEEKLY, DayOfWeek.WEDNESDAY, null,
                 OrderType.MOO, null, new DcaSizing(DcaSizingType.HOLDING_PERCENT, null, new BigDecimal("12.50")),

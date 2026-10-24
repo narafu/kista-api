@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 import lombok.AccessLevel;
@@ -33,6 +34,13 @@ class DcaExecutionPersistenceAdapter implements DcaExecutionPort {
         String detail = e.detail() != null && e.detail().length() > DETAIL_MAX ? e.detail().substring(0, DETAIL_MAX) : e.detail();
         return jpaRepository.insertIgnoringConflict(id, e.strategyId(), e.ruleKey(), e.direction().name(), e.tradeDate(), e.status().name(),
                 e.skipReason() != null ? e.skipReason().name() : null, e.orderId(), e.quantity(), e.referencePrice(), detail) == 1;
+    }
+
+    @Override
+    @Transactional
+    public boolean markOrderedSkipped(UUID strategyId, String ruleKey, LocalDate tradeDate, UUID orderId, DcaSkipReason reason, String detail) {
+        String d = detail != null && detail.length() > DETAIL_MAX ? detail.substring(0, DETAIL_MAX) : detail;
+        return jpaRepository.markOrderedSkipped(strategyId, ruleKey, tradeDate, orderId, reason.name(), d) == 1;
     }
 
     @Override

@@ -26,7 +26,7 @@ public final class TradingFixtures {
 
     // trading 테스트용 TradingUserProfile — 잔고검증 ON, 알림 전부 기본값(미설정=활성)
     public static TradingUserProfile tradingUserProfile(UUID userId) {
-        return new TradingUserProfile(userId, Map.of(), true, null, null);
+        return new TradingUserProfile(userId, Map.of(), null, null);
     }
 
     // 기본 KIS 계좌 (accountNo/appKey/secretKey 기본값 고정)

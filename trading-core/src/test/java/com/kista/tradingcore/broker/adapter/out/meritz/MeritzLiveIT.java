@@ -78,20 +78,18 @@ class MeritzLiveIT {
         assertThat(prevClose).isPositive();
         assertThat(closing).isPositive();
 
-        var balance = adapter.getLiveBalance(account, TICKER);
         var sellable = adapter.getSellableQuantity(TICKER, account);
         var buyable = adapter.getUsdBuyableAmount(account);
         var present = adapter.getPresentBalance(account);
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         var executions = adapter.getExecutions(today.minusDays(30), today, TICKER, account);
-        assertThat(balance).isNotNull();
         assertThat(sellable).isNotNull();
         assertThat(buyable).isNotNull();
         assertThat(present).isNotNull();
         assertThat(executions).isNotEmpty(); // 실계좌에 체결 이력이 있다 — 비면 조회 결함
 
-        System.out.printf("[MeritzLive] price=%s prevClose=%s closing=%s holdings=%d usdDeposit=%s sellable=%d buyable=%s executions30d=%d%n",
-                price, prevClose, closing, balance.holdings(), balance.usdDeposit(), sellable.quantity(), buyable, executions.size());
+        System.out.printf("[MeritzLive] price=%s prevClose=%s closing=%s sellable=%d buyable=%s executions30d=%d%n",
+                price, prevClose, closing, sellable.quantity(), buyable, executions.size());
     }
 
     @Test

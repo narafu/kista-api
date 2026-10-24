@@ -1,6 +1,5 @@
 package com.kista.api.user.adapter.in.web;
 
-import com.kista.api.user.adapter.in.web.dto.BalanceCheckRequest;
 import com.kista.api.user.adapter.in.web.dto.NicknameRequest;
 import com.kista.api.user.adapter.in.web.dto.NotificationChannelRequest;
 import com.kista.api.user.adapter.in.web.dto.NotificationPrefRequest;
@@ -63,16 +62,6 @@ public class SettingsController {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "알 수 없는 알림 채널: " + body.channel() + ". 허용값: NONE, TELEGRAM, FCM, ALL"));
         userProfileUseCase.updateNotificationChannel(userId, channel);
-    }
-
-    // 잔고 검증 설정 변경 (false=예수금 부족해도 전략 생성·재등록 허용)
-    @Operation(summary = "잔고 검증 설정", description = "false 시 실잔고 미확인 모드 — 예수금 부족해도 전략 등록·재등록 가능. body: {\"enabled\": false}")
-    @ApiResponse(responseCode = "204", description = "변경 성공")
-    @PatchMapping("/balance-check")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void updateBalanceCheck(@AuthenticationPrincipal UUID userId,
-                                   @RequestBody BalanceCheckRequest body) {
-        userSettingsUseCase.updateBalanceCheck(userId, body.enabled());
     }
 
     // 알림 타입 on/off (TRADING_ALERT 등)

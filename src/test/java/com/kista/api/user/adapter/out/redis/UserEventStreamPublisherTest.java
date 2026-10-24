@@ -74,7 +74,7 @@ class UserEventStreamPublisherTest {
         UUID userId = UUID.randomUUID();
 
         publisher.onProfileChanged(new UserNotifyProfileChangedEvent(
-                userId, Map.of(), false, true, null, null));
+                userId, Map.of(), true, null, null));
 
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
                 .read(StreamOffset.create(RedisStreamConfig.USER_NOTIFY_PROFILE_CHANGED_STREAM, ReadOffset.from("0")));

@@ -82,9 +82,6 @@ public interface CycleOrderStrategy {
     // false면 호출부가 DB 조회·트랜잭션을 열지 않고 즉시 스킵한다(스케쥴러 매 틱 빈 트랜잭션 방지)
     default boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) { return true; }
 
-    // 계좌별 주문 예산 배정 우선순위 — 값이 작을수록 먼저 승인
-    default int allocationPriority() { return 100; }
-
     // 시드(usd_deposit)를 점유하는지 (DCA만 false) — false면 리포트가 cycle_position.usd_deposit을 0으로 기록한다
     // (calcFreeCash가 전략별 최신 usd_deposit을 점유 시드로 합산하므로 DCA는 계좌 여유 현금을 잠그지 않는다)
     default boolean occupiesSeed() { return true; }

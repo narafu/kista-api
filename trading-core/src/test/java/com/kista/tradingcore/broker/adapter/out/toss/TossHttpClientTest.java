@@ -569,6 +569,31 @@ class TossHttpClientTest {
         assertThat(postFailure(client).isRejected()).isFalse();
     }
 
+    private boolean insufficientFundsFor(String body) {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        expectPost(withStatus(HttpStatus.UNPROCESSABLE_ENTITY).body(body));
+        return postFailure(client).isInsufficientFunds();
+    }
+
+    @Test
+    @DisplayName("POST 422 insufficient-buying-power → 잔고 부족")
+    void post_422InsufficientBuyingPower_isInsufficientFunds() {
+        assertThat(insufficientFundsFor("{\"error\":{\"code\":\"insufficient-buying-power\",\"message\":\"주문 가능 금액이 부족합니다.\"}}")).isTrue();
+    }
+
+    @Test
+    @DisplayName("POST 422 insufficient-sellable-quantity → 잔고 부족 아님(SELL)")
+    void post_422InsufficientSellableQuantity_isNotInsufficientFunds() {
+        assertThat(insufficientFundsFor("{\"error\":{\"code\":\"insufficient-sellable-quantity\"}}")).isFalse();
+    }
+
+    @Test
+    @DisplayName("POST 422 idempotency-key-conflict → 잔고 부족 아님")
+    void post_422IdempotencyKeyConflict_isNotInsufficientFunds() {
+        assertThat(insufficientFundsFor("{\"error\":{\"code\":\"idempotency-key-conflict\"}}")).isFalse();
+    }
+
     @Test
     @DisplayName("POST 4xx → 확정 거절")
     void post_4xx_isRejected() {

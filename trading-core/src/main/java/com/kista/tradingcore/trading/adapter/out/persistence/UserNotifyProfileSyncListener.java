@@ -57,7 +57,7 @@ class UserNotifyProfileSyncListener {
         Instant version = event.occurredAt() != null ? event.occurredAt() : Instant.now();
         // @Id 할당식이라 save()가 곧 upsert
         repository.save(new UserNotifyProfileEntity(
-                event.userId(), prefsJson, event.balanceCheckEnabled(), event.active(),
+                event.userId(), prefsJson, event.active(),
                 encryptedToken, event.chatId(), version, channel));
     }
 }

@@ -4,7 +4,6 @@ import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.domain.model.Execution;
@@ -281,50 +280,6 @@ class MockBrokerAdapterTest {
         adapter().cancel(instruction, ACCOUNT);
 
         verifyNoInteractions(mockSimulationDataPort, priceFeed);
-    }
-
-    // --- getLiveBalance() ---
-
-    @Test
-    @DisplayName("getLiveBalance는 holdings/avgPrice는 해당 ticker 전략 값, usdDeposit은 계좌 전체 전략 합산 값을 반환한다")
-    void getLiveBalanceSumsUsdDepositAcrossStrategiesButKeepsTickerSpecificHoldings() {
-        StrategyRefLite soxlStrategy = new StrategyRefLite(UUID.randomUUID(), StrategyTicker.SOXL);
-        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy, TQQQ_STRATEGY));
-
-        PositionView soxlPosition = new PositionView(4, new BigDecimal("38.00"), new BigDecimal("300.00"));
-        PositionView tqqqPosition = new PositionView(10, new BigDecimal("48.00"), new BigDecimal("500.00"));
-        when(mockSimulationDataPort.findLatestPosition(soxlStrategy.id())).thenReturn(Optional.of(soxlPosition));
-        when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.of(tqqqPosition));
-
-        BrokerBalance balance = adapter().getLiveBalance(ACCOUNT, StrategyTicker.TQQQ);
-
-        // holdings/avgPrice는 TQQQ 전략 고유값
-        assertThat(balance.holdings()).isEqualTo(10);
-        assertThat(balance.avgPrice()).isEqualByComparingTo("48.00");
-        // usdDeposit은 SOXL(300)+TQQQ(500) 계좌 전체 합산 — 다른 전략 예산으로 매수 오판정을 막기 위함
-        assertThat(balance.usdDeposit()).isEqualByComparingTo("800.00");
-    }
-
-    @Test
-    @DisplayName("getLiveBalance는 해당 ticker 전략이 없으면 IllegalStateException을 던진다")
-    void getLiveBalanceThrowsWhenNoMatchingStrategy() {
-        StrategyRefLite soxlStrategy = new StrategyRefLite(UUID.randomUUID(), StrategyTicker.SOXL);
-        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(soxlStrategy));
-
-        MockBrokerAdapter adapter = adapter();
-        assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, StrategyTicker.TQQQ))
-                .isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
-    @DisplayName("getLiveBalance는 전략은 있지만 포지션 이력이 없으면 IllegalStateException을 던진다")
-    void getLiveBalanceThrowsWhenNoPositionHistory() {
-        when(mockSimulationDataPort.findStrategiesByAccountId(ACCOUNT_ID)).thenReturn(List.of(TQQQ_STRATEGY));
-        when(mockSimulationDataPort.findLatestPosition(STRATEGY_ID)).thenReturn(Optional.empty());
-
-        MockBrokerAdapter adapter = adapter();
-        assertThatThrownBy(() -> adapter.getLiveBalance(ACCOUNT, StrategyTicker.TQQQ))
-                .isInstanceOf(IllegalStateException.class);
     }
 
     // --- getSellableQuantity() ---

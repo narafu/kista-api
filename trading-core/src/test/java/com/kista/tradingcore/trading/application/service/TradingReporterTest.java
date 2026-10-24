@@ -185,7 +185,7 @@ class TradingReporterTest {
     @Test
     void TRADING_ALERT_비활성이면_리포트를_발송하지_않는다() {
         TradingUserProfile mutedProfile = new TradingUserProfile(USER.userId(),
-                Map.of(NotificationType.TRADING_ALERT, false), true, null, null);
+                Map.of(NotificationType.TRADING_ALERT, false), null, null);
         BatchContext mutedCtx = new BatchContext(STRATEGY, CYCLE, ACCOUNT, mutedProfile);
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
 

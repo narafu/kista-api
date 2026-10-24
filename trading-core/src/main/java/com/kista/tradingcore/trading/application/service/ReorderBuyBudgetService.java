@@ -1,16 +1,15 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.account.application.port.output.AccountPort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.application.usecase.ReorderBuyBudgetQuery;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.ReorderBuyBudget;
-import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,15 +19,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-// 트랜잭션 없음 — live 조회(외부 HTTP)가 트랜잭션 안에 들어가지 않도록 포트 호출마다 자체 트랜잭션
-@Slf4j
+// 트랜잭션 없음 — 포트 호출마다 자체 트랜잭션(읽기 전용 계산)
 @Service
 @RequiredArgsConstructor
 class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
 
     private final OrderPort orderPort;
-    private final AccountPort accountPort;
-    private final LiveBalancePort liveBalancePort;
+    private final StrategyCyclePort strategyCyclePort;
+    private final StrategyPort strategyPort;
+    private final StrategyLedgerBudget ledgerBudget;
 
     static final int MAX_ORDERS = 50; // 일괄 조회 상한 — 일괄 재주문 폼 한 화면 분량
 
@@ -41,32 +40,31 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
                 .map(id -> orderPort.findById(id)
                         .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다.")))
                 .toList();
-        // 계좌 공통 값(합계·live)을 한 번만 조회하므로 원본은 모두 같은 계좌여야 한다
+        // 같은 계좌 제한 유지 — 일괄 재주문 폼은 한 계좌 단위
         UUID accountId = sources.getFirst().accountId();
         if (sources.stream().anyMatch(o -> !o.accountId().equals(accountId))) {
             throw new IllegalArgumentException("같은 계좌의 주문만 함께 조회할 수 있습니다");
         }
-        TradingAccount account = TradingAccount.from(accountPort.findByIdOrThrow(accountId));
         LocalDate date = tradeDate != null ? tradeDate : sources.getFirst().tradeDate();
 
-        // 예약 합계를 live보다 먼저 읽는다 — 동시 접수분이 이중 차감(보수적)될 뿐 과대 계상되지 않음 (workflow.md 접수 직전 재캡)
-        BigDecimal plannedBuy = orderPort.sumPlannedBuyByAccountAndDate(accountId, date);
-
-        // PLANNED는 합계에 포함, PLACED는 live에서 이미 차감 — 재주문이 원본을 취소하면 둘 다 풀려난다
+        // PLANNED·PLACED BUY 원본은 remaining의 저장된 BUY 차감에 이미 들어 있어 재주문 취소 시 그만큼 풀려난다
         Map<UUID, BigDecimal> sourceRefunds = new LinkedHashMap<>();
         sources.forEach(o -> sourceRefunds.put(o.id(), refundOf(o, date)));
 
-        // usdDeposit은 계좌 단위 값이라 첫 원본 ticker로 1회만 조회 (allocator fetchQuote와 동일)
-        BigDecimal live = null;
-        try {
-            live = liveBalancePort.getLiveBalance(account.brokerRef(), sources.getFirst().ticker()).usdDeposit();
-        } catch (RuntimeException e) {
-            log.warn("재주문 예산 live 조회 실패 — accountId={}, error={}", accountId, e.getMessage());
-        }
-        return new ReorderBuyBudget(plannedBuy, live, sourceRefunds);
+        // 사이클별 원장 한도 — live 조회 없음
+        Map<UUID, ReorderBuyBudget.CycleBudget> cycles = new LinkedHashMap<>();
+        sources.stream().map(Order::strategyCycleId).distinct().forEach(cycleId -> {
+            StrategyCycle cycle = strategyCyclePort.findById(cycleId)
+                    .orElseThrow(() -> new IllegalArgumentException("전략 사이클을 찾을 수 없습니다."));
+            // DCA(시드 비점유) 사이클은 상한 없음 — 키를 생략해 UI가 무제한으로 본다
+            if (!ledgerBudget.applies(strategyPort.findByIdOrThrow(cycle.strategyId()).type())) return;
+            cycles.put(cycleId, new ReorderBuyBudget.CycleBudget(ledgerBudget.remaining(cycle, date)));
+        });
+        return new ReorderBuyBudget(cycles, sourceRefunds);
     }
 
-    private static BigDecimal refundOf(Order source, LocalDate date) {
+    // ReorderService도 재사용 — 같은 거래일 PLANNED·PLACED BUY 원본만 환급
+    static BigDecimal refundOf(Order source, LocalDate date) {
         boolean cancellable = source.direction() == OrderDirection.BUY
                 && (source.status() == OrderStatus.PLANNED || source.status() == OrderStatus.PLACED)
                 && source.tradeDate().equals(date);

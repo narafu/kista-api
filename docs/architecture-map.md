@@ -257,7 +257,7 @@ sequenceDiagram
     participant S as TradingCloseScheduler
     participant Svc as TradingService
     participant Plan as TradingCandidatePlanner
-    participant Alloc as TradingOrderBudgetAllocator
+    participant Led as StrategyLedgerBudget
     participant Exec as TradingOrderExecutor
     participant B as Broker (KIS/Toss)
     participant DB as trading.orders
@@ -269,9 +269,8 @@ sequenceDiagram
     Svc->>B: ticker별 현재가 일괄 조회
     Svc->>Plan: 전략 계산 · BUY cap 사전 계산
     loop 계좌별 (TradingParallelRunner, AccountBudgetLock)
-        Plan->>Alloc: allocate(candidates, tradeDate)
-        Alloc->>B: live 잔고 · 판매가능수량
-        Alloc->>DB: 승인 주문 PLANNED 저장
+        Plan->>Led: remaining · fit (전략 원장 상한)
+        Plan->>DB: 승인 주문 PLANNED 저장
     end
     Svc->>Svc: DstInfo.waitUntilOrderTime() (비DST 60분 대기)
     Svc->>B: 접수 대상 현재가 재조회

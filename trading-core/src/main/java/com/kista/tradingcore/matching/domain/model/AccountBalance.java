@@ -41,7 +41,7 @@ public record AccountBalance(
         BigDecimal amountUsd();
     }
 
-    // 주문 목록 중 BUY 합계 금액 — hasSufficientDepositFor/TradingOrderBudgetAllocator 공용
+    // 주문 목록 중 BUY 합계 금액 — hasSufficientDepositFor/원장 상한 판정 공용
     public static BigDecimal buyTotal(List<PlannedOrder> orders) {
         return orders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)

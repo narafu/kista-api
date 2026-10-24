@@ -126,6 +126,18 @@ class InfinitePositionTest {
     }
 
     @Test
+    @DisplayName("isFinalRound: unitAmount<=원장이어도 기준가 1주가 원장을 넘으면 최종회차")
+    void finalRoundWhenOneShareAtReferenceExceedsDeposit() {
+        // holdings=10, avg=41.5, deposit=25 → purchase=415, total=440, unit=22 (<25), round≈18.86 → 후반
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("41.5"), new BigDecimal("25"));
+        InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("40"), 20);
+
+        assertThat(pos.unitAmount()).isLessThanOrEqualTo(pos.usdDeposit());
+        assertThat(pos.referencePrice()).isGreaterThan(pos.usdDeposit());
+        assertThat(pos.isFinalRound()).isTrue();
+    }
+
+    @Test
     @DisplayName("nextReverseMode: 리버스모드 + 종가 회복 → 일반모드 복귀")
     void nextReverseMode_exits_when_priceRecovered() {
         // SOXL targetProfitRate=0.20 → threshold = avgPrice × (1 - 0.20) = 22 × 0.80 = 17.60

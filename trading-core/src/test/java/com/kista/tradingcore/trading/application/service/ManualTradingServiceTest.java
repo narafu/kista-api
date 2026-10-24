@@ -18,10 +18,8 @@ import com.kista.tradingcore.trading.domain.model.Strategy; import com.kista.tra
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort; import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
@@ -66,8 +64,6 @@ class ManualTradingServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    @Mock LiveBalancePort liveBalancePort;   // LiveBalancePort 직접 mock
-    @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingOrderExecutor orderExecutor;
     @Mock InfiniteStrategy infiniteStrategy; // class-level — 테스트별로 stub 가능
     @Mock StrategyCycleVrPort strategyCycleVrPort; // CycleOrderComputer VR 분기용
@@ -118,18 +114,15 @@ class ManualTradingServiceTest {
                 balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
-        TradingOrderBudgetAllocator budgetAllocator = new TradingOrderBudgetAllocator(
-                liveBalancePort, sellableQuantityPort, orderPort, cycleStrategies);
+        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, cycleStrategies);
 
         // ManualTradingService 필드 목록에 orderPlanner가 포함돼 있다(배치 TradingCandidatePlanner와 동일하게
-        // allocator 승인 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
+        // 원장 통과 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
-                priceFetcher, planBuilder, priceCapper, budgetAllocator,
+                priceFetcher, planBuilder, priceCapper, ledgerBudget,
                 orderPlanner, orderExecutor, budgetLock, eventPublisher, marketCalendarPort);
         lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
-                .thenReturn(new SellableQuantity("SOXL", 100));
 
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT.id(), REQUESTER_ID)).thenReturn(ACCOUNT);
@@ -151,38 +144,74 @@ class ManualTradingServiceTest {
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("22.00")));
     }
 
-    @Test
-    void execute_insufficientSellHoldings_throwsManualTradingException() {
-        // SELL 15주 계획, live holdings=10 → 보유수량 부족 → ManualTradingException
-        Order sellOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.SELL, BigDecimal.valueOf(15), new BigDecimal("22.00"),
-                OrderStatus.PLANNED, null, null, null);
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(sellOrder.toPlanned()));
-        // live holdings=10, sellable=10 < SELL 15주 — 보유수량 부족
-        when(sellableQuantityPort.getSellableQuantity(any(), any()))
-                .thenReturn(new SellableQuantity("SOXL", 10));
+    private void stubLedger(BigDecimal usdDeposit) {
+        CyclePosition pos = new CyclePosition(null, CYCLE.id(), usdDeposit, new BigDecimal("22.00"),
+                new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
+        when(cyclePositionPort.findLatestOne(CYCLE.id())).thenReturn(Optional.of(pos));
+    }
 
-        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
-                .isInstanceOf(ManualTradingException.class)
-                .hasMessageContaining("보유 수량이 부족합니다");
-        // BUY 후보가 없으므로 allocator가 LiveBalancePort를 조회하지 않아야 한다
-        verify(liveBalancePort, never()).getLiveBalance(any(), any());
+    private static PlannedOrder planned(OrderDirection dir, int qty, String price, String leg) {
+        return PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC, dir, qty, new BigDecimal(price), leg);
     }
 
     @Test
-    void execute_liveBalanceBrokerApiFailure_propagatesAsIsFor503() {
-        // 증권사 타입 예외는 409로 감싸지 않고 그대로 전파 — TradingExceptionHandler가 503 매핑·에러 로그 기록
-        Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
-                OrderStatus.PLANNED, null, null, null);
+    void sellSavedWithoutSellableCheck() {
+        // SELL만 있으면 원장과 무관하게 저장된다 — 판매가능수량 조회 없음
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(buyOrder.toPlanned()));
+                .thenReturn(List.of(planned(OrderDirection.SELL, 15, "22.00", "INFINITE_SELL_01")));
+        stubLedger(BigDecimal.ZERO);
+
+        service.execute(STRATEGY.id(), REQUESTER_ID);
+
+        verify(orderPort).saveAll(argThat(saved -> saved.size() == 1));
+    }
+
+    @Test
+    void trimmedBuysSaved() {
+        // base 10주×20 + 보정 1주×9 = 209 > 원장 205 → 보정만 잘리고 base는 저장
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(planned(OrderDirection.BUY, 10, "20.00", "INFINITE_BUY_01"),
+                        planned(OrderDirection.BUY, 1, "9.00", "INFINITE_CORRECTION_01")));
+        stubLedger(new BigDecimal("205"));
+
+        service.execute(STRATEGY.id(), REQUESTER_ID);
+
+        verify(orderPort).saveAll(argThat(saved -> saved.size() == 1
+                && saved.getFirst().quantity().compareTo(BigDecimal.TEN) == 0));
+    }
+
+    @Test
+    void rejectsWhenOverOwnLedger() {
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(planned(OrderDirection.BUY, 10, "20.00", "INFINITE_BUY_01")));
+        stubLedger(new BigDecimal("100"));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessage("전략 원장 예수금이 부족합니다.");
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    @Test
+    void ledgerQueryFailure_notifiesAdminAndThrowsManualTradingFailed() {
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(planned(OrderDirection.BUY, 1, "20.00", "INFINITE_BUY_01")));
+        when(cyclePositionPort.findLatestOne(CYCLE.id())).thenThrow(new RuntimeException("DB 오류"));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingFailedException.class);
+
+        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
+        verify(orderPort, never()).saveAll(anyList());
+    }
+
+    @Test
+    void ledgerQueryBrokerTypedFailure_propagatesAsIs() {
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(planned(OrderDirection.BUY, 1, "20.00", "INFINITE_BUY_01")));
         RuntimeException brokerFailure = new com.kista.tradingcore.support.StubBrokerApiException("Toss", "Toss API 오류",
                 com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.NONE);
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL))).thenThrow(brokerFailure);
+        when(cyclePositionPort.findLatestOne(CYCLE.id())).thenThrow(brokerFailure);
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isSameAs(brokerFailure);
 
@@ -215,49 +244,8 @@ class ManualTradingServiceTest {
     }
 
     @Test
-    void execute_liveBalanceFetchFails_notifiesAdminAndThrowsManualTradingFailed() {
-        // 증권사 타입이 아닌 예상 밖 예외는 500(ManualTradingFailedException)으로 승격 — 핸들러는 보고하지 않으므로 서비스가 TradingErrorEvent를 발행
-        Order buyOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
-                OrderStatus.PLANNED, null, null, null);
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(buyOrder.toPlanned()));
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenThrow(new RuntimeException("Toss API 오류"));
-
-        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
-                .isInstanceOf(ManualTradingFailedException.class).hasCauseInstanceOf(RuntimeException.class);
-
-        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
-    }
-
-    @Test
-    void execute_existingReservedSellExceedsAvailable_rejects() {
-        Order sellOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_OPEN,
-                OrderDirection.SELL, BigDecimal.valueOf(3), new BigDecimal("22.00"),
-                OrderStatus.PLANNED, null, null, null);
-        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
-                .thenReturn(List.of(sellOrder.toPlanned()));
-        when(sellableQuantityPort.getSellableQuantity(any(), any()))
-                .thenReturn(new SellableQuantity("SOXL", 5));
-        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
-                eq(ACCOUNT.id()), any(LocalDate.class), eq(StrategyTicker.SOXL)))
-                .thenReturn(3);
-
-        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
-                .isInstanceOf(ManualTradingException.class)
-                .hasMessage("보유 수량이 부족합니다");
-
-        verify(orderPort, never()).saveAll(anyList());
-        // BUY 후보가 없으므로 allocator가 LiveBalancePort를 조회하지 않아야 한다
-        verify(liveBalancePort, never()).getLiveBalance(any(), any());
-    }
-
-    @Test
     void execute_sufficientBalance_savesOrders() {
-        // BUY 1주, live 충분(usdDeposit=$10,000, holdings=10) → saveAll 호출, 주문 반환
+        // BUY 1주, 원장 충분(usdDeposit=$1,000) → saveAll 호출, 주문 반환
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
@@ -268,14 +256,10 @@ class ManualTradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
-        // live 잔고 충분: usdDeposit=$10,000 > BUY $20
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
-        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of()); // AT_OPEN 없음(BUY뿐) — 개장 후에만 호출되므로 lenient
-        // 1번째(이중 실행 방지 가드)·2번째(락 안 재검사)=빈 목록, 3번째(최종 반환)=저장된 주문
+        // 1번째(이중 실행 방지 가드)·2번째(락 안 재검사)·3번째(원장 잔여 계산)=빈 목록, 4번째(최종 반환)=저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
-                .thenReturn(List.of(), List.of(), List.of(savedOrder));
+                .thenReturn(List.of(), List.of(), List.of(), List.of(savedOrder));
 
         List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
 
@@ -305,7 +289,7 @@ class ManualTradingServiceTest {
         verify(orderPort, never()).saveAll(anyList());
     }
 
-    // 같은 계좌의 배치 승인·재캡과 live 여유분을 이중 사용하지 않도록 allocator 승인~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다
+    // 같은 계좌의 배치 원장 판정·재캡과 같은 여유분을 이중 사용하지 않도록 원장 판정~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다
     @Test
     void execute_allocationAndSave_runInsideAccountBudgetLock() throws InterruptedException {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
@@ -314,14 +298,13 @@ class ManualTradingServiceTest {
                 OrderStatus.PLANNED, null, null, null);
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10000.00")));
         AtomicBoolean held = trackLockHeld(budgetLock);
         AtomicBoolean reservedReadInLock = new AtomicBoolean();
         AtomicBoolean savedInLock = new AtomicBoolean();
-        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenAnswer(invocation -> {
-            reservedReadInLock.set(held.get());
-            return BigDecimal.ZERO;
+        // 락 안 원장 판정 — 같은 날 저장분 조회가 락 보유 중에 일어났는지
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any())).thenAnswer(invocation -> {
+            if (held.get()) reservedReadInLock.set(true);
+            return List.of();
         });
         doAnswer(invocation -> {
             savedInLock.set(held.get());
@@ -339,7 +322,7 @@ class ManualTradingServiceTest {
     // 수동실행이 배치와 동일하게 "캡 적용 후" 금액으로 검증하도록 바뀐 것을 고정하는 회귀 테스트
     @Test
     void execute_buyPriceExceedsCapButCappedAmountFitsBudget_savesOrders() {
-        // 원가 100.00×1주=100.00은 live usdDeposit(60.00)을 초과하지만,
+        // 원가 100.00×1주=100.00은 원장 usdDeposit(60.00)을 초과하지만,
         // 현재가 50.00 기준 캡(52.50)으로 보정된 뒤 금액(52.50)은 예산 안에 든다
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
@@ -356,16 +339,14 @@ class ManualTradingServiceTest {
         // 캡 판단용 현재가 50.00 → cap = 52.50
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
-        // live 잔고: holdings=10, usdDeposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("60.00")));
-        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
+        // 원장 usdDeposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
+        stubLedger(new BigDecimal("60.00"));
         Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("52.50"), OrderStatus.PLANNED, null, null, null);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(CYCLE.id()), any()))
-                .thenReturn(List.of(), List.of(), List.of(savedOrder));
+                .thenReturn(List.of(), List.of(), List.of(), List.of(savedOrder));
 
         List<Order> orders = service.execute(STRATEGY.id(), REQUESTER_ID);
 
@@ -390,14 +371,12 @@ class ManualTradingServiceTest {
                 });
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
-        // live usdDeposit=10.00 — 캡 후 금액(52.50)조차 초과
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(10, new BigDecimal("20.00"), new BigDecimal("10.00")));
-        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
+        // 원장 usdDeposit=10.00 — 캡 후 금액(52.50)조차 초과
+        stubLedger(new BigDecimal("10.00"));
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
                 .isInstanceOf(ManualTradingException.class)
-                .hasMessage("예수금이 부족합니다");
+                .hasMessage("전략 원장 예수금이 부족합니다.");
 
         verify(orderPort, never()).saveAll(anyList());
     }
@@ -481,9 +460,9 @@ class ManualTradingServiceTest {
 
         when(strategyPort.findByIdOrThrow(vrStrat.id())).thenReturn(vrStrat);
         when(strategyCyclePort.requireLatestByStrategyId(vrStrat.id())).thenReturn(vrCycle);
-        // 1번째(이중 실행 방지 가드)·2번째(락 안 재검사)=빈 목록, 3번째(최종 반환)=저장된 주문
+        // 1번째(이중 실행 방지 가드)·2번째(락 안 재검사)·3번째(원장 잔여 계산)=빈 목록, 4번째(최종 반환)=저장된 주문
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(vrCycle.id()), any()))
-                .thenReturn(List.of(), List.of(), List.of(vrBuyPlanned, vrSellPlanned));
+                .thenReturn(List.of(), List.of(), List.of(), List.of(vrBuyPlanned, vrSellPlanned));
         // 잔고: cycle_position 이력에서 로드
         when(cyclePositionPort.findLatestOneByStrategyId(vrStrat.id())).thenReturn(Optional.of(vrHistory));
         when(cyclePositionPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
@@ -495,10 +474,6 @@ class ManualTradingServiceTest {
         // setUp()의 전역 kisPricePort 스텁이 SOXL 전일종가 20.00을 반환 → referencePrice=20.00(대체), currentPrice(live)=null
         when(vrStrategy.buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(new BigDecimal("20.00")), any()))
                 .thenReturn(List.of(vrBuyTemplate.toPlanned(), vrSellTemplate.toPlanned()));
-        // live 잔고 검증 — BUY $22 << usdDeposit $10,000
-        when(liveBalancePort.getLiveBalance(eq(ACCOUNT_REF), eq(StrategyTicker.SOXL)))
-                .thenReturn(new BrokerBalance(5, new BigDecimal("20.00"), new BigDecimal("10000.00")));
-        when(orderPort.sumPlannedBuyByAccountAndDate(eq(ACCOUNT.id()), any())).thenReturn(BigDecimal.ZERO);
 
         return new VrFixture(vrStrat, vrCycle, vrVersionId, vrBuyPlanned, vrSellPlanned);
     }
@@ -540,7 +515,7 @@ class ManualTradingServiceTest {
         // VR 수동실행 plan.position()은 항상 null(VrCycleOrderStrategy.plan()), vrPosition은 non-null,
         // currentPrice는 위에서 재조회한 21.00, cycleId/account/strategy도 실제 값과 일치해야 한다
         verify(orderExecutor, times(1)).placeAtOpenOrders(
-                any(LocalDate.class), eq(TradingAccount.from(ACCOUNT)), eq(fx.vrCycle().id()),
+                any(LocalDate.class), eq(TradingAccount.from(ACCOUNT)), eq(fx.vrCycle()),
                 eq(new BigDecimal("21.00")), isNull(), any(VrPosition.class), eq(fx.vrStrat()));
     }
 

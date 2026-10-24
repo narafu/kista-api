@@ -5,6 +5,7 @@ import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.tradingcore.trading.domain.model.ManualTradingException;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.ReorderCommand;
@@ -43,6 +44,7 @@ class ReorderService implements ReorderUseCase {
     private final MarketCalendarPort marketCalendarPort;
     private final OrderCancelStateWriter stateWriter; // 원본 취소 DB 기록 — 짧은 트랜잭션
     private final OrderSubmitter orderSubmitter;      // IMMEDIATE 재주문 선점 → 접수 → 기록 (배치와 같은 경로)
+    private final StrategyLedgerBudget ledgerBudget;  // BUY 재주문 전략 원장 상한
 
     @Override
     public ReorderResult reorder(ReorderCommand command) {
@@ -98,6 +100,18 @@ class ReorderService implements ReorderUseCase {
             throw new IllegalArgumentException("현재 거래일(" + currentTradeDate + ") 주문으로만 재주문할 수 있습니다");
         }
 
+        // 1-1. BUY는 전략 원장 상한 검증 — 원본 취소 전에 (거절 시 취소·증권사 호출 없음, 축소 없는 단건)
+        // remaining이 같은 거래일 PLANNED·PLACED BUY 원본을 이미 차감했으므로 취소로 풀리는 환급분만 더한다
+        // ponytail: AccountBudgetLock 없이 검사 — 락이 cancelSource 증권사 호출까지 걸리게 돼 동시 배치와 같은 사이클에서 경합 가능. 필요하면 검사+저장을 락으로 감싼다
+        // DCA(시드 비점유)는 원장 상한 제외
+        if (direction == OrderDirection.BUY && ledgerBudget.applies(strategy.type())) {
+            BigDecimal limit = ledgerBudget.remaining(currentCycle, tradeDate)
+                    .add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate));
+            if (price.multiply(BigDecimal.valueOf(quantity)).compareTo(limit) > 0) {
+                throw new ManualTradingException("전략 원장 예수금이 부족합니다.");
+            }
+        }
+
         // 2. 원본 상태별 취소 처리
         cancelSource(sourceOrder, account);
 
@@ -143,7 +157,7 @@ class ReorderService implements ReorderUseCase {
         OrderSubmitter.Submission submission = orderSubmitter.submit(saved, account.toBrokerRef(), account.nickname());
         return switch (submission.outcome()) {
             case PLACED -> new PlacementResult(OrderStatus.PLACED, submission.externalOrderId());
-            case REJECTED -> new PlacementResult(OrderStatus.FAILED, null);
+            case REJECTED, INSUFFICIENT_FUNDS -> new PlacementResult(OrderStatus.FAILED, null); // 잔고 부족은 FAILED 응답으로 사용자에게 직접 전달 — 별도 알림 없음
             case UNKNOWN -> new PlacementResult(OrderStatus.SUBMITTING, null); // 결과 불명 — 재시도 금지, 런북 정정
             case SKIPPED -> resolveSkipped(saved);
         };

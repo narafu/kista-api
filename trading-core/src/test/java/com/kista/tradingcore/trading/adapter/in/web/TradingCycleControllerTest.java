@@ -282,7 +282,7 @@ class TradingCycleControllerTest {
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
         var preview = new com.kista.tradingcore.trading.domain.model.NextOrdersPreview(
                 java.time.LocalDate.of(2026, 1, 5), null, List.of(),
-                null, List.of(), BigDecimal.ZERO, null, null);
+                null, List.of(), BigDecimal.ZERO, null);
         when(tradingExecution.previewBatch(eq(ACCOUNT_ID), any()))
                 .thenReturn(java.util.Map.of(strategyId, preview));
 
@@ -301,7 +301,7 @@ class TradingCycleControllerTest {
 
     @Test
     void seedPreview_returns200_with_minSeed() throws Exception {
-        var preview = new StrategySeedPreview("SOXL", new BigDecimal("30.00"), new BigDecimal("1320.00"), null);
+        var preview = new StrategySeedPreview("SOXL", new BigDecimal("30.00"), new BigDecimal("1320.00"), null, new BigDecimal("500"));
         when(tradingCycle.strategySeedPreview(eq(ACCOUNT_ID), any(),
                 eq(StrategyType.INFINITE), eq(StrategyTicker.SOXL), eq(20)))
                 .thenReturn(preview);
@@ -312,7 +312,8 @@ class TradingCycleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.minSeed").value(1320.00))
                 .andExpect(jsonPath("$.basePrice").value(30.00))
-                .andExpect(jsonPath("$.skipReason").doesNotExist());
+                .andExpect(jsonPath("$.skipReason").doesNotExist())
+                .andExpect(jsonPath("$.availableCash").value(500));
     }
 
     @Test

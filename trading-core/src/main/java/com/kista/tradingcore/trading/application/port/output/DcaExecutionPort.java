@@ -2,6 +2,8 @@ package com.kista.tradingcore.trading.application.port.output;
 
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
 
+import com.kista.shared.kernel.DcaSkipReason;
+
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +15,9 @@ public interface DcaExecutionPort {
 
     // (strategyId, ruleKey, tradeDate) 최초 1회만 삽입 — 삽입했으면 true, UNIQUE 충돌이면 false
     boolean insertIfAbsent(DcaExecution execution);
+
+    // 접수 거절된 주문의 ORDERED 이력을 SKIPPED로 전이 — status=ORDERED이고 order_id가 같은 행만, 바꿨으면 true
+    boolean markOrderedSkipped(UUID strategyId, String ruleKey, LocalDate tradeDate, UUID orderId, DcaSkipReason reason, String detail);
 
     // 규칙·거래일 단건 조회
     Optional<DcaExecution> find(UUID strategyId, String ruleKey, LocalDate tradeDate);

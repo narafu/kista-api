@@ -39,15 +39,6 @@ class KisTradingApi {
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
 
-    // ── getBalance() ─────────────────────────────────────────────────────────
-
-    public BrokerBalance getBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        HoldingResult holding = fetchHolding(account, ticker);
-        BigDecimal usdDeposit = getUsdBuyableAmount(account);
-        BigDecimal avgPrice = holding.quantity() > 0 ? holding.avgPrice() : null;
-        return new BrokerBalance(holding.quantity(), avgPrice, usdDeposit);
-    }
-
     private HoldingResult fetchHolding(BrokerAccountRef account, StrategyTicker ticker) {
         BalanceResponse response = kisHttpClient.tradingGet(
                 BALANCE_TR_ID, BALANCE_PATH, account, BalanceResponse.class,

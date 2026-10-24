@@ -27,7 +27,7 @@ class ApiKeyExpiryNotifierTest {
 
     @Test
     void loadsProfileAndNotifies() {
-        TradingUserProfile profile = new TradingUserProfile(userId, Map.of(), false, "tok", "chat");
+        TradingUserProfile profile = new TradingUserProfile(userId, Map.of(), "tok", "chat");
         when(profilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
 
         notifier.onApiKeyExpiring(event);

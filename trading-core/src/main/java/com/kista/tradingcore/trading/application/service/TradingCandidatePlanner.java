@@ -10,7 +10,6 @@ import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
-import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
@@ -28,9 +27,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-// 전략별 후보 수집(잔고 로드 + 전략 계산 + 가격 캡) + 계좌별 예산 배정 — executeBatch(AT_CLOSE)/placeOpenOrders(AT_OPEN) 공용
+// 전략별 후보 수집(잔고 로드 + 전략 계산 + 가격 캡) + 전략별 원장 상한 적용 — executeBatch(AT_CLOSE)/placeOpenOrders(AT_OPEN) 공용
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -41,14 +39,14 @@ class TradingCandidatePlanner {
     private final TradingOrderPlanner orderPlanner;
     private final BuyOrderPriceCapper priceCapper;
     private final CycleOrderStrategies cycleOrderStrategies;
-    private final TradingOrderBudgetAllocator budgetAllocator;
+    private final StrategyLedgerBudget ledgerBudget;           // 전략 자기 원장 상한 — 계좌 예산 배정 대체
     private final TradingBalanceLoader balanceLoader;
     private final ApplicationEventPublisher eventPublisher; // 예수금 부족 알림(InsufficientBalanceEvent)
     private final TradingBatchGuard batchGuard;
-    private final AccountBudgetLock budgetLock;                 // 계좌별 배정~저장 직렬화 — 수동 실행·재캡과 같은 락
+    private final AccountBudgetLock budgetLock;                 // 계좌별 원장 판정~저장 직렬화 — 수동 실행·재캡과 같은 락
     private final DcaPlanInputCollector dcaInputCollector;      // 회차 판정 전략(DCA) plan 입력 수집 — 부작용 없음
     private final DcaExecutionRecorder dcaExecutionRecorder;    // DCA 회차 이력·skip 알림 기록
-    private final TradingParallelRunner parallelRunner;         // 계좌별 조회+예산배정 병렬 실행
+    private final TradingParallelRunner parallelRunner;         // 계좌별 원장 판정+저장 병렬 실행
 
     // 슬롯별 후보 수집 결과: 전략별 잔고·전략 계산 상태
     record CycleState(
@@ -228,86 +226,47 @@ class TradingCandidatePlanner {
         return new CycleState(ctx, balance, null, null, price, privacyBaseForState);
     }
 
-    // allocator 승인 주문만 PLANNED 저장하고 BUY/SELL 거절 사이클에는 기존 잔고 부족 알림을 재사용한다
+    // 전략 원장 상한을 통과한 주문만 PLANNED 저장하고 BUY가 거절된 사이클에는 기존 잔고 부족 알림을 재사용한다
     SaveAllocationResult saveAllocatedOrders(List<CyclePlanCandidate> candidates, LocalDate tradeDate)
             throws InterruptedException {
-        Map<UUID, List<TradingOrderBudgetAllocator.Candidate>> candidatesByAccount = new LinkedHashMap<>();
+        Map<UUID, List<Slot>> slotsByAccount = new LinkedHashMap<>();
         candidates.stream()
                 .filter(candidate -> !candidate.creatableOrders().isEmpty())
-                .map(candidate -> new TradingOrderBudgetAllocator.Candidate(
-                        candidate.state().ctx(), candidate.creatableOrders()))
-                .forEach(candidate -> candidatesByAccount
-                        .computeIfAbsent(candidate.ctx().account().id(), _ -> new ArrayList<>())
-                        .add(candidate));
-        // 회차 판정 사이클별 leg → 주문 기준가 — ORDERED·거절 skip 이력의 reference_price (병렬 태스크는 읽기만 한다)
+                .map(candidate -> new Slot(candidate.state().ctx(), candidate.creatableOrders()))
+                .forEach(slot -> slotsByAccount
+                        .computeIfAbsent(slot.ctx().account().id(), _ -> new ArrayList<>())
+                        .add(slot));
+        // 회차 판정 사이클별 leg → 주문 기준가 — ORDERED 이력의 reference_price (병렬 태스크는 읽기만 한다)
         Map<BatchContext, Map<String, BigDecimal>> dcaReferencePrices = candidates.stream()
                 .filter(candidate -> !candidate.dcaReferencePrices().isEmpty())
                 .collect(Collectors.toMap(candidate -> candidate.state().ctx(), CyclePlanCandidate::dcaReferencePrices, (a, b) -> a));
 
         Set<BatchContext> savedContexts = new LinkedHashSet<>();
 
-        // 계좌별 조회(잔고·판매가능수량)+예산 배정+승인분 PLANNED 저장을 계좌 간 병렬 태스크로 묶는다.
-        // 계좌 내 예산 차감(우선순위 순차 배정)은 allocate() 내부에서 순차로 처리된다.
-        // 배정~저장 커밋은 계좌 예산 락 안 — 같은 계좌의 수동 실행 승인·접수 직전 재캡과 live 여유분을 이중 사용하지 않게 한다
-        List<TradingParallelRunner.Task<AccountAllocation>> tasks = candidatesByAccount.values().stream()
-                .map(accountCandidates -> {
-                    BatchContext firstContext = accountCandidates.getFirst().ctx();
+        // 계좌 간 병렬 태스크로 원장 판정+PLANNED 저장을 묶는다. 판정~저장 커밋은 계좌 락 안 —
+        // 같은 계좌의 수동 실행·접수 직전 재캡과 저장 슬롯을 이중으로 세지 않게 한다
+        List<TradingParallelRunner.Task<AccountAllocation>> tasks = slotsByAccount.values().stream()
+                .map(accountSlots -> {
+                    BatchContext firstContext = accountSlots.getFirst().ctx();
                     UUID accountId = firstContext.account().id();
                     return new TradingParallelRunner.Task<AccountAllocation>(accountId,
-                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountCandidates, firstContext, tradeDate, dcaReferencePrices)));
+                            () -> budgetLock.call(accountId, () -> allocateAndSave(accountSlots, firstContext, tradeDate, dcaReferencePrices)));
                 })
                 .toList();
 
         for (AccountAllocation accountAllocation : parallelRunner.runAll(tasks)) {
             savedContexts.addAll(accountAllocation.savedContexts());
-            TradingOrderBudgetAllocator.Allocation allocation = accountAllocation.allocation();
-
-            // DCA 거절은 잔고 부족 알림이 아니라 회차 skip 이력(+DCA 미주문 알림)으로 기록한다 — 후보 전체 거절·축소안 제외 모두 leg 단위
-            recordDcaUnapproved(accountAllocation.allocated(), allocation.approved(), tradeDate, dcaReferencePrices);
-            Set<BatchContext> rejectedContexts = Stream.concat(
-                            allocation.rejectedBuy().stream(), allocation.rejectedSell().stream())
-                    .map(TradingOrderBudgetAllocator.Candidate::ctx)
-                    .filter(ctx -> !recordsRounds(ctx))
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            for (BatchContext ctx : rejectedContexts) {
+            for (BatchContext ctx : accountAllocation.rejectedContexts()) {
                 batchGuard.runSafely("예수금 부족 알림", ctx, () -> {
                         eventPublisher.publishEvent(new InsufficientBalanceEvent(
                                 ctx.userProfile().userId(), ctx.account().id(), ctx.account().nickname(),
-                                0, null, ctx.strategy().ticker(), ctx.strategy().type()));
+                                0, null, ctx.strategy().ticker(), ctx.strategy().type(), 0, false));
                         return null;
                     });
             }
         }
 
         return new SaveAllocationResult(Set.copyOf(savedContexts));
-    }
-
-    // allocator에 넘긴 DCA 후보 중 승인 결과에서 빠진 규칙(leg)별 회차 skip 기록 — BUY=예수금 부족, SELL=판매가능수량 부족
-    // 수량만 축소된 leg는 승인(ORDERED)이다. 기록 실패는 사이클 단위로 격리(다음 배치가 재판정)
-    private void recordDcaUnapproved(List<TradingOrderBudgetAllocator.Candidate> allocated,
-                                     List<TradingOrderBudgetAllocator.Candidate> approved, LocalDate tradeDate,
-                                     Map<BatchContext, Map<String, BigDecimal>> dcaReferencePrices) throws InterruptedException {
-        Map<BatchContext, Set<String>> approvedLegs = approved.stream().collect(Collectors.groupingBy(
-                TradingOrderBudgetAllocator.Candidate::ctx,
-                Collectors.flatMapping(c -> c.orders().stream().map(PlannedOrder::orderLeg), Collectors.toSet())));
-        for (TradingOrderBudgetAllocator.Candidate candidate : allocated) {
-            if (!recordsRounds(candidate.ctx())) continue;
-            Set<String> kept = approvedLegs.getOrDefault(candidate.ctx(), Set.of());
-            List<PlannedOrder> dropped = candidate.orders().stream().filter(o -> !kept.contains(o.orderLeg())).toList();
-            if (dropped.isEmpty()) continue;
-            Map<String, BigDecimal> prices = dcaReferencePrices.getOrDefault(candidate.ctx(), Map.of());
-            batchGuard.runSafely("DCA 미주문 기록", candidate.ctx(), () -> {
-                for (PlannedOrder order : dropped) {
-                    boolean buy = order.direction() == OrderDirection.BUY;
-                    String detail = !buy ? "판매가능수량 부족"
-                            : order.partialAllowed() ? "예수금 부족(주문가능금액 < 1주 캡가)"
-                            : "예수금 부족(주문가능금액 < 규칙 주문 금액)";
-                    dcaExecutionRecorder.recordSkipped(candidate.ctx(), tradeDate, dcaRuleKey(order.orderLeg()), order.direction(),
-                            buy ? DcaSkipReason.INSUFFICIENT_BALANCE : DcaSkipReason.NO_HOLDINGS, detail, prices.get(order.orderLeg()));
-                }
-                return candidate.ctx();
-            });
-        }
     }
 
     // 저장된 DCA 주문을 조회해 규칙별 ORDERED 이력 기록 — saveAll이 id를 돌려주지 않아 당일 PLANNED/PLACED에서 DCA leg로 찾는다
@@ -328,51 +287,45 @@ class TradingCandidatePlanner {
         return orderLeg.substring(DCA_LEG_PREFIX.length());
     }
 
-    // 계좌 1개의 배정 결과와 저장 성공 사이클 — allocated: allocator에 실제로 넘긴 후보(배정 실패면 빈 목록, DCA 미승인 leg 판별용)
-    private record AccountAllocation(TradingOrderBudgetAllocator.Allocation allocation, List<BatchContext> savedContexts,
-                                     List<TradingOrderBudgetAllocator.Candidate> allocated) {}
+    // 원장 판정 대상 슬롯 — 사이클(ctx)과 신규 생성 가능한 주문
+    private record Slot(BatchContext ctx, List<PlannedOrder> orders) {}
 
-    // 계좌 예산 락 안에서 실행 — 배정 실패면 empty(runSafely가 알림), 승인분 저장 실패는 사이클 단위로 격리
-    private Optional<AccountAllocation> allocateAndSave(List<TradingOrderBudgetAllocator.Candidate> accountCandidates,
-                                                        BatchContext firstContext, LocalDate tradeDate,
+    // 계좌 1개의 저장 성공 사이클과 원장 상한으로 BUY가 거절된 사이클
+    private record AccountAllocation(List<BatchContext> savedContexts, List<BatchContext> rejectedContexts) {}
+
+    // 계좌 예산 락 안에서 실행 — 사이클마다 저장 직전 원장 잔여를 계산하고(이미 저장된 슬롯은 한 번만 차감), 통과분을 저장한다
+    private Optional<AccountAllocation> allocateAndSave(List<Slot> accountSlots, BatchContext firstContext,
+                                                        LocalDate tradeDate,
                                                         Map<BatchContext, Map<String, BigDecimal>> dcaReferencePrices)
             throws InterruptedException {
-        // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 저장한 슬롯을 배정 전에 제외 — 중복 주문과 예산 이중 계상 방지.
-        // 전부 겹친 사이클은 이미 PLANNED가 있으므로 배정 없이 접수 대상(saved)에 넣는다
         List<BatchContext> saved = new ArrayList<>();
-        Optional<List<TradingOrderBudgetAllocator.Candidate>> fresh = batchGuard.runSafely("기존 주문 재확인", firstContext, () -> {
-            List<TradingOrderBudgetAllocator.Candidate> remaining = new ArrayList<>();
-            for (TradingOrderBudgetAllocator.Candidate candidate : accountCandidates) {
-                List<PlannedOrder> orders = TradingOrderSlots.excludeExisting(candidate.orders(),
-                        orderPort.findPlannedOrPlacedByCycleAndDate(candidate.ctx().currentCycle().id(), tradeDate));
-                if (orders.isEmpty()) {
-                    saved.add(candidate.ctx());
-                } else {
-                    remaining.add(orders.size() == candidate.orders().size() ? candidate : candidate.withOrders(orders));
-                }
+        List<BatchContext> rejected = new ArrayList<>();
+        for (Slot slot : accountSlots) {
+            BatchContext ctx = slot.ctx();
+            // 후보 수집(락 밖) 이후 같은 사이클에 수동 실행이 저장한 슬롯은 제외 — 중복 주문 방지.
+            // 전부 겹친 사이클은 이미 PLANNED가 있으므로 판정 없이 접수 대상(saved)에 넣는다
+            Optional<List<PlannedOrder>> fresh = batchGuard.runSafely("기존 주문 재확인", ctx, () -> TradingOrderSlots.excludeExisting(
+                    slot.orders(), orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate)));
+            if (fresh.isEmpty()) continue;
+            if (fresh.get().isEmpty()) {
+                saved.add(ctx);
+                continue;
             }
-            return remaining;
-        });
-        if (fresh.isEmpty()) return Optional.empty();
-
-        Optional<TradingOrderBudgetAllocator.Allocation> allocation = batchGuard.runSafely("계좌 주문 예산 배정", firstContext,
-                () -> budgetAllocator.allocate(fresh.get(), tradeDate));
-        if (allocation.isEmpty()) { // 배정 실패여도 수동 실행이 이미 채운 사이클은 접수 대상으로 남긴다
-            return Optional.of(new AccountAllocation(
-                    new TradingOrderBudgetAllocator.Allocation(List.of(), List.of(), List.of()), saved, List.of()));
-        }
-
-        for (TradingOrderBudgetAllocator.Candidate approved : allocation.get().approved()) {
-            Optional<BatchContext> savedCtx = batchGuard.runSafely("계획 주문 저장", approved.ctx(), () -> {
-                orderPlanner.savePlannedOrders(
-                        approved.orders(), approved.ctx().account(), approved.ctx().currentCycle().id());
-                return approved.ctx();
+            Optional<BatchContext> savedCtx = batchGuard.runSafely("원장 판정·계획 주문 저장", ctx, () -> {
+                // 저장 직전 원장 잔여 — 위 재확인으로 걸러진 신규 주문만 판정하므로 이미 저장된 슬롯은 remaining에서 한 번만 빠진다
+                StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(ctx.strategy().type(), fresh.get(),
+                        ledgerBudget.remaining(ctx.currentCycle(), tradeDate));
+                if (!fit.orders().isEmpty()) {
+                    orderPlanner.savePlannedOrders(fit.orders(), ctx.account(), ctx.currentCycle().id());
+                }
+                if (fit.rejected()) rejected.add(ctx); // 저장 성공 뒤에만 알림 대상으로 — 저장 실패는 runSafely가 별도 알림
+                return fit.orders().isEmpty() ? null : ctx; // SELL 없이 BUY만 거절된 사이클은 저장 대상 아님
             });
             savedCtx.ifPresent(saved::add);
-            if (savedCtx.isPresent() && recordsRounds(approved.ctx())) {
-                recordDcaOrdered(approved.ctx(), tradeDate, dcaReferencePrices.getOrDefault(approved.ctx(), Map.of())); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
+            if (savedCtx.isPresent() && recordsRounds(ctx)) {
+                recordDcaOrdered(ctx, tradeDate, dcaReferencePrices.getOrDefault(ctx, Map.of())); // 저장 성공 후에만 — 실패해도 접수는 진행, 다음 배치 복구
             }
         }
-        return Optional.of(new AccountAllocation(allocation.get(), saved, fresh.get()));
+        return Optional.of(new AccountAllocation(saved, rejected));
     }
 }

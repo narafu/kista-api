@@ -54,7 +54,7 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
     private TradingUserProfile toProfile(UserNotifyProfileEntity entity) {
         // persistence 경계에서 telegramBotToken 복호화 — null이면 그대로 null 유지
         String telegramBotToken = entity.getTelegramBotToken() == null ? null : crypto.decrypt(entity.getTelegramBotToken());
-        return new TradingUserProfile(entity.getUserId(), readPrefs(entity), entity.isBalanceCheckEnabled(),
+        return new TradingUserProfile(entity.getUserId(), readPrefs(entity),
                 telegramBotToken, entity.getChatId(), entity.getNotificationChannel());
     }
 
@@ -75,6 +75,6 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
         // 행이 없어도 tombstone을 남긴다 — updated_at(trading 시각)이 탈퇴 전 root에서 만든 프로필 스냅샷(occurredAt)보다 늦어
         // UserNotifyProfileSyncListener 버전 가드가 늦게 도착한 스냅샷을 거른다
         NotificationChannel channel = repository.findById(userId).map(UserNotifyProfileEntity::getNotificationChannel).orElse(null);
-        repository.save(new UserNotifyProfileEntity(userId, "{}", true, false, null, null, Instant.now(), channel));
+        repository.save(new UserNotifyProfileEntity(userId, "{}", false, null, null, Instant.now(), channel));
     }
 }

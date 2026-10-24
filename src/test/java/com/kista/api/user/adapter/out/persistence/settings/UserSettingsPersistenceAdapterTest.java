@@ -38,7 +38,7 @@ class UserSettingsPersistenceAdapterTest {
 
     @Test
     void loadByUserId_assembles_settings_with_prefs() {
-        UserSettingsJpaEntity entity = new UserSettingsJpaEntity(USER_ID, false, List.of("VR"));
+        UserSettingsJpaEntity entity = new UserSettingsJpaEntity(USER_ID, List.of("VR"));
         UserNotificationPrefJpaEntity pref = new UserNotificationPrefJpaEntity(USER_ID, "TRADING_ALERT", false);
         when(settingsRepo.findById(USER_ID)).thenReturn(Optional.of(entity));
         when(prefRepo.findByUserId(USER_ID)).thenReturn(List.of(pref));
@@ -46,14 +46,13 @@ class UserSettingsPersistenceAdapterTest {
         Optional<UserSettings> result = adapter.loadByUserId(USER_ID);
 
         assertThat(result).isPresent();
-        assertThat(result.get().balanceCheckEnabled()).isFalse();
         assertThat(result.get().isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
         assertThat(result.get().strategySuggestions()).containsExactly("VR");
     }
 
     @Test
     void loadByUserId_defaultsStrategySuggestions_whenColumnNull() {
-        UserSettingsJpaEntity entity = new UserSettingsJpaEntity(USER_ID, false, null);
+        UserSettingsJpaEntity entity = new UserSettingsJpaEntity(USER_ID, null);
         when(settingsRepo.findById(USER_ID)).thenReturn(Optional.of(entity));
         when(prefRepo.findByUserId(USER_ID)).thenReturn(List.of());
 
@@ -64,12 +63,12 @@ class UserSettingsPersistenceAdapterTest {
 
     @Test
     void save_persists_settings_and_prefs() {
-        UserSettings settings = new UserSettings(USER_ID, true,
+        UserSettings settings = new UserSettings(USER_ID,
                 Map.of(NotificationType.TRADING_ALERT, false), List.of("VR"));
 
         adapter.save(settings);
 
-        verify(settingsRepo).save(argThat(e -> e.getUserId().equals(USER_ID) && e.isBalanceCheckEnabled()
+        verify(settingsRepo).save(argThat(e -> e.getUserId().equals(USER_ID) 
                 && e.getStrategySuggestions().equals(List.of("VR"))));
         verify(prefRepo).save(argThat(e -> e.getType().equals("TRADING_ALERT") && !e.isEnabled()));
     }

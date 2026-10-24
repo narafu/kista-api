@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
@@ -24,7 +25,7 @@ import java.util.UUID;
 @Slf4j
 class OrderSubmitter {
 
-    enum Outcome { PLACED, REJECTED, UNKNOWN, SKIPPED }
+    enum Outcome { PLACED, REJECTED, INSUFFICIENT_FUNDS, UNKNOWN, SKIPPED }
 
     // 접수 결과 — externalOrderId는 PLACED일 때만
     record Submission(Outcome outcome, String externalOrderId) {}
@@ -89,10 +90,14 @@ class OrderSubmitter {
     }
 
     // 확정 거절 — FAILED 기록(그 사이 다른 경로가 상태를 바꿨으면 그 상태 존중)
+    // BUY의 증권사 잔고 부족 거절은 운영 오류가 아니라 사용자 조치 사안 — 관리자 이벤트 없이 INSUFFICIENT_FUNDS로 돌려 호출자가 사용자 알림으로 묶는다
     private Submission rejected(Order order, String accountLabel, Exception e) {
-        log.warn("[{}] {} {} 주문 접수 실패: {}", accountLabel, order.direction(), order.ticker(), e.getMessage());
-        eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 접수 실패] orderId=%s — %s"
-                .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));
+        boolean insufficientFunds = order.direction() == OrderDirection.BUY && BrokerApiException.isInsufficientFundsRejection(e);
+        log.warn("[{}] {} {} 주문 접수 실패{}: {}", accountLabel, order.direction(), order.ticker(), insufficientFunds ? "(잔고 부족)" : "", e.getMessage());
+        if (!insufficientFunds) {
+            eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 접수 실패] orderId=%s — %s"
+                    .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));
+        }
         try {
             orderPort.markFailed(order.id());
         } catch (OrderStateConflictException conflict) {
@@ -101,7 +106,7 @@ class OrderSubmitter {
             // FAILED를 못 써 SUBMITTING 잔류 — 재접수되지 않으므로 결과 불명과 같은 정정 대상
             return unknown(order, accountLabel, dbError);
         }
-        return new Submission(Outcome.REJECTED, null);
+        return new Submission(insufficientFunds ? Outcome.INSUFFICIENT_FUNDS : Outcome.REJECTED, null);
     }
 
     // 결과 불명 — 증권사가 접수했을 수 있어 FAILED로 쓰지 않는다(FAILED는 슬롯을 비워 재실행이 같은 leg를 다시 만든다)

@@ -25,7 +25,7 @@ import java.util.Map;
 import com.kista.shared.kernel.StrategyTicker;
 
 // 전략 1건의 오늘자 주문 계획 계산 오케스트레이션 — 잔고 로드 → prevClose(필요 시) → privacyBase(필요 시) → compute()
-// TradingPreviewService(대상 전략 1건)와 TradingBuyCompetitionSimulator(경쟁 전략 N건 가상 계산)가 공유
+// TradingPreviewService(대상 전략 1건)가 공유
 // package-private — application/service/trading 패키지 전용
 @Component
 @RequiredArgsConstructor

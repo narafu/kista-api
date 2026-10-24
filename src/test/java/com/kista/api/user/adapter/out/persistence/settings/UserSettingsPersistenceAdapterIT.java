@@ -49,7 +49,7 @@ class UserSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
     void save_and_load_roundtrips_strategySuggestions() {
         UUID userId = UUID.randomUUID();
         insertUser(userId);
-        UserSettings settings = new UserSettings(userId, false,
+        UserSettings settings = new UserSettings(userId,
                 Map.of(NotificationType.TRADING_ALERT, false), List.of("VR", "PRIVACY"));
 
         adapter.save(settings);
@@ -60,7 +60,6 @@ class UserSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
         Optional<UserSettings> result = adapter.loadByUserId(userId);
         assertThat(result).isPresent();
         assertThat(result.get().strategySuggestions()).containsExactly("VR", "PRIVACY");
-        assertThat(result.get().balanceCheckEnabled()).isFalse();
         assertThat(result.get().isNotificationEnabled(NotificationType.TRADING_ALERT)).isFalse();
     }
 
@@ -70,7 +69,7 @@ class UserSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
         UUID userId = UUID.randomUUID();
         insertUser(userId);
         // strategySuggestions=null로 직접 저장 (jsonb 컬럼 미설정 상태 재현)
-        settingsRepo.save(new UserSettingsJpaEntity(userId, true, null));
+        settingsRepo.save(new UserSettingsJpaEntity(userId, null));
 
         Optional<UserSettings> result = adapter.loadByUserId(userId);
 
@@ -83,7 +82,7 @@ class UserSettingsPersistenceAdapterIT extends RootDataJpaTestBase {
     void deleteByUserId_removesSettingsAndPrefs() {
         UUID userId = UUID.randomUUID();
         insertUser(userId);
-        adapter.save(new UserSettings(userId, true, Map.of(NotificationType.TRADING_ALERT, false), List.of("VR")));
+        adapter.save(new UserSettings(userId, Map.of(NotificationType.TRADING_ALERT, false), List.of("VR")));
         entityManager.flush();
 
         adapter.deleteByUserId(userId);

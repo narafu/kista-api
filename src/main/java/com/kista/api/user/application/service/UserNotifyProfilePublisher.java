@@ -44,7 +44,7 @@ class UserNotifyProfilePublisher {
     private void publish(UUID userId, UserSettings settings, boolean active, String telegramBotToken, String chatId,
                          NotificationChannel channel) {
         eventPublisher.publishEvent(new UserNotifyProfileChangedEvent(
-                userId, settings.notificationPrefs(), settings.balanceCheckEnabled(), active,
+                userId, settings.notificationPrefs(), active,
                 telegramBotToken, chatId, channel, Instant.now())); // 스냅샷 시각 — trading-core가 재시도된 옛 스냅샷을 거르는 버전
     }
 }

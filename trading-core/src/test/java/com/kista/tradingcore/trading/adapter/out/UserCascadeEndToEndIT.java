@@ -78,8 +78,8 @@ class UserCascadeEndToEndIT {
         jdbcTemplate.update("INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, created_at, updated_at) "
                         + "VALUES (?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', 'UNKNOWN', 22.00, 5, 'PLANNED', now(), now())",
                 accountId, cycleId, LocalDate.now(TimeZones.KST));
-        jdbcTemplate.update("INSERT INTO user_notify_profile (user_id, notification_prefs, balance_check_enabled, is_active, updated_at, telegram_bot_token, chat_id) "
-                + "VALUES (?, '{}', true, true, now() - interval '1 hour', 'cipher', 'chat')", userId);
+        jdbcTemplate.update("INSERT INTO user_notify_profile (user_id, notification_prefs, is_active, updated_at, telegram_bot_token, chat_id) "
+                + "VALUES (?, '{}', true, now() - interval '1 hour', 'cipher', 'chat')", userId);
     }
 
     @AfterEach
@@ -114,7 +114,7 @@ class UserCascadeEndToEndIT {
         assertThat(cascadePublicationStatus()).isEqualTo("COMPLETED");
 
         // 탈퇴 전에 만들어진 프로필 스냅샷이 늦게 도착해도 tombstone을 되살리지 않는다
-        republishInTransaction(new UserNotifyProfileChangedEvent(userId, Map.of(), true, true, "token", "chat",
+        republishInTransaction(new UserNotifyProfileChangedEvent(userId, Map.of(), true, "token", "chat",
                 NotificationChannel.ALL, Instant.now().minusSeconds(60)));
         assertThat(jdbcTemplate.queryForObject("SELECT is_active FROM user_notify_profile WHERE user_id = ?", Boolean.class, userId)).isFalse();
     }

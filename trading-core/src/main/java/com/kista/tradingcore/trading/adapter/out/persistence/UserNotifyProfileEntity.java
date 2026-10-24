@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 import java.util.UUID;
 
-// user 소유 알림·잔고검증·활성여부의 trading-core 복제본. 감사 대상이 아니라 복제본이라
+// user 소유 알림·활성여부의 trading-core 복제본. 감사 대상이 아니라 복제본이라
 // BaseAuditEntity/BaseCreatedAtEntity를 상속하지 않고 동기화 시각(updatedAt)만 직접 관리한다.
 // @Id가 할당식(@GeneratedValue 없음)이라 save()가 곧 upsert(merge)다.
 @Entity
@@ -31,9 +31,6 @@ class UserNotifyProfileEntity {
 
     @Column(name = "notification_prefs", nullable = false)
     private String notificationPrefsJson; // NotificationType->Boolean 직렬화 JSON
-
-    @Column(name = "balance_check_enabled", nullable = false)
-    private boolean balanceCheckEnabled; // 잔고검증 활성 여부
 
     @Column(name = "is_active", nullable = false)
     private boolean active; // UserStatus.ACTIVE 여부 — findAllActive() 판정 기준

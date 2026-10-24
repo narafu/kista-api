@@ -12,4 +12,5 @@ import java.util.UUID;
 // 파라미터 합집합을 한 이벤트에 담고, 발행처가 쓰지 않는 쪽 필드는 sentinel(0/null)로 둔다
 public record InsufficientBalanceEvent(UUID userId, UUID accountId, String accountNickname,
                                         int holdings, BigDecimal usdDeposit,
-                                        StrategyTicker ticker, StrategyType strategyType) {}
+                                        StrategyTicker ticker, StrategyType strategyType,
+                                        int failedCount, boolean partiallyPlaced) {} // failedCount>0: 증권사 잔고 부족 거절 건수(BUY), 0: 원장 상한 거절 또는 관리자 알림

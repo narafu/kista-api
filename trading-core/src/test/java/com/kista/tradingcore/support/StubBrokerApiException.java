@@ -24,6 +24,15 @@ public class StubBrokerApiException extends BrokerApiException {
         super("Stub", message, null, Conflict.NONE, rejected);
     }
 
+    private StubBrokerApiException(String message, boolean rejected, boolean insufficientFunds) {
+        super("Stub", message, null, Conflict.NONE, rejected, insufficientFunds);
+    }
+
+    // 확정 거절 중 잔고 부족 코드로 식별된 실패 — BUY 잔고 부족 분류 시나리오용
+    public static StubBrokerApiException insufficientFunds(String message) {
+        return new StubBrokerApiException(message, true, true);
+    }
+
     // 증권사가 접수하지 않았음이 확실한 실패(확정 거절) — 주문 접수 분류 시나리오용
     public static StubBrokerApiException rejected(String message) {
         return new StubBrokerApiException(message, true);

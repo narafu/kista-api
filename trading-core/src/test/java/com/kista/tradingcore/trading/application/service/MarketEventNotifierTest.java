@@ -41,7 +41,7 @@ class MarketEventNotifierTest {
     }
 
     private static TradingUserProfile activeProfile(UUID userId, boolean marketAlertEnabled) {
-        return new TradingUserProfile(userId, Map.of(NotificationType.MARKET_ALERT, marketAlertEnabled), true, null, null);
+        return new TradingUserProfile(userId, Map.of(NotificationType.MARKET_ALERT, marketAlertEnabled), null, null);
     }
 
     // 사용자 알림이 순차가 아닌 virtual thread로 병렬 발송되는지 CyclicBarrier로 검증

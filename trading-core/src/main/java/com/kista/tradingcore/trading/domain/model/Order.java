@@ -54,7 +54,7 @@ public record Order(
 
     // 영속 Order → 계획 주문 강등 (사후 가격 캡 재산정·canSkipOrderComputation 판정 시 커널에 재입력)
     public PlannedOrder toPlanned() {
-        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, quantity.intValueExact(), price, true); // 축소 정책은 영속하지 않는다 — 영속 주문 재배정(재캡)은 DCA가 타지 않는다
+        return new PlannedOrder(ticker, tradeDate, orderType, timing, direction, orderLeg, quantity.intValueExact(), price);
     }
 
     // 관리자 수동 보정용 FILLED 주문 — LIMIT 고정, 체결 수량·가격 즉시 기록

@@ -3,7 +3,6 @@ package com.kista.tradingcore.broker.application.service;
 import com.kista.tradingcore.broker.application.port.output.AdminMarketPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerCapabilitiesPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.shared.kernel.Broker;
@@ -190,17 +189,6 @@ class BrokerRouterTest {
         when(kis.getPrices(one, kisRef)).thenThrow(new IllegalStateException("503"));
 
         assertThatThrownBy(() -> router.getPrices(one, kisRef)).isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
-    @DisplayName("account 인자 위치가 다른 포트(LiveBalancePort)도 올바르게 위임한다")
-    void routesLiveBalance() {
-        BrokerAccountRef tossRef = ref(Broker.TOSS);
-        BrokerBalance balance = new BrokerBalance(1, BigDecimal.ONE, BigDecimal.TEN);
-        when(toss.getLiveBalance(tossRef, StrategyTicker.SOXL)).thenReturn(balance);
-
-        assertThat(router.getLiveBalance(tossRef, StrategyTicker.SOXL)).isSameAs(balance);
-        verify(toss).getLiveBalance(tossRef, StrategyTicker.SOXL);
     }
 
     @Test

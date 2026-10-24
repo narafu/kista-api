@@ -50,8 +50,8 @@ class FallbackListenerPropagationIT {
     @Test
     void 트랜잭션_밖_사이클_종료_알림_실패가_발행자로_전파되지_않는다() {
         // 텔레그램 미연결 프로필 — 알림은 FCM 위임(Redis XADD)만 탄다
-        jdbcTemplate.update("INSERT INTO user_notify_profile (user_id, notification_prefs, balance_check_enabled, is_active, updated_at) "
-                + "VALUES (?, '{}', true, true, now())", userId);
+        jdbcTemplate.update("INSERT INTO user_notify_profile (user_id, notification_prefs, is_active, updated_at) "
+                + "VALUES (?, '{}', true, now())", userId);
         doThrow(new RedisConnectionFailureException("redis down")).when(redisTemplate).opsForStream();
 
         assertThatCode(() -> eventPublisher.publishEvent(new CycleCompletedEvent(userId, UUID.randomUUID(), "IT",

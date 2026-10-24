@@ -50,7 +50,7 @@ class UserNotifyProfilePublisherTest {
     void publishStatusChanged_carriesActiveFlagAndSettings() {
         User user = DomainFixtures.userWithStatus(USER_ID, UserStatus.ACTIVE, (Instant) null);
         when(userSettingsPort.findOrDefault(USER_ID)).thenReturn(
-                new UserSettings(USER_ID, false, Map.of(NotificationType.MARKET_ALERT, false),
+                new UserSettings(USER_ID, Map.of(NotificationType.MARKET_ALERT, false),
                         UserSettings.DEFAULT_STRATEGY_SUGGESTIONS));
 
         publisher.publishStatusChanged(user);
@@ -58,7 +58,6 @@ class UserNotifyProfilePublisherTest {
         UserNotifyProfileChangedEvent event = captured();
         assertThat(event.userId()).isEqualTo(USER_ID);
         assertThat(event.active()).isTrue();
-        assertThat(event.balanceCheckEnabled()).isFalse();
         assertThat(event.notificationPrefs()).containsEntry(NotificationType.MARKET_ALERT, false);
     }
 

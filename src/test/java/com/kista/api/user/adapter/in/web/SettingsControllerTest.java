@@ -133,17 +133,6 @@ class SettingsControllerTest {
     }
 
     @Test
-    void patch_balance_check_calls_use_case() throws Exception {
-        mockMvc.perform(patch("/api/settings/balance-check")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\": false}")
-                        .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
-                .andExpect(status().isNoContent());
-
-        verify(userSettingsUseCase).updateBalanceCheck(any(), eq(false));
-    }
-
-    @Test
     void put_strategy_suggestions_calls_use_case() throws Exception {
         mockMvc.perform(put("/api/settings/strategy-suggestions")
                         .contentType(MediaType.APPLICATION_JSON)

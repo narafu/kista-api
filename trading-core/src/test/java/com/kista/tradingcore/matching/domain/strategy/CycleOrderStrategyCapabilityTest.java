@@ -32,7 +32,6 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(infinite.capsIndividualOrders()).isFalse(); // 기본값 — 사다리 전체 취소·재저장
         assertThat(infinite.needsCapCheck(null, null)).isFalse(); // position 없으면 캡 검사 스킵
         assertThat(infinite.needsCapCheck(POSITION, null)).isTrue();
-        assertThat(infinite.allocationPriority()).isEqualTo(1);
     }
 
     @Test
@@ -46,7 +45,6 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(privacy.requiresRolloverCheck()).isFalse(); // 기본값
         assertThat(privacy.capsIndividualOrders()).isTrue(); // 개별 주문 가격만 치환
         assertThat(privacy.needsCapCheck(null, null)).isTrue(); // 기본값 — position/vrPosition 불필요
-        assertThat(privacy.allocationPriority()).isEqualTo(2);
     }
 
     @Test
@@ -62,7 +60,6 @@ class CycleOrderStrategyCapabilityTest {
         assertThat(vr.capsIndividualOrders()).isFalse(); // 기본값 — 사다리 전체 취소·재저장
         assertThat(vr.needsCapCheck(null, null)).isFalse(); // vrPosition 없으면 캡 검사 스킵
         assertThat(vr.needsCapCheck(null, VR_POSITION)).isTrue();
-        assertThat(vr.allocationPriority()).isZero();
     }
 
     // capability 기본 메서드는 구현체별 재정의 없이 StrategyType.capability()(shared.kernel SSOT)로 위임한다

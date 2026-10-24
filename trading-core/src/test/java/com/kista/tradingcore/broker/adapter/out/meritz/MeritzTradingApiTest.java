@@ -5,7 +5,6 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
@@ -61,29 +60,6 @@ class MeritzTradingApiTest {
     private void expect(String path, String body) {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + path)))
                 .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(body));
-    }
-
-    @Test
-    void holdings_parse_decimal_string_quantity() {
-        expect("/accounts/v1/me/overseas/holdings", HOLDINGS);
-        expect("/trading/v1/overseas/orders/estimate", ESTIMATE);
-
-        BrokerBalance b = api.getBalance(ACCOUNT, StrategyTicker.SOXL);
-
-        assertThat(b.holdings()).isEqualTo(417);
-        assertThat(b.avgPrice()).isEqualByComparingTo("124.812200");
-        assertThat(b.usdDeposit()).isEqualByComparingTo("3445.0100");
-    }
-
-    @Test
-    void balance_for_unheld_ticker_is_zero_with_null_avg() {
-        expect("/accounts/v1/me/overseas/holdings", HOLDINGS);
-        expect("/trading/v1/overseas/orders/estimate", ESTIMATE);
-
-        BrokerBalance b = api.getBalance(ACCOUNT, StrategyTicker.TQQQ);
-
-        assertThat(b.holdings()).isZero();
-        assertThat(b.avgPrice()).isNull();
     }
 
     @Test

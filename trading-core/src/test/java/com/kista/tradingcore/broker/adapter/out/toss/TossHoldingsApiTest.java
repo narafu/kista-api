@@ -4,7 +4,6 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
@@ -54,64 +53,6 @@ class TossHoldingsApiTest {
 
     // exchange-rate API는 getCommon 사용 — 개별 테스트에서 직접 stub
     private void stubNoAccountHeader() {}
-
-    @Test
-    @DisplayName("보유 종목 있음: 정상 AccountBalance 반환")
-    void getBalance_holdingFound_returnsBalance() {
-        var item = new TossHoldingsApi.HoldingItem("SOXL", "5", "20.00", "22.00");
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of(item))));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("1000.00")));
-
-        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
-
-        assertThat(balance.holdings()).isEqualTo(5);
-        assertThat(balance.avgPrice()).isEqualByComparingTo("20.00");
-        assertThat(balance.usdDeposit()).isEqualByComparingTo("1000.00");
-    }
-
-    @Test
-    @DisplayName("보유 종목 없음: holdings=0, avgPrice=null")
-    void getBalance_noHolding_returnsZeroBalance() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of())));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00")));
-
-        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
-
-        assertThat(balance.holdings()).isEqualTo(0);
-        assertThat(balance.avgPrice()).isNull();
-        assertThat(balance.usdDeposit()).isEqualByComparingTo("500.00");
-    }
-
-    @Test
-    @DisplayName("보유 종목 응답 null: holdings=0, 매수가능금액은 정상 반영")
-    void getBalance_holdingsResponseNull_buyingPowerValid_returnsZeroHoldingsWithDeposit() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(null);
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.BuyableAmountResponse("500.00")));
-
-        BrokerBalance balance = tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL);
-
-        assertThat(balance.holdings()).isEqualTo(0);
-        assertThat(balance.avgPrice()).isNull();
-        assertThat(balance.usdDeposit()).isEqualByComparingTo("500.00");
-    }
-
-    @Test
-    @DisplayName("매수가능금액 응답 null: TossApiException 전파 (KIS getMargin()과 동일 처리)")
-    void getBalance_buyingPowerResponseNull_throwsTossApiException() {
-        when(tossHttpClient.get(eq("/api/v1/holdings"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(new TossResult<>(new TossHoldingsApi.HoldingsResponse(List.of())));
-        when(tossHttpClient.get(eq("/api/v1/buying-power"), any(), any(), any(ParameterizedTypeReference.class)))
-            .thenReturn(null);
-
-        assertThatThrownBy(() -> tossHoldingsApi.getBalance(ACCOUNT, StrategyTicker.SOXL))
-            .isInstanceOf(TossApiException.class);
-    }
 
     @Test
     @DisplayName("getUsdBuyableAmount: 정상 금액 반환")

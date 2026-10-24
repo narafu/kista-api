@@ -64,7 +64,11 @@ class KisOrderApi {
         if (!"0".equals(response.rtCd())) {
             String code = response.msgCd();
             String msg  = response.msg1();
-            throw KisApiException.rejected("KIS 주문 실패 [" + code + "]: " + msg, null); // 응답 수신 후 거부 — 확정 거절
+            String failure = "KIS 주문 실패 [" + code + "]: " + msg;
+            if ("APBK0988".equals(code)) { // 주문수량이 가능수량보다 큼 — 잔고 부족 분류(BUY 여부는 호출자 판단)
+                throw KisApiException.rejectedInsufficientFunds(failure, null);
+            }
+            throw KisApiException.rejected(failure, null); // 응답 수신 후 거부 — 확정 거절
         }
 
         String odno = response.output() != null ? response.output().odno() : null;

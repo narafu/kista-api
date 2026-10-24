@@ -14,6 +14,10 @@ import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionResult;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.ReorderBuyBudget;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
 import com.kista.tradingcore.trading.domain.model.ReorderCommand;
 import com.kista.tradingcore.trading.domain.model.ReorderResult;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -44,7 +48,9 @@ final class TradingContractMapper {
     }
 
     static ReorderBuyBudgetResponse toResponse(ReorderBuyBudget b) {
-        return new ReorderBuyBudgetResponse(b.plannedBuy(), b.liveOrderable(), b.sourceRefunds());
+        Map<UUID, BigDecimal> cycleRemaining = new LinkedHashMap<>();
+        b.cycles().forEach((id, c) -> cycleRemaining.put(id, c.remaining()));
+        return new ReorderBuyBudgetResponse(cycleRemaining, b.sourceRefunds());
     }
 
     static ReorderResponse toResponse(ReorderResult r) {

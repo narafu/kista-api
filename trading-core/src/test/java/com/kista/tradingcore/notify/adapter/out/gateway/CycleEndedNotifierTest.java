@@ -33,7 +33,7 @@ class CycleEndedNotifierTest {
         CycleEndedNotifier notifier = new CycleEndedNotifier(userNotificationPort, userProfilePort);
         UUID userId = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
-        TradingUserProfile profile = new TradingUserProfile(userId, Map.of(), true, "token", "chat");
+        TradingUserProfile profile = new TradingUserProfile(userId, Map.of(), "token", "chat");
         when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
         CycleEndedEvent event = new CycleEndedEvent(userId, accountId, "테스트계좌",
                 StrategyType.PRIVACY, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);

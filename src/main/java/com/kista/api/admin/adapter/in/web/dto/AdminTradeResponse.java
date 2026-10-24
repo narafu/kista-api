@@ -21,6 +21,8 @@ public record AdminTradeResponse(
         UUID accountId,
         @Schema(description = "소속 전략 ID (조회 실패 시 null)")
         UUID strategyId,
+        @Schema(description = "소속 전략 사이클 ID (리오더 예산 cycleRemaining 키, 사이클 미연결 시 null)", nullable = true)
+        UUID strategyCycleId,
         @Schema(description = "계좌 소유자 닉네임")
         String ownerNickname,    // 계좌 소유자 닉네임
         @Schema(description = "전략 종류 (조회 실패 시 null)", example = "INFINITE")
@@ -62,6 +64,7 @@ public record AdminTradeResponse(
         return new AdminTradeResponse(
                 t.id(), userId, t.accountId(),
                 strategySummary != null ? strategySummary.strategyId() : null,
+                t.strategyCycleId(),
                 nickname,
                 strategySummary != null ? strategySummary.strategyType().name() : null,
                 t.tradeDate(), t.ticker().name(),

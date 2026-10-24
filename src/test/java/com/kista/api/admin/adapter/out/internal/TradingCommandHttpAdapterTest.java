@@ -143,7 +143,7 @@ class TradingCommandHttpAdapterTest {
         server.enqueue(new MockResponse.Builder()
                 .code(200).addHeader("Content-Type", "application/json")
                 .body("""
-                    {"plannedBuy":300,"liveOrderable":1000,"sourceRefunds":{"11111111-1111-1111-1111-111111111111":200}}
+                    {"cycleRemaining":{"33333333-3333-3333-3333-333333333333":1000},"sourceRefunds":{"11111111-1111-1111-1111-111111111111":200}}
                     """)
                 .build());
         UUID orderId = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -151,7 +151,7 @@ class TradingCommandHttpAdapterTest {
 
         var result = adapter.reorderBuyBudget(List.of(orderId, other), java.time.LocalDate.of(2026, 10, 6));
 
-        assertThat(result.liveOrderable()).isEqualByComparingTo("1000");
+        assertThat(result.cycleRemaining().get(UUID.fromString("33333333-3333-3333-3333-333333333333"))).isEqualByComparingTo("1000");
         assertThat(result.sourceRefunds().get(orderId)).isEqualByComparingTo("200");
         RecordedRequest recorded = server.takeRequest();
         assertThat(recorded.getTarget()).isEqualTo("/api/internal/trading/reorder-buy-budget?orderIds=" + orderId

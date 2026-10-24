@@ -35,10 +35,10 @@ class ManualTradingService {
     private final TradingPriceFetcher priceFetcher;
     private final StrategyOrderPlanBuilder planBuilder;
     private final BuyOrderPriceCapper priceCapper;
-    private final TradingOrderBudgetAllocator budgetAllocator;
-    private final TradingOrderPlanner orderPlanner;            // allocator 승인 결과 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
+    private final StrategyLedgerBudget ledgerBudget;          // 전략 자기 원장 상한 — 배치 TradingCandidatePlanner와 같은 판정
+    private final TradingOrderPlanner orderPlanner;            // 원장 통과분 PLANNED 저장 — TradingCandidatePlanner와 동일 패턴(브리핑 필드 목록 누락분, 배치와 동일하게 재주입)
     private final TradingOrderExecutor orderExecutor;
-    private final AccountBudgetLock budgetLock;              // 승인+저장 구간 계좌 직렬화 — 배치 allocator·재캡과 같은 락
+    private final AccountBudgetLock budgetLock;              // 원장 판정+저장 구간 계좌 직렬화 — 배치 원장 판정·재캡과 같은 락
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
     private final MarketCalendarPort marketCalendarPort;   // 휴장일 수동 실행 차단 — 배치가 접수하지 않는 죽은 PLANNED·휴장일 즉시 접수 방지
 
@@ -101,42 +101,34 @@ class ManualTradingService {
                 plan.orders(), startPrice, plan.position(), plan.vrPosition(), strategy.ticker(),
                 strategy.type(), today);
 
-        // 예산 배정기로 예수금/보유수량 검증 — 단건 candidate 하나만 넘긴다(Task 2가 단일계좌 전용으로 축소한 진입점)
-        BatchContext ctx = new BatchContext(strategy, currentCycle, account,
-                null /* userProfile: 알림 미사용 경로라 null — allocate()는 approved/rejected 판단에만 ctx.account() 사용 */);
-        // 승인~PLANNED 커밋을 계좌 예산 락 안에서 — 같은 계좌의 배치 승인·접수 직전 재캡과 같은 live 여유분을 이중 사용하지 않게 한다
+        // 원장 판정~PLANNED 커밋을 계좌 예산 락 안에서 — 같은 계좌의 배치 판정·접수 직전 재캡과 같은 여유분을 이중 사용하지 않게 한다
         // (접수는 아래에서 락 밖으로 — 다른 계좌는 병렬 유지)
         try {
             budgetLock.call(account.id(), () -> {
                 // 위 이중 실행 검사는 락 밖이라 그 사이 같은 사이클에 배치·다른 수동 실행이 저장했을 수 있다 — 저장 직전 재검사
                 if (!orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today).isEmpty())
                     throw new AlreadyOrderedTodayException();
-                TradingOrderBudgetAllocator.Allocation allocation;
+                // 재검사 이후라 저장된 슬롯이 없음이 확인됐다 — remaining이 같은 날 저장분을 한 번만 차감
+                StrategyLedgerBudget.LedgerFit fit;
                 try {
-                    allocation = budgetAllocator.allocate(
-                            List.of(new TradingOrderBudgetAllocator.Candidate(ctx, preparedOrders)), today);
+                    fit = ledgerBudget.fit(strategy.type(), preparedOrders, ledgerBudget.remaining(currentCycle, today));
                 } catch (Exception e) {
-                    log.warn("[{}] 예산 배정 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
+                    log.warn("[{}] 원장 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                             account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
                     throw queryFailure(e);
                 }
-                if (!allocation.rejectedBuy().isEmpty()) throw new ManualTradingException("예수금이 부족합니다");
-                if (!allocation.rejectedSell().isEmpty()) throw new ManualTradingException("보유 수량이 부족합니다");
-
-                List<PlannedOrder> approvedOrders = allocation.approved().stream()
-                        .flatMap(candidate -> candidate.orders().stream())
-                        .toList();
-                orderPlanner.savePlannedOrders(approvedOrders, account, currentCycle.id());
+                if (fit.rejected()) throw new ManualTradingException("전략 원장 예수금이 부족합니다.");
+                orderPlanner.savePlannedOrders(fit.orders(), account, currentCycle.id());
                 return null;
             });
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); // 종료 인터럽트 — 승인·저장 전이라 주문은 남지 않는다
+            Thread.currentThread().interrupt(); // 종료 인터럽트 — 판정·저장 전이라 주문은 남지 않는다
             throw queryFailure(e);
         }
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
         // plan.position()/plan.vrPosition() — BUY cap 보정(orderExecutor.placeAtOpenOrders)에 필요
-        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle.id(), today, plan.position(), plan.vrPosition(), dst);
+        placeAtOpenOrdersIfMarketOpen(strategy, account, currentCycle, today, plan.position(), plan.vrPosition(), dst);
 
         // 저장된 주문 반환 (UI에서 예약 확인용)
         return orderPort.findPlannedOrPlacedByCycleAndDate(currentCycle.id(), today);
@@ -156,15 +148,15 @@ class ManualTradingService {
     // INFINITE: AT_OPEN 매도 선접수 / VR: AT_OPEN 매수·매도 사다리 즉시 접수 (BUY cap 보정 포함)
     // PRIVACY: AT_OPEN 주문 없으므로 자연 no-op
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
-    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, UUID cycleId, LocalDate today,
+    private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, StrategyCycle cycle, LocalDate today,
                                                InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
         if (Instant.now().isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
-            if (orderPort.findAtOpenPlannedByCycleAndDate(cycleId, today).isEmpty()) return;
+            if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
             // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)
             BigDecimal currentPrice = priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
             log.info("[{}] 개장 후 수동 실행 — AT_OPEN 주문 접수", account.nickname());
-            orderExecutor.placeAtOpenOrders(today, account, cycleId, currentPrice, position, vrPosition, strategy);
+            orderExecutor.placeAtOpenOrders(today, account, cycle, currentPrice, position, vrPosition, strategy);
         }
     }
 

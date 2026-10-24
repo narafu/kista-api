@@ -9,7 +9,6 @@ import com.kista.tradingcore.broker.application.port.output.BrokerStatisticsPort
 import com.kista.tradingcore.broker.application.port.output.CandlePort;
 import com.kista.tradingcore.broker.application.port.output.ExchangeRatePort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
@@ -50,7 +49,7 @@ class KisBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("공통 7개 Capability Port를 모두 구현한다")
+    @DisplayName("공통 6개 Capability Port를 모두 구현한다")
     void implementsAllCommonCapabilityPorts() {
         KisBrokerAdapter adapter = adapter();
 
@@ -61,7 +60,6 @@ class KisBrokerAdapterTest {
         assertThat(adapter).isInstanceOf(ExecutionPort.class);
         assertThat(adapter).isInstanceOf(BrokerOrderCorrectionPort.class);
         assertThat(adapter).isInstanceOf(BrokerPricePort.class);
-        assertThat(adapter).isInstanceOf(LiveBalancePort.class);
     }
 
     @Test

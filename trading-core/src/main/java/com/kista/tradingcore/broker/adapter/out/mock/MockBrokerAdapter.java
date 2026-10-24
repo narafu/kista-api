@@ -52,17 +52,6 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
                         "모의계좌 포지션 이력이 없습니다: strategyId=" + strategy.id()));
     }
 
-    // 계좌 전체 가용 예수금 — 실제 브로커는 계좌 단일 현금풀을 여러 전략이 공유하므로(TradingOrderBudgetAllocator가
-    // 대표 전략 1개로 getLiveBalance를 호출해 계좌의 모든 BUY 후보에 그대로 적용) 모의계좌도 전략별 usdDeposit을
-    // 합산해 계좌 단위 값으로 맞춘다 — 전략별 값을 그대로 반환하면 다른 전략의 잔고로 매수 승인/거절이 오염된다
-    private BigDecimal sumUsdDepositAcrossStrategies(BrokerAccountRef account) {
-        return mockSimulationDataPort.findStrategiesByAccountId(account.id()).stream()
-                .map(s -> mockSimulationDataPort.findLatestPosition(s.id()))
-                .flatMap(Optional::stream)
-                .map(PositionView::usdDeposit)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
     // --- BrokerPricePort (account 파라미터 무시, priceFeed에 위임 — Toss 패턴과 동일) ---
 
     @Override
@@ -108,15 +97,6 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
             result.put(ticker, priceFeed.getClosingPrice(ticker, tradeDate));
         }
         return result;
-    }
-
-    // --- LiveBalancePort ---
-
-    @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        // usdDeposit은 계좌 전체 합산(위 sumUsdDepositAcrossStrategies 주석 참고), holdings/avgPrice는 해당 ticker 전략 값
-        PositionView position = resolveLatestPosition(account, ticker);
-        return new BrokerBalance(position.holdings(), position.avgPrice(), sumUsdDepositAcrossStrategies(account));
     }
 
     // --- SellableQuantityPort ---
@@ -178,7 +158,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
 
     // 신규 전략 등록 시점 게이트체크(StrategyService.calcFreeCash) 전용 — 등록하려는 전략은 아직 cycle_position이
     // 없어(chicken-and-egg) 실제 잔고를 계산할 수 없으므로 상한 없음으로 항상 통과시킨다.
-    // 실제 매수 예산 제약은 배치 실행 시 LiveBalancePort.getLiveBalance()(계좌 합산)가 담당한다.
+    // 실제 매수 예산 제약은 배치 실행 시 전략 원장(StrategyLedgerBudget)이 담당한다.
     // 주의: 이 값은 GET /api/accounts/{id}/margin에도 그대로 노출되므로 화면상 "가용현금"이 실제와 다르게 크게
     // 보일 수 있다 — 모의계좌 UI에서 이 필드는 참고용이 아님을 별도 안내하는 것을 권장한다.
     @Override

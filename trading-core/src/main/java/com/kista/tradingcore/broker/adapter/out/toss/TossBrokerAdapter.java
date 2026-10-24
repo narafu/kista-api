@@ -14,7 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Toss 증권사 어댑터 — 공통 7개(BrokerCapabilitiesPort) + 통계 5개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
+// Toss 증권사 어댑터 — 공통 6개(BrokerCapabilitiesPort) + 통계 5개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
 @Component
 @RequiredArgsConstructor
 public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisticsPort {
@@ -149,11 +149,6 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
             result.put(ticker, tossPriceApi.getClosingPrice(ticker, tradeDate));
         }
         return result;
-    }
-
-    @Override
-    public BrokerBalance getLiveBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        return tossHoldingsApi.getBalance(account, ticker);
     }
 
 }

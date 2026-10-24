@@ -4,9 +4,12 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.UUID;
 
-// BUY 재주문 예산 — 남은 예산 = liveOrderable − plannedBuy + 재주문할 원본들의 sourceRefunds 합
+// BUY 재주문 예산 — 사이클별 남은 원장 한도(cycles)와 원본 주문별 환급분(sourceRefunds)
+// 재주문 가용 = cycles[원본 사이클].remaining + Σ sourceRefunds[재주문할 원본]
 public record ReorderBuyBudget(
-        BigDecimal plannedBuy,                // 거래일 계좌 PLANNED BUY 합계
-        BigDecimal liveOrderable,             // live 주문가능금액, 조회 실패 시 null
+        Map<UUID, CycleBudget> cycles,        // strategyCycleId별 예산
         Map<UUID, BigDecimal> sourceRefunds   // 원본 주문별 환급분(취소로 풀려나는 BUY 금액)
-) {}
+) {
+    // remaining: 최신 원장 − 같은 거래일 저장된 BUY (StrategyLedgerBudget.remaining)
+    public record CycleBudget(BigDecimal remaining) {}
+}

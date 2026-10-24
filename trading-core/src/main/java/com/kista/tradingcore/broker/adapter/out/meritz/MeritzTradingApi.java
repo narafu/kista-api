@@ -7,7 +7,6 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
@@ -67,13 +66,6 @@ class MeritzTradingApi {
             @JsonProperty("cntg_dqty") String filledQty,
             @JsonProperty("cntg_crnc_prc") String filledPrice,
             @JsonProperty("cntg_camt") String filledAmount) {}
-
-    BrokerBalance getBalance(BrokerAccountRef account, StrategyTicker ticker) {
-        HoldingRow row = findHolding(account, ticker);
-        int qty = row == null ? 0 : MeritzResponse.wholeQuantity(row.holdings());
-        BigDecimal avg = qty == 0 ? null : MeritzResponse.decimal(row.avgPrice());
-        return new BrokerBalance(qty, avg, getUsdBuyableAmount(account));
-    }
 
     BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         EstimateRow usd = estimateRow(account, "USD");

@@ -2,12 +2,11 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
-import com.kista.tradingcore.trading.domain.model.BuyCompetitionPreview;
+import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.tradingcore.trading.domain.model.SellSufficiencyPreview;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -42,14 +41,12 @@ class TradingPreviewService {
     private final StrategyCyclePort strategyCyclePort;
     private final OrderPort orderPort;
     private final StrategyOrderPlanBuilder planBuilder;
-    private final TradingBuyCompetitionSimulator competitionSimulator;
-    private final TradingSellSufficiencySimulator sellSufficiencySimulator;
+    private final StrategyLedgerBudget ledgerBudget; // 배치·수동실행과 같은 전략 원장 상한 판정
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
-    // 내부적으로 previewBatch()에 위임한다 — 대상 전략이 BUY 계획을 가지면 경쟁 시뮬레이션 때문에 계좌 내
-    // 활성 전략 전체를 어차피 다시 계산해야 하므로, 단건과 배치를 별도 코드 경로로 유지할 이유가 없다.
+    // 내부적으로 previewBatch()에 위임한다 — 단건과 배치를 별도 코드 경로로 유지할 이유가 없다.
     @Transactional(readOnly = true)
     NextOrdersPreview preview(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
@@ -68,8 +65,6 @@ class TradingPreviewService {
     // 사이클 없는 전략은 결과 맵에서 생략(단건 preview는 404지만 배치는 부분 실패를 허용) — 계좌 내 전략 수는 소규모라 O(N) 순회로 충분
     //
     // cycle·당일 주문·매매 계획(planBuilder.build)을 전략별로 1회만 미리 계산해 재사용한다.
-    // 이전에는 대상 전략 N개를 순회할 때마다 경쟁 시뮬레이션(TradingBuyCompetitionSimulator)이 계좌 내
-    // 다른 전략 전체를 처음부터 다시 계산해 KIS 시세 조회·DB 조회가 O(N²)로 증폭됐다.
     @Transactional(readOnly = true)
     Map<UUID, NextOrdersPreview> previewBatch(UUID accountId, UUID requesterId) {
         return previewBatch(accountId, requesterId, new HashMap<>());
@@ -81,7 +76,7 @@ class TradingPreviewService {
         Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
         TradingAccount account = TradingAccount.from(ownedAccount);
         LocalDate today = DstInfo.nextTradeDate();
-        // 코인 전략(전부 DCA)은 미리보기·경쟁 시뮬레이션 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
+        // 코인 전략(전부 DCA)은 미리보기 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
         List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
@@ -124,8 +119,7 @@ class TradingPreviewService {
                 continue;
             }
             if (!today.isAfter(cycle.startDate())) {
-                // skip 결과를 캐시에 명시적으로 채워둔다 — 비워두면 경쟁 시뮬레이션이 캐시 미스로 오인해
-                // planBuilder.build()를 직접 재계산하면서 시작예정일 미도래 전략이 정상 주문을 만든 것처럼 취급됨
+                // skip 결과를 캐시에 명시적으로 채워둔다 — 비워두면 아래 최종 루프가 캐시 미스로 오인해 재계산한다
                 planResultsByStrategyId.put(strategy.id(),
                         new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED));
                 continue;
@@ -134,18 +128,11 @@ class TradingPreviewService {
                 planResultsByStrategyId.put(strategy.id(),
                         planBuilder.build(strategy, account, cycle, today, "batch:" + strategy.id(), prevCloseCache));
             } catch (RuntimeException e) {
-                // 대상(target) 전략으로 쓰일 때는 아래 최종 루프가 캐시 누락을 감지해 동일 계산을 재시도하며,
-                // 그때 실패하면 기존과 동일하게 전파된다. 경쟁(competitor)으로 쓰일 때도 캐시 미스 시
-                // TradingBuyCompetitionSimulator가 즉시 재계산을 시도한다 — 실패한 전략 1개당 최대 1회
-                // 추가 계산이 발생해 O(N²) 회귀를 완전히 막지는 못하지만, 과소평가(경쟁 금액 0 처리) 대신
-                // 정확성을 우선한 트레이드오프다. 재계산도 실패하면 그때 uncertain 처리한다.
-                log.warn("배치 미리보기 사전 계산 실패, 재시도/경쟁 시뮬레이션에서 재계산 시도 예정: strategyId={}, error={}",
+                // 아래 최종 루프가 캐시 누락을 감지해 동일 계산을 재시도하며, 그때 실패하면 그대로 전파된다
+                log.warn("배치 미리보기 사전 계산 실패, 재시도 예정: strategyId={}, error={}",
                         strategy.id(), e.getMessage());
             }
         }
-
-        TradingBuyCompetitionSimulator.BatchContext context = new TradingBuyCompetitionSimulator.BatchContext(
-                strategies, cyclesByStrategyId, todayOrdersByStrategyId, planResultsByStrategyId);
 
         Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
         for (Strategy strategy : strategies) {
@@ -166,7 +153,7 @@ class TradingPreviewService {
                 }
             }
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), planResult, context, totalAccountPlannedBuy));
+                    todayOrdersByStrategyId.get(strategy.id()), planResult, totalAccountPlannedBuy));
         }
         return previews;
     }
@@ -174,7 +161,6 @@ class TradingPreviewService {
     private NextOrdersPreview buildPreview(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> todayOrders,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
-                                            TradingBuyCompetitionSimulator.BatchContext context,
                                             BigDecimal totalAccountPlannedBuy) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
@@ -187,39 +173,29 @@ class TradingPreviewService {
         // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
         if (currentCycle.endDate() != null) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.CYCLE_ENDED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+                    todayOrders, otherStrategiesPlannedBuyUsd, null);
         }
         // 시작예정일 미도래 사이클은 계획 계산 자체를 건너뛴다 — TradingService.filterScheduledStart와 동일 기준(tradeDate > startDate)
         if (!today.isAfter(currentCycle.startDate())) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+                    todayOrders, otherStrategiesPlannedBuyUsd, null);
         }
 
         if (planResult.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null);
         }
         CycleOrderStrategy.OrderPlan plan = planResult.plan();
 
-        // 오늘자 계획에 BUY가 있을 때만 계좌 내 예산 경쟁 시뮬레이션 수행
-        List<PlannedOrder> buyOrders = plan.orders().stream()
-                .filter(o -> o.direction() == OrderDirection.BUY)
-                .toList();
-        BuyCompetitionPreview competition = buyOrders.isEmpty()
-                ? null
-                : competitionSimulator.simulate(strategy, account, currentCycle, buyOrders, today, otherStrategiesPlannedBuyUsd, context);
+        // 배치(TradingCandidatePlanner)와 같은 판정 — 이미 저장된 슬롯을 뺀 신규 주문만 원장 잔여에 대조한다
+        // DCA(원장 상한 제외)·신규 BUY 없음이면 경고 없음(null)
+        List<PlannedOrder> freshOrders = TradingOrderSlots.excludeExisting(plan.orders(), todayOrders);
+        LedgerCheckPreview ledgerCheck = null;
+        if (ledgerBudget.applies(strategy.type()) && freshOrders.stream().anyMatch(o -> o.direction() == OrderDirection.BUY)) {
+            BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, today);
+            StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(strategy.type(), freshOrders, remainingLedger);
+            ledgerCheck = new LedgerCheckPreview(remainingLedger, fit.requiredBuyUsd(), !fit.rejected(), fit.trimmed());
+        }
 
-        // 오늘자 계획에 SELL이 있을 때만 판매가능수량 충족 시뮬레이션 수행.
-        // planBuilder.build()는 매번 처음부터 재계산하므로, 오늘 이미 접수(PLACED)된 SELL도 동일하게
-        // 다시 제시한다. 그 몫은 sellSufficiencySimulator가 reservedQuantity로 DB에서 별도 조회해
-        // 이미 반영하므로, 신규 필요분에서는 기존 주문과 겹치는 슬롯을 제외해야 이중 계산되지 않는다
-        // (TradingService.filterCreatableOrders와 동일 기준 — TradingOrderSlots 공유).
-        List<PlannedOrder> newSellOrders = TradingOrderSlots.excludeExisting(
-                plan.orders().stream().filter(o -> o.direction() == OrderDirection.SELL).toList(),
-                todayOrders);
-        SellSufficiencyPreview sellSufficiency = newSellOrders.isEmpty()
-                ? null
-                : sellSufficiencySimulator.simulate(strategy, account, newSellOrders, today);
-
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, competition, sellSufficiency);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck);
     }
 }

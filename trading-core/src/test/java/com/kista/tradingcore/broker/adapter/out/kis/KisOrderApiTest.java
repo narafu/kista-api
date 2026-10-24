@@ -25,6 +25,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -124,6 +125,27 @@ class KisOrderApiTest {
         OrderResult result = api.place(instruction, ACCOUNT);
 
         assertThat(result.externalOrderId()).isEqualTo("ORD123");
+    }
+
+    private KisApiException placeRejectedWith(String msgCd) {
+        OrderInstruction instruction = new OrderInstruction(StrategyTicker.SOXL, OrderDirection.BUY, OrderType.LOC, 10, BigDecimal.ZERO);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
+                .thenReturn(new KisOrderApi.OrderResponse("1", msgCd, "오류", null));
+        return (KisApiException) catchThrowable(() -> api.place(instruction, ACCOUNT));
+    }
+
+    @Test
+    void placeRejectedWithApbk0988IsInsufficientFunds() {
+        KisApiException e = placeRejectedWith("APBK0988");
+        assertThat(e.isRejected()).isTrue();
+        assertThat(e.isInsufficientFunds()).isTrue();
+    }
+
+    @Test
+    void placeRejectedWithOtherCodeIsNotInsufficientFunds() {
+        KisApiException e = placeRejectedWith("APBK0919");
+        assertThat(e.isRejected()).isTrue();
+        assertThat(e.isInsufficientFunds()).isFalse();
     }
 
     @Test

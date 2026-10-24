@@ -30,6 +30,16 @@ interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UU
             """, nativeQuery = true)
     List<DcaExecutionEntity> findLatestByStrategyIds(@Param("strategyIds") Collection<UUID> strategyIds);
 
+    // ORDERED → SKIPPED 조건부 전이 — 반환값 1이면 전이
+    @Modifying
+    @Query(value = """
+            UPDATE dca_execution SET status = 'SKIPPED', skip_reason = :skipReason, detail = :detail
+            WHERE strategy_id = :strategyId AND rule_key = :ruleKey AND trade_date = :tradeDate
+              AND status = 'ORDERED' AND order_id = :orderId
+            """, nativeQuery = true)
+    int markOrderedSkipped(@Param("strategyId") UUID strategyId, @Param("ruleKey") String ruleKey, @Param("tradeDate") LocalDate tradeDate,
+                           @Param("orderId") UUID orderId, @Param("skipReason") String skipReason, @Param("detail") String detail);
+
     // UNIQUE(strategy_id, rule_key, trade_date) 충돌 시 무시 — 반환값 1이면 삽입
     @Modifying
     @Query(value = """

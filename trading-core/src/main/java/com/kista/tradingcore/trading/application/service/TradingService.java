@@ -214,7 +214,7 @@ class TradingService {
                             BigDecimal placementPrice = Optional.ofNullable(placementPrices.get(state.ctx().strategy().ticker()))
                                     .orElse(state.startPrice());
                             List<Order> mainOrders = orderExecutor.placeOrders(today,
-                                    state.ctx().account(), state.ctx().currentCycle().id(),
+                                    state.ctx().account(), state.ctx().currentCycle(),
                                     placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
                             // 선접수된 주문도 포함 — AT_OPEN(개장 스케쥴러) + AT_CLOSE(이전 세션/수동 접수) 모두
                             // 이미 placeOrders()로 접수된 주문과 중복 방지: ID 기준 dedup
@@ -372,7 +372,7 @@ class TradingService {
 
     // 개장 시점에는 AT_OPEN 슬롯의 PLANNED 주문만 즉시 증권사에 접수한다 — BUY cap 보정은 orderExecutor가 AT_OPEN 스코프로 적용
     private void placeAtOpenPlannedOrders(TradingCandidatePlanner.CycleState state, BigDecimal placementPrice, LocalDate tradeDate) {
-        orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle().id(),
+        orderExecutor.placeAtOpenOrders(tradeDate, state.ctx().account(), state.ctx().currentCycle(),
                 placementPrice, state.position(), state.vrPosition(), state.ctx().strategy());
     }
 

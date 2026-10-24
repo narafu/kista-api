@@ -32,7 +32,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
                             p -> NotificationType.valueOf(p.getType()),
                             UserNotificationPrefJpaEntity::isEnabled
                     ));
-            return new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs,
+            return new UserSettings(userId, prefs,
                     resolveSuggestions(entity.getStrategySuggestions()));
         });
     }
@@ -41,7 +41,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
     @Transactional // settings + prefs 다건 저장을 원자적으로 — 호출자 트랜잭션이 있으면 합류
     public void save(UserSettings settings) {
         // user_settings 행 저장 (없으면 INSERT, 있으면 UPDATE)
-        settingsRepo.save(new UserSettingsJpaEntity(settings.userId(), settings.balanceCheckEnabled(),
+        settingsRepo.save(new UserSettingsJpaEntity(settings.userId(),
                 settings.strategySuggestions()));
         // 알림 선호도 각 타입별로 저장
         settings.notificationPrefs().forEach((type, enabled) ->
@@ -78,7 +78,7 @@ public class UserSettingsPersistenceAdapter implements UserSettingsPort {
             if (entities.containsKey(userId)) {
                 UserSettingsJpaEntity entity = entities.get(userId);
                 Map<NotificationType, Boolean> prefs = prefsByUserId.getOrDefault(userId, Map.of());
-                result.put(userId, new UserSettings(userId, entity.isBalanceCheckEnabled(), prefs,
+                result.put(userId, new UserSettings(userId, prefs,
                         resolveSuggestions(entity.getStrategySuggestions())));
             } else {
                 // 설정이 없는 사용자는 기본값으로 채운다

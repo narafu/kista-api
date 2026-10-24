@@ -86,7 +86,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 aid, uid, "계좌", "KIS", "74420614" + aid, "01", "key", "secret");
         if (profileActive != null) {
             jdbcTemplate.update(
-                    "INSERT INTO trading.user_notify_profile (user_id, notification_prefs, balance_check_enabled, is_active, updated_at) VALUES (?, '{}', TRUE, ?, now())",
+                    "INSERT INTO trading.user_notify_profile (user_id, notification_prefs, is_active, updated_at) VALUES (?, '{}', ?, now())",
                     uid, profileActive);
         }
         return aid;
