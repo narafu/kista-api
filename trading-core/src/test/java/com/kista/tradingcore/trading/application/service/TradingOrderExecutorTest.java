@@ -24,7 +24,8 @@ import com.kista.tradingcore.support.StubBrokerApiException;
 import org.mockito.InOrder;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
+import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.broker.domain.model.BrokerBalance;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
@@ -61,7 +62,8 @@ class TradingOrderExecutorTest {
     @Mock BrokerOrderCorrectionPort brokerPort;
     @Mock BuyOrderPriceCapper buyOrderPriceCapper;
     @Mock ApplicationEventPublisher eventPublisher;
-    @Mock LiveBalancePort liveBalancePort;
+    @Mock StrategyLedgerBudget ledgerBudget;
+    @Mock StrategyCyclePort strategyCyclePort;
     @Mock OrderSubmissionReconciler reconciler;
     @Mock DcaExecutionRecorder dcaRecorder;
 
@@ -102,7 +104,7 @@ class TradingOrderExecutorTest {
 
     private TradingOrderExecutor executor() {
         // 실제 OrderSubmitter로 선점→접수→기록 경로까지 끝까지 검증
-        return new TradingOrderExecutor(orderPort, buyOrderPriceCapper, CYCLE_STRATEGIES, liveBalancePort,
+        return new TradingOrderExecutor(orderPort, buyOrderPriceCapper, CYCLE_STRATEGIES, ledgerBudget, strategyCyclePort,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerPort, eventPublisher), reconciler,
                 eventPublisher, dcaRecorder);
     }
@@ -491,52 +493,31 @@ class TradingOrderExecutorTest {
     }
 
     @Test
-    @DisplayName("재캡이 BUY 총액을 늘리면 live 주문가능금액 − 계좌 PLANNED BUY를 예산으로 재캡을 다시 시도")
-    void placeOrders_capIncreasesTotal_retriesWithLiveBudget() {
+    @DisplayName("재캡이 BUY 총액을 늘리면 예산을 사이클 원장 잔여(remaining)로 다시 시도한다")
+    void recapBudgetIsCycleLedgerPlusOwnScopeBuys() {
+        StrategyCycle cycle = new StrategyCycle(STRATEGY_CYCLE_ID, INFINITE_STRATEGY.id(), null,
+                new BigDecimal("1000.00"), null, TODAY, null, null, null);
         when(buyOrderPriceCapper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
                 STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null)).thenReturn(true);
-        when(orderPort.sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(new BigDecimal("600.00"));
-        when(liveBalancePort.getLiveBalance(ACCOUNT_REF, INFINITE_STRATEGY.ticker()))
-                .thenReturn(new BrokerBalance(0, null, new BigDecimal("1000.00")));
+        when(strategyCyclePort.requireLatestByStrategyId(INFINITE_STRATEGY.id())).thenReturn(cycle);
+        // 원장 1000 − 같은 날 PLANNED BUY(자기 스코프 50×4=200) = 800. capper가 자기 스코프 원본(200)을 더해 1000으로 맞춘다
+        when(ledgerBudget.remaining(cycle, TODAY)).thenReturn(new BigDecimal("800.00"));
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 
-        // DB 예약 합계를 live보다 먼저 읽는다 — 동시 접수분이 과소 집계되지 않고 이중 차감(보수적)만 가능
-        var inOrder = inOrder(orderPort, liveBalancePort);
-        inOrder.verify(orderPort).sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY);
-        inOrder.verify(liveBalancePort).getLiveBalance(ACCOUNT_REF, INFINITE_STRATEGY.ticker());
         verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), new BigDecimal("400.00"));
+                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), new BigDecimal("800.00"));
     }
 
     @Test
-    @DisplayName("live 조회 실패 시 여유 0으로 재캡 재시도 — 예산은 자기 스코프 원본 BUY(allocator 승인액)로 한정")
-    void placeOrders_liveBalanceFails_retriesWithZeroFreeBudget() {
-        when(buyOrderPriceCapper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), null)).thenReturn(true);
-        when(orderPort.sumPlannedBuyByAccountAndDate(ACCOUNT.id(), TODAY)).thenReturn(BigDecimal.ZERO);
-        when(liveBalancePort.getLiveBalance(any(), any())).thenThrow(new RuntimeException("rate limit"));
-        Order plannedOrder = planned(UUID.randomUUID(), OrderDirection.BUY, "60.00", 1);
-        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
-        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-009"));
-
-        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
-
-        verify(buyOrderPriceCapper).capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT,
-                STRATEGY_CYCLE_ID, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY.ticker(), BigDecimal.ZERO);
-        assertThat(result).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("재캡이 총액을 늘리지 않으면 live 조회 없음")
-    void placeOrders_capWithoutIncrease_noLiveQuery() {
+    @DisplayName("재캡이 총액을 늘리지 않으면 원장 조회 없음")
+    void placeOrders_capWithoutIncrease_noLedgerQuery() {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of());
 
         executor().placeOrders(TODAY, ACCOUNT, STRATEGY_CYCLE_ID, CURRENT_PRICE, null, null, PRIVACY_STRATEGY);
 
-        verifyNoInteractions(liveBalancePort);
-        verify(orderPort, never()).sumPlannedBuyByAccountAndDate(any(), any());
+        verifyNoInteractions(ledgerBudget, strategyCyclePort);
     }
 
     @Test

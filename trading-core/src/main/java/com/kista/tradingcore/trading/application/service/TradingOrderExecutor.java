@@ -11,7 +11,8 @@ import com.kista.tradingcore.matching.domain.model.InfinitePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.broker.application.port.output.LiveBalancePort;
+import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
+import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
@@ -35,8 +36,9 @@ class TradingOrderExecutor {
     private final OrderPort orderPort;
     private final BuyOrderPriceCapper buyOrderPriceCapper;
     private final CycleOrderStrategies cycleOrderStrategies;
-    private final LiveBalancePort liveBalancePort;              // 재캡이 BUY 총액을 늘릴 때만 live 주문가능금액 조회
-    private final AccountBudgetLock accountBudgetLock;          // 계좌별 재캡 예산 산정 직렬화 — allocator 승인+저장과 같은 락
+    private final StrategyLedgerBudget ledgerBudget;            // 재캡이 BUY 총액을 늘릴 때만 사이클 원장 잔여 조회
+    private final StrategyCyclePort strategyCyclePort;          // 원장 조회용 현재 사이클
+    private final AccountBudgetLock accountBudgetLock;          // 계좌별 재캡 예산 산정 직렬화 — 후보 계획 승인+저장과 같은 락
     private final OrderSubmitter orderSubmitter;                // 건별 선점 → 접수 → PLACED/FAILED 기록
     private final OrderSubmissionReconciler reconciler;         // 접수 전 잔류 SUBMITTING 대사(Toss 멱등 재요청·알림)
     private final ApplicationEventPublisher eventPublisher;     // 잔고 부족 거절 사용자 알림(InsufficientBalanceEvent)
@@ -97,24 +99,14 @@ class TradingOrderExecutor {
         if (!buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
                 currentPrice, position, vrPosition, strategy.ticker(), null)) return;
 
-        // 재캡이 BUY 총액을 늘림 — live 주문가능금액 기준 예산으로 재시도. 브로커 호출이라 트랜잭션(capIfNeeded) 밖에서 조회하고,
-        // 같은 계좌의 "예약 합계 → live → 재캡 커밋"을 직렬화해 동시 재캡끼리 같은 여유분을 이중 사용하지 않게 한다(접수는 락 밖 — 병렬 유지)
+        // 재캡이 BUY 총액을 늘림 — 사이클 원장 잔여(같은 날 PLANNED·SUBMITTING·PLACED BUY 차감 후)를 예산으로 재시도한다.
+        // 자기 스코프 원본 PLANNED BUY는 remaining이 이미 뺐으므로 capper가 되돌려 더한다.
+        // 같은 계좌의 "원장 조회 → 재캡 커밋"을 직렬화해 동시 재캡끼리 같은 여유분을 이중 사용하지 않게 한다(접수는 락 밖 — 병렬 유지)
         try {
             accountBudgetLock.call(account.id(), () -> {
-                // DB 예약 합계를 live보다 먼저 읽는다 — 그 사이 접수된 주문은 이중 차감(보수적)될 뿐 과소 집계되지 않는다
-                BigDecimal reservedBuy = orderPort.sumPlannedBuyByAccountAndDate(account.id(), date);
-                BigDecimal freeBudget;
-                try {
-                    freeBudget = liveBalancePort.getLiveBalance(account.brokerRef(), strategy.ticker()).usdDeposit()
-                            .subtract(reservedBuy);
-                } catch (Exception e) {
-                    // 원장 기준 폴백은 live 초과 재캡 그 자체라 택하지 않는다 — 여유 0으로 두면 예산이 자기 스코프 원본 BUY
-                    // (allocator 승인액)로 한정돼 지출은 원본 이하로 유지하면서 축소된 캡 주문을 접수한다(VR 사다리 캡 누락 방지)
-                    log.warn("[{}] live 잔고 조회 실패 — 원본 BUY 금액 한도로 재캡: {}", account.nickname(), e.getMessage());
-                    freeBudget = BigDecimal.ZERO;
-                }
+                StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
                 return buyOrderPriceCapper.capIfNeeded(strategy.type(), atOpen, date, account, strategyCycleId,
-                        currentPrice, position, vrPosition, strategy.ticker(), freeBudget);
+                        currentPrice, position, vrPosition, strategy.ticker(), ledgerBudget.remaining(cycle, date));
             });
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt(); // placeEach 상단 체크가 남은 접수를 중단

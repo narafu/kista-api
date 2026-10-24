@@ -58,14 +58,14 @@ class BuyOrderPriceCapper {
     // 전략별 BUY 가격 캡 진입점 단일화 — capsIndividualOrders()로 DB 행 단위 취소·재저장 방식을 결정한다.
     // capIfNeeded는 @Transactional이라 needsCapCheck() 가드는 TradingOrderExecutor.applyCap에서 미리 걸러
     // 스킵 케이스마다 빈 트랜잭션이 열리지 않도록 한다.
-    // accountFreeBudget: 계좌 live 주문가능금액 − 계좌 PLANNED BUY 합계(호출부가 트랜잭션 밖에서 조회), null이면 아직 미조회,
-    // live 조회 실패면 0(예산 = 자기 스코프 원본 BUY 합계)
-    // 반환 true = 재캡이 BUY 총액을 늘려 live 예산이 필요함(아무것도 반영하지 않음) — 호출부가 예산을 구해 다시 호출한다
-    // 총액이 늘지 않는 재캡은 allocator 승인 범위 안이라 예산 없이 반영한다
+    // cycleLedgerBudget: 사이클 원장 잔여(원장 − 같은 날 PLANNED·SUBMITTING·PLACED BUY 합계, 자기 스코프 원본 포함 차감 후),
+    // null이면 아직 미조회 — 자기 스코프 원본 BUY 합계를 더해 쓴다
+    // 반환 true = 재캡이 BUY 총액을 늘려 원장 예산이 필요함(아무것도 반영하지 않음) — 호출부가 예산을 구해 다시 호출한다
+    // 총액이 늘지 않는 재캡은 기존 승인 범위 안이라 예산 없이 반영한다
     @Transactional
     boolean capIfNeeded(StrategyType type, boolean atOpen, LocalDate date, TradingAccount account, UUID strategyCycleId,
                         BigDecimal currentPrice, InfinitePosition position, VrPosition vrPosition, StrategyTicker ticker,
-                        BigDecimal accountFreeBudget) {
+                        BigDecimal cycleLedgerBudget) {
         strategyCyclePort.lockForUpdate(strategyCycleId); // 동일 사이클 동시 보정 직렬화
         List<Order> buyOrders = loadBuyOrders(strategyCycleId, date, atOpen);
         if (buyOrders.isEmpty()) return false;
@@ -79,8 +79,8 @@ class BuyOrderPriceCapper {
 
         BigDecimal originalTotal = AccountBalance.buyTotal(plannedBuyOrders);
         if (AccountBalance.buyTotal(corrected).compareTo(originalTotal) > 0) {
-            if (accountFreeBudget == null) return true;
-            corrected = fitToBudget(account, strategy, corrected, accountFreeBudget.add(originalTotal));
+            if (cycleLedgerBudget == null) return true;
+            corrected = fitToBudget(account, strategy, corrected, cycleLedgerBudget.add(originalTotal));
             if (corrected == null) return false; // 원본 PLANNED 유지
         }
 
@@ -92,18 +92,18 @@ class BuyOrderPriceCapper {
         return false;
     }
 
-    // 재캡 결과를 live 예산(자기 스코프 원본 BUY를 되돌린 금액)에 맞춘다 — 접수 시 브로커 주문가능금액 초과 거절 방지
-    // 축소(INFINITE=보정 생략, VR=싼 단부터 rung 절단, PRIVACY=축소 없음)로도 못 담으면 null — allocator가 승인한 원본을 그대로 둔다(base 공식은 불변)
+    // 재캡 결과를 원장 예산(자기 스코프 원본 BUY를 되돌린 금액)에 맞춘다 — 전략 원장 초과 방지
+    // 축소(INFINITE=보정 생략, VR=싼 단부터 rung 절단, PRIVACY=축소 없음)로도 못 담으면 null — 기존 PLANNED 원본을 그대로 둔다(base 공식은 불변)
     private List<PlannedOrder> fitToBudget(TradingAccount account, CycleOrderStrategy strategy,
                                            List<PlannedOrder> corrected, BigDecimal budget) {
         if (AccountBalance.buyTotal(corrected).compareTo(budget) <= 0) return corrected;
         List<PlannedOrder> fitted = strategy.fitBuysToBudget(corrected, budget);
         if (!fitted.isEmpty() && AccountBalance.buyTotal(fitted).compareTo(budget) <= 0) {
-            log.info("[{}] BUY 재캡 live 예산 내 축소: budget={}, orders {}->{}건",
+            log.info("[{}] BUY 재캡 원장 예산 내 축소: budget={}, orders {}->{}건",
                     account.nickname(), budget, corrected.size(), fitted.size());
             return fitted;
         }
-        log.warn("[{}] BUY 재캡이 live 예산 초과 — 재캡 생략, 기존 PLANNED 유지: budget={}, required={}",
+        log.warn("[{}] BUY 재캡이 원장 예산 초과 — 재캡 생략, 기존 PLANNED 유지: budget={}, required={}",
                 account.nickname(), budget, AccountBalance.buyTotal(corrected));
         return null;
     }

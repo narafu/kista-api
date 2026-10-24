@@ -184,7 +184,8 @@ class TradingServiceTest {
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
-        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, liveBalancePort,
+        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, cycleStrategies);
+        TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, ledgerBudget, strategyCyclePort,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerOrderPort, eventPublisher),
                 new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher),
                 eventPublisher, mock(DcaExecutionRecorder.class));
@@ -227,7 +228,6 @@ class TradingServiceTest {
                 .thenAnswer(invocation -> Optional.of(new StrategyInfiniteDetail(invocation.getArgument(0), 20)));
         // MarketEventNotifier — TradingUserProfilePort/ApplicationEventPublisher를 직접 주입해 생성
         MarketEventNotifier marketEventNotifier = new MarketEventNotifier(tradingUserProfilePort, eventPublisher);
-        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, cycleStrategies);
         TradingBatchGuard batchGuard = new TradingBatchGuard(eventPublisher);
         TradingCandidatePlanner candidatePlanner = new TradingCandidatePlanner(
                 orderPort, orderComputer, orderPlanner, priceCapper, cycleStrategies,
@@ -705,6 +705,7 @@ class TradingServiceTest {
                 .thenReturn(Map.of(StrategyTicker.TQQQ, new BigDecimal("80.00")));
         when(cycleHistoryPort.findLatestOneByStrategyId(vr.id())).thenReturn(Optional.of(vrHistory));
         when(cycleHistoryPort.findFirstOne(vrCycle.id())).thenReturn(Optional.of(vrOpening));
+        when(strategyCyclePort.requireLatestByStrategyId(vr.id())).thenReturn(vrCycle); // 재캡 원장 예산 조회용(원장=시작금액 1000)
         when(strategyCycleVrPort.findByCycleId(vrCycle.id())).thenReturn(Optional.of(cycleVr));
         when(strategyVrDetailPort.findByStrategyVersionId(vrCycle.strategyVersionId()))
                 .thenReturn(Optional.of(vrDetail));
@@ -735,7 +736,7 @@ class TradingServiceTest {
         Order cappedPlanned = new Order(cappedOrderId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.TQQQ,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2), new BigDecimal("84.00"),
                 OrderStatus.PLANNED, null, null, null);
-        // 재캡 총액(84×2=168)이 원본(90)보다 커서 capIfNeeded가 2회 조회한다 — 1차(live 예산 요청)·2차(live 예산 10000으로 반영)는
+        // 재캡 총액(84×2=168)이 원본(90)보다 커서 capIfNeeded가 2회 조회한다 — 1차(원장 예산 요청)·2차(원장 예산으로 반영)는
         // stale 90.00 주문, 3번째 조회(보정 이후 접수 대상)는 capped 84.00 주문
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(vrCycle.id()), any()))
                 .thenReturn(List.of(stalePlanned))
@@ -746,7 +747,7 @@ class TradingServiceTest {
         service.placeOpenOrders(List.of(new BatchContext(vr, vrCycle, ACCOUNT, USER)), PAST_DST);
 
         // 접수 전 AT_OPEN 스코프 캡 재산정이 새 cap(84.00)으로 호출됐는지 확인 — stale 90.00 주문을 잡아낸 증거
-        // 총액 증가라 live 예산 요청(1차)·반영(2차)으로 2회 재산정
+        // 총액 증가라 원장 예산 요청(1차)·반영(2차)으로 2회 재산정
         verify(vrStrategy, times(2)).buildCappedBuyOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00")));
         // stale 주문은 CANCELLED
         verify(orderPort).cancelPlanned(staleBuyId);
