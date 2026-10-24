@@ -28,6 +28,9 @@ public interface StrategyCyclePort {
     // 전략의 최초 사이클 — VR 첫 등록 bootstrap 판정에 사용
     Optional<StrategyCycle> findFirstByStrategyId(UUID strategyId);
 
+    // 사이클 ID 단건 조회 (deleted 제외)
+    Optional<StrategyCycle> findById(UUID cycleId);
+
     // 여러 전략의 전체 사이클 배치 조회 (통계용) — deleted 제외, createdAt 오름차순
     List<StrategyCycle> findByStrategyIds(Collection<UUID> strategyIds);
 

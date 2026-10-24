@@ -48,6 +48,11 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
+    public Optional<StrategyCycle> findById(UUID cycleId) {
+        return jpaRepository.findById(cycleId).map(this::toDomain);
+    }
+
+    @Override
     public void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate) {
         // 사이클 종료 기록: load-set-save 패턴 (OrderPersistenceAdapter.markFilled와 동일)
         StrategyCycleEntity e = jpaRepository.findById(cycleId)

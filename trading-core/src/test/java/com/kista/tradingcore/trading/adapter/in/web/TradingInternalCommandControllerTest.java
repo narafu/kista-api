@@ -129,14 +129,14 @@ class TradingInternalCommandControllerTest {
         java.util.UUID b = java.util.UUID.randomUUID();
         when(reorderBuyBudgetQuery.query(java.util.List.of(a, b), java.time.LocalDate.of(2026, 10, 6)))
                 .thenReturn(new com.kista.tradingcore.trading.domain.model.ReorderBuyBudget(
-                        new java.math.BigDecimal("300"), null, java.util.Map.of(a, new java.math.BigDecimal("200"))));
+                        java.util.Map.of(b, new com.kista.tradingcore.trading.domain.model.ReorderBuyBudget.CycleBudget(new java.math.BigDecimal("300"))),
+                        java.util.Map.of(a, new java.math.BigDecimal("200"))));
 
         mockMvc.perform(get("/api/internal/trading/reorder-buy-budget")
                         .param("orderIds", a.toString(), b.toString()).param("tradeDate", "2026-10-06")
                         .header("X-Internal-Token", VALID_TOKEN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plannedBuy").value(300))
-                .andExpect(jsonPath("$.liveOrderable").doesNotExist())
+                .andExpect(jsonPath("$.cycleRemaining['" + b + "']").value(300))
                 .andExpect(jsonPath("$.sourceRefunds['" + a + "']").value(200));
     }
 }

@@ -326,14 +326,13 @@ class AdminTradeControllerTest {
         UUID orderId = UUID.randomUUID();
         when(tradingCommandPort.reorderBuyBudget(List.of(orderId), java.time.LocalDate.of(2026, 10, 6)))
                 .thenReturn(new com.kista.shared.contract.trading.ReorderBuyBudgetResponse(
-                        new BigDecimal("300"), new BigDecimal("1000"), Map.of(orderId, new BigDecimal("200"))));
+                        Map.of(orderId, new BigDecimal("300")), Map.of(orderId, new BigDecimal("200"))));
 
         mockMvc.perform(get("/api/admin/trades/reorder-buy-budget")
                         .param("orderIds", orderId.toString()).param("tradeDate", "2026-10-06")
                         .with(authentication(adminToken(ADMIN_UUID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.plannedBuy").value(300))
-                .andExpect(jsonPath("$.liveOrderable").value(1000))
+                .andExpect(jsonPath("$.cycleRemaining['" + orderId + "']").value(300))
                 .andExpect(jsonPath("$.sourceRefunds['" + orderId + "']").value(200));
     }
 }

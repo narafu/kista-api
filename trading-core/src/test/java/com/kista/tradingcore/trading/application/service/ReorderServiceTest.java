@@ -60,6 +60,7 @@ class ReorderServiceTest {
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     @Mock MarketCalendarPort marketCalendarPort;
     @Mock OrderSubmitter orderSubmitter;
+    @Mock StrategyLedgerBudget ledgerBudget;
 
     ReorderService service;
 
@@ -67,7 +68,7 @@ class ReorderServiceTest {
     void setUp() {
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
-                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter);
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget);
     }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
@@ -341,6 +342,61 @@ class ReorderServiceTest {
 
         verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
         verify(orderPort, never()).markCancelled(any());
+    }
+
+    // --- 원장 상한 ---
+
+    private Order plannedBuy() {
+        return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
+                OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2),
+                new BigDecimal("100.00"), OrderStatus.PLACED, "PLACED-1", null, null);
+    }
+
+    // 가격 250 × 수량 2 = 500 BUY 재주문
+    private ReorderCommand buyCommand(OrderTiming timing) {
+        return new ReorderCommand(USER_ID, ACCOUNT_ID, STRATEGY_ID, ORDER_ID, timing,
+                LocalDate.of(2026, 7, 2), OrderDirection.BUY, 2, new BigDecimal("250.00"), "memo");
+    }
+
+    @Test
+    void immediateBuyOverLedgerRejected409() {
+        // 원본 PLACED BUY 200은 remaining에 이미 차감돼 있어 환불 200을 더한 300이 상한 — 500은 초과
+        stubCommon(plannedBuy());
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("100"));
+
+        assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
+                .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingException.class)
+                .hasMessage("전략 원장 예수금이 부족합니다.");
+
+        verify(orderPort, never()).cancelPlanned(any());
+        verify(orderPort, never()).markCancelled(any());
+        verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
+        verify(brokerOrderCorrectionPort, never()).place(any(), any());
+        verifyNoInteractions(orderSubmitter);
+    }
+
+    @Test
+    void immediateBuyWithinLedgerProceeds() {
+        // remaining 300 + 원본 환불 200 = 500 — 정확히 상한이면 통과
+        stubCommon(plannedBuy());
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("300"));
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.PLACED, "NEW-EXT-1"));
+
+        assertThat(reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.PLACED);
+    }
+
+    @Test
+    void sellOriginBuyReorderGetsNoRefund() {
+        // 원본이 SELL이면 환불 0 — remaining 400 < 500이라 거절
+        stubCommon(plannedOrder());
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("400"));
+
+        assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
+                .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingException.class);
+        verify(orderPort, never()).cancelPlanned(any());
     }
 
     // --- 헬퍼 ---
