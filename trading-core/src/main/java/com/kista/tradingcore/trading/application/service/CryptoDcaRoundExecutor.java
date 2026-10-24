@@ -107,7 +107,7 @@ class CryptoDcaRoundExecutor {
                     continue;
                 }
                 CryptoTradingRules rules = rulesMemo.computeIfAbsent(ticker, exchange::getTradingRules);
-                List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst, today);
+                List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst);
                 UUID cycleId = ctx.currentCycle().id();
                 CyclePosition position = ledgers.get(cycleId);
                 AccountBalance ledger = position == null ? new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO) : position.toBalance();
@@ -168,7 +168,7 @@ class CryptoDcaRoundExecutor {
 
     // 전일 종가까지의 일봉 종가 — 마지막 봉이 기대 일자가 아니면 null(DATA_UNAVAILABLE). 조회 실패는 던진다
     private List<BigDecimal> closes(CryptoExchangePort exchange, StrategyTicker ticker,
-                                    Map<StrategyTicker, List<CryptoCandle>> memo, LocalDateTime now, LocalDate today) {
+                                    Map<StrategyTicker, List<CryptoCandle>> memo, LocalDateTime now) {
         List<CryptoCandle> candles = memo.computeIfAbsent(ticker, t -> exchange.getCompletedDailyCandles(t, CANDLE_COUNT));
         if (candles.isEmpty()) return null;
         // 일봉은 KST 09:00 마감(CryptoCandle 계약) — 09시 전에는 아직 어제 봉이 완성되지 않아 그제가 마지막
@@ -231,6 +231,6 @@ class CryptoDcaRoundExecutor {
 
     // 사용자에게 노출되는 문구 — 내부 예외 메시지는 싣지 않는다
     private static String failureDetail(CryptoFailure failure) {
-        return failure == CryptoFailure.KEY_EXPIRED ? "API 키가 만료되었거나 폐기되었습니다" : "거래소 API 호출에 실패했습니다";
+        return failure == CryptoFailure.KEY_EXPIRED ? "API 키 인증에 실패했습니다(만료·폐기·허용 IP·권한을 확인해 주세요)" : "거래소 API 호출에 실패했습니다";
     }
 }

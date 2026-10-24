@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Broker;
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.CycleEndedEvent;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
@@ -181,7 +182,7 @@ class ManualTradeCorrectionServiceTest {
         Strategy dca = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.BTC, StrategyCycleSeedType.NONE);
         stubSelection(dca);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(com.kista.tradingcore.support.TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID)); // 수량 단위는 계좌 시장 기준
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID)); // 수량 단위는 계좌 시장 기준
         ManualTradeCorrectionCommand.Fill buy = new ManualTradeCorrectionCommand.Fill(LocalDate.of(2026, 7, 1),
                 OrderDirection.BUY, new BigDecimal("0.00123456"), new BigDecimal("100000000"), "C-1", null);
 

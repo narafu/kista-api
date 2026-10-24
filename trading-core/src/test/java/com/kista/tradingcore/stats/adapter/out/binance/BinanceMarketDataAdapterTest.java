@@ -5,6 +5,7 @@ import com.kista.tradingcore.stats.domain.model.DatedLongShortRatio;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import com.kista.tradingcore.stats.domain.model.FundingRateQuote;
 import com.kista.tradingcore.stats.domain.model.FundingRateRecord;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -28,6 +29,11 @@ class BinanceMarketDataAdapterTest {
     private final RestClient.Builder builder = RestClient.builder();
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
     private final BinanceMarketDataAdapter adapter = new BinanceMarketDataAdapter(builder.build());
+
+    @AfterEach
+    void verifyServer() {
+        server.verify(); // 기대한 요청이 모두 나갔는지 — 모든 테스트 공통
+    }
 
     @Test
     void 현물_현재가를_USDT_심볼로_조회한다() {

@@ -2,6 +2,7 @@ package com.kista.tradingcore.stats.adapter.out.upbit;
 
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -11,9 +12,13 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -29,6 +34,11 @@ class UpbitMarketDataAdapterTest {
     private final RestClient.Builder builder = RestClient.builder();
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
     private final UpbitMarketDataAdapter adapter = new UpbitMarketDataAdapter(builder.build(), CLOCK);
+
+    @AfterEach
+    void verifyServer() {
+        server.verify(); // 기대한 요청이 모두 나갔는지 — 모든 테스트 공통
+    }
 
     @Test
     void usdtKrwPriceUsesKrwUsdtMarket() {
@@ -72,7 +82,7 @@ class UpbitMarketDataAdapterTest {
                         """, MediaType.APPLICATION_JSON));
 
         Map<StrategyTicker, BigDecimal> prices = adapter.getKrwPrices(
-                new java.util.LinkedHashSet<>(List.of(StrategyTicker.BTC, StrategyTicker.ETH)));
+                new LinkedHashSet<>(List.of(StrategyTicker.BTC, StrategyTicker.ETH)));
 
         assertThat(prices.get(StrategyTicker.BTC)).isEqualByComparingTo("151000000");
         assertThat(prices.get(StrategyTicker.ETH)).isEqualByComparingTo("5200000");
@@ -92,11 +102,11 @@ class UpbitMarketDataAdapterTest {
 
     // firstDay(KST 09:00)에서 하루씩 과거로 n개 — utc는 -9h
     private static String candleRows(LocalDate firstDay, int n) {
-        return "[" + java.util.stream.IntStream.range(0, n).mapToObj(i -> {
-            java.time.LocalDateTime kst = firstDay.minusDays(i).atTime(9, 0);
+        return "[" + IntStream.range(0, n).mapToObj(i -> {
+            LocalDateTime kst = firstDay.minusDays(i).atTime(9, 0);
             return "{\"candle_date_time_kst\":\"%s\",\"candle_date_time_utc\":\"%s\",\"trade_price\":%d}"
                     .formatted(kst, kst.minusHours(9), 100 + i);
-        }).collect(java.util.stream.Collectors.joining(",")) + "]";
+        }).collect(Collectors.joining(",")) + "]";
     }
 
     @Test

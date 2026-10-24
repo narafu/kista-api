@@ -11,9 +11,11 @@ import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult.State;
 import com.kista.tradingcore.broker.domain.model.binance.BinanceApiException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
@@ -23,9 +25,11 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,7 +39,6 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-import org.springframework.http.HttpStatus;
 
 class BinanceExchangeAdapterTest {
 
@@ -53,6 +56,11 @@ class BinanceExchangeAdapterTest {
         server = MockRestServiceServer.bindTo(builder).build();
         BinanceHttpClient http = new BinanceHttpClient(builder.build(), JsonMapper.builder().build(), BASE, CLOCK);
         adapter = new BinanceExchangeAdapter(http, new BinanceSymbolRegistry(), CLOCK);
+    }
+
+    @AfterEach
+    void verifyServer() {
+        server.verify(); // 기대한 요청이 모두 나갔는지 — 모든 테스트 공통
     }
 
     @Test
@@ -78,7 +86,7 @@ class BinanceExchangeAdapterTest {
         server.expect(requestTo(BASE + "/api/v3/ticker/price?symbol=BTCUSDT")).andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"symbol\":\"BTCUSDT\",\"price\":\"65000.01\"}", APPLICATION_JSON));
 
-        Map<StrategyTicker, java.math.BigDecimal> prices = adapter.getCurrentPrices(List.of(StrategyTicker.BTC));
+        Map<StrategyTicker, BigDecimal> prices = adapter.getCurrentPrices(List.of(StrategyTicker.BTC));
 
         assertThat(prices).containsOnlyKeys(StrategyTicker.BTC);
         assertThat(prices.get(StrategyTicker.BTC)).isEqualByComparingTo("65000.01");
@@ -98,8 +106,27 @@ class BinanceExchangeAdapterTest {
         assertThat(candles).extracting(CryptoCandle::kstDate).containsExactly(LocalDate.of(2026, 10, 21), LocalDate.of(2026, 10, 22));
         assertThat(candles.get(1).close()).isEqualByComparingTo("102.5");
         assertThat(candles.getLast().kstDate())
-                .isEqualTo(CryptoCandle.latestCompletedKstDate(java.time.LocalDateTime.of(2026, 10, 23, 10, 30)))
+                .isEqualTo(CryptoCandle.latestCompletedKstDate(LocalDateTime.of(2026, 10, 23, 10, 30)))
                 .isEqualTo(LocalDate.of(2026, 10, 22));
+    }
+
+    @Test
+    void candleClosingExactlyAtNowIsIncluded() {
+        // now = 10-23 00:00Z 정각 — 10-22 봉은 openTime + 1일 == now 라 완료(제외 조건은 openTime + 1일 > now)
+        Clock boundary = Clock.fixed(Instant.parse("2026-10-23T00:00:00Z"), ZoneOffset.UTC);
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer boundaryServer = MockRestServiceServer.bindTo(builder).build();
+        BinanceExchangeAdapter boundaryAdapter = new BinanceExchangeAdapter(
+                new BinanceHttpClient(builder.build(), JsonMapper.builder().build(), BASE, boundary), new BinanceSymbolRegistry(), boundary);
+        boundaryServer.expect(requestTo(BASE + "/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=2"))
+                .andRespond(withSuccess("""
+                        [[1792540800000,"1","2","0.5","101.5",""],[1792627200000,"1","2","0.5","102.5",""]]
+                        """, APPLICATION_JSON));
+
+        List<CryptoCandle> candles = boundaryAdapter.getCompletedDailyCandles(StrategyTicker.BTC, 1);
+
+        assertThat(candles).extracting(CryptoCandle::kstDate).containsExactly(LocalDate.of(2026, 10, 22));
+        boundaryServer.verify();
     }
 
     @Test
@@ -113,6 +140,15 @@ class BinanceExchangeAdapterTest {
         assertThat(r.feeRate()).isEqualByComparingTo("0.001");
         assertThat(r.minNotional()).isEqualByComparingTo("5");
         assertThat(r.quantityScale()).isEqualTo(5);
+    }
+
+    @Test
+    void emptySymbolsInExchangeInfoThrowsNoSuchElement() {
+        // 현재 동작 고정 — getFirst() 미검증이라 NoSuchElementException (BinanceApiException 아님)
+        server.expect(requestTo(BASE + "/api/v3/exchangeInfo?symbol=BTCUSDT"))
+                .andRespond(withSuccess("{\"symbols\":[]}", APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.getTradingRules(StrategyTicker.BTC)).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
@@ -231,6 +267,23 @@ class BinanceExchangeAdapterTest {
 
         assertThat(r.netExecutedVolume()).isEqualByComparingTo(r.executedVolume());
         assertThat(r.feeAsset()).isEqualTo("BNB");
+    }
+
+    @Test
+    void sellPostResponseFillsNetEqualsExecuted() {
+        server.expect(requestTo(BASE + "/api/v3/exchangeInfo?symbol=BTCUSDT")).andRespond(withSuccess(exchangeInfo("TRADING"), APPLICATION_JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(BASE + "/api/v3/order?")))
+                .andExpect(method(HttpMethod.POST)).andExpect(queryParam("side", "SELL"))
+                .andRespond(withSuccess(orderJson("FILLED", "0.00016000", "10.40000000",
+                        "[{\"price\":\"65000.00\",\"qty\":\"0.00016000\",\"commission\":\"0.01040000\",\"commissionAsset\":\"USDT\"}]"), APPLICATION_JSON));
+
+        CryptoOrderResult r = adapter.sellMarketByVolume(ACCOUNT, StrategyTicker.BTC, new BigDecimal("0.00016"), UUID_ID);
+
+        // 견적 자산(USDT) 수수료는 수량에서 차감되지 않는다
+        assertThat(r.state()).isEqualTo(State.DONE);
+        assertThat(r.netExecutedVolume()).isEqualByComparingTo(r.executedVolume());
+        assertThat(r.paidFee()).isEqualByComparingTo("0.0104");
+        assertThat(r.feeAsset()).isEqualTo("USDT");
     }
 
     @Test

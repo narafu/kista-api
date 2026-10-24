@@ -125,6 +125,6 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].market").value(org.hamcrest.Matchers.contains("US_STOCK")))
                 .andExpect(jsonPath("$.tickers[?(@.code=='BTC')].markets[*]").value(org.hamcrest.Matchers.containsInAnyOrder("CRYPTO_KRW", "CRYPTO_USDT")))
                 .andExpect(jsonPath("$.tickers[?(@.code=='SOXL')].markets[*]").value(org.hamcrest.Matchers.contains("US_STOCK")))
-                .andExpect(jsonPath("$.dcaSkipReasons[?(@.code=='API_KEY_EXPIRED')].label").value(org.hamcrest.Matchers.contains("API 키 만료")));
+                .andExpect(jsonPath("$.dcaSkipReasons[?(@.code=='API_KEY_EXPIRED')].label").value(org.hamcrest.Matchers.contains("API 키 인증 실패")));
     }
 }

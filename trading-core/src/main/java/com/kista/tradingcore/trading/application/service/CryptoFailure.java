@@ -5,7 +5,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 
-// 코인 거래소 호출 실패 분류 — KEY_EXPIRED(키 만료, 확정 거절), REJECTED(그 외 확정 거절), TRANSIENT(결과 불명·일시 장애)
+// 코인 거래소 호출 실패 분류 — KEY_EXPIRED(키 인증 실패: 만료·폐기·IP·권한, 확정 거절), REJECTED(그 외 확정 거절), TRANSIENT(결과 불명·일시 장애)
 enum CryptoFailure {
     KEY_EXPIRED, REJECTED, TRANSIENT;
 
