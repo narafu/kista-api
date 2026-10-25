@@ -89,6 +89,31 @@ class MockBrokerAdapterTest {
     // --- getExecutions() 체결 시뮬레이션 규칙표 ---
 
     @Test
+    @DisplayName("MOO 주문은 항상 체결되며 체결가는 시가다")
+    void mooOrderFillsAtOpen() {
+        stubTqqqCycle();
+        PlacedOrderView order = placedOrder(OrderType.MOO, OrderDirection.BUY, 3,
+                new BigDecimal("100.00"), "MOCK-O1");
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
+        stubCandle("95.00", "110.00", "90.00", "105.00");
+
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
+
+        assertThat(executions).singleElement().satisfies(e -> assertThat(e.price()).isEqualByComparingTo("95.00"));
+    }
+
+    @Test
+    @DisplayName("MOO 매수는 시가가 캡 지정가를 넘으면 체결되지 않는다")
+    void mooBuyAboveCapDoesNotFill() {
+        stubTqqqCycle();
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
+                placedOrder(OrderType.MOO, OrderDirection.BUY, 3, new BigDecimal("100.00"), "MOCK-O2")));
+        stubCandle("101.00", "110.00", "99.00", "105.00");
+
+        assertThat(adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT)).isEmpty();
+    }
+
+    @Test
     @DisplayName("MOC 주문은 지정가와 무관하게 항상 체결되며 체결가는 종가다")
     void mocOrderAlwaysFills() {
         stubTqqqCycle();

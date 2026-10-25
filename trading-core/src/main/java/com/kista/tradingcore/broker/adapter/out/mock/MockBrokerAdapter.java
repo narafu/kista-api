@@ -121,9 +121,9 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     // --- ExecutionPort — 체결 시뮬레이션 코어 ---
-    // MOC/MOO: 항상 체결(종가) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
+    // MOC: 항상 체결(종가) / MOO: 체결가 시가(매수는 시가<=캡 지정가일 때만) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
     // LIMIT: 일봉 OHLC 터치로 판정 — 매수는 저가<=지정가(체결가 min(지정가, 시가)), 매도는 고가>=지정가(체결가 max(지정가, 시가))
-    // (백테스트 FillSimulator.simulate와 동일 규칙)
+    // (LIMIT은 백테스트 FillSimulator.simulate와 동일 규칙 — 백테스트는 DCA 미지원이라 MOO를 만들지 않는다)
     // ponytail: 장중 접수 주문(수동 실행·재주문)도 시가·장중 터치 혜택을 받음 — 접수 시각 이후 분봉으로 판정하면 개선 가능
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
@@ -140,11 +140,14 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
             BigDecimal current = priceFeed.getPrice(ticker);
             return new BrokerCandle(to, current, current, current, current, 0L);
         });
-        BigDecimal closingPrice = candle.close();
         List<Execution> executions = new ArrayList<>();
         for (PlacedOrderView order : placed) {
             if (!fills(order, candle)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
-            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? limitFillPrice(order, candle) : closingPrice;
+            BigDecimal fillPrice = switch (order.orderType()) {
+                case LIMIT -> limitFillPrice(order, candle);
+                case MOO -> candle.open(); // 장개시 시장가 — 시가 체결
+                default -> candle.close(); // MOC/LOC — 종가 체결
+            };
             executions.add(Execution.ofManualFill(to, ticker, order.direction(), order.quantity(), fillPrice, order.externalOrderId()));
         }
         return executions;
@@ -153,8 +156,10 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     // 체결 판정 SSOT는 FillSimulator(trading 타입 PlannedOrder 기반)지만 broker는 trading 타입을 참조할 수 없어
     // 동일 로직을 broker 소유 타입(PlacedOrderView/BrokerCandle)으로 재구현한다(PersistenceSupport/DstInfo 부분 복제와 동일 기준)
     private static boolean fills(PlacedOrderView order, BrokerCandle candle) {
-        if (order.orderType() == OrderType.MOC || order.orderType() == OrderType.MOO) return true; // 시장가 계열은 항상 체결(체결가는 종가 근사)
         boolean buy = order.direction() == OrderDirection.BUY;
+        // MOO 매수는 DCA 캡 지정가를 달고 온다 — 운영(KIS LOO)처럼 시가가 캡을 넘으면 미체결
+        if (order.orderType() == OrderType.MOO) return !buy || order.price() == null || candle.open().compareTo(order.price()) <= 0;
+        if (order.orderType() == OrderType.MOC) return true; // 시장가 — 항상 체결
         if (order.orderType() == OrderType.LIMIT) {
             return buy ? candle.low().compareTo(order.price()) <= 0 : candle.high().compareTo(order.price()) >= 0; // 저가/고가 터치
         }
