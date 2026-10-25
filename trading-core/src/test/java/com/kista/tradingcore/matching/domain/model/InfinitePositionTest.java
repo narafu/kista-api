@@ -84,15 +84,15 @@ class InfinitePositionTest {
     }
 
     @Test
-    @DisplayName("earlyBuyQuantity1/earlyBuyQuantity2: FLOOR 결과가 0이어도 최소 1주 보장")
+    @DisplayName("earlyBuyQuantity1: FLOOR 결과가 0이어도 최소 1주 보장, earlyBuyQuantity2: 잔여가 음수면 0주")
     void earlyBuyQuantity_minimumOneShare() {
         // unitAmount=10, price1=100 → (10/2)/100 = floor(0.05) = 0 → 최소 1
         int quantity1 = InfinitePosition.earlyBuyQuantity1(new BigDecimal("10"), new BigDecimal("100"));
         assertThat(quantity1).isEqualTo(1);
 
-        // unitAmount=10, price1=100, quantity1=1 → (10 - 100*1)/price2 = 음수/200 → 최소 1
+        // unitAmount=10, price1=100, quantity1=1 → (10 - 100*1)/price2 = 음수/200 → 잔여 0 이하라 0주
         int quantity2 = InfinitePosition.earlyBuyQuantity2(new BigDecimal("10"), new BigDecimal("100"), 1, new BigDecimal("200"));
-        assertThat(quantity2).isEqualTo(1);
+        assertThat(quantity2).isZero();
     }
 
     @Test
@@ -157,5 +157,14 @@ class InfinitePositionTest {
         InfinitePosition pos = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("15.00"), 20);
 
         assertThat(pos.nextReverseMode(true)).isTrue(); // 종가 미회복 → 리버스모드 유지
+    }
+
+    @Test
+    @DisplayName("earlyBuyQuantity2: 매수①이 unitAmount를 다 쓰면 0주, 잔여가 있으면 최소 1주")
+    void earlyBuyQuantity2_zeroWhenFirstBuyConsumesUnit() {
+        assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("5.00"), new BigDecimal("60"), 1, new BigDecimal("72.00"))).isZero();
+        assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("100.00"), new BigDecimal("100"), 1, new BigDecimal("120.00"))).isZero();
+        assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("100.00"), new BigDecimal("60"), 1, new BigDecimal("72.00"))).isEqualTo(1);
+        assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("1000.00"), new BigDecimal("50"), 10, new BigDecimal("60.00"))).isEqualTo(8);
     }
 }

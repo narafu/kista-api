@@ -140,22 +140,20 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
-    @DisplayName("buildOrders 0회차 + 소액 예수금: unitAmount가 작아도 매수①② 각 1주 보장 = 2건")
+    @DisplayName("buildOrders 0회차 + 소액 예수금: 매수①은 최소 1주, 매수①이 unitAmount를 다 쓰면 매수② 없음 = 1건")
     void buildOrders_zeroRound_smallDeposit_guaranteesMinimumOneShare() {
         // 0회차: averagePrice=prevClose=100, usdDeposit=20 → totalAssets=20, unitAmount=1.00
         // BUY①: floor((1.00/2)/100)=0 → 최소 1
-        // referencePrice=100×1.20=120.00, BUY②: floor((1.00-100×1)/120)=floor(-0.825)=-1 → 최소 1
+        // BUY②: 잔여 1.00-100×1<0 → 0주(미생성)
         // SELL: holdings=0 → 없음
         AccountBalance balance = new AccountBalance(0, null, new BigDecimal("20"));
         InfinitePosition position = new InfinitePosition(balance, StrategyTicker.SOXL, new BigDecimal("100"), 20);
 
         List<PlannedOrder> orders = strategy.buildOrders(position, TODAY);
 
-        assertThat(orders).hasSize(2);
+        assertThat(orders).hasSize(1);
         assertThat(orders.getFirst()).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.quantity() == 1
                 && o.price().compareTo(new BigDecimal("100")) == 0);
-        assertThat(orders.get(1)).matches(o -> o.orderType() == LOC && o.direction() == BUY && o.quantity() == 1
-                && o.price().compareTo(new BigDecimal("120.00")) == 0);
     }
 
     @Test
@@ -182,6 +180,12 @@ class InfiniteStrategyTypeTest {
                 StrategyTicker.SOXL, new BigDecimal("10.00"), 20);
     }
 
+    // 평단 50, 매입액=예수금(currentRound=10) → priceOffsetRate 0 = 후반
+    private InfinitePosition lateStagePosition(int holdings, String usdDeposit) {
+        return new InfinitePosition(new AccountBalance(holdings, new BigDecimal("50"), new BigDecimal(usdDeposit)),
+                StrategyTicker.SOXL, new BigDecimal("50"), 20);
+    }
+
     private PlannedOrder buy(String price, int quantity) {
         return PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY, quantity, new BigDecimal(price));
     }
@@ -195,7 +199,7 @@ class InfiniteStrategyTypeTest {
     void buildCappedBuyOrders_twoBuys_distinctCaps_recalculatesBoth() {
         // cap=55, unitAmount=1000 / buy①=60(>cap→55), buy②=52(≤cap)
         // qty1 = floor((1000/2) / 55) = 9 / qty2 = floor((1000-55×9) / 52) = floor(9.71) = 9
-        // 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.62 — 각 1주 LOC
+        // 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.61 — 각 1주 LOC
         InfinitePosition position = positionWithUnitAmount("20000");
         List<PlannedOrder> buyOrders = List.of(
                 buy("60.00", 1, "INFINITE_EARLY_AVG_BUY"),
@@ -213,7 +217,7 @@ class InfiniteStrategyTypeTest {
         assertThat(result.get(3).quantity()).isEqualTo(1);
         assertThat(result.get(3).price()).isEqualByComparingTo("50.00");
         assertThat(result.get(4).quantity()).isEqualTo(1);
-        assertThat(result.get(4).price()).isEqualByComparingTo("47.62");
+        assertThat(result.get(4).price()).isEqualByComparingTo("47.61");
         assertThat(result).extracting(PlannedOrder::orderLeg)
                 .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
@@ -231,13 +235,13 @@ class InfiniteStrategyTypeTest {
 
         List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
 
-        // 병합 1건 + 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.62 — 각 1주 LOC
+        // 병합 1건 + 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.61 (FLOOR) — 각 1주 LOC
         assertThat(result).hasSize(4);
         assertThat(result.getFirst().quantity()).isEqualTo(18);
         assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
         assertThat(result.get(1).price()).isEqualByComparingTo("52.63");
         assertThat(result.get(2).price()).isEqualByComparingTo("50.00");
-        assertThat(result.get(3).price()).isEqualByComparingTo("47.62");
+        assertThat(result.get(3).price()).isEqualByComparingTo("47.61");
         assertThat(result).extracting(PlannedOrder::orderLeg)
                 .containsExactly("INFINITE_EARLY_MERGED_BUY",
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
@@ -247,18 +251,18 @@ class InfiniteStrategyTypeTest {
     @DisplayName("buildCappedBuyOrders 후반 1건: 재산정 1건+보정 3건 = 4건")
     void buildCappedBuyOrders_singleBuy_capped_recalculatesQuantity() {
         // 후반 단일 LOC 매수 — cap=55, unitAmount=1000 / qty = floor(1000/55) = 18
-        InfinitePosition position = positionWithUnitAmount("20000");
+        InfinitePosition position = lateStagePosition(200, "10000");
         List<PlannedOrder> buyOrders = List.of(buy("70.00", 1));
 
         List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
 
-        // 재산정 1건 + 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.62 — 각 1주 LOC
+        // 재산정 1건 + 보정 3회: unitAmount/(18+1)=52.63, unitAmount/(19+1)=50.00, unitAmount/(20+1)=47.61 — 각 1주 LOC
         assertThat(result).hasSize(4);
         assertThat(result.getFirst().quantity()).isEqualTo(18);
         assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
         assertThat(result.get(1).price()).isEqualByComparingTo("52.63");
         assertThat(result.get(2).price()).isEqualByComparingTo("50.00");
-        assertThat(result.get(3).price()).isEqualByComparingTo("47.62");
+        assertThat(result.get(3).price()).isEqualByComparingTo("47.61");
     }
 
     @Test
@@ -285,17 +289,17 @@ class InfiniteStrategyTypeTest {
         // qty=9 (priceOffsetRate=0.02 기준), targetProfitRate(0.20) 사용 시 qty=8
         assertThat(result.get(1).quantity()).isEqualTo(9);
         assertThat(result.get(1).price()).isEqualByComparingTo("5.10");
-        // 보정: unitAmount/(19+1)=5.00, /(20+1)=4.76, /(21+1)=4.55 — 각 1주 LOC
+        // 보정: unitAmount/(19+1)=5.00, /(20+1)=4.76, /(21+1)=4.54 — 각 1주 LOC
         assertThat(result.get(2).price()).isEqualByComparingTo("5.00");
         assertThat(result.get(3).price()).isEqualByComparingTo("4.76");
-        assertThat(result.get(4).price()).isEqualByComparingTo("4.55");
+        assertThat(result.get(4).price()).isEqualByComparingTo("4.54");
     }
 
     @Test
     @DisplayName("buildCappedBuyOrders 후반 1건, 캡 후 수량 0이어도 최소 1주+보정 3건")
     void buildCappedBuyOrders_singleBuy_cappedQuantityZero_guaranteesMinimumOneShare() {
         // cap=55, unitAmount=50(usdDeposit=1000) / qty = floor(50/55) = 0 이어도 최소 1주
-        InfinitePosition position = positionWithUnitAmount("1000");
+        InfinitePosition position = lateStagePosition(10, "500"); // unitAmount=50, 후반
         List<PlannedOrder> buyOrders = List.of(buy("200.00", 1));
 
         List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
@@ -304,7 +308,7 @@ class InfiniteStrategyTypeTest {
         assertThat(result.getFirst().quantity()).isEqualTo(1);
         assertThat(result.getFirst().price()).isEqualByComparingTo("55.00");
         assertThat(result.get(1).price()).isEqualByComparingTo("25.00");
-        assertThat(result.get(2).price()).isEqualByComparingTo("16.67");
+        assertThat(result.get(2).price()).isEqualByComparingTo("16.66");
         assertThat(result.get(3).price()).isEqualByComparingTo("12.50");
     }
 
@@ -329,7 +333,7 @@ class InfiniteStrategyTypeTest {
         // 동일 close 배치 내에서 접수 직전 재조회 가격이 최초 계산 시점보다 한 번 더 하락해
         // 이미 캡+correction 4건이 저장된 상태로 capIfNeeded가 재호출되는 시나리오.
         // correction leg가 buy②(기준가)로 오인되면 안 되고, base 1건만 재산정 대상이어야 한다.
-        InfinitePosition position = positionWithUnitAmount("20000");
+        InfinitePosition position = lateStagePosition(200, "10000");
         List<PlannedOrder> buyOrders = List.of(
                 buy("55.00", 18, "INFINITE_LATE_REF_BUY"),   // 직전 캡으로 이미 재산정된 base
                 buy("52.63", 1, "INFINITE_CORRECTION_01"),
@@ -371,8 +375,8 @@ class InfiniteStrategyTypeTest {
                 .containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01");
         assertThat(result.getFirst().quantity()).isEqualTo(3);
         assertThat(result.getFirst().price()).isEqualByComparingTo("73.50");
-        assertThat(result.get(1).price()).isEqualByComparingTo("59.31");
-        assertThat(AccountBalance.buyTotal(result)).isEqualByComparingTo("279.81");
+        assertThat(result.get(1).price()).isEqualByComparingTo("59.30");
+        assertThat(AccountBalance.buyTotal(result)).isEqualByComparingTo("279.80");
     }
 
     @Test
@@ -392,5 +396,43 @@ class InfiniteStrategyTypeTest {
         List<PlannedOrder> buys = List.of(base, buy("59.31", 1, "INFINITE_CORRECTION_01"));
 
         assertThat(InfiniteStrategy.trimCorrectionsToBudget(buys, new BigDecimal("100"))).containsExactly(base);
+    }
+
+    @Test
+    @DisplayName("buildOrders 0회차 매수①이 unitAmount 초과: 매수② 미생성")
+    void buildOrders_zeroRound_firstBuyConsumesUnit_omitsBuy2() {
+        // unitAmount=100/20=5.00, 매수① max(1,0)=1주×60 ≥ 5 → 매수② 0주
+        InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("100")), StrategyTicker.SOXL, new BigDecimal("60"), 20);
+        List<PlannedOrder> buys = strategy.buildOrders(position, TODAY).stream().filter(o -> o.direction() == BUY).toList();
+        assertThat(buys).extracting(PlannedOrder::orderLeg).doesNotContain("INFINITE_EARLY_REF_BUY");
+        assertThat(buys.getFirst()).matches(o -> o.quantity() == 1 && o.price().compareTo(new BigDecimal("60")) == 0
+                && o.orderLeg().equals("INFINITE_EARLY_AVG_BUY"));
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 보정 가격은 FLOOR — (N+1)×가격 ≤ unitAmount")
+    void buildCappedBuyOrders_correctionPriceFloors() {
+        // 0회차 prevClose=50, usdDeposit=20000 → unitAmount=1000, cap=52.50(현재가 50)
+        // base 50×10, 52.50×9 (N=19) → 보정 1000/20=50.00, 1000/21=47.61(HALF_UP이면 47.62), 1000/22=45.45
+        InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("20000")), StrategyTicker.SOXL, new BigDecimal("50"), 20);
+        List<PlannedOrder> base = strategy.buildOrders(position, TODAY).stream()
+                .filter(o -> o.direction() == BUY && !o.orderLeg().startsWith("INFINITE_CORRECTION_")).toList();
+        List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, base, new BigDecimal("52.50"));
+        assertThat(result).filteredOn(o -> o.orderLeg().startsWith("INFINITE_CORRECTION_"))
+                .extracting(PlannedOrder::price).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("50.00"), new BigDecimal("47.61"), new BigDecimal("45.45"));
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 전반 매수② 0주 + cap 발동: 후반 공식이 아닌 전반 공식으로 재산정")
+    void capped_earlyStageWithoutBuy2_staysOnEarlyFormula() {
+        // 0회차 prevClose=100, usdDeposit=2000 → unitAmount=100, 매수① 1주×100 ≥ 100 → base 1건(매수② 0주)
+        // cap=84(현재가 80): 전반 공식 cappedAvg=cappedRef=84 → q1=1, 잔여 16>0 → q2=1 → 병합 84×2
+        // (후반 공식이면 floor(100/84)=1주 — 이 단언이 분기 결함을 잡는다)
+        InfinitePosition position = new InfinitePosition(new AccountBalance(0, null, new BigDecimal("2000")), StrategyTicker.SOXL, new BigDecimal("100"), 20);
+        List<PlannedOrder> base = List.of(PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY, 1, new BigDecimal("100"), "INFINITE_EARLY_AVG_BUY"));
+        List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, base, new BigDecimal("84.00"));
+        assertThat(result.getFirst()).matches(o -> o.orderLeg().equals("INFINITE_EARLY_MERGED_BUY")
+                && o.quantity() == 2 && o.price().compareTo(new BigDecimal("84.00")) == 0);
     }
 }

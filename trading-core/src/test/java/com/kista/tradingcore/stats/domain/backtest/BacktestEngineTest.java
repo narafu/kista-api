@@ -637,17 +637,17 @@ class BacktestEngineTest {
         BacktestEngine.Output output = infiniteEngine.run(List.of(
                 flat("2024-01-02", 1000),
                 flat("2024-01-03", 1000),
-                candle("2024-01-04", 1100, 1200, 1080, 1160), // 지정가 매도 2주@1150 체결 → 전량 청산 → 사이클 종료
+                candle("2024-01-04", 1100, 1200, 1080, 1160), // 지정가 매도 1주@1150 체결 → 전량 청산 → 사이클 종료
                 flat("2024-01-05", 1040),
                 candle("2024-01-06", 1045, 1050, 1040, 1045),
                 flat("2024-01-07", 990),                      // 사이클 B 리버스모드 진입(첫날)
                 flat("2024-01-08", 800)                       // 사이클 B 리버스모드 둘째 날 — 별지점 산출
-        ), infiniteCommand("2024-01-02", "3000", 4));
+        ), infiniteCommand("2024-01-02", "2000", 4));
 
         assertThat(output.cycleCount()).isEqualTo(2);
-        // 청산 당일이 곧 사이클 B의 0회차 — 예수금 1000 + 매도대금 2300 = 3300.00이 그대로 이월된다
+        // 청산 당일이 곧 사이클 B의 0회차 — 0회차 매수①만 체결(매수①이 unitAmount를 다 써 매수② 없음)이라 예수금 1000 + 매도대금 1150 = 2150.00이 그대로 이월된다
         assertThat(recorder.on("2024-01-04").balance().holdings()).isZero();
-        assertThat(recorder.on("2024-01-04").balance().usdDeposit()).isEqualByComparingTo("3300.00");
+        assertThat(recorder.on("2024-01-04").balance().usdDeposit()).isEqualByComparingTo("2150.00");
 
         assertThat(recorder.on("2024-01-07").inputs().isFirstReverseDay()).isTrue();
 

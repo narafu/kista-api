@@ -28,7 +28,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 
 // BUY PLANNED 가격이 캡(PriceCapPolicy) 초과 시 — 전략별 CycleOrderStrategy.capBuyOrders()에 위임해 가격 캡 적용 후 재저장
-// 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)·(1+r)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
+// 가격 캡 재산정 공식(unitAmount/2/averagePrice, (unitAmount-averagePrice·q1)/referencePrice, 보정 주문 등)은 InfiniteStrategy.buildCappedBuyOrders 참고
 // capIfNeeded는 브로커 호출 없이 DB만 다루므로 @Transactional 허용 (constraints.md 외부 호출 금지 규칙과 무충돌)
 // — 사이클 row lock(StrategyCyclePort.lockForUpdate)으로 동시 호출을 직렬화해 read-cancel-write 경합에 의한 부분 저장을 방지한다
 @Component

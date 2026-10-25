@@ -122,9 +122,10 @@ public record InfinitePosition(
 
     public static int earlyBuyQuantity2(BigDecimal unitAmount, BigDecimal price1, int quantity,
                                         BigDecimal price2) {
-        // 전반 매수②: (unitAmount - price1×quantity) / price2 — 최소 1주 보장
-        return Math.max(1, unitAmount.subtract(price1.multiply(BigDecimal.valueOf(quantity)))
-                .divide(price2, 0, FLOOR).intValue());
+        // 전반 매수②: (unitAmount - price1×quantity) / price2 — 잔여 0 이하면 0주, 아니면 최소 1주
+        BigDecimal remaining = unitAmount.subtract(price1.multiply(BigDecimal.valueOf(quantity)));
+        if (remaining.signum() <= 0) return 0;
+        return Math.max(1, remaining.divide(price2, 0, FLOOR).intValue());
     }
 
     public static int lateBuyQuantity(BigDecimal unitAmount, BigDecimal price) {

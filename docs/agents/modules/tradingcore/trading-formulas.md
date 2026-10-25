@@ -16,8 +16,37 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 - `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
 - `currentRound`는 floor 없이 소수점 허용
 - **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < divisionCount/2 여부와 동치)
-- **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가) + LOC 매수②((unitAmount − averagePrice×매수①수량)×(1+priceOffsetRate)/referencePrice, 기준가) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
+- **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가, 내림 결과가 0이어도 최소 1주) + LOC 매수②((unitAmount − averagePrice×매수①수량)/referencePrice, 기준가 — 잔여가 0 이하면 매수② 없음, 아니면 최소 1주) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
 - **후반 unitAmount>usdDeposit 또는 referencePrice>usdDeposit**(리버스 진입 조건도 같은 isFinalRound 판정): MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit 그리고 referencePrice≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
+- isFinalRound(리버스 진입)에 isEarlyStage 가드가 필요 없는 이유: holdings ≥ 1·원장 ≥ 0이면 전반부에서는 성립하지 않는다(전반 ⇒ 원장 > 매입액 ≥ 평단, 기준가 ≤ 평단×(1+targetProfitRate))
+
+### 보정 주문 (INFINITE 가격 캡 경로)
+```
+BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준으로 전반(①②)/후반(단일 LOC)을 position.isEarlyStage()로 분기해 재산정한 뒤 보정 3건을 붙인다
+보정 i(1~3) = LOC 매수 1주, 가격 = unitAmount ÷ (누적수량 + 1)  (scale=2, FLOOR — (누적수량+1)×가격 ≤ unitAmount), leg INFINITE_CORRECTION_01~03, 누적수량 0이면 생략
+```
+- 전반 재산정: cappedAvg = 첫 base 가격.min(cap), cappedRef = (매수② 가격, 매수②가 없던 날은 referencePrice).min(cap). 동가면 q1+q2 병합(`INFINITE_EARLY_MERGED_BUY`), 분리 시 q2 > 0일 때만 매수② 추가
+- 보정 합계가 원장 예수금을 넘으면 뒤쪽 보정부터 제거(`trimCorrectionsToBudget`)
+
+### cap 배수 1.05 경위 (값 유지)
+- cap은 2026-06 이전부터 `currentPrice × 1.10`이었고, 4154c0482(2026-06-24)가 같은 cap을 PRIVACY에도 적용했다. 그 사유는 "Toss CLS 경매에서 현재가와 차이가 큰 지정가가 가격 범위 초과로 취소됨"이다.
+- d40d07e13(2026-07-28)에서 1.10 → 1.05로 줄였다. 사용자 진술: 특별한 정량 근거는 없고, 10%면 놓칠까 싶어 5%로 줄인 운영 판단값이다.
+- 2026-10-25 재평가(운영 DB 읽기 전용 조회): cap이 발동해 보정이 붙은 INFINITE 일(day) 중 종가가 기록된 KIS 실계좌 36일(USD, 2026-07-17~10-24)에서 가장 비싼 base 매수(=cap 가격)가 미체결된 날은 1일(2026-08-04, 접수 시점 대비 종가 +8.2%)뿐이다. 나머지 35일의 "접수 시점 추정 현재가(cap÷1.05) → 종가" 변동은 최대 +1.8%였다. cap 배수 k에서 cap 발동일 체결액은 대략 unitAmount/k(1.05 ≈ 95%, 1.10 ≈ 91%)이고, 종가가 접수 시점(마감 30분 전) 현재가×k를 넘으면 그 다리는 미체결이다.
+- 결론: 1.05 유지. 1.10은 측정된 이득이 위 1일뿐이고 매 발동일 체결액이 약 4%p 줄어든다. 1.02~1.03은 표본(36일·1종목·비교적 잔잔한 구간)에서 추가 미체결이 없었지만, 이득이 회차 금액의 약 3%p에 그치는 반면 3배 레버리지 ETF의 마감 30분 급등 꼬리를 표본이 대표하지 못한다. 표본이 쌓이면 같은 조회로 재평가한다.
+- 재평가 SQL(운영 `kistadb`, 읽기 전용). **배포 이전 데이터 전용 — 이후 재평가는 cap 발동일 식별 방법을 새로 정해야 한다**(보정이 상시 붙으면 `capdays`(보정 leg 존재일 = cap 발동일)가 성립하지 않는다):
+```sql
+with capdays as (select distinct strategy_cycle_id, trade_date from trading.orders
+                 where order_leg like 'INFINITE_CORRECTION_%' and external_order_id is not null),
+legs as (select o.strategy_cycle_id, o.trade_date, o.price, coalesce(o.filled_quantity,0)>0 filled,
+                rank() over (partition by o.strategy_cycle_id, o.trade_date order by o.price desc) rk
+         from trading.orders o join capdays using (strategy_cycle_id, trade_date)
+         where o.direction='BUY' and o.external_order_id is not null and o.order_leg not like 'INFINITE_CORRECTION%'),
+cp as (select strategy_cycle_id, (created_at at time zone 'Asia/Seoul')::date d, max(closing_price) close
+       from trading.cycle_position where deleted_at is null group by 1,2)
+select l.trade_date, l.price cap_leg, cp.close, round(cp.close/(l.price/1.05)-1,4) move, l.filled
+from legs l left join cp on cp.strategy_cycle_id=l.strategy_cycle_id and cp.d=l.trade_date
+where l.rk=1 and cp.close is not null order by l.filled, move desc;
+```
 
 ### 리버스모드 별지점 (변경 금지)
 ```
