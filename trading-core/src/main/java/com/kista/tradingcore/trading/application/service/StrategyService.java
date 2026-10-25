@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -135,7 +136,7 @@ class StrategyService implements StrategyUseCase {
                 .orElse(null);
         // 1주도 못 사는 원장으로 재개하면 0회차 매수가 원장 상한에 막혀 교착 — 거부
         if (closingPrice != null && latestCycle.endAmount().compareTo(closingPrice) < 0) {
-            throw new IllegalStateException(String.format(
+            throw new IllegalStateException(String.format(Locale.US,
                     "남은 원장($%.2f)이 1주 가격($%.2f)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 시드로 다시 등록해 주세요.",
                     latestCycle.endAmount(), closingPrice));
         }

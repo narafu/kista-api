@@ -10,6 +10,7 @@ import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.MarketClosedEvent;
 import com.kista.tradingcore.trading.application.event.MarketCloseEvent;
 import com.kista.tradingcore.trading.application.event.MarketOpenEvent;
+import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import com.kista.shared.kernel.StrategyType;
 
@@ -104,11 +106,11 @@ class TradingAlertNotifierTest {
         BigDecimal seed = new BigDecimal("12.34");
         BigDecimal price = new BigDecimal("60.00");
 
-        notifier().onStrategyAutoPaused(new com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent(
+        notifier().onStrategyAutoPaused(new StrategyAutoPausedEvent(
                 userId, accountId, "메인", StrategyType.INFINITE, StrategyTicker.SOXL, seed, price));
 
         verify(userNotificationPort).notifyStrategyAutoPaused(profile, "메인", StrategyType.INFINITE, StrategyTicker.SOXL, seed, price);
-        org.mockito.Mockito.verifyNoInteractions(notifyPort);
+        verifyNoInteractions(notifyPort);
     }
 
     @Test

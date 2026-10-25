@@ -258,15 +258,15 @@ class StrategyServiceTest {
                 StrategyCycleSeedType.NONE);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        lenient().when(strategyPort.save(any())).thenReturn(saved); // 최소 시드 거부 테스트는 저장까지 가지 않는다
+        when(strategyPort.save(any())).thenReturn(saved);
         // 저장 인자(특히 startDate)를 그대로 반영 — 고정값 반환 시 scheduledStartDate 검증이 무의미해짐
-        lenient().when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
+        when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
             StrategyCycle arg = invocation.getArgument(0);
             return new StrategyCycle(cycleId, arg.strategyId(), arg.strategyVersionId(),
                     arg.startAmount(), arg.endAmount(), arg.startDate(), arg.endDate(),
                     arg.createdAt(), arg.deletedAt());
         });
-        lenient().when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         if (type == StrategyType.VR) {
         }
     }
@@ -2002,7 +2002,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("register() holdings=0 하위호환 — 중간부터 시작 미입력 시 시장가 조회 없이 기존 initialSnapshot으로 등록된다")
+    @DisplayName("register() holdings=0 하위호환 — 중간부터 시작 미입력 시 포지션은 시장가 없이 기존 initialSnapshot으로 등록된다")
     void register_holdingsZero_backwardCompatible_skipsMarketPriceFetch() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
 
@@ -2024,7 +2024,9 @@ class StrategyServiceTest {
     @Test
     @DisplayName("INFINITE register() 시작 금액이 최소 시드(전일종가×분할×2) 미만이면 400으로 거부하고 저장하지 않는다")
     void register_infinite_rejects_seed_below_min() {
-        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+        Account account = ownerAccount(); // 거부 경로는 저장 stub이 불필요해 헬퍼를 쓰지 않는다
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
         when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("2000")))
