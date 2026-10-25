@@ -23,6 +23,7 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -45,6 +46,7 @@ class ReorderService implements ReorderUseCase {
     private final OrderCancelStateWriter stateWriter; // 원본 취소 DB 기록 — 짧은 트랜잭션
     private final OrderSubmitter orderSubmitter;      // IMMEDIATE 재주문 선점 → 접수 → 기록 (배치와 같은 경로)
     private final StrategyLedgerBudget ledgerBudget;  // BUY 재주문 전략 원장 상한
+    private final ApplicationEventPublisher eventPublisher; // 원장 조회 실패 시 관리자 알림 (비트랜잭션이라 즉시 발송)
 
     @Override
     public ReorderResult reorder(ReorderCommand command) {
@@ -105,8 +107,15 @@ class ReorderService implements ReorderUseCase {
         // ponytail: AccountBudgetLock 없이 검사 — 락이 cancelSource 증권사 호출까지 걸리게 돼 동시 배치와 같은 사이클에서 경합 가능. 필요하면 검사+저장을 락으로 감싼다
         // DCA(시드 비점유)는 원장 상한 제외
         if (direction == OrderDirection.BUY && ledgerBudget.applies(strategy.type())) {
-            BigDecimal limit = ledgerBudget.remaining(currentCycle, tradeDate)
-                    .add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate));
+            BigDecimal remaining;
+            try {
+                remaining = ledgerBudget.remaining(currentCycle, tradeDate);
+            } catch (Exception e) {
+                log.warn("원장 조회 실패 — 재주문 중단: accountId={}, strategyId={}, error={}",
+                        command.accountId(), strategy.id(), e.getMessage());
+                throw ManualTradingService.queryFailure(eventPublisher, e);
+            }
+            BigDecimal limit = remaining.add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate));
             if (price.multiply(BigDecimal.valueOf(quantity)).compareTo(limit) > 0) {
                 throw new ManualTradingException("전략 원장 예수금이 부족합니다.");
             }

@@ -61,6 +61,7 @@ class ReorderServiceTest {
     @Mock MarketCalendarPort marketCalendarPort;
     @Mock OrderSubmitter orderSubmitter;
     @Mock StrategyLedgerBudget ledgerBudget;
+    @Mock org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     ReorderService service;
 
@@ -68,7 +69,7 @@ class ReorderServiceTest {
     void setUp() {
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
-                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget);
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget, eventPublisher);
     }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
@@ -400,6 +401,34 @@ class ReorderServiceTest {
         assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
                 .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingException.class);
         verify(orderPort, never()).cancelPlanned(any());
+    }
+
+    @Test
+    void ledgerQueryFailureBecomesManualTradingFailedWithAlert() {
+        stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
+        when(ledgerBudget.remaining(any(), any())).thenThrow(new RuntimeException("db down"));
+
+        assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
+                .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingFailedException.class);
+
+        verify(eventPublisher).publishEvent(any(com.kista.tradingcore.trading.application.event.TradingErrorEvent.class));
+        verify(orderPort, never()).cancelPlanned(any());
+        verify(orderPort, never()).markCancelled(any());
+        verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
+        verify(brokerOrderCorrectionPort, never()).place(any(), any());
+        verifyNoInteractions(orderSubmitter);
+    }
+
+    @Test
+    void ledgerQueryBrokerTypedFailurePassesThroughWithoutAlert() {
+        stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
+        var brokerEx = com.kista.tradingcore.support.StubBrokerApiException.rejected("거절");
+        when(ledgerBudget.remaining(any(), any())).thenThrow(brokerEx);
+
+        assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET)).isSameAs(brokerEx);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
