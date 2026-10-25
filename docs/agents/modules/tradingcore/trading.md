@@ -54,7 +54,7 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 
 ### 전략 원장 상한 (상세 규칙 SSOT → workflow.md)
 - 원장 상한 판정·compute skip·실패 격리 등 실행 규칙 전체는 `docs/agents/workflow.md` "스케쥴러 실행 흐름"이 SSOT — 매매·스케쥴러·주문 로직 작업 시 필수 Read
-- `orders.order_leg`는 스케쥴러 내부 leg 식별자 — 신규 전략 주문은 non-blank concrete leg 필수(`UNKNOWN` 잔존 시 `TradingCandidatePlanner.validateConcreteOrderLegs`가 PLANNED 저장 전 `IllegalStateException`으로 거절), 과거 행·수동 체결 행은 `UNKNOWN` 유지(재주문 불가), 브로커 API payload에 미포함
+- `orders.order_leg`는 스케쥴러 내부 leg 식별자 — 신규 전략 주문은 non-blank concrete leg 필수(`UNKNOWN` 잔존 시 배치는 `TradingCandidatePlanner.validateConcreteOrderLegs`가 원장 판정·슬롯 필터 전에 전략 타입과 함께 `IllegalStateException`으로 거절하고, 공용 저장 지점 `TradingOrderPlanner.savePlannedOrders`도 수동 실행·재캡 포함 모든 저장을 거절 — 앞단 검사를 지우면 결함이 원장 부족 알림·슬롯 중복 제외로 가려지므로 둘 다 유지), 과거 행·수동 체결 행은 `UNKNOWN` 유지(재주문 불가), 브로커 API payload에 미포함
 - 슬롯 점유 판단: `timing + direction + orderLeg`(UNKNOWN coarse 처리는 제거됨)
 - `orders.order_leg`와 scheduler/reservation 조회용 인덱스(`idx_orders_cycle_date_timing_status` 등)는 trading baseline(`db/migration-trading`)에 포함돼 있다 — 후속 orders 쿼리 변경 시 인덱스 prefix와 조회 조건 함께 확인
 
