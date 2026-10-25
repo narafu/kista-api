@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
@@ -9,6 +10,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static com.kista.shared.kernel.OrderDirection.BUY;
 import static com.kista.shared.kernel.OrderDirection.SELL;
@@ -20,15 +22,15 @@ public class InfiniteStrategy {
     // 장마감 하락 대비 보정 주문 추가 횟수
     private static final int CORRECTION_ORDER_COUNT = 3;
 
+    // 전반 매수① leg(병합 포함) / 매수② leg
+    private static final Set<String> AVG_LEGS = Set.of("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_MERGED_BUY");
+    private static final String REF_LEG = "INFINITE_EARLY_REF_BUY";
+
     // 전략 계산 — 전반/후반 분기 후 주문 목록 반환
     public List<PlannedOrder> buildOrders(InfinitePosition position, LocalDate tradeDate) {
-        List<PlannedOrder> orders = new ArrayList<>();
-        if (position.isEarlyStage()) {
-            buildEarlyStageOrders(orders, position, tradeDate);
-        } else {
-            buildLateStageOrders(orders, position, tradeDate);
-        }
-        return orders;
+        return position.isEarlyStage()
+                ? buildEarlyStageOrders(position, tradeDate)
+                : buildLateStageOrders(position, tradeDate);
     }
 
     // BUY PLANNED 가격이 cap을 초과할 때 cap 기준으로 매수 수량 재산정 + 보정 주문(1주 LOC × 3회) 추가
@@ -64,11 +66,11 @@ public class InfiniteStrategy {
 
     // BUY 목록 뒤에 보정 주문 3건을 붙이고, 원장 예수금을 넘으면 뒤쪽부터 생략한다 — 지정가 합계가 예산 밖이면 접수 전체가 거절돼 교착된다
     private List<PlannedOrder> withCorrections(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> buys) {
-        List<PlannedOrder> withCorrections = new ArrayList<>(buys);
+        List<PlannedOrder> result = new ArrayList<>(buys);
         for (int i = 0; i < CORRECTION_ORDER_COUNT; i++) {
-            addCorrectionOrder(tradeDate, position, withCorrections, position.unitAmount(), i + 1);
+            addCorrectionOrder(tradeDate, position, result, position.unitAmount(), i + 1);
         }
-        return trimCorrectionsToBudget(withCorrections, position.usdDeposit());
+        return trimCorrectionsToBudget(result, position.usdDeposit());
     }
 
     // 후반 단일 LOC 매수: unitAmount/referencePrice
@@ -82,11 +84,24 @@ public class InfiniteStrategy {
     }
 
     // 전반: buy①(averagePrice 기반), buy②(referencePrice 기반, 원본에 없을 수 있음)
-    private List<PlannedOrder> computeEarlyBuys(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> buyOrders, BigDecimal cap, BigDecimal unitAmount) {
-        PlannedOrder buy1 = buyOrders.getFirst();
-        PlannedOrder buy2 = buyOrders.size() > 1 ? buyOrders.get(1) : null;
-        BigDecimal cappedAvg = buy1.price().min(cap);
-        BigDecimal cappedRef = (buy2 != null ? buy2.price() : position.referencePrice()).min(cap);
+    // DB 조회 순서가 보장되지 않으므로 ①②는 순서가 아니라 leg로 식별한다 — leg 정보가 없는 legacy(UNKNOWN_LEG)만 위치 순서 폴백
+    private List<PlannedOrder> computeEarlyBuys(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> baseOrders, BigDecimal cap, BigDecimal unitAmount) {
+        PlannedOrder buy1 = baseOrders.stream().filter(o -> AVG_LEGS.contains(o.orderLeg())).findFirst().orElse(null);
+        PlannedOrder buy2 = baseOrders.stream().filter(o -> REF_LEG.equals(o.orderLeg())).findFirst().orElse(null);
+        if (buy1 == null && buy2 == null) {
+            buy1 = baseOrders.getFirst();
+            buy2 = baseOrders.size() > 1 ? baseOrders.get(1) : null;
+        }
+        // 매수①이 없으면(REF만 남은 경우) 평단가 LOC로 다시 만든다
+        BigDecimal avgPrice = buy1 != null ? buy1.price() : position.averagePrice();
+        OrderType avgType = buy1 != null ? buy1.orderType() : LOC;
+        String avgLeg = buy1 != null && !AVG_LEGS.contains(buy1.orderLeg()) ? buy1.orderLeg() : "INFINITE_EARLY_AVG_BUY";
+        BigDecimal refPrice = buy2 != null ? buy2.price() : position.referencePrice();
+        OrderType refType = buy2 != null ? buy2.orderType() : LOC;
+        String refLeg = buy2 != null ? buy2.orderLeg() : REF_LEG;
+
+        BigDecimal cappedAvg = avgPrice.min(cap);
+        BigDecimal cappedRef = refPrice.min(cap);
 
         int quantity1 = InfinitePosition.earlyBuyQuantity1(unitAmount, cappedAvg);
         int quantity2 = InfinitePosition.earlyBuyQuantity2(unitAmount, cappedAvg, quantity1, cappedRef);
@@ -94,14 +109,11 @@ public class InfiniteStrategy {
         List<PlannedOrder> buys = new ArrayList<>();
         if (cappedAvg.compareTo(cappedRef) == 0) {
             // cappedAvg == cappedRef이면 병합
-            buys.add(PlannedOrder.of(tradeDate, position.ticker(), buy1.orderType(), BUY,
+            buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY,
                     quantity1 + quantity2, cappedAvg, "INFINITE_EARLY_MERGED_BUY"));
         } else {
-            buys.add(PlannedOrder.of(tradeDate, position.ticker(), buy1.orderType(), BUY,
-                    quantity1, cappedAvg, buy1.orderLeg()));
-            if (quantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(),
-                    buy2 != null ? buy2.orderType() : LOC, BUY, quantity2, cappedRef,
-                    buy2 != null ? buy2.orderLeg() : "INFINITE_EARLY_REF_BUY"));
+            buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY, quantity1, cappedAvg, avgLeg));
+            if (quantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), refType, BUY, quantity2, cappedRef, refLeg));
         }
         return buys;
     }
@@ -124,22 +136,26 @@ public class InfiniteStrategy {
                 PlannedOrder.leg("INFINITE_CORRECTION", correctionIndex)));
     }
 
-    private void buildEarlyStageOrders(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
+    private List<PlannedOrder> buildEarlyStageOrders(InfinitePosition position, LocalDate tradeDate) {
+        List<PlannedOrder> buys = new ArrayList<>();
         // LOC 매수 ① — 평단가 기준 (최소 1주)
         int buyQuantity1 = position.calcEarlyBuyQuantityByAvgPrice();
-        orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity1,
+        buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity1,
                 position.averagePrice(), "INFINITE_EARLY_AVG_BUY"));
 
         // LOC 매수 ② — 기준가 기준 (매수①이 unitAmount를 다 쓰면 0주 → 미생성)
         int buyQuantity2 = position.calcEarlyBuyQuantityByRefPrice(buyQuantity1);
-        if (buyQuantity2 > 0) orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity2,
+        if (buyQuantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity2,
                 position.referencePrice(), "INFINITE_EARLY_REF_BUY"));
 
-        attachCorrections(orders, position, tradeDate);
+        // 보정 주문은 BUY만 담긴 시점에 붙인다 — base BUY가 없으면 보정도 없다
+        List<PlannedOrder> orders = withCorrections(tradeDate, position, buys);
         addCommonSellOrders(orders, position, tradeDate);
+        return orders;
     }
 
-    private void buildLateStageOrders(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
+    private List<PlannedOrder> buildLateStageOrders(InfinitePosition position, LocalDate tradeDate) {
+        List<PlannedOrder> orders = new ArrayList<>();
         if (position.isFinalRound()) {
             int mocSellQuantity = position.calcMocSellQuantity();
             if (mocSellQuantity >= 1) {
@@ -155,16 +171,10 @@ public class InfiniteStrategy {
                         position.referencePrice(), "INFINITE_LATE_REF_BUY"));
             }
 
-            attachCorrections(orders, position, tradeDate);
+            orders = withCorrections(tradeDate, position, orders);
             addCommonSellOrders(orders, position, tradeDate);
         }
-    }
-
-    // orders에 BUY만 담긴 시점에 보정 주문을 붙인다 — base BUY가 없으면 보정도 없다
-    private void attachCorrections(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
-        List<PlannedOrder> corrected = withCorrections(tradeDate, position, orders);
-        orders.clear();
-        orders.addAll(corrected);
+        return orders;
     }
 
     private void addCommonSellOrders(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {

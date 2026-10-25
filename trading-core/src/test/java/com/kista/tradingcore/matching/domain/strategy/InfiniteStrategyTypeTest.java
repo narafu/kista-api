@@ -289,6 +289,54 @@ class InfiniteStrategyTypeTest {
                         "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
     }
 
+    // 전반 포지션(평단 50, unitAmount 1000) — buildOrders의 base BUY(AVG 50×10, REF 60×8)를 (avg, ref) 순서로 반환
+    private List<PlannedOrder> earlyBaseBuys() {
+        InfinitePosition position = earlyPosition();
+        List<PlannedOrder> base = strategy.buildOrders(position, TODAY).stream()
+                .filter(o -> o.direction() == BUY && !o.orderLeg().startsWith("INFINITE_CORRECTION_")).toList();
+        assertThat(base).extracting(PlannedOrder::orderLeg).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
+        return base;
+    }
+
+    private InfinitePosition earlyPosition() {
+        return new InfinitePosition(new AccountBalance(0, null, new BigDecimal("20000")),
+                StrategyTicker.SOXL, new BigDecimal("50"), 20);
+    }
+
+    private void assertEarlyCappedAt5250(List<PlannedOrder> result) {
+        assertThat(result).extracting(PlannedOrder::orderLeg).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
+        assertThat(result).extracting(PlannedOrder::quantity).containsExactly(10, 9, 1, 1, 1);
+        assertThat(result.get(0).price()).isEqualByComparingTo("50");
+        assertThat(result.get(1).price()).isEqualByComparingTo("52.50");
+        assertThat(result.get(2).price()).isEqualByComparingTo("50.00");
+        assertThat(result.get(3).price()).isEqualByComparingTo("47.61");
+        assertThat(result.get(4).price()).isEqualByComparingTo("45.45");
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 전반, 입력 순서가 뒤집혀도 leg로 ①②를 식별해 같은 결과")
+    void buildCappedBuyOrders_earlyStage_reversedInputOrder_sameResult() {
+        List<PlannedOrder> base = earlyBaseBuys();
+        BigDecimal cap = new BigDecimal("52.50");
+
+        List<PlannedOrder> normal = strategy.buildCappedBuyOrders(earlyPosition(), TODAY, base, cap);
+        List<PlannedOrder> reversed = strategy.buildCappedBuyOrders(earlyPosition(), TODAY, List.of(base.get(1), base.get(0)), cap);
+
+        assertEarlyCappedAt5250(normal);
+        assertThat(reversed).isEqualTo(normal);
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 전반, REF leg만 남아도 매수①을 평단가로 재구성해 같은 결과")
+    void buildCappedBuyOrders_earlyStage_onlyRefLegRemains_rebuildsAvg() {
+        List<PlannedOrder> base = earlyBaseBuys();
+
+        List<PlannedOrder> result = strategy.buildCappedBuyOrders(earlyPosition(), TODAY, List.of(base.get(1)), new BigDecimal("52.50"));
+
+        assertEarlyCappedAt5250(result);
+    }
+
     @Test
     @DisplayName("buildCappedBuyOrders 전반 2건, 동일 캡으로 수렴: 병합 1건+보정 3건 = 4건")
     void buildCappedBuyOrders_twoBuys_convergeToSameCap_mergesIntoOne() {
@@ -364,8 +412,8 @@ class InfiniteStrategyTypeTest {
     @Test
     @DisplayName("buildCappedBuyOrders 후반 1건, 캡 후 수량 0이어도 최소 1주+보정 3건")
     void buildCappedBuyOrders_singleBuy_cappedQuantityZero_guaranteesMinimumOneShare() {
-        // cap=55, unitAmount=50(usdDeposit=1000) / qty = floor(50/55) = 0 이어도 최소 1주
-        InfinitePosition position = lateStagePosition(10, "500"); // unitAmount=50, 후반
+        // cap=55, unitAmount=50 / qty = floor(50/55) = 0 이어도 최소 1주
+        InfinitePosition position = lateStagePosition(10, "500"); // holdings=10·평단 50·usdDeposit=500 → 총자산 1000÷20 = unitAmount 50, 후반
         List<PlannedOrder> buyOrders = List.of(buy("200.00", 1));
 
         List<PlannedOrder> result = strategy.buildCappedBuyOrders(position, TODAY, buyOrders, new BigDecimal("55.00"));
