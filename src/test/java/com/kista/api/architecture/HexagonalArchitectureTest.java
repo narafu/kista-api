@@ -193,7 +193,7 @@ class HexagonalArchitectureTest {
     void trading_batch_path_must_not_carry_account_aggregate() {
         // BatchContext가 복호화된 자격증명을 담은 Account 전체를 들고 배치·프리뷰·리포트 경로를 흘러다니던 결합(리뷰 F8)을 잠근다.
         // 이 경로는 id/userId/nickname/brokerRef 4필드만 쓰므로 trading 소유 투영 TradingAccount만 받는다.
-        // TradingAccount.from()은 정의 1곳이며 호출 경계는 3곳(BatchContextFactory / ManualTradingService / TradingPreviewService)이다.
+        // TradingAccount.from()은 정의 1곳이며 호출 경계는 4곳(BatchContextFactory / ManualTradingService / TradingPreviewService / LedgerReconciliationService)이다.
         // 타입 표면을 좁히는 것이지 자격증명 은닉이 아니다 — brokerRef는 여전히 자격증명을 담고 toString만 마스킹한다.
         // 대상은 application.service 전체 + BatchContext(denylist 방식 — 신규·개명 클래스가 조용히 검사에서 빠지지 않는다).
         // BatchContextFactory는 adapter.in.schedule이라 대상 밖이다.

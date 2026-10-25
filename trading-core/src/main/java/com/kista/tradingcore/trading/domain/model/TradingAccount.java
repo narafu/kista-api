@@ -11,7 +11,7 @@ import java.util.UUID;
 // 타입 표면 축소가 목적이다 — 자격증명 은닉이 아니다
 public record TradingAccount(UUID id, UUID userId, String nickname, BrokerAccountRef brokerRef) {
 
-    // Account 애그리게이트 → 배치 경로 투영 (from() 정의 1곳, 호출 경계 3곳: BatchContextFactory / ManualTradingService / TradingPreviewService)
+    // Account 애그리게이트 → 배치 경로 투영 (from() 정의 1곳, 호출 경계 4곳: BatchContextFactory / ManualTradingService / TradingPreviewService / LedgerReconciliationService)
     public static TradingAccount from(Account account) {
         return new TradingAccount(account.id(), account.userId(), account.nickname(), account.toBrokerRef());
     }

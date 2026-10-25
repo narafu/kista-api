@@ -7,8 +7,8 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
-import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
+import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -53,7 +53,7 @@ class LedgerReconciliationServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
-    @Mock PortfolioPort portfolioPort;
+    @Mock SellableQuantityPort sellableQuantityPort;
     @Mock TradingErrorReportPort errorReportPort;
     @InjectMocks LedgerReconciliationService service;
 
@@ -89,11 +89,10 @@ class LedgerReconciliationServiceTest {
         lenient().when(cyclePositionPort.findLatestByCycleIds(anyCollection())).thenReturn(positionsByCycle);
     }
 
-    private static PresentBalanceResult balance(StrategyTicker ticker, int holdings) {
-        var item = new PresentBalanceResult.Item(ticker, holdings, BigDecimal.ONE, BigDecimal.ONE,
-                BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ZERO, "NASD");
-        return new PresentBalanceResult(List.of(item), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+    // 브로커 총 잔고수량 stub — SellableQuantityPort 계약(미체결 매도 미차감)
+    private void broker(Account account, StrategyTicker ticker, int holdings) {
+        when(sellableQuantityPort.getSellableQuantity(ticker, account.toBrokerRef()))
+                .thenReturn(new SellableQuantity(ticker.name(), holdings));
     }
 
     private List<String> reportedMessages(int expected) {
@@ -109,8 +108,8 @@ class LedgerReconciliationServiceTest {
         strategy(kis, StrategyType.INFINITE, SOXL, "10", false);
         strategy(toss, StrategyType.VR, TQQQ, "5", false);
         stubLedgers(kis, toss);
-        when(portfolioPort.getPresentBalance(kis.toBrokerRef())).thenReturn(balance(SOXL, 9));
-        when(portfolioPort.getPresentBalance(toss.toBrokerRef())).thenReturn(balance(TQQQ, 5));
+        broker(kis, SOXL, 9);
+        broker(toss, TQQQ, 5);
 
         service.reconcileAll();
 
@@ -123,7 +122,7 @@ class LedgerReconciliationServiceTest {
         Account kis = account(Broker.KIS, "한투계좌");
         strategy(kis, StrategyType.INFINITE, SOXL, "10", false);
         stubLedgers(kis);
-        when(portfolioPort.getPresentBalance(kis.toBrokerRef())).thenReturn(balance(SOXL, 10));
+        broker(kis, SOXL, 10);
 
         service.reconcileAll();
 
@@ -138,7 +137,7 @@ class LedgerReconciliationServiceTest {
 
         service.reconcileAll();
 
-        verify(portfolioPort, never()).getPresentBalance(any());
+        verify(sellableQuantityPort, never()).getSellableQuantity(any(), any());
         verifyNoInteractions(errorReportPort);
     }
 
@@ -153,7 +152,7 @@ class LedgerReconciliationServiceTest {
 
         service.reconcileAll();
 
-        verify(portfolioPort, never()).getPresentBalance(any());
+        verify(sellableQuantityPort, never()).getSellableQuantity(any(), any());
         verifyNoInteractions(errorReportPort);
     }
 
@@ -166,7 +165,7 @@ class LedgerReconciliationServiceTest {
         UUID vrCycle = cyclesByStrategy.get(strategiesByAccount.get(kis.id()).get(2).id()).id();
         positionsByCycle.remove(vrCycle);                            // 포지션 없음
         stubLedgers(kis);
-        when(portfolioPort.getPresentBalance(kis.toBrokerRef())).thenReturn(balance(SOXL, 10));
+        broker(kis, SOXL, 10);
 
         service.reconcileAll();
 
@@ -180,8 +179,8 @@ class LedgerReconciliationServiceTest {
         strategy(a, StrategyType.INFINITE, SOXL, "10", false);
         strategy(b, StrategyType.INFINITE, SOXL, "10", false);
         stubLedgers(a, b);
-        when(portfolioPort.getPresentBalance(a.toBrokerRef())).thenThrow(new IllegalStateException("timeout"));
-        when(portfolioPort.getPresentBalance(b.toBrokerRef())).thenReturn(balance(SOXL, 3));
+        when(sellableQuantityPort.getSellableQuantity(SOXL, a.toBrokerRef())).thenThrow(new IllegalStateException("timeout"));
+        broker(b, SOXL, 3);
 
         service.reconcileAll();
 
@@ -197,6 +196,6 @@ class LedgerReconciliationServiceTest {
 
         service.reconcileAll();
 
-        verify(portfolioPort, never()).getPresentBalance(any());
+        verify(sellableQuantityPort, never()).getSellableQuantity(any(), any());
     }
 }

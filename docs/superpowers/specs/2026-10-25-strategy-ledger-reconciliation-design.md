@@ -27,7 +27,7 @@
 
 대상 전략: 삭제되지 않은 전략 중 최신 사이클이 종료되지 않은(`strategy_cycle.end_date IS NULL`) 전략. 전략 `status`(ACTIVE·PAUSED)는 가리지 않는다 — PAUSED 전략도 주식을 들고 있으므로 빼면 원장 합이 과소가 돼 미탐이 난다(내 판단).
 
-1. **실계좌(MOCK 외, 코인 계좌 제외 — `Broker.market` 기준, 메리츠 포함) 보유량 부족**: 종목(`StrategyTicker`)별로 `원장 합 = Σ 해당 종목 전략들의 최신 cycle_position.holdings`(DCA 포함)를 구한다. `브로커 보유량`은 `PortfolioPort.getPresentBalance(brokerRef).items()`의 종목별 `holdings`(총 잔고수량)다. 계좌당 1회 호출로 전 종목을 받는다. 종목마다 부르는 `SellableQuantityPort` 대신 이것을 쓰는 이유는 호출 수다(내 판단). 두 포트 모두 미체결 매도를 빼지 않은 총 잔고수량이다 — 메리츠 판매가능수량이 `seln_able_dqty`(순수량)를 반환하던 버그는 이 설계 중 발견해 `rmnd_dqty`로 고쳤다. 경보 조건은 `브로커 < 원장 합` 하나다.
+1. **실계좌(MOCK 외, 코인 계좌 제외 — `Broker.market` 기준, 메리츠 포함) 보유량 부족**: 종목(`StrategyTicker`)별로 `원장 합 = Σ 해당 종목 전략들의 최신 cycle_position.holdings`(DCA 포함)를 구한다. `브로커 보유량`은 종목마다 `SellableQuantityPort.getSellableQuantity(ticker, brokerRef).quantity()`다(포트 계약: 미체결 매도를 빼지 않은 총 잔고수량 — KIS TTTS3012R `ovrs_cblc_qty`, Toss holdings `quantity`, 메리츠 `rmnd_dqty`). `PortfolioPort.getPresentBalance`는 쓰지 않는다 — KIS 구현의 CTRP6504R `cblc_qty13`이 실잔고보다 적게 오는 사례(`daa2a3f3f`)가 있어 오탐이 나기 때문이다(최종 리뷰 반영). 경보 조건은 `브로커 < 원장 합` 하나다.
 2. `브로커 > 원장 합`은 무시한다. 사용자가 KISTA 밖에서 같은 종목을 보유할 수 있기 때문이다(사용자 확인).
 3. **MOCK 계좌**: MOCK 잔고는 `MockBrokerAdapter`가 원장 합으로 만들기 때문에 바깥 기준이 없다. 대신 전략별 최신 `usd_deposit < 0` 또는 `holdings < 0`이면 경보한다.
 4. 현금은 1차에서 검사하지 않는다. 브로커 주문가능금액(`MarginPort.getUsdBuyableAmount`)은 예수금이 아니라 미결제 대금·환전·수수료·미체결 예약의 영향을 받아 노이즈가 크다.
@@ -59,7 +59,6 @@
 ## builder에게 맡긴 것 / 내 판단으로 정한 것
 
 - 실행 시각 화~토 09:00 KST: 내 판단이다. 마감 리포트(대략 05~06시 KST) 이후, 22:00 이전이면 어느 시각이든 무방하다.
-- 대상 전략 범위(PAUSED 포함), `PortfolioPort` 총 잔고 사용, 미종결 주문 건너뛰기 없음, 중복 제거 없음: 내 판단이다.
+- 대상 전략 범위(PAUSED 포함), `SellableQuantityPort` 총 잔고 사용, 미종결 주문 건너뛰기 없음, 중복 제거 없음: 내 판단이다.
 - 경보 예외 타입, 메시지 문구, 클래스 이름은 builder가 정한다.
-- builder 확인 사항: 브로커별 `getPresentBalance` 구현(KIS·Toss·메리츠)이 `Item.holdings`에 판매가능이 아닌 총 잔고수량을 담는지 확인한다(메리츠는 `rmnd_dqty`여야 한다). 아니면 그 어댑터를 고치는 것까지 범위에 넣는다.
-- 정수 주식만 대상이다(`Item.holdings`가 int). 코인 계좌는 제외한다.
+- 정수 주식만 대상이다(`SellableQuantity.quantity`가 int). 코인 계좌는 제외한다.
