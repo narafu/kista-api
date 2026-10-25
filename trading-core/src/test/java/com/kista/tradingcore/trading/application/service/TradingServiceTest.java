@@ -720,7 +720,8 @@ class TradingServiceTest {
         // AT_OPEN 스코프 보정(capVrIfNeededAtOpen)의 재산정 결과 — cap(84.00)로 재산정된 사다리
         Order cappedTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.TQQQ, OrderType.LIMIT,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2), new BigDecimal("84.00"),
-                OrderStatus.PLANNED, null, null, null);
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("TEST_VR_LADDER_BUY_STALE");
         when(vrStrategy.buildCappedBuyOrders(any(VrPosition.class), eq(StrategyTicker.TQQQ), any(LocalDate.class), eq(new BigDecimal("84.00"))))
                 .thenReturn(List.of(cappedTemplate.toPlanned()));
 

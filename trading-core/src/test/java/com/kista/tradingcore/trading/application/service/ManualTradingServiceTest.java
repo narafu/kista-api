@@ -249,7 +249,8 @@ class ManualTradingServiceTest {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
-                OrderStatus.PLANNED, null, null, null);
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("INFINITE_EARLY_AVG_BUY");
         Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
@@ -273,7 +274,8 @@ class ManualTradingServiceTest {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
-                OrderStatus.PLANNED, null, null, null);
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("INFINITE_EARLY_AVG_BUY");
         Order batchSaved = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
@@ -295,7 +297,8 @@ class ManualTradingServiceTest {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
-                OrderStatus.PLANNED, null, null, null);
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("INFINITE_EARLY_AVG_BUY");
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
         AtomicBoolean held = trackLockHeld(budgetLock);
@@ -327,7 +330,8 @@ class ManualTradingServiceTest {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
-                OrderStatus.PLANNED, null, null, null);
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("INFINITE_EARLY_AVG_BUY");
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
         // InfinitePosition 캡 재산정 — 1주 그대로, 가격만 cap(52.50)으로 교체
@@ -361,7 +365,8 @@ class ManualTradingServiceTest {
         Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
-                OrderStatus.PLANNED, null, null, null);
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("INFINITE_EARLY_AVG_BUY");
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(buyTemplate.toPlanned()));
         when(infiniteStrategy.buildCappedBuyOrders(any(InfinitePosition.class), any(LocalDate.class), anyList(), eq(new BigDecimal("52.50"))))
@@ -445,10 +450,12 @@ class ManualTradingServiceTest {
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문 (BUY 1주 + SELL 1주)
         Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
-                BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null)
+                .withLeg("VR_BUY_01");
         Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
-                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
+                .withLeg("VR_SELL_01");
         UUID vrBuyId = UUID.randomUUID();
         UUID vrSellId = UUID.randomUUID();
         Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,

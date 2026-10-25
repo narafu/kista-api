@@ -25,7 +25,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 // 커널이 산출한 계획 주문(PlannedOrder)을 PLANNED 상태 + 신규 PK(null) + 호출 계좌 FK로 승격해 일괄 저장하는지 검증
 @ExtendWith(MockitoExtension.class)
@@ -53,7 +55,7 @@ class TradingOrderPlannerTest {
     @DisplayName("템플릿을 PLANNED 상태 + 신규 PK + 계좌 FK로 변환해 일괄 저장")
     void savePlannedOrders_convertsTemplatesAndSavesAll() {
         PlannedOrder buyTemplate = template(OrderDirection.BUY, "50.00", 10).withLeg("INFINITE_BUY_01");
-        PlannedOrder sellTemplate = template(OrderDirection.SELL, "60.00", 5);
+        PlannedOrder sellTemplate = template(OrderDirection.SELL, "60.00", 5).withLeg("INFINITE_LOC_SELL");
 
         new TradingOrderPlanner(orderPort).savePlannedOrders(List.of(buyTemplate, sellTemplate), ACCOUNT, STRATEGY_CYCLE_ID);
 
@@ -86,5 +88,16 @@ class TradingOrderPlannerTest {
         verify(orderPort).saveAll(ordersCaptor.capture());
         assertThat(ordersCaptor.getValue()).isEmpty();
     }
-}
 
+    @Test
+    @DisplayName("leg 없는 템플릿이 하나라도 있으면 저장하지 않고 거부")
+    void savePlannedOrders_rejectsUnknownLeg() {
+        PlannedOrder legged = template(OrderDirection.BUY, "50.00", 10).withLeg("INFINITE_BUY_01");
+        PlannedOrder unknown = template(OrderDirection.SELL, "60.00", 5);
+
+        assertThatThrownBy(() -> new TradingOrderPlanner(orderPort)
+                .savePlannedOrders(List.of(legged, unknown), ACCOUNT, STRATEGY_CYCLE_ID))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(orderPort);
+    }
+}
