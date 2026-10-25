@@ -16,7 +16,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// 실제 로컬 PostgreSQL(kistadb_test) 필요 — docker compose up -d postgres 선행
+// 실제 로컬 PostgreSQL(kistadb_it) 필요 — docker compose up -d postgres 선행
 @Tag("integration")
 @Execution(ExecutionMode.SAME_THREAD)
 class TradingPolicySettingsPersistenceAdapterIT extends DataJpaTestBase {

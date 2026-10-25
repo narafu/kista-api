@@ -121,7 +121,7 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
       - name: Create test database
-        run: psql -h localhost -U kista -d kistadb -c "CREATE DATABASE kistadb_test OWNER kista;"
+        run: psql -h localhost -U kista -d kistadb -c "CREATE DATABASE kistadb_test OWNER kista;" -c "CREATE DATABASE kistadb_it OWNER kista;"
         env:
           PGPASSWORD: kista
       - name: Run all tests (ArchUnit 포함) + integration

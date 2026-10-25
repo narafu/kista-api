@@ -100,4 +100,5 @@ tasks.register<Test>("integration") {
         includeTags("integration")
     }
     systemProperty("user.timezone", "Asia/Seoul")
+    systemProperty("kista.test-db-name", "kistadb_it") // 행을 커밋하는 IT 전용 DB — test 태스크(kistadb_test)와 분리
 }

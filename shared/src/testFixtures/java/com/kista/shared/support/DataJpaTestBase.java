@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.test.context.ActiveProfiles;
 
 // @DataJpaTest + application-test.yml 로컬 PostgreSQL 공통 베이스
-// 서브클래스는 이 클래스를 상속하는 것만으로 localhost:5432/kistadb_test 에 연결됨
+// 서브클래스는 이 클래스를 상속하는 것만으로 localhost:5432/kistadb_test(integration 태스크는 kistadb_it)에 연결됨
 @DataJpaTest
 @Import(DataJpaTestBase.TestJpaAuditingConfig.class)
 @ActiveProfiles("test")

@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/kistadb_test
+    url: jdbc:postgresql://localhost:5432/${kista.test-db-name:kistadb_test} # integration 태스크는 kistadb_it — 행을 커밋하는 *IT가 롤백 기반 test 스위트의 건수 단언을 오염시키지 않게 분리
     username: kista
     password: kista
     driver-class-name: org.postgresql.Driver

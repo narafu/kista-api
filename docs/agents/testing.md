@@ -44,13 +44,13 @@
 
 ### 테스트 DB
 
-`application-test.yml` 기준 테스트 DB는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. `DataJpaTestBase`를 상속한 persistence 테스트도 Testcontainers가 아니라 `localhost:5432/kistadb_test`에 직접 연결된다. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가).
+`application-test.yml` 기준 테스트 DB는 **docker-compose로 기동한 로컬 PostgreSQL** 사용. `DataJpaTestBase`를 상속한 persistence 테스트도 Testcontainers가 아니라 `localhost:5432/kistadb_test`에 직접 연결된다. 실제 KIS API 통합 테스트는 **실전계좌**로 실행 (모의투자 계좌는 지정가 주문만 지원해 LOC/MOC 테스트 불가). 단 `integration` 태스크(`*IT`, 행을 커밋하고 teardown으로 지운다)는 `kista.test-db-name=kistadb_it` 시스템 프로퍼티로 별도 DB `kistadb_it`를 쓴다 — 동시 실행·중단된 IT 잔재가 롤백 기반 `test` 스위트의 건수 단언을 깨지 않게 하기 위해서다. 로컬 최초 1회 생성: `docker exec <postgres 컨테이너> psql -U kista -d kistadb -c "CREATE DATABASE kistadb_it OWNER kista;"`
 
 ```bash
 docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 ```
 
-서비스별 Flyway baseline이 각자 자기 스키마에 적용된다(root `db/migration`→`public`/`finance`/`kista_ref`, trading-core `db/migration-trading`→`trading`/`trading_ref`). 옛 레이아웃(`kista`/`reference` 스키마 + 공용 `flyway_schema_history`)으로 만들어진 `kistadb_test`가 로컬에 남아 있으면 baseline 판정이 어긋나므로 재생성한다: `DROP DATABASE kistadb_test; CREATE DATABASE kistadb_test OWNER kista;`. trading-core `test` 태스크는 `workingDir = rootProject.projectDir`로 실행된다.
+서비스별 Flyway baseline이 각자 자기 스키마에 적용된다(root `db/migration`→`public`/`finance`/`kista_ref`, trading-core `db/migration-trading`→`trading`/`trading_ref`). 옛 레이아웃(`kista`/`reference` 스키마 + 공용 `flyway_schema_history`)으로 만들어진 `kistadb_test`가 로컬에 남아 있으면 baseline 판정이 어긋나므로 재생성한다: `DROP DATABASE kistadb_test; CREATE DATABASE kistadb_test OWNER kista;` (`kistadb_it`도 동일). trading-core `test` 태스크는 `workingDir = rootProject.projectDir`로 실행된다.
 
 루트 persistence 테스트는 `com.kista.api.web.RootDataJpaTestBase`(src/test)를 상속한다 — `:shared` 공용 `DataJpaTestBase`를 잇는 얇은 베이스로, 상향 탐색이 `ApiApplication`(루트 `com.kista.api`)을 찾아 엔티티·리포지토리 스캔이 root 범위로 좁혀지므로 classpath의 `:trading-core` 엔티티(`trading.xxx` 테이블)는 검증 대상이 아니다. 옛 `RootJpaScanConfig`는 없다.
 
