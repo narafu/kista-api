@@ -12,6 +12,8 @@ import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.trading.domain.strategy.*;
 import com.kista.tradingcore.matching.domain.strategy.*;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
+import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
+import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -166,6 +168,51 @@ class CycleRotationServiceTest {
         verify(strategyPort).pause(strategy.id());
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
         verify(eventPublisher).publishEvent(any(InsufficientBalanceEvent.class));
+    }
+
+    @Test
+    @DisplayName("MAX — 시드가 1주 가격 미만이면 새 사이클 없이 PAUSED하고 사용자에게 알린다")
+    void rotate_pauses_when_seed_below_one_share() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "50");
+
+        service.rotate(strategy, current, ACCOUNT, USER, new BigDecimal("60"), null);
+
+        verify(strategyPort).pause(strategy.id());
+        verifyNoInteractions(cycleSnapshotCreator);
+        verify(eventPublisher).publishEvent(any(InsufficientBalanceEvent.class));
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof StrategyAutoPausedEvent ev
+                && ev.seed().compareTo(new BigDecimal("50")) == 0
+                && ev.price().compareTo(new BigDecimal("60")) == 0
+                && ev.userId().equals(USER.userId())));
+        verify(eventPublisher, never()).publishEvent(any(NewCycleStartedEvent.class));
+    }
+
+    @Test
+    @DisplayName("MAX — 시드가 1주 가격과 같으면 재등록한다")
+    void rotate_reopens_when_seed_equals_one_share_price() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "60");
+
+        service.rotate(strategy, current, ACCOUNT, USER, new BigDecimal("60"), null);
+
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, new BigDecimal("60"), new BigDecimal("60"));
+        verify(strategyPort, never()).pause(any());
+    }
+
+    @Test
+    @DisplayName("MAX — 가격이 null이면 양수 시드는 그대로 재등록한다")
+    void rotate_with_null_price_keeps_positive_seed_rotation() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "50");
+
+        service.rotate(strategy, current, ACCOUNT, USER, null, null);
+
+        verify(cycleSnapshotCreator).createCycleAndSnapshot(strategy.id(), STRATEGY_VERSION_ID, new BigDecimal("50"), null);
+        verify(strategyPort, never()).pause(any());
     }
 
     @Test

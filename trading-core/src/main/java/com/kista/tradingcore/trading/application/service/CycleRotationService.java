@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
+import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -53,12 +54,16 @@ class CycleRotationService {
                 ? maxSeed
                 : currentCycle.startAmount().min(maxSeed); // MAINTAIN: 손실 뒤엔 남은 돈으로, 수익 뒤엔 원래 시드로
 
-        // 원장이 0 이하(소진·음수)면 0/음수 시드 사이클을 열지 않고 NONE과 같이 PAUSED — 관리자 알림은 최소금액 미달과 같은 이벤트
-        if (targetSeed.signum() <= 0) {
+        // 1주도 못 사는 시드는 0회차 매수가 원장 상한에 막혀 교착 — 새 사이클 없이 PAUSED (가격 모르면 0 이하만 판정)
+        // 관리자 알림은 최소금액 미달과 같은 이벤트, 사용자에게는 자동 일시정지 알림
+        boolean belowOneShare = price != null ? targetSeed.compareTo(price) < 0 : targetSeed.signum() <= 0;
+        if (belowOneShare) {
             strategyPort.pause(strategy.id());
-            log.warn("[strategyId={}] 원장 소진({}) — 새 사이클 없이 PAUSED", strategy.id(), targetSeed);
+            log.warn("[strategyId={}] 원장 1주 미만({} < {}) — 새 사이클 없이 PAUSED", strategy.id(), targetSeed, price);
             eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
                     0, targetSeed, strategy.ticker(), null, 0, false));
+            eventPublisher.publishEvent(new StrategyAutoPausedEvent(userProfile.userId(), account.id(), account.nickname(),
+                    strategy.type(), strategy.ticker(), targetSeed, price));
             return;
         }
 

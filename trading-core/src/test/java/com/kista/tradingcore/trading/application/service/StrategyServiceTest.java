@@ -412,6 +412,44 @@ class StrategyServiceTest {
         verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
     }
 
+    private void stubEndedCycleResume(String endAmount, String closingPrice) {
+        StrategyCycle endedCycle = new StrategyCycle(
+                CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), new BigDecimal(endAmount),
+                LocalDate.now().minusDays(5), LocalDate.now(), null, null);
+        CyclePosition lastPosition = CyclePosition.tradeSnapshot(CYCLE_ID,
+                new AccountBalance(0, null, new BigDecimal(endAmount)),
+                closingPrice == null ? null : new BigDecimal(closingPrice));
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(endedCycle));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(lastPosition));
+    }
+
+    @Test
+    @DisplayName("resume() — 종료 사이클 최종 금액이 1주 가격 미만이면 재개를 거부한다")
+    void resume_rejects_when_end_amount_below_one_share() {
+        stubEndedCycleResume("12.34", "60.00");
+
+        assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("남은 원장($12.34)이 1주 가격($60.00)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 시드로 다시 등록해 주세요.");
+        verify(strategyCyclePort, never()).save(any());
+        verify(cyclePositionPort, never()).save(any());
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("resume() — 종가 정보가 없으면 기존대로 재오픈하고 ACTIVE로 저장한다")
+    void resume_reopens_when_closing_price_missing() {
+        stubEndedCycleResume("12.34", null);
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(i -> i.getArgument(0));
+
+        strategyService.resume(STRATEGY_ID, USER_ID);
+
+        verify(strategyCyclePort).save(any(StrategyCycle.class));
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+    }
+
     @Test
     @DisplayName("resume() 호출 시 최신 사이클이 아직 진행 중이면(endDate 없음) 사이클을 재오픈하지 않는다")
     void resume_does_not_reopen_cycle_when_still_open() {

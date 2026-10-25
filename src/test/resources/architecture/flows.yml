@@ -213,7 +213,7 @@ flows:
         lane: trading
         to: [db, telegram]
         title: 사이클 종료·다음 사이클
-        desc: 보유 수량이 있다가 0이 되면(청산) 현재 사이클을 종료하고 연속 정책에 따라 새 사이클을 연다. VR은 청산으로 끝나지 않고, 대신 매일 N주 롤오버 주기 도래를 판정한다.
+        desc: 보유 수량이 있다가 0이 되면(청산) 현재 사이클을 종료하고 연속 정책에 따라 새 사이클을 연다. VR은 청산으로 끝나지 않고, 대신 매일 N주 롤오버 주기 도래를 판정한다. 다음 사이클 시드가 1주 가격(당일 종가) 미만이면 새 사이클 없이 전략을 PAUSED로 두고 사용자에게 자동 일시정지를 알린다(관리자 알림 유지).
         code: [StrategyCyclePort#markEnded, CycleRotationService#rotate, VrCycleRolloverService#rollIfDue]
         cond: 이전 보유 > 0 → 이번 보유 0 (VR 제외) · VR은 롤오버 주기 도래 시
         state: "strategy_cycle → 종료 · 새 사이클 생성"
@@ -891,7 +891,7 @@ flows:
         code: [StrategyService#resume, StrategyService#reopenCycleIfEnded, CycleSnapshotCreator#createCycleAndSnapshot]
         cond: 최신 사이클에 종료일이 있을 때(VR 제외)
         state: "strategy → ACTIVE · 종료 사이클이면 strategy_cycle +1 · cycle_position +1"
-        fail: 이미 활성이면 400, 활성 전략 버전이 없으면 400(IllegalStateException).
+        fail: 종료 사이클의 최종 금액이 1주 가격(최신 종가) 미만이면 400(삭제 후 재등록 안내), 이미 활성이면 400, 활성 전략 버전이 없으면 400(IllegalStateException).
 
       - id: delete
         lane: trading
@@ -1720,7 +1720,7 @@ lifecycles:
         to: PAUSED
         title: 사이클 종료 후 다음 사이클을 열지 않음
         desc: >-
-          청산으로 사이클이 끝났을 때 연속 정책이 NONE이거나 사이클 재등록이 실패하면
+          청산으로 사이클이 끝났을 때 연속 정책이 NONE이거나, 다음 시드가 1주 가격 미만이거나, 사이클 재등록이 실패하면
           좀비 사이클을 막으려고 전략을 멈춘다.
         code: [CycleRotationService#rotate, StrategyPort#pause]
         tag: 시스템
