@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.time.UsTradeDates;
+import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
@@ -215,19 +216,25 @@ public class TossPriceApi {
         });
     }
 
+    // 확정 종가 — 확정 일봉(fetchConfirmedCandle)의 종가
+    Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate) {
+        return fetchConfirmedCandle(ticker, tradeDate).map(BrokerCandle::close);
+    }
+
     // Toss 캔들 date()는 US 세션일 기준이라 KST 거래일 D → US 세션 D-1로 변환 (KIS fetchConfirmedClose와 동일 규칙)
     // 봉 날짜가 기대 US 세션일과 다르면(미발행 등) filter에서 탈락 → Optional.empty()
-    Optional<BigDecimal> fetchConfirmedClose(StrategyTicker ticker, LocalDate tradeDate) {
+    // public — 모의계좌(MockBrokerAdapter)가 OHLC 체결 판정에 사용
+    public Optional<BrokerCandle> fetchConfirmedCandle(StrategyTicker ticker, LocalDate tradeDate) {
         LocalDate usSessionDate = UsTradeDates.toUsTradeDate(tradeDate);
         try {
-            Optional<BigDecimal> close = tossCandleApi.getCandles(ticker.name(), "1d", usSessionDate, usSessionDate).stream()
+            Optional<BrokerCandle> candle = tossCandleApi.getCandles(ticker.name(), "1d", usSessionDate, usSessionDate).stream()
                     .filter(c -> c.date().equals(usSessionDate))
                     .findFirst()
-                    .map(TossCandle::close);
-            if (close.isEmpty()) {
+                    .map(TossCandle::toBrokerCandle);
+            if (candle.isEmpty()) {
                 log.warn("Toss {} 확정 종가 캔들 없음(기대 US세션일={}): tradeDate={}", ticker, usSessionDate, tradeDate);
             }
-            return close;
+            return candle;
         } catch (Exception e) {
             log.warn("Toss {} 확정 종가 조회 실패: tradeDate={}, error={}", ticker, tradeDate, e.getMessage());
             return Optional.empty();

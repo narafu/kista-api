@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-// 체결 판정 SSOT — MockBrokerAdapter(모의계좌, 종가 기준)와 BacktestEngine(백테스트, OHLC 기준)이 공용
+// 체결 판정 SSOT — 백테스트(BacktestEngine)가 사용, MockBrokerAdapter(모의계좌)는 동일 OHLC 규칙을 broker 타입으로 복제
 // domain 레이어는 Spring 빈 금지(HexagonalArchitectureTest) — 순수 static 유틸
 public final class FillSimulator {
 
@@ -18,8 +18,8 @@ public final class FillSimulator {
         // 인스턴스화 금지 — static 유틸리티
     }
 
-    // 기존 MockBrokerAdapter.fills()와 완전히 동일한 시그니처·동작 — 모의계좌는 LIMIT도 종가 기준으로 판정한다(변경 금지)
-    // MOC: 항상 체결 / LOC·LIMIT: 매수는 종가<=지정가, 매도는 종가>=지정가 (경계값 포함)
+    // 종가 기준 판정 — MOC: 항상 체결 / LOC·LIMIT: 매수는 종가<=지정가, 매도는 종가>=지정가 (경계값 포함)
+    // LIMIT의 실제 판정은 fillsOhlc가 저가/고가로 재판정한다
     public static boolean fills(PlannedOrder order, BigDecimal closingPrice) {
         if (order.orderType() == OrderType.MOC || order.orderType() == OrderType.MOO) return true;
         return order.direction() == OrderDirection.BUY
@@ -27,7 +27,7 @@ public final class FillSimulator {
                 : closingPrice.compareTo(order.price()) >= 0;
     }
 
-    // 백테스트 전용 OHLC 기반 체결 판정 — LIMIT은 고가/저가 터치로 판정(모의계좌의 종가 기준과 다름)
+    // 백테스트 전용 OHLC 기반 체결 판정 — LIMIT은 고가/저가 터치로 판정(종가 기준 fills와 다름)
     // MOC/LOC는 candle.close() 기준으로 fills()와 동일 조건, LIMIT만 low/high로 재판정
     // externalOrderId는 백테스트엔 실물 주문번호가 없으므로 order.orderLeg()를 그대로 실어 보낸다
     public static List<Execution> simulate(List<PlannedOrder> pendingOrders, DailyCandle candle) {

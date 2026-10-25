@@ -180,6 +180,24 @@ class TossPriceApiTest {
     }
 
     @Test
+    @DisplayName("fetchConfirmedCandle: KST 거래일 D → US 세션 D-1 봉의 OHLC를 반환")
+    void fetchConfirmedCandle_returnsOhlcOfUsSession() {
+        LocalDate usSessionDate = LocalDate.of(2026, 9, 3);
+        TossCandle candle = new TossCandle(usSessionDate, new BigDecimal("71.50"),
+                new BigDecimal("72.40"), new BigDecimal("71.10"), new BigDecimal("72.03"), 5000L);
+        when(tossCandleApi.getCandles(eq("TQQQ"), eq("1d"), eq(usSessionDate), eq(usSessionDate)))
+                .thenReturn(List.of(candle));
+
+        var result = tossPriceApi.fetchConfirmedCandle(StrategyTicker.TQQQ, LocalDate.of(2026, 9, 4));
+
+        assertThat(result).isPresent();
+        assertThat(result.get().open()).isEqualByComparingTo("71.50");
+        assertThat(result.get().high()).isEqualByComparingTo("72.40");
+        assertThat(result.get().low()).isEqualByComparingTo("71.10");
+        assertThat(result.get().close()).isEqualByComparingTo("72.03");
+    }
+
+    @Test
     @DisplayName("getClosingPrice: US 세션 봉이 없으면 현재가로 폴백")
     void getClosingPrice_noCandleForUsSession_fallsBackToLivePrice() {
         LocalDate kstTradeDate = LocalDate.of(2026, 8, 24); // US 세션 08-23은 토요일 — 봉 없음

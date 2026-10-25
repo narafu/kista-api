@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.mock;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
@@ -67,6 +68,12 @@ class MockBrokerAdapterTest {
         when(mockSimulationDataPort.findActiveCycleId(STRATEGY_ID)).thenReturn(CYCLE_ID);
     }
 
+    // 거래일 일봉 stub — 인자 순서: open, high, low, close
+    private void stubCandle(String open, String high, String low, String close) {
+        when(priceFeed.fetchConfirmedCandle(eq(StrategyTicker.TQQQ), any())).thenReturn(Optional.of(new BrokerCandle(
+                TRADE_DATE, new BigDecimal(open), new BigDecimal(high), new BigDecimal(low), new BigDecimal(close), 1L)));
+    }
+
     // 테스트용 PLACED 주문 뷰 생성 헬퍼
     private static PlacedOrderView placedOrder(OrderType orderType, OrderDirection direction,
                                                 int quantity, BigDecimal price, String externalOrderId) {
@@ -88,7 +95,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.MOC, OrderDirection.BUY, 10,
                 new BigDecimal("100.00"), "MOCK-1");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("999.99"));
+        stubCandle("999.99", "999.99", "999.99", "999.99");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -107,7 +114,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView fillable = placedOrder(OrderType.LOC, OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-2");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(fillable));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
+        stubCandle("95.00", "95.00", "95.00", "95.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -122,7 +129,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView unfillable = placedOrder(OrderType.LOC, OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-3");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(unfillable));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
+        stubCandle("105.00", "105.00", "105.00", "105.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -136,7 +143,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView fillable = placedOrder(OrderType.LOC, OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-4");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(fillable));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("105.00"));
+        stubCandle("105.00", "105.00", "105.00", "105.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -151,7 +158,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView unfillable = placedOrder(OrderType.LOC, OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-5");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(unfillable));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("95.00"));
+        stubCandle("95.00", "95.00", "95.00", "95.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -159,19 +166,18 @@ class MockBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("LIMIT 매수는 종가<=지정가면 체결하되 체결가는 지정가 그대로다")
-    void limitBuyFillsAtOrderPriceNotClosingPrice() {
+    @DisplayName("LIMIT 매수 — 시가가 지정가보다 낮게 갭하락 개장하면 시가에 체결된다")
+    void limitBuyGapDownFillsAtOpen() {
         stubTqqqCycle();
         PlacedOrderView order = placedOrder(OrderType.LIMIT, OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-6");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
+        stubCandle("90.00", "90.00", "90.00", "90.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        // LOC와 달리 체결가는 종가(90.00)가 아니라 지정가(100.00) 그대로
-        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("90.00"); // min(지정가 100, 시가 90)
     }
 
     @Test
@@ -181,7 +187,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LIMIT, OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-7");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
+        stubCandle("110.00", "110.00", "110.00", "110.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -189,18 +195,18 @@ class MockBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("LIMIT 매도는 종가>=지정가면 체결하되 체결가는 지정가 그대로다")
-    void limitSellFillsAtOrderPriceNotClosingPrice() {
+    @DisplayName("LIMIT 매도 — 시가가 지정가보다 높게 갭상승 개장하면 시가에 체결된다")
+    void limitSellGapUpFillsAtOpen() {
         stubTqqqCycle();
         PlacedOrderView order = placedOrder(OrderType.LIMIT, OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-8");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("110.00"));
+        stubCandle("110.00", "110.00", "110.00", "110.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).hasSize(1);
-        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("110.00");
     }
 
     @Test
@@ -210,11 +216,76 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LIMIT, OrderDirection.SELL, 5,
                 new BigDecimal("100.00"), "MOCK-9");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("90.00"));
+        stubCandle("90.00", "90.00", "90.00", "90.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
         assertThat(executions).isEmpty();
+    }
+
+    @Test
+    @DisplayName("LIMIT 매수 — 장중 저가가 지정가를 터치하면(종가는 지정가 위) 지정가에 체결된다")
+    void limitBuyTouchedIntradayFillsAtLimit() {
+        stubTqqqCycle();
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
+                placedOrder(OrderType.LIMIT, OrderDirection.BUY, 5, new BigDecimal("100.00"), "MOCK-L1")));
+        stubCandle("105.00", "108.00", "99.00", "104.00");
+
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
+
+        assertThat(executions).hasSize(1);
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    @DisplayName("LIMIT 매수 — 저가가 지정가에 닿지 않으면 미체결이다")
+    void limitBuyNotTouchedDoesNotFill() {
+        stubTqqqCycle();
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
+                placedOrder(OrderType.LIMIT, OrderDirection.BUY, 5, new BigDecimal("100.00"), "MOCK-L2")));
+        stubCandle("105.00", "108.00", "101.00", "104.00");
+
+        assertThat(adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("LIMIT 매도 — 장중 고가가 지정가를 터치하면(종가는 지정가 아래) 지정가에 체결된다")
+    void limitSellTouchedIntradayFillsAtLimit() {
+        stubTqqqCycle();
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
+                placedOrder(OrderType.LIMIT, OrderDirection.SELL, 5, new BigDecimal("100.00"), "MOCK-L3")));
+        stubCandle("95.00", "101.00", "94.00", "96.00");
+
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
+
+        assertThat(executions).hasSize(1);
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    @DisplayName("LIMIT 매도 — 고가가 지정가에 닿지 않으면 미체결이다")
+    void limitSellNotTouchedDoesNotFill() {
+        stubTqqqCycle();
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
+                placedOrder(OrderType.LIMIT, OrderDirection.SELL, 5, new BigDecimal("100.00"), "MOCK-L4")));
+        stubCandle("95.00", "99.00", "94.00", "96.00");
+
+        assertThat(adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("일봉이 없으면 현재가 단일값 봉으로 판정한다 — LIMIT 매수는 현재가<=지정가면 현재가에 체결")
+    void noCandleFallsBackToCurrentPrice() {
+        stubTqqqCycle();
+        when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(
+                placedOrder(OrderType.LIMIT, OrderDirection.BUY, 5, new BigDecimal("100.00"), "MOCK-L5")));
+        when(priceFeed.fetchConfirmedCandle(eq(StrategyTicker.TQQQ), any())).thenReturn(Optional.empty());
+        when(priceFeed.getPrice(StrategyTicker.TQQQ)).thenReturn(new BigDecimal("97.00"));
+
+        List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
+
+        assertThat(executions).hasSize(1);
+        assertThat(executions.getFirst().price()).isEqualByComparingTo("97.00");
     }
 
     @Test
@@ -224,7 +295,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.LOC, OrderDirection.BUY, 5,
                 new BigDecimal("100.00"), "MOCK-10");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
+        stubCandle("100.00", "100.00", "100.00", "100.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 
@@ -251,7 +322,7 @@ class MockBrokerAdapterTest {
         PlacedOrderView order = placedOrder(OrderType.MOC, OrderDirection.BUY, 3,
                 new BigDecimal("100.00"), "MOCK-CYCLE-SCOPED");
         when(mockSimulationDataPort.findPlacedOrders(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(order));
-        when(priceFeed.getClosingPrice(eq(StrategyTicker.TQQQ), any())).thenReturn(new BigDecimal("100.00"));
+        stubCandle("100.00", "100.00", "100.00", "100.00");
 
         List<Execution> executions = adapter().getExecutions(TRADE_DATE, TRADE_DATE, StrategyTicker.TQQQ, ACCOUNT);
 

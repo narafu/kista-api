@@ -121,8 +121,10 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     // --- ExecutionPort — 체결 시뮬레이션 코어 ---
-    // MOC: 항상 체결(종가) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
-    // LIMIT: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 지정가 그대로 — LOC와 달리 종가로 재계산하지 않음)
+    // MOC/MOO: 항상 체결(종가) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
+    // LIMIT: 일봉 OHLC 터치로 판정 — 매수는 저가<=지정가(체결가 min(지정가, 시가)), 매도는 고가>=지정가(체결가 max(지정가, 시가))
+    // (백테스트 FillSimulator.simulate와 동일 규칙)
+    // ponytail: 장중 접수 주문(수동 실행·재주문)도 시가·장중 터치 혜택을 받음 — 접수 시각 이후 분봉으로 판정하면 개선 가능
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         // 실제 호출부(TradingReporter)는 항상 from==to(당일)로만 호출 — to를 거래일로 사용
@@ -133,25 +135,37 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
         List<PlacedOrderView> placed = mockSimulationDataPort.findPlacedOrders(cycleId, to);
         if (placed.isEmpty()) return List.of();
 
-        BigDecimal closingPrice = getClosingPrice(ticker, to, account);
+        // 일봉은 호출당 1회 조회 — 확정 봉이 없으면 현재가 단일값 봉(시가=고가=저가=종가)으로 대체
+        BrokerCandle candle = priceFeed.fetchConfirmedCandle(ticker, to).orElseGet(() -> {
+            BigDecimal current = priceFeed.getPrice(ticker);
+            return new BrokerCandle(to, current, current, current, current, 0L);
+        });
+        BigDecimal closingPrice = candle.close();
         List<Execution> executions = new ArrayList<>();
         for (PlacedOrderView order : placed) {
-            if (!fills(order, closingPrice)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
-            // LIMIT은 지정가 그대로 체결, LOC/MOC는 종가 기준 체결
-            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? order.price() : closingPrice;
+            if (!fills(order, candle)) continue; // 미체결 — TradingReporter.markFilledOrders가 CANCELLED로 기록
+            BigDecimal fillPrice = order.orderType() == OrderType.LIMIT ? limitFillPrice(order, candle) : closingPrice;
             executions.add(Execution.ofManualFill(to, ticker, order.direction(), order.quantity(), fillPrice, order.externalOrderId()));
         }
         return executions;
     }
 
-    // 체결 판정 SSOT는 com.kista.tradingcore.stats.domain.backtest.FillSimulator.fills(Order, BigDecimal)이지만 trading의 Order를 받는다 —
-    // broker는 더 이상 trading 타입을 참조할 수 없으므로 동일 판정 로직을 broker 소유 타입으로 재구현한다.
-    // 순수 3줄 판정이라 포트 우회보다 저비용 복제로 판단(PersistenceSupport/DstInfo 부분 복제와 동일 기준, 변경 금지)
-    private static boolean fills(PlacedOrderView order, BigDecimal closingPrice) {
+    // 체결 판정 SSOT는 FillSimulator(trading 타입 PlannedOrder 기반)지만 broker는 trading 타입을 참조할 수 없어
+    // 동일 로직을 broker 소유 타입(PlacedOrderView/BrokerCandle)으로 재구현한다(PersistenceSupport/DstInfo 부분 복제와 동일 기준)
+    private static boolean fills(PlacedOrderView order, BrokerCandle candle) {
         if (order.orderType() == OrderType.MOC || order.orderType() == OrderType.MOO) return true; // 시장가 계열은 항상 체결(체결가는 종가 근사)
+        boolean buy = order.direction() == OrderDirection.BUY;
+        if (order.orderType() == OrderType.LIMIT) {
+            return buy ? candle.low().compareTo(order.price()) <= 0 : candle.high().compareTo(order.price()) >= 0; // 저가/고가 터치
+        }
+        return buy ? candle.close().compareTo(order.price()) <= 0 : candle.close().compareTo(order.price()) >= 0; // LOC: 종가 기준
+    }
+
+    // LIMIT 체결가 — 시가가 지정가보다 유리하게 열리면 시가, 아니면 지정가
+    private static BigDecimal limitFillPrice(PlacedOrderView order, BrokerCandle candle) {
         return order.direction() == OrderDirection.BUY
-                ? closingPrice.compareTo(order.price()) <= 0
-                : closingPrice.compareTo(order.price()) >= 0;
+                ? order.price().min(candle.open())
+                : order.price().max(candle.open());
     }
 
     // --- MarginPort ---
