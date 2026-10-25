@@ -10,6 +10,7 @@ import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.shared.kernel.*;
@@ -32,6 +33,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -62,6 +64,7 @@ class StrategyCreationService {
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
     private final DcaSummaryAssembler dcaSummaryAssembler;      // DCA 등록 응답의 다음 실행일 요약
     private final PrivacyTradePort privacyTradePort;            // PRIVACY 중간부터 시작 — FIDA 기준값으로 시작금액 산출
+    private final CycleOrderStrategies cycleStrategies;         // INFINITE 최소 시드 산출(minRequiredDeposit)
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
     StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
@@ -125,6 +128,11 @@ class StrategyCreationService {
         BigDecimal startAmount = cmd.type() == StrategyType.PRIVACY && bootstrap
                 ? privacyBootstrapStartAmount(depositOrZero, initialHoldings)
                 : depositOrZero.add(initialStockValue);
+
+        // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
+        if (cmd.type() == StrategyType.INFINITE) {
+            validateInfiniteMinSeed(account, resolvedTicker, marketPrice, divisionCount, startAmount);
+        }
 
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
         // (증권사 호출은 위에서 이미 끝났으므로 트랜잭션이 HTTP 대기를 물지 않는다)
@@ -200,6 +208,25 @@ class StrategyCreationService {
     private BigDecimal fetchMarketPrice(Account account, StrategyTicker ticker) {
         return BrokerCallGuard.wrap("전일종가 조회",
                 () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef()));
+    }
+
+    // INFINITE 최소 시드(전일종가×분할×2) 미만이면 거부 — 전일종가 조회 실패는 검증만 건너뛴다(fail-open, 503 변환 불필요)
+    private void validateInfiniteMinSeed(Account account, StrategyTicker ticker, BigDecimal marketPrice,
+                                         int divisionCount, BigDecimal startAmount) {
+        BigDecimal price = marketPrice;
+        if (price == null) {
+            try {
+                price = brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
+            } catch (RuntimeException e) {
+                log.warn("최소 시드 검증 건너뜀 — 전일종가 조회 실패: ticker={}, {}", ticker, e.toString());
+                return;
+            }
+        }
+        BigDecimal min = cycleStrategies.of(StrategyType.INFINITE).minRequiredDeposit(price, null, divisionCount);
+        if (min != null && startAmount.compareTo(min) < 0) {
+            // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관)
+            throw new IllegalArgumentException("최소 시드 $%s 이상이 필요합니다.".formatted(String.format(Locale.US, "%,.2f", min)));
+        }
     }
 
     // 등록 시점에만 런타임 생성 정책을 적용해 기존 전략 흐름과 설정 조회를 분리한다.

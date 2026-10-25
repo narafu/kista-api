@@ -119,7 +119,9 @@ class StrategyServiceTest {
                         vrStrategyLifecycle, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
                         dcaDetailPort),
                 dcaSummaryAssembler,
-                privacyTradePort);
+                privacyTradePort,
+                new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
+                        new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null))));
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort,
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
@@ -256,15 +258,15 @@ class StrategyServiceTest {
                 StrategyCycleSeedType.NONE);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        when(strategyPort.save(any())).thenReturn(saved);
+        lenient().when(strategyPort.save(any())).thenReturn(saved); // 최소 시드 거부 테스트는 저장까지 가지 않는다
         // 저장 인자(특히 startDate)를 그대로 반영 — 고정값 반환 시 scheduledStartDate 검증이 무의미해짐
-        when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
+        lenient().when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
             StrategyCycle arg = invocation.getArgument(0);
             return new StrategyCycle(cycleId, arg.strategyId(), arg.strategyVersionId(),
                     arg.startAmount(), arg.endAmount(), arg.startDate(), arg.endDate(),
                     arg.createdAt(), arg.deletedAt());
         });
-        when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(cyclePositionPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         if (type == StrategyType.VR) {
         }
     }
@@ -1802,7 +1804,7 @@ class StrategyServiceTest {
                 new BigDecimal("1500.00"), null, LocalDate.now(), null, null, null);
 
         RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("1000"), null, 20,
+                StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("1500"), null, 20,
                 BigDecimal.valueOf(10), new BigDecimal("45.50"), null, null, null,
                 null, null, null, null, null, null, null, null, null);
 
@@ -1815,13 +1817,13 @@ class StrategyServiceTest {
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
-        // startAmount = 현금 1000 + 시장가 50.00×10 = 1500.00
-        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1500.00")) == 0));
+        // startAmount = 현금 1500 + 시장가 50.00×10 = 2000.00 (최소 시드 50×20×2 = 2000 충족)
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("2000.00")) == 0));
         verify(cyclePositionPort).save(argThat(p ->
                 p.holdings().compareTo(BigDecimal.valueOf(10)) == 0
                         && p.avgPrice().compareTo(new BigDecimal("45.50")) == 0
                         && p.closingPrice().compareTo(new BigDecimal("50.00")) == 0
-                        && p.usdDeposit().compareTo(new BigDecimal("1000")) == 0));
+                        && p.usdDeposit().compareTo(new BigDecimal("1500")) == 0));
         verify(cyclePositionInfiniteDetailPort).save(argThat(d -> !d.isReverseMode()));
         assertThat(result.currentHoldings()).isEqualTo(10);
     }
@@ -2008,8 +2010,64 @@ class StrategyServiceTest {
                 commandFor(StrategyType.INFINITE, StrategyTicker.SOXL, 20, null, null, null));
 
         assertThat(result.currentHoldings()).isEqualTo(0);
-        verifyNoInteractions(brokerPricePort);
+        // INFINITE는 최소 시드 검증용 전일종가만 조회할 수 있다 — 포지션 closingPrice에는 쓰지 않는다
         verify(cyclePositionPort).save(argThat(p -> p.closingPrice() == null && p.avgPrice() == null));
+    }
+
+    // --- register() INFINITE 최소 시드 검증 ---
+
+    private RegisterStrategyCommand infiniteSeedCommand(String deposit) {
+        return new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal(deposit), null, 20,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    @Test
+    @DisplayName("INFINITE register() 시작 금액이 최소 시드(전일종가×분할×2) 미만이면 400으로 거부하고 저장하지 않는다")
+    void register_infinite_rejects_seed_below_min() {
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("2000")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("최소 시드 $2,400.00 이상이 필요합니다.");
+
+        verifyNoInteractions(strategyVersionPort, strategyCyclePort, cyclePositionPort);
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("INFINITE register() 시작 금액이 최소 시드와 같으면 등록된다")
+    void register_infinite_accepts_seed_at_min() {
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenReturn(new BigDecimal("60"));
+
+        strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("2400"));
+
+        verify(strategyPort).save(any());
+    }
+
+    @Test
+    @DisplayName("INFINITE register() 전일종가 조회가 실패하면 최소 시드 검증만 건너뛰고 등록된다")
+    void register_infinite_skips_min_check_when_price_fetch_fails() {
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+        when(brokerPricePort.getPrevClose(eq(StrategyTicker.SOXL), any())).thenThrow(new RuntimeException("시세 장애"));
+
+        strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("100"));
+
+        verify(strategyPort).save(any());
+    }
+
+    @Test
+    @DisplayName("VR register() 신규 등록(보유 0)은 전일종가를 조회하지 않는다")
+    void register_vr_does_not_fetch_prev_close() {
+        stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
+
+        strategyService.register(USER_ID, ACCOUNT_ID, new RegisterStrategyCommand(
+                StrategyType.VR, null, new BigDecimal("2000"), null, 20,
+                null, null, 4, new BigDecimal("15.00"), 0,
+                null, null, null, null, null, null, null, null, null));
+
+        verify(brokerPricePort, never()).getPrevClose(any(), any());
     }
 
     // --- register() 시작예정일(scheduledStartDate) ---
