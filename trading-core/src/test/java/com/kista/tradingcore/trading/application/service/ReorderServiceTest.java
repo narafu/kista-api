@@ -175,6 +175,20 @@ class ReorderServiceTest {
     }
 
     @Test
+    void reorder_fromUnknownLeg_rejected() {
+        // leg 없는 과거 주문은 슬롯을 식별할 수 없어 재주문 불가 — 취소·저장 없이 거절
+        stubSelection(plannedOrder().withLeg(Order.UNKNOWN_LEG));
+
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_OPEN), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("과거 주문");
+
+        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).saveAll(any());
+        verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
+    }
+
+    @Test
     void reorder_fromFailed_rejected() {
         stubSelection(failedOrder());
 
@@ -350,7 +364,7 @@ class ReorderServiceTest {
     private Order plannedBuy() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2),
-                new BigDecimal("100.00"), OrderStatus.PLACED, "PLACED-1", null, null);
+                new BigDecimal("100.00"), OrderStatus.PLACED, "PLACED-1", null, null).withLeg("PRIVACY_LOC_BUY");
     }
 
     // 가격 250 × 수량 2 = 500 BUY 재주문
@@ -491,13 +505,13 @@ class ReorderServiceTest {
     private Order plannedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1),
-                new BigDecimal("236.54"), OrderStatus.PLANNED, null, null, null);
+                new BigDecimal("236.54"), OrderStatus.PLANNED, null, null, null).withLeg("PRIVACY_LOC_SELL");
     }
 
     private Order placedOrder() {
         return new Order(ORDER_ID, ACCOUNT_ID, CYCLE_ID, LocalDate.of(2026, 7, 2), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1),
-                new BigDecimal("236.54"), OrderStatus.PLACED, "PLACED-1", null, null);
+                new BigDecimal("236.54"), OrderStatus.PLACED, "PLACED-1", null, null).withLeg("PRIVACY_LOC_SELL");
     }
 
     private Order filledOrder() {

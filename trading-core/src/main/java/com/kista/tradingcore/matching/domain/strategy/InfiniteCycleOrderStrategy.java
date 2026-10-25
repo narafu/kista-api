@@ -47,22 +47,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public boolean canSkipOrderComputation(List<PlannedOrder> existingOrders, Set<OrderTiming> creatableTimings) {
-        List<PlannedOrder> targetOrders = existingOrders.stream()
-                .filter(order -> creatableTimings.contains(order.timing()))
-                .toList();
-        // 리버스모드 여부는 계산 전에는 알 수 없으므로 legacy 주문은 양 방향이 모두 있어야만 전체 슬롯을 점유한다.
-        if (!targetOrders.isEmpty()
-                && targetOrders.stream().allMatch(order -> PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
-                && creatableTimings.stream().allMatch(timing -> targetOrders.stream()
-                        .anyMatch(order -> order.timing() == timing && order.direction() == OrderDirection.BUY)
-                        && targetOrders.stream().anyMatch(order -> order.timing() == timing
-                                && order.direction() == OrderDirection.SELL))) {
-            return true;
-        }
-
         Set<ExistingLegSlot> concreteSlots = existingOrders.stream()
                 .filter(order -> creatableTimings.contains(order.timing()))
-                .filter(order -> !PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 .map(ExistingLegSlot::of)
                 .collect(Collectors.toSet());
         if (concreteSlots.isEmpty()) return false;
@@ -73,7 +59,6 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
         Set<String> atCloseLegs = existingOrders.stream()
                 .filter(order -> hasAtCloseTiming && order.timing() == OrderTiming.AT_CLOSE)
-                .filter(order -> !PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 .filter(order -> order.direction() == OrderDirection.BUY)
                 .map(PlannedOrder::orderLeg)
                 .collect(Collectors.toSet());

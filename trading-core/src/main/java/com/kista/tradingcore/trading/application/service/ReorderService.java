@@ -76,6 +76,11 @@ class ReorderService implements ReorderUseCase {
             throw new IllegalArgumentException("미체결(PLANNED·PLACED) 주문만 재주문할 수 있습니다");
         }
 
+        // leg 없는 과거 주문(UNKNOWN)은 복사해도 슬롯을 식별할 수 없다 — 재주문 대상에서 제외
+        if (Order.UNKNOWN_LEG.equals(sourceOrder.orderLeg())) {
+            throw new IllegalArgumentException("주문 구분이 없는 과거 주문은 재주문할 수 없습니다");
+        }
+
         BigDecimal price = requirePrice(command);
         int quantity = requireQuantity(command);
         OrderDirection direction = command.direction() != null ? command.direction() : sourceOrder.direction();

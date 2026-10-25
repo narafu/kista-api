@@ -1283,34 +1283,10 @@ class TradingServiceTest {
     }
 
     @Test
-    void executeBatch_existingUnknownBuyAndSell_skipsOrderComputer() throws InterruptedException {
-        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
-                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
-                BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null);
+    void executeBatch_existingReverseSellOnly_computesAndSavesReverseBuy() throws InterruptedException {
         Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
-                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
-
-        when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
-        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
-        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
-                .thenReturn(List.of(existingBuy, existingSell));
-        when(orderPort.findPlannedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any()))
-                .thenReturn(List.of(existingBuy, existingSell));
-
-        service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
-
-        verify(orderPort, never()).saveAll(anyList());
-        verify(infiniteStrategy, never()).buildOrders(any(InfinitePosition.class), any(LocalDate.class));
-    }
-
-    @Test
-    void executeBatch_existingUnknownSell_computesAndSavesReverseBuy() throws InterruptedException {
-        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
-                StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
-                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
+                BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null).withLeg("REVERSE_INFINITE_LOC_SELL");
         Order reverseBuy = Order.fromPlanned(PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderDirection.BUY, 1, new BigDecimal("21.99"), "REVERSE_INFINITE_LOC_BUY"), null, null);
         CyclePositionInfiniteDetail latestReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
