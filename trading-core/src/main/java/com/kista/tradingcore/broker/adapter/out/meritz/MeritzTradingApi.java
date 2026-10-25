@@ -39,7 +39,6 @@ class MeritzTradingApi {
     record HoldingRow(
             @JsonProperty("ovrs_stck_symb_iscd") String symbol,   // 종목코드(접미사 없는 심볼)
             @JsonProperty("rmnd_dqty") String holdings,           // 잔고수량 — "417.0000000000" 소수 표기
-            @JsonProperty("seln_able_dqty") String sellable,      // 판매가능수량
             @JsonProperty("avrg_unpr") String avgPrice,           // 평균단가
             @JsonProperty("psnt_prc") String currentPrice) {}     // 현재가
 
@@ -79,9 +78,11 @@ class MeritzTradingApi {
         return List.of(new MarginItem(Currency.USD, able, able, able, orZero(usd == null ? null : usd.rate())));
     }
 
+    // 포트 계약(미체결 매도 미차감 보유 수량)에 맞춰 잔고수량 rmnd_dqty를 쓴다 — seln_able_dqty는 미체결 매도를 이미 뺀 순수량이라
+    // 소비처가 DB PLANNED/PLACED SELL 예약을 다시 빼면 이중 차감된다(Toss 0d74f846과 같은 이유)
     SellableQuantity getSellableQuantity(StrategyTicker ticker, BrokerAccountRef account) {
         HoldingRow row = findHolding(account, ticker);
-        return new SellableQuantity(ticker.name(), row == null ? 0 : MeritzResponse.wholeQuantity(row.sellable()));
+        return new SellableQuantity(ticker.name(), row == null ? 0 : MeritzResponse.wholeQuantity(row.holdings()));
     }
 
     PresentBalanceResult getPresentBalance(BrokerAccountRef account) {

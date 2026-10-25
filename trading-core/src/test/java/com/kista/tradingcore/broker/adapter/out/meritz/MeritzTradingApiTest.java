@@ -63,11 +63,11 @@ class MeritzTradingApiTest {
     }
 
     @Test
-    void sellable_quantity_reads_sellable_field_and_zero_when_unheld() {
+    void sellable_quantity_reads_holdings_not_net_sellable_and_zero_when_unheld() {
         expect("/accounts/v1/me/overseas/holdings", HOLDINGS);
         expect("/accounts/v1/me/overseas/holdings", HOLDINGS);
 
-        assertThat(api.getSellableQuantity(StrategyTicker.SOXL, ACCOUNT).quantity()).isEqualTo(400);
+        assertThat(api.getSellableQuantity(StrategyTicker.SOXL, ACCOUNT).quantity()).isEqualTo(417); // seln_able_dqty(400) 아님
         assertThat(api.getSellableQuantity(StrategyTicker.TQQQ, ACCOUNT).quantity()).isZero();
     }
 
