@@ -28,6 +28,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 class ManualTradingService {
 
+    private static final String OPERATION = "바로주문"; // queryFailure 알림·예외 메시지의 경로 이름
+
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final AccountPort accountPort;
@@ -78,7 +80,7 @@ class ManualTradingService {
         } catch (Exception e) {
             log.warn("[{}] 계획 계산 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                     account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
-            throw queryFailure(eventPublisher, e);
+            throw queryFailure(eventPublisher, OPERATION, e);
         }
         if (result.isSkip()) {
             // NO_CYCLE_HISTORY(사이클 이력 없음)는 데이터 무결성 오류에 준하므로 조용한 무동작이 아닌 시끄러운 실패로 승격 —
@@ -115,7 +117,7 @@ class ManualTradingService {
                 } catch (Exception e) {
                     log.warn("[{}] 원장 조회 실패 — 바로주문 중단: account={}, ticker={}, error={}",
                             account.nickname(), account.id(), strategy.ticker().name(), e.getMessage());
-                    throw queryFailure(eventPublisher, e);
+                    throw queryFailure(eventPublisher, OPERATION, e);
                 }
                 if (fit.rejected()) throw new ManualTradingException("전략 원장 예수금이 부족합니다.");
                 orderPlanner.savePlannedOrders(fit.orders(), account, currentCycle.id());
@@ -123,7 +125,7 @@ class ManualTradingService {
             });
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt(); // 종료 인터럽트 — 판정·저장 전이라 주문은 남지 않는다
-            throw queryFailure(eventPublisher, e);
+            throw queryFailure(eventPublisher, OPERATION, e);
         }
 
         // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)
@@ -163,10 +165,11 @@ class ManualTradingService {
     // 바로주문 조회 실패 응답 변환 — 증권사 타입 예외는 다른 화면과 동일하게 503/422/429로 그대로 전파
     // (503은 TradingExceptionHandler가 app_error_logs에 기록), 그 외 예외는 500(ManualTradingFailedException) + 관리자 알림
     // ReorderService도 공용 — 비트랜잭션 호출자는 이벤트가 즉시(fallbackExecution) 발송된다
-    static RuntimeException queryFailure(ApplicationEventPublisher eventPublisher, Exception e) {
+    static RuntimeException queryFailure(ApplicationEventPublisher eventPublisher, String operation, Exception e) {
         if (BrokerCallGuard.isBrokerTyped(e)) return (RuntimeException) e;
         // ManualTradingFailedException은 핸들러 전용 매핑이라 catch-all 보고를 타지 않으므로 여기서 직접 기록
-        eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
-        return new ManualTradingFailedException(e);
+        // operation(바로주문/재주문)을 알림·예외 메시지에 실어 관리자가 어느 경로의 실패인지 구분하게 한다
+        eventPublisher.publishEvent(new TradingErrorEvent(null, operation + " 실패: " + e.getMessage()));
+        return new ManualTradingFailedException(operation, e);
     }
 }

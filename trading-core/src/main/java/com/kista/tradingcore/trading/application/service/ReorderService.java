@@ -113,7 +113,7 @@ class ReorderService implements ReorderUseCase {
             } catch (Exception e) {
                 log.warn("원장 조회 실패 — 재주문 중단: accountId={}, strategyId={}, error={}",
                         command.accountId(), strategy.id(), e.getMessage());
-                throw ManualTradingService.queryFailure(eventPublisher, e);
+                throw ManualTradingService.queryFailure(eventPublisher, "재주문", e);
             }
             BigDecimal limit = remaining.add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate));
             if (price.multiply(BigDecimal.valueOf(quantity)).compareTo(limit) > 0) {

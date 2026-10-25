@@ -412,7 +412,8 @@ class ReorderServiceTest {
         assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
                 .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingFailedException.class);
 
-        verify(eventPublisher).publishEvent(any(com.kista.tradingcore.trading.application.event.TradingErrorEvent.class));
+        // 관리자 알림에 재주문 경로가 실려야 바로주문 실패와 구분된다
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.TradingErrorEvent(null, "재주문 실패: db down"));
         verify(orderPort, never()).cancelPlanned(any());
         verify(orderPort, never()).markCancelled(any());
         verify(brokerOrderCorrectionPort, never()).cancel(any(), any());

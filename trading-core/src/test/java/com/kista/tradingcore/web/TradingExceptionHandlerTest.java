@@ -112,7 +112,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void manualTradingFailed_mapsTo500WithFixedDetailAndNoErrorReport() {
-        var detail = handler.handleTradingCoreExceptions(new ManualTradingFailedException(new RuntimeException("DB down")));
+        var detail = handler.handleTradingCoreExceptions(new ManualTradingFailedException("바로주문", new RuntimeException("DB down")));
         assertThat(detail.getStatus()).isEqualTo(500);
         assertThat(detail.getDetail()).isEqualTo("주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
         assertThat(detail.getProperties() == null || !detail.getProperties().containsKey("code")).isTrue();
