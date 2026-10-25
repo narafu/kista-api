@@ -29,7 +29,7 @@ public record TradingPolicySettings(
         }
         brokers.put(Broker.UPBIT, new BrokerSettings(false, SERVER_EGRESS_IP)); // 단계 배포 — 운영자가 관리자 설정에서 켠다
         brokers.put(Broker.BINANCE, new BrokerSettings(false, SERVER_EGRESS_IP)); // 단계 배포 — 운영자가 관리자 설정에서 켠다
-        brokers.put(Broker.MERITZ, new BrokerSettings(false, null)); // 베타 API·모의계좌 없음 — 운영자가 본인 계좌 검증 후 켠다
+        brokers.put(Broker.MERITZ, new BrokerSettings(false, null)); // 모의계좌 없음 — 운영자가 본인 계좌 검증 후 켠다
         Map<StrategyType, StrategyCreationSettings> strategies = new EnumMap<>(StrategyType.class);
         strategies.put(StrategyType.INFINITE, new StrategyCreationSettings(true,
                 field(true, List.copyOf(StrategyType.INFINITE.capability().availableTickers()), StrategyTicker.SOXL),

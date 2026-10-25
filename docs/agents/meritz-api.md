@@ -1,6 +1,6 @@
 ## 메리츠증권 API
 
-2026-10-23 운영 서버 조회 전용 실측 기준. 구현은 `com.kista.tradingcore.broker.adapter.out.meritz`(벤더 모델 `domain.model.meritz`, internal). 모의 서버가 없고 베타 API라 `Broker.MERITZ`는 관리자 설정에서 **기본 비활성**이다.
+2026-10-23 운영 서버 조회 전용 실측 기준. 구현은 `com.kista.tradingcore.broker.adapter.out.meritz`(벤더 모델 `domain.model.meritz`, internal). 메리츠 Open API는 2026-10-26 00시(KST) 정식 오픈(베타 종료)됐다. 모의 서버가 없어 `Broker.MERITZ`는 관리자 설정에서 **기본 비활성**이다.
 
 ### 기본 사실
 - Base `https://openapi.imeritz.com:9443`(`meritz.base-url`, trading-core `application.yml`). 모든 요청 헤더 `authorization: Bearer <token>` + `mac_address`(고정 상수 `0242AC110002`, 값 검증 없음).
@@ -70,6 +70,7 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 실주문 실측 이후에도 남은 항목 — 관리자 활성화 후 첫 배치에서 확인한다.
 - MOC(매도 `34`)·시장가 매도(`05`, MOO SELL 근사) 실접수 여부(LOC·지정가 매수는 실측 완료).
 - `warn_cls_code`가 `0`이 아닌 경우의 실제 형태 — 실측에서 경고가 한 번도 발생하지 않았다. 경고가 `data.warn_cls_code`가 아니라 성공이 아닌 `rsp_cd`로 올 가능성이 남아 있다 — 이 경우 `MeritzHttpClient`가 먼저 예외를 던져 재전송이 동작하지 않는다(미접수 방향이라 안전).
+- 정식 오픈(2026-10-26) 후 기존 앱키 토큰 발급 유지 여부 — 포털 기준 base URL(`openapi.imeritz.com:9443`)·키 재발급 변경 공지는 확인되지 않았다. 정식 오픈 후 첫 배치 운영 로그에서 토큰 발급 오류(`EGW00103`/`EGW00121`)가 없는지 확인한다.
 - 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `Conflict`는 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
 
 ### 잔고 부족 거절 분류 갭
