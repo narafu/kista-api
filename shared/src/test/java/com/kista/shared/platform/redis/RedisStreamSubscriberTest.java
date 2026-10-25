@@ -81,6 +81,20 @@ class RedisStreamSubscriberTest {
         assertThat(new TestSubscriber(redisTemplate).connectionFactoryStopped()).isFalse();
     }
 
+    // 폴링 오류마다 대기해 즉시 재시도 루프(연결 폭주·포트 고갈)를 막고, 인터럽트는 대기 없이 보존한다
+    @Test
+    void onPollError_백오프_대기하고_인터럽트는_보존한다() {
+        TestSubscriber subscriber = new TestSubscriber(mock(StringRedisTemplate.class));
+
+        long start = System.nanoTime();
+        subscriber.onPollError(new IllegalStateException("Unable to connect to Redis"));
+        assertThat(System.nanoTime() - start).isGreaterThanOrEqualTo(RedisStreamSubscriber.POLL_ERROR_BACKOFF.toNanos());
+
+        Thread.currentThread().interrupt();
+        subscriber.onPollError(new IllegalStateException("종료 중"));
+        assertThat(Thread.interrupted()).isTrue(); // 플래그 보존 확인 + 다음 테스트를 위해 해제
+    }
+
     @Test
     void handle_처리_후_ack한다() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);

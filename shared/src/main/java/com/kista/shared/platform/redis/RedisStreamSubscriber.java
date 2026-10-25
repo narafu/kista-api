@@ -29,6 +29,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     private static final Duration IDLE_THRESHOLD = Duration.ofSeconds(60); // 이 시간 이상 ack 없는 pending만 복구 대상
     private static final String RECOVERY_CONSUMER = "-recovery"; // 복구 전용 컨슈머 이름 접미사
     private static final int CLAIM_BATCH_SIZE = 100; // 복구 1회 최대 claim 건수
+    static final Duration POLL_ERROR_BACKOFF = Duration.ofSeconds(1); // 폴링 오류 후 재폴링 전 대기 — Spring Data Redis 폴링 루프는 오류 시 대기 없이 즉시 재시도한다
 
     private final RedisConnectionFactory connectionFactory; // 구독 컨테이너 생성용 연결 팩토리
     protected final StringRedisTemplate redisTemplate;      // ack·XCLAIM·서브클래스 조회용 템플릿
@@ -85,7 +86,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
                     .consumer(Consumer.from(group, consumerName))
                     .autoAcknowledge(false)
                     .cancelOnError(t -> connectionFactoryStopped())
-                    .errorHandler(t -> log.warn("{} 스트림 폴링 오류 — 구독 유지: {}", streamKey, t.getMessage()))
+                    .errorHandler(this::onPollError)
                     .build();
             subscription = container.register(request, this::handle);
             container.start();
@@ -93,6 +94,17 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
         } catch (Exception e) {
             stop(); // 부분 생성물 폐기 — 다음 recoverPending()이 처음부터 재시도한다
             log.error("{} 스트림 컨슈머 시작 실패 — 다음 복구 주기까지 소비가 지연된다", streamKey, e);
+        }
+    }
+
+    // 폴링 오류 처리 — StreamPollTask가 폴링 스레드에서 동기 호출하므로 여기서 대기해 재시도를 늦춘다.
+    // 대기가 없으면 Redis 연결 실패 시 매 시도가 새 연결을 열어 TIME_WAIT가 쌓이고 ephemeral 포트가 고갈돼 다른 연결(DB 등)까지 BindException으로 실패한다(로컬 실측)
+    void onPollError(Throwable t) {
+        log.warn("{} 스트림 폴링 오류 — 구독 유지: {}", streamKey, t.getMessage());
+        try {
+            Thread.sleep(POLL_ERROR_BACKOFF);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // 종료 인터럽트 보존 — 폴링 루프가 다음 반복에서 감지해 끝낸다
         }
     }
 
