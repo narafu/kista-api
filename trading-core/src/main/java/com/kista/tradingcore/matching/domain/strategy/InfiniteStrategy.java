@@ -9,7 +9,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -88,22 +87,15 @@ public class InfiniteStrategy {
     }
 
     // 전반: buy①(averagePrice 기반), buy②(referencePrice 기반, 원본에 없을 수 있음)
-    // DB 조회 순서가 보장되지 않으므로 ①②는 순서가 아니라 leg로 식별한다 — ①②로 식별되지 않는 행(legacy UNKNOWN_LEG 등)은 비어 있는 자리를 ①→② 순서로 채운다
+    // DB 조회 순서가 보장되지 않으므로 ①②는 순서가 아니라 leg로 식별한다 — ①②로 식별되지 않는 행은 무시하고 없는 자리는 포지션 기준으로 다시 만든다
     private List<PlannedOrder> computeEarlyBuys(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> baseOrders, BigDecimal cap, BigDecimal unitAmount) {
         PlannedOrder buy1 = baseOrders.stream().filter(o -> AVG_LEGS.contains(o.orderLeg())).findFirst().orElse(null);
         PlannedOrder buy2 = baseOrders.stream().filter(o -> EARLY_REF_LEG.equals(o.orderLeg())).findFirst().orElse(null);
-        Iterator<PlannedOrder> legacy = baseOrders.stream()
-                .filter(o -> !AVG_LEGS.contains(o.orderLeg()) && !EARLY_REF_LEG.equals(o.orderLeg())).iterator();
-        if (buy1 == null && legacy.hasNext()) buy1 = legacy.next();
-        // 병합 행은 ①②를 함께 대표하므로 legacy 행을 매수②로 쓰지 않는다
-        if (buy2 == null && legacy.hasNext() && !EARLY_MERGED_LEG.equals(buy1.orderLeg())) buy2 = legacy.next();
         // 매수①이 없으면(REF만 남은 경우) 평단가 LOC로 다시 만든다
         BigDecimal avgPrice = buy1 != null ? buy1.price() : position.averagePrice();
         OrderType avgType = buy1 != null ? buy1.orderType() : LOC;
-        String avgLeg = buy1 != null && !AVG_LEGS.contains(buy1.orderLeg()) ? buy1.orderLeg() : EARLY_AVG_LEG;
         BigDecimal refPrice = buy2 != null ? buy2.price() : position.referencePrice();
         OrderType refType = buy2 != null ? buy2.orderType() : LOC;
-        String refLeg = buy2 != null ? buy2.orderLeg() : EARLY_REF_LEG;
 
         BigDecimal cappedAvg = avgPrice.min(cap);
         BigDecimal cappedRef = refPrice.min(cap);
@@ -117,8 +109,8 @@ public class InfiniteStrategy {
             buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY,
                     quantity1 + quantity2, cappedAvg, EARLY_MERGED_LEG));
         } else {
-            buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY, quantity1, cappedAvg, avgLeg));
-            if (quantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), refType, BUY, quantity2, cappedRef, refLeg));
+            buys.add(PlannedOrder.of(tradeDate, position.ticker(), avgType, BUY, quantity1, cappedAvg, EARLY_AVG_LEG));
+            if (quantity2 > 0) buys.add(PlannedOrder.of(tradeDate, position.ticker(), refType, BUY, quantity2, cappedRef, EARLY_REF_LEG));
         }
         return buys;
     }
