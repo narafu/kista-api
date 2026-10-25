@@ -27,6 +27,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
+
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -51,6 +54,7 @@ class TradingPreviewServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock OrderPort orderPort;
+    @Mock CyclePositionPort cyclePositionPort;
     @Mock StrategyOrderPlanBuilder planBuilder;
     @Mock StrategyLedgerBudget ledgerBudget;
     @Mock TradingPriceFetcher priceFetcher;
@@ -72,7 +76,7 @@ class TradingPreviewServiceTest {
     @BeforeEach
     void setUp() {
         // 생성자에 브로커 잔고·판매가능수량 포트가 없다 — 미리보기는 브로커를 조회하지 않음을 컴파일 타임에 고정
-        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, planBuilder, ledgerBudget, priceFetcher);
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher);
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
@@ -83,6 +87,7 @@ class TradingPreviewServiceTest {
                 .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE));
         lenient().when(orderPort.findPlannedOrPlacedByCycleAndDate(any(), any())).thenReturn(List.of());
         lenient().when(orderPort.findPlannedOrPlacedByCycleIdsAndDate(any(), any())).thenReturn(Map.of());
+        lenient().when(cyclePositionPort.findLatestByCycleIds(any())).thenReturn(Map.of());
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);
     }
 
@@ -348,7 +353,10 @@ class TradingPreviewServiceTest {
         when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
         when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(true);
-        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), any())).thenReturn(new BigDecimal("177.61"));
+        // 배치 조회한 사이클 최신 포지션과 이미 로드한 당일 주문(없음)이 그대로 원장 계산에 넘어가야 한다
+        CyclePosition latest = mock(CyclePosition.class);
+        when(cyclePositionPort.findLatestByCycleIds(any())).thenReturn(Map.of(STRATEGY_CYCLE.id(), latest));
+        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), eq(Optional.of(latest)), eq(List.of()))).thenReturn(new BigDecimal("177.61"));
         when(ledgerBudget.fit(eq(StrategyType.INFINITE), eq(List.of(buy)), eq(new BigDecimal("177.61"))))
                 .thenReturn(new StrategyLedgerBudget.LedgerFit(List.of(), new BigDecimal("304.32"), false, true));
 
@@ -357,6 +365,9 @@ class TradingPreviewServiceTest {
         assertThat(result.ledgerCheck().sufficient()).isFalse();
         assertThat(result.ledgerCheck().requiredBuyUsd()).isEqualByComparingTo("304.32");
         assertThat(result.ledgerCheck().remainingLedger()).isEqualByComparingTo("177.61");
+        // 전략별 개별 조회 없이 배치 조회 결과만 쓴다
+        verify(cyclePositionPort, never()).findLatestOne(any());
+        verify(orderPort, never()).findPlannedOrPlacedByCycleAndDate(any(), any());
     }
 
     @Test
@@ -438,7 +449,7 @@ class TradingPreviewServiceTest {
                 new com.kista.tradingcore.matching.domain.model.AccountBalance(0, null, BigDecimal.ZERO), null));
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
                 new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
-        TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, realBuilder,
+        TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,
                 ledgerBudget, priceFetcher);
 
         NextOrdersPreview result = wired.preview(STOCK_DCA.id(), ACCOUNT.userId());

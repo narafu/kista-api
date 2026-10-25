@@ -10,6 +10,7 @@ import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 // 전략 자기 원장(cycle_position.usd_deposit) 기준 BUY 상한 — 계좌 단위 예산 배정(live 잔고 조회)을 대체하는 순수 계산
 @Component
@@ -32,11 +34,15 @@ class StrategyLedgerBudget {
 
     // 사이클의 신규 BUY 가용 한도 — 최신 원장(첫 거래일처럼 포지션이 없으면 시작 금액)에서 같은 날 저장된 BUY(PLANNED·SUBMITTING·PLACED)를 한 번만 뺀다
     BigDecimal remaining(StrategyCycle cycle, LocalDate tradeDate) {
-        BigDecimal ledger = cyclePositionPort.findLatestOne(cycle.id())
-                .map(CyclePosition::usdDeposit)
-                .orElse(cycle.startAmount());
+        return remaining(cycle, cyclePositionPort.findLatestOne(cycle.id()),
+                orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), tradeDate));
+    }
+
+    // 이미 조회한 최신 포지션·같은 날 PLANNED/SUBMITTING/PLACED 주문으로 계산하는 순수 버전 — 미리보기 배치 N+1 방지용, 공식은 여기 한 곳
+    BigDecimal remaining(StrategyCycle cycle, Optional<CyclePosition> latest, List<Order> sameDayOrders) {
+        BigDecimal ledger = latest.map(CyclePosition::usdDeposit).orElse(cycle.startAmount());
         if (ledger == null) ledger = BigDecimal.ZERO;
-        BigDecimal committed = orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), tradeDate).stream()
+        BigDecimal committed = sameDayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(o.quantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

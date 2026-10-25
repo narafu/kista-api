@@ -9,9 +9,11 @@ import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -28,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -40,6 +43,7 @@ class TradingPreviewService {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final OrderPort orderPort;
+    private final CyclePositionPort cyclePositionPort; // 원장 잔여 계산용 최신 포지션 일괄 조회
     private final StrategyOrderPlanBuilder planBuilder;
     private final StrategyLedgerBudget ledgerBudget; // 배치·수동실행과 같은 전략 원장 상한 판정
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
@@ -91,6 +95,8 @@ class TradingPreviewService {
         // 사이클들의 오늘 PLANNED/PLACED 주문을 1회 배치 조회 (사이클마다 개별 조회하던 것을 축소)
         List<UUID> cycleIds = cyclesByStrategyId.values().stream().map(StrategyCycle::id).toList();
         Map<UUID, List<Order>> ordersByCycleId = orderPort.findPlannedOrPlacedByCycleIdsAndDate(cycleIds, today);
+        // 원장 잔여 계산용 최신 포지션도 1회 배치 조회 (전략마다 findLatestOne 하던 것을 축소)
+        Map<UUID, CyclePosition> latestPositions = cyclePositionPort.findLatestByCycleIds(cycleIds);
         Map<UUID, List<Order>> todayOrdersByStrategyId = new LinkedHashMap<>();
         cyclesByStrategyId.forEach((strategyId, cycle) -> todayOrdersByStrategyId.put(strategyId,
                 ordersByCycleId.getOrDefault(cycle.id(), List.of())));
@@ -153,13 +159,13 @@ class TradingPreviewService {
                 }
             }
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), planResult, totalAccountPlannedBuy));
+                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy));
         }
         return previews;
     }
 
     private NextOrdersPreview buildPreview(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
-                                            List<Order> todayOrders,
+                                            List<Order> todayOrders, CyclePosition latestPosition,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
                                             BigDecimal totalAccountPlannedBuy) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
@@ -191,7 +197,7 @@ class TradingPreviewService {
         List<PlannedOrder> freshOrders = TradingOrderSlots.excludeExisting(plan.orders(), todayOrders);
         LedgerCheckPreview ledgerCheck = null;
         if (ledgerBudget.applies(strategy.type()) && freshOrders.stream().anyMatch(o -> o.direction() == OrderDirection.BUY)) {
-            BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, today);
+            BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, Optional.ofNullable(latestPosition), todayOrders);
             StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(strategy.type(), freshOrders, remainingLedger);
             ledgerCheck = new LedgerCheckPreview(remainingLedger, fit.requiredBuyUsd(), !fit.rejected(), fit.trimmed());
         }
