@@ -1133,6 +1133,18 @@ flows:
         state: "strategy_cycle → 종료 · strategy → PAUSED"
         fail: 청산 이후에 체결이 더 있으면 400 "청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다"이고 전부 롤백된다.
 
+      - id: ledger-reconciliation
+        lane: trading
+        to: [broker, telegram]
+        title: 전략 원장 대사·알림
+        desc: >-
+          화~토 09:00 KST(락 ledger-reconciliation) 비코인 계좌마다 종목별 실보유(총 잔고수량)를 진행 중 사이클 원장 holdings 합과 대조하고 원장 음수를 검사해,
+          괴리가 있는 계좌만 관리자 알림을 보낸다. 실보유가 원장보다 많은 건 KISTA 밖 보유일 수 있어 무시하고, MOCK은 바깥 기준이 없어 원장 음수만 본다.
+          결과는 매매 판단·원장에 쓰지 않는다 — 괴리가 보이면 관리자가 위 수동 체결 보정으로 처리한다.
+        code: [LedgerReconciliationScheduler#run, LedgerReconciliationService#reconcileAll]
+        cond: 실보유 < 원장 합이거나 원장 음수일 때만
+        fail: 한 계좌의 브로커 잔고 조회가 실패하면 그 계좌만 건너뛰고 조회 실패 알림을 보낸다.
+
   notify-settings:
     title: 알림 설정
     trigger: 사용자가 설정 화면에서 텔레그램 봇을 연결하거나, 알림 채널·알림 종류 스위치를 바꾸거나, 푸시 알림을 켠다
