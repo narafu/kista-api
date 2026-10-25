@@ -338,6 +338,36 @@ class InfiniteStrategyTypeTest {
     }
 
     @Test
+    @DisplayName("buildCappedBuyOrders 전반 REF leg + legacy UNKNOWN 혼합: UNKNOWN 행이 비어 있는 매수① 자리를 채운다")
+    void buildCappedBuyOrders_earlyStage_refLegWithLegacyAvg_fillsAvgFromLegacy() {
+        // REF leg가 먼저 와도 legacy(UNKNOWN_LEG) 평단가 행이 매수①로 쓰여 정상 입력과 같은 결과
+        List<PlannedOrder> base = earlyBaseBuys();
+        PlannedOrder legacyAvg = PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY,
+                base.getFirst().quantity(), base.getFirst().price());
+
+        List<PlannedOrder> result = strategy.buildCappedBuyOrders(earlyPosition(), TODAY,
+                List.of(base.get(1), legacyAvg), new BigDecimal("52.50"));
+
+        assertThat(result.getFirst().orderLeg()).isEqualTo(PlannedOrder.UNKNOWN_LEG);
+        assertThat(result).extracting(PlannedOrder::quantity).containsExactly(10, 9, 1, 1, 1);
+        assertThat(result).extracting(PlannedOrder::price).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("50"), new BigDecimal("52.50"), new BigDecimal("50.00"),
+                        new BigDecimal("47.61"), new BigDecimal("45.45"));
+    }
+
+    @Test
+    @DisplayName("buildCappedBuyOrders 전반 MERGED leg + legacy UNKNOWN 혼합: legacy 행을 매수②로 쓰지 않아 MERGED 단독과 같은 결과")
+    void buildCappedBuyOrders_earlyStage_mergedLegWithLegacy_ignoresLegacyAsBuy2() {
+        PlannedOrder merged = PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY, 18, new BigDecimal("50"), InfiniteStrategy.EARLY_MERGED_LEG);
+        PlannedOrder legacy = PlannedOrder.of(TODAY, StrategyTicker.SOXL, LOC, BUY, 3, new BigDecimal("40"));
+
+        List<PlannedOrder> mergedOnly = strategy.buildCappedBuyOrders(earlyPosition(), TODAY, List.of(merged), new BigDecimal("52.50"));
+        List<PlannedOrder> mixed = strategy.buildCappedBuyOrders(earlyPosition(), TODAY, List.of(legacy, merged), new BigDecimal("52.50"));
+
+        assertThat(mixed).isEqualTo(mergedOnly);
+    }
+
+    @Test
     @DisplayName("buildCappedBuyOrders 전반 2건, 동일 캡으로 수렴: 병합 1건+보정 3건 = 4건")
     void buildCappedBuyOrders_twoBuys_convergeToSameCap_mergesIntoOne() {
         // cap=55, buy①=70·buy②=60 모두 55로 캡 → 동일 가격이면 병합

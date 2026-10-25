@@ -78,9 +78,9 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 .map(PlannedOrder::orderLeg)
                 .collect(Collectors.toSet());
 
-        boolean earlyComplete = atCloseLegs.contains("INFINITE_EARLY_AVG_BUY")
-                && atCloseLegs.contains("INFINITE_EARLY_REF_BUY");
-        boolean earlyMergedComplete = atCloseLegs.contains("INFINITE_EARLY_MERGED_BUY");
+        boolean earlyComplete = atCloseLegs.contains(InfiniteStrategy.EARLY_AVG_LEG)
+                && atCloseLegs.contains(InfiniteStrategy.EARLY_REF_LEG);
+        boolean earlyMergedComplete = atCloseLegs.contains(InfiniteStrategy.EARLY_MERGED_LEG);
         boolean lateComplete = atCloseLegs.contains("INFINITE_LATE_REF_BUY");
         boolean correctionComplete = atCloseLegs.contains("INFINITE_CORRECTION_01")
                 && atCloseLegs.contains("INFINITE_CORRECTION_02")
