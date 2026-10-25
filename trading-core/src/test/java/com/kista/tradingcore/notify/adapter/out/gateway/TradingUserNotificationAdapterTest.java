@@ -72,6 +72,19 @@ class TradingUserNotificationAdapterTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void notifyStrategyAutoPaused_sends_reason_and_action() {
+        adapter.notifyStrategyAutoPaused(LINKED_PROFILE, "메인", StrategyType.INFINITE, StrategyTicker.SOXL,
+                new java.math.BigDecimal("12.34"), new java.math.BigDecimal("60.00"));
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("전략 자동 일시정지").contains("메인").contains("SOXL")
+                .contains("$12.34").contains("$60.00").contains("삭제");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_brokerRejection_bodyContainsFailedCountAndPartialNote() {
         adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 2, true);
 

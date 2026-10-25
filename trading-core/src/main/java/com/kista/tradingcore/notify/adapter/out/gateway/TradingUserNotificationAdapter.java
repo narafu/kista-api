@@ -61,6 +61,17 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     }
 
     @Override
+    public void notifyStrategyAutoPaused(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
+                                         StrategyTicker ticker, BigDecimal seed, BigDecimal price) {
+        String text = """
+                ⏸️ <b>전략 자동 일시정지</b> — %s%n\
+                [%s] %s 다음 사이클 시드 $%.2f가 1주 가격 $%.2f보다 작아 새 사이클을 열지 않았습니다.%n\
+                재개해도 매수할 수 없으니 전략을 삭제하고 충분한 시드로 다시 등록해 주세요.""".formatted(
+                TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name(), seed, price);
+        notify(profile, "전략 자동 일시정지", text);
+    }
+
+    @Override
     public void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker,
                                           int failedCount, boolean partiallyPlaced) {
         String account = TelegramHttpClient.escapeHtml(accountNickname);

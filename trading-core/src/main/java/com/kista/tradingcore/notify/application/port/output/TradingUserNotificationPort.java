@@ -21,6 +21,9 @@ public interface TradingUserNotificationPort {
                                StrategyTicker ticker, StrategyCycleSeedType cycleSeedType);
     void notifyNewCycleStarted(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
                                StrategyTicker ticker, BigDecimal initialUsdDeposit);
+    // 소액 시드로 새 사이클을 열 수 없어 전략이 자동 일시정지됨
+    void notifyStrategyAutoPaused(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
+                                  StrategyTicker ticker, BigDecimal seed, BigDecimal price);
     // failedCount>0: 증권사 잔고 부족 거절 BUY 건수, 0: 전략 원장 상한 거절
     void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker,
                                    int failedCount, boolean partiallyPlaced);

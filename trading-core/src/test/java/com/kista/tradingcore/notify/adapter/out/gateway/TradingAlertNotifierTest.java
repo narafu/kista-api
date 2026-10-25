@@ -99,6 +99,19 @@ class TradingAlertNotifierTest {
     }
 
     @Test
+    void onStrategyAutoPaused_notifies_user_only() {
+        when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
+        BigDecimal seed = new BigDecimal("12.34");
+        BigDecimal price = new BigDecimal("60.00");
+
+        notifier().onStrategyAutoPaused(new com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent(
+                userId, accountId, "메인", StrategyType.INFINITE, StrategyTicker.SOXL, seed, price));
+
+        verify(userNotificationPort).notifyStrategyAutoPaused(profile, "메인", StrategyType.INFINITE, StrategyTicker.SOXL, seed, price);
+        org.mockito.Mockito.verifyNoInteractions(notifyPort);
+    }
+
+    @Test
     void onMarketClosed_callsNotifyPort() {
         notifier().onMarketClosed(new MarketClosedEvent());
 
