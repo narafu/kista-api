@@ -427,7 +427,8 @@ class BacktestEngineTest {
         // 1일차: 기준가 100 → unitAmount=1000/4=250.00, 기준가=100×1.15=115.00 → 전반 매수 2건 (115는 접수 전 캡 105로 보정)
         assertThat(recorder.on("2024-01-01").inputs().prevClosePrice()).isEqualByComparingTo("100");
         assertThat(recorder.on("2024-01-01").legs())
-                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
+                .containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                        "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
 
         // 2일차 종가 100에 LOC 매수 2건(@100 / 캡 105) 체결 → 예수금 800, 2주
         // 3일차 종가 90에 2일차 LOC 매수 2건(@100 / 109→캡 105) 체결 → 예수금 620, 4주 → 620 + 4×90 = 980
@@ -506,13 +507,14 @@ class BacktestEngineTest {
         assertThat(early.position(4).currentRound()).isEqualTo(1.52);
         assertThat(early.position(4).isEarlyStage()).isTrue();
         assertThat(early.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03",
                 "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
 
         // 4일차: 캡 보정 매수 2주가 종가 85에 체결 → 6주·평단 91.6667·예수금 450 → 매입금 550 ÷ 250.00 = 2.2회차 (≥ 2.0) → 후반
         Recorded late = recorder.on("2024-01-04");
         assertThat(late.position(4).currentRound()).isEqualTo(2.2);
         assertThat(late.position(4).isEarlyStage()).isFalse();
-        assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
+        assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
         // 후반 매수 = 단위금액 250.00 ÷ 기준가 89.83 내림 = 2주 (기준가 = 평단 91.6667 × (1 − 0.02), offset = 0.15×(1−2×2.2/4) = −0.015 → −0.02)
         assertThat(late.orders().getFirst().quantity()).isEqualTo(2);
         assertThat(late.orders().getFirst().price()).isEqualByComparingTo("89.83");
@@ -582,6 +584,7 @@ class BacktestEngineTest {
         // 일반모드 주문 다리로 복귀 — 5주·평단 87.7778·예수금 510 → 단위금액 (510 + 438.89)/4 = 237.22, 1.85회차라 전반
         assertThat(back.position(4).currentRound()).isEqualTo(1.85);
         assertThat(back.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03",
                 "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
 
         // 예수금 210 + MOC 4주×75 = 510 + 5주×75 = 885.00
@@ -617,7 +620,8 @@ class BacktestEngineTest {
         assertThat(restarted.inputs().isReverseMode()).isFalse();
         assertThat(restarted.inputs().isFirstReverseDay()).isFalse();
         assertThat(restarted.inputs().starPointPrice()).isNull();
-        assertThat(restarted.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY");
+        assertThat(restarted.legs()).containsExactly("INFINITE_EARLY_AVG_BUY", "INFINITE_EARLY_REF_BUY",
+                        "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03");
 
         // 자산은 시드로 리셋되지 않고 그대로 이월된다 — 예수금 0 + 매도대금 950 = 950.00
         assertThat(restarted.balance().usdDeposit()).isEqualByComparingTo("950");

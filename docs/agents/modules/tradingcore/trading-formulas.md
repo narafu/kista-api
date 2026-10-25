@@ -26,6 +26,7 @@ BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준�
 보정 i(1~3) = LOC 매수 1주, 가격 = unitAmount ÷ (누적수량 + 1)  (scale=2, FLOOR — (누적수량+1)×가격 ≤ unitAmount), leg INFINITE_CORRECTION_01~03, 누적수량 0이면 생략
 ```
 - 전반 재산정: cappedAvg = 첫 base 가격.min(cap), cappedRef = (매수② 가격, 매수②가 없던 날은 referencePrice).min(cap). 동가면 q1+q2 병합(`INFINITE_EARLY_MERGED_BUY`), 분리 시 q2 > 0일 때만 매수② 추가
+- cap과 무관하게 일반모드 BUY마다 `buildOrders`가 보정 3건을 부착한다(isFinalRound·리버스모드 제외, base BUY 바로 뒤·SELL 앞)
 - 보정 합계가 원장 예수금을 넘으면 뒤쪽 보정부터 제거(`trimCorrectionsToBudget`)
 
 ### cap 배수 1.05 경위 (값 유지)

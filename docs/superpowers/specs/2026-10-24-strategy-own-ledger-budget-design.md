@@ -198,10 +198,10 @@
 ## 9. 범위 밖 후속
 
 - INFINITE 보정 주문과 cap 점검 결과(공식 변경이 필요해 별도 결정 대상):
-  - 보정 주문이 cap 발동 시에만 붙어 하락 폭 5% 경계에서 매수가 계단식으로 바뀜. 의도 여부 확인
-  - `earlyBuyQuantity2` 최소 1주 보장으로 회차 금액 초과 가능
-  - 보정 가격 HALF_UP 반올림으로 `(N+1)×가격`이 `unitAmount`를 수 센트 넘을 수 있음(FLOOR가 의도에 부합)
-  - cap 배수 1.05의 근거를 문서화
+  - 보정 주문이 cap 발동 시에만 붙어 하락 폭 5% 경계에서 매수가 계단식으로 바뀜. 의도 여부 확인 → 처리: docs/superpowers/specs/2026-10-25-infinite-correction-cap-review-design.md
+  - `earlyBuyQuantity2` 최소 1주 보장으로 회차 금액 초과 가능 → 처리: docs/superpowers/specs/2026-10-25-infinite-correction-cap-review-design.md
+  - 보정 가격 HALF_UP 반올림으로 `(N+1)×가격`이 `unitAmount`를 수 센트 넘을 수 있음(FLOOR가 의도에 부합) → 처리: docs/superpowers/specs/2026-10-25-infinite-correction-cap-review-design.md
+  - cap 배수 1.05의 근거를 문서화 → 처리: docs/superpowers/specs/2026-10-25-infinite-correction-cap-review-design.md
 
 - MOCK LIMIT 체결가 개선(종가 기준 체결, 지정가 이하 체결 반영)
 - 원장과 FIDA·실계좌의 괴리 보정 도구

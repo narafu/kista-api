@@ -17,7 +17,7 @@ import static com.kista.shared.kernel.OrderType.*;
 
 public class InfiniteStrategy {
 
-    // 가격 캡 보정 주문 추가 횟수
+    // 장마감 하락 대비 보정 주문 추가 횟수
     private static final int CORRECTION_ORDER_COUNT = 3;
 
     // 전략 계산 — 전반/후반 분기 후 주문 목록 반환
@@ -46,13 +46,7 @@ public class InfiniteStrategy {
                 ? computeLateBuys(tradeDate, position, baseOrders.getFirst(), cap, unitAmount)
                 : computeEarlyBuys(tradeDate, position, baseOrders, cap, unitAmount);
 
-        // 전후반 공통 보정 주문
-        for (int i = 0; i < CORRECTION_ORDER_COUNT; i++) {
-            addCorrectionOrder(tradeDate, position, newBuys, unitAmount, i + 1);
-        }
-
-        // 보정 주문이 원장 예수금을 넘으면 뒤쪽부터 생략 — 지정가 합계가 예산 밖이면 접수 전체가 거절돼 교착된다
-        return trimCorrectionsToBudget(newBuys, position.usdDeposit());
+        return withCorrections(tradeDate, position, newBuys);
     }
 
     // BUY 지정가×수량 합이 budget을 넘는 동안 뒤쪽 correction leg부터 제거 — 보정 가격이 누적수량 의존이라 앞쪽(prefix)만 남긴다
@@ -66,6 +60,15 @@ public class InfiniteStrategy {
             trimmed.remove(last);
         }
         return trimmed;
+    }
+
+    // BUY 목록 뒤에 보정 주문 3건을 붙이고, 원장 예수금을 넘으면 뒤쪽부터 생략한다 — 지정가 합계가 예산 밖이면 접수 전체가 거절돼 교착된다
+    private List<PlannedOrder> withCorrections(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> buys) {
+        List<PlannedOrder> withCorrections = new ArrayList<>(buys);
+        for (int i = 0; i < CORRECTION_ORDER_COUNT; i++) {
+            addCorrectionOrder(tradeDate, position, withCorrections, position.unitAmount(), i + 1);
+        }
+        return trimCorrectionsToBudget(withCorrections, position.usdDeposit());
     }
 
     // 후반 단일 LOC 매수: unitAmount/referencePrice
@@ -132,6 +135,7 @@ public class InfiniteStrategy {
         if (buyQuantity2 > 0) orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, buyQuantity2,
                 position.referencePrice(), "INFINITE_EARLY_REF_BUY"));
 
+        attachCorrections(orders, position, tradeDate);
         addCommonSellOrders(orders, position, tradeDate);
     }
 
@@ -151,8 +155,16 @@ public class InfiniteStrategy {
                         position.referencePrice(), "INFINITE_LATE_REF_BUY"));
             }
 
+            attachCorrections(orders, position, tradeDate);
             addCommonSellOrders(orders, position, tradeDate);
         }
+    }
+
+    // orders에 BUY만 담긴 시점에 보정 주문을 붙인다 — base BUY가 없으면 보정도 없다
+    private void attachCorrections(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
+        List<PlannedOrder> corrected = withCorrections(tradeDate, position, orders);
+        orders.clear();
+        orders.addAll(corrected);
     }
 
     private void addCommonSellOrders(List<PlannedOrder> orders, InfinitePosition position, LocalDate tradeDate) {
