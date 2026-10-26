@@ -97,6 +97,8 @@ class MetaControllerTest {
                 .andExpect(jsonPath("$.orderStatuses[*].code").value(org.hamcrest.Matchers.contains(
                         "PLANNED", "SUBMITTING", "PLACED", "FILLED", "PARTIALLY_FILLED", "FAILED", "CANCELLED")))
                 .andExpect(jsonPath("$.orderStatuses[?(@.code=='PARTIALLY_FILLED')].label").value(org.hamcrest.Matchers.contains("부분체결")))
+                .andExpect(jsonPath("$.orderTimings[0].code").value("AT_CLOSE"))
+                .andExpect(jsonPath("$.orderTimings[?(@.code=='AT_OPEN')].label").value(org.hamcrest.Matchers.contains("개장 선접수")))
                 .andExpect(jsonPath("$.dcaExecutionStatuses[*].code").value(org.hamcrest.Matchers.contains("ORDERED", "SKIPPED")))
                 .andExpect(jsonPath("$.dcaExecutionStatuses[1].label").value("건너뜀"))
                 .andExpect(jsonPath("$.dcaFrequencies[2].code").value("MONTHLY"))

@@ -20,6 +20,7 @@ import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -59,6 +60,7 @@ public class MetaController {
                 toEnumMeta(OrderType.values(), OrderType::getLabel),
                 toEnumMeta(OrderDirection.values(), OrderDirection::getLabel),
                 toEnumMeta(OrderStatus.values(), OrderStatus::getLabel),
+                toEnumMeta(OrderTiming.values(), OrderTiming::getLabel),
                 toEnumMeta(DcaFrequency.values(), DcaFrequency::getLabel),
                 toEnumMeta(DcaOperator.values(), DcaOperator::getLabel),
                 toEnumMeta(DcaSkipReason.values(), DcaSkipReason::getLabel),

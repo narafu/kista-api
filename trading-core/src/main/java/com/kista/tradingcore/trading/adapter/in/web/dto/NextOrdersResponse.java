@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
 import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -84,10 +85,12 @@ public record NextOrdersResponse(
             @Schema(description = "주문 수량")
             int quantity,               // 주문 수량
             @Schema(description = "주문 가격 (LOC/MOC는 참고용)")
-            BigDecimal price            // 주문 가격 (LOC/MOC는 참고용)
+            BigDecimal price,           // 주문 가격 (LOC/MOC는 참고용)
+            @Schema(description = "접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치, IMMEDIATE=즉시)", example = "AT_CLOSE")
+            OrderTiming timing  // 접수 시점
     ) {
         public static OrderItem from(PlannedOrder o) {
-            return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.quantity(), o.price());
+            return new OrderItem(o.ticker(), o.orderType(), o.direction(), o.quantity(), o.price(), o.timing());
         }
     }
 
@@ -106,7 +109,9 @@ public record NextOrdersResponse(
             @Schema(description = "주문 가격")
             BigDecimal price,
             @Schema(description = "주문 상태 (취소 가능 여부 판단용)", example = "PLANNED")
-            OrderStatus status
+            OrderStatus status,
+            @Schema(description = "접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치, IMMEDIATE=즉시)", example = "AT_CLOSE")
+            OrderTiming timing  // 접수 시점
     ) {
         public static TodayOrderItem from(Order o) {
             return new TodayOrderItem(
@@ -116,7 +121,8 @@ public record NextOrdersResponse(
                     o.orderType().name(),
                     o.quantity(),
                     o.price(),
-                    o.status()
+                    o.status(),
+                    o.timing()
             );
         }
     }

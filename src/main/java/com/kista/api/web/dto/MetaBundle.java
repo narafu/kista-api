@@ -29,6 +29,8 @@ public record MetaBundle(
         List<EnumMeta> orderDirections,        // 주문 방향 목록
         @Schema(description = "주문 상태 목록")
         List<EnumMeta> orderStatuses,          // 주문 상태 목록
+        @Schema(description = "주문 접수 시점 목록")
+        List<EnumMeta> orderTimings,           // 주문 접수 시점 목록
         @Schema(description = "DCA 실행 주기 목록")
         List<EnumMeta> dcaFrequencies,         // DCA 실행 주기 목록
         @Schema(description = "DCA 조건 연산자 목록")

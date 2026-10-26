@@ -1,5 +1,10 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderTiming;
+import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import org.junit.jupiter.api.Test;
@@ -33,5 +38,13 @@ class NextOrdersResponseTest {
         assertThat(summary.requiredBuyUsd()).isEqualByComparingTo("304.32");
         assertThat(summary.sufficient()).isFalse();
         assertThat(summary.trimmed()).isTrue();
+    }
+
+    @Test
+    void orderItem_mapsTiming() {
+        PlannedOrder planned = PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("10"), OrderTiming.AT_OPEN);
+
+        assertThat(NextOrdersResponse.OrderItem.from(planned).timing()).isEqualTo(OrderTiming.AT_OPEN);
     }
 }
