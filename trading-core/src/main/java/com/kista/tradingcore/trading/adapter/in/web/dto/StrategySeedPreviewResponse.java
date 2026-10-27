@@ -12,11 +12,11 @@ public record StrategySeedPreviewResponse(
         String ticker,
         @Schema(description = "기준가 (계산 불가 시 null)")
         BigDecimal basePrice,
-        @Schema(description = "최소 필요 시드 (계산 불가 시 null)")
+        @Schema(description = "최소 필요 투자금 (계산 불가 시 null)")
         BigDecimal minSeed,
         @Schema(description = "계산 불가 사유 (정상이면 null)", example = "NO_PRIVACY_BASE")
         String skipReason,
-        @Schema(description = "가용 예수금 = 증권사 매수가능금액 − 다른 전략 원장 합 (모의계좌·조회 실패면 null). 입력 시드가 넘으면 경고만 한다")
+        @Schema(description = "가용 예수금 = 증권사 매수가능금액 − 다른 전략 원장 합 (모의계좌·조회 실패면 null). 입력 예수금이 넘으면 경고만 한다")
         BigDecimal availableCash
 ) {
     public static StrategySeedPreviewResponse from(StrategySeedPreview preview) {

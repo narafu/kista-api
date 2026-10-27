@@ -434,7 +434,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("남은 원장($12.34)이 1주 가격($60.00)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 시드로 다시 등록해 주세요.");
+                .hasMessage("남은 원장($12.34)이 1주 가격($60.00)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해 주세요.");
         verify(strategyCyclePort, never()).save(any());
         verify(cyclePositionPort, never()).save(any());
         verify(strategyPort, never()).save(any());
@@ -2031,7 +2031,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, infiniteSeedCommand("2000")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("최소 시드 $2,400.00 이상이 필요합니다.");
+                .hasMessage("최소 투자금 $2,400.00 이상이 필요합니다.");
 
         verifyNoInteractions(strategyVersionPort, strategyCyclePort, cyclePositionPort);
         verify(strategyPort, never()).save(any());

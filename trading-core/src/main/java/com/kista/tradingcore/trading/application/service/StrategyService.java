@@ -137,7 +137,7 @@ class StrategyService implements StrategyUseCase {
         // 1주도 못 사는 원장으로 재개하면 0회차 매수가 원장 상한에 막혀 교착 — 거부
         if (closingPrice != null && latestCycle.endAmount().compareTo(closingPrice) < 0) {
             throw new IllegalStateException(String.format(Locale.US,
-                    "남은 원장($%.2f)이 1주 가격($%.2f)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 시드로 다시 등록해 주세요.",
+                    "남은 원장($%.2f)이 1주 가격($%.2f)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해 주세요.",
                     latestCycle.endAmount(), closingPrice));
         }
         cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), latestCycle.endAmount(), closingPrice);
@@ -178,7 +178,7 @@ class StrategyService implements StrategyUseCase {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (strategy.isVr() && cmd.newSeed() != null) {
-            throw new IllegalArgumentException("VR 전략의 시드/시작금액은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
+            throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
         }
         // VR은 롤오버가 사이클 교체를 맡아 연속 사이클 정책이 NONE으로 고정된다
         if (strategy.isVr() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
@@ -202,14 +202,14 @@ class StrategyService implements StrategyUseCase {
     // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
     private void updateSeed(UUID strategyId, BigDecimal newSeed) {
         if (newSeed.signum() <= 0) {
-            throw new IllegalArgumentException("시드는 0보다 커야 합니다");
+            throw new IllegalArgumentException("예수금은 0보다 커야 합니다");
         }
         StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
                 .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
 
         if (latest.holdings().signum() != 0) {
-            throw new IllegalArgumentException("보유 수량이 있는 사이클은 시드를 수정할 수 없습니다");
+            throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다");
         }
 
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);

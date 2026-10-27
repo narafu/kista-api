@@ -225,7 +225,7 @@ class StrategyCreationService {
         BigDecimal min = cycleStrategies.of(StrategyType.INFINITE).minRequiredDeposit(price, null, divisionCount);
         if (min != null && startAmount.compareTo(min) < 0) {
             // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관)
-            throw new IllegalArgumentException("최소 시드 $%s 이상이 필요합니다.".formatted(String.format(Locale.US, "%,.2f", min)));
+            throw new IllegalArgumentException("최소 투자금 $%s 이상이 필요합니다.".formatted(String.format(Locale.US, "%,.2f", min)));
         }
     }
 

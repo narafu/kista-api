@@ -185,7 +185,7 @@ public class TradingCycleController {
     }
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기
-    @Operation(summary = "전략 최소시드·기준가 미리보기")
+    @Operation(summary = "전략 최소 투자금·기준가 미리보기")
     @GetMapping("/api/accounts/{accountId}/strategy-seed-preview")
     public StrategySeedPreviewResponse seedPreview(
             @PathVariable UUID accountId,

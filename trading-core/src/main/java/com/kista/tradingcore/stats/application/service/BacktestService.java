@@ -94,13 +94,13 @@ class BacktestService implements BacktestUseCase {
                     command.type() + " 전략이 지원하지 않는 종목입니다: " + command.ticker());
         }
         if (command.seed() != null && command.seed().signum() < 0) {
-            throw new IllegalArgumentException("시드(seed)는 0 이상이어야 합니다");
+            throw new IllegalArgumentException("예수금(seed)은 0 이상이어야 합니다");
         }
         int initialHoldings = BootstrapPosition.validate(command.initialHoldings() == null ? null : BigDecimal.valueOf(command.initialHoldings()),
                 command.initialAvgPrice(), Market.US_STOCK).intValueExact(); // 백테스트는 주식 전용 — 정수 보유
         boolean hasSeed = command.seed() != null && command.seed().signum() > 0;
         if (!hasSeed && initialHoldings <= 0) {
-            throw new IllegalArgumentException("시드(seed) 또는 기존 보유(initialHoldings·initialAvgPrice) 중 하나는 있어야 합니다");
+            throw new IllegalArgumentException("예수금(seed) 또는 기존 보유(initialHoldings·initialAvgPrice) 중 하나는 있어야 합니다");
         }
         if (command.from().isAfter(command.to())) {
             throw new IllegalArgumentException("시작일(from)이 종료일(to)보다 늦을 수 없습니다");

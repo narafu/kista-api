@@ -55,7 +55,7 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
         String text = """
                 🚀 <b>새 사이클 시작</b> — %s%n\
                 [%s] %s 사이클이 시작되었습니다.%n\
-                시드: $%.2f""".formatted(
+                투자금: $%.2f""".formatted(
                 TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name(), initialUsdDeposit);
         notify(profile, "새 사이클 시작", text);
     }
@@ -65,8 +65,8 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
                                          StrategyTicker ticker, BigDecimal seed, BigDecimal price) {
         String text = """
                 ⏸️ <b>전략 자동 일시정지</b> — %s%n\
-                [%s] %s 다음 사이클 시드 $%.2f가 1주 가격 $%.2f보다 작아 새 사이클을 열지 않았습니다.%n\
-                재개해도 매수할 수 없으니 전략을 삭제하고 충분한 시드로 다시 등록해 주세요.""".formatted(
+                [%s] %s 다음 사이클 투자금 $%.2f가 1주 가격 $%.2f보다 작아 새 사이클을 열지 않았습니다.%n\
+                재개해도 매수할 수 없으니 전략을 삭제하고 충분한 투자금으로 다시 등록해 주세요.""".formatted(
                 TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name(), seed, price);
         notify(profile, "전략 자동 일시정지", text);
     }
