@@ -977,7 +977,7 @@ class BacktestEngineTest {
     }
 
     @Test
-    @DisplayName("사이클 시드 MAX: 청산 시점 예수금 전액으로 재시작한다")
+    @DisplayName("사이클 투자금 MAX: 청산 시점 예수금 전액으로 재시작한다")
     void 시드정책_MAX면_전액으로_재시작한다() {
         RecordingPrivacy recorder = new RecordingPrivacy();
         runPrivacyExit(recorder, null, 150); // null = 기본 MAX

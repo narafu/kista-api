@@ -75,7 +75,7 @@ class MetaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cycleSeedTypes").isArray())
                 .andExpect(jsonPath("$.cycleSeedTypes.length()").value(StrategyCycleSeedType.values().length))
-                .andExpect(jsonPath("$.cycleSeedTypes[?(@.code=='MAINTAIN')].label").value(org.hamcrest.Matchers.contains("시드 유지")));
+                .andExpect(jsonPath("$.cycleSeedTypes[?(@.code=='MAINTAIN')].label").value(org.hamcrest.Matchers.contains("투자금 유지")));
     }
 
     @Test
