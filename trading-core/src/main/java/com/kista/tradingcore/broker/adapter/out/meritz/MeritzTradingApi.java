@@ -12,6 +12,7 @@ import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 // 메리츠 해외주식 계좌 조회 — 잔고·주문가능금액·증거금·판매가능수량·보유현황·체결 내역
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class MeritzTradingApi {
@@ -39,6 +41,7 @@ class MeritzTradingApi {
     record HoldingRow(
             @JsonProperty("ovrs_stck_symb_iscd") String symbol,   // 종목코드(접미사 없는 심볼)
             @JsonProperty("rmnd_dqty") String holdings,           // 잔고수량 — "417.0000000000" 소수 표기
+            @JsonProperty("seln_able_dqty") String sellable,      // 매도가능수량 — 실측용 로그에만 사용(미체결 매도 차감 여부 미확정)
             @JsonProperty("avrg_unpr") String avgPrice,           // 평균단가
             @JsonProperty("psnt_prc") String currentPrice) {}     // 현재가
 
@@ -123,7 +126,20 @@ class MeritzTradingApi {
     }
 
     private List<HoldingRow> holdings(BrokerAccountRef account) {
-        return http.getAllPages(HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingRow.class);
+        List<HoldingRow> rows = http.getAllPages(HOLDINGS_PATH, account, new LinkedMultiValueMap<>(), HoldingRow.class);
+        // ponytail: 실측용 임시 로그 — 미체결 매도 중 rmnd_dqty·seln_able_dqty 차이를 확인하면 sellable 필드와 함께 제거
+        for (HoldingRow r : rows) {
+            try {
+                BigDecimal total = MeritzResponse.decimal(r.holdings());
+                BigDecimal sellable = MeritzResponse.decimal(r.sellable());
+                if (total != null && sellable != null && total.compareTo(sellable) != 0) {
+                    log.info("[메리츠 잔고 실측] symbol={}, rmnd_dqty={}, seln_able_dqty={}", r.symbol(), r.holdings(), r.sellable());
+                }
+            } catch (NumberFormatException e) {
+                // 실측 로그가 잔고 조회 경로를 깨지 않게 숫자 아닌 값은 무시
+            }
+        }
+        return rows;
     }
 
     // 내역 행 심볼은 접미사 포함(SOXL.AX) — 첫 점 앞만 비교
