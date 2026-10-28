@@ -4,6 +4,8 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Broker;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 public record Account(
@@ -22,6 +24,21 @@ public record Account(
     public Account(UUID id, UUID userId, String nickname, String accountNo, String appKey, String secretKey,
                    String brokerAccountCode, Broker broker, Instant createdAt) {
         this(id, userId, nickname, accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, null);
+    }
+
+    // 목록 표시용 증권사 순서 — 운영 중심(메리츠·바이낸스) 먼저, 목록에 없는 증권사는 맨 뒤
+    private static final List<Broker> DISPLAY_BROKER_ORDER =
+            List.of(Broker.MERITZ, Broker.BINANCE, Broker.TOSS, Broker.KIS, Broker.UPBIT, Broker.MOCK);
+
+    // 계좌 목록 표시 순서 — 증권사 → 등록순(createdAt, 동률은 시간순 UUID v7 id)
+    public static final Comparator<Account> DISPLAY_ORDER = Comparator
+            .comparingInt((Account a) -> brokerRank(a.broker()))
+            .thenComparing(Account::createdAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(Account::id, Comparator.nullsLast(Comparator.naturalOrder()));
+
+    private static int brokerRank(Broker broker) {
+        int rank = DISPLAY_BROKER_ORDER.indexOf(broker);
+        return rank < 0 ? DISPLAY_BROKER_ORDER.size() : rank;
     }
 
     // 전역 중복 판정 키 SSOT — 업비트·메리츠는 계좌번호가 없어 앱키, 그 외는 계좌번호

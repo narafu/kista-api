@@ -27,6 +27,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
     public List<Strategy> findByAccountId(UUID accountId) {
         return jpaRepository.findAllByAccountId(accountId).stream()
                 .map(this::toDomain)
+                .sorted(Strategy.DISPLAY_ORDER) // 계좌 안 전략 표시 순서
                 .toList();
     }
 
@@ -68,6 +69,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
         if (accountIds.isEmpty()) return Map.of();
         return jpaRepository.findAllByAccountIdIn(accountIds).stream()
                 .map(this::toDomain)
+                .sorted(Strategy.DISPLAY_ORDER) // groupingBy가 계좌별 리스트에 순서 보존
                 .collect(Collectors.groupingBy(Strategy::accountId));
     }
 

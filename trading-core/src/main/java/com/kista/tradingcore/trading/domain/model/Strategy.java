@@ -5,6 +5,7 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 
+import java.util.Comparator;
 import java.util.UUID;
 
 // 계좌별 영속 전략 설정 — 여러 StrategyCycle(매매 라운드)을 거느림
@@ -16,6 +17,12 @@ public record Strategy(
         StrategyTicker ticker,              // 거래 종목 (매매 도메인 메타: 익절률 + 설명)
         StrategyCycleSeedType cycleSeedType // 사이클 종료 후 자동 재등록 정책
 ) {
+    // 계좌 안 전략 표시 순서 — 유형(enum 선언순) → 종목명 → 등록순(시간순 UUID v7 id)
+    public static final Comparator<Strategy> DISPLAY_ORDER = Comparator
+            .comparing(Strategy::type)
+            .thenComparing(s -> s.ticker().name())
+            .thenComparing(Strategy::id, Comparator.nullsLast(Comparator.naturalOrder()));
+
     // 상태만 교체 — 나머지 필드 보존
     public Strategy withStatus(StrategyStatus newStatus) {
         return new Strategy(id, accountId, type, newStatus, ticker, cycleSeedType);

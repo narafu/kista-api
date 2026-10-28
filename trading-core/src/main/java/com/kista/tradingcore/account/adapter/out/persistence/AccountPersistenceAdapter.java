@@ -26,6 +26,7 @@ public class AccountPersistenceAdapter implements AccountPort {
     public List<Account> findByUserId(UUID userId) {
         return jpaRepository.findByUserId(userId).stream()
                 .map(this::toDomain)
+                .sorted(Account.DISPLAY_ORDER) // 계좌 목록·전체 전략 목록 공통 표시 순서
                 .toList();
     }
 
