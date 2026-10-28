@@ -946,7 +946,7 @@ flows:
         to: [trading, broker]
         title: 다음 주문 미리보기
         desc: >-
-          전략 상세 화면의 "다음 주문" 카드(NextOrderCard)가 오늘 낼 주문 계획과 원장 충족 여부(ledgerCheck)를 보여 준다.
+          전략 상세 화면의 "다음 주문" 카드(NextOrderCard)가 오늘 낼 주문 계획과 원장 충족 여부(ledgerCheck), 계좌 실제 주문가능 USD 대비 BUY 부족 경고(accountCashCheck, 증권사 1회 조회·경고 전용)를 보여 준다.
           DB에 아무것도 저장하지 않고, 휴장일이나 일시정지 여부와 상관없이 강제로 계산한다. 이 계산이 "바로 주문" 활성화와 안내 문구의 근거다.
           브라우저 요청은 kista-ui의 /api/trading-cycles·/api/orders 중계 라우트가 Caddy를 거치지 않고 kista-trading으로 바로 보낸다.
         code: [TradingCycleController#preview, TradingPreviewService#preview]

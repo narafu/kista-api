@@ -14,6 +14,8 @@ import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.broker.application.port.output.MarginPort;
+import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -58,6 +60,7 @@ class TradingPreviewServiceTest {
     @Mock StrategyOrderPlanBuilder planBuilder;
     @Mock StrategyLedgerBudget ledgerBudget;
     @Mock TradingPriceFetcher priceFetcher;
+    @Mock MarginPort marginPort;
 
     TradingPreviewService service;
 
@@ -76,7 +79,7 @@ class TradingPreviewServiceTest {
     @BeforeEach
     void setUp() {
         // 생성자에 브로커 잔고·판매가능수량 포트가 없다 — 미리보기는 브로커를 조회하지 않음을 컴파일 타임에 고정
-        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher);
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort);
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
@@ -450,7 +453,7 @@ class TradingPreviewServiceTest {
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
                 new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
         TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,
-                ledgerBudget, priceFetcher);
+                ledgerBudget, priceFetcher, marginPort);
 
         NextOrdersPreview result = wired.preview(STOCK_DCA.id(), ACCOUNT.userId());
 
@@ -478,5 +481,122 @@ class TradingPreviewServiceTest {
 
         assertThat(service.previewBatch(upbit.id(), upbit.userId())).isEmpty();
         verifyNoInteractions(priceFetcher, planBuilder);
+    }
+    // ===== 계좌 주문가능 USD 경고(accountCashCheck) =====
+
+    private static PlannedOrder buyOrder(StrategyTicker ticker, int qty, String price) {
+        return PlannedOrder.of(LocalDate.now(), ticker, OrderType.LOC, OrderDirection.BUY, qty, new BigDecimal(price));
+    }
+
+    private void stubPlan(Strategy strategy, StrategyCycle cycle, PlannedOrder... orders) {
+        when(planBuilder.build(eq(strategy), eq(TRADING_ACCOUNT), eq(cycle), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(orders)), null));
+    }
+
+    @Test
+    void accountCashCheck_insufficient_whenAvailableBelowRequired() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04")); // 304.32
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("300.00"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountCashCheck().sufficient()).isFalse();
+        assertThat(result.accountCashCheck().availableUsd()).isEqualByComparingTo("300.00");
+        assertThat(result.accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("304.32");
+    }
+
+    @Test
+    void accountCashCheck_sufficient_whenAvailableCoversRequired() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04"));
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("304.32"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountCashCheck().sufficient()).isTrue();
+    }
+
+    @Test
+    void accountCashCheck_isNull_whenMarginPortThrows() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04"));
+        when(marginPort.getUsdBuyableAmount(any())).thenThrow(new IllegalStateException("증권사 오류"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountCashCheck()).isNull();
+        assertThat(result.orders()).hasSize(1); // preview 자체는 정상
+    }
+
+    @Test
+    void accountCashCheck_isNull_andMarginNotCalled_whenNoBuyRequired() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE); // 주문 없음, PLANNED 합도 0
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountCashCheck()).isNull();
+        verifyNoInteractions(marginPort);
+    }
+
+    @Test
+    void accountCashCheck_isNull_andMarginNotCalled_forMockAccount() {
+        Account mock = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "123", "key", "secret", null, Broker.MOCK, null);
+        Strategy mockStrategy = new Strategy(UUID.randomUUID(), mock.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategy.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(7), null, null, null);
+        when(accountPort.requireOwnedAccount(mock.id(), mock.userId())).thenReturn(mock);
+        when(strategyPort.findByAccountId(mock.id())).thenReturn(List.of(mockStrategy));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(mockStrategy.id()))).thenReturn(Map.of(mockStrategy.id(), mockCycle));
+        when(planBuilder.build(eq(mockStrategy), any(), eq(mockCycle), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(
+                        new CycleOrderStrategy.OrderPlan(null, null, List.of(buyOrder(StrategyTicker.SOXL, 8, "38.04"))), null));
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(mock.id(), mock.userId());
+
+        assertThat(result.get(mockStrategy.id()).accountCashCheck()).isNull();
+        verifyNoInteractions(marginPort);
+    }
+
+    @Test
+    void accountCashCheck_callsMarginOnce_andSumsBothStrategiesAndPlannedBuy() {
+        Strategy sibling = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        StrategyCycle siblingCycle = new StrategyCycle(UUID.randomUUID(), sibling.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(7), null, null, null);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, sibling));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id(), sibling.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE, sibling.id(), siblingCycle));
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04")); // 304.32
+        stubPlan(sibling, siblingCycle, buyOrder(StrategyTicker.TQQQ, 2, "10.00"));    // 20.00
+        when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(new BigDecimal("100.00"));
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("1000.00"));
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        verify(marginPort, times(1)).getUsdBuyableAmount(any());
+        assertThat(result.get(STRATEGY.id()).accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("424.32");
+        assertThat(result.get(sibling.id()).accountCashCheck()).isEqualTo(result.get(STRATEGY.id()).accountCashCheck());
+    }
+    // 원장 fit 후 금액만 필요 BUY로 센다 — 축소면 축소 후 금액, 거절이면 신규 BUY 0
+    @Test
+    void accountCashCheck_usesLedgerFitResult_trimmedAndRejected() {
+        PlannedOrder original = buyOrder(StrategyTicker.SOXL, 8, "38.04");
+        stubPlan(STRATEGY, STRATEGY_CYCLE, original);
+        when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(true);
+        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), any(), any())).thenReturn(new BigDecimal("100.00"));
+        when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(new BigDecimal("50.00"));
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("1000.00"));
+        // 축소: 8주 -> 2주 (76.08) + PLANNED 50
+        when(ledgerBudget.fit(eq(StrategyType.INFINITE), any(), any()))
+                .thenReturn(new StrategyLedgerBudget.LedgerFit(List.of(buyOrder(StrategyTicker.SOXL, 2, "38.04")), new BigDecimal("304.32"), true, false));
+
+        NextOrdersPreview trimmed = service.preview(STRATEGY.id(), ACCOUNT.userId());
+        assertThat(trimmed.accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("126.08");
+
+        // 거절: BUY 없음 -> PLANNED 합만 남는다
+        when(ledgerBudget.fit(eq(StrategyType.INFINITE), any(), any()))
+                .thenReturn(new StrategyLedgerBudget.LedgerFit(List.of(), new BigDecimal("304.32"), false, true));
+
+        NextOrdersPreview rejected = service.preview(STRATEGY.id(), ACCOUNT.userId());
+        assertThat(rejected.accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("50.00");
     }
 }

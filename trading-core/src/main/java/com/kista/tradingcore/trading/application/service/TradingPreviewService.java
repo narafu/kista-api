@@ -1,6 +1,10 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.account.domain.model.Account;
+import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.Market;
+import com.kista.tradingcore.broker.application.port.output.MarginPort;
+import com.kista.tradingcore.trading.domain.model.AccountCashCheckPreview;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
@@ -47,6 +51,7 @@ class TradingPreviewService {
     private final StrategyOrderPlanBuilder planBuilder;
     private final StrategyLedgerBudget ledgerBudget; // 배치·수동실행과 같은 전략 원장 상한 판정
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
+    private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -141,6 +146,7 @@ class TradingPreviewService {
         }
 
         Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
+        Map<UUID, BigDecimal> freshBuyByStrategyId = new HashMap<>(); // 전략별 원장 반영 후 신규 BUY 금액 — skip 전략은 없음(0)
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
@@ -159,15 +165,36 @@ class TradingPreviewService {
                 }
             }
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy));
+                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId));
         }
+        return attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId);
+    }
+
+    // 계좌 단위로 1회 판정해 모든 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·코인·필요 BUY 없음·조회 실패면 null)
+    private Map<UUID, NextOrdersPreview> attachAccountCashCheck(Map<UUID, NextOrdersPreview> previews, TradingAccount account,
+                                                                 BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId) {
+        Broker broker = account.brokerRef().broker();
+        if (previews.isEmpty() || broker == Broker.MOCK || broker.getMarket() != Market.US_STOCK) return previews;
+        // 미접수 PLANNED·SUBMITTING BUY(증권사 주문가능금액에 아직 미차감) + 전략별 신규 BUY
+        BigDecimal required = freshBuyByStrategyId.values().stream().reduce(totalAccountPlannedBuy, BigDecimal::add);
+        if (required.signum() <= 0) return previews;
+        AccountCashCheckPreview check;
+        try {
+            BigDecimal available = marginPort.getUsdBuyableAmount(account.brokerRef());
+            if (available == null) return previews;
+            check = new AccountCashCheckPreview(available, required, available.compareTo(required) >= 0);
+        } catch (Exception e) {
+            log.warn("[accountId={}] 주문가능 USD 조회 실패 — 경고 생략: {}", account.id(), e.getMessage());
+            return previews;
+        }
+        previews.replaceAll((id, preview) -> preview.withAccountCashCheck(check));
         return previews;
     }
 
     private NextOrdersPreview buildPreview(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> todayOrders, CyclePosition latestPosition,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
-                                            BigDecimal totalAccountPlannedBuy) {
+                                            BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(o.quantity()))
@@ -179,16 +206,16 @@ class TradingPreviewService {
         // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
         if (currentCycle.endDate() != null) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.CYCLE_ENDED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null);
+                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
         }
         // 시작예정일 미도래 사이클은 계획 계산 자체를 건너뛴다 — TradingService.filterScheduledStart와 동일 기준(tradeDate > startDate)
         if (!today.isAfter(currentCycle.startDate())) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null);
+                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
         }
 
         if (planResult.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null);
+            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null);
         }
         CycleOrderStrategy.OrderPlan plan = planResult.plan();
 
@@ -196,12 +223,18 @@ class TradingPreviewService {
         // DCA(원장 상한 제외)·신규 BUY 없음이면 경고 없음(null)
         List<PlannedOrder> freshOrders = TradingOrderSlots.excludeExisting(plan.orders(), todayOrders);
         LedgerCheckPreview ledgerCheck = null;
+        List<PlannedOrder> buyCandidates = freshOrders; // 원장 fit 후 신규 주문 — 원장 상한 제외(DCA)면 freshOrders 그대로
         if (ledgerBudget.applies(strategy.type()) && freshOrders.stream().anyMatch(o -> o.direction() == OrderDirection.BUY)) {
             BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, Optional.ofNullable(latestPosition), todayOrders);
             StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(strategy.type(), freshOrders, remainingLedger);
             ledgerCheck = new LedgerCheckPreview(remainingLedger, fit.requiredBuyUsd(), !fit.rejected(), fit.trimmed());
+            buyCandidates = fit.orders(); // 거절이면 BUY 없음, 축소면 축소 후 금액
         }
+        freshBuyByStrategyId.put(strategy.id(), buyCandidates.stream()
+                .filter(o -> o.direction() == OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
 
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null);
     }
 }

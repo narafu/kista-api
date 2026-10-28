@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.web.dto;
 
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
+import com.kista.tradingcore.trading.domain.model.AccountCashCheckPreview;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -33,7 +34,9 @@ public record NextOrdersResponse(
         @Schema(description = "계좌 내 타 전략의 당일 PLANNED BUY 합계 (USD)")
         BigDecimal otherStrategiesPlannedBuyUsd,       // 계좌 내 타 전략 당일 PLANNED BUY 합계
         @Schema(description = "전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)")
-        LedgerCheckSummary ledgerCheck
+        LedgerCheckSummary ledgerCheck,
+        @Schema(description = "계좌 주문가능 USD 대비 오늘 BUY 경고 — 계좌 단위(계좌 내 모든 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 BUY 없음·증권사 조회 실패면 null")
+        AccountCashCheckSummary accountCashCheck
 ) {
     public record PositionSnapshot(
             @Schema(description = "거래 종목")
@@ -143,6 +146,20 @@ public record NextOrdersResponse(
         }
     }
 
+    // 계좌 실제 주문가능 USD 대비 BUY 경고 — 계좌 단위
+    public record AccountCashCheckSummary(
+            @Schema(description = "증권사 USD 주문가능금액 (조회 시점, 접수 완료 주문은 증권사가 차감)")
+            BigDecimal availableUsd,
+            @Schema(description = "계좌 전체 오늘 BUY 필요 금액 (PLANNED·SUBMITTING BUY + 전략별 원장 반영 후 신규 BUY, USD) — SUBMITTING은 증권사 차감 여부가 불확실해 보수적으로 포함")
+            BigDecimal requiredBuyUsd,
+            @Schema(description = "false면 배치 접수 시 증권사가 BUY를 거절할 수 있다")
+            boolean sufficient
+    ) {
+        public static AccountCashCheckSummary from(AccountCashCheckPreview p) {
+            return new AccountCashCheckSummary(p.availableUsd(), p.requiredBuyUsd(), p.sufficient());
+        }
+    }
+
     public static NextOrdersResponse from(NextOrdersPreview result) {
         return new NextOrdersResponse(
                 result.tradeDate(),
@@ -151,7 +168,8 @@ public record NextOrdersResponse(
                 result.skipReason(),
                 result.todayOrders().stream().map(TodayOrderItem::from).toList(),
                 result.otherStrategiesPlannedBuyUsd(),
-                result.ledgerCheck() == null ? null : LedgerCheckSummary.from(result.ledgerCheck())
+                result.ledgerCheck() == null ? null : LedgerCheckSummary.from(result.ledgerCheck()),
+                result.accountCashCheck() == null ? null : AccountCashCheckSummary.from(result.accountCashCheck())
         );
     }
 }

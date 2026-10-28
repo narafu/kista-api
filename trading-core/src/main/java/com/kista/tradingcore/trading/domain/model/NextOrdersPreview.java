@@ -14,8 +14,13 @@ public record NextOrdersPreview(
         SkipReason skipReason,                           // 정상이면 null
         List<Order> todayOrders,                          // 오늘 이미 등록된 PLANNED·PLACED 주문 (없으면 빈 리스트) — DTO(NextOrdersResponse.todayOrders)와 이름 통일
         BigDecimal otherStrategiesPlannedBuyUsd,          // 계좌 내 타 전략 당일 PLANNED BUY 합계
-        LedgerCheckPreview ledgerCheck                    // 전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)
+        LedgerCheckPreview ledgerCheck,                   // 전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)
+        AccountCashCheckPreview accountCashCheck          // 계좌 주문가능 USD 대비 BUY 경고 — 계좌 단위·조회 시점 추정·경고 전용, 해당 없음/조회 실패면 null
 ) {
+    public NextOrdersPreview withAccountCashCheck(AccountCashCheckPreview check) {
+        return new NextOrdersPreview(tradeDate, position, orders, skipReason, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, check);
+    }
+
     public enum SkipReason {
         NO_CYCLE_HISTORY,          // 사이클 이력 없음 (신규)
         NO_PRIVACY_BASE,           // PRIVACY 기준매매표 미수신
