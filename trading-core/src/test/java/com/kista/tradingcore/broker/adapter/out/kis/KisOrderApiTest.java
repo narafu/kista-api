@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
@@ -21,12 +22,14 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +39,7 @@ class KisOrderApiTest {
 
     @Mock KisHttpClient kisHttpClient;
     @Spy KisExchangeRegistry exchangeRegistry = new KisExchangeRegistry();
+    @Mock KisTradingApi kisTradingApi;
     @InjectMocks KisOrderApi api;
 
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
@@ -166,7 +170,8 @@ class KisOrderApiTest {
     @DisplayName("cancel: TTTT1004U + CANCEL_PATH 호출, RVSE_CNCL_DVSN_CD=02, ORGN_ODNO=기존주문번호")
     void cancel_sendsCorrectParameters() {
         CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "ORD_123");
-        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(null);
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
+                .thenReturn(new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", null));
 
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         api.cancel(instruction, ACCOUNT);
@@ -200,6 +205,99 @@ class KisOrderApiTest {
         when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(null);
 
         assertThatThrownBy(() -> api.place(instruction, ACCOUNT))
+                .isInstanceOfSatisfying(KisApiException.class, e -> assertThat(e.isRejected()).isFalse());
+    }
+
+    private static final CancelInstruction CANCEL = new CancelInstruction(StrategyTicker.SOXL, "ORD_9");
+
+    @Test
+    @DisplayName("cancel: 전량 체결된 원주문은 POST 없이 ALREADY_FILLED 경합")
+    void cancel_fullyFilled_throwsAlreadyFilledWithoutPost() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT))
+                .thenReturn(Optional.of(new KisTradingApi.OrderStatusView(10, 10, 0)));
+
+        assertThatThrownBy(() -> api.cancel(CANCEL, ACCOUNT))
+                .isInstanceOfSatisfying(KisApiException.class, e -> {
+                    assertThat(e.isAlreadyFilledConflict()).isTrue();
+                    assertThat(e.isRejected()).isTrue();
+                });
+        verify(kisHttpClient, never()).post(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("cancel: 부분 체결 후 잔량 0(취소·만료)은 POST 없이 ALREADY_CANCELED 경합")
+    void cancel_closedWithUnfilledZero_throwsAlreadyCanceledWithoutPost() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT))
+                .thenReturn(Optional.of(new KisTradingApi.OrderStatusView(10, 3, 0)));
+
+        assertThatThrownBy(() -> api.cancel(CANCEL, ACCOUNT))
+                .isInstanceOfSatisfying(KisApiException.class, e -> {
+                    assertThat(e.isAlreadyCanceledConflict()).isTrue();
+                    assertThat(e.isRejected()).isTrue();
+                });
+        verify(kisHttpClient, never()).post(anyString(), anyString(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("cancel: 원주문을 못 찾으면 취소 POST를 보낸다")
+    void cancel_orderNotFound_posts() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT)).thenReturn(Optional.empty());
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
+                .thenReturn(new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", null));
+
+        api.cancel(CANCEL, ACCOUNT);
+
+        verify(kisHttpClient).post(eq("TTTT1004U"), anyString(), eq(ACCOUNT), any(), any());
+    }
+
+    @Test
+    @DisplayName("cancel: 잔량이 있으면 취소 POST를 보낸다")
+    void cancel_withUnfilled_posts() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT))
+                .thenReturn(Optional.of(new KisTradingApi.OrderStatusView(10, 3, 7)));
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
+                .thenReturn(new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", null));
+
+        api.cancel(CANCEL, ACCOUNT);
+
+        verify(kisHttpClient).post(eq("TTTT1004U"), anyString(), eq(ACCOUNT), any(), any());
+    }
+
+    @Test
+    @DisplayName("cancel: 원주문 조회가 실패해도 취소 POST를 그대로 보낸다")
+    void cancel_findOrderFails_stillPosts() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT)).thenThrow(new RuntimeException("조회 장애"));
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
+                .thenReturn(new KisOrderApi.OrderResponse("0", "KISC0000", "정상처리", null));
+
+        api.cancel(CANCEL, ACCOUNT);
+
+        verify(kisHttpClient).post(eq("TTTT1004U"), anyString(), eq(ACCOUNT), any(), any());
+    }
+
+    @Test
+    @DisplayName("cancel: rt_cd!=0 → 확정 거절 KisApiException(경합 아님)")
+    void cancel_rtCdNotZero_throwsRejected() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT)).thenReturn(Optional.empty());
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any()))
+                .thenReturn(new KisOrderApi.OrderResponse("1", "APBK0001", "취소 불가", null));
+
+        assertThatThrownBy(() -> api.cancel(CANCEL, ACCOUNT))
+                .isInstanceOfSatisfying(KisApiException.class, e -> {
+                    assertThat(e.isRejected()).isTrue();
+                    assertThat(e.getMessage()).contains("APBK0001");
+                    assertThat(e.isAlreadyFilledConflict()).isFalse();
+                    assertThat(e.isAlreadyCanceledConflict()).isFalse();
+                });
+    }
+
+    @Test
+    @DisplayName("cancel: 2xx인데 응답 본문 없음 → 결과 불명(rejected=false)")
+    void cancel_nullResponse_isIndeterminate() {
+        when(kisTradingApi.findOrder(StrategyTicker.SOXL, "ORD_9", ACCOUNT)).thenReturn(Optional.empty());
+        when(kisHttpClient.post(anyString(), anyString(), any(BrokerAccountRef.class), any(), any())).thenReturn(null);
+
+        assertThatThrownBy(() -> api.cancel(CANCEL, ACCOUNT))
                 .isInstanceOfSatisfying(KisApiException.class, e -> assertThat(e.isRejected()).isFalse());
     }
 

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.*;
@@ -15,6 +16,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -145,28 +147,12 @@ class KisTradingApi {
     // ── KisExecutionPort ───────────────────────────────────────────────────────
 
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
-        ExecutionListResponse response = kisHttpClient.tradingGet(
-                EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,
-                p -> {
-                    p.add("PDNO", ticker.name());              // 전략 종목만 조회
-                    p.add("ORD_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
-                    p.add("ORD_END_DT", formatTradeDate(to));
-                    p.add("SLL_BUY_DVSN", "00");              // 전체
-                    p.add("CCLD_NCCS_DVSN", "00");            // 전체
-                    p.add("OVRS_EXCG_CD", exchangeRegistry.ovrsExcgCd(ticker)); // 전략 종목 거래소
-                    p.add("SORT_SQN", "DS");                  // 정순
-                    p.add("ORD_DT", "");
-                    p.add("ORD_GNO_BRNO", "");
-                    p.add("ODNO", "");
-                    p.add("CTX_AREA_NK200", "");
-                    p.add("CTX_AREA_FK200", "");
-                });
-        if (response == null || response.output() == null) {
+        List<ExecutionListResponse.OutputItem> items = fetchOrderList(from, to, ticker, "DS", account);
+        if (items.isEmpty()) {
             return Collections.emptyList();
         }
         LocalDate usFrom = UsTradeDates.toUsTradeDate(from); // KST fallback → US 거래일 기준으로 역변환 대응
-        return response.output().stream()
-                .filter(item -> ticker.name().equals(item.pdno()))
+        return items.stream()
                 .filter(item -> KisResponseParser.parseIntSafe(item.filledQuantity()) > 0) // 미체결(ft_ccld_qty=0) 제외
                 .map(item -> new Execution(
                         // KIS ord_dt는 US 거래일 → toKstTradeDate()로 도메인 KST 일자로 복원
@@ -180,6 +166,48 @@ class KisTradingApi {
                 ))
                 .toList();
     }
+
+    // 취소 전 원주문 상태 조회 — KIS는 ODNO 필터를 지원하지 않아 종목·기간 목록에서 주문번호로 찾는다(없으면 empty)
+    // 검색 범위일 뿐 거래일 변환이 아니다 — 취소 대상은 오늘·다음 거래일 주문이라 KST 오늘 앞뒤 1일이면 덮는다
+    Optional<OrderStatusView> findOrder(StrategyTicker ticker, String odno, BrokerAccountRef account) {
+        LocalDate today = LocalDate.now(TimeZones.KST);
+        // 역순(최신 먼저) — 연속조회 없이 첫 페이지만 받으므로 최근 주문이 잘리지 않게 한다
+        return fetchOrderList(today.minusDays(1), today.plusDays(1), ticker, "AS", account).stream()
+                .filter(item -> odno.equals(item.odno()))
+                .findFirst()
+                .map(item -> new OrderStatusView(
+                        KisResponseParser.parseIntSafe(item.orderedQuantity()),
+                        KisResponseParser.parseIntSafe(item.filledQuantity()),
+                        KisResponseParser.parseIntSafe(item.unfilledQuantity())));
+    }
+
+    // 해외주식 주문체결내역(TTTS3035R) — 전략 종목 행만 반환, 응답 없음은 빈 목록
+    private List<ExecutionListResponse.OutputItem> fetchOrderList(LocalDate from, LocalDate to, StrategyTicker ticker,
+                                                                  String sortSqn, BrokerAccountRef account) {
+        ExecutionListResponse response = kisHttpClient.tradingGet(
+                EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,
+                p -> {
+                    p.add("PDNO", ticker.name());              // 전략 종목만 조회
+                    p.add("ORD_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
+                    p.add("ORD_END_DT", formatTradeDate(to));
+                    p.add("SLL_BUY_DVSN", "00");              // 전체
+                    p.add("CCLD_NCCS_DVSN", "00");            // 전체
+                    p.add("OVRS_EXCG_CD", exchangeRegistry.ovrsExcgCd(ticker)); // 전략 종목 거래소
+                    p.add("SORT_SQN", sortSqn);               // DS=정순, AS=역순
+                    p.add("ORD_DT", "");
+                    p.add("ORD_GNO_BRNO", "");
+                    p.add("ODNO", "");
+                    p.add("CTX_AREA_NK200", "");
+                    p.add("CTX_AREA_FK200", "");
+                });
+        if (response == null || response.output() == null) {
+            return Collections.emptyList();
+        }
+        return response.output().stream().filter(item -> ticker.name().equals(item.pdno())).toList();
+    }
+
+    // 원주문 수량 현황 — 주문·체결·미체결(잔량) 수량
+    record OrderStatusView(int ordered, int filled, int unfilled) {}
 
     // KST 날짜 → KIS API 날짜 파라미터 (US 거래일 YYYYMMDD)
     private String formatTradeDate(LocalDate kst) {
@@ -235,7 +263,9 @@ class KisTradingApi {
                 @JsonProperty("pdno") String pdno,                      // 종목코드
                 @JsonProperty("ord_dt") String ordDt,                   // 주문일자 (YYYYMMDD)
                 @JsonProperty("sll_buy_dvsn_cd") String sllBuyDvsnCd,  // 매도매수구분: 01=매도, 02=매수
+                @JsonProperty("ft_ord_qty") String orderedQuantity,     // FT주문수량
                 @JsonProperty("ft_ccld_qty") String filledQuantity,     // FT체결수량
+                @JsonProperty("nccs_qty") String unfilledQuantity,      // 미체결수량
                 @JsonProperty("ft_ccld_unpr3") String ftCcldUnpr3,      // FT체결단가
                 @JsonProperty("ft_ccld_amt3") String ccldAmt,           // FT체결금액
                 @JsonProperty("odno") String odno                       // 주문번호

@@ -80,6 +80,6 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 - `orders`: 주문 단위 이벤트 로그 — 실행당 N건 (mainOrders + corrections 모두 저장, order_type/direction/quantity/price/status 포함)
   - `order_leg`: 내부 leg 식별자. 신규 전략 주문은 `INFINITE_EARLY_AVG_BUY`, `VR_BUY_01`, `PRIVACY_SELL_01` 같은 concrete 값을 저장하고, 과거 행은 `UNKNOWN`으로 backfill돼 있고 수동 체결(`filledManual`) 행도 `UNKNOWN`이다. 브로커 API와 외부 응답 DTO에는 전달하지 않는다.
   - 증권사 접수 확정 거절 → `OrderPort.markFailed(orderId)`로 FAILED 기록, 결과 불명은 SUBMITTING 유지 (`OrderSubmitter`)
-  - 체결 리포트 집계 시 체결 내역 없는 PLACED 주문(미체결) → `OrderPort.markCancelled(orderId)`로 CANCELLED 기록 (`TradingReporter`)
+  - 체결 리포트 집계 시 체결 내역 없는 PLACED 주문(미체결) → `OrderPort.markCancelled(orderId)`로 CANCELLED 기록 (`TradingReporter`). 체결 조회 직전에 `cancelUnresolvedOrders`가 **전 증권사 공통**으로 잔여 PLACED를 증권사에 취소 요청한다(지정가는 애프터장까지 살아 있어, 취소 없이 CANCELLED로 기록하면 이후 체결이 원장에서 누락됨). 이미 종결된 주문(체결·취소·장 마감 만료)은 어댑터가 `BrokerApiException.Conflict`(ALREADY_FILLED/ALREADY_CANCELED)로 알리고 리포트는 관리자 알림 없이 넘긴다(`isOrderClosedConflict`). 그 외 취소 실패만 `[잔여 주문 취소 실패]` 관리자 알림
 - `cycle_position`: 사이클 단위 포지션 스냅샷 — 실행당 1건 append (`CyclePositionPort.save()`, dedup/UNIQUE 제약 없음). 필드: usd_deposit/avg_price/holdings/closing_price
 - `trade_histories`·`portfolio_snapshots` 테이블은 존재하지 않음 — 참조 금지

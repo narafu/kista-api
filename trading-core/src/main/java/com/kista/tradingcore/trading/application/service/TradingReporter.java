@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.OrderStatus;
-import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.trading.domain.model.TradingReport;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import com.kista.shared.kernel.TradeLegSummary;
@@ -94,21 +93,21 @@ class TradingReporter {
         log.info("[{}] 매매 리포트 이벤트 발행 완료 (executions={}건)", account.nickname(), executions.size());
     }
 
-    // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 이미 체결된 주문의 취소는 브로커가 거부(무시)한다.
+    // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 전 증권사 공통.
+    // 정규장 지정가 주문은 Toss·Meritz에서 애프터장까지 살아 있어(Meritz 10-29 실측: 06:10 KST 체결) 명시 취소가 필요하고,
+    // 장 마감 시 만료되는 주문(LOC 등)은 어댑터가 종결 Conflict로 알려 조용히 넘긴다(포트 계약).
     // 실패해도 흐름은 계속되며(다음 getExecutions로 실제 상태를 확정), 취소 자체 실패만 관리자에게 알린다.
-    // Toss 전용 — 정규장 지정가 주문이 애프터장까지 이어져 다음날 09:00 KST에야 자동 취소되므로 명시적 취소가 필요.
-    // KIS는 정규장 종료 시 자동 취소되어 이 호출이 불필요 — 스킵해 마감 시점 KIS API 호출량(rate-limit 위험)도 함께 줄인다.
     private void cancelUnresolvedOrders(List<Order> mainOrders, TradingAccount account) {
-        if (account.broker() != Broker.TOSS) return;
         for (Order order : mainOrders) {
             if (order.status() != OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {
                 brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.brokerRef());
+                log.info("[orderId={}] 마감 후 잔여 주문 취소 완료", order.id());
             } catch (Exception e) {
-                if (isAlreadyFilled(e)) {
-                    // 취소 요청 직전/직후 체결 확정 — 브로커 주석대로 예상된 경합, 관리자 알림 불필요
-                    log.info("[orderId={}] 취소 시점 이미 체결 완료 — 취소 생략", order.id());
+                if (BrokerApiException.isOrderClosedConflict(e)) {
+                    // 취소 시점 이미 체결·만료 — 예상된 경합, 관리자 알림 불필요
+                    log.info("[orderId={}] 취소 시점 이미 종결 — 취소 생략: {}", order.id(), e.getMessage());
                 } else {
                     log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
                     eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s 잔여 주문 취소 실패] orderId=%s — %s"
@@ -116,11 +115,6 @@ class TradingReporter {
                 }
             }
         }
-    }
-
-    // 취소 시점 이미 체결 확정 여부 — 어댑터(TossHttpClient)가 409 CONFLICT(already-filled) 응답을 판정해 BrokerApiException에 실어 보낸다
-    private boolean isAlreadyFilled(Exception e) {
-        return e instanceof BrokerApiException bae && bae.isAlreadyFilledConflict();
     }
 
     // 접수 주문과 실체결 내역을 externalOrderId 기준으로 매칭하여 FILLED / PARTIALLY_FILLED 기록

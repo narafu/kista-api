@@ -82,7 +82,7 @@ class TradingReporterTest {
     static final BatchContext CTX = new BatchContext(STRATEGY, CYCLE, ACCOUNT, USER);
     static final AccountBalance BALANCE = new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000.00"));
 
-    // 마감 후 잔여 주문 취소는 Toss 전용(KIS는 정규장 종료 시 자동 취소) — 취소 검증 테스트만 별도 Toss 계좌 사용
+    // 취소 검증 테스트 중 Toss 시나리오용 계좌
     static final TradingAccount TOSS_ACCOUNT = TradingFixtures.tossTradingAccount(UUID.randomUUID(), UUID.randomUUID());
     static final BrokerAccountRef TOSS_ACCOUNT_REF = TOSS_ACCOUNT.brokerRef();
     static final Strategy TOSS_STRATEGY = new Strategy(
@@ -396,14 +396,27 @@ class TradingReporterTest {
     }
 
     @Test
-    void KIS_계좌는_정규장_자동취소되므로_잔여_PLACED_주문_취소_호출을_생략한다() {
+    void KIS_계좌도_잔여_PLACED_주문을_취소한다() {
         UUID orderId = UUID.randomUUID();
         Order order = placedOrder(orderId, "E1", 5);
         when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
 
         reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
 
-        verify(brokerOrderPort, never()).cancel(any(), any());
+        verify(brokerOrderPort).cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), ACCOUNT_REF);
+    }
+
+    @Test
+    void KIS_취소가_이미취소_경합이면_관리자_알림없이_넘어간다() {
+        UUID orderId = UUID.randomUUID();
+        Order order = placedOrder(orderId, "E1", 5);
+        doThrow(new StubBrokerApiException("KIS 취소 대상 종결", BrokerApiException.Conflict.ALREADY_CANCELED))
+                .when(brokerOrderPort).cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), ACCOUNT_REF);
+        when(executionPort.getExecutions(TODAY, TODAY, StrategyTicker.SOXL, ACCOUNT_REF)).thenReturn(List.of());
+
+        reporter.recordAndNotify(TODAY, CTX, BALANCE, CLOSE, List.of(order), null);
+
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test

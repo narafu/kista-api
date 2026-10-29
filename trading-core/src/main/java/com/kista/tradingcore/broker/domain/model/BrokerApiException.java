@@ -3,7 +3,7 @@ package com.kista.tradingcore.broker.domain.model;
 // 증권사 외부 API 호출 실패의 벤더 중립 상위 타입 — 소비자(trading 등)는 KIS/Toss 구체 예외를 몰라도 이 타입 하나로 catch한다(503 매핑)
 public abstract class BrokerApiException extends RuntimeException {
 
-    // 409 CONFLICT 세부 사유 — 어댑터가 응답 바디를 판정해 전달하는 예상된 경합(현재 Toss만 판정)
+    // 취소 경합 세부 사유 — Toss는 409 응답 바디로, KIS·Meritz는 취소 전 원주문 잔량 조회로 판정
     public enum Conflict {
         NONE,
         ALREADY_FILLED,   // 취소 요청 직전/직후 체결이 확정된 경우
@@ -62,5 +62,10 @@ public abstract class BrokerApiException extends RuntimeException {
 
     public boolean isAlreadyCanceledConflict() {
         return conflict == Conflict.ALREADY_CANCELED;
+    }
+
+    // 취소 대상 주문이 이미 종결(체결 완료 또는 취소·만료)된 예상된 경합 여부
+    public static boolean isOrderClosedConflict(Throwable e) {
+        return e instanceof BrokerApiException b && b.conflict != Conflict.NONE;
     }
 }

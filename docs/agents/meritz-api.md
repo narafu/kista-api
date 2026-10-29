@@ -55,7 +55,7 @@
 `CancelInstruction`에는 ticker·외부 주문번호뿐이라 어댑터가 **당일 주문체결내역에서 `oder_no`로 원주문을 조회**해 `oder_date`·`oder_cls_code`·`odqt`를 채운다. `odqt`=`oder_able_qty`(잔량), `oder_cls_code`는 목록의 `aspr_type_code` 역매핑(`1시장가→05, 2지정가→01, 4LOO→31, 5LOC→32, 6MOO→33, 7MOC→34, 8→35, 9→36, A→37, B→38`).
 - `oder_able_qty=0`(이미 종결): 체결수량이 주문수량과 같으면 `Conflict.ALREADY_FILLED`, 아니면 `ALREADY_CANCELED`로 던지고 취소 API는 부르지 않는다.
 - 당일 목록에 없음: 최근 7일 기간 목록으로 한 번 더 찾고, 그래도 없으면 결과 불명(`rejected=false`) — 접수 직후 목록 지연 가능성이 있어 "이미 취소"로 단정하지 않는다.
-- 당일 주문은 장 마감 시 거래소가 만료시키므로(실측 `ovrs_stck_rfus_reas="Trading Sequence Completed"`) 마감 후 명시 취소(Toss 전용 경로)가 필요 없다.
+- LOC 등 조건부 주문은 장 마감 시 거래소가 만료시킨다(실측 `ovrs_stck_rfus_reas="Trading Sequence Completed"`). 그러나 **지정가는 애프터장까지 살아 있다** — 실측 2026-10-29 거래일 SOXL 매수 지정가 43주 @100.62(주문번호 1878526)가 04:30:02 KST 접수 → 06:10:21 KST 애프터장 체결. 그래서 마감 리포트(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)가 체결 조회 직전에 잔여 PLACED를 명시 취소한다. 이미 종결된 주문은 위 `oder_able_qty=0` 판정으로 `Conflict`가 되어 리포트가 조용히 넘긴다. (취소 없이 05:10 리포트가 CANCELLED로 기록하면 애프터장 체결이 원장에서 누락된다. 원장 대사 `LedgerReconciliation`은 실보유<원장만 경보해 이 매수 누락은 감지하지 못하므로 취소가 방어선이다.)
 
 ### 접수 시각
 kista 접수는 전부 정규장 안이다(마감 배치 AT_CLOSE, 개장 배치는 개장 후). 예약주문 API 불필요. 최악 경로(게이트 20s + 읽기 10s + 토큰 재시도 10s) ≈ 40s로 `SubmittingOrderAwaiter` 60s 예산 안쪽.

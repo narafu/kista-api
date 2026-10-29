@@ -112,6 +112,44 @@ class ReorderServiceTest {
     }
 
     @Test
+    void reorder_fromPlaced_alreadyFilledConflict_abortsWithoutNewOrder() {
+        stubCommon(placedOrder());
+        doThrow(new com.kista.tradingcore.support.StubBrokerApiException("체결됨",
+                com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.ALREADY_FILLED))
+                .when(brokerOrderCorrectionPort).cancel(any(), any());
+
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("원본 주문이 이미 체결돼 재주문할 수 없습니다.");
+        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).saveAll(any());
+    }
+
+    @Test
+    void reorder_fromPlaced_alreadyCanceledConflict_marksCancelledAndProceeds() {
+        stubCommon(placedOrder());
+        doThrow(new com.kista.tradingcore.support.StubBrokerApiException("이미 취소",
+                com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.ALREADY_CANCELED))
+                .when(brokerOrderCorrectionPort).cancel(any(), any());
+
+        reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
+
+        verify(orderPort).markCancelled(ORDER_ID);
+        verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
+    }
+
+    @Test
+    void reorder_fromPlaced_otherBrokerError_propagates() {
+        stubCommon(placedOrder());
+        var ex = com.kista.tradingcore.support.StubBrokerApiException.rejected("거절");
+        doThrow(ex).when(brokerOrderCorrectionPort).cancel(any(), any());
+
+        assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN)).isSameAs(ex);
+        verify(orderPort, never()).markCancelled(any());
+        verify(orderPort, never()).saveAll(any());
+    }
+
+    @Test
     void reorder_fromPlaced_cancelsBrokerThenSavesPlanned() {
         stubCommon(placedOrder());
 

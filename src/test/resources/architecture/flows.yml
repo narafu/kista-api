@@ -189,9 +189,9 @@ flows:
         lane: trading
         to: [broker]
         title: 미체결 주문 취소
-        desc: 여기부터는 전략별로 계좌당 동시 2건까지 병렬 처리한다. Toss 지정가는 애프터마켓까지 이어지므로 남은 PLACED 주문을 명시적으로 취소한다. KIS는 장 마감 때 자동 취소된다.
+        desc: 여기부터는 전략별로 계좌당 동시 2건까지 병렬 처리한다. 지정가는 애프터장까지 이어질 수 있으므로(Meritz 실측) 전 증권사에서 남은 PLACED 주문을 체결 조회 직전에 명시적으로 취소한다. 이미 체결·취소·만료된 주문은 증권사 응답(Toss 409, Meritz·KIS 잔량 0)으로 알아 조용히 넘긴다.
         code: [TradingReporter#recordAndNotify, TradingReporter#cancelUnresolvedOrders]
-        cond: Toss 계좌만
+        cond: 체결 조회 직전, 전 증권사
         fail: 취소가 실패해도 흐름은 계속되고 관리자에게만 알린다.
 
       - id: executions
@@ -1756,7 +1756,7 @@ lifecycles:
       - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: "전체 취소·일시정지·전략/계좌 삭제가 같은 규칙을 쓴다. 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다.", code: [OrderCancelService#cancelByCycle, OrderCancelService#cancelOpenOrders, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}
       - {from: PLACED, to: FILLED, title: 전량 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: PARTIALLY_FILLED, title: 부분 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
-      - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(Toss는 명시 취소, KIS는 장 마감 자동 취소).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
+      - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(전 증권사 마감 전 명시 취소, 이미 종결된 주문은 취소 없이 넘김).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
       - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelOpenOrders, ReorderService#reorder], flow: manual-run/cancel-one}
 
   batch-run:

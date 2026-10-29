@@ -115,6 +115,11 @@ class OrderCancelService {
                 stateWriter.markCancelled(order.id());
                 cancelledCount++;
             } catch (Exception e) {
+                if (isAlreadyFilled(e)) {
+                    // 취소 직전 체결 확정 — 취소할 잔량이 없어 실패가 아니다. 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
+                    log.info("주문이 이미 체결됨 — 취소 생략: orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                    continue;
+                }
                 if (isAlreadyCanceled(e)) {
                     // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
                     log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
@@ -183,6 +188,10 @@ class OrderCancelService {
             brokerOrderCorrectionPort
                     .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
         } catch (Exception e) {
+            if (isAlreadyFilled(e)) {
+                // 취소 직전 체결 확정 — 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
+                throw new OrderCancelException("이미 체결된 주문이라 취소할 수 없습니다.");
+            }
             if (!isAlreadyCanceled(e)) {
                 throw e;
             }
@@ -192,7 +201,12 @@ class OrderCancelService {
         stateWriter.markCancelled(orderId);
     }
 
-    // 중복 취소 요청으로 브로커가 거부한 예상된 경합 여부 — TossHttpClient가 409 CONFLICT(already-canceled) 응답을 판정해 전달
+    // 취소 직전 체결이 확정된 경합 여부 — 어댑터가 종결 Conflict로 전달(BrokerOrderCorrectionPort 계약)
+    private boolean isAlreadyFilled(Exception e) {
+        return e instanceof BrokerApiException bae && bae.isAlreadyFilledConflict();
+    }
+
+    // 중복 취소·장 마감 만료로 이미 취소된 주문인지 — 어댑터가 종결 Conflict로 전달(BrokerOrderCorrectionPort 계약)
     private boolean isAlreadyCanceled(Exception e) {
         return e instanceof BrokerApiException bae && bae.isAlreadyCanceledConflict();
     }

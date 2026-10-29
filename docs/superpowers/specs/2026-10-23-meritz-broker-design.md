@@ -42,7 +42,7 @@
 - 연속조회: 응답 본문 `tr_cont="1"` + `tr_cont_key`(오른쪽 공백 포함, 그대로 쿼리스트링으로 재전송). `rsp_cd 5762`일 때만 이어 조회.
 - 주문체결내역은 **주문당 1행·누적 체결**(실측 733건: `oder_no` 중복 0, 정정/취소 행 0) — `cntg_dqty`=누적 체결수량, `cntg_crnc_prc`=평균 체결가, `cntg_camt`=체결금액. 부분 체결 후 장 마감 만료는 `ovrs_stck_oder_stat_cls_code="3"`(자동취소)·`ncnt_odqt=0`. KIS와 같은 형태라 `TradingReporter`의 주문번호별 합산 계약과 맞는다. 당일 목록 수량 필드는 `cntg_qty`(기간 목록은 `cntg_dqty`).
 - 주문 목록에는 `oder_cls_code`가 없고 `aspr_type_code`만 있다(`1`시장가 `2`지정가 `4`LOO `5`LOC `6`MOO `7`MOC `8`LimitVWAP `9`LimitTWAP `A`VWAP `B`TWAP — 실측 `2`/cond`0`=지정가, `7`/cond`7`=MOC 확인). 취소 시 `oder_cls_code`는 이 표로 역매핑한다(`2→01, 5→32, 7→34, 4→31, 6→33, 1→05, 8→35, 9→36, A→37, B→38`).
-- 당일 주문은 장 마감 시 거래소에서 만료된다(실측: 장중 접수 지정가가 `ovrs_stck_rfus_reas="Trading Sequence Completed"`, 미체결 0으로 종료) → KIS처럼 마감 후 명시 취소(`TradingReporter.cancelUnresolvedOrders`, Toss 전용) 불필요.
+- 당일 주문은 장 마감 시 거래소에서 만료된다(실측: 장중 접수 지정가가 `ovrs_stck_rfus_reas="Trading Sequence Completed"`, 미체결 0으로 종료) → KIS처럼 마감 후 명시 취소(`TradingReporter.cancelUnresolvedOrders`, Toss 전용) 불필요. (정정 2026-10-29: 지정가는 애프터장까지 살아 있음이 실측돼 마감 취소는 전 증권사 공통이 됐다 — `meritz-api.md` 참고)
 
 ## 결정된 설계
 

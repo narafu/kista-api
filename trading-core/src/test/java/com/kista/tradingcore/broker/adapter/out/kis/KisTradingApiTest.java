@@ -10,12 +10,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+
 import java.math.BigDecimal;
+import java.util.function.Consumer;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -119,7 +124,7 @@ class KisTradingApiTest {
         void getExecutions_selnByovCls01_returnsSell() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
-                            "SOXL", "20240614", "01", "5", "25.00", "125.00", "ORD001"
+                            "SOXL", "20240614", "01", "5", "5", "0", "25.00", "125.00", "ORD001"
                     ))
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
@@ -135,7 +140,7 @@ class KisTradingApiTest {
         void getExecutions_otherSelnByovCls_returnsBuyWithFields() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
-                            "SOXL", "20240614", "02", "10", "30.50", "305.00", "ORD002"
+                            "SOXL", "20240614", "02", "10", "10", "0", "30.50", "305.00", "ORD002"
                     ))
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
@@ -158,7 +163,7 @@ class KisTradingApiTest {
         void getExecutions_blankFields_parsedSafely() {
             KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(
                     List.of(new KisTradingApi.ExecutionListResponse.OutputItem(
-                            "SOXL", "20240614", "02", "", "", "", "ORD003"
+                            "SOXL", "20240614", "02", "", "", "", "", "", "ORD003"
                     ))
             );
             when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
@@ -167,6 +172,64 @@ class KisTradingApiTest {
 
             // ft_ccld_qty="" → parseIntSafe → 0 → 미체결 필터에 의해 제외
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("findOrder: odno가 일치하는 행의 주문·체결·미체결 수량 반환")
+        void findOrder_matchesOdno() {
+            KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(List.of(
+                    new KisTradingApi.ExecutionListResponse.OutputItem(
+                            "SOXL", "20240614", "02", "10", "4", "6", "30.50", "122.00", "ORD_A"),
+                    new KisTradingApi.ExecutionListResponse.OutputItem(
+                            "SOXL", "20240614", "02", "7", "7", "0", "30.50", "213.50", "ORD_B")));
+            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
+
+            assertThat(api.findOrder(StrategyTicker.SOXL, "ORD_A", ACCOUNT))
+                    .contains(new KisTradingApi.OrderStatusView(10, 4, 6));
+        }
+
+        @Test
+        @DisplayName("findOrder: 일치하는 odno·다른 종목 행만 있으면 empty")
+        void findOrder_notFound_returnsEmpty() {
+            KisTradingApi.ExecutionListResponse response = new KisTradingApi.ExecutionListResponse(List.of(
+                    new KisTradingApi.ExecutionListResponse.OutputItem(
+                            "SOXL", "20240614", "02", "10", "4", "6", "30.50", "122.00", "ORD_A"),
+                    new KisTradingApi.ExecutionListResponse.OutputItem(
+                            "TQQQ", "20240614", "02", "10", "4", "6", "30.50", "122.00", "ORD_T")));
+            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(response);
+
+            assertThat(api.findOrder(StrategyTicker.SOXL, "ORD_T", ACCOUNT)).isEmpty();
+            assertThat(api.findOrder(StrategyTicker.SOXL, "NOPE", ACCOUNT)).isEmpty();
+        }
+
+        // tradingGet에 넘긴 파라미터 Consumer를 실행해 SORT_SQN 값을 꺼낸다
+        @SuppressWarnings("unchecked")
+        private String capturedSortSqn() {
+            ArgumentCaptor<Consumer<MultiValueMap<String, String>>> captor = ArgumentCaptor.forClass(Consumer.class);
+            verify(kisHttpClient).tradingGet(anyString(), anyString(), any(), any(), captor.capture());
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            captor.getValue().accept(params);
+            return params.getFirst("SORT_SQN");
+        }
+
+        @Test
+        @DisplayName("findOrder: SORT_SQN=AS(역순)로 조회")
+        void findOrder_usesAscendingSortSqnAS() {
+            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(null);
+
+            api.findOrder(StrategyTicker.SOXL, "ORD_A", ACCOUNT);
+
+            assertThat(capturedSortSqn()).isEqualTo("AS");
+        }
+
+        @Test
+        @DisplayName("getExecutions: SORT_SQN=DS(정순) 유지")
+        void getExecutions_keepsSortSqnDS() {
+            when(kisHttpClient.tradingGet(anyString(), anyString(), any(), any(), any())).thenReturn(null);
+
+            api.getExecutions(DATE, DATE, StrategyTicker.SOXL, ACCOUNT);
+
+            assertThat(capturedSortSqn()).isEqualTo("DS");
         }
     }
 

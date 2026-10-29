@@ -182,6 +182,23 @@ class OrderCancelServiceTest {
     }
 
     @Test
+    @DisplayName("cancelOpenOrders: ALREADY_FILLED 경합은 실패로 세지 않고 알림·markCancelled 없이 PLACED로 둔다")
+    void cancelOpenOrders_alreadyFilledConflict_notCountedAsFailure() {
+        Order order = placedOrder(UUID.randomUUID(), "ORD_1");
+        when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+                .thenReturn(List.of(order));
+        doThrow(new StubBrokerApiException("이미 체결", BrokerApiException.Conflict.ALREADY_FILLED))
+                .when(brokerPort).cancel(eq(cancelOf(order)), any());
+
+        CancelResult result = service.cancelOpenOrders(cycleId, ownedAccount);
+
+        assertThat(result.failedCount()).isZero();
+        verify(orderPort, never()).markCancelled(any());
+        verify(eventPublisher, never()).publishEvent(any(OrderCancelFailedEvent.class));
+    }
+
+    @Test
     @DisplayName("cancelByCycle: 자격증명 오류 실패는 credentialFailedCount로 따로 세어 재시도 대상에서 뺀다")
     void cancelByCycle_credentialFailure_countedSeparately() {
         Order order = placedOrder(UUID.randomUUID(), "ORD_1");
@@ -320,6 +337,21 @@ class OrderCancelServiceTest {
         service.cancelOrder(orderId, requesterId);
 
         verify(orderPort).markCancelled(orderId);
+    }
+
+    @Test
+    @DisplayName("cancelOrder: 브로커가 ALREADY_FILLED 경합을 던지면 OrderCancelException, markCancelled 안 함")
+    void cancelOrder_alreadyFilledConflict_throwsOrderCancelException() {
+        Order order = placedOrder(orderId, "ORD_99");
+        when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
+        doThrow(new StubBrokerApiException("이미 체결", BrokerApiException.Conflict.ALREADY_FILLED))
+                .when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
+
+        assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))
+                .isInstanceOf(OrderCancelException.class)
+                .hasMessageContaining("이미 체결");
+        verify(orderPort, never()).markCancelled(any());
     }
 
     @Test

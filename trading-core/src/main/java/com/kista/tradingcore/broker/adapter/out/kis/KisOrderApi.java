@@ -2,6 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
@@ -9,9 +10,13 @@ import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.shared.kernel.OrderType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
 
+
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class KisOrderApi {
@@ -24,6 +29,7 @@ class KisOrderApi {
 
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
+    private final KisTradingApi kisTradingApi; // 취소 전 원주문 잔량 조회
 
     public OrderResult place(OrderInstruction instruction, BrokerAccountRef account) {
         String trId = instruction.direction() == OrderDirection.BUY ? BUY_TR_ID : SELL_TR_ID;
@@ -76,6 +82,15 @@ class KisOrderApi {
     }
 
     public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        // 이미 종결(체결 완료·취소·장 마감 만료)된 주문은 취소 API를 부르지 않고 경합으로 알린다 — 못 찾으면 그대로 취소 요청
+        findOrderOrEmpty(instruction, account)
+                .filter(o -> o.ordered() > 0 && o.unfilled() == 0)
+                .ifPresent(o -> {
+                    Conflict conflict = o.filled() == o.ordered() ? Conflict.ALREADY_FILLED : Conflict.ALREADY_CANCELED;
+                    throw KisApiException.conflict("KIS 취소 대상 종결: odno=" + instruction.externalOrderId()
+                            + ", 체결 " + o.filled() + "/" + o.ordered(), conflict);
+                });
+
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
         String acntPrdtCd = acctParts[1];
@@ -100,7 +115,24 @@ class KisOrderApi {
                 instruction.ticker().name(),
                 instruction.externalOrderId());
 
-        kisHttpClient.post(CANCEL_TR_ID, CANCEL_PATH, account, body, Void.class);
+        OrderResponse response = kisHttpClient.post(CANCEL_TR_ID, CANCEL_PATH, account, body, OrderResponse.class);
+        if (response == null) {
+            throw new KisApiException("KIS 취소 응답 본문 없음 — 취소 여부 불명", null);
+        }
+        // rt_cd != "0" = KIS 비즈니스 오류 (HTTP 200이어도 실패) — 무시하면 살아 있는 주문을 취소된 것으로 기록한다
+        if (!"0".equals(response.rtCd())) {
+            throw KisApiException.rejected("KIS 취소 실패 [" + response.msgCd() + "]: " + response.msg1(), null);
+        }
+    }
+
+    // 사전 조회 실패는 "못 찾음"과 같이 취급 — 조회 장애로 살아 있는 주문의 취소가 막히면 애프터장 체결 누락이 다시 열린다
+    private Optional<KisTradingApi.OrderStatusView> findOrderOrEmpty(CancelInstruction instruction, BrokerAccountRef account) {
+        try {
+            return kisTradingApi.findOrder(instruction.ticker(), instruction.externalOrderId(), account);
+        } catch (RuntimeException e) {
+            log.warn("KIS 취소 전 원주문 조회 실패 — 취소 요청으로 진행: odno={}, {}", instruction.externalOrderId(), e.getMessage());
+            return Optional.empty();
+        }
     }
 
     // KIS SLL_TYPE 파라미터: 매도=00, 매수="" (빈 문자열) — 옛 trading OrderDirection.kisSllType()에 있던 KIS 전용 인코딩을 broker로 이동
