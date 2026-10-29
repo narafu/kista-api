@@ -129,7 +129,7 @@ class AdminQueryServiceTest {
     @Test
     void findAccount_ID로_단일_계좌를_조회한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        AccountSummaryResponse account = new AccountSummaryResponse(accountId, UUID.randomUUID(), "74420614", Broker.KIS, null);
+        AccountSummaryResponse account = new AccountSummaryResponse(accountId, UUID.randomUUID(), null, "74420614", Broker.KIS, null);
         when(accountQueryPort.findById(accountId)).thenReturn(Optional.of(account));
 
         Optional<AccountSummaryResponse> result = service.findAccount(accountId);

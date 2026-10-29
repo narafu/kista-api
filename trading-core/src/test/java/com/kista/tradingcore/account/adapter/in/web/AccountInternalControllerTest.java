@@ -66,7 +66,7 @@ class AccountInternalControllerTest {
                 // appKey/secretKey(복호화된 브로커 자격증명)가 내부망 응답에 실리지 않는지 확인
                 .andExpect(jsonPath("$.appKey").doesNotExist())
                 .andExpect(jsonPath("$.secretKey").doesNotExist())
-                .andExpect(jsonPath("$.nickname").doesNotExist());
+                .andExpect(jsonPath("$.nickname").value("테스트계좌")); // 계좌 별칭은 관리자 화면 표시용으로 노출
     }
 
     @Test

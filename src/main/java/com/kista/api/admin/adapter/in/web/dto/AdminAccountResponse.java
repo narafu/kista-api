@@ -17,6 +17,8 @@ public record AdminAccountResponse(
         UUID userId,
         @Schema(description = "소유자 닉네임")
         String ownerNickname,   // User.nickname
+        @Schema(description = "계좌 별칭")
+        String nickname,        // Account.nickname
         @Schema(description = "마스킹된 계좌번호", example = "****1234")
         String accountNoMasked, // "****1234"
         @Schema(description = "브로커 코드", example = "KIS")
@@ -25,9 +27,9 @@ public record AdminAccountResponse(
         List<AdminStrategyResponse> strategies
 ) {
     public static AdminAccountResponse from(AccountSummaryResponse a, UserSummary user, List<StrategyResponse> strategies) {
-        String nickname = user != null ? user.nickname() : "(알 수 없음)";
+        String ownerNickname = user != null ? user.nickname() : "(알 수 없음)";
         return new AdminAccountResponse(
-                a.id(), a.userId(), nickname, a.accountNo() == null ? null : AccountNumberMasker.mask(a.accountNo()), // UPBIT은 계좌번호 없음
+                a.id(), a.userId(), ownerNickname, a.nickname(), a.accountNo() == null ? null : AccountNumberMasker.mask(a.accountNo()), // UPBIT은 계좌번호 없음
                 a.broker() != null ? a.broker().name() : null,
                 strategies.stream().map(AdminStrategyResponse::from).toList());
     }

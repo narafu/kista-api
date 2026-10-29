@@ -31,7 +31,7 @@ public class AccountInternalController {
 
     // Account → contract 응답 — 자격증명 필드는 매핑하지 않는다
     private static AccountSummaryResponse toResponse(Account a) {
-        return new AccountSummaryResponse(a.id(), a.userId(), a.accountNo(), a.broker(), a.createdAt());
+        return new AccountSummaryResponse(a.id(), a.userId(), a.nickname(), a.accountNo(), a.broker(), a.createdAt());
     }
 
     @Operation(summary = "전체 계좌 조회", description = "관리자 계좌 목록 조회용. X-Internal-Token 필수. from/to 미지정 시 전체, 지정 시 createdAt(KST) 기준 필터링.")

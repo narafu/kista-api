@@ -13,8 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AdminAccountResponseTest {
 
-    AccountSummaryResponse upbit = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), null, Broker.UPBIT, Instant.now());
-    AccountSummaryResponse kis = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "12345678-01", Broker.KIS, Instant.now());
+    AccountSummaryResponse upbit = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "업비트 코인", null, Broker.UPBIT, Instant.now());
+    AccountSummaryResponse kis = new AccountSummaryResponse(UUID.randomUUID(), UUID.randomUUID(), "한투 메인", "12345678-01", Broker.KIS, Instant.now());
 
     @Test
     void upbitAccountNoIsNull() {
@@ -22,6 +22,12 @@ class AdminAccountResponseTest {
         AdminAccountItem item = AdminAccountItem.from(upbit, Map.of());
         assertThat(item.accountNoMasked()).isNull();
         assertThat(item.accountNo()).isNull();
+    }
+
+    @Test
+    void accountNicknameExposed() {
+        assertThat(AdminAccountResponse.from(upbit, null, List.of()).nickname()).isEqualTo("업비트 코인");
+        assertThat(AdminAccountItem.from(upbit, Map.of()).nickname()).isEqualTo("업비트 코인");
     }
 
     @Test

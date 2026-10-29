@@ -106,7 +106,7 @@ class AdminTradeControllerTest {
         // 단일 계좌/사용자 조회 — 전체 풀스캔 대신 findAccount/findUser 사용
         when(adminQuery.findAccount(accountId)).thenReturn(Optional.of(
                 new com.kista.shared.contract.account.AccountSummaryResponse(
-                        accountId, ownerId, "1234-56", broker, java.time.Instant.parse("2026-07-01T00:00:00Z"))));
+                        accountId, ownerId, null, "1234-56", broker, java.time.Instant.parse("2026-07-01T00:00:00Z"))));
         when(adminUser.findUser(ownerId)).thenReturn(Optional.of(
                 new com.kista.api.user.domain.model.UserSummary(
                         ownerId, "privacy-user", UserStatus.ACTIVE, UserRole.USER, java.time.Instant.parse("2026-07-01T00:00:00Z"))));
