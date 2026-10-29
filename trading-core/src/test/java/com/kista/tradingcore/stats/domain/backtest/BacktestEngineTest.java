@@ -143,6 +143,7 @@ class BacktestEngineTest {
         ), vrCommand("2000", "1000", 1, 0));
 
         assertThat(output.cycleCount()).isEqualTo(2);
+        assertThat(output.cycleStartDates()).containsExactly(LocalDate.parse("2024-01-08")); // 두 번째 사이클 시작일만
         assertThat(output.points().get(1).totalAsset()).isEqualByComparingTo("2000"); // 롤오버 당일은 아직 미체결
         // 1114.39 + 1주 × 종가 900 = 2014.39 — 체결가 885.61이 곧 갱신된 V′(1041.89)의 증거
         assertThat(output.points().get(2).totalAsset()).isEqualByComparingTo("2014.39");
@@ -615,6 +616,7 @@ class BacktestEngineTest {
         // 4일차: 10주가 종가 95에 전량 체결 → holdings 0 → 사이클 종료·즉시 재시작
         Recorded restarted = recorder.on("2024-01-04");
         assertThat(output.cycleCount()).isEqualTo(2);
+        assertThat(output.cycleStartDates()).containsExactly(LocalDate.parse("2024-01-04")); // 청산 당일 재시작
         assertThat(restarted.balance().holdings()).isZero();
         // 리버스모드·별지점 윈도우 리셋 — 새 사이클은 항상 일반모드 0회차로 시작한다
         assertThat(restarted.inputs().isReverseMode()).isFalse();

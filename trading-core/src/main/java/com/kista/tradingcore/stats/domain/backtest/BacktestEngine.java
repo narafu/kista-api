@@ -59,13 +59,14 @@ public class BacktestEngine {
     public record Output(
             List<BacktestPoint> points, // 일별 자산 곡선
             int tradeCount,             // 체결 건수 누계
-            int cycleCount,             // 진행된 사이클 수 (롤오버 포함)
+            int cycleCount,             // 진행된 사이클 수 (롤오버 포함, 진행 중 사이클 포함)
+            List<LocalDate> cycleStartDates, // 두 번째 사이클부터 각 사이클 시작일 — 개수 = cycleCount - 1
             List<String> warnings       // 시뮬레이션 중 발생한 경고
     ) {}
 
     // candles는 command.from()~to() 구간이 날짜 오름차순으로 정렬돼 들어온다고 가정한다 (조달은 호출측 책임)
     public Output run(List<DailyCandle> candles, BacktestCommand command) {
-        if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of());
+        if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of(), List.of());
         return switch (command.type()) {
             case VR -> runVr(candles, command);
             case INFINITE -> runInfinite(candles, command);
@@ -78,7 +79,7 @@ public class BacktestEngine {
     // 맵에 키가 없는 날짜는 "기준 매매표 미수신"과 동일 취급 (그날 주문 없음)
     public Output run(List<DailyCandle> candles, BacktestCommand command, Map<LocalDate, PrivacyTradeBase> privacyBases) {
         if (command.type() != StrategyType.PRIVACY) return run(candles, command);
-        if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of());
+        if (candles.isEmpty()) return new Output(List.of(), 0, 0, List.of(), List.of());
         return runPrivacy(candles, command, privacyBases);
     }
 
@@ -137,7 +138,7 @@ public class BacktestEngine {
         // 마지막 캔들까지 이어진 거절 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush
         if (rejectFrom != null) warnings.add(buyRejectGapWarning(rejectFrom, rejectTo, rejectDays));
         // 마지막 pending은 체결 기회가 없어 자연히 버려진다
-        return new Output(List.copyOf(points), state.tradeCount, state.cycleCount, List.copyOf(warnings));
+        return new Output(List.copyOf(points), state.tradeCount, state.cycleCount, List.copyOf(state.cycleStartDates), List.copyOf(warnings));
     }
 
     // 매수 예산 거절 연속구간 1건 요약(체결 세션 날짜 기준) — PrivacyState.flushMissingBaseGap과 동일 포맷 관용구
@@ -200,7 +201,7 @@ public class BacktestEngine {
         // 새 사이클의 poolLimit — 자본 조정까지 반영한 개장 예수금 × 램프 재계산 비율
         state.poolLimit = poolLimitOf(state.balance.usdDeposit(), detail.poolLimitRateAt(weeks));
         state.poolUsed = BigDecimal.ZERO;
-        state.cycleCount++;
+        state.startNextCycle(state.cycleStartDate);
         state.holdReason = null;
     }
 
@@ -306,7 +307,7 @@ public class BacktestEngine {
 
         // 마지막 캔들까지 이어진 결측 구간은 루프 안에서 닫힐 기회가 없다 — 여기서 flush하고 warnings를 다시 담는다
         state.flushMissingBaseGap(warnings);
-        return new Output(output.points(), output.tradeCount(), output.cycleCount(), List.copyOf(warnings));
+        return new Output(output.points(), output.tradeCount(), output.cycleCount(), output.cycleStartDates(), List.copyOf(warnings));
     }
 
     // PRIVACY 하루 처리 — 사이클 종료 판정(endsCycleOnLiquidation=true, 리버스모드 없음) 후 주문 생성
@@ -407,6 +408,7 @@ public class BacktestEngine {
         boolean stopped;          // 사이클 시드 정책(NONE·MAINTAIN 잔고 부족)으로 매매를 멈췄는지
         int tradeCount;           // 체결 건수 누계
         int cycleCount = 1;       // 진행된 사이클 수
+        final List<LocalDate> cycleStartDates = new ArrayList<>(); // 두 번째 사이클부터 각 사이클 시작일
 
         // 중간부터 시작 — initialHoldings>0이면 avgPrice를 평단가로 두고 시작 보유분을 잔고에 반영한다
         // 원금·사이클 시작 금액의 보유분은 첫 캔들 종가 평가금 — 수익률 기준(첫 포인트 총자산)과 같은 기준이다
@@ -458,8 +460,14 @@ public class BacktestEngine {
                 }
                 case MAX -> cycleStartAmount = balance.usdDeposit(); // 청산 시점 예수금 전액 이월
             }
-            cycleCount++;
+            startNextCycle(date);
             return true;
+        }
+
+        // 새 사이클 시작 기록 — 카운터와 시작일을 함께 갱신한다
+        void startNextCycle(LocalDate startDate) {
+            cycleCount++;
+            cycleStartDates.add(startDate);
         }
 
         // 체결 반영 — 잔고·체결건수 갱신

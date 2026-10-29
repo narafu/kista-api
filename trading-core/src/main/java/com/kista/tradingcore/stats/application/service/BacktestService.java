@@ -83,7 +83,7 @@ class BacktestService implements BacktestUseCase {
         warnings.add(COST_WARNING);
         if (command.type() == StrategyType.VR && command.vrRecurringAmount() != 0) warnings.add(VR_CASH_FLOW_WARNING);
 
-        return new BacktestResult(output.points(), summarize(output), List.copyOf(warnings));
+        return new BacktestResult(output.points(), summarize(output), output.cycleStartDates(), List.copyOf(warnings));
     }
 
     // --- 검증 (전부 IllegalArgumentException → GlobalExceptionHandler 400) ---

@@ -52,7 +52,8 @@ class BacktestControllerTest {
                         new BacktestPoint(LocalDate.of(2024, 1, 3), new BigDecimal("1100.00"), new BigDecimal("1000.00"))),
                 new BacktestSummary(new BigDecimal("1100.00"), new BigDecimal("1000.00"),
                         new BigDecimal("0.1000000000"), new BigDecimal("2.5000000000"),
-                        new BigDecimal("-0.0500000000"), 3, 1),
+                        new BigDecimal("-0.0500000000"), 3, 2),
+                List.of(LocalDate.of(2024, 1, 3)),
                 List.of("체결은 일봉 고가/저가 터치 기준으로 판정됩니다"));
     }
 
@@ -74,7 +75,8 @@ class BacktestControllerTest {
                 .andExpect(jsonPath("$.summary.finalAsset").value(1100.00))
                 .andExpect(jsonPath("$.summary.totalReturnRate").value(0.1))
                 .andExpect(jsonPath("$.summary.tradeCount").value(3))
-                .andExpect(jsonPath("$.summary.cycleCount").value(1))
+                .andExpect(jsonPath("$.summary.cycleCount").value(2))
+                .andExpect(jsonPath("$.cycleStartDates[0]").value("2024-01-03"))
                 .andExpect(jsonPath("$.warnings.length()").value(1));
 
         ArgumentCaptor<BacktestCommand> captor = ArgumentCaptor.forClass(BacktestCommand.class);
