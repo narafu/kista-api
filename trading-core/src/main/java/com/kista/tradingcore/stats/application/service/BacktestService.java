@@ -115,7 +115,7 @@ class BacktestService implements BacktestUseCase {
         if (command.type() == StrategyType.VR) validateVr(command);
     }
 
-    // 운영 StrategyCreationService.validateVrCommand()와 동일 규칙 — 허용값·램프 (인출식 최소자산은 validateVrWithdrawal)
+    // 운영 VrRegistration.resolve()와 동일 규칙 — 허용값·램프 (인출식 최소자산은 validateVrWithdrawal)
     private void validateVr(BacktestCommand command) {
         if (command.vrBandWidth() == null || command.vrBandWidth().signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭(vrBandWidth)은 0보다 커야 합니다");

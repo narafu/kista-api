@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.UpdateStrategyCommand;
@@ -65,8 +66,8 @@ public record TradingCycleRequest(
                 initialHoldings, initialAvgPrice,
                 intervalWeeks, bandWidth,
                 recurringAmount != null ? recurringAmount : 0,
-                initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor,
+                new VrRampInput(initialGradient, gGraceWeeks, gStepWeeks, gMax,
+                        initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor),
                 scheduledStartDate, initialVrValue,
                 dca != null ? dca.toDomain() : null);
     }

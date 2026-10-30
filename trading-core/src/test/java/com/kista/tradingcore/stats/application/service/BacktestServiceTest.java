@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
 import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
@@ -303,7 +304,7 @@ class BacktestServiceTest {
         // poolLimitFloor(0.9) > initialPoolLimitRate(0.75 — 거치식 기본값) → 운영 VrRampValidator와 같은 메시지로 거부
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, SEED,
                 null, new BigDecimal("15"), 4, 0, new BigDecimal("1000"), null, null,
-                new BacktestCommand.VrRampInput(null, null, null, null, null, null, null, new BigDecimal("0.9")));
+                new VrRampInput(null, null, null, null, null, null, null, new BigDecimal("0.9")));
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)

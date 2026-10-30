@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -129,8 +130,7 @@ class VrReconfigureServiceTest {
 
     // cmd의 16개 필드 전부 null인 기본 커맨드 — 필요한 필드만 override해서 사용
     private ReconfigureVrCommand allNullCmd() {
-        return new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        return new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, null, null, null, null, null);
     }
 
     // cycleSnapshotCreator.reconfigureVrCycle(...) 호출 인자 전체를 캡처해 검증하기 위한 홀더
@@ -162,8 +162,7 @@ class VrReconfigureServiceTest {
     @DisplayName("순수 파라미터 수정: bandWidth만 변경 → V 이월, holdings/usdDeposit 불변, 나머지 램프값 상속")
     void reconfigure_pureParamChange_carriesOverBalanceAndValue() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, VrRampInput.NONE, null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -194,8 +193,7 @@ class VrReconfigureServiceTest {
     @DisplayName("수량 주입: holdings 증가 + 평단가 가중평균 + V += 주입수량×현재가")
     void reconfigure_injectShares_updatesHoldingsAvgPriceAndValue() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, 5, new BigDecimal("60.00"), null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, 5, new BigDecimal("60.00"), null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -219,8 +217,7 @@ class VrReconfigureServiceTest {
         // 이 이벤트 타입만 실패시켜야 카탈로그 fallback(TradingErrorEvent 발행)까지 함께 실패하지 않는다.
         org.mockito.Mockito.doThrow(new RuntimeException("텔레그램 발송 실패"))
                 .when(eventPublisher).publishEvent(any(NewCycleStartedEvent.class));
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(new BigDecimal("20.00"), null, null, VrRampInput.NONE, null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -233,8 +230,7 @@ class VrReconfigureServiceTest {
     @DisplayName("예수금 주입: usdDeposit 증가, holdings/avgPrice 불변, V 이월")
     void reconfigure_injectDeposit_updatesDepositOnly() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, new BigDecimal("200.00"), null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, null, null, new BigDecimal("200.00"), null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -252,8 +248,7 @@ class VrReconfigureServiceTest {
     @DisplayName("수량 인출: holdings 감소, 평단가는 그대로 유지, V -= 인출수량×현재가")
     void reconfigure_withdrawShares_reducesHoldingsKeepsAvgPriceReducesValue() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, 4, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, null, null, null, 4, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -270,8 +265,7 @@ class VrReconfigureServiceTest {
     @DisplayName("예수금 인출: usdDeposit 감소, holdings/avgPrice 불변, V 이월")
     void reconfigure_withdrawDeposit_reducesDepositOnly() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, new BigDecimal("150.00"));
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, null, null, null, null, new BigDecimal("150.00"));
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -287,8 +281,7 @@ class VrReconfigureServiceTest {
     void reconfigure_withdrawSharesExceedsHoldings_throws() {
         stubHappyPathChain();
         // latestPosition.holdings() == 10
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, 11, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, null, null, null, 11, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -301,8 +294,7 @@ class VrReconfigureServiceTest {
     void reconfigure_withdrawDepositExceedsBalance_throws() {
         stubHappyPathChain();
         // latestPosition.usdDeposit() == 500.00
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, new BigDecimal("500.01"));
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, null, null, null, null, new BigDecimal("500.01"));
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -315,8 +307,7 @@ class VrReconfigureServiceTest {
     void reconfigure_withdrawThenInject_recomputesAvgPriceFromRemainingShares() {
         stubHappyPathChain();
         // 기존 10주(평단가 50.00) 중 4주 인출 → 잔여 6주(원가 300.00), 이후 3주를 60.00에 주입
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, 3, new BigDecimal("60.00"), null, 4, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, 3, new BigDecimal("60.00"), null, 4, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -368,8 +359,7 @@ class VrReconfigureServiceTest {
         // 최초 시작일을 오늘로부터 정확히 60주 전으로 고정 → weeks=60 기대
         stubHappyPathChain(today.minusWeeks(60));
         // initialGradient를 새 값(12, gMax=15 이내)으로 재지정해도 weeks 계산 자체는 firstStart 기준 그대로여야 함
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, 12, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, new VrRampInput(12, null, null, null, null, null, null, null), null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -387,8 +377,7 @@ class VrReconfigureServiceTest {
     @DisplayName("gMax < initialGradient → IllegalArgumentException, cycleSnapshotCreator 미호출")
     void reconfigure_invalidRamp_gMaxLessThanInitialGradient_throws() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, 20, null, null, 15,
-                null, null, null, null, null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, new VrRampInput(20, null, null, 15, null, null, null, null), null, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -400,8 +389,7 @@ class VrReconfigureServiceTest {
     @DisplayName("poolLimitFloor > initialPoolLimitRate → IllegalArgumentException, cycleSnapshotCreator 미호출")
     void reconfigure_invalidRamp_poolLimitFloorGreaterThanInitial_throws() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                new BigDecimal("0.60"), null, null, new BigDecimal("0.70"), null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, new VrRampInput(null, null, null, null, new BigDecimal("0.60"), null, null, new BigDecimal("0.70")), null, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -413,8 +401,7 @@ class VrReconfigureServiceTest {
     @DisplayName("pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 하한 검증 없이 통과")
     void reconfigure_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, 0, 0, BigDecimal.ZERO, null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, new VrRampInput(null, null, null, null, null, 0, 0, BigDecimal.ZERO), null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -428,8 +415,7 @@ class VrReconfigureServiceTest {
     @DisplayName("gStepWeeks=0 — gradient 램프 비활성화, gGraceWeeks=0·gMax=0을 검증 없이 통과")
     void reconfigure_gStepWeeksZero_disablesRampAndSkipsMaxValidation() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, 0, 0, 0,
-                null, null, null, null, null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, new VrRampInput(null, 0, 0, 0, null, null, null, null), null, null, null, null, null);
 
         service.reconfigure(strategyId, requesterId, cmd);
 
@@ -444,8 +430,7 @@ class VrReconfigureServiceTest {
     void reconfigure_pStepWeeksZero_poolLimitFloorExceedsInitial_stillThrows() {
         stubHappyPathChain();
         // currentDetail.initialPoolLimitRate() == 0.75 (상속) — poolLimitFloor=0.90은 이를 초과
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, 0, 0, new BigDecimal("0.90"), null, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, new VrRampInput(null, null, null, null, null, 0, 0, new BigDecimal("0.90")), null, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -459,8 +444,7 @@ class VrReconfigureServiceTest {
     @DisplayName("injectShares>0인데 injectSharePrice 누락 → IllegalArgumentException")
     void reconfigure_injectSharesWithoutPrice_throws() {
         stubHappyPathChain();
-        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, null, null, null, null,
-                null, null, null, null, 5, null, null, null, null);
+        ReconfigureVrCommand cmd = new ReconfigureVrCommand(null, null, null, VrRampInput.NONE, 5, null, null, null, null);
 
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);

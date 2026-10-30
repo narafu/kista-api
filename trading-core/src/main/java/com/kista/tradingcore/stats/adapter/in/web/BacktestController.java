@@ -2,6 +2,7 @@ package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.adapter.in.web.dto.BacktestResponse;
 import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -60,7 +61,7 @@ public class BacktestController {
             @RequestParam(required = false) BigDecimal vrPoolLimitFloor,
             // INFINITE/PRIVACY 사이클 종료 후 재시작 정책 — 미지정 시 MAX(전액 이월), VR은 무시
             @RequestParam(required = false) StrategyCycleSeedType cycleSeedType) {
-        BacktestCommand.VrRampInput rampInput = new BacktestCommand.VrRampInput(
+        VrRampInput rampInput = new VrRampInput(
                 vrInitialGradient, vrGGraceWeeks, vrGStepWeeks, vrGMax,
                 vrInitialPoolLimitRate, vrPGraceWeeks, vrPStepWeeks, vrPoolLimitFloor);
         BacktestCommand command = new BacktestCommand(type, ticker, from, to, seed,

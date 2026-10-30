@@ -23,7 +23,7 @@ public class VrCreationResolver implements StrategyCreationResolver {
         return new ResolvedCreation(ticker, StrategyDefaults.DEFAULT_DIVISION_COUNT, intervalWeeks, bandWidth, recurringAmount);
     }
 
-    // 방향(recurringMode)만 설정으로 검증하고 recurringAmount의 실제 크기는 기존 VR 자산 규칙(validateVrCommand)에 맡긴다.
+    // 방향(recurringMode)만 설정으로 검증하고 recurringAmount의 실제 크기는 기존 VR 자산 규칙(VrRegistration)에 맡긴다.
     private int resolveRecurringAmount(StrategyCreationRequest request, StrategyCreationSettings settings) {
         if (!settings.recurringMode().customizable()) {
             int amount = request.recurringAmount() != null ? request.recurringAmount() : 0;

@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 // 백테스트 실행 입력 — 값 유효성 검증(인출식 최소자산 등)은 API 경계 책임이고 이 record는 입력을 그대로 담는다
@@ -25,18 +26,10 @@ public record BacktestCommand(
         VrRampInput vrRampInput,    // VR 전용 램프 8파라미터 입력 (null이거나 필드가 null이면 운영 기본값)
         StrategyCycleSeedType cycleSeedType // INFINITE/PRIVACY 사이클 종료 후 재시작 정책 (null이면 MAX — VR은 무시)
 ) {
-    // VR 램프 8파라미터 원본 입력 — 미지정(null) 필드는 vrRamp()에서 recurringAmount별 운영 기본값으로 채운다
-    public record VrRampInput(
-            Integer initialGradient,         // gradient 초기값
-            Integer gGraceWeeks,             // gradient 램프 유예 주수
-            Integer gStepWeeks,              // gradient 램프 단계 주기 (0=램프 비활성)
-            Integer gMax,                    // gradient 램프 상한
-            BigDecimal initialPoolLimitRate, // poolLimitRate 초기값 (0~1)
-            Integer pGraceWeeks,             // poolLimitRate 램프 유예 주수
-            Integer pStepWeeks,              // poolLimitRate 램프 단계 주기 (0=램프 비활성)
-            BigDecimal poolLimitFloor        // poolLimitRate 램프 하한 (0~1)
-    ) {
-        static final VrRampInput NONE = new VrRampInput(null, null, null, null, null, null, null, null); // 전부 기본값
+    public BacktestCommand {
+        if (vrRampInput == null) {
+            vrRampInput = VrRampInput.NONE; // 램프 전부 운영 기본값
+        }
     }
 
     // 13개 필드 호출부(테스트 등) 호환용 — 사이클 시드 정책 생략 시 MAX
@@ -65,9 +58,7 @@ public record BacktestCommand(
 
     // 운영 전략 등록과 동일한 기본값 표로 정규화한 VR 램프 파라미터 — 서비스 검증과 엔진 시뮬레이션이 같은 값을 쓴다
     public VrRampParams vrRamp() {
-        VrRampInput in = vrRampInput != null ? vrRampInput : VrRampInput.NONE;
-        return VrRampParams.withDefaults(vrRecurringAmount, in.initialGradient(), in.gGraceWeeks(), in.gStepWeeks(),
-                in.gMax(), in.initialPoolLimitRate(), in.pGraceWeeks(), in.pStepWeeks(), in.poolLimitFloor());
+        return vrRampInput.withDefaults(vrRecurringAmount);
     }
 
     // 사이클 시드 정책 — 미입력이면 MAX(전액 이월, 기존 백테스트 결과 호환)

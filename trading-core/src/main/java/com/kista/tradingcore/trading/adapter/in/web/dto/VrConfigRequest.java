@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web.dto;
 
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.model.ReconfigureVrCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
@@ -43,8 +44,8 @@ public record VrConfigRequest(
 ) {
     public ReconfigureVrCommand toCommand() {
         return new ReconfigureVrCommand(bandWidth, intervalWeeks, recurringAmount,
-                initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor,
+                new VrRampInput(initialGradient, gGraceWeeks, gStepWeeks, gMax,
+                        initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor),
                 injectShares, injectSharePrice, injectDeposit,
                 withdrawShares, withdrawDeposit);
     }

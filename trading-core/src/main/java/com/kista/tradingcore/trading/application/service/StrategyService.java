@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Market;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
@@ -20,19 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
-import com.kista.shared.kernel.StrategyDefaults;
 
 @Slf4j
 @Service
@@ -42,28 +37,20 @@ class StrategyService implements StrategyUseCase {
 
     private final StrategyPort strategyPort;
     private final StrategyVersionPort strategyVersionPort;
-    private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final VrStrategyDetailUseCase vrStrategyLifecycle;      // VR 전략 전용 상세 저장·조회
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
-    private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final AccountPort accountPort;
     private final StrategyCreationService creationService;         // 신규 전략 등록 전용
+    private final StrategyDetailAssembler detailAssembler;         // 응답 StrategyDetail 조립(조회·등록 공용)
     private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
     private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
-    private final StrategyDcaDetailPort dcaDetailPort;             // DCA 활성 설정 조회
-    private final DcaExecutionPort dcaExecutionPort;               // DCA 최근 회차 조회
-    private final DcaSummaryAssembler dcaSummaryAssembler;         // DCA 조회 요약 조립
     private final StrategyStateWriter stateWriter;                 // 일시중지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
-        Strategy created = creationService.register(userId, accountId, cmd);
-        // 응답은 조회 경로와 동일하게 조립한다 — 등록 응답과 이후 GET이 어긋나지 않도록(UI가 POST 응답을 캐시)
-        Account account = accountPort.requireOwnedAccount(accountId, userId);
-        return toDetail(created, account.broker().getMarket());
+        return creationService.register(userId, accountId, cmd);
     }
 
     @Override
@@ -158,14 +145,14 @@ class StrategyService implements StrategyUseCase {
         List<Strategy> strategies = accountIds.stream()
                 .flatMap(id -> strategiesByAccount.getOrDefault(id, List.of()).stream())
                 .toList();
-        return toDetails(strategies, marketByAccountId);
+        return detailAssembler.toDetails(strategies, marketByAccountId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return toDetails(strategyPort.findByAccountId(accountId), Map.of(accountId, account.broker().getMarket()));
+        return detailAssembler.toDetails(strategyPort.findByAccountId(accountId), Map.of(accountId, account.broker().getMarket()));
     }
 
     @Override
@@ -173,7 +160,7 @@ class StrategyService implements StrategyUseCase {
     public StrategyDetail getById(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return toDetail(strategy, account.broker().getMarket());
+        return detailAssembler.toDetail(strategy, account.broker().getMarket());
     }
 
     @Override
@@ -199,7 +186,7 @@ class StrategyService implements StrategyUseCase {
         }
 
         log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);
-        return toDetail(saved, account.broker().getMarket());
+        return detailAssembler.toDetail(saved, account.broker().getMarket());
     }
 
     // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
@@ -218,150 +205,6 @@ class StrategyService implements StrategyUseCase {
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
         cyclePositionPort.updateCycleStartSnapshot(strategyId, newSeed);
         log.info("시드 수정: strategyId={}, newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
-    }
-
-    // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다. (단건 경로 — 단건 port 호출로 입력 구성 후 assemble 위임)
-    private StrategyDetail toDetail(Strategy strategy, Market market) {
-        var latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id());
-        Optional<CyclePosition> openingPosition = strategy.isVr()
-                ? latestCycle.map(cycle -> cyclePositionPort.findFirstOne(cycle.id())
-                        .orElseThrow(() -> new IllegalStateException(
-                                "VR 시작 포지션 없음: cycleId=" + cycle.id())))
-                : Optional.empty();
-
-        Integer divisionCount = strategy.isInfinite()
-                ? strategyInfiniteDetailPort.findActiveByStrategyId(strategy.id())
-                        .map(StrategyInfiniteDetail::divisionCount)
-                        .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT)
-                : null;
-
-        Optional<CyclePosition> latestPos = cyclePositionPort.findLatestOneByStrategyId(strategy.id());
-
-        boolean isReverseMode = latestPos
-                .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
-                .map(CyclePositionInfiniteDetail::isReverseMode)
-                .orElse(false);
-
-        // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산 — openingPosition/latestPos는 위에서 이미 조회한 값 재사용
-        VrSummary vrSummary = strategy.isVr()
-                ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle, openingPosition, latestPos).orElse(null)
-                : null;
-
-        DcaSummary dcaSummary = null;
-        if (strategy.isDca()) {
-            Map<String, DcaExecution> last = dcaExecutionPort.findLatestByStrategyIds(List.of(strategy.id()))
-                    .getOrDefault(strategy.id(), Map.of());
-            dcaSummary = latestCycle.flatMap(c -> dcaDetailPort.findActiveByStrategyId(strategy.id())
-                    .map(config -> buildDcaSummary(config, last, c, market, latestPos))).orElse(null);
-        }
-
-        return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
-    }
-
-    // DCA 요약 — 규칙별 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산 + 원장 보유·평단
-    private DcaSummary buildDcaSummary(DcaStrategyConfig config, Map<String, DcaExecution> lastByRule, StrategyCycle cycle,
-                                       Market market, Optional<CyclePosition> ledger) {
-        return dcaSummaryAssembler.assemble(config, lastByRule, cycle.startDate(), market, LocalDateTime.now(TimeZones.KST),
-                ledger.map(CyclePosition::holdings).orElse(null), ledger.map(CyclePosition::avgPrice).orElse(null));
-    }
-
-    // 목록 경로 — 배치 메서드로 Map을 구성한 뒤 전략별 assemble 호출 (전략 수와 무관한 상수 쿼리 수)
-    private List<StrategyDetail> toDetails(List<Strategy> strategies, Map<UUID, Market> marketByAccountId) {
-        if (strategies.isEmpty()) return List.of();
-        List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();
-
-        Map<UUID, StrategyCycle> latestCycles = strategyCyclePort.findLatestByStrategyIds(strategyIds);
-        List<UUID> cycleIds = latestCycles.values().stream().map(StrategyCycle::id).toList();
-
-        // VR만 개장 포지션 필요 — 해당 전략들의 최신 사이클 ID로만 조회
-        List<UUID> vrCycleIds = strategies.stream()
-                .filter(Strategy::isVr)
-                .map(s -> latestCycles.get(s.id()))
-                .filter(Objects::nonNull)
-                .map(StrategyCycle::id)
-                .toList();
-        Map<UUID, CyclePosition> openingPositions = cyclePositionPort.findFirstByCycleIds(vrCycleIds);
-        Map<UUID, CyclePosition> latestPositions = cyclePositionPort.findLatestByCycleIds(cycleIds);
-
-        Map<UUID, StrategyVersion> activeVersions = strategyVersionPort.findActiveByStrategyIds(strategyIds);
-        List<UUID> versionIds = activeVersions.values().stream().map(StrategyVersion::id).toList();
-        Map<UUID, StrategyInfiniteDetail> infiniteDetails = strategyInfiniteDetailPort.findByStrategyVersionIds(versionIds);
-        Map<UUID, StrategyVrDetail> vrDetails = vrStrategyLifecycle.findVrDetailsByVersionIds(versionIds);
-        Map<UUID, StrategyCycleVrDetail> cycleVrDetails = vrStrategyLifecycle.findCycleVrDetailsByCycleIds(cycleIds);
-
-        // DCA만 설정·최근 회차 배치 조회 (각 1회)
-        List<UUID> dcaIds = strategies.stream().filter(Strategy::isDca).map(Strategy::id).toList();
-        Map<UUID, DcaStrategyConfig> dcaConfigs = dcaIds.isEmpty() ? Map.of() : dcaDetailPort.findActiveByStrategyIds(dcaIds);
-        Map<UUID, Map<String, DcaExecution>> dcaLast = dcaIds.isEmpty() ? Map.of() : dcaExecutionPort.findLatestByStrategyIds(dcaIds);
-
-        List<UUID> positionIds = latestPositions.values().stream().map(CyclePosition::id).toList();
-        Map<UUID, CyclePositionInfiniteDetail> infinitePositionDetails =
-                cyclePositionInfiniteDetailPort.findByCyclePositionIds(positionIds);
-
-        return strategies.stream().map(strategy -> {
-            Optional<StrategyCycle> latestCycle = Optional.ofNullable(latestCycles.get(strategy.id()));
-            Optional<CyclePosition> openingPosition = strategy.isVr()
-                    ? latestCycle.map(cycle -> Optional.ofNullable(openingPositions.get(cycle.id()))
-                            .orElseThrow(() -> new IllegalStateException(
-                                    "VR 시작 포지션 없음: cycleId=" + cycle.id())))
-                    : Optional.empty();
-            Optional<StrategyVersion> activeVersion = Optional.ofNullable(activeVersions.get(strategy.id()));
-
-            Integer divisionCount = strategy.isInfinite()
-                    ? activeVersion.map(StrategyVersion::id)
-                            .flatMap(versionId -> Optional.ofNullable(infiniteDetails.get(versionId)))
-                            .map(StrategyInfiniteDetail::divisionCount)
-                            .orElse(StrategyDefaults.DEFAULT_DIVISION_COUNT)
-                    : null;
-
-            Optional<CyclePosition> latestPos = latestCycle.flatMap(cycle -> Optional.ofNullable(latestPositions.get(cycle.id())));
-
-            boolean isReverseMode = latestPos
-                    .flatMap(pos -> Optional.ofNullable(infinitePositionDetails.get(pos.id())))
-                    .map(CyclePositionInfiniteDetail::isReverseMode)
-                    .orElse(false);
-
-            VrSummary vrSummary = strategy.isVr()
-                    ? activeVersion.map(StrategyVersion::id)
-                            .flatMap(versionId -> Optional.ofNullable(vrDetails.get(versionId)))
-                            .flatMap(vrDetail -> latestCycle.flatMap(cycle -> Optional.ofNullable(cycleVrDetails.get(cycle.id())))
-                                    .map(cycleVr -> vrStrategyLifecycle.buildSummary(
-                                            vrDetail, cycleVr, openingPosition.map(CyclePosition::usdDeposit).orElse(null),
-                                            latestPos.map(CyclePosition::usdDeposit).orElse(null))))
-                            .orElse(null)
-                    : null;
-
-            DcaSummary dcaSummary = null;
-            if (strategy.isDca() && dcaConfigs.containsKey(strategy.id()) && latestCycle.isPresent()) {
-                dcaSummary = buildDcaSummary(dcaConfigs.get(strategy.id()), dcaLast.getOrDefault(strategy.id(), Map.of()),
-                        latestCycle.get(), marketByAccountId.get(strategy.accountId()), latestPos);
-            }
-
-            return assemble(strategy, latestCycle, openingPosition, latestPos, divisionCount, isReverseMode, vrSummary, dcaSummary);
-        }).toList();
-    }
-
-    // 이미 조회된 입력들을 조합만 하는 순수 조립 메서드 — toDetail/toDetails 공용
-    private StrategyDetail assemble(Strategy strategy, Optional<StrategyCycle> latestCycle,
-                                     Optional<CyclePosition> openingPosition, Optional<CyclePosition> latestPosition,
-                                     Integer divisionCount, boolean isReverseMode, VrSummary vrSummary,
-                                     DcaSummary dcaSummary) {
-        BigDecimal initialUsdDeposit = strategy.isVr()
-                ? openingPosition.map(CyclePosition::usdDeposit).orElse(null)
-                : latestCycle.map(StrategyCycle::startAmount).orElse(null);
-        LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
-
-        // VR·DCA는 currentRound 없음 — INFINITE·PRIVACY만 계산
-        Double currentRound = strategy.isVr() || strategy.isDca() ? null :
-                latestPosition.map(pos -> InfinitePosition.calcCurrentRound(
-                        pos.avgPrice(), pos.toBalance().wholeShares(), pos.usdDeposit(),
-                        divisionCount == null ? 0 : divisionCount)).orElse(null);
-
-        // 코인은 소수 원장이라 wholeShares()를 부르지 않는다(StrategyDetail도 코인 보유 수량은 싣지 않음)
-        Integer currentHoldings = strategy.ticker().isCrypto() ? null
-                : latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
-
-        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary);
     }
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────

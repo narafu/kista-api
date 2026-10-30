@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.domain.backtest;
 
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
 import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
@@ -162,7 +163,7 @@ class BacktestEngineTest {
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("2000"),
                 null, BAND_WIDTH, 1, 0, new BigDecimal("1000"), null, null,
-                new BacktestCommand.VrRampInput(null, 0, 1, null, null, null, 0, null));
+                new VrRampInput(null, 0, 1, null, null, null, 0, null));
 
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-01", 950, 1000, 900, 950),

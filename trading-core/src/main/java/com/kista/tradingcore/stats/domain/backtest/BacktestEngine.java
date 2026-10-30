@@ -373,7 +373,7 @@ public class BacktestEngine {
                 ramp.gMax(), ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
     }
 
-    // 초기 V값 — 운영 StrategyCreationService.resolveVrValue()와 동일 우선순위: 직접 입력(>0)이 있으면 그 값,
+    // 초기 V값 — 운영 VrRegistration.resolve()와 동일 우선순위: 직접 입력(>0)이 있으면 그 값,
     // 없으면 보유분 평가금(시작 시점 시장가 × 보유수량). 등록 시점 전일종가 대신 첫 캔들 종가로 근사한다(PrivacyState와 동일 근사)
     // 보유분이 없으면 0 — VrStrategy bootstrap 경로로 첫 포지션을 만든다
     public static BigDecimal initialVrValue(BacktestCommand command, BigDecimal day0Close) {

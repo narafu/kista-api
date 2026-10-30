@@ -3,7 +3,9 @@ package com.kista.tradingcore.trading.domain.creation;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-// VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService(등록)·VrReconfigureService(재설정)·stats BacktestService(백테스트) 공유
+// VR 램프 파라미터·인출식 최소자산 검증 공용 유틸 — StrategyCreationService→VrRegistration(등록)·VrReconfigureService(재설정)·stats BacktestService(백테스트) 공유
+// validateWithdrawalSufficiency는 등록·재설정 공용 단일 규칙 — 호출이 둘인 이유: 등록은 override V(gate)와 시장가 평가금(required)을 분리해 넘기고,
+// 재설정은 현재가 조회 뒤에만 자산을 알 수 있어 램프 검증(가격 조회 전)과 시점이 다르다(합치면 램프 오류에도 브로커 호출이 생긴다)
 // (docs/agents/modules/trading-formulas.md "VR 공식" 변경 금지 대상 — 검증 조건 자체는 옮기기 전과 byte-for-byte 동일)
 public final class VrRampValidator {
 

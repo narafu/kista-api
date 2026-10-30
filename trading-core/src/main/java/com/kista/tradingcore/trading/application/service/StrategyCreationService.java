@@ -9,10 +9,7 @@ import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
-import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
-import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.shared.kernel.*;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.tradingcore.trading.application.port.output.*;
@@ -20,8 +17,7 @@ import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationRequest;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolvers;
-import com.kista.tradingcore.trading.domain.creation.VrRampParams;
-import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
+import com.kista.tradingcore.trading.domain.creation.VrRegistration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -61,12 +57,13 @@ class StrategyCreationService {
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
-    private final PrivacyTradePort privacyTradePort;            // PRIVACY 중간부터 시작 — FIDA 기준값으로 시작금액 산출
+    private final StrategyStartAmountCalculator startAmountCalculator; // 시작금액 산출(PRIVACY 중간부터 시작 환산 포함)
     private final CycleOrderStrategies cycleStrategies;         // INFINITE 최소 시드 산출(minRequiredDeposit)
+    private final StrategyDetailAssembler detailAssembler;      // 응답 조립(조회 경로와 동일 SSOT)
 
-    // 저장된 전략만 반환 — 응답 StrategyDetail 조립은 조회 경로(StrategyService.toDetail)가 SSOT
+    // 응답은 조회 경로와 같은 StrategyDetailAssembler로 조립한다(UI가 POST 응답을 캐시) — 이미 조회한 계좌의 market 재사용
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
-    Strategy register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
+    StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
         // 코인 계좌는 DCA 전용 — 정책 조회보다 먼저 거부한다
         if (account.broker().isCryptoExchange() && cmd.type() != StrategyType.DCA) {
@@ -102,29 +99,17 @@ class StrategyCreationService {
         BigDecimal initialStockValue = !bootstrap ? BigDecimal.ZERO
                 : (dca ? cmd.initialAvgPrice() : marketPrice).multiply(initialHoldings).setScale(2, RoundingMode.HALF_UP);
 
-        // VR 전략 파라미터 검증 (서비스 계층 — DTO @NotNull 없이 여기서 처리) — V값은 시장가×보유수량 기준
-        // 램프 파라미터(gradient/poolLimitRate 경과주수 함수)는 RuntimeSettings 정책 밖 — 요청값 정규화 후 여기서 직접 검증
-        VrRampParams ramp = null;
-        BigDecimal vrValue = null;
-        if (cmd.type() == StrategyType.VR) {
-            int normalizedRecurringAmount = resolved.recurringAmount() != null ? resolved.recurringAmount() : 0;
-            vrValue = resolveVrValue(cmd, initialStockValue);
-            ramp = normalizeVrRampParams(cmd, normalizedRecurringAmount);
-            validateVrCommand(cmd, resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(),
-                    vrValue, initialStockValue, ramp);
-        }
+        // VR 전략 파라미터 해석·검증 — V값은 시장가×보유수량 기준 (비VR은 null)
+        VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialStockValue) : null;
 
         // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
         StrategyCycleSeedType seedType = cmd.type() == StrategyType.VR || dca
                 ? StrategyCycleSeedType.NONE  // VR·DCA는 NONE 강제 (순환 재등록 불가)
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
-        // startAmount = 현금 + 시장가×보유수량(DCA는 평단×보유 = 초기 투입 원가) — VR도 총 시작자산을 동일하게 보존한다(vrValue override와 무관)
-        // PRIVACY 중간부터 시작만 FIDA 기준 배수로 환산한다 — 매매표 배수(startAmount ÷ currentCycleStart)가 보유 비율과 맞도록
+        // 시작금액 산출 — 예수금 null은 0으로 취급
         BigDecimal depositOrZero = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
-        BigDecimal startAmount = cmd.type() == StrategyType.PRIVACY && bootstrap
-                ? privacyBootstrapStartAmount(depositOrZero, initialHoldings)
-                : depositOrZero.add(initialStockValue);
+        BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), depositOrZero, initialHoldings, initialStockValue);
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
@@ -134,41 +119,11 @@ class StrategyCreationService {
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
         // (증권사 호출은 위에서 이미 끝났으므로 트랜잭션이 HTTP 대기를 물지 않는다)
         Strategy strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
-                accountId, cmd.type(), seedType, resolved, ramp, initialUsdDeposit, initialHoldings,
-                cmd.initialAvgPrice(), marketPrice, startAmount, vrValue, scheduledStart, dcaConfig));
+                accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialUsdDeposit, initialHoldings,
+                cmd.initialAvgPrice(), marketPrice, startAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
 
         log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, strategy.id(), strategy.type());
-        return strategy;
-    }
-
-    // PRIVACY 중간부터 시작 시작금액 — 원가 기준 자산 비율로 배수를 구해 FIDA 사이클 시작금액에 곱한다
-    // 배수 = (예수금 + 보유×FIDA 평단) ÷ (FIDA 사이클 시작금액 + 실현손익), 소수 2자리 버림(PrivacyStrategy 배수 산출과 동일)
-    // 예: 3,445.25 + 417×125.95 = 55,966.40 ÷ (14,434.58 − 454.07) = 4.00배 → 57,738.32
-    private BigDecimal privacyBootstrapStartAmount(BigDecimal initialUsdDeposit, BigDecimal initialHoldings) {
-        PrivacyCurrentBase base = privacyTradePort.findSeedPreviewBase()
-                .orElseThrow(() -> new IllegalArgumentException("PRIVACY 기준 매매표가 없어 중간부터 시작할 수 없습니다."));
-        BigDecimal fidaBookValue = base.currentCycleStart().add(base.currentCycleRealizedPnl());
-        if (base.avgPrice() == null || fidaBookValue.signum() <= 0) {
-            throw new IllegalArgumentException("PRIVACY 기준 매매표에 보유 평단이 없어 중간부터 시작할 수 없습니다.");
-        }
-        BigDecimal userBookValue = initialUsdDeposit.add(initialHoldings.multiply(base.avgPrice()));
-        BigDecimal multiple = userBookValue.divide(fidaBookValue, 2, RoundingMode.FLOOR);
-        log.info("[PRIVACY] 중간부터 시작 배수: userBookValue={}, fidaBookValue={}, multiple={}", userBookValue, fidaBookValue, multiple);
-        if (multiple.signum() <= 0) {
-            throw new IllegalArgumentException("보유 자산이 PRIVACY 기준 매매표 대비 너무 적어 중간부터 시작할 수 없습니다.");
-        }
-        // CEILING — 매매 시 startAmount ÷ currentCycleStart를 FLOOR로 되돌리므로 반올림 내림이면 배수가 0.01 낮아진다
-        return multiple.multiply(base.currentCycleStart()).setScale(2, RoundingMode.CEILING);
-    }
-
-    // VR V값 우선순위 — 초기 V 직접 입력(>0)이 있으면 그 값을, 없으면 평가금(전일종가×보유수량)을 사용한다.
-    // 실제 포지션(CyclePosition)·startAmount는 이 override와 무관하게 항상 evaluatedStockValue(실제 시장가) 기준을 유지한다.
-    private BigDecimal resolveVrValue(RegisterStrategyCommand cmd, BigDecimal evaluatedStockValue) {
-        BigDecimal explicit = cmd.initialVrValue();
-        if (explicit != null && explicit.signum() < 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 V값(initialVrValue)은 0 이상이어야 합니다");
-        }
-        return explicit != null && explicit.signum() > 0 ? explicit : evaluatedStockValue;
+        return detailAssembler.toDetail(strategy, account.broker().getMarket());
     }
 
     // 시작예정일 — 기본값 오늘(KST), 과거 거부. 상한 없음
@@ -214,41 +169,6 @@ class StrategyCreationService {
                 new StrategyCreationRequest(
                         cmd.ticker(), cmd.divisionCount(), cmd.intervalWeeks(), cmd.bandWidth(), cmd.recurringAmount());
         return creationResolvers.of(cmd.type()).resolve(request, settings);
-    }
-
-    // VR 전용 파라미터 검증 — 각 항목이 null이거나 범위 위반이면 IllegalArgumentException
-    // vrValue: register()에서 override 우선순위로 해석된 V값(게이트 판정용) — resolveVrValue() 참고
-    // evaluatedStockValue: 실제 시장가 기준 평가금(전일종가×보유수량) — 인출식 최소자산 검증은 이 값만 사용해 override로 우회할 수 없게 한다
-    private void validateVrCommand(RegisterStrategyCommand cmd, Integer intervalWeeks,
-                                   BigDecimal bandWidth, Integer recurringAmount,
-                                   BigDecimal vrValue, BigDecimal evaluatedStockValue,
-                                   VrRampParams ramp) {
-        if (intervalWeeks == null || intervalWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
-        }
-        BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
-        int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
-        BigDecimal initialAssets = vrValue.add(initialUsdDeposit);
-        BigDecimal evaluatedAssets = evaluatedStockValue.add(initialUsdDeposit);
-
-        // gate 체크는 override 가능한 vrValue 기준, 인출액 대비 필요자산 비교는 시장가(evaluatedStockValue) 기준
-        // — override로 우회할 수 없게 별도 값을 넘긴다 (VrRampValidator 참고)
-        VrRampValidator.validateWithdrawalSufficiency(normalizedRecurringAmount, intervalWeeks, initialAssets, evaluatedAssets);
-
-        // 램프 파라미터 + intervalWeeks/bandWidth 검증 — 정규화된(null 아님) 값 기준
-        ramp.validate(intervalWeeks, bandWidth);
-    }
-
-    // VR 램프 파라미터 정규화 — 기본값 표는 VrRampParams.withDefaults()가 SSOT(백테스트와 공유)
-    private VrRampParams normalizeVrRampParams(RegisterStrategyCommand cmd, int normalizedRecurringAmount) {
-        return VrRampParams.withDefaults(normalizedRecurringAmount,
-                cmd.initialGradient(), cmd.gGraceWeeks(), cmd.gStepWeeks(), cmd.gMax(),
-                cmd.initialPoolLimitRate(), cmd.pGraceWeeks(), cmd.pStepWeeks(), cmd.poolLimitFloor());
-    }
-
-    // VR 금액 입력 null은 사용자가 0을 입력한 것과 동일하게 취급
-    private BigDecimal normalizeMoney(BigDecimal value) {
-        return value != null ? value : BigDecimal.ZERO;
     }
 
     // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장 (DCA도 예외 없음 — 매수·매도는 한 전략의 규칙으로)

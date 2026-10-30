@@ -73,19 +73,9 @@ class VrReconfigureService implements VrReconfigureUseCase {
         BigDecimal bandWidth = cmd.bandWidth() != null ? cmd.bandWidth() : currentDetail.bandWidth();
         int intervalWeeks = cmd.intervalWeeks() != null ? cmd.intervalWeeks() : currentDetail.intervalWeeks();
         int recurringAmount = cmd.recurringAmount() != null ? cmd.recurringAmount() : currentDetail.recurringAmount();
-        int initialGradient = cmd.initialGradient() != null ? cmd.initialGradient() : currentDetail.initialGradient();
-        int gGraceWeeks = cmd.gGraceWeeks() != null ? cmd.gGraceWeeks() : currentDetail.gGraceWeeks();
-        int gStepWeeks = cmd.gStepWeeks() != null ? cmd.gStepWeeks() : currentDetail.gStepWeeks();
-        int gMax = cmd.gMax() != null ? cmd.gMax() : currentDetail.gMax();
-        BigDecimal initialPoolLimitRate = cmd.initialPoolLimitRate() != null
-                ? cmd.initialPoolLimitRate() : currentDetail.initialPoolLimitRate();
-        int pGraceWeeks = cmd.pGraceWeeks() != null ? cmd.pGraceWeeks() : currentDetail.pGraceWeeks();
-        int pStepWeeks = cmd.pStepWeeks() != null ? cmd.pStepWeeks() : currentDetail.pStepWeeks();
-        BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : currentDetail.poolLimitFloor();
 
         // 램프 파라미터 + 자본 주입 형태(주식 수·단가·예수금 부호) 검증 — 외부 브로커 호출(가격 조회·주문 취소) 이전에 전부 완료
-        VrRampParams ramp = new VrRampParams(initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
+        VrRampParams ramp = cmd.vrRamp().inheritFrom(currentDetail);
         ramp.validate(intervalWeeks, bandWidth);
 
         // 자본 주입/인출 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
@@ -96,7 +86,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
                 () -> brokerPricePort.getPrice(strategy.ticker(), account.toBrokerRef()));
         BigDecimal newValue = computeNewValue(cmd, currentCycleVr, currentPrice);
 
-        // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(StrategyCreationService.validateVrCommand)과 동일 규칙,
+        // 인출식(recurringAmount<0) 최소자산 검증 — 등록 시점(VrRegistration)과 동일 규칙,
         // 재설정으로 recurringAmount를 인출식으로 바꾸는 경우도 동일하게 검증되도록 재적용
         // 재설정은 override 개념이 없어 gate·required 양쪽에 같은 값을 넘긴다
         BigDecimal totalAssets = newValue.add(postBalance.usdDeposit());

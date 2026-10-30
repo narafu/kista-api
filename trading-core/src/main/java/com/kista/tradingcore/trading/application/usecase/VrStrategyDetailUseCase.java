@@ -23,13 +23,13 @@ public interface VrStrategyDetailUseCase {
     // 등록 시점(경과 0주) 스냅샷 — gradientAt(0)/poolLimitRateAt(0)은 각각 initialGradient/initialPoolLimitRate와 동일
     StrategyCycleVrDetail saveInitialCycleDetail(UUID cycleId, BigDecimal initialValue, StrategyVrDetail vrDetail);
 
-    // openingPosition: 호출측(StrategyService.toDetail)이 이미 조회한 개장 포지션 — 여기서 재조회하지 않는다
+    // openingPosition: 호출측(StrategyDetailAssembler.toDetail)이 이미 조회한 개장 포지션 — 여기서 재조회하지 않는다
     // latestPosition: 라이브 pool(currentPool) 노출용 — 없으면(이력 없음) currentPool=null
     Optional<VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
                                      Optional<CyclePosition> openingPosition,
                                      Optional<CyclePosition> latestPosition);
 
-    // 목록 조립(StrategyService.toDetails) 전용 배치 조회
+    // 목록 조립(StrategyDetailAssembler.toDetails) 전용 배치 조회
     Map<UUID, StrategyVrDetail> findVrDetailsByVersionIds(Collection<UUID> strategyVersionIds);
 
     Map<UUID, StrategyCycleVrDetail> findCycleVrDetailsByCycleIds(Collection<UUID> cycleIds);

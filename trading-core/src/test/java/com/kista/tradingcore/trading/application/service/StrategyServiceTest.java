@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
@@ -107,6 +108,9 @@ class StrategyServiceTest {
     @BeforeEach
     void setUp() {
         DcaSummaryAssembler dcaSummaryAssembler = new DcaSummaryAssembler(marketCalendarPort);
+        StrategyDetailAssembler detailAssembler = new StrategyDetailAssembler(
+                strategyVersionPort, strategyInfiniteDetailPort, vrStrategyLifecycle, strategyCyclePort,
+                cyclePositionPort, cyclePositionInfiniteDetailPort, dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler);
         StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
                 accountPort,
@@ -118,9 +122,10 @@ class StrategyServiceTest {
                 new StrategyCreationPersister(strategyPort, strategyVersionPort, strategyInfiniteDetailPort,
                         vrStrategyLifecycle, strategyCyclePort, cyclePositionPort, cyclePositionInfiniteDetailPort,
                         dcaDetailPort),
-                privacyTradePort,
+                new StrategyStartAmountCalculator(privacyTradePort),
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
-                        new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null))));
+                        new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null))),
+                detailAssembler);
         var historyStrategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
                 new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
                 new com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy(null)));
@@ -131,18 +136,15 @@ class StrategyServiceTest {
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
-                strategyInfiniteDetailPort,
-                vrStrategyLifecycle,
                 strategyCyclePort,
                 cyclePositionPort,
-                cyclePositionInfiniteDetailPort,
                 accountPort,
                 creationService,
+                detailAssembler,
                 historyQueryService,
                 new CycleSnapshotCreator(
                         strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle),
                 orderCancelService,
-                dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
@@ -272,9 +274,7 @@ class StrategyServiceTest {
     private RegisterStrategyCommand commandFor(StrategyType type, StrategyTicker ticker, int divisionCount,
                                                 Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount) {
         // 중간부터 시작 입력(initialHoldings/initialAvgPrice) 없음 — holdings=0에서 시작하는 기존 시나리오 전용 헬퍼
-        return new RegisterStrategyCommand(type, ticker, null, null, divisionCount,
-                null, null, intervalWeeks, bandWidth, recurringAmount,
-                null, null, null, null, null, null, null, null, null);
+        return new RegisterStrategyCommand(type, ticker, null, null, divisionCount, null, null, intervalWeeks, bandWidth, recurringAmount, VrRampInput.NONE, null, null, null);
     }
 
     private void stubSuccessfulRegistration(StrategyType type, StrategyTicker ticker) {
@@ -727,6 +727,19 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("register()는 계좌 소유 검증을 한 번만 하고, 응답은 같은 stub의 getById 결과와 같다")
+    void register_requiresOwnedAccountOnce() {
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+
+        StrategyDetail registered = strategyService.register(USER_ID, ACCOUNT_ID,
+                commandFor(StrategyType.INFINITE, null, 0, null, null, null));
+
+        verify(accountPort, times(1)).requireOwnedAccount(ACCOUNT_ID, USER_ID);
+        when(strategyPort.findByIdOrThrow(registered.strategy().id())).thenReturn(registered.strategy());
+        assertThat(strategyService.getById(registered.strategy().id(), USER_ID)).isEqualTo(registered);
+    }
+
+    @Test
     @DisplayName("INFINITE register()는 생략한 ticker와 divisionCount에 런타임 기본값을 적용한다")
     void register_infinite_appliesOmittedDefaults() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.TQQQ);
@@ -816,9 +829,7 @@ class StrategyServiceTest {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
-                new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 0,
-                        null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null));
+                new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 0, null, null, null, null, null, VrRampInput.NONE, null, null, null));
 
         assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.TQQQ);
         verify(strategyVrDetailPort).save(argThat(detail -> detail.intervalWeeks() == 2
@@ -920,10 +931,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("register() 호출 시 같은 계좌에 동일 종목 전략이 이미 있으면 IllegalStateException 발생")
     void register_duplicateTicker_throws() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, null, null, null, null, null, VrRampInput.NONE, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.SOXL)).thenReturn(List.of(ACTIVE_STRATEGY));
@@ -937,10 +945,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("register() 호출 시 시드가 가용 예수금을 넘어도 등록은 성공하고 증권사 잔고를 조회하지 않는다")
     void registerOverFreeCashIsAllowed() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.TQQQ, new BigDecimal("600"), null, 20,
-                null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, new BigDecimal("600"), null, 20, null, null, null, null, null, VrRampInput.NONE, null, null, null);
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.TQQQ);
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
@@ -954,11 +959,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() holdings=0이어도 초기 V 입력이 있으면 그 값을 V값으로 저장한다")
     void register_vr_explicitInitialValue_holdingsZero_usesOverrideAsValue() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
-                null, null, 2, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null,
-                new BigDecimal("5000"));
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, BigDecimal.ZERO, null, 20, null, null, 2, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, new BigDecimal("5000"), null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -988,11 +989,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 초기 V 입력이 있어도 실제 포지션·startAmount는 시장가 평가금 기준을 그대로 유지한다")
     void register_vr_explicitInitialValue_withHoldings_keepsEvaluatedAssetsSeparate() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
-                BigDecimal.valueOf(10), new BigDecimal("100.00"), 2, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null,
-                new BigDecimal("99999"));
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, BigDecimal.ZERO, null, 20, BigDecimal.valueOf(10), new BigDecimal("100.00"), 2, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, new BigDecimal("99999"), null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
@@ -1023,11 +1020,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 인출식 최소자산 검증은 초기 V 입력을 반영하지 않고 실제 평가금 기준으로만 판단한다")
     void register_vr_explicitInitialValue_doesNotBypassWithdrawalMinimumCheck() {
         // 게이트(V+예수금>0)는 override(100000)로 통과하지만, 인출식 최소자산(실제 평가금 0 + 예수금 100)은 미달
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("100"), null, 20,
-                null, null, 2, new BigDecimal("15.00"), -100,
-                null, null, null, null, null, null, null, null, null,
-                new BigDecimal("100000"));
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("100"), null, 20, null, null, 2, new BigDecimal("15.00"), -100, VrRampInput.NONE, null, new BigDecimal("100000"), null);
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1041,11 +1034,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 초기 V값이 음수이면 IllegalArgumentException")
     void register_vr_negativeInitialValue_throws() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, null, null, 20,
-                null, null, 2, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null,
-                new BigDecimal("-1"));
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, null, null, 20, null, null, 2, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, new BigDecimal("-1"), null);
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1060,10 +1049,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 성공 — StrategyVrDetail·StrategyCycleVrDetail 저장, poolLimit 계산, cycleSeedType NONE 강제")
     void register_vr_success_savesVrDetailsAndPoolLimit() {
         // holdings=0(중간부터 시작 미입력) → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75(recurringAmount=0) → poolLimit = 1500.00
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("2000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("2000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1115,10 +1101,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() holdings=0 허용 — 중간부터 시작 미입력 시 initialSnapshot으로 초기 포지션 저장")
     void register_vr_holdingsZero_allowed() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 2, new BigDecimal("10.00"), 0,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 2, new BigDecimal("10.00"), 0, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1148,10 +1131,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR 적립식은 초기 V와 초기 시드가 모두 0이어도 등록 가능")
     void register_vr_recurringDeposit_allowsZeroInitialValueAndSeed() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
-                null, null, 2, new BigDecimal("15.00"), 200,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, BigDecimal.ZERO, null, 20, null, null, 2, new BigDecimal("15.00"), 200, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1187,14 +1167,8 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR 거치식과 인출식은 초기 V와 초기 시드가 모두 0이면 등록 불가")
     void register_vr_nonDeposit_requiresInitialValueOrSeed() {
-        RegisterStrategyCommand hold = new RegisterStrategyCommand(
-                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
-                null, null, 2, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null);
-        RegisterStrategyCommand withdraw = new RegisterStrategyCommand(
-                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
-                null, null, 2, new BigDecimal("15.00"), -100,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand hold = new RegisterStrategyCommand(StrategyType.VR, null, BigDecimal.ZERO, null, 20, null, null, 2, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, null, null);
+        RegisterStrategyCommand withdraw = new RegisterStrategyCommand(StrategyType.VR, null, BigDecimal.ZERO, null, 20, null, null, 2, new BigDecimal("15.00"), -100, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1212,10 +1186,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR 인출식은 초기 자산이 월 인출액의 100배 이상이어야 등록 가능")
     void register_vr_withdrawal_requiresMinimumInitialAssets() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 2, new BigDecimal("15.00"), -100,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 2, new BigDecimal("15.00"), -100, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1231,10 +1202,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() recurringAmount null이면 0으로 저장한다")
     void register_vr_nullRecurringAmount_defaultsToZero() {
         // holdings=0 → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75 → poolLimit = 1500.00
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("2000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("2000"), null, 20, null, null, 4, new BigDecimal("15.00"), null, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1269,10 +1237,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 적립식 initialValue null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullInitialValue_defaultsToZero() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, BigDecimal.ZERO, null, 20,
-                null, null, 4, new BigDecimal("15.00"), 200,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, BigDecimal.ZERO, null, 20, null, null, 4, new BigDecimal("15.00"), 200, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1295,10 +1260,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 적립식 initialUsdDeposit null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullPool_defaultsToZero() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, null, null, 20,
-                null, null, 4, new BigDecimal("15.00"), 200,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, null, null, 20, null, null, 4, new BigDecimal("15.00"), 200, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1324,10 +1286,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() poolLimit scale=2 HALF_UP — recurringAmount > 0 시 poolLimitRate=1.0")
     void register_vr_poolLimitRate_withDeposit() {
         // holdings=0 → V=0, recurringAmount=100(입금) → poolLimitRate=1.0 → poolLimit = 1000 × 1.0 = 1000.00
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 100,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 100, VrRampInput.NONE, null, null, null);
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1363,11 +1322,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 램프 8필드 모두 생략 — 거치식(recurringAmount=0) 부호 파생 기본값 저장")
     void register_vr_rampFieldsOmitted_appliesNormalizedDefaults() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null,
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, null, null);
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1384,11 +1339,7 @@ class StrategyServiceTest {
     void register_vr_rampFieldsOmitted_withdrawal_appliesGradient40() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         // 인출식: recurringAmount=-100, intervalWeeks=2 → 필요 최소자산 = 100×100×4/2 = 20000, initialUsdDeposit=20000으로 충족
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("20000"), null, 20,
-                null, null, 2, new BigDecimal("15.00"), -100,
-                null, null, null, null, null, null, null, null,
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("20000"), null, 20, null, null, 2, new BigDecimal("15.00"), -100, VrRampInput.NONE, null, null, null);
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1402,12 +1353,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 램프 8필드 명시 입력 시 정규화 없이 그대로 저장된다")
     void register_vr_rampFieldsExplicit_savedAsProvided() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                12, 10, 5, 18,
-                new BigDecimal("0.60"), 8, 4, new BigDecimal("0.30"),
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, new VrRampInput(12, 10, 5, 18, new BigDecimal("0.60"), 8, 4, new BigDecimal("0.30")), null, null, null);
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1422,12 +1368,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 그대로 저장(0 초과 요구만 생략)")
     void register_vr_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                null, null, null, null,
-                new BigDecimal("0.60"), 0, 0, BigDecimal.ZERO,
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, new VrRampInput(null, null, null, null, new BigDecimal("0.60"), 0, 0, BigDecimal.ZERO), null, null, null);
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1440,12 +1381,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() gStepWeeks=0 — gradient 램프 비활성화, gGraceWeeks=0·gMax=0을 그대로 저장")
     void register_vr_gStepWeeksZero_disablesRampAndSkipsMaxValidation() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                10, 0, 0, 0,
-                null, null, null, null,
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, new VrRampInput(10, 0, 0, 0, null, null, null, null), null, null, null);
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1459,12 +1395,7 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                null, null, null, null,
-                new BigDecimal("0.60"), 0, 0, new BigDecimal("0.90"),
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, new VrRampInput(null, null, null, null, new BigDecimal("0.60"), 0, 0, new BigDecimal("0.90")), null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1479,12 +1410,7 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                15, null, null, 10,
-                null, null, null, null,
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, new VrRampInput(15, null, null, 10, null, null, null, null), null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1499,12 +1425,7 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                null, null, null, null,
-                new BigDecimal("0.50"), null, null, new BigDecimal("0.80"),
-                null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, new VrRampInput(null, null, null, null, new BigDecimal("0.50"), null, null, new BigDecimal("0.80")), null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1830,10 +1751,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("1500.00"), null, LocalDate.now(), null, null, null);
 
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("1500"), null, 20,
-                BigDecimal.valueOf(10), new BigDecimal("45.50"), null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal("1500"), null, 20, BigDecimal.valueOf(10), new BigDecimal("45.50"), null, null, null, VrRampInput.NONE, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1868,10 +1786,7 @@ class StrategyServiceTest {
         StrategyCycle savedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
                 new BigDecimal("2200.00"), null, LocalDate.now(), null, null, null);
 
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.PRIVACY, null, new BigDecimal("200"), null, 0,
-                BigDecimal.valueOf(20), new BigDecimal("95.00"), null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.PRIVACY, null, new BigDecimal("200"), null, 0, BigDecimal.valueOf(20), new BigDecimal("95.00"), null, null, null, VrRampInput.NONE, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1902,10 +1817,7 @@ class StrategyServiceTest {
     void register_privacy_bootstrap_withoutBase_throws() {
         Account account = ownerAccount();
         StrategyTicker ticker = defaultTicker(StrategyType.PRIVACY);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.PRIVACY, null, new BigDecimal("200"), null, 0,
-                BigDecimal.valueOf(20), new BigDecimal("95.00"), null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.PRIVACY, null, new BigDecimal("200"), null, 0, BigDecimal.valueOf(20), new BigDecimal("95.00"), null, null, null, VrRampInput.NONE, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1925,10 +1837,7 @@ class StrategyServiceTest {
         UUID vrCycleId = UUID.randomUUID();
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                BigDecimal.valueOf(5), new BigDecimal("100"), 4, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, BigDecimal.valueOf(5), new BigDecimal("100"), 4, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1962,10 +1871,7 @@ class StrategyServiceTest {
     @DisplayName("register() 중간부터 시작 검증 — holdings>0인데 avgPrice가 없으면 IllegalArgumentException")
     void register_bootstrap_holdingsWithoutAvgPrice_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                BigDecimal.valueOf(10), null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, BigDecimal.valueOf(10), null, null, null, null, VrRampInput.NONE, null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -1976,10 +1882,7 @@ class StrategyServiceTest {
     @DisplayName("register() 중간부터 시작 검증 — avgPrice가 0이어도 holdings>0이면 IllegalArgumentException")
     void register_bootstrap_holdingsWithZeroAvgPrice_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                BigDecimal.valueOf(10), BigDecimal.ZERO, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, BigDecimal.valueOf(10), BigDecimal.ZERO, null, null, null, VrRampInput.NONE, null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -1989,10 +1892,7 @@ class StrategyServiceTest {
     @DisplayName("register() 중간부터 시작 검증 — holdings가 음수면 IllegalArgumentException")
     void register_bootstrap_negativeHoldings_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                BigDecimal.valueOf(-1), null, null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, BigDecimal.valueOf(-1), null, null, null, null, VrRampInput.NONE, null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -2002,10 +1902,7 @@ class StrategyServiceTest {
     @DisplayName("register() 중간부터 시작 검증 — avgPrice가 음수면 IllegalArgumentException")
     void register_bootstrap_negativeAvgPrice_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                null, new BigDecimal("-5"), null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, null, new BigDecimal("-5"), null, null, null, VrRampInput.NONE, null, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -2015,10 +1912,7 @@ class StrategyServiceTest {
     @DisplayName("register() 중간부터 시작 — 시장가(전일종가) 조회 실패 시 IllegalStateException으로 등록 자체가 실패한다")
     void register_bootstrap_priceFetchFailure_throwsIllegalState() {
         Account account = ownerAccount();
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                BigDecimal.valueOf(10), new BigDecimal("45.50"), null, null, null,
-                null, null, null, null, null, null, null, null, null);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, BigDecimal.valueOf(10), new BigDecimal("45.50"), null, null, null, VrRampInput.NONE, null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -2046,8 +1940,7 @@ class StrategyServiceTest {
     // --- register() INFINITE 최소 시드 검증 ---
 
     private RegisterStrategyCommand infiniteSeedCommand(String deposit) {
-        return new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal(deposit), null, 20,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        return new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, new BigDecimal(deposit), null, 20, null, null, null, null, null, VrRampInput.NONE, null, null, null);
     }
 
     @Test
@@ -2093,10 +1986,7 @@ class StrategyServiceTest {
     void register_vr_does_not_fetch_prev_close() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
 
-        strategyService.register(USER_ID, ACCOUNT_ID, new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("2000"), null, 20,
-                null, null, 4, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, null));
+        strategyService.register(USER_ID, ACCOUNT_ID, new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("2000"), null, 20, null, null, 4, new BigDecimal("15.00"), 0, VrRampInput.NONE, null, null, null));
 
         verify(brokerPricePort, never()).getPrevClose(any(), any());
     }
@@ -2108,10 +1998,7 @@ class StrategyServiceTest {
     void register_infinite_withScheduledStartDate_setsCycleStartDate() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
         LocalDate scheduledStart = LocalDate.now(TimeZones.KST).plusDays(3);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20,
-                null, null, null, null, null,
-                null, null, null, null, null, null, null, null, scheduledStart);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.INFINITE, StrategyTicker.SOXL, null, null, 20, null, null, null, null, null, VrRampInput.NONE, scheduledStart, null, null);
 
         StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -2142,10 +2029,7 @@ class StrategyServiceTest {
     void register_vr_withPastScheduledStartDate_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         LocalDate yesterday = LocalDate.now(TimeZones.KST).minusDays(1);
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(
-                StrategyType.VR, null, new BigDecimal("1000"), null, 20,
-                null, null, 2, new BigDecimal("15.00"), 0,
-                null, null, null, null, null, null, null, null, yesterday);
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, new BigDecimal("1000"), null, 20, null, null, 2, new BigDecimal("15.00"), 0, VrRampInput.NONE, yesterday, null, null);
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -2168,8 +2052,7 @@ class StrategyServiceTest {
     }
 
     private static RegisterStrategyCommand dcaCommand(StrategyTicker ticker, DcaStrategyConfig dca, BigDecimal holdings, BigDecimal avgPrice) {
-        return new RegisterStrategyCommand(StrategyType.DCA, ticker, null, null, 0, holdings, avgPrice,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, dca);
+        return new RegisterStrategyCommand(StrategyType.DCA, ticker, null, null, 0, holdings, avgPrice, null, null, null, VrRampInput.NONE, null, null, dca);
     }
 
     // 저장된 설정 캡처 — ruleKey가 부여됐는지 확인하고, 키를 지운 값으로 요청과 비교한다
