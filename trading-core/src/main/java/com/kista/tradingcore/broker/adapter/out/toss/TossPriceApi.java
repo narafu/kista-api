@@ -8,7 +8,6 @@ import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
-import com.kista.tradingcore.broker.domain.model.toss.TossStockInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -18,7 +17,6 @@ import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -40,9 +38,6 @@ public class TossPriceApi {
 
     // Toss 가격 API: GET /api/v1/prices?symbols=SOXL,TQQQ (콤마 구분, 최대 200개)
     private static final String PRICES_PATH = "/api/v1/prices";
-    // Toss 종목 기본 정보 API: GET /api/v1/stocks?symbols=SOXL (복수형, 콤마 구분)
-    // 주의: stocks API는 가격 정보 미제공 — 현재가는 /prices 별도 조회
-    private static final String STOCKS_PATH = "/api/v1/stocks";
 
     private final TossHttpClient tossHttpClient;
     private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
@@ -50,7 +45,6 @@ public class TossPriceApi {
     // 만료 로직 없음 — 날짜가 바뀌면 키가 자연히 달라지고, 종목 수가 적어(4개) 메모리 증가는 무시 가능.
     private record PrevCloseCacheKey(String symbol, LocalDate date, String bucket) {}
     private final ConcurrentMap<PrevCloseCacheKey, Optional<BigDecimal>> prevCloseCache = new ConcurrentHashMap<>();
-    private final TossStockInfoCache stockInfoCache = new TossStockInfoCache(Duration.ofHours(6), Instant::now);
 
     public Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers) {
         if (tickers.isEmpty()) return Map.of();
@@ -255,53 +249,11 @@ public class TossPriceApi {
         return Optional.empty();
     }
 
-    // ── StockInfoPort(TossBrokerAdapter가 변환해 노출) ──────────────────────────────────────────────────────
-
-    public TossStockInfo getStockInfo(StrategyTicker ticker) {
-        return stockInfoCache.getOrFetch(ticker.name(), () -> fetchStockInfoUncached(ticker))
-                .orElseGet(() -> new TossStockInfo(ticker.name(), ticker.name(), ticker.name(), "", "USD", ""));
-    }
-
-    // stocks API 직접 호출 — 성공 응답만 Optional에 담아 캐싱, 실패/empty는 Optional.empty 반환
-    private Optional<TossStockInfo> fetchStockInfoUncached(StrategyTicker ticker) {
-        // stocks API는 복수형 파라미터(symbols) — 단건이어도 동일
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("symbols", ticker.name());
-
-        // 공통 API — 관리자 토큰 사용
-        TossResult<List<StockItem>> wrapper = tossHttpClient.getCommon(STOCKS_PATH, params,
-                new ParameterizedTypeReference<TossResult<List<StockItem>>>() {});
-        List<StockItem> items = wrapper != null ? wrapper.result() : null;
-        if (items == null || items.isEmpty()) {
-            log.warn("Toss 종목 정보 응답 없음: ticker={}", ticker);
-            return Optional.empty();
-        }
-        StockItem s = items.getFirst();
-        return Optional.of(new TossStockInfo(
-                s.symbol(),
-                s.name()         != null ? s.name()         : ticker.name(),
-                s.englishName()  != null ? s.englishName()  : ticker.name(),
-                s.market()       != null ? s.market()       : "",
-                s.currency()     != null ? s.currency()     : "USD",
-                s.status()       != null ? s.status()       : ""
-        ));
-    }
-
     // ── 내부 응답 record ──────────────────────────────────────────────────────
 
     // package-private — TossPriceApiTest에서 직접 생성하여 stub에 사용
     record PriceItem(
         @JsonProperty("symbol")    String symbol,    // 종목 코드 (예: SOXL)
         @JsonProperty("lastPrice") String lastPrice  // 현재가 (문자열 소수 형식)
-    ) {}
-
-    // stocks API 응답 — 가격 정보 없음 (name/market/currency 등 기본 정보만)
-    record StockItem(
-        @JsonProperty("symbol")           String symbol,          // 종목 코드
-        @JsonProperty("name")             String name,            // 한글 종목명
-        @JsonProperty("englishName")      String englishName,     // 영문 종목명
-        @JsonProperty("market")           String market,          // 거래소/시장
-        @JsonProperty("currency")         String currency,        // 통화
-        @JsonProperty("status")           String status           // 종목 상태
     ) {}
 }

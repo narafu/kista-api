@@ -1,8 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
-import com.kista.tradingcore.broker.application.port.output.BrokerAccountPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerAdapterPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerMarketCalendarPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerStatisticsPort;
@@ -12,7 +10,6 @@ import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
-import com.kista.tradingcore.broker.application.port.output.StockInfoPort;
 import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,9 +66,6 @@ class KisBrokerAdapterTest {
 
         assertThat(adapter).isNotInstanceOf(CandlePort.class);
         assertThat(adapter).isNotInstanceOf(ExchangeRatePort.class);
-        assertThat(adapter).isNotInstanceOf(StockInfoPort.class);
-        assertThat(adapter).isNotInstanceOf(BrokerMarketCalendarPort.class);
-        assertThat(adapter).isNotInstanceOf(BrokerAccountPort.class);
         assertThat(adapter).isNotInstanceOf(BrokerStatisticsPort.class);
     }
 }

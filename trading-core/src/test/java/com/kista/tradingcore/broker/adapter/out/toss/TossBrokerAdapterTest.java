@@ -1,8 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
-import com.kista.tradingcore.broker.application.port.output.BrokerAccountPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerAdapterPort;
-import com.kista.tradingcore.broker.application.port.output.BrokerMarketCalendarPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.BrokerStatisticsPort;
@@ -12,17 +10,10 @@ import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
-import com.kista.tradingcore.broker.application.port.output.StockInfoPort;
-import com.kista.tradingcore.broker.domain.model.BrokerAccountInfo;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
-import com.kista.tradingcore.broker.domain.model.BrokerStockInfo;
 import com.kista.tradingcore.broker.domain.model.ExchangeRateQuote;
-import com.kista.tradingcore.broker.domain.model.MarketCalendarDay;
-import com.kista.tradingcore.broker.domain.model.toss.TossAccountInfo;
 import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
 import com.kista.tradingcore.broker.domain.model.toss.TossExchangeRate;
-import com.kista.tradingcore.broker.domain.model.toss.TossMarketSession;
-import com.kista.tradingcore.broker.domain.model.toss.TossStockInfo;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +26,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -56,13 +46,10 @@ class TossBrokerAdapterTest {
     private TossPriceApi tossPriceApi;
 
     @Mock
-    private TossMarketApi tossMarketApi;
-
-    @Mock
     private TossCandleApi tossCandleApi;
 
     private TossBrokerAdapter adapter() {
-        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossMarketApi, tossCandleApi);
+        return new TossBrokerAdapter(tossHoldingsApi, tossOrderApi, tossPriceApi, tossCandleApi);
     }
 
     @Test
@@ -86,15 +73,12 @@ class TossBrokerAdapterTest {
     }
 
     @Test
-    @DisplayName("Toss 전용 5개 Capability Port를 모두 구현한다")
+    @DisplayName("Toss 전용 2개 Capability Port를 모두 구현한다")
     void implementsAllTossOnlyCapabilityPorts() {
         TossBrokerAdapter adapter = adapter();
 
         assertThat(adapter).isInstanceOf(CandlePort.class);
         assertThat(adapter).isInstanceOf(ExchangeRatePort.class);
-        assertThat(adapter).isInstanceOf(StockInfoPort.class);
-        assertThat(adapter).isInstanceOf(BrokerMarketCalendarPort.class);
-        assertThat(adapter).isInstanceOf(BrokerAccountPort.class);
     }
 
     @Test
@@ -107,33 +91,14 @@ class TossBrokerAdapterTest {
     @DisplayName("Toss 응답 타입을 벤더 중립 타입으로 변환해 노출한다")
     void statisticsPortConvertsTossTypesToNeutralTypes() {
         LocalDate day = LocalDate.of(2026, 1, 2);
-        OffsetDateTime start = OffsetDateTime.parse("2026-01-02T14:30:00Z");
-        OffsetDateTime end = OffsetDateTime.parse("2026-01-02T21:00:00Z");
         when(tossCandleApi.getCandles("SOXL", "1D", day, day)).thenReturn(List.of(
                 new TossCandle(day, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TWO, 7L)));
         when(tossHoldingsApi.getExchangeRate()).thenReturn(new TossExchangeRate(new BigDecimal("1380.5"), new BigDecimal("1375")));
-        when(tossPriceApi.getStockInfo(StrategyTicker.SOXL))
-                .thenReturn(new TossStockInfo("SOXL", "반도체", "Semi", "NYSE ARCA", "USD", "NORMAL"));
-        when(tossMarketApi.getMarketCalendar(day, day)).thenReturn(List.of(
-                new TossMarketSession(day, null, new TossMarketSession.SessionHours(start, end), null)));
 
         TossBrokerAdapter adapter = adapter();
 
         assertThat(adapter.getCandles("SOXL", "1D", day, day))
                 .containsExactly(new BrokerCandle(day, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.TWO, 7L));
         assertThat(adapter.getExchangeRate()).isEqualTo(new ExchangeRateQuote(new BigDecimal("1380.5"), new BigDecimal("1375")));
-        assertThat(adapter.getStockInfo(StrategyTicker.SOXL))
-                .isEqualTo(new BrokerStockInfo("SOXL", "반도체", "Semi", "NYSE ARCA", "USD", "NORMAL"));
-        List<MarketCalendarDay> calendar = adapter.getMarketCalendar(day, day);
-        assertThat(calendar).hasSize(1);
-        assertThat(calendar.getFirst().isOpen()).isTrue();
-        assertThat(calendar.getFirst().preMarket()).isNull();
-        assertThat(calendar.getFirst().regularMarket()).isEqualTo(new MarketCalendarDay.SessionHours(start, end));
-    }
-
-    @Test
-    @DisplayName("Toss 계좌 정보를 벤더 중립 BrokerAccountInfo로 변환한다")
-    void accountInfoConvertedToNeutral() {
-        assertThat(new TossAccountInfo(3, "123-45").toBrokerAccountInfo()).isEqualTo(new BrokerAccountInfo(3, "123-45"));
     }
 }

@@ -36,7 +36,7 @@ class TossHttpClient {
         return post(path, account, body, ParameterizedTypeReference.forType(responseType));
     }
 
-    // get/getNoAccountHeader/getCommon은 ParameterizedTypeReference 버전만 유지 — 실제 호출부가 전부
+    // get/getCommon은 ParameterizedTypeReference 버전만 유지 — 실제 호출부가 전부
     // TossResult<T> 제네릭 래퍼를 언랩해야 해서 Class<T> 오버로드가 쓰이지 않았다(post만 Void.class로 사용).
 
     // 계좌 컨텍스트 API용
@@ -45,16 +45,6 @@ class TossHttpClient {
         String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
         return executeWithRetry(account, path, token -> {
             HttpHeaders headers = buildHeaders(account.brokerAccountCode(), token);
-            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
-        });
-    }
-
-    // 계좌 헤더 불필요 API용 (ParameterizedTypeReference 버전)
-    public <T> T getNoAccountHeader(String path, BrokerAccountRef account, MultiValueMap<String, String> params,
-                                    ParameterizedTypeReference<T> typeRef) {
-        String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
-        return executeWithRetry(account, path, token -> {
-            HttpHeaders headers = buildHeaders(null, token);
             return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
         });
     }

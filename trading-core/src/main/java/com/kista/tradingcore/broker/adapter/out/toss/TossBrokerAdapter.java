@@ -14,15 +14,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Toss 증권사 어댑터 — 공통 6개(BrokerCapabilitiesPort) + 통계 5개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
+// Toss 증권사 어댑터 — 공통 6개(BrokerCapabilitiesPort) + 통계 2개(BrokerStatisticsPort, 벤더 중립 타입으로 변환해 노출) Port 구현
 @Component
 @RequiredArgsConstructor
 public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisticsPort {
 
     private final TossHoldingsApi tossHoldingsApi;  // portfolio/margin/sellable/exchangeRate/account
     private final TossOrderApi tossOrderApi;          // cancel/place/execution
-    private final TossPriceApi tossPriceApi;          // price/snapshot/stockInfo
-    private final TossMarketApi tossMarketApi;         // marketCalendar/accountList
+    private final TossPriceApi tossPriceApi;          // price/snapshot
     private final TossCandleApi tossCandleApi;         // candle
 
     @Override
@@ -87,21 +86,6 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
     @Override
     public ExchangeRateQuote getExchangeRate() {
         return tossHoldingsApi.getExchangeRate().toExchangeRateQuote();
-    }
-
-    @Override
-    public BrokerStockInfo getStockInfo(StrategyTicker ticker) {
-        return tossPriceApi.getStockInfo(ticker).toBrokerStockInfo();
-    }
-
-    @Override
-    public List<MarketCalendarDay> getMarketCalendar(LocalDate from, LocalDate to) {
-        return tossMarketApi.getMarketCalendar(from, to).stream().map(TossMarketSession::toMarketCalendarDay).toList();
-    }
-
-    @Override
-    public List<BrokerAccountInfo> getAccountList(BrokerAccountRef account) {
-        return tossMarketApi.getAccountList(account).stream().map(TossAccountInfo::toBrokerAccountInfo).toList();
     }
 
     // --- BrokerPricePort (공통 API — account 불필요) ---
