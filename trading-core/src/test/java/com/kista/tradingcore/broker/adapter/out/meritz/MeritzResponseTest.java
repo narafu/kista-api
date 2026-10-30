@@ -25,6 +25,15 @@ class MeritzResponseTest {
     }
 
     @Test
+    void buyable_amount_shortage_code_is_insufficient_funds_rejection() {
+        var e = (MeritzApiException) new MeritzResponse("5988", "주문가능금액이 부족합니다.", null, null, null, null).failure("주문");
+
+        assertThat(e.isRejected()).isTrue();
+        assertThat(e.isInsufficientFunds()).isTrue();
+        assertThat(BrokerApiException.isInsufficientFundsRejection(e)).isTrue();
+    }
+
+    @Test
     void other_rejection_code_is_not_insufficient_funds() {
         var e = (MeritzApiException) new MeritzResponse("9999", "기타", null, null, null, null).failure("주문");
 

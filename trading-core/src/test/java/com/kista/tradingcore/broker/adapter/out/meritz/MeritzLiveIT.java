@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 // 메리츠 실 API 검증 — 메리츠는 모의 서버가 없어 운영 API를 실계좌로 호출한다. 환경변수 없으면 건너뜀(비밀값은 출력 금지)
 // 조회: MERITZ_APP_KEY·MERITZ_APP_SECRET / 주문: 추가로 MERITZ_LIVE_ORDER=1 (LOC 취소 불가 구간인 마감 10분 전 이후 실행 금지)
+// 거절 코드 실측: MERITZ_LIVE_REJECT=1(미보유 매도)·MERITZ_LIVE_REJECT_BUY=1(주문가능 금액 초과 매수) — 정규장에 실행
 @Tag("integration")
 @EnabledIfEnvironmentVariable(named = "MERITZ_APP_KEY", matches = ".+")
 class MeritzLiveIT {
@@ -109,13 +110,34 @@ class MeritzLiveIT {
         assumeTrue("1".equals(System.getenv("MERITZ_LIVE_REJECT")));
         StrategyTicker unheld = StrategyTicker.QLD;
         BigDecimal farPrice = adapter.getPrice(unheld, account).multiply(new BigDecimal("2")).setScale(2, RoundingMode.HALF_UP);
+        expectRejection(new OrderInstruction(unheld, OrderDirection.SELL, OrderType.LIMIT, 1, farPrice), "미보유 매도");
+    }
+
+    // 주문가능 USD의 2배 금액 매수(현재가 절반 지정가 — 접수돼도 체결 불가) → 예수금 부족 거절 rsp_cd 실측. 접수되면 즉시 취소 후 실패 (MERITZ_LIVE_REJECT_BUY=1)
+    @Test
+    void buy_over_buyable_amount_reports_rejection_code() {
+        assumeTrue("1".equals(System.getenv("MERITZ_LIVE_REJECT_BUY")));
+        BigDecimal buyable = adapter.getUsdBuyableAmount(account);
+        BigDecimal farPrice = adapter.getPrice(TICKER, account).multiply(new BigDecimal("0.5")).setScale(2, RoundingMode.HALF_UP);
+        // 주문 금액 = 주문가능 금액 × 2 이상, 최소 1주
+        int quantity = Math.max(1, buyable.multiply(new BigDecimal("2")).divide(farPrice, 0, RoundingMode.CEILING).intValueExact());
+        System.out.printf("[MeritzLive] 초과 매수 시도 buyable=%s price=%s quantity=%d%n", buyable, farPrice, quantity);
+        expectRejection(new OrderInstruction(TICKER, OrderDirection.BUY, OrderType.LIMIT, quantity, farPrice), "초과 매수");
+    }
+
+    // 접수 거절 실측 — 확정 거절만 정상 종료. 접수되면 취소(취소 실패는 삼키지 않고 전파) 후 실패
+    private void expectRejection(OrderInstruction instruction, String label) {
+        OrderResult placed;
         try {
-            OrderResult placed = adapter.place(new OrderInstruction(unheld, OrderDirection.SELL, OrderType.LIMIT, 1, farPrice), account);
-            adapter.cancel(new CancelInstruction(unheld, placed.externalOrderId()), account);
-            throw new AssertionError("미보유 매도가 접수됨 — 취소함: " + placed.externalOrderId());
+            placed = adapter.place(instruction, account);
         } catch (MeritzApiException e) {
-            System.out.printf("[MeritzLive] 미보유 매도 거절 rejected=%s msg=%s%n", e.isRejected(), e.getMessage());
+            // 결과 불명(rejected=false)은 접수됐을 수 있어 실측값으로 보지 않는다 — 증권사 앱에서 수동 확인
+            assertThat(e.isRejected()).as(label + " 확정 거절 아님(접수 여부 수동 확인): " + e.getMessage()).isTrue();
+            System.out.printf("[MeritzLive] %s 거절 insufficientFunds=%s msg=%s%n", label, e.isInsufficientFunds(), e.getMessage());
+            return;
         }
+        adapter.cancel(new CancelInstruction(instruction.ticker(), placed.externalOrderId()), account);
+        throw new AssertionError(label + " 주문이 접수됨 — 취소함: " + placed.externalOrderId());
     }
 
     // 현재가 절반 1주 매수 → 당일 목록 반영 대기 → 취소 → 취소 가능 수량 0 확인 (체결 불가 가격)
