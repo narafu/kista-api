@@ -289,4 +289,21 @@ class KisTradingApiTest {
         }
     }
 
+    @Nested
+    @DisplayName("SellableQuantityPort — 잔고 연속조회")
+    class BalanceTests {
+
+        @Test
+        @DisplayName("대상 종목이 2페이지에 있으면 연속조회로 찾아 수량 반환")
+        void getSellableQuantity_followsContinuation() {
+            when(kisHttpClient.tradingGetPage(anyString(), anyString(), any(), eq(KisTradingApi.BalanceResponse.class), any(), any()))
+                    .thenReturn(new KisHttpClient.Page<>(new KisTradingApi.BalanceResponse(
+                            List.of(new KisTradingApi.BalanceResponse.Output1("TQQQ", "3", "50.0")), "FK", "NK"), "M"))
+                    .thenReturn(new KisHttpClient.Page<>(new KisTradingApi.BalanceResponse(
+                            List.of(new KisTradingApi.BalanceResponse.Output1("SOXL", "7", "20.0")), null, null), "D"));
+
+            assertThat(api.getSellableQuantity(StrategyTicker.SOXL, ACCOUNT).quantity()).isEqualTo(7);
+            verify(kisHttpClient, times(2)).tradingGetPage(anyString(), anyString(), any(), any(), any(), any());
+        }
+    }
 }
