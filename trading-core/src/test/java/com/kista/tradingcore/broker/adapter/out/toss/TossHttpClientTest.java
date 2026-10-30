@@ -568,9 +568,9 @@ class TossHttpClientTest {
     }
 
     @Test
-    @DisplayName("POST 422 insufficient-sellable-quantity → 잔고 부족 아님(SELL)")
-    void post_422InsufficientSellableQuantity_isNotInsufficientFunds() {
-        assertThat(insufficientFundsFor("{\"error\":{\"code\":\"insufficient-sellable-quantity\"}}")).isFalse();
+    @DisplayName("POST 422 insufficient-sellable-quantity → 잔고·수량 부족(SELL)")
+    void post_422InsufficientSellableQuantity_isInsufficientFunds() {
+        assertThat(insufficientFundsFor("{\"error\":{\"code\":\"insufficient-sellable-quantity\"}}")).isTrue();
     }
 
     @Test

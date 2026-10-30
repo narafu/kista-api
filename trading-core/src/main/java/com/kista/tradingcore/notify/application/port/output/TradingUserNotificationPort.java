@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.application.port.output;
 
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
@@ -24,9 +25,9 @@ public interface TradingUserNotificationPort {
     // 소액 시드로 새 사이클을 열 수 없어 전략이 자동 일시정지됨
     void notifyStrategyAutoPaused(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
                                   StrategyTicker ticker, BigDecimal seed, BigDecimal price);
-    // failedCount>0: 증권사 잔고 부족 거절 BUY 건수, 0: 전략 원장 상한 거절
+    // failedCount>0: 증권사 잔고·수량 부족 거절 건수(direction 방향), 0: 전략 원장 상한 거절(BUY)
     void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker,
-                                   int failedCount, boolean partiallyPlaced);
+                                   int failedCount, boolean partiallyPlaced, OrderDirection direction);
     void notifyError(TradingUserProfile profile, Exception e);
     void notifyBatchInterrupted(TradingUserProfile profile, String accountNickname);
     void notifyMarketOpen(TradingUserProfile profile);

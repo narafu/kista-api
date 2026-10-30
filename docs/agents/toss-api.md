@@ -73,4 +73,4 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 
 ### 잔고 부족 거절 분류
 - 주문 POST가 HTTP 422 + `error.code = insufficient-buying-power`이면 `TossApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `TossHttpClient`가 판정). 출처: 공식 문서 `openapi.tossinvest.com/openapi-docs/overview.md`.
-- `insufficient-sellable-quantity`(SELL)·`idempotency-key-conflict` 등 다른 422 코드는 분류하지 않는다. BUY 여부 판단은 호출자(`OrderSubmitter`) 몫.
+- 422 `insufficient-sellable-quantity`(SELL, 판매 가능 수량 부족)도 같은 `isInsufficientFunds()`로 분류한다. `idempotency-key-conflict` 등 다른 422 코드는 분류하지 않는다. 방향별 문구는 알림 어댑터가 정한다.

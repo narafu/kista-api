@@ -1,7 +1,6 @@
 package com.kista.tradingcore.stats.application.usecase;
 
 import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.tradingcore.trading.domain.model.CycleHistoryPage;
 import com.kista.shared.kernel.StrategyTicker;
@@ -17,7 +16,6 @@ import java.util.UUID;
 // (전략 스코프 이력·주문·시드 미리보기는 trading StrategyUseCase 소유)
 public interface AccountStatisticsUseCase {
     PresentBalanceResult getPresentBalance(UUID accountId, UUID requesterId);
-    List<MarginItem> getMargin(UUID accountId, UUID requesterId);
     DailyTransactionResult getDailyTransactions(UUID accountId, UUID requesterId, LocalDate from, LocalDate to);
     // 유저 스코프 일별 거래내역 조회 (대시보드 위젯용 — 보유 계좌 전체 합산, 1회 조회)
     DailyTransactionResult getDailyTransactionsForUser(UUID requesterId, LocalDate from, LocalDate to);

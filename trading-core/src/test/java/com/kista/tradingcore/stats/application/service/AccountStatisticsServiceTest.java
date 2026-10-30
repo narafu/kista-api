@@ -8,7 +8,6 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,6 @@ class AccountStatisticsServiceTest {
     @Mock OrderPort orderPort;
     @Mock BrokerPricePort pricePort;
     @Mock PortfolioPort portfolioPort;
-    @Mock MarginPort marginPort;
 
     private AccountStatisticsService service;
     private final UUID accountId = UUID.randomUUID();
@@ -47,7 +45,7 @@ class AccountStatisticsServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccountStatisticsService(
-                accountPort, cyclePositionPort, orderPort, portfolioPort, marginPort, pricePort);
+                accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
         Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
@@ -68,7 +66,7 @@ class AccountStatisticsServiceTest {
 
     @Test
     void getPresentBalance_brokerFailure_wrappedAsIllegalStateException() {
-        // getMargin()과 동일하게 BrokerCallGuard로 감싸져야 함 — 증권사 타입 외 예상 밖 예외는 사용자용 메시지로 래핑
+        // BrokerCallGuard로 감싸져야 함 — 증권사 타입 외 예상 밖 예외는 사용자용 메시지로 래핑
         when(portfolioPort.getPresentBalance(any())).thenThrow(new RuntimeException("Toss 매수가능금액 응답 없음"));
 
         assertThatThrownBy(() -> service.getPresentBalance(accountId, userId))

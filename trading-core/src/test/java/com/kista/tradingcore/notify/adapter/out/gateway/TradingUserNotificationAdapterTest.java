@@ -1,6 +1,7 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
 import com.kista.shared.kernel.NotificationChannel;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
@@ -86,7 +87,7 @@ class TradingUserNotificationAdapterTest {
     @Test
     @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_brokerRejection_bodyContainsFailedCountAndPartialNote() {
-        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 2, true);
+        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 2, true, OrderDirection.BUY);
 
         var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
         verify(restClient.post().uri(anyString())).body(captor.capture());
@@ -97,8 +98,20 @@ class TradingUserNotificationAdapterTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void notifyInsufficientBalance_sellRejection_bodyAsksToCheckHoldings() {
+        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 1, false, OrderDirection.SELL);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("증권사 판매 가능 수량 부족").contains("내계좌").contains("SOXL")
+                .contains("매도 1건 실패").contains("보유 수량 확인 바랍니다.");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_ledgerCap_bodyExplainsNoOrderToday() {
-        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 0, false);
+        adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 0, false, OrderDirection.BUY);
 
         var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
         verify(restClient.post().uri(anyString())).body(captor.capture());

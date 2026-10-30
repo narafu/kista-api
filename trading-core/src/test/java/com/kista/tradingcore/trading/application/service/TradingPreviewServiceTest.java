@@ -38,6 +38,8 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -61,6 +63,7 @@ class TradingPreviewServiceTest {
     @Mock StrategyLedgerBudget ledgerBudget;
     @Mock TradingPriceFetcher priceFetcher;
     @Mock MarginPort marginPort;
+    @Mock SellableQuantityPort sellableQuantityPort;
 
     TradingPreviewService service;
 
@@ -78,8 +81,8 @@ class TradingPreviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 생성자에 브로커 잔고·판매가능수량 포트가 없다 — 미리보기는 브로커를 조회하지 않음을 컴파일 타임에 고정
-        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort);
+        // 브로커 조회는 경고 전용 포트(MarginPort·SellableQuantityPort)뿐이다 — 매매 판정에는 쓰지 않는다
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort, sellableQuantityPort);
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
@@ -453,7 +456,7 @@ class TradingPreviewServiceTest {
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
                 new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
         TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,
-                ledgerBudget, priceFetcher, marginPort);
+                ledgerBudget, priceFetcher, marginPort, sellableQuantityPort);
 
         NextOrdersPreview result = wired.preview(STOCK_DCA.id(), ACCOUNT.userId());
 
@@ -598,5 +601,97 @@ class TradingPreviewServiceTest {
 
         NextOrdersPreview rejected = service.preview(STRATEGY.id(), ACCOUNT.userId());
         assertThat(rejected.accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("50.00");
+    }
+
+    // ===== 계좌 보유 수량 SELL 경고(accountHoldingsCheck) =====
+
+    private static PlannedOrder sellOrder(StrategyTicker ticker, int qty, String price) {
+        return PlannedOrder.of(LocalDate.now(), ticker, OrderType.LIMIT, OrderDirection.SELL, qty, new BigDecimal(price));
+    }
+
+    @Test
+    void accountHoldingsCheck_insufficient_whenSellableBelowRequired() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, sellOrder(StrategyTicker.SOXL, 5, "40.00"));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(eq(ACCOUNT.id()), any(), eq(StrategyTicker.SOXL))).thenReturn(2);
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, TRADING_ACCOUNT.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 6));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountHoldingsCheck().sufficient()).isFalse();
+        assertThat(result.accountHoldingsCheck().availableQuantity()).isEqualByComparingTo("6");
+        assertThat(result.accountHoldingsCheck().requiredSellQuantity()).isEqualByComparingTo("7"); // 저장 SELL 2 + 신규 5
+    }
+
+    @Test
+    void accountHoldingsCheck_sufficient_whenSellableCoversRequired() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, sellOrder(StrategyTicker.SOXL, 5, "40.00"));
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, TRADING_ACCOUNT.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 5));
+
+        assertThat(service.preview(STRATEGY.id(), ACCOUNT.userId()).accountHoldingsCheck().sufficient()).isTrue();
+    }
+
+    @Test
+    void accountHoldingsCheck_isNull_whenSellablePortThrows() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, sellOrder(StrategyTicker.SOXL, 5, "40.00"));
+        when(sellableQuantityPort.getSellableQuantity(any(), any())).thenThrow(new IllegalStateException("증권사 오류"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountHoldingsCheck()).isNull();
+        assertThat(result.orders()).hasSize(1); // preview 자체는 정상
+    }
+
+    @Test
+    void accountHoldingsCheck_isNull_andSellableNotCalled_whenNoSell() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04"));
+        when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("1000.00"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountHoldingsCheck()).isNull();
+        verifyNoInteractions(sellableQuantityPort);
+    }
+
+    @Test
+    void accountHoldingsCheck_isNull_andSellableNotCalled_forMockAccount() {
+        Account mock = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "123", "key", "secret", null, Broker.MOCK, null);
+        Strategy mockStrategy = new Strategy(UUID.randomUUID(), mock.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategy.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(7), null, null, null);
+        when(accountPort.requireOwnedAccount(mock.id(), mock.userId())).thenReturn(mock);
+        when(strategyPort.findByAccountId(mock.id())).thenReturn(List.of(mockStrategy));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(mockStrategy.id()))).thenReturn(Map.of(mockStrategy.id(), mockCycle));
+        when(planBuilder.build(eq(mockStrategy), any(), eq(mockCycle), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(
+                        new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder(StrategyTicker.SOXL, 5, "40.00"))), null));
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(mock.id(), mock.userId());
+
+        assertThat(result.get(mockStrategy.id()).accountHoldingsCheck()).isNull();
+        verifyNoInteractions(sellableQuantityPort);
+    }
+
+    @Test
+    void accountHoldingsCheck_callsSellableOncePerTicker_andAggregatesStrategiesOfSameTicker() {
+        Strategy sibling = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle siblingCycle = new StrategyCycle(UUID.randomUUID(), sibling.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(7), null, null, null);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, sibling));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id(), sibling.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE, sibling.id(), siblingCycle));
+        stubPlan(STRATEGY, STRATEGY_CYCLE, sellOrder(StrategyTicker.SOXL, 3, "40.00"));
+        stubPlan(sibling, siblingCycle, sellOrder(StrategyTicker.SOXL, 4, "40.00"));
+        when(sellableQuantityPort.getSellableQuantity(StrategyTicker.SOXL, TRADING_ACCOUNT.brokerRef()))
+                .thenReturn(new SellableQuantity("SOXL", 10));
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        verify(sellableQuantityPort, times(1)).getSellableQuantity(any(), any());
+        assertThat(result.get(STRATEGY.id()).accountHoldingsCheck().requiredSellQuantity()).isEqualByComparingTo("7");
+        assertThat(result.get(sibling.id()).accountHoldingsCheck()).isEqualTo(result.get(STRATEGY.id()).accountHoldingsCheck());
     }
 }

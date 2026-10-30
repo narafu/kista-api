@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingNotifyPort;
@@ -73,10 +74,10 @@ class TradingAlertNotifierTest {
         BigDecimal usdDeposit = new BigDecimal("100.00");
 
         notifier().onInsufficientBalance(new InsufficientBalanceEvent(null, accountId, accountNickname,
-                0, usdDeposit, StrategyTicker.SOXL, null, 0, false));
+                0, usdDeposit, StrategyTicker.SOXL, null, 0, false, null));
 
         verify(notifyPort).notifyInsufficientBalance(0, usdDeposit, StrategyTicker.SOXL);
-        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any(), anyInt(), anyBoolean());
+        verify(userNotificationPort, never()).notifyInsufficientBalance(any(), any(), any(), any(), anyInt(), anyBoolean(), any());
     }
 
     @Test
@@ -84,9 +85,9 @@ class TradingAlertNotifierTest {
         when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
 
         notifier().onInsufficientBalance(
-                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 0, false));
+                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 0, false, OrderDirection.BUY));
 
-        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 0, false);
+        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 0, false, OrderDirection.BUY);
         verify(notifyPort, never()).notifyInsufficientBalance(anyInt(), any(), any());
     }
 
@@ -95,9 +96,29 @@ class TradingAlertNotifierTest {
         when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
 
         notifier().onInsufficientBalance(
-                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 2, true));
+                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 2, true, OrderDirection.BUY));
 
-        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 2, true);
+        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 2, true, OrderDirection.BUY);
+    }
+
+    @Test
+    void onInsufficientBalance_userPath_forwardsSellDirection() {
+        when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
+
+        notifier().onInsufficientBalance(
+                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, false, OrderDirection.SELL));
+
+        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 1, false, OrderDirection.SELL);
+    }
+
+    @Test
+    void onInsufficientBalance_legacyEventWithoutDirection_treatedAsBuy() {
+        when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
+
+        notifier().onInsufficientBalance(
+                new InsufficientBalanceEvent(userId, accountId, accountNickname, 0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, false, null));
+
+        verify(userNotificationPort).notifyInsufficientBalance(profile, accountNickname, StrategyType.INFINITE, StrategyTicker.SOXL, 1, false, OrderDirection.BUY);
     }
 
     @Test

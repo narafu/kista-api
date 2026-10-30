@@ -43,23 +43,6 @@ public class StatisticsController {
         return PortfolioSummaryResponse.from(accountStatistics.getPresentBalance(accountId, userId));
     }
 
-    // 해외증거금 통화별조회 — 브로커 어댑터 경유(KIS: TTTC2101R / Toss: buying-power), USD·KRW만 반환
-    @Operation(summary = "해외증거금 조회", description = "브로커 어댑터 경유(KIS: TTTC2101R / Toss: buying-power) — USD·KRW 통화별 통합주문가능금액(예수금) 조회.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "403", description = "내 계좌가 아님"),
-            @ApiResponse(responseCode = "404", description = "계좌를 찾을 수 없음"),
-            @ApiResponse(responseCode = "503", description = "브로커 API 호출 실패")
-    })
-    @GetMapping("/margin")
-    public List<MarginResponse> getMargin(
-            @Parameter(description = "계좌 ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-            @PathVariable UUID accountId,
-            @AuthenticationPrincipal UUID userId) {
-        return accountStatistics.getMargin(accountId, userId)
-                .stream().map(MarginResponse::from).toList();
-    }
-
     // 일별거래내역 조회 — 저장된 체결 주문 기록 기준(외부 브로커 API 미호출, KIS CTOS4001R 아님)
     @Operation(summary = "일별 거래내역 조회", description = "저장된 체결 주문 기록 기준 지정 기간 동안의 일별 거래내역 조회 (외부 브로커 API 호출 없음).")
     @ApiResponses({

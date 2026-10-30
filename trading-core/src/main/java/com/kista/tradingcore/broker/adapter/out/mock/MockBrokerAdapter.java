@@ -179,8 +179,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     // 신규 전략 등록 시점 게이트체크(StrategyService.calcFreeCash) 전용 — 등록하려는 전략은 아직 cycle_position이
     // 없어(chicken-and-egg) 실제 잔고를 계산할 수 없으므로 상한 없음으로 항상 통과시킨다.
     // 실제 매수 예산 제약은 배치 실행 시 전략 원장(StrategyLedgerBudget)이 담당한다.
-    // 주의: 이 값은 GET /api/accounts/{id}/margin에도 그대로 노출되므로 화면상 "가용현금"이 실제와 다르게 크게
-    // 보일 수 있다 — 모의계좌 UI에서 이 필드는 참고용이 아님을 별도 안내하는 것을 권장한다.
+    // 주의: 미리보기 계좌 주문가능 USD 경고(accountCashCheck)도 이 값을 읽으므로 모의계좌는 판정에서 제외한다(TradingPreviewService).
     @Override
     public BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
         return new BigDecimal("999999999.00");

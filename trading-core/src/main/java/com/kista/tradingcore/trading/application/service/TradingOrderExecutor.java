@@ -139,26 +139,33 @@ class TradingOrderExecutor {
         return new PlaceResult(placed, insufficient);
     }
 
-    // 접수 결과 — placed: 접수 성공, insufficient: 증권사 잔고 부족으로 거절된 BUY
+    // 접수 결과 — placed: 접수 성공, insufficient: 증권사 잔고·수량 부족으로 거절된 주문(BUY·SELL 혼재 가능)
     private record PlaceResult(List<Order> placed, List<Order> insufficient) {}
 
     private static final String DCA_LEG_PREFIX = "DCA_"; // DCA 주문 leg = "DCA_" + ruleKey
 
-    // 잔고 부족 거절을 사용자 알림으로 전달 — 전략당 1건(DCA는 회차 skip 기록), 알림 실패가 접수 결과를 막지 않게 격리
+    // 잔고·수량 부족 거절을 사용자 알림으로 전달 — 전략·방향당 1건(DCA는 회차 skip 기록), 알림 실패가 접수 결과를 막지 않게 격리
     private void reportInsufficient(PlaceResult result, LocalDate tradeDate, TradingAccount account, Strategy strategy) {
         if (result.insufficient().isEmpty()) return;
         try {
             if (cycleOrderStrategies.of(strategy.type()).recordsRounds()) {
                 for (Order order : result.insufficient()) {
                     if (!order.orderLeg().startsWith(DCA_LEG_PREFIX)) continue;
+                    boolean sell = order.direction() == OrderDirection.SELL;
                     dcaRecorder.recordOrderRejected(strategy, account, tradeDate, order.orderLeg().substring(DCA_LEG_PREFIX.length()),
-                            order, DcaSkipReason.INSUFFICIENT_BALANCE, "증권사 주문 가능 금액 부족");
+                            order, sell ? DcaSkipReason.INSUFFICIENT_HOLDINGS : DcaSkipReason.INSUFFICIENT_BALANCE,
+                            sell ? "증권사 판매 가능 수량 부족" : "증권사 주문 가능 금액 부족");
                 }
                 return;
             }
-            eventPublisher.publishEvent(new InsufficientBalanceEvent(account.userId(), account.id(), account.nickname(),
-                    0, null, strategy.ticker(), strategy.type(), result.insufficient().size(),
-                    result.placed().stream().anyMatch(o -> o.direction() == OrderDirection.BUY))); // 접수된 BUY가 있을 때만 일부 접수
+            // 방향별로 1건씩 — 일부 접수 여부도 같은 방향의 접수 주문이 있을 때만
+            for (OrderDirection direction : OrderDirection.values()) {
+                int failed = (int) result.insufficient().stream().filter(o -> o.direction() == direction).count();
+                if (failed == 0) continue;
+                eventPublisher.publishEvent(new InsufficientBalanceEvent(account.userId(), account.id(), account.nickname(),
+                        0, null, strategy.ticker(), strategy.type(), failed,
+                        result.placed().stream().anyMatch(o -> o.direction() == direction), direction));
+            }
         } catch (Exception e) {
             // 관리자 이벤트는 이미 억제됐으므로 여기서 실패하면 아무도 모른다 — 관리자에게 알린다
             log.error("[{}] 잔고 부족 알림 처리 실패: {}", account.nickname(), e.getMessage());

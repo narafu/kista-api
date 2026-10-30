@@ -49,7 +49,7 @@ public class TradingAlertNotifier {
         } else {
             TradingUserProfile profile = TradingUserProfiles.requireProfile(userProfilePort, event.userId());
             userNotificationPort.notifyInsufficientBalance(profile, event.accountNickname(), event.strategyType(), event.ticker(),
-                    event.failedCount(), event.partiallyPlaced());
+                    event.failedCount(), event.partiallyPlaced(), event.directionOrBuy());
         }
     }
 

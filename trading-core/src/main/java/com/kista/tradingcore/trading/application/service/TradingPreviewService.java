@@ -4,7 +4,10 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
+import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.trading.domain.model.AccountCashCheckPreview;
+import com.kista.tradingcore.trading.domain.model.AccountHoldingsCheckPreview;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
@@ -52,6 +55,7 @@ class TradingPreviewService {
     private final StrategyLedgerBudget ledgerBudget; // 배치·수동실행과 같은 전략 원장 상한 판정
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
     private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
+    private final SellableQuantityPort sellableQuantityPort; // 종목 실제 판매 가능 수량 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -147,6 +151,7 @@ class TradingPreviewService {
 
         Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
         Map<UUID, BigDecimal> freshBuyByStrategyId = new HashMap<>(); // 전략별 원장 반영 후 신규 BUY 금액 — skip 전략은 없음(0)
+        Map<UUID, Integer> freshSellByStrategyId = new HashMap<>(); // 전략별 신규(미저장) SELL 수량 — skip 전략은 없음(0)
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
@@ -165,9 +170,10 @@ class TradingPreviewService {
                 }
             }
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId));
+                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId));
         }
-        return attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId);
+        attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId);
+        return attachAccountHoldingsCheck(previews, strategies, account, today, freshSellByStrategyId);
     }
 
     // 계좌 단위로 1회 판정해 모든 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·코인·필요 BUY 없음·조회 실패면 null)
@@ -191,10 +197,49 @@ class TradingPreviewService {
         return previews;
     }
 
+    // (계좌, 종목)마다 1회 판정해 그 종목 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·코인·필요 SELL 없음·조회 실패면 null)
+    // 판매 가능 수량은 미체결 매도를 빼지 않은 보유 수량이라 필요량에 PLACED SELL도 포함한다(현금은 증권사가 PLACED를 차감하므로 제외)
+    private Map<UUID, NextOrdersPreview> attachAccountHoldingsCheck(Map<UUID, NextOrdersPreview> previews, List<Strategy> strategies,
+                                                                     TradingAccount account, LocalDate today,
+                                                                     Map<UUID, Integer> freshSellByStrategyId) {
+        Broker broker = account.brokerRef().broker();
+        if (previews.isEmpty() || broker == Broker.MOCK || broker.getMarket() != Market.US_STOCK) return previews;
+        // 종목별 신규 SELL 수량 합 + 오늘 이미 저장된 SELL 보유 여부(신규가 없어도 PLACED SELL이 보유량을 넘을 수 있다)
+        Map<StrategyTicker, Integer> freshSellByTicker = new LinkedHashMap<>();
+        for (Strategy strategy : strategies) {
+            NextOrdersPreview preview = previews.get(strategy.id());
+            if (preview == null) continue;
+            int fresh = freshSellByStrategyId.getOrDefault(strategy.id(), 0);
+            boolean hasStoredSell = preview.todayOrders().stream().anyMatch(o -> o.direction() == OrderDirection.SELL);
+            if (fresh > 0 || hasStoredSell) freshSellByTicker.merge(strategy.ticker(), fresh, Integer::sum);
+        }
+        freshSellByTicker.forEach((ticker, fresh) -> {
+            int required = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, ticker) + fresh;
+            if (required <= 0) return;
+            AccountHoldingsCheckPreview check;
+            try {
+                SellableQuantity sellable = sellableQuantityPort.getSellableQuantity(ticker, account.brokerRef());
+                if (sellable == null) return;
+                check = new AccountHoldingsCheckPreview(BigDecimal.valueOf(sellable.quantity()), BigDecimal.valueOf(required),
+                        sellable.quantity() >= required);
+            } catch (Exception e) {
+                log.warn("[accountId={}] {} 판매 가능 수량 조회 실패 — 경고 생략: {}", account.id(), ticker, e.getMessage());
+                return;
+            }
+            for (Strategy strategy : strategies) {
+                if (strategy.ticker() == ticker && previews.containsKey(strategy.id())) {
+                    previews.computeIfPresent(strategy.id(), (id, preview) -> preview.withAccountHoldingsCheck(check));
+                }
+            }
+        });
+        return previews;
+    }
+
     private NextOrdersPreview buildPreview(Strategy strategy, TradingAccount account, StrategyCycle currentCycle, LocalDate today,
                                             List<Order> todayOrders, CyclePosition latestPosition,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
-                                            BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId) {
+                                            BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
+                                            Map<UUID, Integer> freshSellByStrategyId) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(o.quantity()))
@@ -206,16 +251,16 @@ class TradingPreviewService {
         // startDate==endDate==오늘(당일 등록·당일 청산)인 경우와 겹칠 수 있어 시작예정일 체크보다 먼저 판정한다
         if (currentCycle.endDate() != null) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.CYCLE_ENDED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+                    todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
         }
         // 시작예정일 미도래 사이클은 계획 계산 자체를 건너뛴다 — TradingService.filterScheduledStart와 동일 기준(tradeDate > startDate)
         if (!today.isAfter(currentCycle.startDate())) {
             return new NextOrdersPreview(today, null, List.of(), NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED,
-                    todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+                    todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
         }
 
         if (planResult.isSkip()) {
-            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null);
+            return new NextOrdersPreview(today, null, List.of(), planResult.skipReason(), todayOrders, otherStrategiesPlannedBuyUsd, null, null, null);
         }
         CycleOrderStrategy.OrderPlan plan = planResult.plan();
 
@@ -234,7 +279,11 @@ class TradingPreviewService {
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
+        freshSellByStrategyId.put(strategy.id(), freshOrders.stream()
+                .filter(o -> o.direction() == OrderDirection.SELL)
+                .mapToInt(PlannedOrder::quantity)
+                .sum());
 
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null);
+        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null, null);
     }
 }

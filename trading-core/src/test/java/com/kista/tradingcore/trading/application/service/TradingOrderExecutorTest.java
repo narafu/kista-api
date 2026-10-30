@@ -140,7 +140,7 @@ class TradingOrderExecutorTest {
         assertThat(result).hasSize(1);
         verify(eventPublisher, times(1)).publishEvent(any(InsufficientBalanceEvent.class));
         verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(ACCOUNT.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
-                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 2, true));
+                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 2, true, OrderDirection.BUY));
         verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
@@ -156,7 +156,27 @@ class TradingOrderExecutorTest {
         executor().placeOrders(TODAY, ACCOUNT, CYCLE, null, POSITION, null, INFINITE_STRATEGY);
 
         verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(ACCOUNT.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
-                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, false));
+                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, false, OrderDirection.BUY));
+    }
+
+    @Test
+    @DisplayName("BUY·SELL이 모두 잔고·수량 부족이면 방향별로 이벤트 1건씩, 일부 접수는 같은 방향 기준")
+    void mixedDirectionInsufficient_publishesOneEventPerDirection() {
+        Order buy = planned(UUID.randomUUID(), OrderDirection.BUY, "50.00", 1);
+        Order sell1 = planned(UUID.randomUUID(), OrderDirection.SELL, "60.00", 1);
+        Order sell2 = planned(UUID.randomUUID(), OrderDirection.SELL, "61.00", 1);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(buy, sell1, sell2));
+        when(brokerPort.place(eq(instructionOf(buy)), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+        when(brokerPort.place(eq(instructionOf(sell1)), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+        when(brokerPort.place(eq(instructionOf(sell2)), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-S"));
+
+        executor().placeOrders(TODAY, ACCOUNT, CYCLE, null, POSITION, null, INFINITE_STRATEGY);
+
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(ACCOUNT.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
+                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, false, OrderDirection.BUY));
+        verify(eventPublisher).publishEvent(new InsufficientBalanceEvent(ACCOUNT.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
+                0, null, StrategyTicker.SOXL, StrategyType.INFINITE, 1, true, OrderDirection.SELL));
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
@@ -186,6 +206,21 @@ class TradingOrderExecutorTest {
         verify(dcaRecorder).recordOrderRejected(eq(dca), eq(ACCOUNT), eq(TODAY), eq("rule-1"), eq(o),
                 eq(DcaSkipReason.INSUFFICIENT_BALANCE), any());
         verify(eventPublisher, never()).publishEvent(any(InsufficientBalanceEvent.class));
+    }
+
+    @Test
+    @DisplayName("DCA SELL 수량 부족은 INSUFFICIENT_HOLDINGS 회차 skip으로 기록")
+    void dcaSellInsufficientRecordsHoldingsSkip() {
+        Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT.userId(), StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        Order o = planned(UUID.randomUUID(), OrderDirection.SELL, "50.00", 1).withLeg("DCA_rule-2");
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(o));
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenThrow(StubBrokerApiException.insufficientFunds("부족"));
+
+        executor().placeOrders(TODAY, ACCOUNT, CYCLE, null, null, null, dca);
+
+        verify(dcaRecorder).recordOrderRejected(eq(dca), eq(ACCOUNT), eq(TODAY), eq("rule-2"), eq(o),
+                eq(DcaSkipReason.INSUFFICIENT_HOLDINGS), eq("증권사 판매 가능 수량 부족"));
     }
 
     @Test

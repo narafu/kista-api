@@ -160,8 +160,9 @@ class TossHttpClient {
                             .orElse(null);
                     // 4xx는 증권사가 처리 후 거부한 것(확정 거절) — 단 멱등키 원 요청이 아직 처리 중(409 request-in-progress)이면 결과 불명
                     boolean inProgress = e.getStatusCode().value() == 409 && "request-in-progress".equals(errorCode);
-                    // 422 insufficient-buying-power = 매수 가능 금액 부족 — 잔고 부족 분류(BUY 여부는 호출자 판단)
-                    boolean insufficientFunds = e.getStatusCode().value() == 422 && "insufficient-buying-power".equals(errorCode);
+                    // 422 insufficient-buying-power(매수 가능 금액 부족)·insufficient-sellable-quantity(매도 가능 수량 부족) — 잔고·수량 부족 분류
+                    boolean insufficientFunds = e.getStatusCode().value() == 422
+                            && ("insufficient-buying-power".equals(errorCode) || "insufficient-sellable-quantity".equals(errorCode));
                     throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, !inProgress, insufficientFunds, errorCode);
                 }
                 if (attempt >= MAX_RETRY_ATTEMPTS) {

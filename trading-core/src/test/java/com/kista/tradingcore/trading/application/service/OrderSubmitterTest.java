@@ -126,17 +126,17 @@ class OrderSubmitterTest {
     }
 
     @Test
-    @DisplayName("SELL은 같은 잔고 부족 예외여도 관리자 알림을 유지한다")
-    void sellInsufficientFundsStaysAdminRejection() {
+    @DisplayName("SELL 수량 부족 확정 거절도 BUY처럼 관리자 이벤트 없이 INSUFFICIENT_FUNDS로 돌려준다")
+    void sellInsufficientQuantityMarksFailedWithoutAdminEvent() {
         Order sell = new Order(ORDER_ID, ACCOUNT_REF.id(), ORDER.strategyCycleId(), LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.SELL, BigDecimal.valueOf(3), new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null);
         when(brokerPort.place(any(), any())).thenThrow(StubBrokerApiException.insufficientFunds("매도가능수량 부족"));
 
         OrderSubmitter.Submission result = submitter().submit(sell, ACCOUNT_REF, "계좌");
 
-        assertThat(result.outcome()).isEqualTo(Outcome.REJECTED);
+        assertThat(result.outcome()).isEqualTo(Outcome.INSUFFICIENT_FUNDS);
         verify(orderPort).markFailed(ORDER_ID);
-        expectAlert("접수 실패");
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test

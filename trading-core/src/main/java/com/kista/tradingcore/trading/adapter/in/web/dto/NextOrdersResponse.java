@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.web.dto;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.trading.domain.model.AccountCashCheckPreview;
+import com.kista.tradingcore.trading.domain.model.AccountHoldingsCheckPreview;
 import com.kista.tradingcore.trading.domain.model.LedgerCheckPreview;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -36,7 +37,9 @@ public record NextOrdersResponse(
         @Schema(description = "전략 원장 대비 BUY 경고 (DCA·신규 BUY 없음·skip이면 null)")
         LedgerCheckSummary ledgerCheck,
         @Schema(description = "계좌 주문가능 USD 대비 오늘 BUY 경고 — 계좌 단위(계좌 내 모든 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 BUY 없음·증권사 조회 실패면 null")
-        AccountCashCheckSummary accountCashCheck
+        AccountCashCheckSummary accountCashCheck,
+        @Schema(description = "계좌 보유(판매 가능) 수량 대비 오늘 SELL 경고 — (계좌, 종목) 단위(같은 종목 전략 동일 값), 조회 시점 추정, 경고 전용. MOCK·코인·필요 SELL 없음·증권사 조회 실패면 null")
+        AccountHoldingsCheckSummary accountHoldingsCheck
 ) {
     public record PositionSnapshot(
             @Schema(description = "거래 종목")
@@ -160,6 +163,20 @@ public record NextOrdersResponse(
         }
     }
 
+    // 계좌 실제 보유(판매 가능) 수량 대비 SELL 경고 — (계좌, 종목) 단위
+    public record AccountHoldingsCheckSummary(
+            @Schema(description = "증권사 판매 가능 수량 (조회 시점, 미체결 매도 차감 전 보유 수량)")
+            BigDecimal availableQuantity,
+            @Schema(description = "종목 전체 오늘 SELL 필요 수량 (PLANNED·SUBMITTING·PLACED SELL + 신규 SELL) — 판매 가능 수량이 미체결 매도를 차감하기 전 보유 수량이라 접수 완료(PLACED) SELL도 포함한다. 장중 일부 체결된 PLACED SELL은 주문 수량 전체로 세므로 보수적으로(부족 쪽으로) 표시될 수 있다")
+            BigDecimal requiredSellQuantity,
+            @Schema(description = "false면 배치 접수 시 증권사가 SELL을 거절할 수 있다")
+            boolean sufficient
+    ) {
+        public static AccountHoldingsCheckSummary from(AccountHoldingsCheckPreview p) {
+            return new AccountHoldingsCheckSummary(p.availableQuantity(), p.requiredSellQuantity(), p.sufficient());
+        }
+    }
+
     public static NextOrdersResponse from(NextOrdersPreview result) {
         return new NextOrdersResponse(
                 result.tradeDate(),
@@ -169,7 +186,8 @@ public record NextOrdersResponse(
                 result.todayOrders().stream().map(TodayOrderItem::from).toList(),
                 result.otherStrategiesPlannedBuyUsd(),
                 result.ledgerCheck() == null ? null : LedgerCheckSummary.from(result.ledgerCheck()),
-                result.accountCashCheck() == null ? null : AccountCashCheckSummary.from(result.accountCashCheck())
+                result.accountCashCheck() == null ? null : AccountCashCheckSummary.from(result.accountCashCheck()),
+                result.accountHoldingsCheck() == null ? null : AccountHoldingsCheckSummary.from(result.accountHoldingsCheck())
         );
     }
 }

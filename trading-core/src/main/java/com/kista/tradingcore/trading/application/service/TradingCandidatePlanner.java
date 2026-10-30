@@ -260,7 +260,7 @@ class TradingCandidatePlanner {
                 batchGuard.runSafely("예수금 부족 알림", ctx, () -> {
                         eventPublisher.publishEvent(new InsufficientBalanceEvent(
                                 ctx.userProfile().userId(), ctx.account().id(), ctx.account().nickname(),
-                                0, null, ctx.strategy().ticker(), ctx.strategy().type(), 0, false));
+                                0, null, ctx.strategy().ticker(), ctx.strategy().type(), 0, false, OrderDirection.BUY));
                         return null;
                     });
             }

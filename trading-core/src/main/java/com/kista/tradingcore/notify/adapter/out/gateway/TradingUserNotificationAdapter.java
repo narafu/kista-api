@@ -73,8 +73,14 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
 
     @Override
     public void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker,
-                                          int failedCount, boolean partiallyPlaced) {
+                                          int failedCount, boolean partiallyPlaced, OrderDirection direction) {
         String account = TelegramHttpClient.escapeHtml(accountNickname);
+        // SELL 거절은 판매 가능 수량 부족 — 예수금이 아니라 보유 수량 확인을 안내한다
+        if (failedCount > 0 && direction == OrderDirection.SELL) {
+            notify(profile, "보유 수량 부족", "⚠️ <b>증권사 판매 가능 수량 부족</b> — %s %s %s 매도 %d건 실패%s. 보유 수량 확인 바랍니다.".formatted(
+                    account, ticker.name(), strategyType.name(), failedCount, partiallyPlaced ? " (일부 접수)" : ""));
+            return;
+        }
         // 증권사 거절(failedCount>0)과 전략 원장 상한 거절(0)은 원인·조치가 달라 문구를 나눈다
         String text = failedCount > 0
                 ? "⚠️ <b>증권사 주문 가능 금액 부족</b> — %s %s %s 매수 %d건 실패%s. 예수금 확인 바랍니다.".formatted(

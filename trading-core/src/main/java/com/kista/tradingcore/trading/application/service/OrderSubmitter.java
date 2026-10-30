@@ -91,10 +91,10 @@ class OrderSubmitter {
     }
 
     // 확정 거절 — FAILED 기록(그 사이 다른 경로가 상태를 바꿨으면 그 상태 존중)
-    // BUY의 증권사 잔고 부족 거절은 운영 오류가 아니라 사용자 조치 사안 — 관리자 이벤트 없이 INSUFFICIENT_FUNDS로 돌려 호출자가 사용자 알림으로 묶는다
+    // 증권사의 잔고·수량 부족 거절(BUY 주문가능금액·SELL 판매가능수량)은 운영 오류가 아니라 사용자 조치 사안 — 관리자 이벤트 없이 INSUFFICIENT_FUNDS로 돌려 호출자가 사용자 알림으로 묶는다
     private Submission rejected(Order order, String accountLabel, Exception e) {
-        boolean insufficientFunds = order.direction() == OrderDirection.BUY && BrokerApiException.isInsufficientFundsRejection(e);
-        log.warn("[{}] {} {} 주문 접수 실패{}: {}", accountLabel, order.direction(), order.ticker(), insufficientFunds ? "(잔고 부족)" : "", e.getMessage());
+        boolean insufficientFunds = BrokerApiException.isInsufficientFundsRejection(e);
+        log.warn("[{}] {} {} 주문 접수 실패{}: {}", accountLabel, order.direction(), order.ticker(), insufficientFunds ? (order.direction() == OrderDirection.BUY ? "(잔고 부족)" : "(보유 수량 부족)") : "", e.getMessage());
         if (!insufficientFunds) {
             eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s %s 접수 실패] orderId=%s — %s"
                     .formatted(accountLabel, order.ticker(), order.direction(), order.id(), e.getMessage())));

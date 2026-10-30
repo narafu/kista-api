@@ -30,7 +30,7 @@ public abstract class BrokerApiException extends RuntimeException {
                 || e instanceof BrokerRateLimitException;
     }
 
-    // 잔고 부족 확정 거절 판정 — 방향(BUY/SELL) 판단은 호출자 몫
+    // 잔고·가능수량 부족 확정 거절 판정 — BUY(예수금)·SELL(보유 수량) 공통
     public static boolean isInsufficientFundsRejection(Throwable e) {
         return e instanceof BrokerApiException b && b.rejected && b.insufficientFunds;
     }

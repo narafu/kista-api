@@ -76,4 +76,4 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 - 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `CancelOutcome`은 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
 
 ### 잔고 부족 거절 분류 갭
-- 메리츠는 잔고 부족을 나타내는 `rsp_cd`가 확인되지 않아 `isInsufficientFunds()`로 분류하지 않는다. 잔고 부족 거절도 일반 확정 거절과 같이 관리자 알림으로 남는다 — 실측으로 코드를 확인하면 `MeritzHttpClient`에서 분류를 추가한다. 분류 전까지 메리츠 사용자에게는 미리보기 `accountCashCheck`가 사전 신호다.
+- 메리츠는 잔고 부족을 나타내는 `rsp_cd`가 확인되지 않아 `isInsufficientFunds()`로 분류하지 않는다. BUY 잔고 부족뿐 아니라 SELL 수량 부족 거절도 일반 확정 거절과 같이 관리자 알림으로 남는다 — 실측으로 코드를 확인하면 `MeritzHttpClient`에서 분류를 추가한다. 분류 전까지 메리츠 사용자에게는 미리보기 `accountCashCheck`(BUY)·`accountHoldingsCheck`(SELL)가 사전 신호다.

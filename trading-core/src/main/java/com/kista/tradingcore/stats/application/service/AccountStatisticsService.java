@@ -7,7 +7,6 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.DailyTransaction;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionResult;
 import com.kista.tradingcore.broker.domain.model.DailyTransactionSummary;
-import com.kista.tradingcore.broker.domain.model.MarginItem;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.shared.kernel.OrderDirection;
@@ -19,7 +18,6 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.PortfolioPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,7 +35,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final PortfolioPort portfolioPort;
-    private final MarginPort marginPort;
     private final BrokerPricePort brokerPricePort;
 
     // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
@@ -46,14 +43,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         return BrokerCallGuard.wrap("잔고 조회", () ->
                 portfolioPort.getPresentBalance(account.toBrokerRef()));
-    }
-
-    // 증거금 통화별 조회 — KIS: TTTC2101R / Toss: buying-power USD+KRW
-    @Override
-    public List<MarginItem> getMargin(UUID accountId, UUID requesterId) {
-        Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return BrokerCallGuard.wrap("예수금 조회", () ->
-                marginPort.getMargin(account.toBrokerRef()));
     }
 
     @Override

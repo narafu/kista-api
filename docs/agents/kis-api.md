@@ -34,8 +34,8 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
     - **단일 인스턴스 전제**: `nextSlotByAppKey`는 JVM 로컬 상태 — 롤링 배포로 인스턴스 2개가 잠시 공존하면 같은 appKey에 대한 실효 간격이 인스턴스 수만큼 짧아진다(`BenchmarkResultCache`와 동일한 전제)
   - 주문 접수(`TradingOrderExecutor.placeEach()`)는 자체 페이싱 없이 이 공통 게이트에 의존한다 — 취소 경로(`OrderCancelService.cancelByCycle`)도 같은 `KisHttpClient.post()`를 거치므로 별도 처리 불필요. 마감 리포트의 잔여 PLACED 취소(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)도 같은 경로다. `KisOrderApi.cancel`은 취소 POST 전에 `KisTradingApi.findOrder`(TTTS3035R 주문체결내역 — ODNO 필터 미지원이라 종목·KST 오늘±1일 목록에서 odno 매칭. 목록은 연속조회로 전 페이지를 받는다: 응답 헤더 `tr_cont` F/M이면 다음 페이지, 요청 헤더 `tr_cont=N` + 응답 `ctx_area_fk200`/`ctx_area_nk200` 원문 재전송, 50페이지 상한 도달 시 warn 후 누적분 반환 — `getExecutions`도 동일. 근거는 KIS 공식 샘플이며 실계좌 미실측)로 `nccs_qty`(미체결수량)를 보고, 0이면 POST 없이 `CancelOutcome`(ALREADY_FILLED/ALREADY_CANCELED)을 반환해 리포트가 관리자 알림 없이 넘긴다. 주문을 목록에서 못 찾으면 그대로 취소 POST. 취소 응답 `rt_cd≠0`은 확정 거절(`KisApiException.rejected`, "KIS 취소 실패 [msg_cd]: msg1")로 던진다(과거 응답 본문을 무시해 거부된 취소가 성공으로 기록되던 버그를 고침). 마감 시점 KIS 호출은 PLACED 주문당 GET 1회 + 잔량이 있을 때 POST 1회가 늘어난다. **미검증(실계좌 쓰기 필요)**: KIS가 장 마감 만료 주문의 `nccs_qty`를 0으로 내리는지 — 아니면 취소 POST가 실패해 `[잔여 주문 취소 실패]` 관리자 알림에 msg_cd가 실리므로 그 코드로 종결 분류를 추가한다.
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
-- `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 BUY를 전략 원장(`StrategyLedgerBudget`)으로만 제한하고 브로커 잔고는 사전 조회하지 않는다 — BUY가 이 코드로 확정 거절되면 `BrokerApiException.isInsufficientFundsRejection`이 잔고 부족으로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다(SELL의 같은 코드는 관리자 알림 유지). 수동 SELL은 기존 예약 수량과 신규 수량의 합을 검증한다.
-  - 주문 접수 응답이 `APBK0988`이면 `KisApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `isRejected()` 의미 불변). BUY만 잔고 부족으로 취급해 사용자 알림 대상이 되고, SELL의 APBK0988은 판매가능수량 문제라 관리자 알림을 유지한다(방향 판단은 `OrderSubmitter`). 다른 msg_cd는 분류하지 않는다.
+- `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 BUY를 전략 원장(`StrategyLedgerBudget`)으로만 제한하고 브로커 잔고는 사전 조회하지 않는다 — BUY가 이 코드로 확정 거절되면 `BrokerApiException.isInsufficientFundsRejection`이 잔고 부족으로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다(SELL의 같은 코드도 동일 — 판매 가능 수량 부족 사용자 알림, 관리자 알림 없음. 원장과 증권사 보유의 어긋남은 일일 대사 알림이 계속 감지한다). 수동 SELL은 기존 예약 수량과 신규 수량의 합을 검증한다.
+  - 주문 접수 응답이 `APBK0988`이면 `KisApiException.isInsufficientFunds()`=true(확정 거절의 하위 분류, `isRejected()` 의미 불변). BUY·SELL 모두 잔고·수량 부족으로 취급해 사용자 알림 대상이 된다(방향별 문구는 알림 어댑터). 다른 msg_cd는 분류하지 않는다.
 
 ### Alpaca Calendar API (`/v2/calendar`, AlpacaCalendarAdapter)
 - 지원 범위: 1970~2029년 — 2026년 기준 최대 3년 선제 적재 가능
@@ -48,7 +48,6 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 ### 노출된 KIS live REST 엔드포인트 (신규 추가 전 확인)
 - `GET /api/accounts/{accountId}/prices?tickers=TQQQ,SOXL,USD` — `StatisticsController`(tradingcore.stats), `MultiPriceResponse`(`prices[{ticker, price}]`) 응답(**전일종가**, current 아님 — 전략 생성 화면 최소 시드 기준가와 통일), `accounts/[[...path]]` catch-all로 kista-ui 프록시됨
-- `GET /api/accounts/{accountId}/margin` — `StatisticsController`, `List<MarginResponse>` 응답(도메인 `MarginItem` 변환), USD 예수금은 `currency==USD` 행
 - `GET /api/market/holidays?year=YYYY&month=MM` — `MarketHolidayController`(root `market` 모듈), 해당 월 미국 시장 휴장일 날짜 목록(`List<String>`, ISO 형식), JWT 인증 필요
 
 ### 잔고 조회 주의사항 (TTTC2101R)

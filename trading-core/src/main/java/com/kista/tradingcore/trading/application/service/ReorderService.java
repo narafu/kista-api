@@ -180,7 +180,7 @@ class ReorderService implements ReorderUseCase {
         OrderSubmitter.Submission submission = orderSubmitter.submit(saved, account.toBrokerRef(), account.nickname());
         return switch (submission.outcome()) {
             case PLACED -> new PlacementResult(OrderStatus.PLACED, submission.externalOrderId());
-            case REJECTED, INSUFFICIENT_FUNDS -> new PlacementResult(OrderStatus.FAILED, null); // 잔고 부족은 FAILED 응답으로 사용자에게 직접 전달 — 별도 알림 없음
+            case REJECTED, INSUFFICIENT_FUNDS -> new PlacementResult(OrderStatus.FAILED, null); // 잔고·수량 부족은 FAILED 응답으로 사용자에게 직접 전달 — 별도 알림 없음
             case UNKNOWN -> new PlacementResult(OrderStatus.SUBMITTING, null); // 결과 불명 — 재시도 금지, 런북 정정
             case SKIPPED -> resolveSkipped(saved);
         };

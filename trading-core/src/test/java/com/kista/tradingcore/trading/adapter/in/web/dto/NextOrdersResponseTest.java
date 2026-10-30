@@ -20,7 +20,7 @@ class NextOrdersResponseTest {
     @Test
     void from_mapsLedgerCheckAsNull_whenPreviewLedgerCheckIsNull() {
         NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null);
+                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null, null);
 
         assertThat(NextOrdersResponse.from(preview).ledgerCheck()).isNull();
     }
@@ -30,7 +30,7 @@ class NextOrdersResponseTest {
         LedgerCheckPreview check = new LedgerCheckPreview(
                 new BigDecimal("177.61"), new BigDecimal("304.32"), false, true);
         NextOrdersPreview preview = new NextOrdersPreview(
-                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, check, null);
+                LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, check, null, null);
 
         NextOrdersResponse.LedgerCheckSummary summary = NextOrdersResponse.from(preview).ledgerCheck();
 
