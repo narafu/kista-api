@@ -30,6 +30,8 @@ record MeritzResponse(
     static final String INVALID_CLIENT = "EGW00103";                               // 잘못된 client_id
     static final Set<String> PERMISSION_DENIED_CODES = Set.of("0760", "EGW00202"); // 권한 없음
 
+    static final Set<String> INSUFFICIENT_QUANTITY_CODES = Set.of("1543"); // 매도가능수량 없음(2026-10-30 실측) — 수량 부족 확정 거절
+
     boolean success() {
         return SUCCESS_CODES.contains(rspCd);
     }
@@ -59,7 +61,9 @@ record MeritzResponse(
     RuntimeException failure(String action) {
         if (INVALID_CLIENT.equals(rspCd)) return new BrokerCredentialException();
         if (PERMISSION_DENIED_CODES.contains(rspCd)) return new BrokerPermissionDeniedException();
-        return MeritzApiException.rejected(rspCd, "Meritz " + action + " 실패: rsp_cd=" + rspCd + ", " + rspMsg + " / " + rspSubMsg);
+        String message = "Meritz " + action + " 실패: rsp_cd=" + rspCd + ", " + rspMsg + " / " + rspSubMsg;
+        if (INSUFFICIENT_QUANTITY_CODES.contains(rspCd)) return MeritzApiException.rejectedInsufficientFunds(rspCd, message);
+        return MeritzApiException.rejected(rspCd, message);
     }
 
     // 숫자 문자열/숫자 혼재 필드 — 행 record는 String으로 받고 여기서 변환

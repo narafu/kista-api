@@ -16,7 +16,7 @@
 3. `rsp_cd` ∈ {`0000`,`0001`,`5620`,`5762`,`5766`,`5820`,`5822`}이면 성공, 그 외는 확정 거절(`rejected=true`).
 4. 자료 유무는 `data`가 비었는지로 판단(`5820`이어도 data가 있을 수 있음).
 
-오류 코드: `EGW00121`/`EGW00123` 토큰 무효·만료 → 거절 토큰 조건부 무효화 후 재발급, **1회** 재시도(POST 포함 — 게이트웨이 단계 거절이라 미접수 확정). `EGW00200` 초당 한도(API별 10 TPS) → GET만 백오프 재시도 후 `BrokerRateLimitException`. `EGW00103`(잘못된 client_id)·`0760`/`EGW00202`(권한 없음) → `BrokerCredentialException`/`BrokerPermissionDeniedException`(재시도 금지). `IGW50024` mac 헤더 누락.
+오류 코드: `EGW00121`/`EGW00123` 토큰 무효·만료 → 거절 토큰 조건부 무효화 후 재발급, **1회** 재시도(POST 포함 — 게이트웨이 단계 거절이라 미접수 확정). `EGW00200` 초당 한도(API별 10 TPS) → GET만 백오프 재시도 후 `BrokerRateLimitException`. `EGW00103`(잘못된 client_id)·`0760`/`EGW00202`(권한 없음) → `BrokerCredentialException`/`BrokerPermissionDeniedException`(재시도 금지). `IGW50024` mac 헤더 누락. `1543` 매도가능수량 없음(SELL 수량 부족 확정 거절 → `isInsufficientFunds()`).
 
 호출 간격: 앱키별 최소 110ms(≈9 TPS), 최대 대기 20s(`CallIntervalGate`). 주문·취소 POST는 멱등키가 없어 위 토큰 재발급 1회와 경고 재전송 1회 외에는 자동 재시도하지 않는다. 연속조회는 본문 `tr_cont="1"` + `tr_cont_key`를 **공백 포함 그대로** 쿼리로 재전송하고 `rsp_cd 5762`일 때만 이어 조회, 페이지 상한 50.
 
@@ -76,4 +76,4 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 - 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `CancelOutcome`은 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
 
 ### 잔고 부족 거절 분류 갭
-- 메리츠는 잔고 부족을 나타내는 `rsp_cd`가 확인되지 않아 `isInsufficientFunds()`로 분류하지 않는다. BUY 잔고 부족뿐 아니라 SELL 수량 부족 거절도 일반 확정 거절과 같이 관리자 알림으로 남는다 — 실측으로 코드를 확인하면 `MeritzHttpClient`에서 분류를 추가한다. 분류 전까지 메리츠 사용자에게는 미리보기 `accountCashCheck`(BUY)·`accountHoldingsCheck`(SELL)가 사전 신호다.
+- SELL 매도가능수량 부족은 `rsp_cd=1543`("매도가능수량이 없습니다. 잔고를 확인해주세요.", `rsp_sub_msg` null, 2026-10-30 22:40 KST 정규장 MeritzLiveIT 미보유 QLD 1주 지정가 매도 실측, 미접수)으로 확정 거절이며, `MeritzResponse.failure`가 `isInsufficientFunds()`로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다(KIS `APBK0988`과 동일 처리). BUY 예수금 부족 코드는 아직 미실측이라 일반 확정 거절(관리자 알림)로 남는다 — 실측 후 `INSUFFICIENT_QUANTITY_CODES`에 추가하며, 그때까지 미리보기 `accountCashCheck`(BUY)가 사전 신호다.
