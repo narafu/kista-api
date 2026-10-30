@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +36,8 @@ class KisTradingApi {
 
     private static final String EXECUTION_PATH  = "/uapi/overseas-stock/v1/trading/inquire-ccnl";
     private static final String EXECUTION_TR_ID = "TTTS3035R"; // 해외주식 체결 내역 조회
+
+    private static final int MAX_PAGES = 50; // 연속조회 상한 — 초과 시 warn 후 누적분 반환(Meritz와 동일 정책)
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.BASIC_ISO_DATE;
 
@@ -147,7 +150,7 @@ class KisTradingApi {
     // ── KisExecutionPort ───────────────────────────────────────────────────────
 
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
-        List<ExecutionListResponse.OutputItem> items = fetchOrderList(from, to, ticker, "DS", account);
+        List<ExecutionListResponse.OutputItem> items = fetchOrderList(from, to, ticker, account);
         if (items.isEmpty()) {
             return Collections.emptyList();
         }
@@ -171,8 +174,7 @@ class KisTradingApi {
     // 검색 범위일 뿐 거래일 변환이 아니다 — 취소 대상은 오늘·다음 거래일 주문이라 KST 오늘 앞뒤 1일이면 덮는다
     Optional<OrderStatusView> findOrder(StrategyTicker ticker, String odno, BrokerAccountRef account) {
         LocalDate today = LocalDate.now(TimeZones.KST);
-        // 역순(최신 먼저) — 연속조회 없이 첫 페이지만 받으므로 최근 주문이 잘리지 않게 한다
-        return fetchOrderList(today.minusDays(1), today.plusDays(1), ticker, "AS", account).stream()
+        return fetchOrderList(today.minusDays(1), today.plusDays(1), ticker, account).stream()
                 .filter(item -> odno.equals(item.odno()))
                 .findFirst()
                 .map(item -> new OrderStatusView(
@@ -181,29 +183,54 @@ class KisTradingApi {
                         KisResponseParser.parseIntSafe(item.unfilledQuantity())));
     }
 
-    // 해외주식 주문체결내역(TTTS3035R) — 전략 종목 행만 반환, 응답 없음은 빈 목록
+    // 해외주식 주문체결내역(TTTS3035R) — 연속조회로 전 페이지 누적 후 전략 종목 행만 반환, 응답 없음은 빈 목록
+    // 연속조회 규약(KIS 공식 샘플 기준, 실계좌 미실측): 응답 헤더 tr_cont F/M이면 다음 페이지 — 요청 헤더 tr_cont=N + 응답 ctx_area_fk200/nk200 원문 재전송
     private List<ExecutionListResponse.OutputItem> fetchOrderList(LocalDate from, LocalDate to, StrategyTicker ticker,
-                                                                  String sortSqn, BrokerAccountRef account) {
-        ExecutionListResponse response = kisHttpClient.tradingGet(
-                EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class,
-                p -> {
-                    p.add("PDNO", ticker.name());              // 전략 종목만 조회
-                    p.add("ORD_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
-                    p.add("ORD_END_DT", formatTradeDate(to));
-                    p.add("SLL_BUY_DVSN", "00");              // 전체
-                    p.add("CCLD_NCCS_DVSN", "00");            // 전체
-                    p.add("OVRS_EXCG_CD", exchangeRegistry.ovrsExcgCd(ticker)); // 전략 종목 거래소
-                    p.add("SORT_SQN", sortSqn);               // DS=정순, AS=역순
-                    p.add("ORD_DT", "");
-                    p.add("ORD_GNO_BRNO", "");
-                    p.add("ODNO", "");
-                    p.add("CTX_AREA_NK200", "");
-                    p.add("CTX_AREA_FK200", "");
-                });
-        if (response == null || response.output() == null) {
-            return Collections.emptyList();
+                                                                  BrokerAccountRef account) {
+        List<ExecutionListResponse.OutputItem> all = new ArrayList<>();
+        String trCont = null;     // 첫 페이지는 tr_cont 헤더 없음
+        String fk200 = "";
+        String nk200 = "";
+        for (int page = 1; ; page++) {
+            String pageFk = fk200;
+            String pageNk = nk200;
+            KisHttpClient.Page<ExecutionListResponse> res = kisHttpClient.tradingGetPage(
+                    EXECUTION_TR_ID, EXECUTION_PATH, account, ExecutionListResponse.class, trCont,
+                    p -> {
+                        p.add("PDNO", ticker.name());              // 전략 종목만 조회
+                        p.add("ORD_STRT_DT", formatTradeDate(from)); // KST → UTC(US거래일)
+                        p.add("ORD_END_DT", formatTradeDate(to));
+                        p.add("SLL_BUY_DVSN", "00");              // 전체
+                        p.add("CCLD_NCCS_DVSN", "00");            // 전체
+                        p.add("OVRS_EXCG_CD", exchangeRegistry.ovrsExcgCd(ticker)); // 전략 종목 거래소
+                        p.add("SORT_SQN", "DS");                  // 정순
+                        p.add("ORD_DT", "");
+                        p.add("ORD_GNO_BRNO", "");
+                        p.add("ODNO", "");
+                        p.add("CTX_AREA_NK200", pageNk);          // 연속조회 키(첫 페이지는 빈 값)
+                        p.add("CTX_AREA_FK200", pageFk);
+                    });
+            ExecutionListResponse body = res == null ? null : res.body();
+            if (body != null && body.output() != null) {
+                all.addAll(body.output());
+            }
+            if (res == null || !res.hasNext()) {
+                break;
+            }
+            if (page >= MAX_PAGES) {
+                log.warn("KIS 주문체결내역 연속조회 {}페이지 상한 도달 — 누적 {}건만 반환: accountId={}", MAX_PAGES, all.size(), account.id());
+                break;
+            }
+            trCont = "N"; // 연속조회 다음 페이지
+            fk200 = body == null || body.ctxAreaFk200() == null ? "" : body.ctxAreaFk200();
+            nk200 = body == null || body.ctxAreaNk200() == null ? "" : body.ctxAreaNk200();
+            // 키가 그대로면 같은 페이지를 다시 받아 체결이 중복 집계된다 — 이상 응답으로 보고 중단
+            if (fk200.equals(pageFk) && nk200.equals(pageNk)) {
+                log.warn("KIS 주문체결내역 연속조회 키 미변경 — {}페이지에서 중단, 누적 {}건 반환: accountId={}", page, all.size(), account.id());
+                break;
+            }
         }
-        return response.output().stream().filter(item -> ticker.name().equals(item.pdno())).toList();
+        return all.stream().filter(item -> ticker.name().equals(item.pdno())).toList();
     }
 
     // 원주문 수량 현황 — 주문·체결·미체결(잔량) 수량
@@ -258,7 +285,11 @@ class KisTradingApi {
         ) {}
     }
 
-    record ExecutionListResponse(@JsonProperty("output") List<OutputItem> output) {
+    record ExecutionListResponse(
+            @JsonProperty("output") List<OutputItem> output,
+            @JsonProperty("ctx_area_fk200") String ctxAreaFk200, // 연속조회 키 FK
+            @JsonProperty("ctx_area_nk200") String ctxAreaNk200  // 연속조회 키 NK
+    ) {
         record OutputItem(
                 @JsonProperty("pdno") String pdno,                      // 종목코드
                 @JsonProperty("ord_dt") String ordDt,                   // 주문일자 (YYYYMMDD)

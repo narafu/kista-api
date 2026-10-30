@@ -10,13 +10,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.function.Consumer;
@@ -50,11 +50,14 @@ class KisHttpClient {
     }
 
     public <T> T get(String path, HttpHeaders headers, MultiValueMap<String, String> params, Class<T> responseType) {
-        String url = UriComponentsBuilder
-                .fromPath(path)
-                .queryParams(params)
-                .toUriString();
-        return kisRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(responseType);
+        return getEntity(path, headers, params, responseType).getBody();
+    }
+
+    // 응답 헤더(tr_cont 연속조회 신호)가 필요한 호출용
+    private <T> ResponseEntity<T> getEntity(String path, HttpHeaders headers, MultiValueMap<String, String> params, Class<T> responseType) {
+        // 빌더에서 한 번만 인코딩 — toUriString() 결과를 문자열 uri()에 넘기면 %가 다시 인코딩된다(공백·^ 포함 연속조회 키 깨짐)
+        return kisRestClient.get().uri(b -> b.path(path).queryParams(params).build())
+                .headers(h -> h.addAll(headers)).retrieve().toEntity(responseType);
     }
 
     public <T> T post(String path, HttpHeaders headers, Object body, Class<T> responseType) {
@@ -74,12 +77,30 @@ class KisHttpClient {
     // Trading API용: CANO/ACNT_PRDT_CD 자동 주입 + buildHeaders + get 일괄 처리
     public <T> T tradingGet(String trId, String path, BrokerAccountRef account,
                             Class<T> responseType, Consumer<MultiValueMap<String, String>> extraParams) {
+        return tradingGetPage(trId, path, account, responseType, null, extraParams).body();
+    }
+
+    // 연속조회 한 페이지 — trCont: 요청 헤더 tr_cont(첫 페이지 null, 다음 페이지 "N"), 반환 trCont: 응답 헤더 tr_cont(F/M=다음 페이지 있음)
+    public <T> Page<T> tradingGetPage(String trId, String path, BrokerAccountRef account, Class<T> responseType,
+                                      String trCont, Consumer<MultiValueMap<String, String>> extraParams) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         String[] parts = splitAccountNo(account.accountNo());
         params.add("CANO", parts[0]);
         params.add("ACNT_PRDT_CD", parts[1]);
         extraParams.accept(params);
-        return executeWithRetry(trId, account, true, headers -> get(path, headers, params, responseType));
+        return executeWithRetry(trId, account, true, headers -> {
+            if (trCont != null) {
+                headers.set("tr_cont", trCont);
+            }
+            ResponseEntity<T> res = getEntity(path, headers, params, responseType);
+            return new Page<>(res.getBody(), res.getHeaders().getFirst("tr_cont"));
+        });
+    }
+
+    record Page<T>(T body, String trCont) {
+        boolean hasNext() {
+            return "F".equals(trCont) || "M".equals(trCont); // F/M=다음 페이지 있음, D/E=마지막
+        }
     }
 
     // 시세 API용: AUTH="" 기본 주입 + buildHeaders + get 일괄 처리 (계좌 파라미터 없음)

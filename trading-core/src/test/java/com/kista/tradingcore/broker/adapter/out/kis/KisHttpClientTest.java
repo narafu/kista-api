@@ -338,4 +338,26 @@ class KisHttpClientTest {
         expectPost(withServerError().body("{\"rt_cd\":\"1\",\"msg_cd\":\"EGW00999\",\"msg1\":\"x\"}"));
         assertThat(postFailure().isRejected()).isFalse();
     }
+
+    @Test
+    @DisplayName("연속조회: 요청 tr_cont=N·ctx 원문이 이중 인코딩 없이 전송되고 응답 tr_cont를 읽는다")
+    void tradingGetPage_sendsTrContAndEncodesCtxOnce() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("tok");
+        server.expect(requestTo(startsWithPath() + "&CTX_AREA_FK200=&CTX_AREA_NK200="))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist("tr_cont"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON).header("tr_cont", "M"));
+        server.expect(requestTo(startsWithPath() + "&CTX_AREA_FK200=FK%20%20&CTX_AREA_NK200=ABC%5E12%20%20%20"))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("tr_cont", "N"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON).header("tr_cont", "D"));
+        KisHttpClient client = newClient();
+
+        KisHttpClient.Page<String> p1 = client.tradingGetPage(TR_ID, PATH, ACCOUNT, String.class, null,
+                p -> { p.add("CTX_AREA_FK200", ""); p.add("CTX_AREA_NK200", ""); });
+        KisHttpClient.Page<String> p2 = client.tradingGetPage(TR_ID, PATH, ACCOUNT, String.class, "N",
+                p -> { p.add("CTX_AREA_FK200", "FK  "); p.add("CTX_AREA_NK200", "ABC^12   "); });
+
+        assertThat(p1.hasNext()).isTrue();
+        assertThat(p2.hasNext()).isFalse();
+        server.verify();
+    }
 }
