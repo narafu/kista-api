@@ -30,7 +30,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     // 규칙 단위 판정 입력 — closes: 전일까지 종가(null=조회 실패), ledger: 원장(AVG_PRICE·보유비율 기준),
-    // sellableAfterReserved: SELL만(브로커 판매가능수량 − 예약분 − 앞 규칙 계획분, null=조회 실패),
+    // sellableAfterReserved: SELL 상한 — 주식은 원장 − 기존 예약분 − 앞 규칙 계획분(브로커 잔고 미사용), 코인은 원장 − 앞 틱 매도분 ∧ 지갑 보유,
     // currentPrice: 현재가(null=조회 실패), availableCash: 크립토 BUY만(지갑 견적 통화) — 주식은 null(allocator가 판정),
     // tradingRules: 크립토 필수(거래소 수수료·최소 금액·수량 단위), 주식은 null
     public record DcaRuleInputs(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
@@ -47,7 +47,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
     }
 
     // 주식 DCA 배치 계획 — 판정할 규칙마다 decideRule, 같은 시점 발동 규칙은 각자 주문(상계 없음)
-    // SELL 가용 = 수집 시점 가용(min(판매가능 − 예약분, 원장)) − 같은 배치 앞 규칙이 계획한 SELL — 규칙 합계가 원장·판매가능을 넘지 않게
+    // SELL 가용 = 수집 시점 상한(원장 − 기존 예약분) − 같은 배치 앞 규칙이 계획한 SELL — 규칙 합계가 원장을 넘지 않게
     // 판정할 규칙이 없어도 빈 계획을 돌려준다(전략 차원 skip 아님). 코인은 CryptoDcaRoundExecutor가 decideRule을 직접 부른다
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
@@ -110,7 +110,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         BigDecimal quantity;
         BigDecimal notional = null;
         if (sell) {
-            // 가용 = min(원장 보유, 판매가능 − 예약분)
+            // 가용 = min(원장 보유, 상한) — 주식은 상한이 이미 원장 기반, 코인은 지갑 보유 반영
             BigDecimal available = in.ledger().holdings().min(in.sellableAfterReserved()).setScale(scale, RoundingMode.FLOOR);
             if (available.signum() <= 0) {
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", basis);

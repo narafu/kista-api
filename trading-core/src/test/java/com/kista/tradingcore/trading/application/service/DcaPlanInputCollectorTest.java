@@ -15,9 +15,7 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.application.port.output.CandlePort;
-import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
-import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -71,12 +69,11 @@ class DcaPlanInputCollectorTest {
 
     MarketCalendarPort calendar = mock(MarketCalendarPort.class);
     CandlePort candlePort = mock(CandlePort.class);
-    SellableQuantityPort sellablePort = mock(SellableQuantityPort.class);
     FearGreedIndexPort fearGreedPort = mock(FearGreedIndexPort.class);
     OrderPort orderPort = mock(OrderPort.class);
     StrategyDcaDetailPort dcaDetailPort = mock(StrategyDcaDetailPort.class);
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
-    DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort, sellablePort, fearGreedPort, orderPort,
+    DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort, fearGreedPort, orderPort,
             dcaDetailPort, executionPort);
     DcaCycleOrderStrategy kernel = new DcaCycleOrderStrategy();
     DcaCollected collected; // 직전 plan() 호출의 수집 결과 — 복구 대상 단언용
@@ -198,11 +195,44 @@ class DcaPlanInputCollectorTest {
 
     @Test
     void sell_subtracts_reserved_quantity() {
-        dca(OrderDirection.SELL, OrderType.MOC);
-        when(sellablePort.getSellableQuantity(StrategyTicker.UPRO, ctx.account().brokerRef())).thenReturn(new SellableQuantity("UPRO", 5));
-        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(ctx.account().id(), TRADE_DATE, StrategyTicker.UPRO)).thenReturn(5);
-        plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
+        // 원장 5 중 앞 timing 배치가 이미 PLANNED로 5주 매도 계획 — 같은 SELL 규칙이 또 팔면 안 된다
+        config(stockDcaRule(KEY, OrderDirection.SELL, "300", OrderType.MOC));
+        ledger = new AccountBalance(5, new BigDecimal("80.00"), BigDecimal.ZERO);
+        Order reserved = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
+                OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.SELL, "DCA_" + KEY2, BigDecimal.valueOf(5), new BigDecimal("91.48"),
+                OrderStatus.PLANNED, null, null, null);
+        plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(reserved), null, ledger);
         assertSkipped(DcaSkipReason.NO_HOLDINGS);
+    }
+
+    @Test
+    void sell_subtracts_cancelled_placed_sell_of_today() {
+        // 원장 10, 앞 배치 SELL 4주 접수 후 취소(일부 체결 가능, 원장은 마감 전까지 그대로) — 4주를 보수적으로 빼 6주만 판다
+        config(sellRule(DcaShortfallPolicy.PARTIAL));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        Order cancelled = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
+                OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.SELL, "DCA_" + KEY2, BigDecimal.valueOf(4), new BigDecimal("91.48"),
+                OrderStatus.CANCELLED, "E9", null, null);
+        when(orderPort.findByStrategyId(ctx.strategy().id(), TRADE_DATE, TRADE_DATE)).thenReturn(List.of(cancelled));
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(6);
+    }
+
+    @Test
+    void sell_over_ledger_rejects_when_policy_reject() {
+        // 원장 10 < 희망 15(1305/87.12) — REJECT는 INSUFFICIENT_HOLDINGS, 브로커 잔고는 보지 않는다(수집기에 포트 없음)
+        config(sellRule(DcaShortfallPolicy.REJECT));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
+        assertSkipped(DcaSkipReason.INSUFFICIENT_HOLDINGS);
+    }
+
+    @Test
+    void sell_over_ledger_caps_to_ledger_when_policy_partial() {
+        config(sellRule(DcaShortfallPolicy.PARTIAL));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(10);
     }
 
     @Test
@@ -276,12 +306,11 @@ class DcaPlanInputCollectorTest {
         config(stockDcaRule(KEY, OrderDirection.SELL, "300", OrderType.MOC),  // 300/87.12 → 3주
                 stockDcaRule(KEY2, OrderDirection.SELL, "300", OrderType.MOC),
                 stockDcaRule("33333333-3333-3333-3333-333333333333", OrderDirection.BUY, "300", OrderType.MOC));
-        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
-        when(sellablePort.getSellableQuantity(StrategyTicker.UPRO, ctx.account().brokerRef())).thenReturn(new SellableQuantity("UPRO", 5));
+        ledger = new AccountBalance(5, new BigDecimal("80.00"), BigDecimal.ZERO);
 
         List<PlannedOrder> plan = plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
 
-        // 판매가능 5 − 앞 규칙 3 = 2 → 두 번째 SELL은 PARTIAL로 2주
+        // 원장 5 − 앞 규칙 3 = 2 → 두 번째 SELL은 PARTIAL로 2주
         assertThat(plan).extracting(PlannedOrder::direction, PlannedOrder::quantity)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(OrderDirection.SELL, 3),
                         org.assertj.core.groups.Tuple.tuple(OrderDirection.SELL, 2),
@@ -290,11 +319,10 @@ class DcaPlanInputCollectorTest {
 
     @Test
     void 같은_시점_매도_규칙_합계는_원장_보유를_넘지_않는다() {
-        // 원장 10 < 판매가능 100 — 두 PARTIAL SELL(각 8주 희망)은 8 + 2
+        // 원장 10 — 두 PARTIAL SELL(각 8주 희망)은 8 + 2
         config(stockDcaRule(KEY, OrderDirection.SELL, "697", OrderType.MOC),   // 697/87.12 → 8주
                 stockDcaRule(KEY2, OrderDirection.SELL, "697", OrderType.MOC));
         ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
-        when(sellablePort.getSellableQuantity(StrategyTicker.UPRO, ctx.account().brokerRef())).thenReturn(new SellableQuantity("UPRO", 100));
 
         List<PlannedOrder> plan = plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
 
@@ -401,6 +429,12 @@ class DcaPlanInputCollectorTest {
     private Order existingOrder(OrderTiming timing, OrderType type) {
         return new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
                 type, timing, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.valueOf(3), new BigDecimal("91.48"), OrderStatus.PLANNED, null, null, null);
+    }
+
+    // 15주 희망(1305/87.12) SELL 규칙 — 부족 정책만 바꾼다
+    private static DcaRule sellRule(DcaShortfallPolicy policy) {
+        return new DcaRule(KEY, OrderDirection.SELL, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("1305"), null), policy, List.of());
     }
 
     private void config(DcaRule... rules) {

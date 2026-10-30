@@ -10,6 +10,7 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
+import com.kista.tradingcore.broker.domain.model.meritz.MeritzApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,21 @@ class MeritzLiveIT {
     @Test
     void place_and_cancel_one_share_far_limit() throws InterruptedException {
         placeAndCancel(OrderType.LIMIT);
+    }
+
+    // 미보유 QLD 1주 매도(현재가 2배 지정가 — 접수돼도 체결 불가) → 거절 rsp_cd 실측. 접수되면 즉시 취소 후 실패 (MERITZ_LIVE_REJECT=1)
+    @Test
+    void sell_unheld_ticker_reports_rejection_code() {
+        assumeTrue("1".equals(System.getenv("MERITZ_LIVE_REJECT")));
+        StrategyTicker unheld = StrategyTicker.QLD;
+        BigDecimal farPrice = adapter.getPrice(unheld, account).multiply(new BigDecimal("2")).setScale(2, RoundingMode.HALF_UP);
+        try {
+            OrderResult placed = adapter.place(new OrderInstruction(unheld, OrderDirection.SELL, OrderType.LIMIT, 1, farPrice), account);
+            adapter.cancel(new CancelInstruction(unheld, placed.externalOrderId()), account);
+            throw new AssertionError("미보유 매도가 접수됨 — 취소함: " + placed.externalOrderId());
+        } catch (MeritzApiException e) {
+            System.out.printf("[MeritzLive] 미보유 매도 거절 rejected=%s msg=%s%n", e.isRejected(), e.getMessage());
+        }
     }
 
     // 현재가 절반 1주 매수 → 당일 목록 반영 대기 → 취소 → 취소 가능 수량 0 확인 (체결 불가 가격)
