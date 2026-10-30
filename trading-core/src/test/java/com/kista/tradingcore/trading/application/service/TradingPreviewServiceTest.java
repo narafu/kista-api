@@ -446,7 +446,8 @@ class TradingPreviewServiceTest {
                 TradingFixtures.stockDcaRule(DCA_KEY, OrderDirection.BUY, "300", OrderType.MOC))));
         var executionPort = mock(com.kista.tradingcore.trading.application.port.output.DcaExecutionPort.class);
         DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort,
-                mock(com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort.class), orderPort, dcaDetailPort, executionPort);
+                mock(com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort.class), orderPort, dcaDetailPort, executionPort,
+                mock(com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator.class, inv -> new BigDecimal("100000")));
         var strategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(
                 List.of(new com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy()));
         var balanceLoader = mock(com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader.class);

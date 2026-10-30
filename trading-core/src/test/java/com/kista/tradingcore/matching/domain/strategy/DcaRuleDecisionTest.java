@@ -48,7 +48,8 @@ class DcaRuleDecisionTest {
     private static final CryptoTradingRules BINANCE_LIKE = new CryptoTradingRules(new BigDecimal("0.001"), FeeSide.RECEIVED_ASSET, new BigDecimal("5"), new BigDecimal("0.00001"));
 
     private DcaRuleDecision decide(DcaRule r, Market m, AccountBalance ledger, String sellable, String close, String current, String cash) {
-        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(close)), ledger, bd(sellable), null, bd(current), bd(cash),
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(close)), ledger, bd(sellable), null, bd(current),
+                cash == null && !m.isCrypto() && r.direction() == OrderDirection.BUY ? DcaCycleOrderStrategy.UNLIMITED_CASH : bd(cash),
                 m.isCrypto() ? UPBIT_LIKE : null));
     }
 

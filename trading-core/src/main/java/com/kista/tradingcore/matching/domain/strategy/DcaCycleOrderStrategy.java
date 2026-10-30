@@ -29,9 +29,13 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
+    // 주식 BUY 가용 USD 상한을 걸지 않는 입력(MOCK·US 주식 외 계좌) — availableCash null은 조회 실패(DATA_UNAVAILABLE)라 구분용 값
+    public static final BigDecimal UNLIMITED_CASH = new BigDecimal("1000000000000");
+
     // 규칙 단위 판정 입력 — closes: 전일까지 종가(null=조회 실패), ledger: 원장(AVG_PRICE·보유비율 기준),
     // sellableAfterReserved: SELL 상한 — 주식은 원장 − 기존 예약분 − 앞 규칙 계획분(브로커 잔고 미사용), 코인은 원장 − 앞 틱 매도분 ∧ 지갑 보유,
-    // currentPrice: 현재가(null=조회 실패), availableCash: 크립토 BUY만(지갑 견적 통화) — 주식은 null(allocator가 판정),
+    // currentPrice: 현재가(null=조회 실패), availableCash: BUY 가용 금액(null=조회 실패) — 크립토는 지갑 견적 통화,
+    // 주식은 계좌 미배정 USD(증권사 매수가능 − 다른 시드 전략 원장 − 미차감 기존 BUY), 상한 없음은 UNLIMITED_CASH,
     // tradingRules: 크립토 필수(거래소 수수료·최소 금액·수량 단위), 주식은 null
     public record DcaRuleInputs(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
                                 BigDecimal sellableAfterReserved, BigDecimal fearGreed, BigDecimal currentPrice,
@@ -48,6 +52,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     // 주식 DCA 배치 계획 — 판정할 규칙마다 decideRule, 같은 시점 발동 규칙은 각자 주문(상계 없음)
     // SELL 가용 = 수집 시점 상한(원장 − 기존 예약분) − 같은 배치 앞 규칙이 계획한 SELL — 규칙 합계가 원장을 넘지 않게
+    // BUY 가용 = 수집 시점 미배정 USD − 같은 배치 앞 규칙이 계획한 BUY(수량 × 캡가) — 규칙 합계가 가용을 넘지 않게
     // 판정할 규칙이 없어도 빈 계획을 돌려준다(전략 차원 skip 아님). 코인은 CryptoDcaRoundExecutor가 decideRule을 직접 부른다
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
@@ -56,15 +61,17 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         List<DcaRuleDecision.Skipped> skips = new ArrayList<>();
         Map<String, BigDecimal> referencePrices = new LinkedHashMap<>();
         BigDecimal plannedSell = BigDecimal.ZERO;
+        BigDecimal plannedBuy = BigDecimal.ZERO; // 앞 규칙이 계획한 BUY 금액(수량 × 캡가)
         for (DcaRuleInputs in : due) {
             DcaRule rule = in.rule();
             boolean sell = rule.direction() == OrderDirection.SELL;
-            DcaRuleInputs adjusted = sell && in.sellableAfterReserved() != null
-                    ? withSellable(in, in.sellableAfterReserved().subtract(plannedSell).max(BigDecimal.ZERO))
-                    : in;
+            DcaRuleInputs adjusted = sell
+                    ? withLimits(in, in.sellableAfterReserved() == null ? null : in.sellableAfterReserved().subtract(plannedSell).max(BigDecimal.ZERO), in.availableCash())
+                    : withLimits(in, in.sellableAfterReserved(), in.availableCash() == null ? null : in.availableCash().subtract(plannedBuy).max(BigDecimal.ZERO));
             switch (decideRule(adjusted)) {
                 case DcaRuleDecision.Planned p -> {
                     if (sell) plannedSell = plannedSell.add(p.quantity());
+                    else plannedBuy = plannedBuy.add(p.quantity().multiply(p.limitPrice()));
                     orders.add(PlannedOrder.of(ctx.tradeDate(), ctx.ticker(), rule.orderType(), rule.direction(),
                             p.quantity().intValueExact(), p.limitPrice(), rule.timing(), rule.orderLeg()));
                     referencePrices.put(rule.orderLeg(), p.referencePrice());
@@ -75,9 +82,9 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         return Optional.of(new OrderPlan(null, null, List.copyOf(orders), List.copyOf(skips), Map.copyOf(referencePrices)));
     }
 
-    private static DcaRuleInputs withSellable(DcaRuleInputs in, BigDecimal sellable) {
+    private static DcaRuleInputs withLimits(DcaRuleInputs in, BigDecimal sellable, BigDecimal availableCash) {
         return new DcaRuleInputs(in.rule(), in.market(), in.closes(), in.ledger(), sellable, in.fearGreed(),
-                in.currentPrice(), in.availableCash(), in.tradingRules());
+                in.currentPrice(), availableCash, in.tradingRules());
     }
 
     // 규칙 1개 판정 — 데이터 → 조건 → 보유(SELL) → 규모 → 부족 정책 → 최소 단위
@@ -106,6 +113,8 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             DcaDecision.Skipped s = notMet.get();
             return new DcaRuleDecision.Skipped(key, s.reason(), s.detail(), s.referencePrice());
         }
+        // 주식 BUY는 캡 지정가(LOO/LOC), 나머지는 기준가 기록용
+        BigDecimal limit = !sell && !crypto ? PriceCapPolicy.capFor(basis) : basis;
         int scale = crypto ? in.tradingRules().quantityScale() : 0; // 코인 수량은 거래소 수량 단위, 주식 정수
         BigDecimal quantity;
         BigDecimal notional = null;
@@ -139,7 +148,18 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             notional = want.min(affordable);
             quantity = notional.divide(basis, scale, RoundingMode.FLOOR);
         } else {
-            quantity = rule.sizing().amount().divide(basis, 0, RoundingMode.FLOOR);
+            if (in.availableCash() == null) {
+                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "주문 가능 잔고 조회 실패", basis);
+            }
+            // 주문가는 캡 지정가라 가용 수량 = floor(가용 / 캡가)
+            BigDecimal want = rule.sizing().amount().divide(basis, 0, RoundingMode.FLOOR);
+            BigDecimal affordable = in.availableCash().divide(limit, 0, RoundingMode.FLOOR);
+            if (want.compareTo(affordable) > 0 && (rule.shortfall() == DcaShortfallPolicy.REJECT || affordable.signum() == 0)) {
+                // PARTIAL이어도 1주조차 못 사면 INSUFFICIENT_BALANCE — 회차 금액 부족(BELOW_ONE_SHARE)과 구분
+                return new DcaRuleDecision.Skipped(key, DcaSkipReason.INSUFFICIENT_BALANCE,
+                        "필요 " + DcaConditions.money(want.multiply(limit)) + " > 가용 " + DcaConditions.money(in.availableCash()), basis);
+            }
+            quantity = want.min(affordable);
         }
         if (crypto) {
             BigDecimal value = notional != null ? notional : quantity.multiply(basis);
@@ -153,8 +173,6 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.BELOW_ONE_SHARE,
                     "회차 금액 < 기준가 " + DcaConditions.money(basis), basis);
         }
-        // 주식 BUY는 캡 지정가(LOO/LOC), 나머지는 기준가 기록용
-        BigDecimal limit = !sell && !crypto ? PriceCapPolicy.capFor(basis) : basis;
         return new DcaRuleDecision.Planned(key, rule.direction(), quantity, notional, basis, limit);
     }
 

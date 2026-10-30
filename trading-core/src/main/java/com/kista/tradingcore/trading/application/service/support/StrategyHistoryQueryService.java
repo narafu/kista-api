@@ -3,10 +3,6 @@ package com.kista.tradingcore.trading.application.service.support;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
-import com.kista.shared.kernel.Broker;
-import com.kista.shared.kernel.Market;
-import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
@@ -48,7 +44,7 @@ public class StrategyHistoryQueryService {
     private final CycleOrderStrategies cycleStrategies;
     private final PrivacyTradePort privacyTradePort;
     private final BrokerPricePort brokerPricePort;
-    private final MarginPort marginPort; // 가용 예수금 경고용 USD 매수가능금액 조회
+    private final UnassignedUsdCalculator unassignedUsd; // 가용 예수금 경고용 계좌 미배정 USD
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
     // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
@@ -85,18 +81,12 @@ public class StrategyHistoryQueryService {
         return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null, calcAvailableCash(account));
     }
 
-    // 가용 예수금 = 증권사 USD 매수가능금액 − 계좌 내 전략별 최신 원장(usd_deposit) 합 — 등록 차단이 아닌 폼 경고용
-    // MOCK은 마진이 고정값이라 무의미, 코인 계좌는 USD 매수가능금액 개념이 없어 null, 조회 실패도 미리보기를 막지 않고 null
+    // 가용 예수금 = 계좌 미배정 USD(UnassignedUsdCalculator) — 등록 차단이 아닌 폼 경고용
+    // 미적용 계좌(MOCK·코인)와 조회 실패는 미리보기를 막지 않고 null
     private BigDecimal calcAvailableCash(Account account) {
-        if (account.broker() == Broker.MOCK || account.broker().getMarket() != Market.US_STOCK) return null;
+        if (!UnassignedUsdCalculator.applies(account.broker())) return null;
         try {
-            BigDecimal reserved = strategyPort.findByAccountId(account.id()).stream()
-                    .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id())
-                            .map(CyclePosition::usdDeposit)
-                            .orElse(BigDecimal.ZERO))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal buyable = marginPort.getUsdBuyableAmount(account.toBrokerRef());
-            return buyable == null ? null : buyable.subtract(reserved);
+            return unassignedUsd.available(account.id(), account.toBrokerRef());
         } catch (Exception e) {
             log.warn("[accountId={}] 가용 예수금 조회 실패 — 경고 생략: {}", account.id(), e.getMessage());
             return null;

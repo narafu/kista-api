@@ -43,7 +43,68 @@ class DcaCycleOrderStrategyTest {
                                    BigDecimal fearGreed, String currentPrice) {
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, closes, ledger,
                 sellable == null ? null : BigDecimal.valueOf(sellable), fearGreed,
-                currentPrice == null ? null : new BigDecimal(currentPrice), null, null));
+                currentPrice == null ? null : new BigDecimal(currentPrice),
+                r.direction() == OrderDirection.BUY ? DcaCycleOrderStrategy.UNLIMITED_CASH : null, null));
+    }
+
+    // 주식 BUY 가용 USD를 직접 지정 — 전일 종가 100 단일 봉, 캡가 = PriceCapPolicy.capFor(100)
+    private DcaRuleDecision decideBuyWithCash(DcaShortfallPolicy policy, String amount, String cash) {
+        DcaRule r = new DcaRule(KEY, OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal(amount), null), policy, List.of());
+        return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
+                null, null, null, cash == null ? null : new BigDecimal(cash), null));
+    }
+
+    private static final BigDecimal CAP_100 = PriceCapPolicy.capFor(new BigDecimal("100"));
+
+    @Test
+    void 주식_BUY_PARTIAL은_가용_캡가_수량으로_줄인다() { // want 5주, 가용은 캡가 2주분 + 여유
+        BigDecimal cash = CAP_100.multiply(BigDecimal.valueOf(2)).add(BigDecimal.ONE);
+        DcaRuleDecision d = decideBuyWithCash(DcaShortfallPolicy.PARTIAL, "500", cash.toPlainString());
+        DcaRuleDecision.Planned p = (DcaRuleDecision.Planned) d;
+        assertThat(p.quantity()).isEqualByComparingTo("2");
+        assertThat(p.limitPrice()).isEqualByComparingTo(CAP_100);
+    }
+
+    @Test
+    void 주식_BUY_REJECT은_가용_부족이면_INSUFFICIENT_BALANCE() {
+        DcaRuleDecision d = decideBuyWithCash(DcaShortfallPolicy.REJECT, "500", CAP_100.toPlainString());
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.INSUFFICIENT_BALANCE);
+        assertThat(((DcaRuleDecision.Skipped) d).detail()).startsWith("필요 ").contains("> 가용");
+    }
+
+    @Test
+    void 주식_BUY_PARTIAL도_1주_못_사면_INSUFFICIENT_BALANCE() {
+        DcaRuleDecision d = decideBuyWithCash(DcaShortfallPolicy.PARTIAL, "500", "1");
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.INSUFFICIENT_BALANCE);
+    }
+
+    @Test
+    void 주식_BUY_가용_충분하면_그대로_주문() {
+        DcaRuleDecision d = decideBuyWithCash(DcaShortfallPolicy.REJECT, "500", "100000");
+        assertThat(((DcaRuleDecision.Planned) d).quantity()).isEqualByComparingTo("5");
+    }
+
+    @Test
+    void 주식_BUY_가용_null이면_DATA_UNAVAILABLE() {
+        DcaRuleDecision d = decideBuyWithCash(DcaShortfallPolicy.PARTIAL, "500", null);
+        assertThat(((DcaRuleDecision.Skipped) d).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
+    }
+
+    @Test
+    void plan은_앞_BUY_규칙_계획분을_뒤_규칙_가용에서_뺀다() { // 규칙 둘 각 2주(캡가), 가용은 3주분 → 2주 + 1주
+        BigDecimal cash = CAP_100.multiply(BigDecimal.valueOf(3)).add(BigDecimal.ONE);
+        DcaRule r1 = new DcaRule("11111111-1111-1111-1111-111111111111", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("200"), null), DcaShortfallPolicy.PARTIAL, List.of());
+        DcaRule r2 = new DcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, DcaFrequency.DAILY, null, null, OrderType.MOC, null,
+                new DcaSizing(DcaSizingType.AMOUNT, new BigDecimal("200"), null), DcaShortfallPolicy.PARTIAL, List.of());
+        List<DcaCycleOrderStrategy.DcaRuleInputs> due = List.of(r1, r2).stream()
+                .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(new BigDecimal("100")), null,
+                        null, null, null, cash, null)).toList();
+        var plan = strategy.plan(new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext(
+                new AccountBalance(0, null, BigDecimal.ZERO), StrategyTicker.UPRO, DAY, "t", null, null, null,
+                new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy.PlanContext.DcaPlanInputs(due))).orElseThrow();
+        assertThat(plan.orders()).extracting(PlannedOrder::quantity).containsExactly(2, 1);
     }
 
     private DcaRuleDecision decide(DcaRule r, String prevClose, Integer sellable) {

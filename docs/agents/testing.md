@@ -71,6 +71,7 @@ docker-compose up -d postgres   # 테스트 전 postgres 기동 필수
 - 원장 거절 시 SELL은 유지되고 원래 순서가 보존되는지, 기존 주문이 없는 사이클은 접수·포지션 저장(`cycleHistoryPort.save`)·리포트가 호출되지 않는지, 기존 PLANNED/PLACED 주문이 있으면 후속 처리를 유지하는지 검증한다.
 - 배치 실패 격리 테스트는 서로 다른 account의 context를 함께 전달하고 원장 조회·`saveAll`·잔고 부족 알림을 각각 예외 처리해 성공 계좌의 저장·접수와 `TradingErrorEvent` 발행(`eventPublisher.publishEvent`)을 함께 검증한다.
 - 신규 양방향 거절 또는 저장 실패 시 기존 주문이 없는 사이클은 접수·포지션 저장·리포트가 호출되지 않아야 하며, 기존 PLANNED/PLACED 주문이 있는 사이클은 후속 처리를 유지해야 한다.
+- 주식 DCA BUY 가용 테스트: 커널(`DcaCycleOrderStrategyTest`)은 `availableCash` 직접 주입으로 PARTIAL 축소(캡가 기준)·REJECT·null=DATA_UNAVAILABLE·`plan()` 앞 BUY 누적을, 수집기(`DcaPlanInputCollectorTest`)는 `UnassignedUsdCalculator` mock으로 자기 PLANNED/SUBMITTING만 차감·전략당 1회 조회·실패 skip·MOCK 무조회를 검증한다. 주식 BUY를 쓰는 기존 커널·플래너 테스트는 `DcaCycleOrderStrategy.UNLIMITED_CASH`를 넘겨 상한을 끈다. 미배정 USD 계산(`UnassignedUsdCalculatorTest`)은 시드 점유 전략만 빼고 DCA는 제외하는 경계를 잠근다.
 - DCA SELL 규칙 테스트(`DcaPlanInputCollectorTest`)는 브로커 판매가능수량을 쓰지 않는다 — 원장 보유에서 `existingOrders`의 PLANNED/PLACED SELL 수량을 뺀 값이 규칙 입력이 되는 경계(원장 초과 REJECT/PARTIAL 포함)를 검증한다.
 - `AccountBalance` 테스트 데이터: `usdDeposit = 통합주문가능금액(현금 대용)`; quantity=0이면 usdDeposit만 의미 있음
 

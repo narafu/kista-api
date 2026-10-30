@@ -122,12 +122,13 @@ class StrategyServiceTest {
                 privacyTradePort,
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
                         new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null))));
+        var historyStrategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
+                new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
+                new com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy(null)));
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
-                accountPort, strategyPort, cyclePositionPort, orderPort,
-                new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
-                        new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
-                        new com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy(null))),
-                privacyTradePort, brokerPricePort, marginPort);
+                accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
+                privacyTradePort, brokerPricePort,
+                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort, historyStrategies));
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,

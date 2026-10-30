@@ -21,6 +21,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPo
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
+import com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -56,6 +57,7 @@ class DcaPlanInputCollector {
     private final OrderPort orderPort;
     private final StrategyDcaDetailPort dcaDetailPort;
     private final DcaExecutionPort dcaExecutionPort;        // 판정 완료 여부 조회 전용(읽기)
+    private final UnassignedUsdCalculator unassignedUsd;    // 주식 BUY 가용 USD — 계좌 미배정 현금
     // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
     // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회 (spec 6.2)
@@ -81,6 +83,8 @@ class DcaPlanInputCollector {
         List<Order> todayOrders = null;          // 종결 주문 포함 당일 주문 — 처음 필요할 때 1회 조회
         // SELL 상한 = 원장 보유 − 같은 사이클·거래일 기존 PLANNED/PLACED SELL(앞 timing 배치가 이미 계획한 분) — 브로커 잔고는 보지 않는다
         BigDecimal sellable = ledger == null ? null : ledger.holdings().subtract(reservedSell(existingOrders)).max(BigDecimal.ZERO);
+        BigDecimal buyCash = null;               // 주식 BUY 가용 USD — BUY 규칙이 처음 필요할 때 1회(실패 null)
+        boolean buyCashLoaded = false;
         boolean cancelledDeducted = false;       // 당일 취소 SELL 차감 여부 — SELL 규칙이 처음 필요할 때 1회
         for (DcaRule rule : config.rules()) {
             String key = rule.ruleKey();
@@ -111,11 +115,35 @@ class DcaPlanInputCollector {
                 sellable = sellable.subtract(cancelledPlacedSell(todayOrders)).max(BigDecimal.ZERO);
                 cancelledDeducted = true;
             }
+            if (!sell && !buyCashLoaded) {
+                buyCash = loadBuyCash(ctx, existingOrders);
+                buyCashLoaded = true;
+            }
             due.add(new DcaCycleOrderStrategy.DcaRuleInputs(rule, ctx.account().brokerRef().broker().getMarket(),
                     loadCloses(strategy.ticker(), usSession), ledger, sell ? sellable : null,
-                    loadFearGreed(rule), currentPrice, null, null));
+                    loadFearGreed(rule), currentPrice, sell ? null : buyCash, null));
         }
         return new DcaCollected(new CycleOrderStrategy.PlanContext.DcaPlanInputs(List.copyOf(due)), Map.copyOf(recoveries));
+    }
+
+    // 주식 BUY 가용 USD = 계좌 미배정 USD − 이 전략의 아직 증권사가 차감하지 않은 당일 BUY(PLANNED·SUBMITTING; PLACED는 이미 매수가능금액에 반영)
+    // MOCK·US 주식 외 계좌는 상한 없음(UNLIMITED_CASH), 조회 실패는 null(DATA_UNAVAILABLE)
+    // ponytail: 같은 계좌의 다른 DCA 전략 BUY는 차감하지 않는다 — 두 DCA가 미배정 USD를 각자 전부 보고 합계가 넘으면 증권사 거절(예수금 부족 알림). 계좌당 DCA 다수가 흔해지면 계좌 단위 차감으로 승격
+    private BigDecimal loadBuyCash(BatchContext ctx, List<Order> existingOrders) {
+        var ref = ctx.account().brokerRef();
+        if (!UnassignedUsdCalculator.applies(ref.broker())) return DcaCycleOrderStrategy.UNLIMITED_CASH;
+        try {
+            BigDecimal free = unassignedUsd.available(ctx.account().id(), ref);
+            if (free == null) return null;
+            BigDecimal undeducted = existingOrders.stream()
+                    .filter(o -> o.direction() == OrderDirection.BUY && o.price() != null
+                            && (o.status() == OrderStatus.PLANNED || o.status() == OrderStatus.SUBMITTING))
+                    .map(o -> o.quantity().multiply(o.price())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            return free.subtract(undeducted).max(BigDecimal.ZERO);
+        } catch (RuntimeException e) {
+            log.warn("[DCA] 주문 가능 USD 조회 실패: accountId={}", ctx.account().id(), e);
+            return null;
+        }
     }
 
     // 조회 US 세션 이전 확정 종가 250봉 — 실패·피드 지연(마지막 봉 ≠ 직전 개장일)이면 null(DATA_UNAVAILABLE)
