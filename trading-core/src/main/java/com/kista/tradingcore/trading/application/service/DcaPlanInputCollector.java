@@ -6,6 +6,7 @@ import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -41,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 // 주식 DCA plan() 입력 수집 — 규칙마다 판정 이력·기존 주문 복구·timing·실행일 확인 후 250봉 종가(신선도 검증·세션 캐시)·
-// CNN 지수를 모은다. 부작용 없음(이력 기록 안 함) — 프리뷰도 이 경로를 타며, 복구 기록은 배치(TradingCandidatePlanner)가 한다
+// 판매가능수량·CNN 지수를 모은다. 부작용 없음(이력 기록 안 함) — 프리뷰도 이 경로를 타며, 복구 기록은 배치(TradingCandidatePlanner)가 한다
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -53,6 +54,7 @@ class DcaPlanInputCollector {
 
     private final MarketCalendarPort marketCalendarPort;
     private final CandlePort candlePort;
+    private final SellableQuantityPort sellableQuantityPort; // 주식 SELL 상한 — 증권사 판매가능수량
     private final FearGreedIndexPort fearGreedIndexPort;    // FEAR_GREED 조건용 CNN 지수
     private final OrderPort orderPort;
     private final StrategyDcaDetailPort dcaDetailPort;
@@ -81,11 +83,11 @@ class DcaPlanInputCollector {
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = new ArrayList<>();
         Map<String, Order> recoveries = new LinkedHashMap<>();
         List<Order> todayOrders = null;          // 종결 주문 포함 당일 주문 — 처음 필요할 때 1회 조회
-        // SELL 상한 = 원장 보유 − 같은 사이클·거래일 기존 PLANNED/PLACED SELL(앞 timing 배치가 이미 계획한 분) — 브로커 잔고는 보지 않는다
+        // SELL 상한 = min(원장 보유 − 같은 사이클·거래일 기존 SELL − 취소된 접수 SELL, 증권사 판매가능수량 − 계좌 당일 예약 SELL) — 증권사 쪽은 SELL 규칙이 처음 필요할 때 1회
         BigDecimal sellable = ledger == null ? null : ledger.holdings().subtract(reservedSell(existingOrders)).max(BigDecimal.ZERO);
         BigDecimal buyCash = null;               // 주식 BUY 가용 USD — BUY 규칙이 처음 필요할 때 1회(실패 null)
         boolean buyCashLoaded = false;
-        boolean cancelledDeducted = false;       // 당일 취소 SELL 차감 여부 — SELL 규칙이 처음 필요할 때 1회
+        boolean sellCapped = false;              // 취소 SELL 차감·증권사 판매가능수량 상한 적용 여부 — SELL 규칙이 처음 필요할 때 1회
         for (DcaRule rule : config.rules()) {
             String key = rule.ruleKey();
             if (dcaExecutionPort.find(strategy.id(), key, tradeDate).isPresent()) continue; // 이미 판정됨
@@ -111,9 +113,13 @@ class DcaPlanInputCollector {
 
             boolean sell = rule.direction() == OrderDirection.SELL;
             // 접수 후 취소된 당일 SELL은 일부 체결됐을 수 있는데 원장은 마감 리포트 전까지 줄지 않는다 — 주문 수량 전체를 보수적으로 차감
-            if (sell && sellable != null && !cancelledDeducted) {
+            if (sell && sellable != null && !sellCapped) {
                 sellable = sellable.subtract(cancelledPlacedSell(todayOrders)).max(BigDecimal.ZERO);
-                cancelledDeducted = true;
+                if (UnassignedUsdCalculator.applies(ctx.account().brokerRef().broker())) {
+                    Integer broker = loadBrokerSellable(ctx, tradeDate);
+                    sellable = broker == null ? null : sellable.min(BigDecimal.valueOf(broker));
+                }
+                sellCapped = true;
             }
             if (!sell && !buyCashLoaded) {
                 buyCash = loadBuyCash(ctx, existingOrders);
@@ -124,6 +130,19 @@ class DcaPlanInputCollector {
                     loadFearGreed(rule), currentPrice, sell ? null : buyCash, null));
         }
         return new DcaCollected(new CycleOrderStrategy.PlanContext.DcaPlanInputs(List.copyOf(due)), Map.copyOf(recoveries));
+    }
+
+    // 증권사 판매가능수량 − 같은 계좌·거래일·종목 기존 PLANNED/PLACED SELL 예약분(다른 전략 포함), 실패 시 null
+    private Integer loadBrokerSellable(BatchContext ctx, LocalDate tradeDate) {
+        try {
+            int sellable = sellableQuantityPort.getSellableQuantity(ctx.strategy().ticker(), ctx.account().brokerRef()).quantity();
+            int reserved = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
+                    ctx.account().id(), tradeDate, ctx.strategy().ticker());
+            return Math.max(0, sellable - reserved);
+        } catch (RuntimeException e) {
+            log.warn("[DCA] 판매가능수량 조회 실패: strategy={}", ctx.strategy().id(), e);
+            return null;
+        }
     }
 
     // 주식 BUY 가용 USD = 계좌 미배정 USD − 이 전략의 아직 증권사가 차감하지 않은 당일 BUY(PLANNED·SUBMITTING; PLACED는 이미 매수가능금액에 반영)

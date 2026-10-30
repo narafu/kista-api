@@ -15,6 +15,8 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
+import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.broker.domain.model.BrokerCandle;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
@@ -71,11 +73,12 @@ class DcaPlanInputCollectorTest {
     CandlePort candlePort = mock(CandlePort.class);
     FearGreedIndexPort fearGreedPort = mock(FearGreedIndexPort.class);
     OrderPort orderPort = mock(OrderPort.class);
+    SellableQuantityPort sellablePort = mock(SellableQuantityPort.class);
     StrategyDcaDetailPort dcaDetailPort = mock(StrategyDcaDetailPort.class);
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
     com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator unassigned =
             mock(com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator.class);
-    DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort, fearGreedPort, orderPort,
+    DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort, sellablePort, fearGreedPort, orderPort,
             dcaDetailPort, executionPort, unassigned);
     DcaCycleOrderStrategy kernel = new DcaCycleOrderStrategy();
     DcaCollected collected; // 직전 plan() 호출의 수집 결과 — 복구 대상 단언용
@@ -94,6 +97,7 @@ class DcaPlanInputCollectorTest {
         StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
                 BigDecimal.ZERO, null, LocalDate.of(2026, 10, 1), null, null, null);
         ctx = new BatchContext(strategy, cycle, account, TradingFixtures.tradingUserProfile(account.userId()));
+        when(sellablePort.getSellableQuantity(any(), any())).thenReturn(new SellableQuantity("UPRO", 1000)); // 기본: 증권사 판매가능 충분
         when(unassigned.available(any(), any())).thenReturn(new BigDecimal("100000")); // 기본: BUY 가용 충분
         when(calendar.usSessionDateOf(TRADE_DATE)).thenReturn(US_SESSION);
         when(calendar.isUsSessionOpen(any())).thenReturn(true);
@@ -222,8 +226,63 @@ class DcaPlanInputCollectorTest {
     }
 
     @Test
+    void sell_capped_by_broker_sellable_minus_account_reserved() {
+        // 원장 10이지만 증권사 판매가능 8 − 계좌 예약(다른 전략 포함) 3 = 5
+        config(sellRule(DcaShortfallPolicy.PARTIAL));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        when(sellablePort.getSellableQuantity(any(), any())).thenReturn(new SellableQuantity("UPRO", 8));
+        when(orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(ctx.account().id(), TRADE_DATE, StrategyTicker.UPRO)).thenReturn(3);
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(5);
+    }
+
+    @Test
+    void sell_ledger_side_wins_when_lower_than_broker() {
+        config(sellRule(DcaShortfallPolicy.PARTIAL));
+        ledger = new AccountBalance(4, new BigDecimal("80.00"), BigDecimal.ZERO);
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(4);
+    }
+
+    @Test
+    void sell_broker_lookup_failure_is_data_unavailable() {
+        config(sellRule(DcaShortfallPolicy.PARTIAL));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        when(sellablePort.getSellableQuantity(any(), any())).thenThrow(new IllegalStateException("broker down"));
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
+        assertSkipped(DcaSkipReason.DATA_UNAVAILABLE);
+    }
+
+    @Test
+    void sell_loads_broker_sellable_once_for_multiple_rules() {
+        config(stockDcaRule(KEY, OrderDirection.SELL, "300", OrderType.MOC), stockDcaRule(KEY2, OrderDirection.SELL, "300", OrderType.MOC));
+        ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
+        plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
+        verify(sellablePort, times(1)).getSellableQuantity(any(), any());
+    }
+
+    @Test
+    void buy_only_strategy_does_not_query_broker_sellable() {
+        dca(OrderDirection.BUY, OrderType.MOC);
+        plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger);
+        verifyNoInteractions(sellablePort);
+    }
+
+    @Test
+    void mock_account_sell_is_ledger_only() {
+        TradingAccount mockAcc = TradingAccount.from(new com.kista.tradingcore.account.domain.model.Account(
+                ctx.account().id(), ctx.account().userId(), "모의", "123-45-678901", "key", "secret", "1", com.kista.shared.kernel.Broker.MOCK, null));
+        ctx = new BatchContext(ctx.strategy(), ctx.currentCycle(), mockAcc, ctx.userProfile());
+        config(sellRule(DcaShortfallPolicy.PARTIAL));
+        ledger = new AccountBalance(4, new BigDecimal("80.00"), BigDecimal.ZERO);
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(4);
+        verifyNoInteractions(sellablePort);
+    }
+
+    @Test
     void sell_over_ledger_rejects_when_policy_reject() {
-        // 원장 10 < 희망 15(1305/87.12) — REJECT는 INSUFFICIENT_HOLDINGS, 브로커 잔고는 보지 않는다(수집기에 포트 없음)
+        // 원장 10 < 희망 15(1305/87.12) — REJECT는 INSUFFICIENT_HOLDINGS(브로커 판매가능은 기본 stub 1000이라 원장 쪽이 상한)
         config(sellRule(DcaShortfallPolicy.REJECT));
         ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger)).isEmpty();
