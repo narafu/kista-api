@@ -72,17 +72,18 @@ class MeritzTradingApiTest {
     }
 
     @Test
-    void buyable_amount_reads_usd_row() {
+    void buyable_amount_sums_usd_and_krw_rows() {
         expect("/trading/v1/overseas/orders/estimate", ESTIMATE);
 
-        assertThat(api.getUsdBuyableAmount(ACCOUNT)).isEqualByComparingTo("3445.0100");
+        // KRW 행의 USD 환산 주문가능금액도 자동 환전으로 매수에 쓰인다
+        assertThat(api.getUsdBuyableAmount(ACCOUNT)).isEqualByComparingTo("3459.0600");
     }
 
     @Test
-    void buyable_amount_is_zero_without_usd_row() {
+    void buyable_amount_uses_krw_row_without_usd_row() {
         expect("/trading/v1/overseas/orders/estimate", "{\"rsp_cd\":\"5766\",\"data\":[{\"crcd\":\"KRW\",\"oder_crnc_oder_able_camt\":\"1\"}]}");
 
-        assertThat(api.getUsdBuyableAmount(ACCOUNT)).isEqualByComparingTo("0");
+        assertThat(api.getUsdBuyableAmount(ACCOUNT)).isEqualByComparingTo("1");
     }
 
     @Test
@@ -92,7 +93,9 @@ class MeritzTradingApiTest {
         List<MarginItem> m = api.getMargin(ACCOUNT);
 
         assertThat(m).singleElement().satisfies(i -> {
-            assertThat(i.purchasableAmount()).isEqualByComparingTo("3445.0100");
+            assertThat(i.purchasableAmount()).isEqualByComparingTo("3459.0600");
+            assertThat(i.integratedOrderableAmount()).isEqualByComparingTo("3459.0600");
+            assertThat(i.foreignOrderableAmount()).isEqualByComparingTo("3445.0100");
             assertThat(i.usdToKrwRate()).isEqualByComparingTo("1325.5");
         });
     }

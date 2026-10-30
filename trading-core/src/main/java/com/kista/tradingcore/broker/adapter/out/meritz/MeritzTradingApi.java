@@ -66,16 +66,18 @@ class MeritzTradingApi {
             @JsonProperty("cntg_crnc_prc") String filledPrice,
             @JsonProperty("cntg_camt") String filledAmount) {}
 
+    // 메리츠는 원화를 주문 시 자동 환전해 체결한다 — 각 통화 행의 oder_crnc_oder_able_camt가 이미 USD 환산값이라
+    // 전 행 합이 실제 매수 가능 USD (2026-10-30 실측: USD 행 4501.94 + KRW 행 3577.99 = KRW 예수금 95% ÷ 환율)
     BigDecimal getUsdBuyableAmount(BrokerAccountRef account) {
-        EstimateRow usd = estimateRow(account, "USD");
-        BigDecimal able = usd == null ? null : MeritzResponse.decimal(usd.orderable());
-        return able == null ? BigDecimal.ZERO : able;
+        return totalOrderable(estimateRows(account));
     }
 
     List<MarginItem> getMargin(BrokerAccountRef account) {
-        EstimateRow usd = estimateRow(account, "USD");
-        BigDecimal able = orZero(usd == null ? null : usd.orderable());
-        return List.of(new MarginItem(Currency.USD, able, able, able, orZero(usd == null ? null : usd.rate())));
+        List<EstimateRow> rows = estimateRows(account);
+        EstimateRow usd = findCurrency(rows, "USD");
+        BigDecimal total = totalOrderable(rows);
+        return List.of(new MarginItem(Currency.USD, total, orZero(usd == null ? null : usd.orderable()), total,
+                orZero(usd == null ? null : usd.rate())));
     }
 
     // 포트 계약(미체결 매도 미차감 보유 수량)에 맞춰 잔고수량 rmnd_dqty를 쓴다 — seln_able_dqty는 미체결 매도를 이미 뺀 순수량이라
@@ -138,8 +140,19 @@ class MeritzTradingApi {
     }
 
     private EstimateRow estimateRow(BrokerAccountRef account, String currency) {
-        return http.rowList(http.get(ESTIMATE_PATH, account, new LinkedMultiValueMap<>()), EstimateRow.class)
-                .stream().filter(e -> currency.equals(e.currency())).findFirst().orElse(null);
+        return findCurrency(estimateRows(account), currency);
+    }
+
+    private List<EstimateRow> estimateRows(BrokerAccountRef account) {
+        return http.rowList(http.get(ESTIMATE_PATH, account, new LinkedMultiValueMap<>()), EstimateRow.class);
+    }
+
+    private static EstimateRow findCurrency(List<EstimateRow> rows, String currency) {
+        return rows.stream().filter(e -> currency.equals(e.currency())).findFirst().orElse(null);
+    }
+
+    private static BigDecimal totalOrderable(List<EstimateRow> rows) {
+        return rows.stream().map(e -> orZero(e.orderable())).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private static BigDecimal orZero(String s) {
