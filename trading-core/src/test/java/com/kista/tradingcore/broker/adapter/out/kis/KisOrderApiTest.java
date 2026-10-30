@@ -138,11 +138,19 @@ class KisOrderApiTest {
         return (KisApiException) catchThrowable(() -> api.place(instruction, ACCOUNT));
     }
 
-    @Test
-    void placeRejectedWithApbk0988IsInsufficientFunds() {
-        KisApiException e = placeRejectedWith("APBK0988");
+    @ParameterizedTest
+    @CsvSource({"APBK0988", "APBK0952"})
+    void placeRejectedWithInsufficientFundsCodeIsInsufficientFunds(String code) {
+        KisApiException e = placeRejectedWith(code);
         assertThat(e.isRejected()).isTrue();
         assertThat(e.isInsufficientFunds()).isTrue();
+    }
+
+    @Test
+    void placeRejectedWithoutMsgCdIsPlainRejection() {
+        KisApiException e = placeRejectedWith(null);
+        assertThat(e.isRejected()).isTrue();
+        assertThat(e.isInsufficientFunds()).isFalse();
     }
 
     @Test

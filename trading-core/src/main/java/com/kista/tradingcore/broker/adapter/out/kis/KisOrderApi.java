@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.Set;
 
 
 @Slf4j
@@ -26,6 +27,9 @@ class KisOrderApi {
     private static final String BUY_TR_ID   = "TTTT1002U"; // 미국 해외주식 매수 주문
     private static final String SELL_TR_ID  = "TTTT1006U"; // 미국 해외주식 매도 주문
     private static final String CANCEL_TR_ID = "TTTT1004U"; // 미국 해외주식 정정취소주문
+
+    // 잔고·수량 부족 msg_cd — APBK0988 주문수량이 가능수량보다 큼(BUY·SELL 공통), APBK0952 주문가능금액 초과(BUY, 2026-10-31 운영 실측)
+    private static final Set<String> INSUFFICIENT_FUNDS_CODES = Set.of("APBK0988", "APBK0952");
 
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
@@ -71,7 +75,7 @@ class KisOrderApi {
             String code = response.msgCd();
             String msg  = response.msg1();
             String failure = "KIS 주문 실패 [" + code + "]: " + msg;
-            if ("APBK0988".equals(code)) { // 주문수량이 가능수량보다 큼 — BUY(주문가능금액)·SELL(판매가능수량) 공통 잔고·수량 부족 분류
+            if (code != null && INSUFFICIENT_FUNDS_CODES.contains(code)) { // 잔고·수량 부족 확정 거절(msg_cd 누락은 일반 거절 — Set.of는 null 조회 시 NPE)
                 throw KisApiException.rejectedInsufficientFunds(failure, null);
             }
             throw KisApiException.rejected(failure, null); // 응답 수신 후 거부 — 확정 거절
