@@ -2,7 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.shared.kernel.OrderDirection;
@@ -81,15 +81,13 @@ class KisOrderApi {
         return new OrderResult(odno);
     }
 
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        // 이미 종결(체결 완료·취소·장 마감 만료)된 주문은 취소 API를 부르지 않고 경합으로 알린다 — 못 찾으면 그대로 취소 요청
-        findOrderOrEmpty(instruction, account)
-                .filter(o -> o.ordered() > 0 && o.unfilled() == 0)
-                .ifPresent(o -> {
-                    Conflict conflict = o.filled() == o.ordered() ? Conflict.ALREADY_FILLED : Conflict.ALREADY_CANCELED;
-                    throw KisApiException.conflict("KIS 취소 대상 종결: odno=" + instruction.externalOrderId()
-                            + ", 체결 " + o.filled() + "/" + o.ordered(), conflict);
-                });
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        // 이미 종결(체결 완료·취소·장 마감 만료)된 주문은 취소 API를 부르지 않고 결과로 알린다 — 못 찾으면 그대로 취소 요청
+        Optional<KisTradingApi.OrderStatusView> closed = findOrderOrEmpty(instruction, account)
+                .filter(o -> o.ordered() > 0 && o.unfilled() == 0);
+        if (closed.isPresent()) {
+            return closed.get().filled() == closed.get().ordered() ? CancelOutcome.ALREADY_FILLED : CancelOutcome.ALREADY_CANCELED;
+        }
 
         String[] acctParts = splitAccountNo(account);
         String cano = acctParts[0];
@@ -123,6 +121,7 @@ class KisOrderApi {
         if (!"0".equals(response.rtCd())) {
             throw KisApiException.rejected("KIS 취소 실패 [" + response.msgCd() + "]: " + response.msg1(), null);
         }
+        return CancelOutcome.CANCELLED;
     }
 
     // 사전 조회 실패는 "못 찾음"과 같이 취급 — 조회 장애로 살아 있는 주문의 취소가 막히면 애프터장 체결 누락이 다시 열린다

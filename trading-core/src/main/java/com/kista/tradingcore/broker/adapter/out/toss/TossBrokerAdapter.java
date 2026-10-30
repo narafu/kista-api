@@ -58,8 +58,8 @@ public class TossBrokerAdapter implements BrokerCapabilitiesPort, BrokerStatisti
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        tossOrderApi.cancel(instruction, account);
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        return tossOrderApi.cancel(instruction, account);
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
@@ -13,6 +14,7 @@ import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -61,9 +63,19 @@ class TossOrderApi {
         return new OrderResult(resp.orderId());
     }
 
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        // POST /api/v1/orders/{externalOrderId}/cancel — DELETE 아님 (Toss 공식 스펙, cancelOrder)
-        tossHttpClient.post(ORDER_PATH + "/" + instruction.externalOrderId() + "/cancel", account, Map.of(), Void.class);
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        try {
+            // POST /api/v1/orders/{externalOrderId}/cancel — DELETE 아님 (Toss 공식 스펙, cancelOrder)
+            tossHttpClient.post(ORDER_PATH + "/" + instruction.externalOrderId() + "/cancel", account, Map.of(), Void.class);
+            return CancelOutcome.CANCELLED;
+        } catch (TossApiException e) {
+            // 409 + error.code 값으로 정확히 매칭 — 무관한 오류 메시지에 문자열이 우연히 섞여
+            // 실제 취소되지 않은 주문이 DB에 CANCELLED로 오기록되는 것을 방지
+            boolean conflict = e.getCause() instanceof HttpClientErrorException h && h.getStatusCode().value() == 409;
+            if (conflict && "already-filled".equals(e.errorCode())) return CancelOutcome.ALREADY_FILLED;
+            if (conflict && "already-canceled".equals(e.errorCode())) return CancelOutcome.ALREADY_CANCELED;
+            throw e;
+        }
     }
 
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {

@@ -7,6 +7,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.meritz.MeritzApiException;
 import org.junit.jupiter.api.BeforeEach;
@@ -233,19 +234,16 @@ class MeritzOrderApiTest {
     }
 
     @Test
-    void cancel_terminal_order_throws_conflict_without_calling_cancel_api() {
+    void cancel_terminal_order_returns_outcome_without_calling_cancel_api() {
         expectToday(todayRow(2700586, "2", 0, 36, 0)); // 만료·취소
-        assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> {
-                    assertThat(e.isAlreadyCanceledConflict()).isTrue();
-                    assertThat(e.isAlreadyFilledConflict()).isFalse();
-                });
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
+                .isEqualTo(CancelOutcome.ALREADY_CANCELED);
         server.verify(); // cancel POST 기대 없음 → 호출됐으면 실패
 
         server.reset();
         expectToday(todayRow(2700586, "5", 0, 36, 36)); // 전량 체결
-        assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
-                .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isAlreadyFilledConflict()).isTrue());
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
+                .isEqualTo(CancelOutcome.ALREADY_FILLED);
         server.verify();
     }
 
@@ -255,8 +253,6 @@ class MeritzOrderApiTest {
         assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "2700586"), ACCOUNT))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> {
                     assertThat(e.isRejected()).isFalse();
-                    assertThat(e.isAlreadyFilledConflict()).isFalse();
-                    assertThat(e.isAlreadyCanceledConflict()).isFalse();
                 });
         server.verify(); // cancel POST 없음
     }
@@ -278,7 +274,7 @@ class MeritzOrderApiTest {
                 .andExpect(jsonPath("$.odqt").value("30"))
                 .andRespond(ok(orderResponse("0", 1)));
 
-        api.cancel(new CancelInstruction(StrategyTicker.SOXL, "1295619"), ACCOUNT);
+        assertThat(api.cancel(new CancelInstruction(StrategyTicker.SOXL, "1295619"), ACCOUNT)).isEqualTo(CancelOutcome.CANCELLED);
         server.verify();
 
         server.reset();
@@ -287,8 +283,6 @@ class MeritzOrderApiTest {
         assertThatThrownBy(() -> api.cancel(new CancelInstruction(StrategyTicker.SOXL, "9999999"), ACCOUNT))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> {
                     assertThat(e.isRejected()).isFalse();
-                    assertThat(e.isAlreadyCanceledConflict()).isFalse();
-                    assertThat(e.isAlreadyFilledConflict()).isFalse();
                 });
         server.verify();
     }

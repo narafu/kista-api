@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -155,27 +154,15 @@ class TossHttpClient {
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode().value() != 401) {
                     String body = e.getResponseBodyAsString();
-                    // 예상된 409 경합 — 취소 요청 직전/직후 체결 확정(already-filled)은 TradingReporter가,
-                    // 중복 취소 요청으로 이미 취소된 주문(already-canceled)은 OrderCancelService가 관리자 알림 없이 처리
-                    // Toss error.code 필드 값으로 정확히 매칭 — 무관한 오류 메시지에 문자열이 우연히 섞여
-                    // 실제 취소되지 않은 주문이 DB에 CANCELLED로 오기록되는 것을 방지 (알림도 함께 억제되므로 오판정 위험 큼)
-                    BrokerApiException.Conflict conflict = BrokerApiException.Conflict.NONE;
                     String errorCode = ErrorBodyDecoder.decode(objectMapper, body, TossErrorBody.class)
                             .map(TossErrorBody::error)
                             .map(TossErrorBody.ErrorDetail::code)
                             .orElse(null);
-                    if (e.getStatusCode().value() == 409 && errorCode != null) {
-                        conflict = switch (errorCode) {
-                            case "already-filled" -> BrokerApiException.Conflict.ALREADY_FILLED;
-                            case "already-canceled" -> BrokerApiException.Conflict.ALREADY_CANCELED;
-                            default -> BrokerApiException.Conflict.NONE;
-                        };
-                    }
                     // 4xx는 증권사가 처리 후 거부한 것(확정 거절) — 단 멱등키 원 요청이 아직 처리 중(409 request-in-progress)이면 결과 불명
                     boolean inProgress = e.getStatusCode().value() == 409 && "request-in-progress".equals(errorCode);
                     // 422 insufficient-buying-power = 매수 가능 금액 부족 — 잔고 부족 분류(BUY 여부는 호출자 판단)
                     boolean insufficientFunds = e.getStatusCode().value() == 422 && "insufficient-buying-power".equals(errorCode);
-                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, conflict, !inProgress, insufficientFunds);
+                    throw new TossApiException("Toss API 오류: " + e.getStatusCode() + " " + body, e, !inProgress, insufficientFunds, errorCode);
                 }
                 if (attempt >= MAX_RETRY_ATTEMPTS) {
                     throw TossApiException.rejected("Toss API 토큰 재시도 실패: " + e.getMessage(), e); // 매 시도 401 거부 — 확정 거절

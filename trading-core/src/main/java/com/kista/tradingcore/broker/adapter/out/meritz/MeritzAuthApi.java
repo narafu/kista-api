@@ -77,7 +77,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
                     .headers(h -> MeritzHttpClient.applyHeaders(h, token))
                     .exchange((req, res) -> MeritzHttpClient.readBody(res));
         } catch (RestClientException e) {
-            throw new MeritzApiException(null, "Meritz 연결 테스트 조회 통신 실패", e, MeritzApiException.Conflict.NONE, false);
+            throw new MeritzApiException(null, "Meritz 연결 테스트 조회 통신 실패", e, false);
         }
         MeritzResponse res = MeritzResponse.parse(objectMapper, body, "GET " + CURRENCIES_PATH);
         if (!res.success()) {
@@ -104,7 +104,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
                     .body(form)
                     .exchange((req, res) -> MeritzHttpClient.readBody(res));
         } catch (RestClientException e) {
-            throw new MeritzApiException(null, "Meritz 토큰 발급 통신 실패", e, MeritzApiException.Conflict.NONE, false);
+            throw new MeritzApiException(null, "Meritz 토큰 발급 통신 실패", e, false);
         }
         JsonNode json;
         try {
@@ -119,13 +119,13 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
                 return new Token(accessToken, LocalDateTime.parse(expiresDate, EXPIRY_FORMAT).atZone(TimeZones.KST).toOffsetDateTime());
             } catch (DateTimeParseException e) {
                 // 만료일 형식 이상 — 발송 전 단계 실패로 분류되도록 MeritzApiException으로 감싼다
-                throw new MeritzApiException(null, "Meritz 토큰 만료일 해석 불가", e, MeritzApiException.Conflict.NONE, false);
+                throw new MeritzApiException(null, "Meritz 토큰 만료일 해석 불가", e, false);
             }
         }
         String code = text(json, "error_code") != null ? text(json, "error_code") : text(json, "rsp_cd");
         log.warn("Meritz 토큰 발급 실패: code={}", code); // 본문엔 토큰이 없지만 메시지 원문은 로그에 남기지 않는다
         if (MeritzResponse.INVALID_CLIENT.equals(code)) throw new BrokerCredentialException();
-        throw new MeritzApiException(code, "Meritz 토큰 발급 실패: code=" + code, null, MeritzApiException.Conflict.NONE, false);
+        throw new MeritzApiException(code, "Meritz 토큰 발급 실패: code=" + code, null, false);
     }
 
     private static String text(JsonNode json, String field) {

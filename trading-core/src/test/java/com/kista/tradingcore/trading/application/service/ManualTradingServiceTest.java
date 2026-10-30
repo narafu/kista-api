@@ -4,7 +4,6 @@ import com.kista.tradingcore.trading.application.service.support.TradingBalanceL
 
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
@@ -20,7 +19,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
-import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
@@ -209,8 +207,7 @@ class ManualTradingServiceTest {
     void ledgerQueryBrokerTypedFailure_propagatesAsIs() {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(planned(OrderDirection.BUY, 1, "20.00", "INFINITE_BUY_01")));
-        RuntimeException brokerFailure = new com.kista.tradingcore.support.StubBrokerApiException("Toss", "Toss API 오류",
-                com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.NONE);
+        RuntimeException brokerFailure = new com.kista.tradingcore.support.StubBrokerApiException("Toss", "Toss API 오류");
         when(cyclePositionPort.findLatestOne(CYCLE.id())).thenThrow(brokerFailure);
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isSameAs(brokerFailure);

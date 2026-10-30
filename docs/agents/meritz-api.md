@@ -53,9 +53,9 @@
 
 ### 취소
 `CancelInstruction`에는 ticker·외부 주문번호뿐이라 어댑터가 **당일 주문체결내역에서 `oder_no`로 원주문을 조회**해 `oder_date`·`oder_cls_code`·`odqt`를 채운다. `odqt`=`oder_able_qty`(잔량), `oder_cls_code`는 목록의 `aspr_type_code` 역매핑(`1시장가→05, 2지정가→01, 4LOO→31, 5LOC→32, 6MOO→33, 7MOC→34, 8→35, 9→36, A→37, B→38`).
-- `oder_able_qty=0`(이미 종결): 체결수량이 주문수량과 같으면 `Conflict.ALREADY_FILLED`, 아니면 `ALREADY_CANCELED`로 던지고 취소 API는 부르지 않는다.
+- `oder_able_qty=0`(이미 종결): 체결수량이 주문수량과 같으면 `CancelOutcome.ALREADY_FILLED`, 아니면 `ALREADY_CANCELED`를 반환하고 취소 API는 부르지 않는다.
 - 당일 목록에 없음: 최근 7일 기간 목록으로 한 번 더 찾고, 그래도 없으면 결과 불명(`rejected=false`) — 접수 직후 목록 지연 가능성이 있어 "이미 취소"로 단정하지 않는다.
-- LOC 등 조건부 주문은 장 마감 시 거래소가 만료시킨다(실측 `ovrs_stck_rfus_reas="Trading Sequence Completed"`). 그러나 **지정가는 애프터장까지 살아 있다** — 실측 2026-10-29 거래일 SOXL 매수 지정가 43주 @100.62(주문번호 1878526)가 04:30:02 KST 접수 → 06:10:21 KST 애프터장 체결. 그래서 마감 리포트(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)가 체결 조회 직전에 잔여 PLACED를 명시 취소한다. 이미 종결된 주문은 위 `oder_able_qty=0` 판정으로 `Conflict`가 되어 리포트가 조용히 넘긴다. (취소 없이 05:10 리포트가 CANCELLED로 기록하면 애프터장 체결이 원장에서 누락된다. 원장 대사 `LedgerReconciliation`은 실보유<원장만 경보해 이 매수 누락은 감지하지 못하므로 취소가 방어선이다.)
+- LOC 등 조건부 주문은 장 마감 시 거래소가 만료시킨다(실측 `ovrs_stck_rfus_reas="Trading Sequence Completed"`). 그러나 **지정가는 애프터장까지 살아 있다** — 실측 2026-10-29 거래일 SOXL 매수 지정가 43주 @100.62(주문번호 1878526)가 04:30:02 KST 접수 → 06:10:21 KST 애프터장 체결. 그래서 마감 리포트(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)가 체결 조회 직전에 잔여 PLACED를 명시 취소한다. 이미 종결된 주문은 위 `oder_able_qty=0` 판정으로 `CancelOutcome`이 되어 리포트가 조용히 넘긴다. (취소 없이 05:10 리포트가 CANCELLED로 기록하면 애프터장 체결이 원장에서 누락된다. 원장 대사 `LedgerReconciliation`은 실보유<원장만 경보해 이 매수 누락은 감지하지 못하므로 취소가 방어선이다.)
 
 ### 접수 시각
 kista 접수는 전부 정규장 안이다(마감 배치 AT_CLOSE, 개장 배치는 개장 후). 예약주문 API 불필요. 최악 경로(게이트 20s + 읽기 10s + 토큰 재시도 10s) ≈ 40s로 `SubmittingOrderAwaiter` 60s 예산 안쪽.
@@ -73,7 +73,7 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 실주문 실측 이후에도 남은 항목 — 관리자 활성화 후 첫 배치에서 확인한다.
 - MOC(매도 `34`)·시장가 매도(`05`, MOO SELL 근사) 실접수 여부(LOC·지정가 매수는 실측 완료).
 - `warn_cls_code`가 `0`이 아닌 경우의 실제 형태 — 실측·첫 운영 배치(2026-10-27)에서 경고가 한 번도 발생하지 않았다. 경고가 `data.warn_cls_code`가 아니라 성공이 아닌 `rsp_cd`로 올 가능성이 남아 있다 — 이 경우 `MeritzHttpClient`가 먼저 예외를 던져 재전송이 동작하지 않는다(미접수 방향이라 안전).
-- 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `Conflict`는 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
+- 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `CancelOutcome`은 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
 
 ### 잔고 부족 거절 분류 갭
 - 메리츠는 잔고 부족을 나타내는 `rsp_cd`가 확인되지 않아 `isInsufficientFunds()`로 분류하지 않는다. 잔고 부족 거절도 일반 확정 거절과 같이 관리자 알림으로 남는다 — 실측으로 코드를 확인하면 `MeritzHttpClient`에서 분류를 추가한다. 분류 전까지 메리츠 사용자에게는 미리보기 `accountCashCheck`가 사전 신호다.

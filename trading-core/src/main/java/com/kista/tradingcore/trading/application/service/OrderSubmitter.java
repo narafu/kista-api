@@ -5,6 +5,7 @@ import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectio
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
@@ -122,9 +123,28 @@ class OrderSubmitter {
     // PLACED 기록 경합(선점 뒤 다른 경로가 상태를 바꿈) — 증권사 주문을 즉시 취소해 DB와 맞춘다
     private void cancelRacedOrder(Order order, String externalOrderId, BrokerAccountRef account, String accountLabel) {
         try {
-            brokerOrderCorrectionPort.cancel(new CancelInstruction(order.ticker(), externalOrderId), account);
-            log.warn("[{}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사 주문 즉시 취소 (orderId={}, externalOrderId={})",
-                    accountLabel, order.direction(), order.ticker(), order.id(), externalOrderId);
+            CancelOutcome outcome = brokerOrderCorrectionPort.cancel(new CancelInstruction(order.ticker(), externalOrderId), account);
+            boolean filled = switch (outcome) {
+                case CANCELLED -> {
+                    log.warn("[{}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사 주문 즉시 취소 (orderId={}, externalOrderId={})",
+                            accountLabel, order.direction(), order.ticker(), order.id(), externalOrderId);
+                    yield false;
+                }
+                case ALREADY_CANCELED -> {
+                    // 증권사에서 이미 취소·만료 — DB와 맞는 상태라 알림 불필요
+                    log.warn("[{}] {} {} 접수 중 DB 주문 상태가 바뀜 — 증권사에서 이미 취소됨 (orderId={}, externalOrderId={})",
+                            accountLabel, order.direction(), order.ticker(), order.id(), externalOrderId);
+                    yield false;
+                }
+                case ALREADY_FILLED -> true;
+            };
+            if (filled) {
+                log.error("[{}] {} {} 접수 중 DB 주문 상태가 바뀌었으나 증권사에서 이미 체결됨 — DB 정정 필요 (orderId={}, externalOrderId={})",
+                        accountLabel, order.direction(), order.ticker(), order.id(), externalOrderId);
+                eventPublisher.publishEvent(new TradingErrorEvent(null,
+                        "[취소 경합] %s %s %s 접수 직후 DB 주문 상태가 바뀌었으나 증권사에서 이미 체결됨 — orderId=%s, externalOrderId=%s. DB 정정 필요"
+                                .formatted(accountLabel, order.ticker(), order.direction(), order.id(), externalOrderId)));
+            }
         } catch (Exception e) {
             log.error("[{}] {} {} 접수 중 상태가 바뀐 주문의 증권사 취소 실패 — 수동 취소 필요 (externalOrderId={}): {}",
                     accountLabel, order.direction(), order.ticker(), externalOrderId, e.getMessage());

@@ -9,13 +9,13 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderCancelException;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -110,23 +110,26 @@ class OrderCancelService {
 
         for (Order order : placedOrders) {
             try {
-                brokerOrderCorrectionPort
+                CancelOutcome outcome = brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
-                stateWriter.markCancelled(order.id());
-                cancelledCount++;
-            } catch (Exception e) {
-                if (isAlreadyFilled(e)) {
-                    // 취소 직전 체결 확정 — 취소할 잔량이 없어 실패가 아니다. 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
-                    log.info("주문이 이미 체결됨 — 취소 생략: orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
-                    continue;
-                }
-                if (isAlreadyCanceled(e)) {
-                    // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
-                    log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                boolean markCancelled = switch (outcome) {
+                    case CANCELLED -> true;
+                    case ALREADY_FILLED -> {
+                        // 취소 직전 체결 확정 — 취소할 잔량이 없어 실패가 아니다. 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
+                        log.info("주문이 이미 체결됨 — 취소 생략: orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                        yield false;
+                    }
+                    case ALREADY_CANCELED -> {
+                        // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
+                        log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                        yield true;
+                    }
+                };
+                if (markCancelled) {
                     stateWriter.markCancelled(order.id());
                     cancelledCount++;
-                    continue;
                 }
+            } catch (Exception e) {
                 log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
                         order.id(), order.externalOrderId(), e.getMessage());
                 failures.add("orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId()
@@ -184,32 +187,18 @@ class OrderCancelService {
             throw new OrderCancelException("취소 가능한 상태가 아닙니다.");
         }
 
-        try {
-            brokerOrderCorrectionPort
-                    .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
-        } catch (Exception e) {
-            if (isAlreadyFilled(e)) {
-                // 취소 직전 체결 확정 — 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
-                throw new OrderCancelException("이미 체결된 주문이라 취소할 수 없습니다.");
-            }
-            if (!isAlreadyCanceled(e)) {
-                throw e;
-            }
+        CancelOutcome outcome = brokerOrderCorrectionPort
+                .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
+        boolean alreadyCanceled = switch (outcome) {
+            case CANCELLED -> false;
+            case ALREADY_CANCELED -> true;
+            // 취소 직전 체결 확정 — 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
+            case ALREADY_FILLED -> throw new OrderCancelException("이미 체결된 주문이라 취소할 수 없습니다.");
+        };
+        if (alreadyCanceled) {
             // 동일 주문에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
             log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", orderId, order.externalOrderId());
         }
         stateWriter.markCancelled(orderId);
     }
-
-    // 취소 직전 체결이 확정된 경합 여부 — 어댑터가 종결 Conflict로 전달(BrokerOrderCorrectionPort 계약)
-    private boolean isAlreadyFilled(Exception e) {
-        return e instanceof BrokerApiException bae && bae.isAlreadyFilledConflict();
-    }
-
-    // 중복 취소·장 마감 만료로 이미 취소된 주문인지 — 어댑터가 종결 Conflict로 전달(BrokerOrderCorrectionPort 계약)
-    private boolean isAlreadyCanceled(Exception e) {
-        return e instanceof BrokerApiException bae && bae.isAlreadyCanceledConflict();
-    }
-
 }
-

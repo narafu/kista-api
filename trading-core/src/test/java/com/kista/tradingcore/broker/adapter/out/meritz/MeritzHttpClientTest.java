@@ -122,7 +122,7 @@ class MeritzHttpClientTest {
 
     @Test
     void token_failure_is_rejected_before_send() {
-        when(authApi.getToken(ACCOUNT)).thenThrow(new MeritzApiException(null, "issue failed", null, MeritzApiException.Conflict.NONE, false));
+        when(authApi.getToken(ACCOUNT)).thenThrow(new MeritzApiException(null, "issue failed", null, false));
 
         assertThatThrownBy(() -> client.post(PATH, ACCOUNT, Map.of("a", "b")))
                 .isInstanceOfSatisfying(MeritzApiException.class, e -> assertThat(e.isRejected()).isTrue());

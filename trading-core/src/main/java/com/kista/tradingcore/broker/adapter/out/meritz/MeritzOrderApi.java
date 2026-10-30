@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
@@ -87,23 +87,21 @@ class MeritzOrderApi {
         long orderNo = parseOrderNo(res.orderNo());
         if (orderNo <= 0) {
             throw new MeritzApiException(null, "Meritz 주문 응답 주문번호 없음/해석 불가(" + res.orderNo() + ") — 접수 여부 불명",
-                    null, Conflict.NONE, false);
+                    null, false);
         }
         return new OrderResult(String.valueOf(orderNo));
     }
 
-    void cancel(CancelInstruction instruction, BrokerAccountRef account) {
+    CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
         Original o = findOriginal(instruction.externalOrderId(), account);
         if (o.ordered() <= 0) {
             // 주문수량 누락 행 — 체결 완료로 오판해 CANCELLED/FILLED 오기록하지 않도록 결과 불명
             throw new MeritzApiException(null, "Meritz 원주문 수량 해석 불가: oder_no=" + instruction.externalOrderId(),
-                    null, Conflict.NONE, false);
+                    null, false);
         }
         if (o.cancelable() <= 0) {
-            // 이미 종결(체결 완료 또는 취소·장 마감 만료) — 취소 API를 부르면 업무 오류로 실패가 보인다
-            Conflict conflict = o.filled() == o.ordered() ? Conflict.ALREADY_FILLED : Conflict.ALREADY_CANCELED;
-            throw new MeritzApiException(null, "Meritz 취소 대상 종결: oder_no=" + instruction.externalOrderId()
-                    + ", 체결 " + o.filled() + "/" + o.ordered(), null, conflict, true);
+            // 이미 종결(체결 완료 또는 취소·장 마감 만료) — 취소 API를 부르면 업무 오류로 실패가 보이므로 호출하지 않는다
+            return o.filled() == o.ordered() ? CancelOutcome.ALREADY_FILLED : CancelOutcome.ALREADY_CANCELED;
         }
         Map<String, String> body = new LinkedHashMap<>();
         body.put("oder_date", o.orderDate());
@@ -111,6 +109,7 @@ class MeritzOrderApi {
         body.put("oder_cls_code", cancelOrderClass(o.asprType()));
         body.put("odqt", String.valueOf(o.cancelable())); // 잔량 전부 취소
         postConfirmingWarning(CANCEL_PATH, account, body);
+        return CancelOutcome.CANCELLED;
     }
 
     // 경고 1/3은 미접수 확정이라 warn_cnfr_yn=Y로 1회 재전송(중복 주문 아님), 그 외 비접수는 확정 거절
@@ -135,7 +134,7 @@ class MeritzOrderApi {
     private OrderResponse send(String path, BrokerAccountRef account, Map<String, String> body) {
         OrderResponse res = http.rows(http.post(path, account, body), OrderResponse.class);
         if (res == null) {
-            throw new MeritzApiException(null, "Meritz POST " + path + " 응답 data 없음 — 접수 여부 불명", null, Conflict.NONE, false);
+            throw new MeritzApiException(null, "Meritz POST " + path + " 응답 data 없음 — 접수 여부 불명", null, false);
         }
         return res;
     }
@@ -162,7 +161,7 @@ class MeritzOrderApi {
                 return new Original(r.orderDate(), r.asprType(), qty(r.histOrdered()), qty(r.histFilled()), qty(r.histCancelable()));
             }
         }
-        throw new MeritzApiException(null, "원주문 조회 실패", null, Conflict.NONE, false);
+        throw new MeritzApiException(null, "원주문 조회 실패", null, false);
     }
 
     // oder_no는 JSON 숫자 — 숫자 값으로 비교(선행 0·공백 차이 무시)

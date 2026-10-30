@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.shared.kernel.TimeZones;
-import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
@@ -16,13 +15,13 @@ import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.trading.application.event.OrderCancelFailedEvent;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +77,7 @@ class OrderCancelServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(brokerPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED); // 기본: 취소 접수
         ownedAccount = TradingFixtures.kisAccount(accountId, requesterId);
         cycle = new Strategy(cycleId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
@@ -164,7 +164,7 @@ class OrderCancelServiceTest {
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
-        doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
+        doReturn(CancelOutcome.CANCELLED).when(brokerPort).cancel(eq(cancelOf(order1)), any());
         doThrow(new RuntimeException("KIS 오류")).when(brokerPort).cancel(eq(cancelOf(order2)), any());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
@@ -188,7 +188,7 @@ class OrderCancelServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order));
-        doThrow(new StubBrokerApiException("이미 체결", BrokerApiException.Conflict.ALREADY_FILLED))
+        doReturn(CancelOutcome.ALREADY_FILLED)
                 .when(brokerPort).cancel(eq(cancelOf(order)), any());
 
         CancelResult result = service.cancelOpenOrders(cycleId, ownedAccount);
@@ -218,7 +218,7 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelByCycle: 브로커가 409(already-canceled)로 거부해도 성공으로 흡수 → CancelResult(2, 0), 알림 없음")
+    @DisplayName("cancelByCycle: 브로커가 ALREADY_CANCELED를 반환해도 성공으로 흡수 → CancelResult(2, 0), 알림 없음")
     void cancelByCycle_alreadyCanceledConflict_absorbedAsSuccess() {
         Order order1 = placedOrder(UUID.randomUUID(), "ORD_1");
         Order order2 = placedOrder(UUID.randomUUID(), "ORD_2");
@@ -229,9 +229,8 @@ class OrderCancelServiceTest {
         when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
                 .thenReturn(List.of(order1, order2));
         // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
-        doNothing().when(brokerPort).cancel(eq(cancelOf(order1)), any());
-        doThrow(new StubBrokerApiException("Toss API 오류: 409 CONFLICT already-canceled",
-                BrokerApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(eq(cancelOf(order2)), any());
+        doReturn(CancelOutcome.CANCELLED).when(brokerPort).cancel(eq(cancelOf(order1)), any());
+        doReturn(CancelOutcome.ALREADY_CANCELED).when(brokerPort).cancel(eq(cancelOf(order2)), any());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
@@ -326,13 +325,12 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelOrder: 브로커가 409(already-canceled)로 거부해도 성공으로 흡수해 DB만 CANCELLED 처리")
+    @DisplayName("cancelOrder: 브로커가 ALREADY_CANCELED를 반환해도 성공으로 흡수해 DB만 CANCELLED 처리")
     void cancelOrder_alreadyCanceledConflict_absorbedAsSuccess() {
         Order order = placedOrder(orderId, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        doThrow(new StubBrokerApiException("Toss API 오류: 409 CONFLICT already-canceled",
-                BrokerApiException.Conflict.ALREADY_CANCELED)).when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
+        doReturn(CancelOutcome.ALREADY_CANCELED).when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
 
         service.cancelOrder(orderId, requesterId);
 
@@ -340,12 +338,12 @@ class OrderCancelServiceTest {
     }
 
     @Test
-    @DisplayName("cancelOrder: 브로커가 ALREADY_FILLED 경합을 던지면 OrderCancelException, markCancelled 안 함")
+    @DisplayName("cancelOrder: 브로커가 ALREADY_FILLED를 반환하면 OrderCancelException, markCancelled 안 함")
     void cancelOrder_alreadyFilledConflict_throwsOrderCancelException() {
         Order order = placedOrder(orderId, "ORD_99");
         when(orderPort.findById(orderId)).thenReturn(Optional.of(order));
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
-        doThrow(new StubBrokerApiException("이미 체결", BrokerApiException.Conflict.ALREADY_FILLED))
+        doReturn(CancelOutcome.ALREADY_FILLED)
                 .when(brokerPort).cancel(cancelOf(order), ownedAccount.toBrokerRef());
 
         assertThatThrownBy(() -> service.cancelOrder(orderId, requesterId))

@@ -1756,7 +1756,7 @@ lifecycles:
       - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: "전체 취소·일시정지·전략/계좌 삭제가 같은 규칙을 쓴다. 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다.", code: [OrderCancelService#cancelByCycle, OrderCancelService#cancelOpenOrders, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}
       - {from: PLACED, to: FILLED, title: 전량 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: PARTIALLY_FILLED, title: 부분 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
-      - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(전 증권사 마감 전 명시 취소, 이미 종결된 주문은 취소 없이 넘김).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
+      - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(전 증권사 마감 전 명시 취소, 이미 종결된 주문은 CancelOutcome 반환으로 알림 없이 넘김).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
       - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelOpenOrders, ReorderService#reorder], flow: manual-run/cancel-one}
 
   batch-run:

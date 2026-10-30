@@ -18,8 +18,8 @@ import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalend
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import lombok.RequiredArgsConstructor;
@@ -148,17 +148,15 @@ class ReorderService implements ReorderUseCase {
     // 원본 취소 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED (그 밖의 상태는 앞에서 거부됨)
     private void cancelSource(Order order, Account account) {
         if (order.status() == OrderStatus.PLACED) {
-            try {
-                brokerOrderCorrectionPort
-                        .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
-            } catch (BrokerApiException e) {
-                // 체결된 원본은 재주문하면 중복 매매 — 중단. 이미 취소·만료된 원본은 그대로 대체 주문을 낸다
-                if (e.isAlreadyFilledConflict()) {
-                    throw new IllegalArgumentException("원본 주문이 이미 체결돼 재주문할 수 없습니다.");
-                }
-                if (!e.isAlreadyCanceledConflict()) {
-                    throw e;
-                }
+            CancelOutcome outcome = brokerOrderCorrectionPort
+                    .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.toBrokerRef());
+            // 체결된 원본은 재주문하면 중복 매매 — 중단. 이미 취소·만료된 원본은 그대로 대체 주문을 낸다
+            boolean filled = switch (outcome) {
+                case CANCELLED, ALREADY_CANCELED -> false;
+                case ALREADY_FILLED -> true;
+            };
+            if (filled) {
+                throw new IllegalArgumentException("원본 주문이 이미 체결돼 재주문할 수 없습니다.");
             }
             stateWriter.markCancelled(order.id());
             return;

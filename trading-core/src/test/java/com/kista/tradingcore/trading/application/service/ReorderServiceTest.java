@@ -18,7 +18,7 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
-import com.kista.tradingcore.broker.domain.model.OrderResult;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +37,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -67,6 +69,7 @@ class ReorderServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(brokerOrderCorrectionPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED); // 기본: 취소 접수
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
                 brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget, eventPublisher);
@@ -114,8 +117,7 @@ class ReorderServiceTest {
     @Test
     void reorder_fromPlaced_alreadyFilledConflict_abortsWithoutNewOrder() {
         stubCommon(placedOrder());
-        doThrow(new com.kista.tradingcore.support.StubBrokerApiException("체결됨",
-                com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.ALREADY_FILLED))
+        doReturn(CancelOutcome.ALREADY_FILLED)
                 .when(brokerOrderCorrectionPort).cancel(any(), any());
 
         assertThatThrownBy(() -> reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN))
@@ -128,8 +130,7 @@ class ReorderServiceTest {
     @Test
     void reorder_fromPlaced_alreadyCanceledConflict_marksCancelledAndProceeds() {
         stubCommon(placedOrder());
-        doThrow(new com.kista.tradingcore.support.StubBrokerApiException("이미 취소",
-                com.kista.tradingcore.broker.domain.model.BrokerApiException.Conflict.ALREADY_CANCELED))
+        doReturn(CancelOutcome.ALREADY_CANCELED)
                 .when(brokerOrderCorrectionPort).cancel(any(), any());
 
         reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);

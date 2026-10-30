@@ -20,18 +20,6 @@ class BrokerApiExceptionTest {
     }
 
     @Test
-    @DisplayName("409 세부 사유는 벤더 중립 상위 타입에서 판정된다")
-    void conflictDeterminedOnBaseType() {
-        BrokerApiException filled = new TossApiException("x", null, BrokerApiException.Conflict.ALREADY_FILLED);
-        BrokerApiException canceled = new TossApiException("x", null, BrokerApiException.Conflict.ALREADY_CANCELED);
-
-        assertThat(filled.isAlreadyFilledConflict()).isTrue();
-        assertThat(filled.isAlreadyCanceledConflict()).isFalse();
-        assertThat(canceled.isAlreadyCanceledConflict()).isTrue();
-        assertThat(new KisApiException("x", null).isAlreadyFilledConflict()).isFalse();
-    }
-
-    @Test
     @DisplayName("거절 플래그가 선 벤더 예외와 자격증명·토큰 한도 예외는 확정 거절")
     void isRejection_trueFor_rejectedKisAndToss_credential_rateLimit() {
         assertThat(BrokerApiException.isRejection(KisApiException.rejected("x", null))).isTrue();

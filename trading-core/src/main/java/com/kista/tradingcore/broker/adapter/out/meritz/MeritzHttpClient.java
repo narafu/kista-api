@@ -151,7 +151,7 @@ class MeritzHttpClient {
         } catch (RestClientException e) {
             // I/O·타임아웃 — 접수 여부 불명
             log.warn("Meritz {} 통신 실패: {}", action, e.getMessage());
-            throw new MeritzApiException(null, "Meritz " + action + " 통신 실패", e, MeritzApiException.Conflict.NONE, false);
+            throw new MeritzApiException(null, "Meritz " + action + " 통신 실패", e, false);
         }
         return MeritzResponse.parse(objectMapper, body, action);
     }

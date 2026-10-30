@@ -9,7 +9,7 @@ public class BinanceApiException extends BrokerApiException {
     private final Integer code; // 바이낸스 오류 코드 (없으면 null) — 어댑터가 -2013 등 분기에 사용
 
     public BinanceApiException(int status, Integer code, String message, Throwable cause, boolean rejected) {
-        super("Binance", message, cause, Conflict.NONE, rejected);
+        super("Binance", message, cause, rejected);
         this.status = status;
         this.code = code;
     }

@@ -10,6 +10,7 @@ import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectio
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.support.StubBrokerApiException;
@@ -200,6 +201,28 @@ class OrderSubmitterTest {
         verify(brokerPort).cancel(new CancelInstruction(ORDER.ticker(), "EXT"), ACCOUNT_REF);
         verify(orderPort, times(1)).markPlaced(ORDER_ID, "EXT");
         expectAlert("취소 경합");
+    }
+
+    @Test
+    @DisplayName("PLACED 기록 경합 후 증권사가 이미 체결이면 DB 정정 알림")
+    void submit_markPlacedConflict_alreadyFilled_alertsDbFix() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markPlaced(ORDER_ID, "EXT");
+        when(brokerPort.cancel(any(), any())).thenReturn(CancelOutcome.ALREADY_FILLED);
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.SKIPPED);
+        expectAlert("DB 정정 필요");
+    }
+
+    @Test
+    @DisplayName("PLACED 기록 경합 후 증권사가 이미 취소면 알림 없음")
+    void submit_markPlacedConflict_alreadyCanceled_noAlert() {
+        when(brokerPort.place(any(), any())).thenReturn(new OrderResult("EXT"));
+        doThrow(new OrderStateConflictException("경합")).when(orderPort).markPlaced(ORDER_ID, "EXT");
+        when(brokerPort.cancel(any(), any())).thenReturn(CancelOutcome.ALREADY_CANCELED);
+
+        assertThat(submitter().submit(ORDER, ACCOUNT_REF, "계좌").outcome()).isEqualTo(Outcome.SKIPPED);
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test

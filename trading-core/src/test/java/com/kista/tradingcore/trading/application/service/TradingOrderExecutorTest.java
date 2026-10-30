@@ -8,6 +8,7 @@ import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
@@ -430,6 +431,7 @@ class TradingOrderExecutorTest {
         when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedOrder));
         when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-301"));
         doThrow(new OrderStateConflictException("경합")).when(orderPort).markPlaced(orderId, "KIS-301");
+        when(brokerPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED);
 
         List<Order> result = executor().placeOrders(TODAY, ACCOUNT, CYCLE, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
 

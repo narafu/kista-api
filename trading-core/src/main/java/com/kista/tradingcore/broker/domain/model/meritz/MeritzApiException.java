@@ -7,14 +7,14 @@ public class MeritzApiException extends BrokerApiException {
 
     private final String rspCd; // 응답 본문 rsp_cd (I/O·파싱 불가면 null)
 
-    public MeritzApiException(String rspCd, String message, Throwable cause, Conflict conflict, boolean rejected) {
-        super("Meritz", message, cause, conflict, rejected);
+    public MeritzApiException(String rspCd, String message, Throwable cause, boolean rejected) {
+        super("Meritz", message, cause, rejected);
         this.rspCd = rspCd;
     }
 
     // 증권사가 접수하지 않았음이 확실한 실패(송신 전 실패·업무 오류 응답)
     public static MeritzApiException rejected(String rspCd, String message) {
-        return new MeritzApiException(rspCd, message, null, Conflict.NONE, true);
+        return new MeritzApiException(rspCd, message, null, true);
     }
 
     public String rspCd() {

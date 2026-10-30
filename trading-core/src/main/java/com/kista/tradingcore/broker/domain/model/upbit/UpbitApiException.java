@@ -9,7 +9,7 @@ public class UpbitApiException extends BrokerApiException {
     private final String errorName; // 업비트 error.name (없으면 null) — 어댑터가 order_not_found 등 분기에 사용
 
     public UpbitApiException(int status, String errorName, String message, Throwable cause, boolean rejected) {
-        super("Upbit", message, cause, Conflict.NONE, rejected);
+        super("Upbit", message, cause, rejected);
         this.status = status;
         this.errorName = errorName;
     }

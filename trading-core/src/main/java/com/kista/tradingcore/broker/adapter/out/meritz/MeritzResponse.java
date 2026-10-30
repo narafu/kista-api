@@ -50,7 +50,7 @@ record MeritzResponse(
         }
         if (res == null || res.rspCd() == null) {
             throw new MeritzApiException(null, "Meritz " + action + " 응답 본문 해석 불가: " + abbreviate(body),
-                    null, MeritzApiException.Conflict.NONE, false);
+                    null, false);
         }
         return res;
     }

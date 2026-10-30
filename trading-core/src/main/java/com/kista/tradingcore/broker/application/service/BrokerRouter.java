@@ -63,8 +63,8 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        of(account).cancel(instruction, account);
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        return of(account).cancel(instruction, account);
     }
 
     @Override

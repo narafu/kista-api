@@ -67,8 +67,8 @@ public class KisBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        kisOrderApi.cancel(instruction, account);
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        return kisOrderApi.cancel(instruction, account);
     }
 
     @Override

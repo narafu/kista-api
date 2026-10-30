@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequest;
@@ -172,8 +173,8 @@ class TossHttpClientTest {
     }
 
     @Test
-    @DisplayName("409 CONFLICT(already-canceled) 응답은 TossApiException.isAlreadyCanceledConflict()=true로 전달")
-    void get_409AlreadyCanceled_setsAlreadyCanceledConflictFlag() {
+    @DisplayName("409 CONFLICT 응답의 error.code는 TossApiException.errorCode()로 전달되고 cause는 409 예외다")
+    void get_409_exposesErrorCodeAndCause() {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
         server.expect(requestTo(URL))
@@ -183,26 +184,10 @@ class TossHttpClientTest {
 
         assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>(),
                 new ParameterizedTypeReference<String>() {}))
-                .isInstanceOfSatisfying(TossApiException.class,
-                        tae -> assertThat(tae.isAlreadyCanceledConflict()).isTrue());
-        server.verify();
-    }
-
-    @Test
-    @DisplayName("409 CONFLICT(already-filled) 응답은 already-canceled로 오판정되지 않는다")
-    void get_409AlreadyFilled_doesNotSetAlreadyCanceledConflictFlag() {
-        TossHttpClient client = newClient();
-        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
-        server.expect(requestTo(URL))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withStatus(HttpStatus.CONFLICT).body(
-                        "{\"error\":{\"code\":\"already-filled\",\"message\":\"체결 완료된 주문입니다.\"}}"));
-
-        assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>(),
-                new ParameterizedTypeReference<String>() {}))
                 .isInstanceOfSatisfying(TossApiException.class, tae -> {
-                    assertThat(tae.isAlreadyFilledConflict()).isTrue();
-                    assertThat(tae.isAlreadyCanceledConflict()).isFalse();
+                    assertThat(tae.errorCode()).isEqualTo("already-canceled");
+                    assertThat(tae.getCause()).isInstanceOfSatisfying(HttpClientErrorException.class,
+                            h -> assertThat(h.getStatusCode().value()).isEqualTo(409));
                 });
         server.verify();
     }

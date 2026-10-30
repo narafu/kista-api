@@ -10,10 +10,10 @@ import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
@@ -95,24 +95,27 @@ class TradingReporter {
 
     // 체결 조회 전 잔여 PLACED 주문을 증권사에 취소 요청 — 전 증권사 공통.
     // 정규장 지정가 주문은 Toss·Meritz에서 애프터장까지 살아 있어(Meritz 10-29 실측: 06:10 KST 체결) 명시 취소가 필요하고,
-    // 장 마감 시 만료되는 주문(LOC 등)은 어댑터가 종결 Conflict로 알려 조용히 넘긴다(포트 계약).
+    // 장 마감 시 만료되는 주문(LOC 등)은 어댑터가 ALREADY_FILLED/ALREADY_CANCELED로 반환해 조용히 넘긴다(포트 계약).
     // 실패해도 흐름은 계속되며(다음 getExecutions로 실제 상태를 확정), 취소 자체 실패만 관리자에게 알린다.
     private void cancelUnresolvedOrders(List<Order> mainOrders, TradingAccount account) {
         for (Order order : mainOrders) {
             if (order.status() != OrderStatus.PLACED || order.externalOrderId() == null) continue;
             try {
-                brokerOrderCorrectionPort
+                CancelOutcome outcome = brokerOrderCorrectionPort
                         .cancel(new CancelInstruction(order.ticker(), order.externalOrderId()), account.brokerRef());
-                log.info("[orderId={}] 마감 후 잔여 주문 취소 완료", order.id());
-            } catch (Exception e) {
-                if (BrokerApiException.isOrderClosedConflict(e)) {
-                    // 취소 시점 이미 체결·만료 — 예상된 경합, 관리자 알림 불필요
-                    log.info("[orderId={}] 취소 시점 이미 종결 — 취소 생략: {}", order.id(), e.getMessage());
+                boolean cancelled = switch (outcome) {
+                    case CANCELLED -> true;
+                    case ALREADY_FILLED, ALREADY_CANCELED -> false; // 취소 시점 이미 체결·만료 — 예상된 경합, 관리자 알림 불필요
+                };
+                if (cancelled) {
+                    log.info("[orderId={}] 마감 후 잔여 주문 취소 완료", order.id());
                 } else {
-                    log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
-                    eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s 잔여 주문 취소 실패] orderId=%s — %s"
-                            .formatted(account.nickname(), order.ticker(), order.id(), e.getMessage())));
+                    log.info("[orderId={}] 취소 시점 이미 종결({}) — 취소 생략", order.id(), outcome);
                 }
+            } catch (Exception e) {
+                log.warn("[orderId={}] 마감 후 잔여 주문 취소 실패: {}", order.id(), e.getMessage());
+                eventPublisher.publishEvent(new TradingErrorEvent(null, "[%s %s 잔여 주문 취소 실패] orderId=%s — %s"
+                        .formatted(account.nickname(), order.ticker(), order.id(), e.getMessage())));
             }
         }
     }

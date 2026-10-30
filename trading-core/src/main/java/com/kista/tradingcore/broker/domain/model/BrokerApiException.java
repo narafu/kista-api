@@ -3,32 +3,23 @@ package com.kista.tradingcore.broker.domain.model;
 // 증권사 외부 API 호출 실패의 벤더 중립 상위 타입 — 소비자(trading 등)는 KIS/Toss 구체 예외를 몰라도 이 타입 하나로 catch한다(503 매핑)
 public abstract class BrokerApiException extends RuntimeException {
 
-    // 취소 경합 세부 사유 — Toss는 409 응답 바디로, KIS·Meritz는 취소 전 원주문 잔량 조회로 판정
-    public enum Conflict {
-        NONE,
-        ALREADY_FILLED,   // 취소 요청 직전/직후 체결이 확정된 경우
-        ALREADY_CANCELED, // 이미 취소 처리된 주문에 중복 취소 요청이 도착한 경우
-    }
-
     private final String vendorLabel; // 응답 title·로그용 벤더 표기("KIS"/"Toss")
-    private final Conflict conflict;  // 409 세부 사유(없으면 NONE)
     private final boolean rejected;   // 증권사가 요청을 접수하지 않았음이 확실(송신 전 실패·명시 거부) — false면 결과 불명
     private final boolean insufficientFunds; // 확정 거절 중 어댑터가 잔고·가능수량 부족 코드로 식별한 경우(isRejected의 하위 분류)
 
-    protected BrokerApiException(String vendorLabel, String message, Throwable cause, Conflict conflict) {
-        this(vendorLabel, message, cause, conflict, false);
+    protected BrokerApiException(String vendorLabel, String message, Throwable cause) {
+        this(vendorLabel, message, cause, false);
     }
 
-    protected BrokerApiException(String vendorLabel, String message, Throwable cause, Conflict conflict, boolean rejected) {
-        this(vendorLabel, message, cause, conflict, rejected, false);
+    protected BrokerApiException(String vendorLabel, String message, Throwable cause, boolean rejected) {
+        this(vendorLabel, message, cause, rejected, false);
     }
 
-    protected BrokerApiException(String vendorLabel, String message, Throwable cause, Conflict conflict, boolean rejected,
+    protected BrokerApiException(String vendorLabel, String message, Throwable cause, boolean rejected,
                                  boolean insufficientFunds) {
         super(message, cause);
         this.insufficientFunds = insufficientFunds;
         this.vendorLabel = vendorLabel;
-        this.conflict = conflict;
         this.rejected = rejected;
     }
 
@@ -54,18 +45,5 @@ public abstract class BrokerApiException extends RuntimeException {
 
     public String vendorLabel() {
         return vendorLabel;
-    }
-
-    public boolean isAlreadyFilledConflict() {
-        return conflict == Conflict.ALREADY_FILLED;
-    }
-
-    public boolean isAlreadyCanceledConflict() {
-        return conflict == Conflict.ALREADY_CANCELED;
-    }
-
-    // 취소 대상 주문이 이미 종결(체결 완료 또는 취소·만료)된 예상된 경합 여부
-    public static boolean isOrderClosedConflict(Throwable e) {
-        return e instanceof BrokerApiException b && b.conflict != Conflict.NONE;
     }
 }

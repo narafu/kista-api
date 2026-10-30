@@ -116,8 +116,9 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        // no-op — 모의계좌는 별도 취소 대상이 없음(getExecutions에서 미체결 주문은 TradingReporter가 자체적으로 CANCELLED 처리)
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        // 모의계좌는 별도 취소 대상이 없음(getExecutions에서 미체결 주문은 TradingReporter가 자체적으로 CANCELLED 처리) — 항상 취소 접수로 응답
+        return CancelOutcome.CANCELLED;
     }
 
     // --- ExecutionPort — 체결 시뮬레이션 코어 ---

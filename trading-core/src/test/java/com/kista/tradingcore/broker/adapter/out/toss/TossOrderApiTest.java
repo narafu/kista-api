@@ -2,6 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
+import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.broker.domain.model.OrderInstruction;
@@ -12,6 +13,9 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -138,9 +142,52 @@ class TossOrderApiTest {
     void cancel_callsPostCancelWithOrderId() {
         CancelInstruction instruction = new CancelInstruction(StrategyTicker.SOXL, "toss-oid-123");
 
-        tossOrderApi.cancel(instruction, ACCOUNT);
+        CancelOutcome outcome = tossOrderApi.cancel(instruction, ACCOUNT);
 
+        assertThat(outcome).isEqualTo(CancelOutcome.CANCELLED);
         verify(tossHttpClient).post(eq("/api/v1/orders/toss-oid-123/cancel"), any(), any(), eq(Void.class));
+    }
+
+    private static TossApiException conflict(String errorCode, int status) {
+        HttpClientErrorException cause = HttpClientErrorException.create(
+                HttpStatus.valueOf(status), "err", HttpHeaders.EMPTY, new byte[0], null);
+        return new TossApiException("Toss API 오류: " + status, cause, true, false, errorCode);
+    }
+
+    @Test
+    @DisplayName("취소: 409 already-filled → ALREADY_FILLED 반환")
+    void cancel_409AlreadyFilled_returnsAlreadyFilled() {
+        doThrow(conflict("already-filled", 409)).when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
+
+        assertThat(tossOrderApi.cancel(new CancelInstruction(StrategyTicker.SOXL, "o1"), ACCOUNT))
+            .isEqualTo(CancelOutcome.ALREADY_FILLED);
+    }
+
+    @Test
+    @DisplayName("취소: 409 already-canceled → ALREADY_CANCELED 반환")
+    void cancel_409AlreadyCanceled_returnsAlreadyCanceled() {
+        doThrow(conflict("already-canceled", 409)).when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
+
+        assertThat(tossOrderApi.cancel(new CancelInstruction(StrategyTicker.SOXL, "o1"), ACCOUNT))
+            .isEqualTo(CancelOutcome.ALREADY_CANCELED);
+    }
+
+    @Test
+    @DisplayName("취소: 409지만 다른 error.code(request-in-progress)는 예외로 전파")
+    void cancel_409OtherCode_rethrows() {
+        doThrow(conflict("request-in-progress", 409)).when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
+
+        assertThatThrownBy(() -> tossOrderApi.cancel(new CancelInstruction(StrategyTicker.SOXL, "o1"), ACCOUNT))
+            .isInstanceOf(TossApiException.class);
+    }
+
+    @Test
+    @DisplayName("취소: 409가 아닌 응답의 already-filled 코드는 종결로 취급하지 않고 전파")
+    void cancel_non409WithClosedCode_rethrows() {
+        doThrow(conflict("already-filled", 400)).when(tossHttpClient).post(anyString(), any(), any(), eq(Void.class));
+
+        assertThatThrownBy(() -> tossOrderApi.cancel(new CancelInstruction(StrategyTicker.SOXL, "o1"), ACCOUNT))
+            .isInstanceOf(TossApiException.class);
     }
 
     @Test

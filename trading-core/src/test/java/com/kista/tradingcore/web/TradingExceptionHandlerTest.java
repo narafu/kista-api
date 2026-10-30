@@ -7,7 +7,6 @@ import com.kista.tradingcore.broker.domain.model.BrokerIpNotAllowedException;
 import com.kista.tradingcore.broker.domain.model.BrokerPermissionDeniedException;
 import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.BrokerWithdrawalEnabledException;
-import com.kista.tradingcore.broker.domain.model.BrokerApiException;
 import com.kista.shared.platform.web.ErrorCode;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeConflictException;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
@@ -122,7 +121,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void kisApiException_mapsTo503AndPublishesErrorReport() {
-        var detail = handler.handleBrokerApiException(new StubBrokerApiException("KIS", "KIS API 연결 오류", BrokerApiException.Conflict.NONE));
+        var detail = handler.handleBrokerApiException(new StubBrokerApiException("KIS", "KIS API 연결 오류"));
 
         assertThat(detail.getStatus()).isEqualTo(503);
         assertThat(detail.getTitle()).isEqualTo("KIS API Error");
@@ -139,7 +138,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void tossApiException_mapsTo503AndPublishesErrorReport() {
-        var detail = handler.handleBrokerApiException(new StubBrokerApiException("Toss", "invalid-token", BrokerApiException.Conflict.NONE));
+        var detail = handler.handleBrokerApiException(new StubBrokerApiException("Toss", "invalid-token"));
 
         assertThat(detail.getStatus()).isEqualTo(503);
         assertThat(detail.getTitle()).isEqualTo("Toss API Error");
@@ -151,7 +150,7 @@ class TradingExceptionHandlerTest {
     void kisApiException_publishFails_stillMapsTo503() {
         doThrow(new RuntimeException("발행 실패")).when(eventPublisher).publishEvent(any(AppErrorRaisedEvent.class));
 
-        var detail = handler.handleBrokerApiException(new StubBrokerApiException("KIS", "KIS API 연결 오류", BrokerApiException.Conflict.NONE));
+        var detail = handler.handleBrokerApiException(new StubBrokerApiException("KIS", "KIS API 연결 오류"));
 
         assertThat(detail.getStatus()).isEqualTo(503);
     }

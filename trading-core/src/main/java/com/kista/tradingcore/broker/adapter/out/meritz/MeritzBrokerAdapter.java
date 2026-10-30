@@ -52,8 +52,8 @@ public class MeritzBrokerAdapter implements BrokerCapabilitiesPort {
     }
 
     @Override
-    public void cancel(CancelInstruction instruction, BrokerAccountRef account) {
-        orderApi.cancel(instruction, account);
+    public CancelOutcome cancel(CancelInstruction instruction, BrokerAccountRef account) {
+        return orderApi.cancel(instruction, account);
     }
 
     @Override
