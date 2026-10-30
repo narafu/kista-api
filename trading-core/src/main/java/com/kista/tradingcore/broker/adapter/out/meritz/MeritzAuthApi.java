@@ -131,7 +131,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
     private static String text(JsonNode json, String field) {
         if (json == null) return null;
         JsonNode node = json.get(field);
-        return node == null || node.isNull() || node.asText().isEmpty() ? null : node.asText();
+        return node == null || node.isNull() || node.asString().isEmpty() ? null : node.asString();
     }
 
     private record Token(String accessToken, OffsetDateTime expiresAt) {}

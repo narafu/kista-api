@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.kernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import org.junit.jupiter.api.DisplayName;
@@ -26,12 +25,11 @@ import static org.mockito.Mockito.when;
 class UserNotifyProfilePersistenceAdapterTest {
 
     @Mock UserNotifyProfileJpaRepository repository;
-    @Mock AesCryptoService crypto;
 
     private final UUID USER_ID = UUID.randomUUID();
 
     private UserNotifyProfilePersistenceAdapter adapter() {
-        return new UserNotifyProfilePersistenceAdapter(repository, new ObjectMapper(), crypto);
+        return new UserNotifyProfilePersistenceAdapter(repository, new ObjectMapper());
     }
 
     private UserNotifyProfileEntity entity(UUID userId, String prefsJson, boolean active) {
@@ -88,12 +86,11 @@ class UserNotifyProfilePersistenceAdapterTest {
     }
 
     @Test
-    @DisplayName("암호문으로 저장된 telegramBotToken을 복호화해 평문으로 투영한다")
-    void findByUserId_decryptsTelegramBotToken() {
+    @DisplayName("telegramBotToken을 그대로 투영한다(복호화는 컨버터 몫)")
+    void findByUserId_projectsTelegramBotToken() {
         UserNotifyProfileEntity withTelegram = new UserNotifyProfileEntity(
-                USER_ID, "{}", true, "cipher-text", "chat-1", Instant.now(), NotificationChannel.TELEGRAM);
+                USER_ID, "{}", true, "plain-token", "chat-1", Instant.now(), NotificationChannel.TELEGRAM);
         when(repository.findById(USER_ID)).thenReturn(Optional.of(withTelegram));
-        when(crypto.decrypt("cipher-text")).thenReturn("plain-token");
 
         TradingUserProfile profile = adapter().findByUserId(USER_ID).orElseThrow();
 

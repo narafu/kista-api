@@ -61,32 +61,25 @@ public final class RedisStreams {
         }
     }
 
-    // 그룹 전체의 idle 항목을 idleThreshold 기준으로 조회해 recoveryConsumer로 claim 후 handler로 재처리 — 처리 건수 반환.
-    // 재시도 한도 없이(Integer.MAX_VALUE) 복구한다
-    public static int reclaimPending(StringRedisTemplate redisTemplate, String streamKey, String group,
-                                     String recoveryConsumer, Duration idleThreshold, int batchSize,
-                                     Consumer<MapRecord<String, String, String>> handler) {
-        return reclaimPending(redisTemplate, streamKey, group, recoveryConsumer, idleThreshold, batchSize, Integer.MAX_VALUE, handler);
-    }
-
-    // 재시도 한도 초과 포기 시 별도 처리 없이(로그만) 복구한다
-    public static int reclaimPending(StringRedisTemplate redisTemplate, String streamKey, String group,
-                                     String recoveryConsumer, Duration idleThreshold, int batchSize, int maxDeliveries,
-                                     Consumer<MapRecord<String, String, String>> handler) {
-        return reclaimPending(redisTemplate, streamKey, group, recoveryConsumer, idleThreshold, batchSize, maxDeliveries, handler, id -> { });
-    }
+    // pending 복구 대상·정책 — 같은 타입 인자(문자열 3·정수 2)의 자리 바뀜을 막으려고 묶는다
+    // maxDeliveries: 재시도 한도 없이 복구하려면 Integer.MAX_VALUE
+    public record ReclaimSpec(String streamKey, String group, String recoveryConsumer,
+                              Duration idleThreshold, int batchSize, int maxDeliveries) {}
 
     // 그룹 전체의 idle 항목을 idleThreshold 기준으로 조회해 recoveryConsumer로 claim 후 handler로 재처리 — 처리 건수 반환.
     // 컨슈머가 읽고 ack 전에 죽어 pending으로 남은 메시지의 복구 경로. 스트림/그룹이 아직 없으면(NOGROUP) 0.
     // 전달 횟수가 maxDeliveries를 넘은 메시지는 claim·재처리하지 않고 ack로 포기한다(poison의 무한 재시도 방지, 반환 건수 제외) —
     // 포기한 메시지 ID는 onGiveUp으로 넘겨 소비자가 관리자 알림 등 후속 조치를 하게 한다
-    public static int reclaimPending(StringRedisTemplate redisTemplate, String streamKey, String group,
-                                     String recoveryConsumer, Duration idleThreshold, int batchSize, int maxDeliveries,
+    public static int reclaimPending(StringRedisTemplate redisTemplate, ReclaimSpec spec,
                                      Consumer<MapRecord<String, String, String>> handler, Consumer<RecordId> onGiveUp) {
+        String streamKey = spec.streamKey();
+        String group = spec.group();
+        int maxDeliveries = spec.maxDeliveries();
+        Duration idleThreshold = spec.idleThreshold();
         StreamOperations<String, String, String> ops = redisTemplate.opsForStream();
         PendingMessages pending;
         try {
-            pending = ops.pending(streamKey, group, Range.unbounded(), batchSize, idleThreshold);
+            pending = ops.pending(streamKey, group, Range.unbounded(), spec.batchSize(), idleThreshold);
         } catch (RedisSystemException e) {
             if (String.valueOf(e.getCause()).contains("NOGROUP")) {
                 return 0;
@@ -120,7 +113,7 @@ public final class RedisStreams {
         if (retryIds.isEmpty()) {
             return 0;
         }
-        List<MapRecord<String, String, String>> claimed = ops.claim(streamKey, group, recoveryConsumer, idleThreshold, retryIds.toArray(RecordId[]::new));
+        List<MapRecord<String, String, String>> claimed = ops.claim(streamKey, group, spec.recoveryConsumer(), idleThreshold, retryIds.toArray(RecordId[]::new));
         for (MapRecord<String, String, String> record : claimed) {
             handler.accept(record);
         }

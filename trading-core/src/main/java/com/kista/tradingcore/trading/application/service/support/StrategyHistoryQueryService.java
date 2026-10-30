@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service.support;
 
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
@@ -85,12 +86,8 @@ public class StrategyHistoryQueryService {
     // 미적용 계좌(MOCK·코인)와 조회 실패는 미리보기를 막지 않고 null
     private BigDecimal calcAvailableCash(Account account) {
         if (!UnassignedUsdCalculator.applies(account.broker())) return null;
-        try {
-            return unassignedUsd.available(account.id(), account.toBrokerRef());
-        } catch (Exception e) {
-            log.warn("[accountId={}] 가용 예수금 조회 실패 — 경고 생략: {}", account.id(), e.getMessage());
-            return null;
-        }
+        return BrokerCallGuard.tryGet("가용 예수금 조회: accountId=" + account.id(),
+                () -> unassignedUsd.available(account.id(), account.toBrokerRef())).orElse(null);
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션

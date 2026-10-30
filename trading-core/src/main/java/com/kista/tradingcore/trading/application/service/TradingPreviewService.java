@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Market;
@@ -184,15 +185,12 @@ class TradingPreviewService {
         // 미접수 PLANNED·SUBMITTING BUY(증권사 주문가능금액에 아직 미차감) + 전략별 신규 BUY
         BigDecimal required = freshBuyByStrategyId.values().stream().reduce(totalAccountPlannedBuy, BigDecimal::add);
         if (required.signum() <= 0) return previews;
-        AccountCashCheckPreview check;
-        try {
+        // 조회 실패·null은 경고만 생략 (fail-open)
+        AccountCashCheckPreview check = BrokerCallGuard.tryGet("주문가능 USD 조회: accountId=" + account.id(), () -> {
             BigDecimal available = marginPort.getUsdBuyableAmount(account.brokerRef());
-            if (available == null) return previews;
-            check = new AccountCashCheckPreview(available, required, available.compareTo(required) >= 0);
-        } catch (Exception e) {
-            log.warn("[accountId={}] 주문가능 USD 조회 실패 — 경고 생략: {}", account.id(), e.getMessage());
-            return previews;
-        }
+            return available == null ? null : new AccountCashCheckPreview(available, required, available.compareTo(required) >= 0);
+        }).orElse(null);
+        if (check == null) return previews;
         previews.replaceAll((id, preview) -> preview.withAccountCashCheck(check));
         return previews;
     }
@@ -216,16 +214,14 @@ class TradingPreviewService {
         freshSellByTicker.forEach((ticker, fresh) -> {
             int required = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(account.id(), today, ticker) + fresh;
             if (required <= 0) return;
-            AccountHoldingsCheckPreview check;
-            try {
-                SellableQuantity sellable = sellableQuantityPort.getSellableQuantity(ticker, account.brokerRef());
-                if (sellable == null) return;
-                check = new AccountHoldingsCheckPreview(BigDecimal.valueOf(sellable.quantity()), BigDecimal.valueOf(required),
-                        sellable.quantity() >= required);
-            } catch (Exception e) {
-                log.warn("[accountId={}] {} 판매 가능 수량 조회 실패 — 경고 생략: {}", account.id(), ticker, e.getMessage());
-                return;
-            }
+            // 조회 실패·null은 경고만 생략 (fail-open)
+            AccountHoldingsCheckPreview check = BrokerCallGuard.tryGet(
+                    "판매 가능 수량 조회: accountId=" + account.id() + ", ticker=" + ticker, () -> {
+                        SellableQuantity sellable = sellableQuantityPort.getSellableQuantity(ticker, account.brokerRef());
+                        return sellable == null ? null : new AccountHoldingsCheckPreview(BigDecimal.valueOf(sellable.quantity()),
+                                BigDecimal.valueOf(required), sellable.quantity() >= required);
+                    }).orElse(null);
+            if (check == null) return;
             for (Strategy strategy : strategies) {
                 if (strategy.ticker() == ticker && previews.containsKey(strategy.id())) {
                     previews.computeIfPresent(strategy.id(), (id, preview) -> preview.withAccountHoldingsCheck(check));

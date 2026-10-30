@@ -7,7 +7,7 @@ import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.trading.domain.strategy.*;
+import com.kista.tradingcore.trading.domain.creation.*;
 import com.kista.tradingcore.matching.domain.strategy.*;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;

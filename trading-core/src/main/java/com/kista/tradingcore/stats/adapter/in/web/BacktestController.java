@@ -1,7 +1,7 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
 import com.kista.tradingcore.stats.adapter.in.web.dto.BacktestResponse;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
+import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;
 import io.swagger.v3.oas.annotations.Operation;

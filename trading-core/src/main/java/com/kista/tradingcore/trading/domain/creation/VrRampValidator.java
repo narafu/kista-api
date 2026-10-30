@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.domain.strategy;
+package com.kista.tradingcore.trading.domain.creation;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,9 +11,15 @@ public final class VrRampValidator {
     }
 
     // gradient/poolLimitRate 램프 8필드 + intervalWeeks/bandWidth 검증
-    public static void validateRampParams(int intervalWeeks, BigDecimal bandWidth,
-                                    int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
-                                    BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks, BigDecimal poolLimitFloor) {
+    public static void validateRampParams(int intervalWeeks, BigDecimal bandWidth, VrRampParams ramp) {
+        int initialGradient = ramp.initialGradient();
+        int gGraceWeeks = ramp.gGraceWeeks();
+        int gStepWeeks = ramp.gStepWeeks();
+        int gMax = ramp.gMax();
+        BigDecimal initialPoolLimitRate = ramp.initialPoolLimitRate();
+        int pGraceWeeks = ramp.pGraceWeeks();
+        int pStepWeeks = ramp.pStepWeeks();
+        BigDecimal poolLimitFloor = ramp.poolLimitFloor();
         if (intervalWeeks <= 0) {
             throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
         }

@@ -16,12 +16,12 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.shared.kernel.*;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.tradingcore.trading.domain.model.*;
-import com.kista.tradingcore.trading.domain.strategy.StrategyCreationResolver.ResolvedCreation;
-import com.kista.tradingcore.trading.domain.strategy.StrategyCreationResolvers;
-import com.kista.tradingcore.trading.domain.strategy.VrRampParams;
-import com.kista.tradingcore.trading.domain.strategy.VrRampValidator;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationRequest;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolvers;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
+import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -55,19 +55,18 @@ class StrategyCreationService {
     }
 
     private final StrategyPort strategyPort;
-    private final VrStrategyDetailUseCase vrStrategyLifecycle;
     private final AccountPort accountPort;
     private final TradingUserProfilePort tradingUserProfilePort; // 사용자 복제본 존재 확인용
     private final BrokerPricePort brokerPricePort;
     private final StrategyCreationPolicyPort strategyCreationPolicyPort;
     private final StrategyCreationResolvers creationResolvers;
     private final StrategyCreationPersister creationPersister; // 저장 5단계 트랜잭션 경계 (self-invocation 회피용 별도 빈)
-    private final DcaSummaryAssembler dcaSummaryAssembler;      // DCA 등록 응답의 다음 실행일 요약
     private final PrivacyTradePort privacyTradePort;            // PRIVACY 중간부터 시작 — FIDA 기준값으로 시작금액 산출
     private final CycleOrderStrategies cycleStrategies;         // INFINITE 최소 시드 산출(minRequiredDeposit)
 
+    // 저장된 전략만 반환 — 응답 StrategyDetail 조립은 조회 경로(StrategyService.toDetail)가 SSOT
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
-    StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
+    Strategy register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
         Account account = accountPort.requireOwnedAccount(accountId, userId);
         // 코인 계좌는 DCA 전용 — 정책 조회보다 먼저 거부한다
         if (account.broker().isCryptoExchange() && cmd.type() != StrategyType.DCA) {
@@ -120,8 +119,6 @@ class StrategyCreationService {
                 ? StrategyCycleSeedType.NONE  // VR·DCA는 NONE 강제 (순환 재등록 불가)
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
-        int divisionCount = resolved.divisionCount();
-
         // startAmount = 현금 + 시장가×보유수량(DCA는 평단×보유 = 초기 투입 원가) — VR도 총 시작자산을 동일하게 보존한다(vrValue override와 무관)
         // PRIVACY 중간부터 시작만 FIDA 기준 배수로 환산한다 — 매매표 배수(startAmount ÷ currentCycleStart)가 보유 비율과 맞도록
         BigDecimal depositOrZero = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
@@ -131,36 +128,17 @@ class StrategyCreationService {
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {
-            validateInfiniteMinSeed(account, resolvedTicker, marketPrice, divisionCount, startAmount);
+            validateInfiniteMinSeed(account, resolvedTicker, marketPrice, resolved.divisionCount(), startAmount);
         }
 
         // 저장 5단계(strategy·version·detail·cycle·position)는 별도 빈의 한 트랜잭션 — 중간 실패 시 부분 저장 없이 롤백
         // (증권사 호출은 위에서 이미 끝났으므로 트랜잭션이 HTTP 대기를 물지 않는다)
-        StrategyCreationPersister.Persisted persisted = creationPersister.persist(
-                accountId, cmd.type(), resolvedTicker, seedType, divisionCount,
-                resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), ramp,
-                initialUsdDeposit, initialHoldings, cmd.initialAvgPrice(), marketPrice, startAmount,
-                vrValue, scheduledStart, dcaConfig);
+        Strategy strategy = creationPersister.persist(new StrategyCreationPersister.Draft(
+                accountId, cmd.type(), seedType, resolved, ramp, initialUsdDeposit, initialHoldings,
+                cmd.initialAvgPrice(), marketPrice, startAmount, vrValue, scheduledStart, dcaConfig));
 
-        log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, persisted.strategy().id(), persisted.strategy().type());
-
-        // VR 응답은 개장 포지션의 USD pool을 기준으로 조립한다.
-        if (persisted.strategy().isVr()) {
-            VrSummary vrSummary = vrStrategyLifecycle.buildSummary(
-                    persisted.vrDetail(), persisted.cycleVr(), persisted.initialPosition().usdDeposit(),
-                    persisted.initialPosition().usdDeposit()); // 등록 직후엔 개장 pool=현재 pool 동일
-            return new StrategyDetail(persisted.strategy(), persisted.initialPosition().usdDeposit(), persisted.cycle().startDate(), null, false, null, initialHoldings.intValueExact(), vrSummary, null);
-        }
-        if (dca) {
-            Market market = account.broker().getMarket();
-            CyclePosition ledger = persisted.initialPosition();
-            DcaSummary summary = dcaSummaryAssembler.assemble(dcaConfig, Map.of(), persisted.cycle().startDate(), market,
-                    LocalDateTime.now(TimeZones.KST), ledger.holdings(), ledger.avgPrice());
-            // 코인은 소수 원장이라 정수 보유 수량을 싣지 않는다(DCA 블록이 원장 보유를 싣는다)
-            Integer holdings = market.isCrypto() ? null : initialHoldings.intValueExact();
-            return new StrategyDetail(persisted.strategy(), BigDecimal.ZERO, persisted.cycle().startDate(), null, false, null, holdings, null, summary);
-        }
-        return new StrategyDetail(persisted.strategy(), persisted.cycle().startAmount(), persisted.cycle().startDate(), divisionCount, false, 0.0, initialHoldings.intValueExact(), null, null);
+        log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, strategy.id(), strategy.type());
+        return strategy;
     }
 
     // PRIVACY 중간부터 시작 시작금액 — 원가 기준 자산 비율로 배수를 구해 FIDA 사이클 시작금액에 곱한다
@@ -213,15 +191,10 @@ class StrategyCreationService {
     // INFINITE 최소 시드(전일종가×분할×2) 미만이면 거부 — 전일종가 조회 실패는 검증만 건너뛴다(fail-open, 503 변환 불필요)
     private void validateInfiniteMinSeed(Account account, StrategyTicker ticker, BigDecimal marketPrice,
                                          int divisionCount, BigDecimal startAmount) {
-        BigDecimal price = marketPrice;
-        if (price == null) {
-            try {
-                price = brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
-            } catch (RuntimeException e) {
-                log.warn("최소 시드 검증 건너뜀 — 전일종가 조회 실패: ticker={}, {}", ticker, e.toString());
-                return;
-            }
-        }
+        BigDecimal price = marketPrice != null ? marketPrice
+                : BrokerCallGuard.tryGet("최소 시드 검증용 전일종가 조회: ticker=" + ticker,
+                        () -> brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).orElse(null);
+        if (price == null) return; // 조회 실패 — 검증 건너뜀
         BigDecimal min = cycleStrategies.of(StrategyType.INFINITE).minRequiredDeposit(price, null, divisionCount);
         if (min != null && startAmount.compareTo(min) < 0) {
             // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관)
@@ -237,8 +210,8 @@ class StrategyCreationService {
         if (!settings.enabled()) {
             throw new IllegalArgumentException("비활성화된 전략 유형은 새로 등록할 수 없습니다: " + cmd.type());
         }
-        com.kista.tradingcore.trading.domain.strategy.StrategyCreationRequest request =
-                new com.kista.tradingcore.trading.domain.strategy.StrategyCreationRequest(
+        StrategyCreationRequest request =
+                new StrategyCreationRequest(
                         cmd.ticker(), cmd.divisionCount(), cmd.intervalWeeks(), cmd.bandWidth(), cmd.recurringAmount());
         return creationResolvers.of(cmd.type()).resolve(request, settings);
     }

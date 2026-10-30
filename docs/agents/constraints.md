@@ -6,6 +6,11 @@
 - 커밋 메시지는 한글, Conventional Commit 접두사(`feat(scope):`, `fix:`, `docs:`, `debug:` 등) + 명령형 제목
 - 매매 시간대 배포 가드는 폐지됐다 — kista-trading은 재기동 시 진행 중 매매 배치를 재개한다(`TradingBatchResumer`, workflow.md "재기동 종료·재개"). 단 kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s를 유지해야 한다(재개가 잔여 락을 인수하므로 겹침 기동은 이중 실행 — `.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다. EPR 재발행 소유: root 루트 패키지(`com.kista.api`)가 trading-core(`com.kista.tradingcore`)를 포함하지 않아 kista-scheduler엔 매매 관련 빈이 없다 — `event_publication`이 서비스별로 분리돼 kista-trading은 `trading.event_publication`(4a `de693b5c`에서 매매 알림 6종 리스너 이관), kista-scheduler는 root `public.event_publication`을 각각 재발행한다(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`, kista-api는 false 유지 — 둘 다 true면 이중 claim). 배포 파이프라인 구조 → docker-infra.md "서버 배포 방식"
 
+### Deprecated API·클래스 식별 문자열·persistence 기본값
+- deprecated API는 새로 쓰지 않는다 — Spring 7/Jackson 3 대체를 쓴다(`HttpStatus.UNPROCESSABLE_CONTENT`, `JsonNode.asString()`/`isString()`, `org.jspecify.annotations.Nullable` — TYPE_USE라 중첩 타입은 `Outer.@Nullable Inner`). 컴파일 경고 `[deprecation]`를 남기지 않는다
+- 오류 보고 caller 등 클래스 식별 문자열은 `X.class.getSimpleName()` — 리터럴 하드코딩 금지(개명 시 어긋남). `getClass()`는 프록시 이름이 나오므로 쓰지 않는다
+- persistence 매퍼(`toEntity`/`toDomain`)는 필드 복사만 한다 — 기본값 할당은 도메인 생성 시점(서비스·compact constructor·팩토리)에서 하고 어댑터에 `!= null ? x : 기본값` 폴백을 두지 않는다. 예외는 DB 컬럼 자체가 nullable인 레거시 값(예: `user_settings.strategy_suggestions`)뿐
+
 ### application/port/output/ 네이밍 규칙
 - 아웃바운드 포트 인터페이스: `*Port` 접미사. `*Repository` 접미사 사용 금지 — adapter 레이어 `*JpaRepository`와 혼동 유발
 
@@ -15,6 +20,7 @@
 - 레거시 `com.kista.adapter`/`com.kista.application` shim은 전부 소멸했다. 여러 모듈을 집계하는 앱 레벨 inbound 관심사(크로스모듈 컨트롤러·`GlobalExceptionHandler` 등 전역 `@ControllerAdvice`)는 `com.kista.api.web`(pure inbound sink, NamedInterface 0개)에, trading-core 프로세스 전역 web 관심사(`TradingExceptionHandler` — 부팅 진입점 `TradingApplication`은 앱셸이 아니라 `com.kista.tradingcore` 루트)는 대칭 앱셸 `com.kista.tradingcore.web`에 추가 — 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`으로. `@Aspect`는 저장소 전체에서 금지(`HexagonalArchitectureTest.no_aspects_in_codebase` — 포인트컷 문자열은 Modulith·ArchUnit이 못 보는 모듈 간 런타임 결합을 만든다, 횡단 관심사는 이벤트로)
 - persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.shared.platform`(인프라 leaf)에 추가 — 다른 `com.kista` 모듈 참조 시 `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`가 빌드를 깬다
 - 주문생성 알고리즘 커널(전략 계산·position 값객체·`PlannedOrder`·`AccountBalance` 등)은 `com.kista.tradingcore.matching`에 추가, `"kernel"` NamedInterface로 공개 — `com.kista.shared.kernel` 외 다른 `com.kista` 모듈 의존 금지(`HexagonalArchitectureTest.matching_must_not_depend_on_other_modules` — privacy 데이터는 커널 소유 `PrivacyPlan`으로 받는다)
+- 같은 하위 패키지 이름(`domain/strategy` 등)을 모듈마다 다른 의미로 재사용하지 않는다(matching `domain/strategy`=주문생성 전략, trading `domain/creation`=등록 정책). 값 타입은 `domain/model/<x>`, 도메인 로직 묶음과 그 값이 한 하위 도메인이면 한 패키지로 둔다 — 둘로 쪼개지 않는다(stats `domain/backtest`). 신규 코드는 `@Configuration`·리스너(`@TransactionalEventListener`)·`@Scheduled`를 `application/service`에 두지 않는다(설정=`<module>/config`, 저장 트리거 리스너=`adapter/in/event`, 스케쥴러=`adapter/in/schedule`). 기존 예외: `tradingcore.stats.application.service.TradingStatsService`의 캐시 무효화 `@EventListener`.
 
 모듈 간 참조가 얽히면 own-type 정의(아래 "모듈 경계 own-type" 게이트 통과 시) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도 보장) 패턴을 사용한다. 마이그레이션 경위·순환 해소 상세는 `docs/agents/modulith-migration-history.md` 참고(필요시 Read).
 
@@ -48,6 +54,7 @@
 
 ### GlobalExceptionHandler 자동 예외 처리
 - Controller에서 별도 catch/rethrow 불필요 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT (예외별 코드는 코드가 SSOT)
+- **예외 매핑 SSOT**: advice별 `MAPPINGS` 테이블 하나가 기준이다 — `ProblemDetailMappings.withGeneric(...)` + `catchAll`로 처리하고, 같은 예외를 `@ExceptionHandler` 목록에 중복 나열하지 않는다(헤더·고유 로직이 필요한 전용 핸들러만 별도 메서드: `User.CooldownException`, `BrokerApiException`, 검증 실패 등)
 - async/SSE lifecycle 예외(`AsyncRequestTimeoutException` / `AsyncRequestNotUsableException`)는 이미 종료된 스트림에 응답 본문을 쓰지 않고 `handleAsyncLifecycle()`에서 debug 로그만 남긴다
 - **ProblemDetail 응답 계약**: `detail`은 사용자에게 그대로 보여줄 수 있는 한국어 문구다(완전한 문장은 "~습니다."+마침표). 내부 정보(URL·응답 바디·계좌번호·enum 원문·영어 프레임워크 메시지)는 detail에 싣지 말고 로그로 — 원문이 영어 내부 정보인 프레임워크 예외는 `Mapping.fixedDetail`로 고정 문구를 쓴다. 예외: 검증 실패(`MethodArgumentNotValidException`)는 "[field: message]" 형식 유지
 - **기계 판독 코드 `code`**: UI가 분기하거나 문구를 달리 보여줘야 하는 예외만 `ErrorCode`(`com.kista.shared.platform.web`)를 `Mapping`에 지정한다 — 응답 확장 프로퍼티 `code`, 없으면 키 자체가 없다. 상수 이름 변경·삭제 금지(kista-ui 계약). 추가 절차: ① `ErrorCode` 상수 ② 핸들러 매핑 테이블 `Mapping(status, title, code, fixedDetail)` ③ 같은 예외 클래스가 여러 의미면 서브클래스 분리(`resolve()`가 계층 하위부터 탐색 — 예: `AlreadyOrderedTodayException`) ④ openapi는 `ErrorCodeOpenApiCustomizer`가 자동 반영 → kista-ui `gen:types` + 문구 매핑
@@ -76,7 +83,7 @@
 - 복합 수량 필드: `orderedQuantity`/`filledQuantity` (`orderedQty`/`filledQty` 금지)
 
 ### AES-256 암호화 컬럼 크기
-- AES-256 CBC 암호화 + Base64 인코딩 시 입력 ~180자 → 출력 ~260자 — VARCHAR(255) 초과로 `DataIntegrityViolationException` 발생
+- AES-256 GCM 암호화 + Base64 인코딩 시 입력 ~180자 → 출력 ~260자 — VARCHAR(255) 초과로 `DataIntegrityViolationException` 발생
 - 암호화 저장 컬럼은 반드시 VARCHAR(512) 이상 — `AccountEntity`: account_no/app_key/secret_key 512, `UserEntity`: telegram_bot_token 512
 - 새 암호화 컬럼 추가 시 length=512로 선언, Flyway도 동일하게
 
@@ -146,7 +153,9 @@
 - `private record`를 유지하면서 테스트에서 response 타입을 `any(Class.class)` 매처로 우회하면 타입 안전성 저하 → package-private 선언 권장
 
 ### AES-256 암호화 위치
-- KIS 자격증명·계좌번호·텔레그램 봇 토큰은 **persistence adapter 경계에서만** 암호화/복호화 (ArchUnit: application → adapter 의존 금지)
+- KIS 자격증명·계좌번호·텔레그램 봇 토큰·이메일은 엔티티 컬럼에 `@Convert(converter = AesStringConverter.class)`(`shared.platform.crypto`, autoApply 없음)를 명시해 암복호화한다 — 어댑터·매퍼는 평문 복사만 하고 `AesCryptoService`를 직접 쓰지 않는다. 컨버터는 빈 등록 없이 Spring `SpringBeanContainer`가 생성자 주입으로 만든다(`AesCryptoService` 빈 필요 — `@DataJpaTest`는 `DataJpaTestBase`가 import)
+- 암호화 컬럼은 AES-GCM이 비결정론적이라 JPQL/파생 쿼리 조건에 쓰면 매칭되지 않는다(컨버터가 파라미터도 암호화) — 조회는 `*_hash`(`AccountNoHasher`) 경유. 해시는 컨버터가 채울 수 없으므로 어댑터가 평문으로 계산한다
+- 컨버터는 엔티티를 로드할 때마다 복호화한다 — 테스트·시드의 raw SQL INSERT로 암호화 컬럼에 값을 넣을 때는 반드시 `crypto.encrypt(...)` 암호문을 넣는다. 복호화 불가 값이 한 행이라도 있으면 그 엔티티를 읽는 모든 경로(배치 재개 포함)가 실패한다
 
 ### adapter.in.telegram package-private 제약
 - 텔레그램 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아닌 **인바운드 관리자 명령**이라 `com.kista.api.admin.adapter.in.telegram`이 소유한다. `TelegramBotService`는 package-private → 컨트롤러 외 다른 패키지에서 직접 참조 불가. `/telegram/webhook`은 `platform.security.SecurityConfig`에서 permitAll(경로 불변)
@@ -174,6 +183,10 @@
 - `JwtIssuerService`: EC P-256 JWK → ES256 JWT 발급, `JwtAuthFilter`: principal을 `UUID` 타입으로 저장
 - **`JwtDecoder` @Bean은 반드시 `JwtDecoderConfig.java`에 분리** — `SecurityConfig`에 두면 `JwtAuthFilter` 순환 참조로 기동 실패
 - 환경변수: `JWT_SIGNING_KEY` (EC P-256 JWK JSON), `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`(선택)
+
+### 파라미터 개수·브로커 호출 실패 정책
+- 메서드 파라미터 8개 이상이거나 같은 타입이 인접해 자리 바뀜이 조용히 통과할 수 있으면 record로 묶는다 — 같은 값을 이미 담은 기존 record(`VrRampParams`·`ResolvedCreation` 등)가 있으면 새로 만들지 말고 재사용
+- 브로커·시세 호출 실패 정책은 `BrokerCallGuard`로 통일: 실패 시 중단은 `wrap`(fail-closed), 건너뛰고 대체값으로 진행은 `tryGet`(fail-open). 신규 코드는 서비스에서 브로커 호출을 raw `catch (RuntimeException)`으로 감싸지 않는다 — 단 이벤트 발행·분기 처리가 필요한 경우(예: 실패 종목 집계, 관리자 알림 이벤트)는 예외(기존 catch는 대부분 이 예외에 해당)
 
 ### 주석 규칙
 - 신규 코드 작성 시 주석을 함께 작성할 것

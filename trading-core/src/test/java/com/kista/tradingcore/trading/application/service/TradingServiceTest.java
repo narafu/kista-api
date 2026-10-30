@@ -39,7 +39,7 @@ import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
-import com.kista.tradingcore.trading.domain.strategy.*;
+import com.kista.tradingcore.trading.domain.creation.*;
 import com.kista.tradingcore.matching.domain.strategy.*;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;

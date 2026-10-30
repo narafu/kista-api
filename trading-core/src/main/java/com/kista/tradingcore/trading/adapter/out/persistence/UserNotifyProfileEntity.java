@@ -1,5 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.shared.platform.crypto.AesStringConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 import com.kista.shared.kernel.NotificationChannel;
@@ -35,8 +37,9 @@ class UserNotifyProfileEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active; // UserStatus.ACTIVE 여부 — findAllActive() 판정 기준
 
+    @Convert(converter = AesStringConverter.class)
     @Column(name = "telegram_bot_token", length = 512)
-    private String telegramBotToken; // AES-256 암호화 저장(trading-core persistence 경계에서 암복호화), null 가능
+    private String telegramBotToken; // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터), null 가능
 
     @Column(name = "chat_id", length = 64)
     private String chatId; // 텔레그램 chat ID(평문), null 가능

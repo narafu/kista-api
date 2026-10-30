@@ -1,7 +1,6 @@
 package com.kista.tradingcore.account.adapter.out.persistence;
 
 import com.kista.shared.platform.crypto.AccountNoHasher;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,7 +25,6 @@ import static org.mockito.Mockito.*;
 class AccountPersistenceAdapterTest {
 
     @Mock AccountJpaRepository accountJpaRepository;
-    @Mock AesCryptoService crypto;
     @Mock AccountNoHasher hasher;
     @InjectMocks AccountPersistenceAdapter adapter;
 
@@ -35,9 +33,6 @@ class AccountPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        // 암호화/복호화 lenient stub
-        lenient().when(crypto.encrypt(anyString())).thenAnswer(inv -> "enc:" + inv.getArgument(0));
-        lenient().when(crypto.decrypt(anyString())).thenAnswer(inv -> ((String) inv.getArgument(0)).replace("enc:", ""));
         // 해시 lenient stub
         lenient().when(hasher.hash(anyString())).thenAnswer(inv -> "hash:" + inv.getArgument(0));
     }
@@ -47,23 +42,22 @@ class AccountPersistenceAdapterTest {
         e.setId(id);
         e.setUserId(userId);
         e.setNickname("테스트계좌");
-        e.setAccountNo("enc:74420614");
-        e.setAppKey("enc:appKey");
-        e.setSecretKey("enc:appSecret");
+        e.setAccountNo("74420614");
+        e.setAppKey("appKey");
+        e.setSecretKey("appSecret");
         e.setBrokerAccountCode("01");
         e.setBroker(Broker.KIS);
         return e;
     }
 
     @Test
-    void save_upbitWithoutAccountNo_hashesAccessKeyAndSkipsEncryptingNull() {
+    void save_upbitWithoutAccountNo_hashesAccessKeyWithNullAccountNo() {
         Account upbit = new Account(null, UUID.randomUUID(), "업비트", null, "ak", "sk", null, Broker.UPBIT, null,
                 Instant.parse("2027-01-01T00:00:00Z"));
         when(accountJpaRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         Account saved = adapter.save(upbit);
 
-        verify(crypto, never()).encrypt(null);
         verify(accountJpaRepository).save(argThat(e -> e.getAccountNo() == null && "hash:ak".equals(e.getAccountNoHash())
                 && Instant.parse("2027-01-01T00:00:00Z").equals(e.getApiKeyExpiresAt())));
         assertThat(saved.accountNo()).isNull();
@@ -103,7 +97,7 @@ class AccountPersistenceAdapterTest {
         // then
         assertThat(result).isPresent();
         assertThat(result.get().id()).isEqualTo(accountId);
-        assertThat(result.get().accountNo()).isEqualTo("74420614"); // 복호화 확인
+        assertThat(result.get().accountNo()).isEqualTo("74420614");
     }
 
     @Test

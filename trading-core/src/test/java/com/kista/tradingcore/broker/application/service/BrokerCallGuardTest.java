@@ -45,4 +45,17 @@ class BrokerCallGuardTest {
             })).isSameAs(e);
         }
     }
+
+    @Test
+    @DisplayName("tryGet은 정상 결과를 감싸 반환하고, 예외(증권사 타입 포함)는 삼켜 empty로 돌려준다 — fail-open")
+    void tryGet_swallowsAnyRuntimeException() {
+        assertThat(BrokerCallGuard.tryGet("조회", () -> "OK")).contains("OK");
+        assertThat(BrokerCallGuard.tryGet("조회", () -> null)).isEmpty();
+        assertThat(BrokerCallGuard.tryGet("조회", () -> {
+            throw new BrokerRateLimitException();
+        })).isEmpty();
+        assertThat(BrokerCallGuard.tryGet("조회", () -> {
+            throw new IllegalStateException("boom");
+        })).isEmpty();
+    }
 }

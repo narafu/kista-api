@@ -15,7 +15,7 @@ import com.kista.tradingcore.matching.domain.strategy.VrStrategy;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase.PrivacyTrade;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
+import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 

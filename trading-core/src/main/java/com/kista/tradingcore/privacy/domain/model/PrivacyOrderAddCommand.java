@@ -4,7 +4,7 @@ import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 

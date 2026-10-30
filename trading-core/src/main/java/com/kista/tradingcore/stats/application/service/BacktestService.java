@@ -1,10 +1,10 @@
 package com.kista.tradingcore.stats.application.service;
 
 import com.kista.tradingcore.stats.domain.backtest.BacktestEngine;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestPoint;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestResult;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestSummary;
+import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
+import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
+import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
+import com.kista.tradingcore.stats.domain.backtest.BacktestSummary;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.privacy.domain.model.PrivacyDates;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
@@ -13,8 +13,8 @@ import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.matching.domain.model.BootstrapPosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
-import com.kista.tradingcore.trading.domain.strategy.VrRampValidator;
-import com.kista.tradingcore.trading.domain.strategy.StrategyCreationResolver;
+import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;

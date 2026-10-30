@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import tools.jackson.databind.ObjectMapper;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +28,6 @@ class UserNotifyProfileSyncListener {
 
     private final UserNotifyProfileJpaRepository repository;
     private final ObjectMapper objectMapper;
-    private final AesCryptoService crypto; // telegramBotToken 암호화 — persistence 경계에서만 사용
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -47,8 +45,6 @@ class UserNotifyProfileSyncListener {
         // 직렬화 실패는 잡지 않는다 — 예외를 삼키면 복제본이 조용히 낡고, 그대로 던지면 publication이 FAILED로 남아
         // UserEventResubmitScheduler가 재발행한다(Map<NotificationType,Boolean>이라 실패 가능성 자체가 없음)
         String prefsJson = objectMapper.writeValueAsString(event.notificationPrefs());
-        // persistence 경계에서 telegramBotToken 암호화 — null이면 그대로 null 유지
-        String encryptedToken = event.telegramBotToken() == null ? null : crypto.encrypt(event.telegramBotToken());
         // 채널 없는 이벤트(채널 복제 이전 root가 발행)는 저장된 채널을 지우지 않는다 — NULL이 되면 봇 연결만 보고 텔레그램을 다시 보내게 된다
         NotificationChannel channel = event.notificationChannel() != null
                 ? event.notificationChannel()
@@ -58,6 +54,6 @@ class UserNotifyProfileSyncListener {
         // @Id 할당식이라 save()가 곧 upsert
         repository.save(new UserNotifyProfileEntity(
                 event.userId(), prefsJson, event.active(),
-                encryptedToken, event.chatId(), version, channel));
+                event.telegramBotToken(), event.chatId(), version, channel));
     }
 }

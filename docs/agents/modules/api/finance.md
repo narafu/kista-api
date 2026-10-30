@@ -11,6 +11,7 @@ com.kista.api.finance/   ← Spring Modulith 모듈(CLOSED) — 가계부 애그
   adapter/in/schedule/ ← FinanceRegistrationReminderScheduler
   adapter/out/user/   ← UserModuleFinanceMemberAdapter(package-private — `FinanceMemberPort` 구현: `activeMemberIds()`=user `UserPort.findIdsByStatus(ACTIVE)`, `nicknameOf(userId)`=user `UserSummaryPort.findById(...).map(UserSummary::nickname)`, 사용자가 없으면 empty. **finance → user import가 있는 유일한 파일**)
   adapter/out/UserCascadeListener ← `UserDeletedEvent`(AFTER_COMMIT, REQUIRES_NEW) 구독으로 재무 기록(userId 축)·그룹 멤버십 정리. 빈 이름 `financeUserCascadeListener`(trading 모듈에 동명 클래스 존재)
+  (리스너 배치 예외 — 2026-10-31 검토) `UserCascadeListener`는 `application.service.GroupMembershipSupport`(그룹 승계 규칙, `FinanceGroupService`와 공유)를 호출해 `adapter.in.event`로 옮기면 `inbound_adapters_must_not_depend_on_application_layer`에 걸린다. 규칙 공유 헬퍼를 domain/포트로 승격하는 새 추상화가 필요해 adapter/out에 유지했다.
   adapter/out/persistence/ ← Entity + *JpaRepository + *PersistenceAdapter 3종
 
 **모듈 의존**: `finance → notify` import 0(리마인더는 `finance.application.event` 발행으로만 전달). `finance → user`는 finance 소유 포트 `FinanceMemberPort`(ACTIVE 사용자 id 목록 + 닉네임 조회 — "finance가 필요로 하는 사용자 정보의 전부") 뒤의 어댑터 1곳(`adapter/out/user/UserModuleFinanceMemberAdapter`)으로 한정된다. `FinanceGroupController`(멤버 닉네임 표시, 없으면 null)와 `FinanceRegistrationReminderNotifier`는 user를 직접 모른다. 사용자 설정·수신자 정보는 finance가 읽지 않는다. finance가 사용자 정보를 더 필요로 하면 이 포트에 메서드를 추가한다.

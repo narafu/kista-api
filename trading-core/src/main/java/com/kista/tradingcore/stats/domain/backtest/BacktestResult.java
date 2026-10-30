@@ -1,4 +1,4 @@
-package com.kista.tradingcore.stats.domain.model.backtest;
+package com.kista.tradingcore.stats.domain.backtest;
 
 import java.time.LocalDate;
 import java.util.List;

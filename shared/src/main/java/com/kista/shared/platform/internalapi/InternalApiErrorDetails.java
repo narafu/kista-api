@@ -20,8 +20,8 @@ public final class InternalApiErrorDetails {
         try {
             JsonNode node = MAPPER.readTree(response.getBody());
             JsonNode detail = node.get("detail");
-            if (detail != null && detail.isTextual() && !detail.asText().isBlank()) {
-                return detail.asText();
+            if (detail != null && detail.isString() && !detail.asString().isBlank()) {
+                return detail.asString();
             }
         } catch (Exception _) {
             // 바디 파싱 실패 — 고정 문구로 폴백

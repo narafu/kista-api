@@ -1,6 +1,5 @@
 package com.kista.api.user.adapter.out.persistence.user;
 
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.api.user.domain.model.User;
 import com.kista.api.user.application.port.output.UserPort;
 import lombok.AccessLevel;
@@ -21,31 +20,30 @@ import com.kista.shared.kernel.UserStatus;
 public class UserPersistenceAdapter implements UserPort {
 
     private final UserJpaRepository jpaRepository;
-    private final AesCryptoService crypto; // telegramBotToken AES-256 암호화/복호화
 
     @Override
     public Optional<User> findById(UUID id) {
-        return jpaRepository.findById(id).map(this::toDomain);
+        return jpaRepository.findById(id).map(UserEntity::toModel);
     }
 
     @Override
     public Optional<User> findByKakaoId(String kakaoId) {
-        return jpaRepository.findByKakaoId(kakaoId).map(this::toDomain);
+        return jpaRepository.findByKakaoId(kakaoId).map(UserEntity::toModel);
     }
 
     @Override
     public Optional<User> findByTelegramChatId(String chatId) {
-        return jpaRepository.findByTelegramChatId(chatId).map(this::toDomain);
+        return jpaRepository.findByTelegramChatId(chatId).map(UserEntity::toModel);
     }
 
     @Override
     public User save(User user) {
-        return toDomain(jpaRepository.save(UserEntity.fromModel(encrypt(user))));
+        return jpaRepository.save(UserEntity.fromModel(user)).toModel();
     }
 
     @Override
     public List<User> findAllByStatus(UserStatus status) {
-        return jpaRepository.findAllByStatus(status).stream().map(this::toDomain).toList();
+        return jpaRepository.findAllByStatus(status).stream().map(UserEntity::toModel).toList();
     }
 
     @Override
@@ -71,30 +69,5 @@ public class UserPersistenceAdapter implements UserPort {
     @Override
     public void delete(UUID id) {
         jpaRepository.softDeleteById(id, Instant.now());
-    }
-
-    // persistence 경계에서 telegramBotToken·email 암호화
-    private User encrypt(User user) {
-        User encrypted = user;
-        if (encrypted.telegramBotToken() != null) {
-            encrypted = encrypted.withTelegram(crypto.encrypt(encrypted.telegramBotToken()),
-                    encrypted.telegramChatId(), encrypted.telegramBotUsername());
-        }
-        if (encrypted.email() != null) {
-            encrypted = encrypted.withEmail(crypto.encrypt(encrypted.email()));
-        }
-        return encrypted;
-    }
-
-    // persistence 경계에서 telegramBotToken·email 복호화
-    private User toDomain(UserEntity e) {
-        User raw = e.toModel();
-        if (raw.telegramBotToken() != null) {
-            raw = raw.withTelegram(crypto.decrypt(raw.telegramBotToken()), raw.telegramChatId(), raw.telegramBotUsername());
-        }
-        if (raw.email() != null) {
-            raw = raw.withEmail(crypto.decrypt(raw.email()));
-        }
-        return raw;
     }
 }

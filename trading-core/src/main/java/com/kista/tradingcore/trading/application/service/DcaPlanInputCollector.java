@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
@@ -134,15 +135,12 @@ class DcaPlanInputCollector {
 
     // 증권사 판매가능수량 − 같은 계좌·거래일·종목 기존 PLANNED/PLACED SELL 예약분(다른 전략 포함), 실패 시 null
     private Integer loadBrokerSellable(BatchContext ctx, LocalDate tradeDate) {
-        try {
+        return BrokerCallGuard.tryGet("DCA 판매가능수량 조회: strategy=" + ctx.strategy().id(), () -> {
             int sellable = sellableQuantityPort.getSellableQuantity(ctx.strategy().ticker(), ctx.account().brokerRef()).quantity();
             int reserved = orderPort.sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker(
                     ctx.account().id(), tradeDate, ctx.strategy().ticker());
             return Math.max(0, sellable - reserved);
-        } catch (RuntimeException e) {
-            log.warn("[DCA] 판매가능수량 조회 실패: strategy={}", ctx.strategy().id(), e);
-            return null;
-        }
+        }).orElse(null);
     }
 
     // 주식 BUY 가용 USD = 계좌 미배정 USD − 이 전략의 아직 증권사가 차감하지 않은 당일 BUY(PLANNED·SUBMITTING; PLACED는 이미 매수가능금액에 반영)
@@ -151,7 +149,7 @@ class DcaPlanInputCollector {
     private BigDecimal loadBuyCash(BatchContext ctx, List<Order> existingOrders) {
         var ref = ctx.account().brokerRef();
         if (!UnassignedUsdCalculator.applies(ref.broker())) return DcaCycleOrderStrategy.UNLIMITED_CASH;
-        try {
+        return BrokerCallGuard.tryGet("DCA 주문 가능 USD 조회: accountId=" + ctx.account().id(), () -> {
             BigDecimal free = unassignedUsd.available(ctx.account().id(), ref);
             if (free == null) return null;
             BigDecimal undeducted = existingOrders.stream()
@@ -159,10 +157,7 @@ class DcaPlanInputCollector {
                             && (o.status() == OrderStatus.PLANNED || o.status() == OrderStatus.SUBMITTING))
                     .map(o -> o.quantity().multiply(o.price())).reduce(BigDecimal.ZERO, BigDecimal::add);
             return free.subtract(undeducted).max(BigDecimal.ZERO);
-        } catch (RuntimeException e) {
-            log.warn("[DCA] 주문 가능 USD 조회 실패: accountId={}", ctx.account().id(), e);
-            return null;
-        }
+        }).orElse(null);
     }
 
     // 조회 US 세션 이전 확정 종가 250봉 — 실패·피드 지연(마지막 봉 ≠ 직전 개장일)이면 null(DATA_UNAVAILABLE)
@@ -173,7 +168,7 @@ class DcaPlanInputCollector {
     }
 
     private List<BigDecimal> fetchCloses(StrategyTicker ticker, LocalDate usSession) {
-        try {
+        return BrokerCallGuard.tryGet("DCA 일봉 조회: ticker=" + ticker + ", usSession=" + usSession, () -> {
             List<BrokerCandle> candles = candlePort.getDailyCandlesBefore(ticker.name(), usSession, CANDLE_COUNT);
             LocalDate expected = previousOpenSession(usSession);
             if (candles.isEmpty() || expected == null || !candles.getLast().date().equals(expected)) {
@@ -182,10 +177,7 @@ class DcaPlanInputCollector {
                 return null;
             }
             return candles.stream().map(BrokerCandle::close).toList();
-        } catch (RuntimeException e) {
-            log.warn("[DCA] 일봉 조회 실패: ticker={}, usSession={}", ticker, usSession, e);
-            return null;
-        }
+        }).orElse(null);
     }
 
     // usSession 직전 US 개장일 — 휴장 데이터 미존재 등으로 못 찾으면 null

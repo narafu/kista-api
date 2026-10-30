@@ -60,7 +60,10 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
-        return creationService.register(userId, accountId, cmd);
+        Strategy created = creationService.register(userId, accountId, cmd);
+        // 응답은 조회 경로와 동일하게 조립한다 — 등록 응답과 이후 GET이 어긋나지 않도록(UI가 POST 응답을 캐시)
+        Account account = accountPort.requireOwnedAccount(accountId, userId);
+        return toDetail(created, account.broker().getMarket());
     }
 
     @Override

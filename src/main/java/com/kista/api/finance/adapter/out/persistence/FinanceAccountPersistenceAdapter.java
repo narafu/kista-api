@@ -1,7 +1,6 @@
 package com.kista.api.finance.adapter.out.persistence;
 
 import com.kista.shared.platform.crypto.AccountNoHasher;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import lombok.AccessLevel;
@@ -18,24 +17,23 @@ import java.util.UUID;
 public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
 
     private final FinanceAccountJpaRepository jpaRepository;
-    private final AesCryptoService crypto; // accountNo AES-256 암호화/복호화
     private final AccountNoHasher hasher;  // accountNo 전역 중복 체크용 HMAC-SHA256 해시
 
     @Override
     public List<FinanceAccount> findMyScope(UUID userId, UUID currentGroupId) {
         return jpaRepository.findMyScope(userId, currentGroupId).stream()
-                .map(this::toDomain)
+                .map(FinanceAccountEntity::toDomain)
                 .toList();
     }
 
     @Override
     public Optional<FinanceAccount> findById(UUID id) {
-        return jpaRepository.findById(id).map(this::toDomain);
+        return jpaRepository.findById(id).map(FinanceAccountEntity::toDomain);
     }
 
     @Override
     public Optional<FinanceAccount> findActiveById(UUID id) {
-        return jpaRepository.findByIdAndDeletedAtIsNull(id).map(this::toDomain);
+        return jpaRepository.findByIdAndDeletedAtIsNull(id).map(FinanceAccountEntity::toDomain);
     }
 
     @Override
@@ -53,10 +51,9 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
         // 더 이상 DataIntegrityViolationException을 DuplicateNameException으로 변환할 이유가 없다.
         FinanceAccountEntity entity = FinanceAccountEntity.fromModel(account);
         if (entity.getAccountNo() != null) {
-            entity.setAccountNoHash(hasher.hash(entity.getAccountNo())); // 전역 중복 체크용 해시 — 암호화 전 평문 기준
-            entity.setAccountNo(crypto.encrypt(entity.getAccountNo()));
+            entity.setAccountNoHash(hasher.hash(entity.getAccountNo())); // 전역 중복 체크용 해시 — 평문 기준
         }
-        return toDomain(jpaRepository.saveAndFlush(entity));
+        return FinanceAccountEntity.toDomain(jpaRepository.saveAndFlush(entity));
     }
 
     @Override
@@ -67,14 +64,5 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
     @Override
     public void softDeleteByUserId(UUID userId) {
         jpaRepository.softDeleteByUserId(userId, Instant.now());
-    }
-
-    // persistence 경계에서 accountNo 복호화
-    private FinanceAccount toDomain(FinanceAccountEntity e) {
-        FinanceAccount raw = FinanceAccountEntity.toDomain(e);
-        if (raw.accountNo() == null) {
-            return raw;
-        }
-        return raw.withAccountNo(crypto.decrypt(raw.accountNo()));
     }
 }

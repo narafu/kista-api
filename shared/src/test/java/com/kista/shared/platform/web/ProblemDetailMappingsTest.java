@@ -83,6 +83,18 @@ class ProblemDetailMappingsTest {
     }
 
     @Test
+    void catchAll_mappedExceptionWithDisconnectCause_keepsMappedResponse() {
+        // 이탈 메시지를 cause로 감싼 매핑 예외는 이탈(503)이 아니라 매핑 응답을 유지한다
+        var reported = new java.util.ArrayList<Exception>();
+
+        var p = ProblemDetailMappings.catchAll(new IllegalStateException("주문 실패", new IOException("Connection reset by peer")),
+                ProblemDetailMappings.GENERIC, reported::add);
+
+        assertThat(p.getStatus()).isEqualTo(400);
+        assertThat(reported).isEmpty();
+    }
+
+    @Test
     void catchAll_mappedException_returnsMappedStatusAndSkipsReport() {
         var reported = new java.util.ArrayList<Exception>();
 

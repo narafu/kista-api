@@ -1,11 +1,11 @@
-package com.kista.tradingcore.stats.domain.model.backtest;
+package com.kista.tradingcore.stats.domain.backtest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.tradingcore.trading.domain.strategy.VrRampParams;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 // 백테스트 실행 입력 — 값 유효성 검증(인출식 최소자산 등)은 API 경계 책임이고 이 record는 입력을 그대로 담는다
 public record BacktestCommand(

@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.trading.domain.model.VrSummary;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -15,12 +16,9 @@ import java.util.UUID;
 // VR 전략의 버전 상세·사이클 상세 저장과 요약 조립 — 레거시 StrategyService(향후 strategy-config)가 크로스모듈로 소비
 public interface VrStrategyDetailUseCase {
 
-    // 램프 8필드는 호출측(StrategyService)이 이미 null 정규화를 마친 값이라고 가정한다
+    // 램프는 호출측이 이미 null 정규화를 마친 값(VrRampParams)이라고 가정한다
     StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
-                                        BigDecimal bandWidth, Integer recurringAmount,
-                                        int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
-                                        BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks,
-                                        BigDecimal poolLimitFloor);
+                                        BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp);
 
     // 등록 시점(경과 0주) 스냅샷 — gradientAt(0)/poolLimitRateAt(0)은 각각 initialGradient/initialPoolLimitRate와 동일
     StrategyCycleVrDetail saveInitialCycleDetail(UUID cycleId, BigDecimal initialValue, StrategyVrDetail vrDetail);

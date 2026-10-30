@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
         // com.kista.tradingcore.web.TradingExceptionHandler로 이관됨 — 아래는 admin이
         // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
         // 코드는 trading-core 원본(BrokerCredential/RateLimit)과 동일 — 내부 API가 status만 전달하므로 root가 같은 코드를 다시 붙인다
-        Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_ENTITY,   "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
+        Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_CONTENT,   "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
         Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "Broker Rate Limit", ErrorCode.BROKER_RATE_LIMITED)),
         // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
         Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable", ErrorCode.TRADING_CORE_UNAVAILABLE)),
@@ -126,7 +126,7 @@ public class GlobalExceptionHandler {
     // (TradingExceptionHandler.reportErrorLog와 동일)
     private void reportErrorLog(Exception ex) {
         try {
-            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, "GlobalExceptionHandler"));
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, GlobalExceptionHandler.class.getSimpleName()));
         } catch (Exception reportEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", reportEx.getMessage());
         }

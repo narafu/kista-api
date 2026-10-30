@@ -79,7 +79,7 @@ class UserCascadeEndToEndIT {
                         + "VALUES (?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', 'UNKNOWN', 22.00, 5, 'PLANNED', now(), now())",
                 accountId, cycleId, LocalDate.now(TimeZones.KST));
         jdbcTemplate.update("INSERT INTO user_notify_profile (user_id, notification_prefs, is_active, updated_at, telegram_bot_token, chat_id) "
-                + "VALUES (?, '{}', true, now() - interval '1 hour', 'cipher', 'chat')", userId);
+                + "VALUES (?, '{}', true, now() - interval '1 hour', ?, 'chat')", userId, crypto.encrypt("token")); // 컨버터가 엔티티 로드 시 복호화하므로 실제 암호문이어야 한다
     }
 
     @AfterEach

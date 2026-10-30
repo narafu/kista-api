@@ -2,7 +2,6 @@ package com.kista.tradingcore.account.application.service;
 
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.platform.crypto.AccountNoHasher;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.shared.support.DataJpaTestBase;
 import com.kista.tradingcore.account.adapter.out.persistence.AccountPersistenceAdapter;
 import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort;
@@ -32,7 +31,7 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 // 키 교체 경합 409 — 실 PostgreSQL unique 위반이 실제 저장 경로(트랜잭션 없는 JPA auto-commit)에서 DuplicateAccountException으로 변환되는지 확인
-@Import({AccountPersistenceAdapter.class, AesCryptoService.class, AccountNoHasher.class})
+@Import({AccountPersistenceAdapter.class, AccountNoHasher.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AccountServiceKeyRotationDbTest extends DataJpaTestBase {
 

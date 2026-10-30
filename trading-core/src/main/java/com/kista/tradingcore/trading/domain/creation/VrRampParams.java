@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.domain.strategy;
+package com.kista.tradingcore.trading.domain.creation;
 
 import java.math.BigDecimal;
 
@@ -41,8 +41,6 @@ public record VrRampParams(
 
     // 램프 8필드 + intervalWeeks/bandWidth 검증 — 위반 시 IllegalArgumentException
     public void validate(int intervalWeeks, BigDecimal bandWidth) {
-        VrRampValidator.validateRampParams(intervalWeeks, bandWidth,
-                initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
+        VrRampValidator.validateRampParams(intervalWeeks, bandWidth, this);
     }
 }

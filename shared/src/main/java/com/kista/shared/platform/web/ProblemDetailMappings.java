@@ -80,18 +80,20 @@ public final class ProblemDetailMappings {
         return false;
     }
 
-    // 두 advice의 catch-all 공통 본문 — 클라이언트 이탈 → 매핑 테이블 → 미매핑 500 순으로 처리한다.
+    // 두 advice의 catch-all 공통 본문 — 매핑 테이블 → 클라이언트 이탈 → 미매핑 500 순으로 처리한다.
+    // 매핑이 먼저인 이유: 이탈 판정은 cause 체인 메시지 기준이라, 외부 호출의 connection reset을 감싼 도메인 예외(바로주문 실패 등)가
+    // 이탈로 오판돼 고정 문구 응답을 잃지 않게 한다. 이탈 판정은 미매핑(=오류 보고 대상) 예외의 보고 오염만 막으면 된다.
     // 이벤트 발행은 platform이 shared.kernel을 참조할 수 없어 호출자가 넘기는 onUnmapped Consumer(보고·로그 담당)에 남긴다
     public static ProblemDetail catchAll(Exception ex, Map<Class<? extends Exception>, Mapping> mappings, Consumer<Exception> onUnmapped) {
+        // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용, 매핑 있으면 해당 응답(오류 보고 없음)
+        Mapping m = resolve(ex, mappings);
+        if (m != null) {
+            return toProblem(m, ex);
+        }
         // 클라이언트가 응답 수신 전 연결을 끊으면 직렬화·응답 쓰기가 실패해 catch-all로 떨어진다 — 기록 없이 종료
         if (isClientDisconnect(ex)) {
             log.debug("클라이언트 연결 끊김으로 응답 미완: {}", ex.getMessage());
             return problem(HttpStatus.SERVICE_UNAVAILABLE, "Client Disconnected", "");
-        }
-        // 매핑 테이블 조회 — 클래스 계층 탐색으로 서브클래스도 상위 매핑 적용, 매핑 있으면 4xx 응답(오류 보고 없음)
-        Mapping m = resolve(ex, mappings);
-        if (m != null) {
-            return toProblem(m, ex);
         }
         // 매핑 없는 미처리 예외 — 호출자가 보고·로그를 수행한 뒤 500
         onUnmapped.accept(ex);

@@ -1,10 +1,8 @@
 package com.kista.tradingcore.account.adapter.out.persistence;
 
 import com.kista.shared.platform.crypto.AccountNoHasher;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
-import com.kista.shared.kernel.Broker;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,7 +17,6 @@ import java.util.UUID;
 public class AccountPersistenceAdapter implements AccountPort {
 
     private final AccountJpaRepository jpaRepository;
-    private final AesCryptoService crypto;
     private final AccountNoHasher hasher;
 
     @Override
@@ -75,29 +72,27 @@ public class AccountPersistenceAdapter implements AccountPort {
         return jpaRepository.existsByAccountNoHashAndDeletedAtIsNull(hasher.hash(dedupeKey));
     }
 
-    // Account 도메인 모델 → 암호화 후 Entity 변환
+    // Account 도메인 모델 → Entity 변환 (암호화는 AesStringConverter, 해시만 여기서 평문으로 계산)
     private AccountEntity toEntity(Account a) {
         AccountEntity e = new AccountEntity();
         e.setId(a.id()); // null이면 @UuidGenerator가 UUID v7 생성
         e.setUserId(a.userId());
         e.setNickname(a.nickname());
-        e.setAccountNo(a.accountNo() != null ? crypto.encrypt(a.accountNo()) : null); // 업비트는 계좌번호 없음
+        e.setAccountNo(a.accountNo()); // 업비트는 계좌번호 없음(null)
         e.setAccountNoHash(hasher.hash(a.dedupeKey())); // 전역 중복 체크용 HMAC-SHA256 해시 — 업비트는 access key
-        e.setAppKey(crypto.encrypt(a.appKey()));
-        e.setSecretKey(crypto.encrypt(a.secretKey()));
+        e.setAppKey(a.appKey());
+        e.setSecretKey(a.secretKey());
         e.setBrokerAccountCode(a.brokerAccountCode());
         e.setApiKeyExpiresAt(a.apiKeyExpiresAt());
-        e.setBroker(a.broker() != null ? a.broker() : Broker.KIS); // null 방어 — persistence 경계에서 보장
+        e.setBroker(a.broker());
         return e;
     }
 
-    // Entity → 복호화 후 Account 도메인 모델 변환
+    // Entity → Account 도메인 모델 변환
     private Account toDomain(AccountEntity e) {
         return new Account(
                 e.getId(), e.getUserId(), e.getNickname(),
-                e.getAccountNo() != null ? crypto.decrypt(e.getAccountNo()) : null,
-                crypto.decrypt(e.getAppKey()),
-                crypto.decrypt(e.getSecretKey()),
+                e.getAccountNo(), e.getAppKey(), e.getSecretKey(),
                 e.getBrokerAccountCode(),
                 e.getBroker(),
                 e.getCreatedAt(),

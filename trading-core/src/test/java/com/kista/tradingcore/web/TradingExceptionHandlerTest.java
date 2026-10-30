@@ -33,70 +33,70 @@ class TradingExceptionHandlerTest {
 
     @Test
     void brokerCredentialException_mapsTo422() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerCredentialException());
+        var detail = handler.handleGeneric(new BrokerCredentialException());
         assertThat(detail.getStatus()).isEqualTo(422);
     }
 
     @Test
     void brokerRateLimitException_mapsTo429() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerRateLimitException());
+        var detail = handler.handleGeneric(new BrokerRateLimitException());
         assertThat(detail.getStatus()).isEqualTo(429);
     }
 
     @Test
     void manualTradingException_mapsTo409() {
-        var detail = handler.handleTradingCoreExceptions(new ManualTradingException("오늘 이미 주문이 존재합니다"));
+        var detail = handler.handleGeneric(new ManualTradingException("오늘 이미 주문이 존재합니다"));
         assertThat(detail.getStatus()).isEqualTo(409);
     }
 
     @Test
     void orderCancelException_mapsTo409() {
-        var detail = handler.handleTradingCoreExceptions(new OrderCancelException("PLACED 상태가 아닙니다"));
+        var detail = handler.handleGeneric(new OrderCancelException("PLACED 상태가 아닙니다"));
         assertThat(detail.getStatus()).isEqualTo(409);
     }
 
     @Test
     void privacyTradeConflictException_mapsTo409() {
-        var detail = handler.handleTradingCoreExceptions(new PrivacyTradeConflictException("기준 매매표 충돌"));
+        var detail = handler.handleGeneric(new PrivacyTradeConflictException("기준 매매표 충돌"));
         assertThat(detail.getStatus()).isEqualTo(409);
     }
 
     @Test
     void duplicateAccountException_mapsTo409() {
-        var detail = handler.handleTradingCoreExceptions(new Account.DuplicateAccountException("74420614"));
+        var detail = handler.handleGeneric(new Account.DuplicateAccountException("74420614"));
         assertThat(detail.getStatus()).isEqualTo(409);
     }
 
     @Test
     void brokerCredentialException_hasCode() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerCredentialException());
+        var detail = handler.handleGeneric(new BrokerCredentialException());
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_CREDENTIAL_INVALID.name());
         assertThat(detail.getDetail()).isEqualTo("증권사 API 키가 유효하지 않습니다.");
     }
 
     @Test
     void brokerRateLimitException_hasCode() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerRateLimitException());
+        var detail = handler.handleGeneric(new BrokerRateLimitException());
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_RATE_LIMITED.name());
         assertThat(detail.getDetail()).isEqualTo("증권사 API 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요.");
     }
 
     @Test
     void duplicateAccountException_hasCodeAndHidesAccountNo() {
-        var detail = handler.handleTradingCoreExceptions(new Account.DuplicateAccountException("74420614-01"));
+        var detail = handler.handleGeneric(new Account.DuplicateAccountException("74420614-01"));
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.DUPLICATE_ACCOUNT.name());
         assertThat(detail.getDetail()).isEqualTo("이미 등록된 계좌입니다.");
     }
 
     @Test
     void orderCancelException_hasCode() {
-        var detail = handler.handleTradingCoreExceptions(new OrderCancelException("취소 가능한 상태가 아닙니다."));
+        var detail = handler.handleGeneric(new OrderCancelException("취소 가능한 상태가 아닙니다."));
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.ORDER_NOT_CANCELLABLE.name());
     }
 
     @Test
     void alreadyOrderedToday_resolvesSubclassMappingBeforeParent() {
-        var detail = handler.handleTradingCoreExceptions(new AlreadyOrderedTodayException());
+        var detail = handler.handleGeneric(new AlreadyOrderedTodayException());
         assertThat(detail.getStatus()).isEqualTo(409);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.ALREADY_ORDERED_TODAY.name());
         assertThat(detail.getDetail()).isEqualTo("오늘 이미 주문이 등록된 전략입니다.");
@@ -104,14 +104,14 @@ class TradingExceptionHandlerTest {
 
     @Test
     void plainManualTradingException_hasNoCode() {
-        var detail = handler.handleTradingCoreExceptions(new ManualTradingException("예수금이 부족합니다"));
+        var detail = handler.handleGeneric(new ManualTradingException("예수금이 부족합니다"));
         assertThat(detail.getStatus()).isEqualTo(409);
         assertThat(detail.getProperties() == null || !detail.getProperties().containsKey("code")).isTrue();
     }
 
     @Test
     void manualTradingFailed_mapsTo500WithFixedDetailAndNoErrorReport() {
-        var detail = handler.handleTradingCoreExceptions(new ManualTradingFailedException("바로주문", new RuntimeException("DB down")));
+        var detail = handler.handleGeneric(new ManualTradingFailedException("바로주문", new RuntimeException("DB down")));
         assertThat(detail.getStatus()).isEqualTo(500);
         assertThat(detail.getDetail()).isEqualTo("주문 계산 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
         assertThat(detail.getProperties() == null || !detail.getProperties().containsKey("code")).isTrue();
@@ -175,7 +175,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void dcaManualExecutionUnsupported_is409WithCode() {
-        var detail = handler.handleTradingCoreExceptions(new DcaManualExecutionUnsupportedException());
+        var detail = handler.handleGeneric(new DcaManualExecutionUnsupportedException());
         assertThat(detail.getStatus()).isEqualTo(409);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED.name());
         assertThat(detail.getDetail()).isEqualTo("DCA 전략은 바로 주문과 미리보기를 지원하지 않습니다.");
@@ -183,7 +183,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void brokerIpNotAllowedException_is422WithOwnCode() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerIpNotAllowedException());
+        var detail = handler.handleGeneric(new BrokerIpNotAllowedException());
         assertThat(detail.getStatus()).isEqualTo(422);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_IP_NOT_ALLOWED.name());
         assertThat(detail.getDetail()).isEqualTo("거래소 API 키에 서버 IP가 허용되어 있지 않습니다.");
@@ -191,7 +191,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void brokerPermissionDeniedException_is422WithOwnCode() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerPermissionDeniedException());
+        var detail = handler.handleGeneric(new BrokerPermissionDeniedException());
         assertThat(detail.getStatus()).isEqualTo(422);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_PERMISSION_DENIED.name());
         assertThat(detail.getDetail()).isEqualTo("거래소 API 키에 필요한 권한이 없습니다.");
@@ -199,7 +199,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void withdrawalEnabledMapsTo422WithCode() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerWithdrawalEnabledException());
+        var detail = handler.handleGeneric(new BrokerWithdrawalEnabledException());
         assertThat(detail.getStatus()).isEqualTo(422);
         assertThat(detail.getProperties()).containsEntry("code", ErrorCode.BROKER_WITHDRAWAL_ENABLED.name());
         assertThat(detail.getDetail()).isEqualTo("출금 권한이 켜진 API 키는 등록할 수 없습니다.");
@@ -207,7 +207,7 @@ class TradingExceptionHandlerTest {
 
     @Test
     void brokerRateLimitException_titleIsBrokerNeutral() {
-        var detail = handler.handleTradingCoreExceptions(new BrokerRateLimitException());
+        var detail = handler.handleGeneric(new BrokerRateLimitException());
         assertThat(detail.getTitle()).isEqualTo("Broker Rate Limit");
     }
 }

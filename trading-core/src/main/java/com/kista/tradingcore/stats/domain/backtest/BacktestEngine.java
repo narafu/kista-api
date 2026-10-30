@@ -1,7 +1,7 @@
 package com.kista.tradingcore.stats.domain.backtest;
 
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestPoint;
+import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
+import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
@@ -17,7 +17,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
 import com.kista.tradingcore.matching.domain.strategy.VrStrategy;
-import com.kista.tradingcore.trading.domain.strategy.VrRampParams;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -38,7 +38,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyDefaults;
 
 // 백테스트 시뮬레이션 엔진 — 일봉을 하루씩 진행하며 기존 전략 순수 함수를 올바른 순서로 호출한다
-// 새 매매 수식은 하나도 만들지 않는다: 주문 생성·V값 갱신·가격 캡·램프는 전부 domain/strategy·domain/model/strategy에 위임
+// 새 매매 수식은 하나도 만들지 않는다: 주문 생성·V값 갱신·가격 캡·램프는 전부 matching/domain/strategy·matching/domain/model에 위임
 // domain 레이어는 Spring 빈 금지(HexagonalArchitectureTest) — 평범한 생성자 주입
 public class BacktestEngine {
 

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.trading.domain.strategy.VrRampValidator;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
+import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
@@ -83,8 +84,9 @@ class VrReconfigureService implements VrReconfigureUseCase {
         BigDecimal poolLimitFloor = cmd.poolLimitFloor() != null ? cmd.poolLimitFloor() : currentDetail.poolLimitFloor();
 
         // 램프 파라미터 + 자본 주입 형태(주식 수·단가·예수금 부호) 검증 — 외부 브로커 호출(가격 조회·주문 취소) 이전에 전부 완료
-        VrRampValidator.validateRampParams(intervalWeeks, bandWidth, initialGradient, gGraceWeeks, gStepWeeks, gMax,
+        VrRampParams ramp = new VrRampParams(initialGradient, gGraceWeeks, gStepWeeks, gMax,
                 initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor);
+        ramp.validate(intervalWeeks, bandWidth);
 
         // 자본 주입/인출 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
         AccountBalance postBalance = applyCapitalAdjustment(cmd, latestPosition);
@@ -111,11 +113,9 @@ class VrReconfigureService implements VrReconfigureUseCase {
         orderCancelService.cancelByCycle(strategyId, requesterId);
 
         // 새 버전 발급 + 강제 롤오버(사이클 종료 → 새 사이클) 원자 처리
-        cycleSnapshotCreator.reconfigureVrCycle(strategyId, currentCycle.id(), today,
-                intervalWeeks, bandWidth, recurringAmount,
-                initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor,
-                postBalance, currentPrice, newValue, weeks);
+        cycleSnapshotCreator.reconfigureVrCycle(new CycleSnapshotCreator.VrReconfiguration(
+                strategyId, currentCycle.id(), today, intervalWeeks, bandWidth, recurringAmount, ramp,
+                postBalance, currentPrice, newValue, weeks));
 
         // 사용자 알림 이벤트 발행 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
         // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 fallbackExecution 리스너를 즉시 동기 실행하므로 try/catch가 유효함

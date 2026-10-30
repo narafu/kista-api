@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service.support;
 
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
@@ -42,7 +43,7 @@ class VrStrategyLifecycleTest {
 
         StrategyVrDetail result = vrStrategyLifecycle.saveVersionDetail(
                 versionId, 4, new BigDecimal("15.00"), null,
-                10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
+                new VrRampParams(10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75")));
 
         assertThat(result.strategyVersionId()).isEqualTo(versionId);
         assertThat(result.recurringAmount()).isZero();

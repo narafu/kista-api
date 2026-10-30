@@ -1,140 +1,58 @@
 package com.kista.api.user.adapter.out.persistence.user;
 
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.api.user.domain.model.User;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Base64;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import com.kista.api.web.RootDataJpaTestBase;
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityManager;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 
-@ExtendWith(MockitoExtension.class)
-@DisplayName("UserPersistenceAdapter — telegramBotToken AES 암호화 왕복 매핑 테스트")
-class UserPersistenceAdapterTest {
+import java.util.UUID;
 
-    @Mock
-    private UserJpaRepository jpaRepository;
+import static org.assertj.core.api.Assertions.assertThat;
 
-    private AesCryptoService crypto; // 실제 인스턴스 — 암복호화 왕복 검증에 mock 부적합
-    private UserPersistenceAdapter adapter;
+// telegramBotToken·email은 AesStringConverter가 암호화 — 컬럼 원문은 평문이 아니고 어댑터로 읽으면 평문이 복원된다
+@Import(UserPersistenceAdapter.class)
+@Execution(ExecutionMode.SAME_THREAD)
+class UserPersistenceAdapterTest extends RootDataJpaTestBase {
 
-    @BeforeEach
-    void setUp() {
-        // 테스트용 32바이트(256bit) 키 (Base64 인코딩)
-        String testKey = Base64.getEncoder().encodeToString(new byte[32]);
-        crypto = new AesCryptoService(testKey);
-        adapter = new UserPersistenceAdapter(jpaRepository, crypto);
-    }
+    @Autowired UserPersistenceAdapter adapter;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager em;
 
-    private User newUser(String telegramBotToken) {
-        return new User(UUID.randomUUID(), "kakao-1", "닉네임", null, UserStatus.ACTIVE, UserRole.USER,
-                telegramBotToken, "chat-1", "bot-username", null, null, NotificationChannel.TELEGRAM);
-    }
-
-    private User newUserWithEmail(String email) {
-        return new User(UUID.randomUUID(), "kakao-1", "닉네임", email, UserStatus.ACTIVE, UserRole.USER,
-                null, null, null, null, null, NotificationChannel.TELEGRAM);
+    private User user(String email, String token) {
+        return new User(UUID.randomUUID(), "kakao-" + UUID.randomUUID(), "닉네임", email, UserStatus.ACTIVE, UserRole.USER,
+                token, "chat-1", "bot-username", null, null, NotificationChannel.TELEGRAM);
     }
 
     @Test
-    @DisplayName("save 시 telegramBotToken이 평문과 다르게 저장되고(암호화) 복호화하면 평문이 복원된다")
-    void save_encrypts_telegram_bot_token() {
-        String plainToken = "plain-bot-token";
-        User user = newUser(plainToken);
-        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
-        when(jpaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    void emailAndTokenEncryptedAtRestAndDecryptedOnRead() {
+        User saved = adapter.save(user("user@example.com", "plain-bot-token"));
+        em.flush();
+        em.clear();
 
-        adapter.save(user);
+        var raw = jdbc.queryForMap("SELECT email, telegram_bot_token FROM users WHERE id = ?", saved.id());
+        assertThat(raw.get("email").toString()).isNotEqualTo("user@example.com");
+        assertThat(raw.get("telegram_bot_token").toString()).isNotEqualTo("plain-bot-token");
 
-        verify(jpaRepository).save(captor.capture());
-        UserEntity saved = captor.getValue();
-        assertThat(saved.getTelegramBotToken()).isNotEqualTo(plainToken); // 암호화되어 저장됨
-        assertThat(crypto.decrypt(saved.getTelegramBotToken())).isEqualTo(plainToken); // 복호화하면 원본 복원
+        User found = adapter.findById(saved.id()).orElseThrow();
+        assertThat(found.email()).isEqualTo("user@example.com");
+        assertThat(found.telegramBotToken()).isEqualTo("plain-bot-token");
     }
 
     @Test
-    @DisplayName("findById 시 엔티티의 암호문이 도메인 User에서 평문으로 복호화된다")
-    void findById_decrypts_telegram_bot_token() {
-        String plainToken = "plain-bot-token";
-        String encryptedToken = crypto.encrypt(plainToken);
-        UUID userId = UUID.randomUUID();
-        UserEntity entity = UserEntity.fromModel(new User(userId, "kakao-1", "닉네임", null, UserStatus.ACTIVE,
-                UserRole.USER, encryptedToken, "chat-1", "bot-username", null, null,
-                NotificationChannel.TELEGRAM));
-        when(jpaRepository.findById(userId)).thenReturn(Optional.of(entity));
+    void nullEmailAndTokenRoundTripAsNull() {
+        User saved = adapter.save(user(null, null));
+        em.flush();
+        em.clear();
 
-        Optional<User> result = adapter.findById(userId);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().telegramBotToken()).isEqualTo(plainToken); // 복호화되어 평문 반환
-    }
-
-    @Test
-    @DisplayName("telegramBotToken이 null인 사용자는 null 그대로 왕복된다")
-    void null_telegram_bot_token_round_trips_as_null() {
-        User user = newUser(null);
-        when(jpaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        User saved = adapter.save(user);
-
-        assertThat(saved.telegramBotToken()).isNull();
-    }
-
-    @Test
-    @DisplayName("save 시 email이 평문과 다르게 저장되고(암호화) 복호화하면 평문이 복원된다")
-    void save_encrypts_email() {
-        String plainEmail = "user@example.com";
-        User user = newUserWithEmail(plainEmail);
-        ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
-        when(jpaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        adapter.save(user);
-
-        verify(jpaRepository).save(captor.capture());
-        UserEntity saved = captor.getValue();
-        assertThat(saved.getEmail()).isNotEqualTo(plainEmail); // 암호화되어 저장됨
-        assertThat(crypto.decrypt(saved.getEmail())).isEqualTo(plainEmail); // 복호화하면 원본 복원
-    }
-
-    @Test
-    @DisplayName("findById 시 엔티티의 email 암호문이 도메인 User에서 평문으로 복호화된다")
-    void findById_decrypts_email() {
-        String plainEmail = "user@example.com";
-        String encryptedEmail = crypto.encrypt(plainEmail);
-        UUID userId = UUID.randomUUID();
-        UserEntity entity = UserEntity.fromModel(new User(userId, "kakao-1", "닉네임", encryptedEmail,
-                UserStatus.ACTIVE, UserRole.USER, null, null, null, null, null,
-                NotificationChannel.TELEGRAM));
-        when(jpaRepository.findById(userId)).thenReturn(Optional.of(entity));
-
-        Optional<User> result = adapter.findById(userId);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().email()).isEqualTo(plainEmail); // 복호화되어 평문 반환
-    }
-
-    @Test
-    @DisplayName("email이 null인 사용자는 null 그대로 왕복된다 (이메일 동의 미완료)")
-    void null_email_round_trips_as_null() {
-        User user = newUserWithEmail(null);
-        when(jpaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        User saved = adapter.save(user);
-
-        assertThat(saved.email()).isNull();
+        assertThat(adapter.findById(saved.id()).orElseThrow().email()).isNull();
+        assertThat(jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, saved.id())).isNull();
     }
 }

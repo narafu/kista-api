@@ -26,6 +26,7 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 - 신규 브로커 추가: `BrokerCapabilitiesPort` 구현체 1개만 추가 — Router/switch 수정 불필요
 - 브로커 분기 필요 시 `account.broker() == Broker.TOSS` 직접 비교(`Account.isToss()` 없음)
 - "application" NamedInterface는 `BrokerConnectionTesters`/`BrokerCallGuard` 공개용으로 유지
+- `BrokerCallGuard` 실패 정책 짝: `wrap`=fail-closed(실패 시 중단·예외 전파, 증권사 타입 예외는 상태코드 보존), `tryGet`=fail-open(실패 시 경고 로그 후 `Optional.empty()`로 건너뜀). 이벤트 발행·분기 처리가 필요한 실패 처리만 직접 catch
 
 ### DCA 지원 (단계 ①)
 - `CandlePort.getDailyCandlesBefore(symbol, beforeUsSession, count)`: DCA 지표용 일봉 조회(Toss `TossCandleApi` 구현). 200봉 단위로 페이징하며 다음 페이지 `before`는 직전 페이지 가장 오래된 봉 날짜 00:00 UTC이고, 날짜 기준으로 중복을 제거한다. 이 경로만 `adjusted=true`(분할·배당 조정)를 보낸다.

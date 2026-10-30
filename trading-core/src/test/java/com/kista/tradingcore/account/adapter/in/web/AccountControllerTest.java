@@ -75,7 +75,7 @@ class AccountControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"appKey\":\"wrongkey\",\"appSecret\":\"wrongsecret\"}")
                         .with(csrf()).with(authentication(userToken(UUID.fromString(USER_ID)))))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableContent());
     }
 
     @Test

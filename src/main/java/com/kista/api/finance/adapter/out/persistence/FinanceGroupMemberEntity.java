@@ -43,16 +43,6 @@ class FinanceGroupMemberEntity extends BaseAuditEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 그룹 탈퇴로 소프트 삭제됨
 
-    static FinanceGroupMemberEntity fromModel(FinanceGroupMember m) {
-        FinanceGroupMemberEntity e = new FinanceGroupMemberEntity();
-        e.id = m.id(); // null이면 @UuidGenerator가 UUID v7 생성
-        e.groupId = m.groupId();
-        e.userId = m.userId();
-        e.role = m.role();
-        e.joinedAt = m.joinedAt() != null ? m.joinedAt() : Instant.now();
-        return e;
-    }
-
     static FinanceGroupMember toDomain(FinanceGroupMemberEntity e) {
         return new FinanceGroupMember(e.id, e.groupId, e.userId, e.role, e.joinedAt, e.getCreatedAt());
     }

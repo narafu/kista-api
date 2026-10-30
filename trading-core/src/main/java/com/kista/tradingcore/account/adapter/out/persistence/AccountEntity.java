@@ -1,5 +1,6 @@
 package com.kista.tradingcore.account.adapter.out.persistence;
 
+import com.kista.shared.platform.crypto.AesStringConverter;
 import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.shared.kernel.Broker;
 import jakarta.persistence.*;
@@ -36,17 +37,20 @@ class AccountEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 20)
     private Broker broker;       // 증권사
 
+    @Convert(converter = AesStringConverter.class)
     @Column(name = "account_no", length = 512)
-    private String accountNo;            // AES-256 암호화 저장 — 업비트는 null
+    private String accountNo;            // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터), 업비트는 null
 
     @Column(name = "broker_account_code", length = 10)
     private String brokerAccountCode;    // 증권사 API 보조 식별자 — KIS: null, TOSS: accountSeq
 
+    @Convert(converter = AesStringConverter.class)
     @Column(name = "app_key", nullable = false, length = 512)
-    private String appKey;            // AES-256 암호화 저장
+    private String appKey;            // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터)
 
+    @Convert(converter = AesStringConverter.class)
     @Column(name = "secret_key", nullable = false, length = 512)
-    private String secretKey;         // AES-256 암호화 저장
+    private String secretKey;         // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터)
 
     @Column(name = "account_no_hash", length = 64)
     private String accountNoHash;          // HMAC-SHA256 해시 (전역 중복 체크용, 기존 레코드는 NULL)

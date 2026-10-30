@@ -80,7 +80,7 @@ com.kista.shared.platform/      :shared    · OPEN · (NamedInterface 없음, �
 - `toEntity()` 내에서 `setCreatedAt()`/`setUpdatedAt()` 명시적 호출 금지 — 호출 자체가 dead code이며 `@Setter(PACKAGE)` 범위 제약과도 충돌
 
 ### 텔레그램 알림 (사용자 봇)
-- 계좌별 텔레그램 설정은 없다 — 사용자 봇(`telegramBotToken`/`chatId`)만 사용. 봇 토큰은 persistence 경계에서만 AES-256 암호화/복호화(root `UserPersistenceAdapter`, trading-core `UserNotifyProfilePersistenceAdapter`/`UserNotifyProfileSyncListener`)
+- 계좌별 텔레그램 설정은 없다 — 사용자 봇(`telegramBotToken`/`chatId`)만 사용. 봇 토큰은 엔티티 컬럼의 `@Convert(converter = AesStringConverter.class)`가 AES-256 암복호화(root `UserEntity`, trading-core `UserNotifyProfileEntity`) — 어댑터·리스너는 평문만 다룬다
 - 매매 알림(`notifyTradingReport` 등)은 trading-core `tradingcore.notify`가 `trading.user_notify_profile` 복제본(`TradingUserProfile`)의 토큰·chatId로 발송하고, 둘 중 하나라도 없거나 알림 채널에 텔레그램이 없으면 조용히 건너뛴다(`TradingUserProfile.telegramEnabled()` — 채널이 아직 복제되지 않은 NULL 행은 봇 연결만 본다) → `modules/tradingcore/notify.md`
 
 ### 전략 패턴 (모듈별 문서로 이동)

@@ -52,11 +52,11 @@ class HousingBenchmarkApiDocsTest {
                 properties.path("currentExchangeRate"),
                 "HousingBenchmarkCurrentExchangeRate");
         assertThat(response.path("required")).anySatisfy(required ->
-                assertThat(required.asText()).isEqualTo("currentExchangeRate"));
+                assertThat(required.asString()).isEqualTo("currentExchangeRate"));
         assertThat(schemas.path("HousingBenchmarkCurrentExchangeRate")
                 .path("properties").path("source").path("enum"))
                 .singleElement()
-                .satisfies(value -> assertThat(value.asText()).isEqualTo("TOSS_INVEST"));
+                .satisfies(value -> assertThat(value.asString()).isEqualTo("TOSS_INVEST"));
     }
 
     @Test
@@ -64,10 +64,10 @@ class HousingBenchmarkApiDocsTest {
         JsonNode schemas = apiDocsSchemas();
 
         assertThat(schemas.path("EquityCurveResponse").path("properties")
-                .path("points").path("items").path("$ref").asText())
+                .path("points").path("items").path("$ref").asString())
                 .endsWith("/EquityCurvePoint");
         assertThat(schemas.path("HousingBenchmarkComparisonResponse").path("properties")
-                .path("points").path("items").path("$ref").asText())
+                .path("points").path("items").path("$ref").asString())
                 .endsWith("/HousingBenchmarkPoint");
         assertThat(propertyNames(schemas.path("EquityCurvePoint")))
                 .containsExactlyInAnyOrder("date", "totalAsset", "principal");
@@ -104,12 +104,12 @@ class HousingBenchmarkApiDocsTest {
                 .findFirst()
                 .orElseThrow();
         JsonNode nullBranch = branches.stream()
-                .filter(branch -> "null".equals(branch.path("type").asText()))
+                .filter(branch -> "null".equals(branch.path("type").asString()))
                 .findFirst()
                 .orElseThrow();
 
         assertThat(referenceBranch).isNotSameAs(nullBranch);
-        assertThat(referenceBranch.path("$ref").asText()).endsWith("/" + refName);
+        assertThat(referenceBranch.path("$ref").asString()).endsWith("/" + refName);
         assertThat(referenceBranch.has("type")).isFalse();
         assertThat(nullBranch.has("$ref")).isFalse();
         assertThat(property.has("$ref")).isFalse();

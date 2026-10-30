@@ -80,7 +80,7 @@ jwt:
   signing-key: ${JWT_SIGNING_KEY}
 
 crypto:
-  aes-key: ${AES_ENCRYPTION_KEY} # AesCryptoService(:shared) — UserNotifyProfilePersistenceAdapter의 telegram_bot_token 암복호화
+  aes-key: ${AES_ENCRYPTION_KEY} # AesCryptoService(:shared) — `AesStringConverter`(엔티티 `@Convert`)가 telegram_bot_token을 암복호화한다
 
 kis:
   base-url: https://openapi.koreainvestment.com:9443

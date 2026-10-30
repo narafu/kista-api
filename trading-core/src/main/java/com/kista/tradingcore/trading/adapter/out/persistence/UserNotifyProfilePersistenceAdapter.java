@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
@@ -32,7 +31,6 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
 
     private final UserNotifyProfileJpaRepository repository;
     private final ObjectMapper objectMapper;
-    private final AesCryptoService crypto; // telegramBotToken 복호화 — persistence 경계에서만 사용
 
     @Override
     public Optional<TradingUserProfile> findByUserId(UUID userId) {
@@ -52,10 +50,8 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
     }
 
     private TradingUserProfile toProfile(UserNotifyProfileEntity entity) {
-        // persistence 경계에서 telegramBotToken 복호화 — null이면 그대로 null 유지
-        String telegramBotToken = entity.getTelegramBotToken() == null ? null : crypto.decrypt(entity.getTelegramBotToken());
         return new TradingUserProfile(entity.getUserId(), readPrefs(entity),
-                telegramBotToken, entity.getChatId(), entity.getNotificationChannel());
+                entity.getTelegramBotToken(), entity.getChatId(), entity.getNotificationChannel());
     }
 
     // 복제본이 손상돼도 알림 판정만 기본값(전부 활성)으로 떨어지고 매매 자체는 계속되도록 격리한다

@@ -1,4 +1,4 @@
-package com.kista.api.user.application.service;
+package com.kista.api.user.adapter.in.event;
 
 import com.kista.api.user.application.event.ApprovalRequirementDisabledEvent;
 import com.kista.shared.kernel.UserStatus;

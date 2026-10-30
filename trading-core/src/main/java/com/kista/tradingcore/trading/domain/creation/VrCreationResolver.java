@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.domain.strategy;
+package com.kista.tradingcore.trading.domain.creation;
 
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;

@@ -61,11 +61,11 @@ class UpbitHttpClientTest {
         String token = client.token(ACCESS, SECRET, "market=KRW-BTC&side=bid&ord_type=price&price=5000&identifier=0190a5c4-0000-7000-8000-000000000001");
         String[] parts = token.split("\\.");
         JsonNode payload = mapper.readTree(Base64.getUrlDecoder().decode(parts[1]));
-        assertThat(payload.get("access_key").asText()).isEqualTo(ACCESS);
-        assertThat(payload.get("nonce").asText()).isEqualTo(NONCE);
-        assertThat(payload.get("query_hash_alg").asText()).isEqualTo("SHA512");
+        assertThat(payload.get("access_key").asString()).isEqualTo(ACCESS);
+        assertThat(payload.get("nonce").asString()).isEqualTo(NONCE);
+        assertThat(payload.get("query_hash_alg").asString()).isEqualTo("SHA512");
         // Python hashlib.sha512 독립 계산값
-        assertThat(payload.get("query_hash").asText()).isEqualTo(
+        assertThat(payload.get("query_hash").asString()).isEqualTo(
                 "edff38f20d7c635e5ea5c0d55236e934b3286c530667e2e1dca234100f043294fe990714b757c6f54f290a7968a4188e9c6a32d212960b38cbbffef69a172319");
         Mac mac = Mac.getInstance("HmacSHA512");
         mac.init(new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA512"));

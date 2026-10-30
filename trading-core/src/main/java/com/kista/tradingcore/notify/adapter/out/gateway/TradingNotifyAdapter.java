@@ -30,7 +30,7 @@ class TradingNotifyAdapter implements TradingNotifyPort {
     public void notifyError(Exception e) {
         // 보고 이벤트 발행 실패(리스너 예외 등)가 관리자 텔레그램 알림 자체를 막지 않도록 격리
         try {
-            eventPublisher.publishEvent(AppErrorRaisedEvent.of(e, "TradingNotifyAdapter"));
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(e, TradingNotifyAdapter.class.getSimpleName()));
         } catch (Exception publishEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", publishEx.getMessage());
         }

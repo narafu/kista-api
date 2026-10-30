@@ -107,7 +107,7 @@ class UpbitHttpClient {
     private String errorName(String body) {
         try {
             JsonNode name = objectMapper.readTree(body).path("error").path("name");
-            return name.isMissingNode() || name.isNull() ? null : name.asText();
+            return name.isMissingNode() || name.isNull() ? null : name.asString();
         } catch (RuntimeException ex) {
             return null; // 바디가 JSON이 아님 — 상태 코드만으로 판정
         }

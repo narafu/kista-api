@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.Optional;
 import com.kista.shared.kernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
-import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import org.junit.jupiter.api.DisplayName;
@@ -28,13 +27,12 @@ import static org.mockito.Mockito.when;
 class UserNotifyProfileSyncListenerTest {
 
     @Mock UserNotifyProfileJpaRepository repository;
-    @Mock AesCryptoService crypto;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UUID USER_ID = UUID.randomUUID();
 
     private UserNotifyProfileSyncListener listener() {
-        return new UserNotifyProfileSyncListener(repository, objectMapper, crypto);
+        return new UserNotifyProfileSyncListener(repository, objectMapper);
     }
 
     @Test
@@ -148,23 +146,21 @@ class UserNotifyProfileSyncListenerTest {
     }
 
     @Test
-    @DisplayName("telegramBotToken 평문을 암호화해 저장하고, DB 저장값은 평문이 아니다")
-    void onProfileChanged_encryptsTelegramBotToken() {
-        when(crypto.encrypt("plain-token")).thenReturn("cipher-text");
-
+    @DisplayName("telegramBotToken 평문을 엔티티에 담는다(암호화는 컨버터 몫)")
+    void onProfileChanged_storesTelegramBotToken() {
         listener().onProfileChanged(new UserNotifyProfileChangedEvent(
                 USER_ID, Map.of(), true, "plain-token", "chat-1"));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());
         UserNotifyProfileEntity saved = captor.getValue();
-        assertThat(saved.getTelegramBotToken()).isEqualTo("cipher-text").isNotEqualTo("plain-token");
+        assertThat(saved.getTelegramBotToken()).isEqualTo("plain-token");
         assertThat(saved.getChatId()).isEqualTo("chat-1");
     }
 
     @Test
-    @DisplayName("telegramBotToken이 null이면 암호화를 시도하지 않고 null을 저장한다")
-    void onProfileChanged_nullTelegramBotTokenSkipsEncrypt() {
+    @DisplayName("telegramBotToken이 null이면 null을 저장한다")
+    void onProfileChanged_nullTelegramBotTokenStoresNull() {
         listener().onProfileChanged(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);

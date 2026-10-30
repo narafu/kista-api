@@ -23,7 +23,7 @@ public class TelegramAdapter implements NotifyPort {
         // 발송 전에 오류 보고 이벤트를 먼저 발행 — 저장은 admin AppErrorRaisedListener가 담당
         // 리스너 예외가 관리자 텔레그램 발송을 막지 않도록 격리
         try {
-            eventPublisher.publishEvent(AppErrorRaisedEvent.of(e, "TelegramAdapter"));
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(e, TelegramAdapter.class.getSimpleName()));
         } catch (Exception reportEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", reportEx.getMessage());
         }

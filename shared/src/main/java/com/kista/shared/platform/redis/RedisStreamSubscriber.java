@@ -146,8 +146,10 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
 
     // idleThreshold 이상 ack 없는 pending을 복구 컨슈머로 claim해 handle로 재처리 — 처리 건수 반환
     public int reclaimPending(Duration idleThreshold) {
-        return RedisStreams.reclaimPending(redisTemplate, streamKey, group,
-                consumerPrefix + RECOVERY_CONSUMER, idleThreshold, CLAIM_BATCH_SIZE, maxDeliveries(), this::handle, this::onGiveUp);
+        return RedisStreams.reclaimPending(redisTemplate,
+                new RedisStreams.ReclaimSpec(streamKey, group, consumerPrefix + RECOVERY_CONSUMER,
+                        idleThreshold, CLAIM_BATCH_SIZE, maxDeliveries()),
+                this::handle, this::onGiveUp);
     }
 
     // 구독 컨테이너 정지 — 정지 중 오류는 무시하고 상태를 초기화해 재기동 가능하게 한다

@@ -5,6 +5,7 @@ import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.trading.domain.model.VrSummary;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
 import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
@@ -28,15 +29,12 @@ public class VrStrategyLifecycle implements VrStrategyDetailUseCase {
 
     @Override
     public StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
-                                       BigDecimal bandWidth, Integer recurringAmount,
-                                       int initialGradient, int gGraceWeeks, int gStepWeeks, int gMax,
-                                       BigDecimal initialPoolLimitRate, int pGraceWeeks, int pStepWeeks,
-                                       BigDecimal poolLimitFloor) {
+                                       BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp) {
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
         return strategyVrDetailPort.save(
                 new StrategyVrDetail(strategyVersionId, intervalWeeks, bandWidth, normalizedRecurringAmount,
-                        initialGradient, gGraceWeeks, gStepWeeks, gMax,
-                        initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor));
+                        ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
+                        ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor()));
     }
 
     @Override

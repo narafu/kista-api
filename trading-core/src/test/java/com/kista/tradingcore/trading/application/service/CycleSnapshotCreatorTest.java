@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.application.service.support.VrStrategyLifecycle;
 
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -46,8 +47,8 @@ class CycleSnapshotCreatorTest {
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
                 strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
-        creator.createVrCycleAndSnapshot(strategyId, strategyVersionId, postBalance, new BigDecimal("120.00"),
-                new BigDecimal("900.00"), 10, new BigDecimal("0.50"));
+        creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
+                new BigDecimal("120.00"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now()));
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         ArgumentCaptor<CyclePosition> positionCaptor = ArgumentCaptor.forClass(CyclePosition.class);
@@ -71,8 +72,8 @@ class CycleSnapshotCreatorTest {
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
                 strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
-        creator.createVrCycleAndSnapshot(strategyId, strategyVersionId, postBalance, new BigDecimal("600.005"),
-                new BigDecimal("900.00"), 10, new BigDecimal("0.50"));
+        creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
+                new BigDecimal("600.005"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now()));
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(cycleCaptor.capture());
@@ -124,9 +125,8 @@ class CycleSnapshotCreatorTest {
         when(strategyVersionPort.nextVersionNo(strategyId)).thenReturn(2);
         when(strategyVersionPort.save(any())).thenReturn(
                 new StrategyVersion(newVersionId, strategyId, 2, null, null));
-        when(vrStrategyLifecycle.saveVersionDetail(
-                newVersionId, 4, new BigDecimal("15.00"), 0,
-                10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50")))
+        VrRampParams ramp = new VrRampParams(10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
+        when(vrStrategyLifecycle.saveVersionDetail(newVersionId, 4, new BigDecimal("15.00"), 0, ramp))
                 .thenReturn(newDetail);
         when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
             StrategyCycle cycle = invocation.getArgument(0);
@@ -136,12 +136,9 @@ class CycleSnapshotCreatorTest {
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
                 strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
-        creator.reconfigureVrCycle(
-                strategyId, currentCycleId, today,
-                4, new BigDecimal("15.00"), 0,
-                10, 52, 26, 10,
-                new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"),
-                postAdjustment, closingPrice, new BigDecimal("1000.00"), 0);
+        creator.reconfigureVrCycle(new CycleSnapshotCreator.VrReconfiguration(
+                strategyId, currentCycleId, today, 4, new BigDecimal("15.00"), 0, ramp,
+                postAdjustment, closingPrice, new BigDecimal("1000.00"), 0));
 
         ArgumentCaptor<BigDecimal> endAmountCaptor = ArgumentCaptor.forClass(BigDecimal.class);
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);

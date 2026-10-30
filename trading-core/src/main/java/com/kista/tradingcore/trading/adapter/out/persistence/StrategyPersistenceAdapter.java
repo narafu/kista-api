@@ -15,7 +15,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.shared.kernel.StrategyCycleSeedType;
 
 @Component
 @RequiredArgsConstructor
@@ -112,7 +111,7 @@ class StrategyPersistenceAdapter implements StrategyPort {
         e.setType(s.type());
         e.setStatus(s.status());
         e.setTicker(s.ticker());
-        e.setCycleSeedType(s.cycleSeedType() != null ? s.cycleSeedType() : StrategyCycleSeedType.NONE);
+        e.setCycleSeedType(s.cycleSeedType());
         return e;
     }
 }

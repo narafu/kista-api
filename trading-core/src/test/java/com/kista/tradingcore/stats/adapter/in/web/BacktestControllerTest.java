@@ -1,9 +1,9 @@
 package com.kista.tradingcore.stats.adapter.in.web;
 
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestPoint;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestResult;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestSummary;
+import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
+import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
+import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
+import com.kista.tradingcore.stats.domain.backtest.BacktestSummary;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.stats.application.usecase.BacktestUseCase;
 import org.junit.jupiter.api.Test;

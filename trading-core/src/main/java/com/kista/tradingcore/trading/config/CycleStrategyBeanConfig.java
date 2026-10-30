@@ -1,19 +1,19 @@
-package com.kista.tradingcore.trading.application.service.support;
+package com.kista.tradingcore.trading.config;
 
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.tradingcore.trading.domain.strategy.DcaCreationResolver;
-import com.kista.tradingcore.trading.domain.strategy.InfiniteCreationResolver;
+import com.kista.tradingcore.trading.domain.creation.DcaCreationResolver;
+import com.kista.tradingcore.trading.domain.creation.InfiniteCreationResolver;
 import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
-import com.kista.tradingcore.trading.domain.strategy.PrivacyCreationResolver;
+import com.kista.tradingcore.trading.domain.creation.PrivacyCreationResolver;
 import com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.PrivacyStrategy;
 import com.kista.tradingcore.matching.domain.strategy.ReverseInfiniteStrategy;
-import com.kista.tradingcore.trading.domain.strategy.StrategyCreationResolver;
-import com.kista.tradingcore.trading.domain.strategy.StrategyCreationResolvers;
-import com.kista.tradingcore.trading.domain.strategy.VrCreationResolver;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolvers;
+import com.kista.tradingcore.trading.domain.creation.VrCreationResolver;
 import com.kista.tradingcore.matching.domain.strategy.VrCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.VrStrategy;
 import org.springframework.context.annotation.Bean;
@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
-// domain/strategy 전략 구현체를 Spring 빈으로 명시 배선 — 도메인 레이어를 Spring 비의존으로 유지하기 위해
+// matching/domain/strategy 전략 구현체를 Spring 빈으로 명시 배선 — 도메인 레이어를 Spring 비의존으로 유지하기 위해
 // @Component 대신 이 팩토리가 인스턴스화한다(stats BacktestEngine이 순수 도메인 원칙으로 직접 new 하는 것과 동일 취지).
 @Configuration
 class CycleStrategyBeanConfig {

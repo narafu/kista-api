@@ -1,5 +1,6 @@
 package com.kista.api.finance.adapter.out.persistence;
 
+import com.kista.shared.platform.crypto.AesStringConverter;
 import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.api.finance.domain.model.FinanceAccount;
 import jakarta.persistence.*;
@@ -42,8 +43,9 @@ class FinanceAccountEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 50)
     private String name;                  // 계좌명 (예: 토스증권 일반계좌)
 
+    @Convert(converter = AesStringConverter.class)
     @Column(name = "account_no", length = 512)
-    private String accountNo;             // AES-256 암호화 저장, 선택
+    private String accountNo;             // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터), 선택
 
     @Column(name = "account_no_hash", length = 64)
     private String accountNoHash;         // HMAC-SHA256 해시 (전역 중복 체크용, accountNo 없으면 null)
@@ -60,7 +62,7 @@ class FinanceAccountEntity extends BaseAuditEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt; // null이면 활성, non-null이면 소프트 삭제됨
 
-    // 암/복호화는 persistence 경계(FinanceAccountPersistenceAdapter)에서 수행 — 이 메서드에는 평문/암호문 어느 쪽이든 그대로 들어온다.
+    // 암/복호화는 accountNo 컬럼의 AesStringConverter가 수행 — 엔티티는 평문만 다룬다.
     static FinanceAccountEntity fromModel(FinanceAccount a) {
         FinanceAccountEntity e = new FinanceAccountEntity();
         e.id = a.id(); // null이면 @UuidGenerator가 UUID v7 생성

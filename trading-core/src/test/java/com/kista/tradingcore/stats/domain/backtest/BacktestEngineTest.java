@@ -1,7 +1,7 @@
 package com.kista.tradingcore.stats.domain.backtest;
 
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestCommand;
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestPoint;
+import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
+import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderType;

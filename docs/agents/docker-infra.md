@@ -167,6 +167,32 @@ DELETE FROM event_publication WHERE completion_date IS NULL AND event_type LIKE 
 - **리스너 패키지 이동은 `event_publication.listener_id`에 고아 row를 남긴다**(`trading.notify` → `tradingnotify` 분리, 매매 알림 리스너 6종 `com.kista.trading.notify.adapter.out.gateway.*` → `com.kista.tradingnotify.adapter.out.gateway.*`): 옛 id로 남은 미완료 row는 어떤 리스너와도 매칭하지 못해 재발행되지 않고 영구히 남는다. 이벤트 FQCN(위 항목)과는 별개 문제다. **kista-trading 이미지 교체 직전**(매매 시간대 밖) `SELECT count(*) FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`로 확인해 0건이 아니면 같은 조건으로 `DELETE FROM trading.event_publication WHERE completion_date IS NULL AND listener_id LIKE 'com.kista.trading.notify.%'`를 실행한다(해당 알림은 유실 — 배포 공지에 명시). 옛 패턴만 지우므로 새 이미지 기동 후 재실행해도 무해하다. 완료 row는 건드리지 않는다 — Modulith가 자체 정리한다
 - **benchmark 패키지 개명(`com.kista.stats` → `com.kista.benchmark`)도 같은 `ClassNotFoundException`을 만든다** — root 이벤트 `StatsAlertRaisedEvent`가 `BenchmarkAlertRaisedEvent`로 개명되며 FQCN이 `com.kista.stats.application.event.StatsAlertRaisedEvent` → `com.kista.benchmark.application.event.BenchmarkAlertRaisedEvent`로 바뀌었다(KB Land·시장지수 수집 실패 알림, notify `AlertNotifier`가 구독). 대상은 root `public.event_publication`이고 EPR 재발행 소유는 kista-scheduler(`REPUBLISH_OUTSTANDING_EVENTS_ON_RESTART=true`)다. 옛 FQCN 미완료 row가 남은 채 배포하면 kista-scheduler 재기동마다 반복 실패하며 자연 치유되지 않는다. 배포 직전 `SELECT count(*) FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'`로 확인하고, 0건이 아니면 `DELETE FROM public.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.stats.application.event.StatsAlertRaisedEvent'`로 정리한다(수집 실패 알림 일부 유실 — 배포 공지 불필요). `completion_date`를 채워 완료로 위장하지 않고 삭제로 처리한다. 확인·정리는 kista-scheduler 이미지 교체 직전에 하며, 옛 FQCN 패턴은 정상 신규 row와 겹치지 않으므로 새 이미지 기동 후 발견해도 같은 DELETE로 안전하게 정리할 수 있다
 - **탈퇴 정리 리스너 병합은 `trading.event_publication.listener_id`에 고아 row를 남길 수 있다**: trading-core의 `UserDeletedEvent` 구독자 4개를 `com.kista.trading.adapter.out.UserCascadeListener#onUserDeleted` 하나로 합쳤다. 사라진 3개는 `com.kista.trading.application.service.support.StrategyUserCascadeListener`, `com.kista.account.application.service.AccountUserCascadeListener`, `com.kista.trading.adapter.out.persistence.UserNotifyProfileSyncListener`의 `onUserDeleted`다(같은 클래스의 `onProfileChanged`는 유지). 이벤트 FQCN(`com.kista.sharedkernel.UserDeletedEvent`)은 그대로라 병합 리스너 row는 정상 재발행된다. 사라진 3개 id로 남은 미완료 row는 새 이미지에서 매칭되지 않고 `pre-apply.sh`(`epr-orphans.sh`)가 배포를 막는다. **kista-trading 이미지 교체 직전**(매매 시간대 밖)에 확인한다: `SELECT listener_id, count(*) FROM trading.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.sharedkernel.UserDeletedEvent' GROUP BY listener_id`. 고아 row가 하나라도 있으면 병합 리스너 row 상태와 무관하게, 삭제 전에 그 row들의 `serialized_event`에서 userId를 모두 기록한다 — 옛 이미지의 병합 리스너 id는 cycle_position·strategy_cycle만 정리했으므로 그 row가 이미 완료돼 있어도 계좌·전략·`broker_tokens`·`user_notify_profile` 정리는 고아 row에만 걸려 있다. 배포 후 기록한 사용자마다 계좌·전략·토큰이 남았는지 확인하고, 남았으면 그 사용자의 `UserDeletedEvent`를 `stream:user.deleted`로 다시 흘려 병합 리스너(멱등)가 정리하게 한다. `listener_id` 형식은 Modulith 버전에 따라 `Class.method(EventFqcn)` 또는 `Class#method`라 아래 SQL은 접두사 LIKE로 둘 다 맞춘다. 삭제: `DELETE FROM trading.event_publication WHERE completion_date IS NULL AND event_type = 'com.kista.sharedkernel.UserDeletedEvent' AND (listener_id LIKE 'com.kista.trading.application.service.support.StrategyUserCascadeListener%' OR listener_id LIKE 'com.kista.account.application.service.AccountUserCascadeListener%' OR (listener_id LIKE 'com.kista.trading.adapter.out.persistence.UserNotifyProfileSyncListener%' AND listener_id LIKE '%onUserDeleted%'))`. 옛 id는 새 코드에 다시 생기지 않으므로 새 이미지 기동 후 재실행해도 무해하다. `completion_date`를 채워 완료로 위장하지 않는다
+- **2026-10-31 리스너 재배치는 `listener_id`를 바꾼다**(이벤트 FQCN은 불변, 리스너 클래스만 이동). listener_id 형식은 `FQCN.메서드(이벤트FQCN)`(Spring `ApplicationListenerMethodAdapter` 기본 id — `epr-orphans.sh` 헤더 참고). `pre-apply.sh`/`epr-orphans.sh`는 FQCN 하드코딩 없이 배포 대상 커밋 소스를 조회하므로 옛 id가 남아 있으면 자동으로 막는다 — 이 항목은 막힌 뒤(또는 그 전에) 정리하는 절차다.
+  | 서비스(테이블) | 옛 listener_id | 새 listener_id |
+  |---|---|---|
+  | kista-trading(`trading.event_publication`) | `com.kista.tradingcore.trading.application.service.support.AccountCascadeListener.onAccountDeleted(com.kista.tradingcore.account.application.event.AccountDeletedEvent)` | `com.kista.tradingcore.trading.adapter.in.event.AccountCascadeListener.onAccountDeleted(com.kista.tradingcore.account.application.event.AccountDeletedEvent)` |
+  | kista-scheduler(`public.event_publication`) | `com.kista.api.user.application.service.ApprovalRequirementDisabledListener.onApprovalRequirementDisabled(com.kista.api.user.application.event.ApprovalRequirementDisabledEvent)` | `com.kista.api.user.adapter.in.event.ApprovalRequirementDisabledListener.onApprovalRequirementDisabled(com.kista.api.user.application.event.ApprovalRequirementDisabledEvent)` |
+  
+  `public.event_publication` 행은 발행 프로세스(kista-api)가 로드한 리스너 id로 기록되므로 kista-api·kista-scheduler 두 role이 모두 새 이미지로 교체된 뒤 다시 조회해 정리한다.
+
+  각 이미지 교체 **직전**(매매 시간대 밖)에 서버(`ssh kista-server` → `docker exec kista-postgres psql -U kista -d kistadb`)에서 읽기 전용으로 확인하고, 0건이 아니면 삭제한다(재시도 포기 — 해당 미완료 계좌 삭제 cascade/승인 설정 OFF 일괄 승인은 유실되므로 필요 시 수동 처리: 남은 계좌의 사이클·전략 soft-delete, PENDING 사용자 수동 승인).
+  ```sql
+  -- kista-trading 교체 전
+  SELECT id, event_type, listener_id, publication_date FROM trading.event_publication
+   WHERE completion_date IS NULL
+     AND listener_id LIKE 'com.kista.tradingcore.trading.application.service.support.AccountCascadeListener.%';
+  DELETE FROM trading.event_publication
+   WHERE completion_date IS NULL
+     AND listener_id LIKE 'com.kista.tradingcore.trading.application.service.support.AccountCascadeListener.%';
+  -- kista-scheduler 교체 전
+  SELECT id, event_type, listener_id, publication_date FROM public.event_publication
+   WHERE completion_date IS NULL
+     AND listener_id LIKE 'com.kista.api.user.application.service.ApprovalRequirementDisabledListener.%';
+  DELETE FROM public.event_publication
+   WHERE completion_date IS NULL
+     AND listener_id LIKE 'com.kista.api.user.application.service.ApprovalRequirementDisabledListener.%';
+  ```
+  `completion_date`를 채워 완료로 위장하지 말 것. 교체 직후 재조회로 blue/green 겹침 동안 옛 id로 쓰인 row가 없는지 확인한다.
 
 ### SUBMITTING 잔류 주문 정정 런북
 접수 결과 불명 주문은 `orders.status='SUBMITTING'`으로 남아 어떤 재실행도 재접수하지 않는다(관리자 알림 `[접수 결과 불명]`·`[DB 불일치]`·`[접수 결과 불명 — 리포트 제외]`). Toss는 다음 접수 경로가 선점 후 2~9분 창에서 같은 멱등키로 재요청해 자동 대사하지만, KIS·창 밖은 사람이 정정한다. 잔류 동안 그 사이클의 전략·계좌 삭제와 탈퇴 cascade는 재시도 가능한 취소 실패로 막힌다.

@@ -1,5 +1,6 @@
 package com.kista.api.user.adapter.out.persistence.user;
 
+import com.kista.shared.platform.crypto.AesStringConverter;
 import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.api.user.domain.model.User;
 import com.kista.shared.kernel.NotificationChannel;
@@ -33,8 +34,9 @@ class UserEntity extends BaseAuditEntity {
     @Column(length = 100)
     private String nickname;
 
+    @Convert(converter = AesStringConverter.class)
     @Column(length = 512)
-    private String email; // AES-256 암호화 저장 — 이메일 동의 안 하면 null
+    private String email; // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터), 이메일 동의 안 하면 null
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -44,8 +46,9 @@ class UserEntity extends BaseAuditEntity {
     @Column(nullable = false, length = 20)
     private UserRole role; // 사용자 권한 (USER / ADMIN)
 
+    @Convert(converter = AesStringConverter.class)
     @Column(name = "telegram_bot_token", length = 512)
-    private String telegramBotToken; // AES-256 암호화 저장
+    private String telegramBotToken; // 평문 보유 — DB에는 AES-256 암호문 저장(컨버터)
 
     @Column(name = "telegram_chat_id", length = 50)
     private String telegramChatId;

@@ -4,12 +4,12 @@ import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
-import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.tradingcore.trading.domain.model.*;
-import com.kista.tradingcore.trading.domain.strategy.VrRampParams;
+import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
+import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,50 +34,48 @@ class StrategyCreationPersister {
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
     private final StrategyDcaDetailPort dcaDetailPort;
 
-    // 저장 결과 — VR이 아니면 vrDetail·cycleVr는 null
-    record Persisted(Strategy strategy, StrategyVrDetail vrDetail, StrategyCycle cycle,
-                     CyclePosition initialPosition, StrategyCycleVrDetail cycleVr) {}
+    // 저장 입력 — 같은 타입 인자(BigDecimal 7)의 자리 바뀜을 막으려고 묶는다
+    // resolved: 런타임 정책이 해석한 ticker·divisionCount·VR 주기/밴드/적립액, ramp: VR 등록일 때만 non-null,
+    // vrValue: VR V값(override 반영) — 비VR은 null, dca: DCA 등록일 때만 non-null
+    record Draft(UUID accountId, StrategyType type, StrategyCycleSeedType seedType, ResolvedCreation resolved,
+                 VrRampParams ramp, BigDecimal initialUsdDeposit, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
+                 BigDecimal marketPrice, BigDecimal startAmount, BigDecimal vrValue, LocalDate scheduledStart,
+                 DcaStrategyConfig dca) {}
 
-    // ramp: VR 등록일 때만 non-null, vrValue: VR V값(override 반영) — 비VR은 null, dca: DCA 등록일 때만 non-null
     @Transactional
-    Persisted persist(UUID accountId, StrategyType type, StrategyTicker ticker, StrategyCycleSeedType seedType,
-                      int divisionCount, Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount,
-                      VrRampParams ramp, BigDecimal initialUsdDeposit, BigDecimal initialHoldings, BigDecimal initialAvgPrice,
-                      BigDecimal marketPrice, BigDecimal startAmount, BigDecimal vrValue, LocalDate scheduledStart,
-                      DcaStrategyConfig dca) {
+    Strategy persist(Draft d) {
+        ResolvedCreation resolved = d.resolved();
         // strategy → strategy_versions → 전략 타입별 detail 순 저장
-        Strategy saved = strategyPort.save(new Strategy(null, accountId, type, StrategyStatus.ACTIVE, ticker, seedType));
+        Strategy saved = strategyPort.save(new Strategy(null, d.accountId(), d.type(), StrategyStatus.ACTIVE, resolved.ticker(), d.seedType()));
         StrategyVersion version = strategyVersionPort.save(
                 new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
         );
         StrategyVrDetail vrDetail = null;
         if (saved.isInfinite()) {
-            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), divisionCount));
+            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), resolved.divisionCount()));
         } else if (saved.isVr()) {
-            vrDetail = vrStrategyLifecycle.saveVersionDetail(version.id(), intervalWeeks, bandWidth, recurringAmount,
-                    ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
-                    ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor());
+            vrDetail = vrStrategyLifecycle.saveVersionDetail(
+                    version.id(), resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), d.ramp());
         } else if (saved.isDca()) {
-            dcaDetailPort.save(version.id(), dca); // DCA 버전 규칙 (ruleKey는 호출부가 확정)
+            dcaDetailPort.save(version.id(), d.dca()); // DCA 버전 규칙 (ruleKey는 호출부가 확정)
         }
 
         // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
         // startAmount 산출 규칙은 호출부(StrategyCreationService) 소유
-        BigDecimal normalizedInitialUsdDeposit = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
-        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), version.id(), startAmount, scheduledStart));
+        BigDecimal normalizedInitialUsdDeposit = d.initialUsdDeposit() != null ? d.initialUsdDeposit() : BigDecimal.ZERO;
+        StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), version.id(), d.startAmount(), d.scheduledStart()));
 
         // DCA는 marketPrice 없음(closingPrice null) — 시작 원장 = 초기 보유·평단, 예수금 0
-        CyclePosition initialPosition = initialHoldings.signum() > 0
+        CyclePosition initialPosition = d.initialHoldings().signum() > 0
                 ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(
-                        cycle.id(), normalizedInitialUsdDeposit, initialHoldings, initialAvgPrice, marketPrice))
+                        cycle.id(), normalizedInitialUsdDeposit, d.initialHoldings(), d.initialAvgPrice(), d.marketPrice()))
                 : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
 
-        StrategyCycleVrDetail cycleVr = null;
         if (saved.isInfinite()) {
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
         } else if (saved.isVr()) {
-            cycleVr = vrStrategyLifecycle.saveInitialCycleDetail(cycle.id(), vrValue, vrDetail);
+            vrStrategyLifecycle.saveInitialCycleDetail(cycle.id(), d.vrValue(), vrDetail);
         }
-        return new Persisted(saved, vrDetail, cycle, initialPosition, cycleVr);
+        return saved;
     }
 }

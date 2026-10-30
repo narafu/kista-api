@@ -151,7 +151,7 @@ class VrCycleRolloverService {
         // 시작일은 evaluationDate(항상 실제 거래일)로 고정 — dueDate(휴장일일 수 있음) 그대로 쓰면 시작일이 비거래일이 되고,
         // 배치 실행일(today)을 쓰면 실행이 며칠 밀릴 때마다 다음 due일도 함께 밀려 N주 스케줄이 누적 drift된다
         AccountBalance newCycleBalance = postBalance.withUsdDeposit(adjustedPool);
-        cycleSnapshotCreator.createVrCycleAndSnapshot(
+        cycleSnapshotCreator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(
                 strategy.id(),
                 cycle.strategyVersionId(),
                 newCycleBalance,
@@ -160,7 +160,7 @@ class VrCycleRolloverService {
                 detail.gradientAt(weeks),  // 램프 재계산 G (스냅샷 이월 폐기)
                 newPoolLimitRate,
                 evaluationDate
-        );
+        ));
         log.info("[strategyId={}] VR 사이클 롤오버 완료: newValue={}, newPoolLimitRate={}", strategy.id(), newValue, newPoolLimitRate);
 
         // 사용자에게 새 사이클 시작 알림 이벤트 발행 (적립/인출 반영된 개장 예수금)

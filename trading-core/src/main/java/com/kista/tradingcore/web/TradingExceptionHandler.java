@@ -35,7 +35,7 @@ import static com.kista.shared.platform.web.ProblemDetailMappings.problem;
 
 // trading-core 프로세스 전역 예외→HTTP 매핑 advice(앱셸 tradingcore.web 소속 — root com.kista.api.web.GlobalExceptionHandler와 대칭).
 // 이 프로세스엔 root advice가 없으므로 컨트롤러 패키지 제약 없이 모든 컨트롤러의 예외를 처리한다:
-// trading-core 고유 예외 + BrokerApiException(503) + 범용 JDK/Spring 예외(ProblemDetailMappings.GENERIC) + catch-all 500.
+// BrokerApiException(503)·검증 실패 전용 핸들러 + catch-all이 MAPPINGS(trading-core 고유 예외 + 범용 JDK/Spring 예외 GENERIC) 조회 후 500 폴백.
 //
 // BrokerApiException(KIS/Toss 예외의 벤더 중립 상위 타입, trading-core 소유)은 app_error_logs가 root 소유 테이블이라
 // AppErrorRaisedEvent(shared.kernel)를 발행하고 AppErrorStreamPublisher가 Redis Stream(stream:app.error)으로 root에 push한다.
@@ -46,7 +46,7 @@ import static com.kista.shared.platform.web.ProblemDetailMappings.problem;
 // AppErrorRaisedEvent를 함께 발행해 같은 스트림으로 저장되므로 예외 처리기와 무관한 별도 경로로 이미 보장된다.
 //
 // @Order(HIGHEST_PRECEDENCE): catch-all(@ExceptionHandler(Exception.class))을 가진 다른 advice가 같은 컨텍스트에 생겨도
-// 이 advice가 먼저 평가되도록 하는 방어적 명시 — 지우면 advice 등록 순서에 따라 6종 전용 매핑이 500으로 회귀할 수 있다.
+// 이 advice가 먼저 평가되도록 하는 방어적 명시 — 지우면 advice 등록 순서에 따라 MAPPINGS의 4xx 매핑이 500으로 회귀할 수 있다.
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice
@@ -56,14 +56,14 @@ public class TradingExceptionHandler {
     // AppErrorRaisedEvent 발행용 — 저장은 AppErrorStreamPublisher(Redis Stream) → root admin이 담당
     private final ApplicationEventPublisher eventPublisher;
 
-    // trading-core 고유 예외 매핑 — 서브클래스(AlreadyOrderedToday/ManualTradingFailed)는 resolve()의 계층 탐색이 상위 ManualTradingException보다 먼저 찾는다
+    // 이 프로세스 예외→HTTP 매핑 SSOT(고유 예외 + 범용 GENERIC 병합) — 서브클래스(AlreadyOrderedToday/ManualTradingFailed)는 resolve()의 계층 탐색이 상위 ManualTradingException보다 먼저 찾는다
     private static final String BROKER_UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요."; // 503 응답 detail
 
-    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = Map.ofEntries(
-            Map.entry(BrokerWithdrawalEnabledException.class, new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker Withdrawal Enabled", ErrorCode.BROKER_WITHDRAWAL_ENABLED)),
-            Map.entry(BrokerIpNotAllowedException.class,      new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker IP Not Allowed", ErrorCode.BROKER_IP_NOT_ALLOWED)),
-            Map.entry(BrokerPermissionDeniedException.class,  new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Broker Permission Denied", ErrorCode.BROKER_PERMISSION_DENIED)),
-            Map.entry(BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_ENTITY, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
+    private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = ProblemDetailMappings.withGeneric(Map.ofEntries(
+            Map.entry(BrokerWithdrawalEnabledException.class, new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Broker Withdrawal Enabled", ErrorCode.BROKER_WITHDRAWAL_ENABLED)),
+            Map.entry(BrokerIpNotAllowedException.class,      new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Broker IP Not Allowed", ErrorCode.BROKER_IP_NOT_ALLOWED)),
+            Map.entry(BrokerPermissionDeniedException.class,  new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Broker Permission Denied", ErrorCode.BROKER_PERMISSION_DENIED)),
+            Map.entry(BrokerCredentialException.class,        new Mapping(HttpStatus.UNPROCESSABLE_CONTENT, "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
             Map.entry(BrokerRateLimitException.class,         new Mapping(HttpStatus.TOO_MANY_REQUESTS,     "Broker Rate Limit", ErrorCode.BROKER_RATE_LIMITED)),
             Map.entry(AlreadyOrderedTodayException.class,     new Mapping(HttpStatus.CONFLICT,              "Conflict", ErrorCode.ALREADY_ORDERED_TODAY)),
             Map.entry(DcaManualExecutionUnsupportedException.class, new Mapping(HttpStatus.CONFLICT,        "Conflict", ErrorCode.DCA_MANUAL_EXECUTION_UNSUPPORTED)),
@@ -75,21 +75,7 @@ public class TradingExceptionHandler {
             // 등록 409는 이 의미 하나뿐이라 UI 분기용 code 없이 status로 충분 — detail이 사용자 문구
             Map.entry(DuplicateStrategyTickerException.class, new Mapping(HttpStatus.CONFLICT,             "Conflict")),
             Map.entry(Account.DuplicateAccountException.class, new Mapping(HttpStatus.CONFLICT,             "Conflict", ErrorCode.DUPLICATE_ACCOUNT))
-    );
-
-    @ExceptionHandler({
-            BrokerCredentialException.class, BrokerRateLimitException.class,
-            ManualTradingException.class, DcaManualExecutionUnsupportedException.class, OrderCancelException.class,
-            PrivacyTradeConflictException.class, Account.DuplicateAccountException.class, DuplicateStrategyTickerException.class
-    })
-    public ProblemDetail handleTradingCoreExceptions(Exception ex) {
-        Mapping m = ProblemDetailMappings.resolve(ex, MAPPINGS);
-        if (m == null) {
-            // 위 6종(또는 그 서브클래스)만 이 메서드로 라우팅되므로 도달 불가 — 방어적 가드
-            throw new IllegalStateException("매핑 없는 예외가 TradingExceptionHandler로 라우팅됨: " + ex.getClass());
-        }
-        return ProblemDetailMappings.toProblem(m, ex);
-    }
+    ));
 
     // KIS·Toss 등 모든 증권사 API 실패를 벤더 중립 BrokerApiException 하나로 503 매핑 — title은 벤더 표기로 도출("KIS API Error"/"Toss API Error", 저장은 이벤트로 위임)
     @ExceptionHandler(BrokerApiException.class)
@@ -107,12 +93,12 @@ public class TradingExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ProblemDetailMappings.validationMessage(ex));
     }
 
-    // catch-all — 범용 매핑(GENERIC) 우선 조회, 매핑 있으면 4xx(에러 로그 없음) / 없으면 500 + 이벤트로 에러 로그 보고.
+    // catch-all — MAPPINGS 조회(고유 예외 + GENERIC), 매핑 있으면 4xx(에러 로그 없음) / 없으면 500 + 이벤트로 에러 로그 보고.
     // isClientDisconnect 가드: kista-ui가 직접 호출하는 브라우저·모바일 라우트가 섞여 있어 클라이언트 중도 이탈(broken pipe)이
     // app_error_logs를 오염시키는 결함을 막는다
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneric(Exception ex) {
-        return ProblemDetailMappings.catchAll(ex, ProblemDetailMappings.GENERIC, this::reportUnmapped);
+        return ProblemDetailMappings.catchAll(ex, MAPPINGS, this::reportUnmapped);
     }
 
     // 매핑 없는 미처리 예외 — 오류 보고 이벤트 + log.error
@@ -125,7 +111,7 @@ public class TradingExceptionHandler {
     // (스택트레이스 전체를 보내고 30줄 truncate는 저장 측(root)에서 수행)
     private void reportErrorLog(Exception ex) {
         try {
-            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, "TradingExceptionHandler"));
+            eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, TradingExceptionHandler.class.getSimpleName()));
         } catch (Exception reportEx) {
             log.warn("오류 보고 이벤트 발행 실패: {}", reportEx.getMessage());
         }

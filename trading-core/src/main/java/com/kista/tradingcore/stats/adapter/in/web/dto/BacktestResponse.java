@@ -1,6 +1,6 @@
 package com.kista.tradingcore.stats.adapter.in.web.dto;
 
-import com.kista.tradingcore.stats.domain.model.backtest.BacktestResult;
+import com.kista.tradingcore.stats.domain.backtest.BacktestResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;

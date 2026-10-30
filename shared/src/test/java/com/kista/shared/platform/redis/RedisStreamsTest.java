@@ -31,6 +31,7 @@ class RedisStreamsTest {
 
     private static final String STREAM = "stream:test";
     private static final String GROUP = "test-group";
+    private static final RedisStreams.ReclaimSpec SPEC = new RedisStreams.ReclaimSpec(STREAM, GROUP, "rc", Duration.ofSeconds(60), 100, 24);
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static StreamOperations<String, Object, Object> stubOps(StringRedisTemplate redisTemplate) {
@@ -82,7 +83,7 @@ class RedisStreamsTest {
         when(ops.claim(eq(STREAM), eq(GROUP), eq("rc"), any(Duration.class), any(RecordId[].class))).thenReturn(List.of(retryRecord));
         List<MapRecord<String, String, String>> handled = new ArrayList<>();
 
-        int count = RedisStreams.reclaimPending(redisTemplate, STREAM, GROUP, "rc", Duration.ofSeconds(60), 100, 24, handled::add);
+        int count = RedisStreams.reclaimPending(redisTemplate, SPEC, handled::add, id -> { });
 
         assertThat(count).isEqualTo(1);
         assertThat(handled).containsExactly(retryRecord);
@@ -104,7 +105,7 @@ class RedisStreamsTest {
                 new PendingMessage(poison, Consumer.from(GROUP, "c1"), Duration.ofMinutes(5), 99)));
         when(ops.pending(eq(STREAM), eq(GROUP), any(), anyLong(), any(Duration.class))).thenReturn(pending);
 
-        int count = RedisStreams.reclaimPending(redisTemplate, STREAM, GROUP, "rc", Duration.ofSeconds(60), 100, 24, r -> { });
+        int count = RedisStreams.reclaimPending(redisTemplate, SPEC, r -> { }, id -> { });
 
         assertThat(count).isZero();
         verify(ops).acknowledge(STREAM, GROUP, poison);
@@ -124,7 +125,7 @@ class RedisStreamsTest {
         when(ops.pending(eq(STREAM), eq(GROUP), any(), anyLong(), any(Duration.class))).thenReturn(pending);
         List<RecordId> givenUp = new ArrayList<>();
 
-        RedisStreams.reclaimPending(redisTemplate, STREAM, GROUP, "rc", Duration.ofSeconds(60), 100, 24, r -> { }, id -> {
+        RedisStreams.reclaimPending(redisTemplate, SPEC, r -> { }, id -> {
             givenUp.add(id);
             throw new IllegalStateException("alert down");
         });

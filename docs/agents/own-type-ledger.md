@@ -16,7 +16,7 @@
 **narrowing projection** (own-type이되 값 복제가 아니라 애그리게이트 축소 노출 — 별도 트랙):
 - `BrokerAccountRef`(broker, `Account`의 자격증명 투영): `Account→BrokerAccountRef` 변환은 `Account.toBrokerRef()` 1곳이 전담. `SellableQuantity`/`BrokerCredentialException`/`BrokerRateLimitException`은 broker 단독 소유 — account 측엔 대응 타입 없음. "복제"가 아니라 broker-native
 - `StrategyRefLite`(broker, `MockSimulationDataPort` 확장용 초경량 뷰)
-- `StrategyCreationRequest`(trading.domain.strategy, 원시값 5개): 리졸버 4종이 19필드 `RegisterStrategyCommand` 전체 대신 실제로 쓰는 필드만 받는 ISP 좁히기 — 모듈 경계용이 아니라 순수 인터페이스 설계
+- `StrategyCreationRequest`(trading.domain.creation, 원시값 5개): 리졸버 4종이 19필드 `RegisterStrategyCommand` 전체 대신 실제로 쓰는 필드만 받는 ISP 좁히기 — 모듈 경계용이 아니라 순수 인터페이스 설계
 - `FidaPlannedOrder`(privacy.domain.model, 원시값 4필드): `trading.domain.model.Order`(15필드) 대신 FIDA가 실제로 보내고 privacy가 실제로 읽는 필드만 받는 ISP 좁히기 — 필드 타입은 `sharedkernel.OrderDirection`/`OrderType`
 - `StrategyRef`(`com.kista.api.benchmark.domain.model`, `Strategy`의 id/type/ticker 3필드만 담는 narrowing): `InvestmentPointsPort.Result.selectedStrategy`와 `BenchmarkComparison.strategy`가 공유. modulith-migration-history.md에 "소멸했다"고 기록된 과거의 동명 trading own-type `StrategyRef`(strategyconfig 병합으로 제거)와는 이름만 같은 별개 타입 — 혼동 금지
 - `NotificationRecipient`(notify, `com.kista.api.notify.domain.model` — User 애그리게이트의 알림 발송용 6필드 투영: userId/nickname/notificationChannel/telegramBotToken/telegramChatId/rejectReason): 변환은 gateway 어댑터 경계의 `NotificationRecipients.from(User)`가 맡는다(`modules/api/notify.md`). notify가 User를 모르게 하는 목적 — trading-core `TradingUserProfile`(`trading.domain.model`)과 같은 접근

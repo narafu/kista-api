@@ -557,7 +557,7 @@ class TossHttpClientTest {
     private boolean insufficientFundsFor(String body) {
         TossHttpClient client = newClient();
         when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
-        expectPost(withStatus(HttpStatus.UNPROCESSABLE_ENTITY).body(body));
+        expectPost(withStatus(HttpStatus.UNPROCESSABLE_CONTENT).body(body));
         return postFailure(client).isInsufficientFunds();
     }
 

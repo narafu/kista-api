@@ -119,11 +119,7 @@ class VrReconfigureServiceTest {
         StrategyCycle firstCycle = new StrategyCycle(UUID.randomUUID(), strategyId, strategyVersionId,
                 BigDecimal.valueOf(500), null, firstStartDate, null, null, null);
         lenient().when(strategyCyclePort.findFirstByStrategyId(strategyId)).thenReturn(Optional.of(firstCycle));
-        lenient().when(cycleSnapshotCreator.reconfigureVrCycle(
-                        any(), any(), any(), any(), any(), any(),
-                        anyInt(), anyInt(), anyInt(), anyInt(),
-                        any(), anyInt(), anyInt(), any(),
-                        any(), any(), any(), anyLong()))
+        lenient().when(cycleSnapshotCreator.reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class)))
                 .thenReturn(newCycleAfterReconfigure);
     }
 
@@ -147,38 +143,17 @@ class VrReconfigureServiceTest {
     }
 
     private CapturedCall captureReconfigureCall() {
-        ArgumentCaptor<UUID> strategyIdCaptor = ArgumentCaptor.forClass(UUID.class);
-        ArgumentCaptor<UUID> cycleIdCaptor = ArgumentCaptor.forClass(UUID.class);
-        ArgumentCaptor<LocalDate> todayCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        ArgumentCaptor<Integer> intervalWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<BigDecimal> bandWidthCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-        ArgumentCaptor<Integer> recurringAmountCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<Integer> initialGradientCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<Integer> gGraceWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<Integer> gStepWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<Integer> gMaxCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<BigDecimal> initialPoolLimitRateCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-        ArgumentCaptor<Integer> pGraceWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<Integer> pStepWeeksCaptor = ArgumentCaptor.forClass(Integer.class);
-        ArgumentCaptor<BigDecimal> poolLimitFloorCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-        ArgumentCaptor<AccountBalance> postBalanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
-        ArgumentCaptor<BigDecimal> closingPriceCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-        ArgumentCaptor<BigDecimal> newValueCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-        ArgumentCaptor<Long> weeksCaptor = ArgumentCaptor.forClass(Long.class);
-
-        verify(cycleSnapshotCreator).reconfigureVrCycle(
-                strategyIdCaptor.capture(), cycleIdCaptor.capture(), todayCaptor.capture(),
-                intervalWeeksCaptor.capture(), bandWidthCaptor.capture(), recurringAmountCaptor.capture(),
-                initialGradientCaptor.capture(), gGraceWeeksCaptor.capture(), gStepWeeksCaptor.capture(), gMaxCaptor.capture(),
-                initialPoolLimitRateCaptor.capture(), pGraceWeeksCaptor.capture(), pStepWeeksCaptor.capture(), poolLimitFloorCaptor.capture(),
-                postBalanceCaptor.capture(), closingPriceCaptor.capture(), newValueCaptor.capture(), weeksCaptor.capture());
-
+        ArgumentCaptor<CycleSnapshotCreator.VrReconfiguration> captor =
+                ArgumentCaptor.forClass(CycleSnapshotCreator.VrReconfiguration.class);
+        verify(cycleSnapshotCreator).reconfigureVrCycle(captor.capture());
+        CycleSnapshotCreator.VrReconfiguration r = captor.getValue();
+        var ramp = r.ramp();
         return new CapturedCall(
-                strategyIdCaptor.getValue(), cycleIdCaptor.getValue(), todayCaptor.getValue(),
-                intervalWeeksCaptor.getValue(), bandWidthCaptor.getValue(), recurringAmountCaptor.getValue(),
-                initialGradientCaptor.getValue(), gGraceWeeksCaptor.getValue(), gStepWeeksCaptor.getValue(), gMaxCaptor.getValue(),
-                initialPoolLimitRateCaptor.getValue(), pGraceWeeksCaptor.getValue(), pStepWeeksCaptor.getValue(), poolLimitFloorCaptor.getValue(),
-                postBalanceCaptor.getValue(), closingPriceCaptor.getValue(), newValueCaptor.getValue(), weeksCaptor.getValue());
+                r.strategyId(), r.currentCycleId(), r.today(),
+                r.intervalWeeks(), r.bandWidth(), r.recurringAmount(),
+                ramp.initialGradient(), ramp.gGraceWeeks(), ramp.gStepWeeks(), ramp.gMax(),
+                ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor(),
+                r.postBalance(), r.closingPrice(), r.newValue(), r.weeks());
     }
 
     // --- 1) 순수 파라미터 수정 (자본 주입 없음) ---
@@ -318,11 +293,7 @@ class VrReconfigureServiceTest {
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
-                any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), anyInt(), anyInt(),
-                any(), anyInt(), anyInt(), any(),
-                any(), any(), any(), anyLong());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 
     @Test
@@ -336,11 +307,7 @@ class VrReconfigureServiceTest {
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
-                any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), anyInt(), anyInt(),
-                any(), anyInt(), anyInt(), any(),
-                any(), any(), any(), anyLong());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 
     @Test
@@ -426,11 +393,7 @@ class VrReconfigureServiceTest {
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
-                any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), anyInt(), anyInt(),
-                any(), anyInt(), anyInt(), any(),
-                any(), any(), any(), anyLong());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 
     @Test
@@ -443,11 +406,7 @@ class VrReconfigureServiceTest {
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
-                any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), anyInt(), anyInt(),
-                any(), anyInt(), anyInt(), any(),
-                any(), any(), any(), anyLong());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 
     @Test
@@ -491,11 +450,7 @@ class VrReconfigureServiceTest {
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
-                any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), anyInt(), anyInt(),
-                any(), anyInt(), anyInt(), any(),
-                any(), any(), any(), anyLong());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 
     // --- 8) 주식 주입인데 단가 누락 ---
@@ -510,10 +465,6 @@ class VrReconfigureServiceTest {
         assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, cmd))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(
-                any(), any(), any(), any(), any(), any(),
-                anyInt(), anyInt(), anyInt(), anyInt(),
-                any(), anyInt(), anyInt(), any(),
-                any(), any(), any(), anyLong());
+        verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
 }
