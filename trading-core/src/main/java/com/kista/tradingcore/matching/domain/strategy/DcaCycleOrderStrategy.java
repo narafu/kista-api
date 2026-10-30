@@ -131,7 +131,8 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             int amountScale = in.market().amountScale();
             BigDecimal affordable = in.tradingRules().affordableAmount(in.availableCash(), amountScale);
             BigDecimal want = rule.sizing().amount().setScale(amountScale, RoundingMode.FLOOR);
-            if (want.compareTo(affordable) > 0 && rule.shortfall() == DcaShortfallPolicy.REJECT) {
+            // 가용 0이면 PARTIAL도 잔고 부족 — 최소 금액 미달로 기록되면 원인(지갑 비어 있음)이 가려진다
+            if (want.compareTo(affordable) > 0 && (rule.shortfall() == DcaShortfallPolicy.REJECT || affordable.signum() <= 0)) {
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.INSUFFICIENT_BALANCE,
                         "필요 " + DcaConditions.plain(want) + " > 가용 " + DcaConditions.plain(affordable), basis);
             }

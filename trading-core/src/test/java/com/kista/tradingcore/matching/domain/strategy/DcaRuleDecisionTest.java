@@ -182,6 +182,14 @@ class DcaRuleDecisionTest {
     }
 
     @Test
+    void 크립토_BUY_PARTIAL도_가용0이면_INSUFFICIENT_BALANCE() { // Spot USDT 0(Earn 예치 등)
+        DcaRule r = crypto(OrderDirection.BUY, amount("10"), DcaShortfallPolicy.PARTIAL, List.of());
+        DcaRuleDecision.Skipped s = skipped(decideWith(r, Market.CRYPTO_USDT, BINANCE_LIKE, "0", "65000"));
+        assertThat(s.reason()).isEqualTo(DcaSkipReason.INSUFFICIENT_BALANCE);
+        assertThat(s.detail()).isEqualTo("필요 10 > 가용 0");
+    }
+
+    @Test
     void 크립토_USDT_최소금액_미달_문구() {
         DcaRule r = crypto(OrderDirection.BUY, amount("10"), DcaShortfallPolicy.PARTIAL, List.of());
         DcaRuleDecision.Skipped s = skipped(decideWith(r, Market.CRYPTO_USDT, BINANCE_LIKE, "4.99", "65000"));
