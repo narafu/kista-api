@@ -4,9 +4,9 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.NotificationType;
-import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
+import com.kista.tradingcore.trading.domain.model.TradingUserProfileChange;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -68,27 +68,27 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
 
     @Override
     @Transactional // 클래스 기본 readOnly 해제 — UserNotifyProfileSyncListener(REQUIRES_NEW) 트랜잭션에 합류
-    public void applyChange(UserNotifyProfileChangedEvent event) {
-        Optional<UserNotifyProfileEntity> existing = repository.findById(event.userId());
+    public void applyChange(TradingUserProfileChange change) {
+        Optional<UserNotifyProfileEntity> existing = repository.findById(change.userId());
         // 버전 가드 — 재시도·재발행된 옛 스냅샷이 더 새로운 복제본(또는 탈퇴 tombstone)을 덮지 않게 한다.
         // 한계: root 시각(occurredAt)과 trading 시각(tombstone)을 비교하므로 같은 호스트 시계에 기대고, 같은 사용자의 동시 두 변경이
         // 커밋 역순으로 도착하면 나중 커밋이 버려질 수 있다(발생 드묾 — 다음 변경이 바로잡는다).
         // occurredAt 없는 구버전 발행분은 비교 기준이 없어 그대로 적용한다
-        if (event.occurredAt() != null && existing.isPresent() && existing.get().getUpdatedAt().isAfter(event.occurredAt())) {
+        if (change.occurredAt() != null && existing.isPresent() && existing.get().getUpdatedAt().isAfter(change.occurredAt())) {
             log.info("옛 프로필 스냅샷 무시 — userId={}, occurredAt={}, 복제본 updatedAt={}",
-                    event.userId(), event.occurredAt(), existing.get().getUpdatedAt());
+                    change.userId(), change.occurredAt(), existing.get().getUpdatedAt());
             return;
         }
         // 직렬화 실패는 잡지 않는다 — 예외를 삼키면 복제본이 조용히 낡고, 그대로 던지면 publication이 FAILED로 남아
         // UserEventResubmitScheduler가 재발행한다(Map<NotificationType,Boolean>이라 실패 가능성 자체가 없음)
-        String prefsJson = objectMapper.writeValueAsString(event.notificationPrefs());
+        String prefsJson = objectMapper.writeValueAsString(change.notificationPrefs());
         // updated_at = 스냅샷 시각(버전) — 구버전 발행분만 동기화 시각
-        Instant version = event.occurredAt() != null ? event.occurredAt() : Instant.now();
+        Instant version = change.occurredAt() != null ? change.occurredAt() : Instant.now();
         // 기존 행은 필드 갱신, 없으면 신규 생성 — @Id 할당식이라 save()가 곧 upsert
         UserNotifyProfileEntity entity = existing.orElseGet(() -> new UserNotifyProfileEntity(
-                event.userId(), prefsJson, event.active(),
-                event.telegramBotToken(), event.chatId(), version, event.notificationChannel()));
-        entity.applyChange(prefsJson, event.active(), event.telegramBotToken(), event.chatId(), version, event.notificationChannel());
+                change.userId(), prefsJson, change.active(),
+                change.telegramBotToken(), change.chatId(), version, change.notificationChannel()));
+        entity.applyChange(prefsJson, change.active(), change.telegramBotToken(), change.chatId(), version, change.notificationChannel());
         repository.save(entity);
     }
 

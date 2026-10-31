@@ -6,6 +6,7 @@ import com.kista.shared.kernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
+import com.kista.tradingcore.trading.domain.model.TradingUserProfileChange;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,10 +36,25 @@ class UserNotifyProfileApplyChangeTest {
         return new UserNotifyProfilePersistenceAdapter(repository, objectMapper);
     }
 
+    // 어댑터 입력 스냅샷 — 채널·occurredAt 생략 오버로드는 구버전 발행분(null) 의미
+    private static TradingUserProfileChange snapshot(UUID id, Map<NotificationType, Boolean> prefs, boolean active, String token, String chat) {
+        return snapshot(id, prefs, active, token, chat, null, null);
+    }
+
+    private static TradingUserProfileChange snapshot(UUID id, Map<NotificationType, Boolean> prefs, boolean active, String token, String chat,
+                                                     NotificationChannel channel) {
+        return snapshot(id, prefs, active, token, chat, channel, null);
+    }
+
+    private static TradingUserProfileChange snapshot(UUID id, Map<NotificationType, Boolean> prefs, boolean active, String token, String chat,
+                                                     NotificationChannel channel, Instant occurredAt) {
+        return new TradingUserProfileChange(id, prefs, active, token, chat, channel, occurredAt);
+    }
+
     @Test
     @DisplayName("프로필 변경 이벤트를 받으면 복제본 행을 upsert 한다")
     void onProfileChanged_upsertsRow() {
-        adapter().applyChange(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(snapshot(
                 USER_ID, Map.of(NotificationType.MARKET_ALERT, false), true, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -53,7 +69,7 @@ class UserNotifyProfileApplyChangeTest {
     @Test
     @DisplayName("알림 채널을 복제한다")
     void onProfileChanged_storesNotificationChannel() {
-        adapter().applyChange(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(snapshot(
                 USER_ID, Map.of(), true, null, null, NotificationChannel.FCM));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -67,7 +83,7 @@ class UserNotifyProfileApplyChangeTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", true, null, null, Instant.now(), NotificationChannel.NONE)));
 
-        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, "t", "c"));
+        adapter().applyChange(snapshot(USER_ID, Map.of(), true, "t", "c"));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());
@@ -93,7 +109,7 @@ class UserNotifyProfileApplyChangeTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", false, null, null, stored, NotificationChannel.NONE)));
 
-        adapter().applyChange(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(snapshot(
                 USER_ID, Map.of(), true, null, null, NotificationChannel.NONE, stored.minusSeconds(1)));
 
         verify(repository, never()).save(any());
@@ -107,7 +123,7 @@ class UserNotifyProfileApplyChangeTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", true, null, null, stored, NotificationChannel.NONE)));
 
-        adapter().applyChange(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(snapshot(
                 USER_ID, Map.of(), false, null, null, NotificationChannel.NONE, occurredAt));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -122,7 +138,7 @@ class UserNotifyProfileApplyChangeTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", true, null, null, Instant.now().plusSeconds(3600), NotificationChannel.NONE)));
 
-        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), false, null, null));
+        adapter().applyChange(snapshot(USER_ID, Map.of(), false, null, null));
 
         verify(repository).save(any());
     }
@@ -138,7 +154,7 @@ class UserNotifyProfileApplyChangeTest {
     @Test
     @DisplayName("비활성 전환 이벤트는 is_active=false로 기록돼 장 이벤트 브로드캐스트에서 빠진다")
     void onProfileChanged_inactiveIsPersisted() {
-        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), false, null, null));
+        adapter().applyChange(snapshot(USER_ID, Map.of(), false, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());
@@ -148,7 +164,7 @@ class UserNotifyProfileApplyChangeTest {
     @Test
     @DisplayName("telegramBotToken 평문을 엔티티에 담는다(암호화는 컨버터 몫)")
     void onProfileChanged_storesTelegramBotToken() {
-        adapter().applyChange(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(snapshot(
                 USER_ID, Map.of(), true, "plain-token", "chat-1"));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -161,7 +177,7 @@ class UserNotifyProfileApplyChangeTest {
     @Test
     @DisplayName("telegramBotToken이 null이면 null을 저장한다")
     void onProfileChanged_nullTelegramBotTokenStoresNull() {
-        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, null, null));
+        adapter().applyChange(snapshot(USER_ID, Map.of(), true, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());

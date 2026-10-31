@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.adapter.in.redis;
+package com.kista.tradingcore.trading.adapter.in.schedule;
 
 import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;

@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.event;
 
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
+import com.kista.tradingcore.trading.domain.model.TradingUserProfileChange;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -26,6 +27,8 @@ class UserNotifyProfileSyncListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onProfileChanged(UserNotifyProfileChangedEvent event) {
-        tradingUserProfilePort.applyChange(event);
+        // 이벤트(shared.kernel) → trading 스냅샷 변환 — 포트는 이벤트 타입을 모른다
+        tradingUserProfilePort.applyChange(new TradingUserProfileChange(event.userId(), event.notificationPrefs(), event.active(),
+                event.telegramBotToken(), event.chatId(), event.notificationChannel(), event.occurredAt()));
     }
 }
