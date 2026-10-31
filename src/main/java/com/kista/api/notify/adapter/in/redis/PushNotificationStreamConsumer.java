@@ -5,10 +5,11 @@ import com.kista.shared.platform.redis.RedisStreamConfig;
 import com.kista.shared.platform.redis.RedisStreamSubscriber;
 import com.kista.shared.platform.redis.RedisStreams;
 import com.kista.shared.kernel.UserPushNotificationRequestedEvent;
-import jakarta.annotation.PostConstruct;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -34,8 +35,8 @@ public class PushNotificationStreamConsumer extends RedisStreamSubscriber {
         this.objectMapper = objectMapper;
     }
 
-    // 기동 시 구독 시작
-    @PostConstruct
+    // 기동 완료 후 구독 시작 — @PostConstruct면 메서드 리스너 등록 전에 밀린 메시지를 발행해 이벤트가 유실되고 Modulith 리스너 캐시가 비어 EPR 기록이 멈춘다
+    @EventListener(ApplicationReadyEvent.class)
     void init() {
         start();
     }

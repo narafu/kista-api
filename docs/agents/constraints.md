@@ -207,6 +207,9 @@
 - 패턴: `eventPublisher.publishEvent(event)` + `@TransactionalEventListener(phase = AFTER_COMMIT)`
 - 이벤트 위치: `application/event/`, 리스너 위치: `adapter/out/` (ArchUnit: adapter.out → application 의존 허용) — 단, 이벤트가 외부 시스템 호출이 아니라 **저장 트리거**(인바운드 성격, 예: admin `AppErrorRaisedListener`가 `AppErrorRaisedEvent`를 받아 `app_error_logs` 저장)면 `adapter/in/event/`에 둔다 — 인바운드 어댑터라 `application.service`·adapter 내부 package-private 타입을 직접 쓸 수 없으므로 정리 로직은 usecase(예: finance `FinanceUserCascadeListener` → `FinanceUserDataEraseUseCase`) 또는 `application/port/output` 쓰기 포트(예: trading `UserNotifyProfileSyncListener` → `TradingUserProfilePort.applyChange`) 뒤에 둔다. 발행 지점이 트랜잭션 밖이면 `@TransactionalEventListener` 대신 동기 `@EventListener`(AFTER_COMMIT은 트랜잭션 없을 때 이벤트를 버린다)
 
+### 백그라운드 구독 기동 시점
+- 프로세스 내 이벤트를 발행하는 백그라운드 구독(Redis Stream 컨슈머 등)은 `@PostConstruct`가 아니라 `ApplicationReadyEvent` 이후 시작한다 — 메서드 리스너 등록 전 발행은 이벤트 유실 + Modulith 리스너 캐시 오염(EPR 미기록), 가드 `HexagonalArchitectureTest`(root)·`StreamSubscriberStartupTest`(trading-core)
+
 ### 포트 인터페이스 위치 규칙
 - 인바운드 포트(UseCase/Query 인터페이스)는 `application/usecase/`, 아웃바운드 포트(`*Port`)는 `application/port/output/`에 위치 — `domain/port/{in,out}`은 더 이상 사용하지 않는다
 - 포트의 파라미터·반환 타입으로 쓰이는 record/class는 여전히 `domain/model/` 하위에 위치 — 포트 위치가 옮겨가도 타입 소유는 domain 유지. `adapter/in/web/dto/`에 두면 `domain → adapter` ArchUnit 규칙 위반

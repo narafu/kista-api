@@ -22,6 +22,7 @@ import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsid
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DisplayName("Hexagonal Architecture 규칙")
@@ -174,6 +175,16 @@ class HexagonalArchitectureTest {
                         "com.kista..application.service..",
                         "com.kista..adapter.out.."
                 );
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("RedisStreamSubscriber 하위 클래스는 @PostConstruct로 구독을 시작하지 않는다 — ApplicationReadyEvent 사용")
+    void stream_subscribers_must_not_start_in_post_construct() {
+        // 메서드 리스너 등록 전에 밀린 메시지를 publishEvent하면 이벤트가 유실되고 Modulith 리스너 캐시가 비어 EPR 기록이 멈춘다
+        ArchRule rule = noMethods()
+                .that().areDeclaredInClassesThat().areAssignableTo("com.kista.shared.platform.redis.RedisStreamSubscriber")
+                .should().beAnnotatedWith("jakarta.annotation.PostConstruct");
         rule.check(classes);
     }
 

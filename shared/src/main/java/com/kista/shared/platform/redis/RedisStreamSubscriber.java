@@ -18,8 +18,8 @@ import java.util.UUID;
 
 // Redis Stream 컨슈머 그룹 구독의 공통 골격(비-빈 abstract 베이스) — 구독 시작/정지, cancelOnError=false 등록,
 // ack 보장, 끊긴 구독 재기동, XCLAIM pending 복구를 한 곳에 둔다. 서브클래스는 onRecord(도메인 처리)만 구현하고,
-// 기동(@PostConstruct → start())과 주기 복구(@Scheduled → recoverPending())는 서브클래스가 배선한다 —
-// platform은 @Scheduled/@PostConstruct 프로세스 배선을 갖지 않는다. 베이스를 빈으로 등록하면 서브클래스와 이중 구독이 된다.
+// 기동(@EventListener(ApplicationReadyEvent) → start())과 주기 복구(@Scheduled → recoverPending())는 서브클래스가 배선한다 —
+// platform은 @Scheduled/ApplicationReadyEvent 프로세스 배선을 갖지 않는다. 베이스를 빈으로 등록하면 서브클래스와 이중 구독이 된다.
 // 처리 실패 정책은 훅으로 고른다 — 기본(ackOnFailure=true)은 onRecord 예외를 삼켜 warn만 남기고 ack해 poison 메시지의 영구 재시도를
 // 막는다(app.error·푸시처럼 유실 허용 소비자). 정합성 이벤트 소비자는 ackOnFailure를 false로 override해 일시 오류를 pending으로 남기고
 // recoverPending()의 XCLAIM 재시도에 맡기되, maxDeliveries로 재시도 한도를 둬 poison의 무한 재시도를 막는다. ack 실패도 삼켜 pending으로 남긴다.
