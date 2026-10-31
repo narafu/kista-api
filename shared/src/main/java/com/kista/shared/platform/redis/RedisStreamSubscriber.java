@@ -68,8 +68,9 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     protected void onGiveUp(RecordId recordId) {
     }
 
-    // 구독 시작 — 이미 살아 있으면 no-op, 기동 실패는 삼키고 다음 recoverPending()이 처음부터 재시도한다
-    public void start() {
+    // 구독 시작 — 이미 살아 있으면 no-op, 기동 실패는 삼키고 다음 recoverPending()이 처음부터 재시도한다.
+    // synchronized — 기동(ApplicationReadyEvent)과 첫 @Scheduled 복구가 동시에 들어오면 컨테이너가 둘 생기고 하나는 정지되지 않은 채 남는다
+    public synchronized void start() {
         if (subscription != null && subscription.isActive()) return;
         stop();
         try {
@@ -153,7 +154,7 @@ public abstract class RedisStreamSubscriber implements DisposableBean {
     }
 
     // 구독 컨테이너 정지 — 정지 중 오류는 무시하고 상태를 초기화해 재기동 가능하게 한다
-    public void stop() {
+    public synchronized void stop() {
         if (container != null) {
             try {
                 container.stop();
