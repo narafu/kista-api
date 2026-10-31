@@ -865,11 +865,12 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_interruptedAtMarketOpenWait_notifiesAllContextUsersAndRethrows() {
-        // marketOpen을 살짝 미래로 설정 → waitUntilMarketOpen()이 양수 → Thread.sleep 실제 호출
+        // marketOpen을 충분히 미래로 설정 → waitUntilMarketOpen()이 양수 → Thread.sleep 호출 즉시 인터럽트 플래그로 예외(실제 대기 없음).
+        // 300ms였을 땐 느린 CI에서 setup이 그보다 오래 걸려 대기 0 → sleep 미호출로 간헐 실패했다
         DstInfo interruptingDst = new DstInfo(true,
                 Instant.now().minusSeconds(3600),
                 Instant.now().minusSeconds(1800),
-                Instant.now().plusMillis(300));
+                Instant.now().plusSeconds(60));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
