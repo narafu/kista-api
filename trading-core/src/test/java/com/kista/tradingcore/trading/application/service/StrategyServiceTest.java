@@ -959,7 +959,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() holdings=0이어도 초기 V 입력이 있으면 그 값을 V값으로 저장한다")
     void register_vr_explicitInitialValue_holdingsZero_usesOverrideAsValue() {
-        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).vrValue("5000").build();
+        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).vrValue("5000").build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -989,7 +989,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 초기 V 입력이 있어도 실제 포지션·startAmount는 시장가 평가금 기준을 그대로 유지한다")
     void register_vr_explicitInitialValue_withHoldings_keepsEvaluatedAssetsSeparate() {
-        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).divisionCount(20).holdings(BigDecimal.valueOf(10)).avgPrice(new BigDecimal("100.00")).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).vrValue("99999").build();
+        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).holdings(BigDecimal.valueOf(10)).avgPrice(new BigDecimal("100.00")).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).vrValue("99999").build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
@@ -1020,7 +1020,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 인출식 최소자산 검증은 초기 V 입력을 반영하지 않고 실제 평가금 기준으로만 판단한다")
     void register_vr_explicitInitialValue_doesNotBypassWithdrawalMinimumCheck() {
         // 게이트(V+예수금>0)는 override(100000)로 통과하지만, 인출식 최소자산(실제 평가금 0 + 예수금 100)은 미달
-        RegisterStrategyCommand cmd = vr().deposit("100").divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).vrValue("100000").build();
+        RegisterStrategyCommand cmd = vr().deposit("100").intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).vrValue("100000").build();
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1034,7 +1034,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 초기 V값이 음수이면 IllegalArgumentException")
     void register_vr_negativeInitialValue_throws() {
-        RegisterStrategyCommand cmd = vr().divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).vrValue("-1").build();
+        RegisterStrategyCommand cmd = vr().intervalWeeks(2).bandWidth("15.00").recurringAmount(0).vrValue("-1").build();
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1049,7 +1049,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 성공 — StrategyVrDetail·StrategyCycleVrDetail 저장, poolLimit 계산, cycleSeedType NONE 강제")
     void register_vr_success_savesVrDetailsAndPoolLimit() {
         // holdings=0(중간부터 시작 미입력) → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75(recurringAmount=0) → poolLimit = 1500.00
-        RegisterStrategyCommand cmd = vr().deposit("2000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build();
+        RegisterStrategyCommand cmd = vr().deposit("2000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1101,7 +1101,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() holdings=0 허용 — 중간부터 시작 미입력 시 initialSnapshot으로 초기 포지션 저장")
     void register_vr_holdingsZero_allowed() {
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(2).bandWidth("10.00").recurringAmount(0).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(2).bandWidth("10.00").recurringAmount(0).build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1131,7 +1131,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR 적립식은 초기 V와 초기 시드가 모두 0이어도 등록 가능")
     void register_vr_recurringDeposit_allowsZeroInitialValueAndSeed() {
-        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(200).build();
+        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).intervalWeeks(2).bandWidth("15.00").recurringAmount(200).build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1167,8 +1167,8 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR 거치식과 인출식은 초기 V와 초기 시드가 모두 0이면 등록 불가")
     void register_vr_nonDeposit_requiresInitialValueOrSeed() {
-        RegisterStrategyCommand hold = vr().deposit(BigDecimal.ZERO).divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).build();
-        RegisterStrategyCommand withdraw = vr().deposit(BigDecimal.ZERO).divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
+        RegisterStrategyCommand hold = vr().deposit(BigDecimal.ZERO).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).build();
+        RegisterStrategyCommand withdraw = vr().deposit(BigDecimal.ZERO).intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1186,7 +1186,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR 인출식은 초기 자산이 월 인출액의 100배 이상이어야 등록 가능")
     void register_vr_withdrawal_requiresMinimumInitialAssets() {
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
         Account account = ownerAccount();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
@@ -1202,7 +1202,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() recurringAmount null이면 0으로 저장한다")
     void register_vr_nullRecurringAmount_defaultsToZero() {
         // holdings=0 → V=0, 초기 자산 2000(예수금만), poolLimitRate=0.75 → poolLimit = 1500.00
-        RegisterStrategyCommand cmd = vr().deposit("2000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").build();
+        RegisterStrategyCommand cmd = vr().deposit("2000").intervalWeeks(4).bandWidth("15.00").build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1237,7 +1237,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 적립식 initialValue null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullInitialValue_defaultsToZero() {
-        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(200).build();
+        RegisterStrategyCommand cmd = vr().deposit(BigDecimal.ZERO).intervalWeeks(4).bandWidth("15.00").recurringAmount(200).build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1260,7 +1260,7 @@ class StrategyServiceTest {
     @Test
     @DisplayName("VR register() 적립식 initialUsdDeposit null이면 0으로 정규화한다")
     void register_vr_recurringDeposit_nullPool_defaultsToZero() {
-        RegisterStrategyCommand cmd = vr().divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(200).build();
+        RegisterStrategyCommand cmd = vr().intervalWeeks(4).bandWidth("15.00").recurringAmount(200).build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1286,7 +1286,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() poolLimit scale=2 HALF_UP — recurringAmount > 0 시 poolLimitRate=1.0")
     void register_vr_poolLimitRate_withDeposit() {
         // holdings=0 → V=0, recurringAmount=100(입금) → poolLimitRate=1.0 → poolLimit = 1000 × 1.0 = 1000.00
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(100).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(100).build();
         Account account = ownerAccount();
         UUID vrStrategyId = UUID.randomUUID();
         UUID vrCycleId = UUID.randomUUID();
@@ -1322,7 +1322,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 램프 8필드 모두 생략 — 거치식(recurringAmount=0) 부호 파생 기본값 저장")
     void register_vr_rampFieldsOmitted_appliesNormalizedDefaults() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build();
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1339,7 +1339,7 @@ class StrategyServiceTest {
     void register_vr_rampFieldsOmitted_withdrawal_appliesGradient40() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
         // 인출식: recurringAmount=-100, intervalWeeks=2 → 필요 최소자산 = 100×100×4/2 = 20000, initialUsdDeposit=20000으로 충족
-        RegisterStrategyCommand cmd = vr().deposit("20000").divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
+        RegisterStrategyCommand cmd = vr().deposit("20000").intervalWeeks(2).bandWidth("15.00").recurringAmount(-100).build();
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1353,7 +1353,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() 램프 8필드 명시 입력 시 정규화 없이 그대로 저장된다")
     void register_vr_rampFieldsExplicit_savedAsProvided() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(12, 10, 5, 18, new BigDecimal("0.60"), 8, 4, new BigDecimal("0.30"))).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(12, 10, 5, 18, new BigDecimal("0.60"), 8, 4, new BigDecimal("0.30"))).build();
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1368,7 +1368,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() pStepWeeks=0 — poolLimitRate 램프 비활성화, poolLimitFloor=0도 그대로 저장(0 초과 요구만 생략)")
     void register_vr_pStepWeeksZero_disablesRampAndSkipsFloorValidation() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(null, null, null, null, new BigDecimal("0.60"), 0, 0, BigDecimal.ZERO)).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(null, null, null, null, new BigDecimal("0.60"), 0, 0, BigDecimal.ZERO)).build();
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1381,7 +1381,7 @@ class StrategyServiceTest {
     @DisplayName("VR register() gStepWeeks=0 — gradient 램프 비활성화, gGraceWeeks=0·gMax=0을 그대로 저장")
     void register_vr_gStepWeeksZero_disablesRampAndSkipsMaxValidation() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(10, 0, 0, 0, null, null, null, null)).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(10, 0, 0, 0, null, null, null, null)).build();
 
         strategyService.register(USER_ID, ACCOUNT_ID, cmd);
 
@@ -1395,7 +1395,7 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(null, null, null, null, new BigDecimal("0.60"), 0, 0, new BigDecimal("0.90"))).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(null, null, null, null, new BigDecimal("0.60"), 0, 0, new BigDecimal("0.90"))).build();
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1410,7 +1410,7 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(15, null, null, 10, null, null, null, null)).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(15, null, null, 10, null, null, null, null)).build();
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1425,7 +1425,7 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(null, null, null, null, new BigDecimal("0.50"), null, null, new BigDecimal("0.80"))).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).vrRamp(new VrRampInput(null, null, null, null, new BigDecimal("0.50"), null, null, new BigDecimal("0.80"))).build();
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -1837,7 +1837,7 @@ class StrategyServiceTest {
         UUID vrCycleId = UUID.randomUUID();
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).holdings(BigDecimal.valueOf(5)).avgPrice(new BigDecimal("100")).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").holdings(BigDecimal.valueOf(5)).avgPrice(new BigDecimal("100")).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build();
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1986,7 +1986,7 @@ class StrategyServiceTest {
     void register_vr_does_not_fetch_prev_close() {
         stubSuccessfulRegistration(StrategyType.VR, StrategyTicker.TQQQ);
 
-        strategyService.register(USER_ID, ACCOUNT_ID, vr().deposit("2000").divisionCount(20).intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build());
+        strategyService.register(USER_ID, ACCOUNT_ID, vr().deposit("2000").intervalWeeks(4).bandWidth("15.00").recurringAmount(0).build());
 
         verify(brokerPricePort, never()).getPrevClose(any(), any());
     }
@@ -2029,7 +2029,7 @@ class StrategyServiceTest {
     void register_vr_withPastScheduledStartDate_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         LocalDate yesterday = LocalDate.now(TimeZones.KST).minusDays(1);
-        RegisterStrategyCommand cmd = vr().deposit("1000").divisionCount(20).intervalWeeks(2).bandWidth("15.00").recurringAmount(0).scheduledStartDate(yesterday).build();
+        RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(2).bandWidth("15.00").recurringAmount(0).scheduledStartDate(yesterday).build();
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
