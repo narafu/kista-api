@@ -1,13 +1,13 @@
 package com.kista.tradingcore.trading.domain.creation;
 
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
 import com.kista.tradingcore.trading.domain.model.RegisterStrategyCommand;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
+import static com.kista.tradingcore.support.StrategyCommands.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -17,8 +17,7 @@ class VrRegistrationTest {
 
     // 테스트용 VR 명령 — 예수금·주기·적립액·V값만 바꿔 가며 쓴다
     private static RegisterStrategyCommand cmd(BigDecimal deposit, Integer recurring, BigDecimal vrValue, VrRampInput ramp) {
-        return new RegisterStrategyCommand(StrategyType.VR, StrategyTicker.TQQQ, deposit, null, 0,
-                null, null, 4, new BigDecimal("15"), recurring, ramp, null, vrValue, null);
+        return vr().ticker(StrategyTicker.TQQQ).deposit(deposit).intervalWeeks(4).bandWidth("15").recurringAmount(recurring).vrRamp(ramp).vrValue(vrValue).build();
     }
 
     private static ResolvedCreation resolved(Integer intervalWeeks, Integer recurring) {
