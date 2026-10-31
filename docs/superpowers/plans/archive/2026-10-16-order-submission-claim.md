@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JPA(PostgreSQL), JUnit5·Mockito·AssertJ, MockRestServiceServer(기존 어댑터 테스트 방식).
 
-**Spec:** `docs/superpowers/specs/2026-10-16-order-submission-claim-design.md` — 각 태스크의 "왜"는 spec 절 번호로 참조한다.
+**Spec:** `docs/superpowers/specs/archive/2026-10-16-order-submission-claim-design.md` — 각 태스크의 "왜"는 spec 절 번호로 참조한다.
 
 ## Global Constraints
 

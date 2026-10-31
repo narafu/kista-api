@@ -1,6 +1,6 @@
 # 스키마 재편 런북 (kista → trading 등) — 수동 실행
 
-설계·근거: `docs/superpowers/specs/2026-09-21-db-schema-reorg-design.md`. **자동 롤백은 불가능하다** — 이 문서의 롤백 절차만 유효하다.
+설계·근거: `docs/superpowers/specs/archive/2026-09-21-db-schema-reorg-design.md`. **자동 롤백은 불가능하다** — 이 문서의 롤백 절차만 유효하다.
 
 로컬 사전 검증(스크래치 DB, 이 브랜치 커밋 기준): 정방향→역방향 왕복 덤프 diff 0(`ROUNDTRIP_OK`), 옛 마이그레이션 적용+정방향 결과 vs 새 V1 두 개 fresh 적용 결과 스키마 diff 0(`SCHEMA_EQUAL`), 시스템 카테고리·런타임 설정 시드 동치. 운영 리허설은 같은 게이트를 **운영 덤프**로 다시 통과시키는 것이다.
 

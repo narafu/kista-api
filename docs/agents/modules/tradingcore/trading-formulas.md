@@ -30,24 +30,9 @@ BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준�
 - 보정 합계가 원장 예수금을 넘으면 뒤쪽 보정부터 제거(`trimCorrectionsToBudget`)
 
 ### cap 배수 1.05 경위 (값 유지)
-- cap은 2026-06 이전부터 `currentPrice × 1.10`이었고, 4154c0482(2026-06-24)가 같은 cap을 PRIVACY에도 적용했다. 그 사유는 "Toss CLS 경매에서 현재가와 차이가 큰 지정가가 가격 범위 초과로 취소됨"이다.
-- d40d07e13(2026-07-28)에서 1.10 → 1.05로 줄였다. 사용자 진술: 특별한 정량 근거는 없고, 10%면 놓칠까 싶어 5%로 줄인 운영 판단값이다.
+- cap은 원래 `currentPrice × 1.10`이었고 PRIVACY에도 같은 cap을 적용한다(Toss CLS 경매에서 현재가와 차이가 큰 지정가가 가격 범위 초과로 취소되는 것을 막기 위함). 1.05는 정량 근거 없는 운영 판단값이다.
 - 2026-10-25 재평가(운영 DB 읽기 전용 조회): cap이 발동해 보정이 붙은 INFINITE 일(day) 중 종가가 기록된 KIS 실계좌 36일(USD, 2026-07-17~10-24)에서 가장 비싼 base 매수(=cap 가격)가 미체결된 날은 1일(2026-08-04, 접수 시점 대비 종가 +8.2%)뿐이다. 나머지 35일의 "접수 시점 추정 현재가(cap÷1.05) → 종가" 변동은 최대 +1.8%였다. cap 배수 k에서 cap 발동일 체결액은 대략 unitAmount/k(1.05 ≈ 95%, 1.10 ≈ 91%)이고, 종가가 접수 시점(마감 30분 전) 현재가×k를 넘으면 그 다리는 미체결이다.
 - 결론: 1.05 유지. 1.10은 측정된 이득이 위 1일뿐이고 매 발동일 체결액이 약 4%p 줄어든다. 1.02~1.03은 표본(36일·1종목·비교적 잔잔한 구간)에서 추가 미체결이 없었지만, 이득이 회차 금액의 약 3%p에 그치는 반면 3배 레버리지 ETF의 마감 30분 급등 꼬리를 표본이 대표하지 못한다. 표본이 쌓이면 같은 조회로 재평가한다.
-- 재평가 SQL(운영 `kistadb`, 읽기 전용). **배포 이전 데이터 전용 — 이후 재평가는 cap 발동일 식별 방법을 새로 정해야 한다**(보정이 상시 붙으면 `capdays`(보정 leg 존재일 = cap 발동일)가 성립하지 않는다):
-```sql
-with capdays as (select distinct strategy_cycle_id, trade_date from trading.orders
-                 where order_leg like 'INFINITE_CORRECTION_%' and external_order_id is not null),
-legs as (select o.strategy_cycle_id, o.trade_date, o.price, coalesce(o.filled_quantity,0)>0 filled,
-                rank() over (partition by o.strategy_cycle_id, o.trade_date order by o.price desc) rk
-         from trading.orders o join capdays using (strategy_cycle_id, trade_date)
-         where o.direction='BUY' and o.external_order_id is not null and o.order_leg not like 'INFINITE_CORRECTION%'),
-cp as (select strategy_cycle_id, (created_at at time zone 'Asia/Seoul')::date d, max(closing_price) close
-       from trading.cycle_position where deleted_at is null group by 1,2)
-select l.trade_date, l.price cap_leg, cp.close, round(cp.close/(l.price/1.05)-1,4) move, l.filled
-from legs l left join cp on cp.strategy_cycle_id=l.strategy_cycle_id and cp.d=l.trade_date
-where l.rk=1 and cp.close is not null order by l.filled, move desc;
-```
 
 ### 리버스모드 별지점 (변경 금지)
 ```

@@ -7,8 +7,8 @@
 **Goal:** `Broker.BINANCE`를 추가한다. 바이낸스 현물(BTCUSDT·ETHUSDT) 계좌 등록(연결 테스트 포함)부터 코인 DCA 실행·동기화·원장 반영·알림·포트폴리오까지 업비트와 같은 경로로 동작하게 한다. 관리자 정책 기본값은 비활성이다. 백엔드 쪽 API 계약 expand(포트폴리오 중립 필드·`currency`, 브로커 메타 최소 금액·자릿수, SSE 통화)를 같이 낸다.
 **Architecture:** 벤더 어댑터는 `com.kista.tradingcore.broker.adapter.out.binance`(internal)이고, 벤더 예외는 `broker.domain.model.binance.BinanceApiException`이다. 공통 경로(실행기·동기화기·원장·알림·포트폴리오)는 Phase 0+1이 만든 계약(`CryptoExchangePort`, `CryptoTradingRules`, `Market`/`Currency` capability)만 쓰므로 `BINANCE` 분기를 새로 두지 않는다. 바이낸스 고유 의미(받은 자산 수수료 → 순수량, `newClientOrderId` 비영구 고유, -2013만 "없음")는 어댑터 안에 가둔다.
 **Tech Stack:** Java 25, Spring Boot 4 (`RestClient`, Jackson 3 `tools.jackson`), JUnit 5, Mockito, AssertJ, `MockRestServiceServer`
-**Spec:** docs/superpowers/specs/2026-10-23-binance-spot-dca-design.md (이 계획 범위: 5·6·7·8절 + 7·10절의 백엔드 API 계약 expand. kista-ui 작업 제외)
-**선행 계획:** docs/superpowers/plans/2026-10-23-binance-dca-phase0-1-structure.md (전부 완료 후 착수)
+**Spec:** docs/superpowers/specs/archive/2026-10-23-binance-spot-dca-design.md (이 계획 범위: 5·6·7·8절 + 7·10절의 백엔드 API 계약 expand. kista-ui 작업 제외)
+**선행 계획:** docs/superpowers/plans/archive/2026-10-23-binance-dca-phase0-1-structure.md (전부 완료 후 착수)
 
 ## Global Constraints
 - 선행 계획의 "다음 계획이 소비하는 인터페이스"를 그대로 쓴다. 포트·커널 시그니처(`CryptoExchangePort` 9메서드, `CryptoTradingRules`, `CryptoOrderResult` 8인자, `DcaRuleInputs` 9인자, `CryptoOrderFilledEvent` 10인자)는 이 계획에서 바꾸지 않는다.
@@ -682,7 +682,7 @@ grep -l 'failures="[1-9]' build/test-results/test/TEST-*.xml trading-core/build/
 ```
 → 둘 다 BUILD SUCCESSFUL, 실패 XML 0건. `BinanceTestnetIT`는 키 환경변수가 없으면 SKIPPED. `HexagonalArchitectureTest`·`ModulithArchitectureTest`(api·trading-core)·`TradingCoreTestVendorModelTest`·`InternalApiContractTest`·`ArchitectureMapTest`·컨텍스트 로드 2종을 포함한다.
 - [ ] **Step 3: 커밋 전 검토자 검수**(전역 규칙) — 리뷰어 서브에이전트에 Review Focus 5항목과 "설계와의 차이"를 넘긴다. 발견한 결함은 수정·재검증한다.
-- [ ] **Step 4: 커밋** — `git add docs/superpowers/plans/2026-10-23-binance-dca-phase2-binance.md` → `docs: 바이낸스 Phase 2 계획 완료를 기록한다`
+- [ ] **Step 4: 커밋** — `git add docs/superpowers/plans/archive/2026-10-23-binance-dca-phase2-binance.md` → `docs: 바이낸스 Phase 2 계획 완료를 기록한다`
 - [ ] **Step 5: 배포 메모(사용자 보고)**
   - 정책 기본 비활성이다. 관리자가 켜기 전에 kista-ui 바이낸스 등록 UI가 배포돼야 한다.
   - `CryptoOrderFilledEvent`의 `@JsonAlias("amountKrw")`는 유지한다(선행 계획 도입 후 한 릴리스가 지나지 않았다). 제거는 kista-ui 전환 후 contract 릴리스에서 한다.

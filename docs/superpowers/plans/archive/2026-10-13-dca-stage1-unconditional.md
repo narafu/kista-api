@@ -11,7 +11,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, Spring Modulith, JPA + Flyway(PostgreSQL), JUnit 5 + Mockito + AssertJ, ArchUnit
 
-**Spec:** `docs/superpowers/specs/2026-10-13-dca-strategy-design.md` — 실행자는 이 계획과 spec을 함께 읽는다. 단계 ②(지표 조건)와 ③(공포탐욕지수)는 이 계획 범위가 아니다.
+**Spec:** `docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md` — 실행자는 이 계획과 spec을 함께 읽는다. 단계 ②(지표 조건)와 ③(공포탐욕지수)는 이 계획 범위가 아니다.
 
 ## Global Constraints
 
@@ -630,7 +630,7 @@ Expected: 전부 PASS. `:trading-core:compileTestJava`에서 `new StrategyCapabi
 - [ ] **Step 5: 커밋 (Task 1+2)**
 
 ```bash
-git add shared trading-core/src src/main/java/com/kista/api/admin docs/superpowers/specs/2026-10-13-dca-strategy-design.md
+git add shared trading-core/src src/main/java/com/kista/api/admin docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md
 git commit -m "feat(dca): DCA 전략 어휘·런타임 정책과 MOO 주문 브로커 매핑을 추가한다"
 ```
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 21, Spring Boot 4, Spring Modulith, Gradle, ArchUnit.
 
-**Spec:** `docs/superpowers/specs/2026-08-30-port-location-migration-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md`
 
 ## Global Constraints
 

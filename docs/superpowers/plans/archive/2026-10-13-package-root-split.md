@@ -100,7 +100,7 @@ is_class() { [[ ${1##*.} =~ ^[A-Z] ]]; }
 
 if [[ $phase == docs ]]; then
   MAP=$( { map_for shared; map_for tradingcore; map_for api; } )
-  FILES=$(git ls-files -- '*.md' ':!docs/superpowers/**' ':!docs/agents/modulith-migration-history.md')
+  FILES=$(git ls-files -- '*.md' ':!docs/superpowers/**' ':!docs/history/modulith-migration-history.md')
 else
   MAP=$(map_for "$phase")
   # 1) 이동 — 세 서브프로젝트 × main/test/testFixtures 전부
@@ -143,7 +143,7 @@ echo "pkgmove $phase done"
 주의:
 - `api` 이동표의 `"com.kista.marketcalendar com.kista.marketcalendar"`는 no-op 가드다(이 시점엔 이미 `tradingcore.marketcalendar`라 매칭되지 않지만, `market` 규칙이 `marketcalendar`를 건드리지 않음을 명시). `(?![\w])` 부정 전방탐색이 실제 방어선이다.
 - `tradingcore` 단계에서 `com.kista.tradingweb.TradingApplication`은 `com.kista.tradingcore.web.TradingApplication`이 된다. 루트로 옮기는 것은 import 추가가 필요해 Task 4(수작업)에서 한다.
-- `docs` 단계는 세 이동표를 합쳐 `*.md`에 적용한다(역사 문서 `docs/superpowers/**`, `modulith-migration-history.md` 제외).
+- `docs` 단계는 세 이동표를 합쳐 `*.md`에 적용한다(역사 문서 `docs/superpowers/**`, `docs/history/modulith-migration-history.md` 제외).
 
 ### `fix-claude-md.py` (Task 8에서 사용)
 
@@ -1107,7 +1107,7 @@ cd - >/dev/null
 ```
 문서 경로 참조 치환(역사 문서 제외):
 ```bash
-FILES=$(git ls-files -- '*.md' ':!docs/superpowers/**' ':!docs/agents/modulith-migration-history.md')
+FILES=$(git ls-files -- '*.md' ':!docs/superpowers/**' ':!docs/history/modulith-migration-history.md')
 printf '%s\n' $FILES | xargs perl -pi -e '
   s{modules/(admin|benchmark|finance|market|user)\.md}{modules/api/$1.md}g;
   s{modules/(account|broker|marketcalendar|matching|privacy|trading-formulas|trading)\.md}{modules/tradingcore/$1.md}g;
@@ -1132,7 +1132,7 @@ Expected: `BROKEN` 출력 없음, 19개 처리 출력.
 
 - [ ] **Step 3: 수작업 갱신**
 
-각 문서에서 아래 서술을 현재 사실로 바꾼다(구 서술 삭제, 이력은 `modulith-migration-history.md`에만).
+각 문서에서 아래 서술을 현재 사실로 바꾼다(구 서술 삭제, 이력은 `docs/history/modulith-migration-history.md`에만).
 - `architecture.md`
   - "Gradle 구조": `TradingApplication`은 `com.kista.tradingcore` 루트, 테스트는 `@SpringBootConfiguration` 상향 탐색으로 앱 클래스를 찾고 `@ContextConfiguration`·`TradingCoreJpaTestConfig`는 없다. 테스트 지원은 `com.kista.shared.support`(`:shared` testFixtures: `DataJpaTestBase`/`WebMvcTestSupport`/`application-test.yml`), `com.kista.tradingcore.support`(`TradingFixtures`/`StubBrokerApiException`), `com.kista.api.support`(`DomainFixtures`).
   - 새 소절 "루트 패키지": 서브프로젝트별 루트(`com.kista.api`/`com.kista.tradingcore`/`com.kista.shared`), 앱 클래스는 각 루트에 있고 스캔 목록이 없다, shared 빈은 `PlatformAutoConfiguration`, 경계는 `GradleModuleBoundaryTest.subprojectClassesStayUnderOwnRootPackage`.
@@ -1150,7 +1150,7 @@ Expected: `BROKEN` 출력 없음, 19개 처리 출력.
 - [ ] **Step 4: 잔여 검사**
 
 ```bash
-git grep -nE 'com\.kista\.(sharedkernel|contract|platform|trading|tradingstats|tradingnotify|tradingweb|matching|broker|account|privacy|marketcalendar|admin|finance|market|notify|benchmark|user|web|support|architecture)\b|KistaApplication|scanBasePackages|TradingCoreJpaTestConfig|RootJpaScanConfig' -- '*.md' ':!docs/superpowers/**' ':!docs/agents/modulith-migration-history.md'
+git grep -nE 'com\.kista\.(sharedkernel|contract|platform|trading|tradingstats|tradingnotify|tradingweb|matching|broker|account|privacy|marketcalendar|admin|finance|market|notify|benchmark|user|web|support|architecture)\b|KistaApplication|scanBasePackages|TradingCoreJpaTestConfig|RootJpaScanConfig' -- '*.md' ':!docs/superpowers/**' ':!docs/history/modulith-migration-history.md'
 ```
 Expected: 출력 없음, 또는 남은 줄이 의도된 이력 서술(예: "과거 `scanBasePackages`로 배제했다")뿐 — 각 줄을 확인.
 

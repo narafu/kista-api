@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JPA/Flyway(PostgreSQL), JUnit 5, AssertJ, Mockito
 
-**Spec:** `docs/superpowers/specs/2026-10-21-dca-multi-rule-ledger-design.md` — §3 "원장 저장"·"원장 원칙" 행, §5.2 주식, §9 R1·E5. Plan 2(`2026-10-21-dca-multi-rule.md`)는 이 plan이 두 role 모두에 배포된 뒤 시작한다.
+**Spec:** `docs/superpowers/specs/archive/2026-10-21-dca-multi-rule-ledger-design.md` — §3 "원장 저장"·"원장 원칙" 행, §5.2 주식, §9 R1·E5. Plan 2(`2026-10-21-dca-multi-rule.md`)는 이 plan이 두 role 모두에 배포된 뒤 시작한다.
 
 ## Global Constraints
 

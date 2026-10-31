@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, Spring Modulith, JPA/Flyway(PostgreSQL), JUnit 5 + Mockito + AssertJ, Gradle 서브프로젝트(`:trading-core`, `:shared`, 루트 `:api`)
 
-**Spec:** `docs/superpowers/specs/2026-10-24-strategy-own-ledger-budget-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-24-strategy-own-ledger-budget-design.md`
 
 ## Global Constraints
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit 5 + Mockito + AssertJ.
 
-**Spec:** `docs/superpowers/specs/2026-10-25-strategy-ledger-reconciliation-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-25-strategy-ledger-reconciliation-design.md`
 
 ## Global Constraints
 

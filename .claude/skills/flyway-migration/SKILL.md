@@ -24,7 +24,7 @@ bash 명령으로 해당 서비스 디렉토리의 최신 버전 확인 후 +1:
 브랜치/워크트리 간 미머지 마이그레이션 파일이 있으면 버전 번호가 충돌할 수 있다 (병렬 브랜치가 같은 버전 번호의 서로 다른 파일을 만들어 실제 배포 롤백 2회 발생). 로컬 ls뿐 아니라 아래 명령으로 다른 브랜치의 최근 마이그레이션도 함께 확인할 것:
   git log --all --diff-filter=A -- 'src/main/resources/db/migration/*' 'trading-core/src/main/resources/db/migration-trading/*'
 
-root 마이그레이션은 `kista-api`·`kista-scheduler` 독립 배포 backward-compat(expand/contract)을 지켜야 한다. trading 마이그레이션은 독립 스키마·이력이라 이 제약 밖이다 (→ `docs/agents/constraints.md` Flyway 절).
+root 마이그레이션은 `kista-api`·`kista-scheduler` 독립 배포 backward-compat(expand/contract)을 지켜야 한다. trading 마이그레이션은 독립 스키마·이력이라 이 제약 밖이다 (→ `docs/agents/constraints.md` Flyway 절, 상세는 `docs/agents/flyway.md`).
 
 ## 2. Entity ↔ SQL 크로스체크 (필수)
 

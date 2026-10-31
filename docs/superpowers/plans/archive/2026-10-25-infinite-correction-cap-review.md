@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, JUnit 5, AssertJ, Gradle `:trading-core`
 
-**Spec:** `docs/superpowers/specs/2026-10-25-infinite-correction-cap-review-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-25-infinite-correction-cap-review-design.md`
 
 ## Global Constraints
 
@@ -157,7 +157,7 @@ git commit -m "fix(matching): INFINITE 보정 가격을 내림하고 매수①�
 
 **Files:**
 - Modify: `trading-core/src/main/java/com/kista/tradingcore/matching/domain/strategy/InfiniteStrategy.java` (`buildEarlyStageOrders`, `buildLateStageOrders`, 보정 부착 공용 헬퍼)
-- Modify: `docs/agents/workflow.md` ("BuyOrderPriceCapper 보정 주문" 절), `docs/agents/testing.md`(INFINITE 서술 중 바뀐 사실만), `docs/superpowers/specs/2026-10-24-strategy-own-ledger-budget-design.md` §9(4개 항목 옆에 "→ 2026-10-25 설계에서 처리" 링크)
+- Modify: `docs/agents/workflow.md` ("BuyOrderPriceCapper 보정 주문" 절), `docs/agents/testing.md`(INFINITE 서술 중 바뀐 사실만), `docs/superpowers/specs/archive/2026-10-24-strategy-own-ledger-budget-design.md` §9(4개 항목 옆에 "→ 2026-10-25 설계에서 처리" 링크)
 - Test: `trading-core/src/test/java/com/kista/tradingcore/matching/domain/strategy/InfiniteStrategyTypeTest.java` + 실패하는 trading-core 테스트 전부(예상: `TradingServiceTest`, `BuyOrderPriceCapperTest`, `ManualTradingServiceTest`, `InfiniteCycleOrderStrategy` canSkip 테스트, `BacktestEngineTest`)
 
 **Interfaces:**
@@ -191,13 +191,13 @@ Run: `./gradlew :trading-core:test 2>&1 | grep -E "FAILED|tests completed|BUILD"
 - `workflow.md` "BuyOrderPriceCapper 보정 주문" INFINITE 절: 보정은 cap 경로 전용이 아니라 `buildOrders`가 상시 붙이고 cap 재산정 시 base와 함께 다시 계산된다, 가격 `K/(누적수량+1)` HALF_UP → FLOOR, `buildOrders`에서도 `trimCorrectionsToBudget` 적용.
 - `trading-formulas.md` 보정 주문 절(Task 1에서 신설)에 "cap과 무관하게 일반모드 BUY마다 부착(isFinalRound·리버스 제외)" 추가.
 - `testing.md`: INFINITE 테스트 패턴 서술 중 위 변경으로 거짓이 된 문장만 고친다(없으면 변경 없음).
-- 원 spec §9의 INFINITE 4개 항목에 `→ 처리: docs/superpowers/specs/2026-10-25-infinite-correction-cap-review-design.md` 표기.
+- 원 spec §9의 INFINITE 4개 항목에 `→ 처리: docs/superpowers/specs/archive/2026-10-25-infinite-correction-cap-review-design.md` 표기.
 - `src/test/resources/architecture/flows.yml`에 보정 주문 서술이 없는지 grep으로 재확인(있으면 갱신).
 
 - [ ] **Step 7: 커밋**
 
 ```bash
-git add trading-core/src docs/agents docs/superpowers/specs/2026-10-24-strategy-own-ledger-budget-design.md
+git add trading-core/src docs/agents docs/superpowers/specs/archive/2026-10-24-strategy-own-ledger-budget-design.md
 git commit -m "feat(matching): INFINITE 보정 주문을 cap 발동과 무관하게 항상 붙인다"
 ```
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** PostgreSQL 17, Flyway 12(Spring Boot 4), Spring Data JPA/Hibernate(`ddl-auto: validate`), Gradle, GitHub Actions, docker compose(OCI 단일 인스턴스).
 
-**Spec:** `docs/superpowers/specs/2026-09-21-db-schema-reorg-design.md` (결정·실측 근거·롤백 논리는 전부 여기 — 실행자는 반드시 먼저 읽을 것)
+**Spec:** `docs/superpowers/specs/archive/2026-09-21-db-schema-reorg-design.md` (결정·실측 근거·롤백 논리는 전부 여기 — 실행자는 반드시 먼저 읽을 것)
 
 ## Global Constraints
 
@@ -575,7 +575,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ## Task 5: 문서·kista-infra 주석 갱신, 최종 검증, 리뷰
 
-**Files:** 문서 목록(File Structure 참조) + `docs/agents/modulith-migration-history.md`(이력 절 추가) + `src/main/java/com/kista/user/application/service/UserSyncBackfillService.java`(주석 1줄)
+**Files:** 문서 목록(File Structure 참조) + `docs/history/modulith-migration-history.md`(이력 절 추가) + `src/main/java/com/kista/user/application/service/UserSyncBackfillService.java`(주석 1줄)
 
 - [ ] **Step 1: 문서 갱신** — 각 항목은 "무엇을 바꾸는가"만(버전 번호 서술 금지):
   - `architecture.md`: "DB 스키마 3분리" 절을 새 5개 스키마·소유 표(위 매핑 표)로 교체. "`db/migration` 루트 전용" 서술 → 서비스별 마이그레이션 디렉토리·이력 테이블. trading `event_publication`/`scheduler_locks` 사본과 search_path 명시. `KisTokenEntity`(`broker_tokens`)가 `trading` 소유임.
@@ -588,7 +588,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
   - `README.md`: "스키마"/"Flyway"/배포 파이프라인 서술이 있으면 정정(`grep -n "스키마\|Flyway\|flyway" README.md`).
   - `../kista-infra/scripts/backup.sh`(복원 절차 5번 쿼리를 두 이력 테이블 조회로), `../kista-infra/README.md`(해당 서술이 있으면). **kista-infra는 별도 레포 — 별도 커밋(author 확인).**
   - `UserSyncBackfillService.java`: 주석의 "kista.user_notify_profile" → "trading.user_notify_profile"(코드 변경 없음).
-  - `modulith-migration-history.md`: "스키마 재편" 항목 추가(결정 요약 + 설계 문서 링크).
+  - `docs/history/modulith-migration-history.md`: "스키마 재편" 항목 추가(결정 요약 + 설계 문서 링크).
 
 - [ ] **Step 2: 통합 리뷰어 검수** (브랜치 전체 diff)
 
@@ -617,7 +617,7 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ````markdown
 # 스키마 재편 런북 (kista → trading 등) — 수동 실행
 
-설계·근거: `docs/superpowers/specs/2026-09-21-db-schema-reorg-design.md`. **자동 롤백은 불가능하다** — 이 문서의 롤백 절차만 유효하다.
+설계·근거: `docs/superpowers/specs/archive/2026-09-21-db-schema-reorg-design.md`. **자동 롤백은 불가능하다** — 이 문서의 롤백 절차만 유효하다.
 
 ## 0. 사전 점검 (T-1일 이전, 읽기 전용)
 

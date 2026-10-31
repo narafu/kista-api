@@ -16,7 +16,6 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - `BrokerConnectionTestPort` 구현 (`verifyCredentials`/`verifyAccount`): `verifyCredentials(appKey, secretKey)` — 어느 계좌의 토큰 캐시도 건드리지 않는 등록 전 사전 검증, 성공 토큰은 appKey 기준 90초 단기 캐시(EGW00133 회피)
 - `verifyAccount(appKey, secretKey, accountNo)` — TTTC2101R로 계좌 실소유 검증 후 `null` 반환 (KIS는 brokerAccountCode 없음), 실패 시 `BrokerCredentialException`
 - **관리자(시세 전용) 자격증명**: `kis.admin-app-key`/`admin-app-secret`(env `KIS_ADMIN_APP_KEY`/`KIS_ADMIN_APP_SECRET`, 둘 중 하나라도 비면 비활성 — 기동 실패 아님). `KisAdminPriceSource`가 nil UUID(`KisAdminTokenCoordinator.ADMIN_TOKEN_ID`)를 id로 한 `BrokerAccountRef`(accountNo=null)로 `pricingGet`을 호출한다 — 해외시세 TR(`HHDFS00000300`·`HHDFS76220000`·`HHDFS76240000`)은 계좌번호 없이 `AUTH`/`EXCD`/`SYMB` 파라미터와 토큰·appkey·appsecret 헤더만 필요(공식 예제 `open-trading-api/examples_user/overseas_stock` 확인). `KisAuthApi.getToken/recoverToken`이 이 id를 `KisAdminTokenCoordinator`(Redis `kis:admin:token:<sha256(appKey) 앞 8자>` — 앱키 교체 시 옛 토큰 미사용, TTL=만료 1분 전, JVM 락 더블체크, Redis 장애 시 JVM 메모리 폴백)로 보낸다 — `broker_tokens.account_id`는 accounts FK라 저장 불가. 재기동해도 Redis 토큰을 재사용해 24시간 재사용·1분 1회 발급(EGW00133) 규칙을 지킨다. 관리자 앱키는 등록 계좌 앱키와 다른 것을 쓸 것(같으면 토큰이 DB·Redis 두 곳에 캐시돼 첫 발급이 겹칠 때 EGW00133 위험, 호출 간격 게이트는 appKey 기준이라 공유)
-- 모든 브로커 포트 메서드는 `BrokerAccountRef account`를 받는다 — `getPrices(tickers, account)`, `place(OrderInstruction, account)` 등 (`Account.toBrokerRef()` 1곳에서 변환, broker는 Account 애그리게이트를 참조하지 않음)
 - KIS 포트 인터페이스에 `token` 파라미터 없음 — 서비스 레이어에서 token 관리·전달 금지
 - Base URL: `https://openapi.koreainvestment.com:9443`
 
@@ -29,10 +28,10 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
   - 재시도 로직 없음 — 원인 제거로만 해결
 - `EGW00201` "초당 거래건수를 초과하였습니다" — **appKey(계좌 아님) 단위** 초당 20건 제한(공식 문서 기준) 초과 (지연 없는 연속 매도 선접수 등에서 발생)
   - `KisHttpClient.executeWithRetry`가 조회·주문접수·취소 등 스케쥴러·서비스 경유 KIS 호출의 공통 경로라 이 한 지점에서 방어(예외: `KisAuthApi.verifyAccount`는 계좌 등록 전 검증용으로 `kisRestClient`를 직접 호출해 이 게이트를 타지 않음 — 등록 전 1회성 호출이라 리스크 낮음):
-    - **사전 게이트(appKey 단위, GET+POST 공통, 401 인라인 재시도 포함)**: 같은 appKey로의 연속 호출 사이 최소 간격(`MIN_CALL_INTERVAL_MILLIS`=350ms)을 CAS 루프로 강제(`System.nanoTime()` 기준, 대기 상한 초과로 거부하는 호출은 슬롯을 커밋하지 않음 — 안 그러면 반복 거부가 대기열을 무한정 미래로 밀어버림). 대량 배치(VR 사다리 등)가 슬롯을 선점 중이어도 `MAX_QUEUE_WAIT_MILLIS`(20초)를 넘으면 무한 대기 대신 즉시 `KisApiException` — 같은 appKey의 실시간 조회(`StatisticsController` 등)가 배치 뒤에 무한정 밀리는 것을 방지
+    - **사전 게이트(appKey 단위, GET+POST 공통, 401 인라인 재시도 포함)**: `KisHttpClient`의 `CallIntervalGate`(`broker.adapter.out.internal`, 최소 간격 350ms·대기 상한 20초)가 같은 appKey 연속 호출 사이 간격을 강제한다(거부 호출은 슬롯 미커밋). 대량 배치(VR 사다리 등)가 슬롯을 선점 중이어도 대기 상한을 넘으면 무한 대기 대신 즉시 `KisApiException` — 같은 appKey의 실시간 조회(`StatisticsController` 등)가 배치 뒤에 무한정 밀리는 것을 방지
     - **반응 재시도(조회 GET 전용)**: `retryOnRateLimit=true`일 때 msg_cd 매칭 시 추가로 지수 백오프(1초 기준) 재시도. 주문 접수/취소(POST)는 재시도 안 함(중복 주문 위험 배제 — 사전 게이트만으로 방어)
-    - **단일 인스턴스 전제**: `nextSlotByAppKey`는 JVM 로컬 상태 — 롤링 배포로 인스턴스 2개가 잠시 공존하면 같은 appKey에 대한 실효 간격이 인스턴스 수만큼 짧아진다(`BenchmarkResultCache`와 동일한 전제)
-  - 주문 접수(`TradingOrderExecutor.placeEach()`)는 자체 페이싱 없이 이 공통 게이트에 의존한다 — 취소 경로(`OrderCancelService.cancelByCycle`)도 같은 `KisHttpClient.post()`를 거치므로 별도 처리 불필요. 마감 리포트의 잔여 PLACED 취소(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)도 같은 경로다. `KisOrderApi.cancel`은 취소 POST 전에 `KisTradingApi.findOrder`(TTTS3035R 주문체결내역 — ODNO 필터 미지원이라 종목·KST 오늘±1일 목록에서 odno 매칭. 목록은 연속조회로 전 페이지를 받는다: 응답 헤더 `tr_cont` F/M이면 다음 페이지, 요청 헤더 `tr_cont=N` + 응답 `ctx_area_fk200`/`ctx_area_nk200` 원문 재전송, 50페이지 상한 도달 시 warn 후 누적분 반환 — `getExecutions`도 동일하며 잔고 조회 TTTS3012R(`fetchHolding`)도 같은 공용 루프 `fetchAllPages`로 연속조회한다. 근거는 KIS 공식 샘플, 2026-10-31 운영 배치에서 이상 경고 없음 — 2페이지 이상 응답은 아직 미관측)로 `nccs_qty`(미체결수량)를 보고, 0이면 POST 없이 `CancelOutcome`(ALREADY_FILLED/ALREADY_CANCELED)을 반환해 리포트가 관리자 알림 없이 넘긴다. 주문을 목록에서 못 찾으면 그대로 취소 POST. 취소 응답 `rt_cd≠0`은 확정 거절(`KisApiException.rejected`, "KIS 취소 실패 [msg_cd]: msg1")로 던진다(과거 응답 본문을 무시해 거부된 취소가 성공으로 기록되던 버그를 고침). 마감 시점 KIS 호출은 PLACED 주문당 GET 1회 + 잔량이 있을 때 POST 1회가 늘어난다. KIS는 장 마감 만료 주문(LOC)의 `nccs_qty`를 0으로 내린다 — 2026-10-31 마감 배치 실측: LOC SELL(odno 0030934602)이 `ALREADY_CANCELED`로 취소 POST 없이 넘어갔고, 애프터장까지 살아 있는 지정가 SELL(odno 0030934651)은 취소 POST로 정상 취소됐다. 같은 배치에서 연속조회 이상 경고(키 미변경·상한 도달)는 없었다.
+    - **단일 인스턴스 전제**: 게이트는 JVM 로컬 상태 — 인스턴스 2개가 잠시 공존하면 같은 appKey에 대한 실효 간격이 인스턴스 수만큼 짧아진다
+  - 주문 접수(`TradingOrderExecutor.placeEach()`)는 자체 페이싱 없이 이 공통 게이트에 의존한다 — 취소 경로(`OrderCancelService.cancelByCycle`)도 같은 `KisHttpClient.post()`를 거치므로 별도 처리 불필요. 마감 리포트의 잔여 PLACED 취소(`TradingReporter.cancelUnresolvedOrders`, 전 증권사 공통)도 같은 경로다. `KisOrderApi.cancel`은 취소 POST 전에 `KisTradingApi.findOrder`(TTTS3035R 주문체결내역 — ODNO 필터 미지원이라 종목·KST 오늘±1일 목록에서 odno 매칭. 목록은 연속조회로 전 페이지를 받는다: 응답 헤더 `tr_cont` F/M이면 다음 페이지, 요청 헤더 `tr_cont=N` + 응답 `ctx_area_fk200`/`ctx_area_nk200` 원문 재전송, 50페이지 상한 도달 시 warn 후 누적분 반환 — `getExecutions`도 동일하며 잔고 조회 TTTS3012R(`fetchHolding`)도 같은 공용 루프 `fetchAllPages`로 연속조회한다. 근거는 KIS 공식 샘플 — 2페이지 이상 응답은 아직 미관측)로 `nccs_qty`(미체결수량)를 보고, 0이면 POST 없이 `CancelOutcome`(ALREADY_FILLED/ALREADY_CANCELED)을 반환해 리포트가 관리자 알림 없이 넘긴다. 주문을 목록에서 못 찾으면 그대로 취소 POST. 취소 응답 `rt_cd≠0`은 확정 거절(`KisApiException.rejected`, "KIS 취소 실패 [msg_cd]: msg1")로 던진다(과거 응답 본문을 무시해 거부된 취소가 성공으로 기록되던 버그를 고침). 마감 시점 KIS 호출은 PLACED 주문당 GET 1회 + 잔량이 있을 때 POST 1회가 늘어난다. KIS는 장 마감 만료 주문(LOC)의 `nccs_qty`를 0으로 내린다 — 2026-10-31 마감 배치 실측: LOC SELL(odno 0030934602)이 `ALREADY_CANCELED`로 취소 POST 없이 넘어갔고, 애프터장까지 살아 있는 지정가 SELL(odno 0030934651)은 취소 POST로 정상 취소됐다. 같은 배치에서 연속조회 이상 경고(키 미변경·상한 도달)는 없었다.
 - `EGW00123` — 토큰 만료 경계값 오류 (만료 1분 전 재발급으로 방지 중, `KisAuthApi`)
 - `APBK0988` "주문수량이 가능수량보다 큽니다" — 매도 주문 수량 > 판매가능수량 또는 매수 금액 > 실가용자금. 스케쥴러는 BUY를 전략 원장(`StrategyLedgerBudget`)으로만 제한하고 브로커 잔고는 사전 조회하지 않는다 — BUY가 이 코드로 확정 거절되면 `BrokerApiException.isInsufficientFundsRejection`이 잔고 부족으로 분류해 사용자 알림(`InsufficientBalanceEvent`)만 내고 관리자 알림은 내지 않는다(SELL의 같은 코드도 동일 — 판매 가능 수량 부족 사용자 알림, 관리자 알림 없음. 원장과 증권사 보유의 어긋남은 일일 대사 알림이 계속 감지한다). 수동 SELL은 기존 예약 수량과 신규 수량의 합을 검증한다.
   - 주문 접수 응답이 `APBK0988` 또는 `APBK0952`("주문가능금액을 초과 했습니다", BUY — 2026-10-31 운영 배치 실측)이면 `KisApiException.isInsufficientFunds()`=true(목록 SSOT `KisOrderApi.INSUFFICIENT_FUNDS_CODES`)(확정 거절의 하위 분류, `isRejected()` 의미 불변). BUY·SELL 모두 잔고·수량 부족으로 취급해 사용자 알림 대상이 된다(방향별 문구는 알림 어댑터). 다른 msg_cd는 분류하지 않는다.
@@ -62,7 +61,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - 매도 MOO/MOC(시장가) 주문 시 `OVRS_ORD_UNPR="0"`, **LOC(장마감지정가)는 실제 limit price 필수**
 - **KIS 가격 파라미터 포맷팅 SSOT**: `KisResponseParser.formatPrice(type, price)` — 매도 MOO/MOC(시장가)만 `"0"`, LOC/LIMIT(지정가)는 `setScale(2, HALF_UP).toPlainString()`. `price.toPlainString()` 직접 사용 금지 (scale=4 값 전송 시 KIS 오류)
 - **주문 body는 반드시 raw JSON String**: `String.format("""...""", ...)` 방식으로 직접 구성 — `Map<String, String>` + RestClient Jackson 직렬화 방식으로 보내면 KIS GW가 EGW00202 반환 (필드 순서·포맷 민감성)
-- **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 전 구간에서 LOC/MOC 모두 지원하므로 불필요 (코드에 없음)
+- **KIS 예약주문 API(`TTTT3014U`) 사용 금지** — 지정가(ORD_DVSN=00)만 지원, LOC/MOC 전송 시 EGW00202 반환. 일반 주문 API가 전 구간에서 LOC/MOC 모두 지원하므로 불필요
 
 ### KIS 어댑터 공통 파싱 헬퍼 (KisResponseParser)
 - `com.kista.tradingcore.broker.adapter.out.kis.KisResponseParser` — package-private 유틸: `parseBd(String)`, `parseIntSafe(String)`, `parseDirection(String)`
@@ -94,9 +93,5 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 
 ### KIS 응답 Ticker 필터링 패턴
 - 응답 stream에서 enum 외 종목 제거: `.flatMap(o -> StrategyTicker.tryParse(o.pdno()).map(t -> new Foo(t, ...)).stream())`
-- `StrategyTicker.tryParse`가 empty인 항목은 자동 제외 (silent drop) — 필요 시 `log.warn("KIS 응답 Ticker 외 종목 무시: {}", pdno)` 추가
-- 어댑터 단위 테스트: fixture에 `pdno="AAPL"` 행 추가 → 결과 List 크기·내용으로 필터 동작 검증
+- `StrategyTicker.tryParse`가 empty인 항목은 자동 제외(silent drop)
 
-### kis-trade-mcp (localhost:3001)
-- `open-trading-api/MCP/Kis Trading MCP` 소스, SSE 모드 Docker 컨테이너
-- 환경변수·재시작 절차: `docker-infra.md`의 `kis-trade-mcp 재시작` 섹션

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4 `RestClient`, `MockRestServiceServer`, JUnit5/AssertJ/Mockito.
 
-**Spec:** `docs/superpowers/specs/2026-10-19-crypto-market-indicators-design.md` — "### 시장 전체 지표 추가 — BTC 도미넌스·알트코인 시즌·Hash Ribbons (2026-10-20)" 섹션
+**Spec:** `docs/superpowers/specs/archive/2026-10-19-crypto-market-indicators-design.md` — "### 시장 전체 지표 추가 — BTC 도미넌스·알트코인 시즌·Hash Ribbons (2026-10-20)" 섹션
 
 ## Global Constraints
 

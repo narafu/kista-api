@@ -7,7 +7,7 @@
 **Goal:** "코인 = 업비트 = KRW" 리터럴 전제를 `shared.kernel` capability(시장·통화·거래소)와 거래소 포트 계약으로 바꾼다(Phase 0). 이어서 BTC·ETH가 여러 시장에서 거래되도록 종목↔시장 관계를 바꾸고, 시장은 계좌에서 정하게 한다(Phase 1). 업비트·KIS·Toss·메리츠·MOCK의 관찰 가능한 동작은 바뀌지 않고, 기존 테스트는 전부 통과해야 한다.
 **Architecture:** 어휘는 `shared.kernel`이 가진다. `Market`(`isCrypto`/`quoteCurrency`/`minOrderAmount`/`amountScale`), `Currency`(`USDT`, `amountScale`/`round`/`format`), `Broker`(생성자 capability 플래그), `StrategyTicker`(`markets`/`tradableOn`/`isCrypto`), 신규 `CryptoTradingRules`가 여기에 든다. 거래소별 실행 규칙은 `CryptoExchangePort.getTradingRules`가 공급하고, 실행기가 `DcaRuleInputs`에 실어 matching 커널로 넘긴다. 김치 프리미엄용 업비트 KRW 시세(KRW-USDT·코인 KRW 현재가·완성 일봉)는 broker 거래 포트에서 빼서, stats 소유 공개 시세 포트 `UpbitMarketDataPort`와 어댑터 `stats.adapter.out.upbit.UpbitMarketDataAdapter`(키 불필요, `BinanceMarketDataAdapter`와 같은 패턴)로 옮긴다. 이로써 김프 지표는 broker `CryptoExchanges`·`Broker.UPBIT`에 의존하지 않는다. 일반화의 기준은 "업비트 동작 보존 + 바이낸스가 1급"이다. 중립 이름·계약은 바이낸스 쪽(USDT 소수 금액, 받은 자산 수수료, 순수량)을 자연스럽게 표현한다. 업비트 고유 개념(KRW 정수, 견적 통화 추가 수수료)은 업비트 구현체와 `Market.CRYPTO_KRW` capability 안에 둔다. 업비트 거래 제거가 `broker.adapter.out.upbit` 패키지·`Broker.UPBIT` 상수·정책 기본값 정리로 끝나게 한다. `Broker.BINANCE`와 바이낸스 어댑터는 만들지 않는다. `Market.CRYPTO_USDT`·`Currency.USDT`만 추가해 일반화 경로를 테스트로 검증한다.
 **Tech Stack:** Java 25, Spring Boot 4, Spring Modulith, JUnit 5, Mockito, AssertJ
-**Spec:** docs/superpowers/specs/2026-10-23-binance-spot-dca-design.md (이 계획 범위: 설계 1·2·3·4·9절 + `TickerMeta.markets` expand)
+**Spec:** docs/superpowers/specs/archive/2026-10-23-binance-spot-dca-design.md (이 계획 범위: 설계 1·2·3·4·9절 + `TickerMeta.markets` expand)
 
 ## Global Constraints
 - enum 상수명 변경 금지(DB·API 계약): `Market.US_STOCK`/`CRYPTO_KRW`, `Currency.KRW`/`USD`/`JPY`, `Broker.*`, `StrategyTicker.*`. 신규 상수는 `Market.CRYPTO_USDT`, `Currency.USDT`, `CryptoTradingRules.FeeSide.QUOTE_SURCHARGE`/`RECEIVED_ASSET`뿐이다. 신규 상수는 기존 상수 뒤에 선언한다(순서 의존 `List.getFirst()`·EnumSet 보호).
@@ -744,7 +744,7 @@ grep -l 'failures="[1-9]' build/test-results/test/TEST-*.xml trading-core/build/
 - [ ] **Step 3: 드리프트 확인** — `grep -n -i "upbit\|업비트\|KRW" README.md`를 실행해 코드와 어긋난 서술(예: "코인은 업비트 KRW 전용 구조")이 있으면 고친다. kista-ui 영향을 정리한다: `TickerMeta.markets` 추가만 있고 UI 변경은 불필요하다(`market` 유지). `gen:types`는 Phase 3에서 한다. `docs/agents/modules/tradingcore/trading.md` "코인 DCA 실행" 절에 남은 "1.0005"·"원화"·"KST 09:00(업비트)" 서술을 grep해 Task 4·6 결과와 맞춘다.
 - [ ] **Step 4: 커밋**
 ```
-git add [수정한 문서 경로] docs/superpowers/plans/2026-10-23-binance-dca-phase0-1-structure.md
+git add [수정한 문서 경로] docs/superpowers/plans/archive/2026-10-23-binance-dca-phase0-1-structure.md
 git commit -m "docs: 코인 거래소 일반화 Phase 0+1 완료를 문서에 반영한다"
 ```
 

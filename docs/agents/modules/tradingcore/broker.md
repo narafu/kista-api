@@ -24,7 +24,7 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 - `com.kista.tradingcore.broker.application.service.BrokerRouter`(package-private, `@Primary @Component`): `List<BrokerCapabilitiesPort>`를 `Map<Broker, BrokerCapabilitiesPort>`로 수집해 공통 6개 Port를 **개별로** 구현하고 `account.broker()`로 위임한다. `BrokerCapabilitiesPort`/`BrokerAdapterPort`를 구현하지 않는 이유 — 구현하면 자기 자신이 `List<BrokerCapabilitiesPort>`에 수집된다. 미등록 브로커는 `IllegalArgumentException("지원하지 않는 증권사: ...")` → GlobalExceptionHandler 400
 - 소비처(trading 등)는 `BrokerPricePort` 같은 Port 인터페이스를 그대로 주입 — `@Primary`가 Router를 고른다(어댑터 3개도 같은 타입 빈이라 Router가 없으면 모호)
 - 신규 브로커 추가: `BrokerCapabilitiesPort` 구현체 1개만 추가 — Router/switch 수정 불필요
-- 브로커 분기 필요 시 `account.broker() == Broker.TOSS` 직접 비교(`Account.isToss()` 없음)
+- 브로커 분기 필요 시 `account.broker() == Broker.TOSS` 직접 비교
 - "application" NamedInterface는 `BrokerConnectionTesters`/`BrokerCallGuard` 공개용으로 유지
 - `BrokerCallGuard` 실패 정책 짝: `wrap`=fail-closed(실패 시 중단·예외 전파, 증권사 타입 예외는 상태코드 보존), `tryGet`=fail-open(실패 시 경고 로그 후 `Optional.empty()`로 건너뜀). 이벤트 발행·분기 처리가 필요한 실패 처리만 직접 catch
 
@@ -36,3 +36,8 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 ### 업비트 코인 DCA 지원
 - `UpbitExchangeAdapter.getCompletedDailyCandles(ticker, count)`: count 1~400, 한 번에 최대 200봉이라 `to` 파라미터로 페이징하며 미완성(오늘) 봉은 제외한다. 주문은 identifier=주문 UUID로 멱등 전송하고 체결 조회는 `executedVolume`을 기준으로 삼는다(→ trading.md "코인 DCA 실행").
 - 김프 시세(KRW-USDT·코인 KRW 현재가/일봉)는 stats `UpbitMarketDataAdapter`(무인증 공개 시세)로 이전 — 업비트 거래를 제거해도 남는다.
+
+### KIS 계좌번호 DB 저장 방식
+- 계좌번호는 `accounts.account_no`(AES-256 암호화) + `accounts.broker_account_code`(KIS: null, TOSS: accountSeq)에 저장한다
+- KIS API 호출은 `KisHttpClient.splitAccountNo(account.accountNo())` → `[CANO, ACNT_PRDT_CD]` — `-` 기준으로 나누고, 구분자가 없으면 `ACNT_PRDT_CD="01"` 기본값
+- `"74420614-01"` 형태로 저장돼 있으면 `["74420614","01"]`, `"74420614"` 8자리만 저장돼 있으면 기본 `"01"`을 쓴다

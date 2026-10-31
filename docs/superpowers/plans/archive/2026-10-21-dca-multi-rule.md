@@ -14,7 +14,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JPA/Flyway, JUnit 5, AssertJ, Mockito
 
-**Spec:** `docs/superpowers/specs/2026-10-21-dca-multi-rule-ledger-design.md` (전체)
+**Spec:** `docs/superpowers/specs/archive/2026-10-21-dca-multi-rule-ledger-design.md` (전체)
 
 **전제:** Plan 1(`2026-10-21-ledger-decimal-own-fills.md`)이 main에 병합되어 두 role 모두에 배포되어 있어야 한다. 이 plan이 기대는 Plan 1의 결과는 다음과 같다.
 - `AccountBalance.holdings`가 BigDecimal이다.
@@ -375,7 +375,7 @@
 - Modify:
   - `docs/agents/modules/tradingcore/trading.md`, `matching.md`
   - `README.md`(DCA 설명이 있으면)
-  - `docs/superpowers/specs/2026-10-13-dca-strategy-design.md` 상단에 "§3.4·§5.4는 2026-10-21 spec으로 대체" 한 줄을 넣는다.
+  - `docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md` 상단에 "§3.4·§5.4는 2026-10-21 spec으로 대체" 한 줄을 넣는다.
 - [ ] **Step 1: 문서 갱신**
 - [ ] **Step 2: 전체 스위트 1회** — `./gradlew test 2>&1 | grep -E "FAILED|BUILD"`와 `./gradlew integration 2>&1 | grep -E "FAILED|BUILD"` 실행 시 Expected: BUILD SUCCESSFUL.
 - [ ] **Step 3: Commit** — `docs(dca): 다중 규칙·DB 원장 흐름을 모듈 문서와 아키텍처 맵에 반영한다`

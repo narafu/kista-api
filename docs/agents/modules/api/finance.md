@@ -10,7 +10,7 @@ com.kista.api.finance/   ← Spring Modulith 모듈(CLOSED) — 가계부 애그
   adapter/in/web/     ← Finance*Controller/AssetSnapshotController/MonthlyClosingController/AdminFinanceCategoryController(경로만 /api/admin/**, finance 소유) + dto/
   adapter/in/schedule/ ← FinanceRegistrationReminderScheduler
   adapter/out/user/   ← UserModuleFinanceMemberAdapter(package-private — `FinanceMemberPort` 구현: `activeMemberIds()`=user `UserPort.findIdsByStatus(ACTIVE)`, `nicknameOf(userId)`=user `UserSummaryPort.findById(...).map(UserSummary::nickname)`, 사용자가 없으면 empty. **finance → user import가 있는 유일한 파일**)
-  adapter/in/event/FinanceUserCascadeListener ← `UserDeletedEvent`(AFTER_COMMIT, REQUIRES_NEW) 구독 → `FinanceUserDataEraseUseCase.eraseUserData`(정리 전체가 한 트랜잭션). FQCN·메서드명이 EPR listener_id(2026-10-31 `adapter/out/UserCascadeListener`에서 이동 → docker-infra.md 런북)
+  adapter/in/event/FinanceUserCascadeListener ← `UserDeletedEvent`(AFTER_COMMIT, REQUIRES_NEW) 구독 → `FinanceUserDataEraseUseCase.eraseUserData`(정리 전체가 한 트랜잭션). FQCN·메서드명이 EPR listener_id라 개명·이동 시 docker-infra.md "배포 직전 EPR 정리 런북" 확인
   adapter/out/persistence/ ← Entity + *JpaRepository + *PersistenceAdapter 3종
 
 **모듈 의존**: `finance → notify` import 0(리마인더는 `finance.application.event` 발행으로만 전달). `finance → user`는 finance 소유 포트 `FinanceMemberPort`(ACTIVE 사용자 id 목록 + 닉네임 조회 — "finance가 필요로 하는 사용자 정보의 전부") 뒤의 어댑터 1곳(`adapter/out/user/UserModuleFinanceMemberAdapter`)으로 한정된다. `FinanceGroupController`(멤버 닉네임 표시, 없으면 null)와 `FinanceRegistrationReminderNotifier`는 user를 직접 모른다. 사용자 설정·수신자 정보는 finance가 읽지 않는다. finance가 사용자 정보를 더 필요로 하면 이 포트에 메서드를 추가한다.

@@ -1,6 +1,6 @@
 ## 메리츠증권 API
 
-2026-10-23 운영 서버 조회 전용 실측 기준. 구현은 `com.kista.tradingcore.broker.adapter.out.meritz`(벤더 모델 `domain.model.meritz`, internal). 메리츠 Open API는 2026-10-26 00시(KST) 정식 오픈(베타 종료)됐다. 모의 서버가 없어 `Broker.MERITZ`는 관리자 설정에서 **기본 비활성**이다.
+2026-10-23 운영 서버 조회 전용 실측 기준. 구현은 `com.kista.tradingcore.broker.adapter.out.meritz`(벤더 모델 `domain.model.meritz`, internal). 모의 서버가 없어 `Broker.MERITZ`는 관리자 설정에서 **기본 비활성**이다.
 
 ### 기본 사실
 - Base `https://openapi.imeritz.com:9443`(`meritz.base-url`, trading-core `application.yml`). 모든 요청 헤더 `authorization: Bearer <token>` + `mac_address`(고정 상수 `0242AC110002`, 값 검증 없음).
@@ -66,13 +66,10 @@ SOXL 1주 매수 @현재가×0.5 → 즉시 취소를 LOC·지정가로 각 1회
 - **당일 목록 반영**: 접수 후 첫 조회(약 90ms 뒤)에 이미 보인다. 행의 `aspr_type_code`는 LOC=`5`, 지정가=`2`(역매핑 표와 일치), `oder_able_qty`=1.
 - **취소**: 정상 처리, 약 650ms 뒤 원주문 행 `oder_able_qty=0`·`cntg_qty=0`. 취소는 당일 목록에 **별도 행**으로 생긴다 — 취소 행은 새 `oder_no`, `oder_rctf_cncl_cls_code="2"`, `orgl_oder_no`=원주문 번호, `cncl_odqt`=취소 수량. 원주문 행은 `oder_rctf_cncl_cls_code="0"` 그대로이고 `cncl_odqt=0`이다. 어댑터의 원주문 조회(`oder_no` 일치)와 체결 필터(`oder_rctf_cncl_cls_code=="0"`)는 이 형태와 맞는다.
 
-### 첫 운영 배치 확인 (2026-10-27)
-정식 오픈(2026-10-26) 후 기존 앱키로 토큰 발급·접수가 그대로 동작했다(`EGW00103`/`EGW00121` 없음). PRIVACY SOXL 지정가 4건(매수 1·매도 3) 전부 접수 성공, 마감 후 체결 조회로 매도 1건 FILLED(지정가 84.58 → 체결가 92.28, 시장가 위 지정가 매도라 즉시 체결)·나머지 3건 미체결 CANCELLED 반영.
-
 ### 미검증
 실주문 실측 이후에도 남은 항목 — 관리자 활성화 후 첫 배치에서 확인한다.
 - MOC(매도 `34`)·시장가 매도(`05`, MOO SELL 근사) 실접수 여부(LOC·지정가 매수는 실측 완료).
-- `warn_cls_code`가 `0`이 아닌 경우의 실제 형태 — 실측·첫 운영 배치(2026-10-27)에서 경고가 한 번도 발생하지 않았다. 경고가 `data.warn_cls_code`가 아니라 성공이 아닌 `rsp_cd`로 올 가능성이 남아 있다 — 이 경우 `MeritzHttpClient`가 먼저 예외를 던져 재전송이 동작하지 않는다(미접수 방향이라 안전).
+- `warn_cls_code`가 `0`이 아닌 경우의 실제 형태 — 실측·첫 운영 배치에서 경고가 한 번도 발생하지 않았다. 경고가 `data.warn_cls_code`가 아니라 성공이 아닌 `rsp_cd`로 올 가능성이 남아 있다 — 이 경우 `MeritzHttpClient`가 먼저 예외를 던져 재전송이 동작하지 않는다(미접수 방향이라 안전).
 - 취소 오류 코드(이미 체결·이미 취소된 주문에 대한 취소 응답) — `CancelOutcome`은 목록 기반 판정만 하고 응답 코드로는 판정하지 않는다.
 
 ### 잔고 부족 거절 분류

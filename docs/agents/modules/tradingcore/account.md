@@ -1,7 +1,7 @@
 ## com.kista.tradingcore.account (`:trading-core`)
 
 com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-core`) — 계좌 자격증명·브로커 연결. "domain"·"usecase"·"port"·"event" 4개 NamedInterface, service·adapter internal
-  domain/model/       ← Account(`apiKeyExpiresAt` — 업비트 키 만료, `dedupeKey()` — 키 전용 브로커(`Broker.isKeyOnlyCredentials()` — 업비트·메리츠·바이낸스)는 appKey, 그 외 계좌번호 = 전역 중복 판정 키 SSOT, `withCredentials`)/RegisterAccountCommand/UpdateAccountCommand. `Account.Broker` nested enum 없음 — `sharedkernel.Broker` 참조. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
+  domain/model/       ← Account(`apiKeyExpiresAt` — 업비트 키 만료, `dedupeKey()` — 키 전용 브로커(`Broker.isKeyOnlyCredentials()` — 업비트·메리츠·바이낸스)는 appKey, 그 외 계좌번호 = 전역 중복 판정 키 SSOT, `withCredentials`)/RegisterAccountCommand/UpdateAccountCommand. Broker enum은 `sharedkernel.Broker`. `SellableQuantity`/브로커 자격증명 예외는 broker 소유가 SSOT
   application/usecase/ ← AccountUseCase(조회/등록/수정/삭제/증권사 연결 테스트)
   application/port/output/ ← AccountPort/BrokerEnabledPort(account가 정의, 정책 소유자인 trading `TradingPolicyService`가 구현 — 포트 역전)/AccountOpenOrderCancelPort(계좌 삭제 전 미체결 주문 취소 — account 정의, 주문 소유자인 trading `AccountOpenOrderCanceller`가 구현, 실패 건수>0이면 `AccountService.delete()`가 삭제 중단)
   application/event/  ← AccountDeletedEvent(UUID accountId) — `AccountService.delete()`(NOT_SUPPORTED — 증권사 취소 HTTP 뒤 `AccountDeletionWriter`가 증권사 토큰 제거(broker `AccountTokenEvictionPort`)·계좌 소프트 삭제·발행을 한 트랜잭션으로)가 발행, trading `adapter.in.event.AccountCascadeListener`가 AFTER_COMMIT 구독해 cycle_position → strategy_cycle → strategy 순으로 소프트 삭제(EPR 추적)
@@ -17,3 +17,6 @@ com.kista.tradingcore.account/   ← Spring Modulith 모듈(CLOSED, `:trading-co
 
 ### 업비트 API 키 만료 점검
 `adapter/in/schedule/ApiKeyExpiryScheduler`(매일 10:00 KST, 락 `api-key-expiry` 30분, `scheduler.enabled`)가 `broker.isApiKeyExpiring() && apiKeyExpiresAt != null` 계좌만 훑어 만료까지 30·7·0일 남은 날에만 `ApiKeyExpiringEvent`(application/event, userId·accountId·nickname·broker·expiresOn·daysLeft)를 발행한다 — 알림은 notify `ApiKeyExpiryNotifier`가 소유. 키 교체(`updateCredentials`) 저장 시 사전 중복 검사와 저장 사이의 경합으로 unique 위반이 나면 `DataIntegrityViolationException`을 `Account.DuplicateAccountException`(409)으로 변환한다. 관리자 계좌 응답의 `accountNoMasked`·`accountNo`는 업비트(계좌번호 없음)에서 null이다.
+
+### 공유 요청 DTO @Valid 제약
+`AccountRequest`는 계좌 register/update 공용이다 — `@Valid`는 register(`AccountController` POST)에만 붙이고 update(nickname만 사용)는 `@Valid` 없이 둔다. 등록 전용 제약(`@Pattern` 계좌번호 형식 등)이 update에 강제되면 Breaking Change다.

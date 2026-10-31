@@ -80,13 +80,9 @@
 - **테스트넷 IT: 미검증(키 없음, 2026-10-23 실행 시 6건 SKIPPED)**. 36자 clientOrderId 수락 여부, -2013 응답 실측, myTrades 반영 지연, 테스트넷 수수료 자산은 아직 기록이 없다. 키가 생기면 IT를 돌리고 이 절에 날짜와 함께 추가한다.
 
 ### 미검증 (실계좌·키가 필요한 항목)
-- 연결 테스트 4가지(정상·출금 켜짐·IP 미제한·거래 권한 꺼짐) — `/sapi/v1/account/apiRestrictions` 필드명은 공식 문서 기준이며 실키 확인 전이다.
-- 실계좌 실주문(매수 10.50 USDT·매도) 및 BNB 수수료 차감 계정의 `commissionAsset`.
 - `myTrades` 반영 지연(Memory→Database) — 동기화기는 10분 뒤 조회하고 불일치면 예외 → 다음 틱 재시도로 방어한다. 실제 지연은 미실측.
 - -1021 빈도 — OCI 시각 오차 실측 없음. 운영 로그에 -1021이 보이면 `/api/v3/time` 오프셋 보정을 추가한다.
-- 운영 서버에서 서명 요청·IP 허용 목록 동작 — 공개 `ping`만 확인했다. 실키 등록 시 확인한다.
 
 ### 배포·롤백
-- **kista-api(root)와 kista-trading은 같은 릴리스로 배포한다.** 정책 JSON의 DB 읽기는 안전하다 — trading-core `TradingPolicySettingsPersistenceAdapter`가 누락 enum 키를 `defaults()`로 백필한다. 깨지는 곳은 root↔trading-core 내부 API(`TradingPolicyHttpAdapter` GET/PUT)다. 이 경로는 백필 없이 그대로 역직렬화하므로, 이미지가 어긋나면 교체 구간에 관리자 정책 GET/PUT이 양방향으로 실패한다 — 구 이미지는 모르는 `BINANCE` 키를 JSON 역직렬화에서 거부하고, 신 root는 구 trading-core 응답의 누락 키를 `immutableEnumMap`에서 거부한다(MERITZ도 같은 동시 배포에 의존했다).
 - **롤백 위험**: 관리자가 정책을 저장해 JSON에 BINANCE가 들어갔거나 BINANCE 계좌가 생기면, kista-trading을 BINANCE 이전 이미지로 되돌릴 수 없다. `TradingPolicySettingsPersistenceAdapter.deserialize`가 예외를 던지고 `accounts.broker='BINANCE'`는 읽을 수 없다.
-- BINANCE는 실키로 1회 검증(연결 테스트·실주문 경로는 미검증)한 뒤에만 관리자가 활성화한다.
+- BINANCE는 실키 검증을 마치고 관리자가 활성화했다. 비활성화하면 바이낸스 계좌 등록·매매가 막힌다.

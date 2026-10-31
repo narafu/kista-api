@@ -13,7 +13,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit5 + Mockito, Spring Modulith 이벤트(EPR)
 
-**Spec:** `docs/superpowers/specs/2026-10-25-infinite-small-seed-deadlock-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-25-infinite-small-seed-deadlock-design.md`
 
 ## Global Constraints
 

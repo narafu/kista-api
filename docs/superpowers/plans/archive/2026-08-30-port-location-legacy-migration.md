@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 21, Spring Boot 4, Gradle, ArchUnit.
 
-**Spec:** `docs/superpowers/specs/2026-08-30-port-location-migration-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md`
 
 ## Global Constraints
 
@@ -354,7 +354,7 @@ port/output/   ← *Port 접미사 아웃바운드 포트 인터페이스 (레�
 
 ```diff
 - 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요
-+ 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(레거시 청크 완료, `docs/superpowers/specs/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 중 레거시 완료, 나머지 4개 진행 예정
++ 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(레거시 청크 완료, `docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 중 레거시 완료, 나머지 4개 진행 예정
 ```
 
 - [ ] **Step 7: 최종 전체 테스트 스위트 1회 실행**
@@ -399,4 +399,4 @@ EOF
 
 ## 다음 청크
 
-이 레거시 청크가 main에 병합되면, `docs/superpowers/specs/2026-08-30-port-location-migration-design.md`의 finance 청크(16개 포트 파일 — NamedInterface 재구성 포함)에 대한 별도 계획 문서를 `writing-plans`로 새로 작성한다. 레거시 청크에서 확립된 sed 기법·태스크 분할 패턴을 그대로 재사용하되, finance는 `"domain"` NamedInterface를 `"domain"`(model만)+`"usecase"`+`"port"` 3개로 재구성하는 태스크가 추가된다(스펙 "NamedInterface 재구성" 표 참고).
+이 레거시 청크가 main에 병합되면, `docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md`의 finance 청크(16개 포트 파일 — NamedInterface 재구성 포함)에 대한 별도 계획 문서를 `writing-plans`로 새로 작성한다. 레거시 청크에서 확립된 sed 기법·태스크 분할 패턴을 그대로 재사용하되, finance는 `"domain"` NamedInterface를 `"domain"`(model만)+`"usecase"`+`"port"` 3개로 재구성하는 태스크가 추가된다(스펙 "NamedInterface 재구성" 표 참고).

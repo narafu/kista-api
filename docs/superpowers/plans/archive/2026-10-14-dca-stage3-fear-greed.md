@@ -11,7 +11,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, RestClient, Jackson, JUnit 5, Mockito, MockRestServiceServer
 
-**Spec:** `docs/superpowers/specs/2026-10-13-dca-strategy-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md`
 
 - 이번 단계 대상은 6.2, 5.2의 3·4단계 FEAR_GREED 항목, 7.4, 11의 3번이다.
 - 이 계획은 위 절들을 근거로 한다. 실행자는 이 계획과 함께 스펙도 읽는다.

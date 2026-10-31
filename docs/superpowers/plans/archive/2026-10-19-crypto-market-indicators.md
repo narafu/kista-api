@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, RestClient(`RestClients.withTimeouts`), JUnit 5 + AssertJ + Mockito, `MockRestServiceServer`, `@WebMvcTest`
 
-**Spec:** `docs/superpowers/specs/2026-10-19-crypto-market-indicators-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-19-crypto-market-indicators-design.md`
 
 ## Global Constraints
 
@@ -239,7 +239,7 @@ openInterestHist: [{"symbol":"BTCUSDT","sumOpenInterest":"93130.501","sumOpenInt
   - `result` 흐름 `dashboard` 단계 뒤에 `crypto-market-indicators` 단계 추가: `lane: ui`, `to: [trading, broker]`, `code: [CryptoMarketIndicatorController#get, CryptoMarketIndicatorService#get]`, `fail: 지표·종목별로 실패한 섹션만 null(200), 10분 캐시`
   - `landscape` "사용자 기능"에 `{id: crypto-market-indicators, title: 코인 시장 지표(김프·펀딩비·OI), flow: result}` 추가
   - `result.summary`의 "공포탐욕"이 kista-api 담당이라는 문장은 유지하고, 코인 시장 지표가 kista-trading이라는 점을 덧붙인다
-- Modify: `docs/superpowers/specs/2026-10-19-crypto-market-indicators-design.md` — "모든 섹션 실패하면 503" 문장을 "200 + 전부 null(미캐시)"로 바꾼다
+- Modify: `docs/superpowers/specs/archive/2026-10-19-crypto-market-indicators-design.md` — "모든 섹션 실패하면 503" 문장을 "200 + 전부 null(미캐시)"로 바꾼다
 - Check: `README.md` 외부 연동·기술 스택 목록에 Upbit·Binance가 나열돼 있으면 Binance·Frankfurter를 추가하고, 그런 목록이 없으면 변경하지 않는다
 
 - [ ] **Step 1: 문서 편집**

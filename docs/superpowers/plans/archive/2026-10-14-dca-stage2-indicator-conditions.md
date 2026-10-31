@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, Spring Data JPA, Flyway, JUnit 5 + AssertJ + Mockito.
 
-**Spec:** `docs/superpowers/specs/2026-10-13-dca-strategy-design.md` — 3.2(조건 검증), 5.2 3~4단계, 6.1, 7.1·7.2·7.4, 9장. 브랜치 `feat/dca-stage2`(feat/dca-stage1 위).
+**Spec:** `docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md` — 3.2(조건 검증), 5.2 3~4단계, 6.1, 7.1·7.2·7.4, 9장. 브랜치 `feat/dca-stage2`(feat/dca-stage1 위).
 
 ## Global Constraints
 
@@ -1077,7 +1077,7 @@ git commit -m "feat(dca): DCA 조건 요청·응답을 타입화하고 공포탐
 **Files:**
 - Modify: `src/test/resources/architecture/flows.yml` (DCA 회차 판정 step, `code:` 목록 유지)
 - Modify: `docs/agents/modules/tradingcore/matching.md`, `docs/agents/modules/tradingcore/trading.md`, `docs/agents/modules/tradingcore/broker.md` 중 DCA·CandlePort 서술이 있는 곳(`grep -n "DCA\|getDailyCandlesBefore\|조건" `)
-- Modify: `docs/superpowers/specs/2026-10-13-dca-strategy-design.md` 상단 "상태" 줄
+- Modify: `docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md` 상단 "상태" 줄
 
 - [ ] **Step 1: flows.yml** — `title: DCA 회차 판정` step의 desc를 다음 의미로 바꾼다: "기존 주문·timing·실행일·이력을 확인하고, 티커·세션별로 캐시한 250봉 종가(마지막 봉이 직전 개장일이 아니면 데이터 실패)와 판매가능수량·실잔고 평단을 조회해 평단가·이평선·RSI 조건을 AND로 평가한다. 데이터 실패 → 조건 미충족 → 보유 없음 → 1주 미만 순으로 skip 사유를 정하고 이력·알림을 남긴다." 기존 문장 톤·길이를 맞춘다. `code:` 참조는 바꾸지 않는다.
 - [ ] **Step 2: 모듈 문서** — matching.md에 `DcaIndicators`(SMA·Wilder RSI 14)·`DcaCondition`(검증 규칙)·판정 순서 한 단락, trading.md에 `DcaRoundPlanner` 캐시·신선도·실잔고 조회와 `strategy_dca_condition`, broker.md에 `getDailyCandlesBefore` 페이징·adjusted. "단계 ②에서" 같은 미래형 서술이 남아 있으면 현재형으로 고친다.
@@ -1094,7 +1094,7 @@ Expected: BUILD SUCCESSFUL, grep 결과 없음. `ArchitectureMapTest`·`Hexagona
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add src/test/resources/architecture/flows.yml docs/agents/modules/tradingcore docs/superpowers/specs/2026-10-13-dca-strategy-design.md
+git add src/test/resources/architecture/flows.yml docs/agents/modules/tradingcore docs/superpowers/specs/archive/2026-10-13-dca-strategy-design.md
 git commit -m "docs(dca): 단계 ② 지표 조건 흐름과 모듈 문서를 동기화한다"
 ```
 

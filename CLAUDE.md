@@ -1,9 +1,7 @@
 # CLAUDE.md
 
 한국투자증권(KIS)·토스증권 API 기반 해외주식 자동 분할매매 서비스.
-Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`). 현재 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT, 루트 패키지는 서브프로젝트별 `com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`이고, 모듈 경계는 프로세스별 `ApplicationModules.verify()`(api·trading-core 각 1개)가 검증한다.
-
-이 파일은 Claude Code 진입점이다. 실제 프로젝트 공통 지식은 `docs/agents/`에 둔다.
+Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 3 서브프로젝트 `:api`·`:trading-core`·`:shared`, 루트 패키지 `com.kista.api`·`com.kista.tradingcore`·`com.kista.shared`). 모듈 목록·소속은 `docs/agents/architecture.md` "모듈 한눈에 보기"가 SSOT. 이 파일은 진입점이고 공통 지식은 `docs/agents/`에 둔다.
 
 ## 코드 철학
 
@@ -25,7 +23,7 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 
 빌드·실행·테스트 명령어는 `docs/agents/commands.md`(자동 로드) 참고.
 
-필수 환경변수(누락·빈값이면 기동 실패 — `@Validated @NotBlank` 또는 기본값 없는 placeholder): `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `INTERNAL_API_TOKEN` (서버 간 내부 인증), `TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID` (관리자 봇, root·trading-core 공통), `KAKAO_CLIENT_ID` (root만), `CORS_ALLOWED_ORIGINS` (쉼표 구분 — root는 항상 필수, trading-core는 prod만 필수·그 외 기본값 `http://localhost:3000`). 선택: `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — 로그인 시 ADMIN 자동 승격 seed, 강등 경로가 없어 bootstrap 후 비어도 무해), `INTERNAL_API_BASE_URL` (root→trading-core 내부 HTTP 호출 base URL, 기본값 `http://localhost:8081` = trading-core 로컬 포트 — 운영은 compose가 kista-api에 주입)
+필수 환경변수(누락·빈값이면 기동 실패 — `@Validated @NotBlank` 또는 기본값 없는 placeholder): `JWT_SIGNING_KEY`, `AES_ENCRYPTION_KEY`, `INTERNAL_API_TOKEN` (서버 간 내부 인증), `TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID` (관리자 봇, root·trading-core 공통), `KAKAO_CLIENT_ID` (root만), `CORS_ALLOWED_ORIGINS` (쉼표 구분 — root는 항상 필수, trading-core는 prod만 필수). 선택: `ADMIN_KAKAO_IDS` (쉼표 구분 카카오 ID — 로그인 시 ADMIN 자동 승격 seed), `INTERNAL_API_BASE_URL` (root→trading-core 내부 HTTP base URL, 기본값 `http://localhost:8081`, 운영은 compose가 주입)
 
 로컬 환경: `src/main/resources/application-local.yml` (.gitignored) — `jwt.signing-key` EC JWK, `spring.datasource.*`, `kakao.*` 설정 필수
 
@@ -34,11 +32,12 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 공통 작업 방식(서브에이전트 병렬/모델 라우팅, 커밋 전 검토, 자동 커밋, 모호하면 질문, 기존 오류 즉시 수정, 의심 사항 제보, 범위 밖 개선 제안)은 전역 `~/.claude/CLAUDE.md` 참고 — 여기는 이 프로젝트 고유 규칙만 기재.
 
 - **직접 확인 우선**: 직접 확인할 수 있는 것은 추정·"미검증"으로 남기지 말고 확인한다 — 라이브러리 동작은 gradle 캐시의 sources jar로, 트랜잭션·이벤트(EPR)·Redis 경로는 실 컨텍스트·실 DB/Redis 통합 테스트(`*IT`)로, 고친 테스트가 회귀를 잡는지는 변이 확인(수정을 잠시 되돌려 실패하는지)으로, 운영 상태는 읽기 전용 조회(`ssh kista-server` 후 SELECT·`docker logs`)로. "미검증"은 쓰기·실계좌 주문·배포가 필요한 것만, 이유와 함께 보고
-- **시간 기준 정책**: 거래일은 전 구간 KST 단일 기준(변환 없음), `release_date`는 FIDA 발행일 원본, US 기준 외부 데이터만 어댑터 내부 `UsTradeDates` 변환 (`docs/agents/constraints.md` 참고)
+- **시간 기준 정책**: 거래일은 전 구간 KST 단일 기준 → `constraints.md` "시간 기준 정책"
 - **kista-ui 연계 작업 감지 시**: API 응답 형식 변경·인증/토큰 흐름 등이면 즉시 `../kista-ui/CLAUDE.md`를 Read로 확인 (자동 로드 안 됨)
 - **README.md 드리프트 감지**: 코드 변경으로 `README.md`(기술 스택 배지 버전, 아키텍처 다이어그램 속 클래스/패키지명, 스케쥴러 실행 시각, 배포 파이프라인 방식 등)의 내용이 실제와 달라지면 같은 작업에서 `README.md`도 함께 수정. kista-ui 쪽 README도 영향받으면 `../kista-ui/README.md`까지 확인
-- **flows.yml 드리프트 감지**: 흐름·상태 전이·통신 경로·기능 목록을 바꾸면 같은 작업에서 아키텍처 맵 원본 `flows.yml`도 갱신 — 규칙 상세는 `docs/agents/constraints.md` "아키텍처 맵 flows.yml 동기화"
-- Git 규칙(push·author·커밋 메시지)은 `docs/agents/constraints.md` 참고
+- **flows.yml 드리프트 감지**: 흐름·상태 전이·통신 경로·기능 목록을 바꾸면 같은 작업에서 `flows.yml`도 갱신 → `constraints.md` "아키텍처 맵 flows.yml 동기화"
+- **완료된 계획 archive 이동**: `docs/superpowers/plans/`의 계획이 구현·배포까지 끝나면 같은 작업(마지막 커밋)에서 계획과 짝 spec을 `git mv`로 `plans/archive/`·`specs/archive/`에 옮기고, 그 경로를 참조하는 문서·memory도 함께 고친다. 남은 후속 작업이 있으면 옮기지 않는다
+- Git 규칙(push·author·커밋 메시지·배포 가드)은 `docs/agents/constraints.md` "Git 규칙"이 SSOT
 
 @docs/agents/commands.md
 @docs/agents/architecture.md
@@ -51,17 +50,12 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - `docs/agents/own-type-ledger.md` — own-type 허용 원장 (필수 Read)
 - `docs/agents/modules/tradingcore/trading-formulas.md` — 매매·VR 공식 (변경 금지 SSOT)
 
-## 운영 도구
-
-- **API 운영 로그**: OCI 서버 SSH 접속 후 `docker logs -f $(docker ps -qlf label=com.docker.compose.service=kista-api)` (blue/green 교체로 컨테이너 이름이 고정되지 않음 — 교체 중 2개면 최신) (상세 명령어 → `docs/agents/docker-infra.md`)
-- **DB 작업**: 자체호스팅 postgres(`kista-postgres` 컨테이너) — SSH 접속 후 `docker exec kista-postgres psql -U kista -d kistadb` (상세 명령어 → `docs/agents/docker-infra.md`)
-
 ## 참고 문서 (필요시 Read)
-- **전체 구조 그림**: `docs/architecture-map.md` — 시스템 컨텍스트·빌드/스키마 경계·프로세스 간 통신·매매 배치 시퀀스(Mermaid), 아키텍처 맵(`build/architecture-map/index.html` — 모듈 구조·흐름 오버레이·랜드스케이프·스윔레인·타임라인·생명주기 단일 페이지, 원본 `src/test/resources/architecture/flows.yml`)은 `ArchitectureMapTest`가 생성
+- **전체 구조 그림**: `docs/architecture-map.md`(Mermaid), 아키텍처 맵 `build/architecture-map/index.html`(`ArchitectureMapTest`가 생성, 원본 `src/test/resources/architecture/flows.yml`)
 - **매매·스케쥴러·주문 로직 작업 시 필수 Read**: `docs/agents/workflow.md` — 스케쥴러 실행 흐름, MarketSession(DIRECT|BLOCKED), BuyOrderPriceCapper 보정 주문, orders/cycle_position 기록 테이블 구분
 - KIS API 작업: `docs/agents/kis-api.md` — TR ID, 오류 코드, 응답 필드, 어댑터 패턴
 - 토스증권 API 작업: `docs/agents/toss-api.md`
 - 메리츠 API 작업: `docs/agents/meritz-api.md`
 - 바이낸스 API 작업: `docs/agents/binance-api.md`
-- Docker/배포/인프라 작업: `docs/agents/docker-infra.md`
+- Docker/배포/인프라·운영 로그·DB 접속(`ssh kista-server`): `docs/agents/docker-infra.md`
 - 배치 스케줄러 실행 시각: `docs/agents/scheduler-time-table.md`

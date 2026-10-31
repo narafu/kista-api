@@ -6,10 +6,7 @@
 
 ### 어댑터 구조
 
-- `TossHttpClient` — 공통 헤더 처리 (package-private), `TossConfig`의 `tossRestClient`(RestClient) 빈 주입
-- API 클래스 5개: `TossAuthApi`, `TossCandleApi`, `TossHoldingsApi`, `TossOrderApi`, `TossPriceApi`
-- `TossBrokerAdapter`: `BrokerCapabilitiesPort`(어댑터 식별 + 공통 6개 Port) + `BrokerStatisticsPort`(통계 2개 Port) 구현 (`BrokerConnectionTestPort`는 `TossAuthApi`가 구현)
-  - 통계 capability(`BrokerStatisticsPort`로 묶임, 현재 Toss만 구현 — 벤더 중립 `BrokerCandle`/`ExchangeRateQuote` 반환): `CandlePort`, `ExchangeRatePort`
+클래스 구성·구현 포트는 `modules/tradingcore/broker.md`의 `adapter/out/toss` 항목. `TossHttpClient`는 package-private 공통 헤더 처리이고 `TossConfig`의 `tossRestClient` 빈을 쓴다.
 
 ### 계좌번호 포맷
 
@@ -47,10 +44,6 @@
 - 주문 목록·상세 응답(`Order` 스키마)에는 `clientOrderId`가 없어 사후 조회가 안 된다 — 잔류 SUBMITTING 대사(`OrderSubmissionReconciler`)는 선점 후 2~9분 창에서만 같은 키 재요청으로 원 주문번호를 회수한다(workflow.md "PLANNED 상태 전이 경합")
 - 2026-10-17 실계좌 실측: 같은 키·같은 내용 재요청 → 같은 `orderId` 재반환(200), 같은 키·다른 내용 → 422 `idempotency-key-conflict`(본문 gzip). 409 `request-in-progress`는 공식 openapi.json 응답 예시로 확인
 
-### 주의사항
-
-- KIS API와 필드명·인증 방식이 다르므로 혼용 주의 (`TossApiException` → 503 매핑은 `GlobalExceptionHandler`가 SSOT, 브로커 분기는 `docs/agents/modules/tradingcore/broker.md` "BrokerCapabilitiesPort + BrokerRouter 패턴" 참고)
-
 ### 가격 조회 API 3분리 — TossPriceApi
 
 Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 분리된 HTTP 호출**이므로, 필요한 값만 조회하도록 메서드를 3그룹으로 분리했다 (KIS는 한 응답에 둘 다 묶여 있어 이 구분이 무의미 — `kis-api.md` 참고):
@@ -66,8 +59,8 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 ### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
 
 - `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회
-- `before` 시각 계산이 핵심: `DstInfo.isRegularSessionActive()`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `DstInfo.lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 `Instant.now()`
-- **`DstInfo.marketOpen` 필드를 그대로 쓰면 안 됨**: 이 필드는 "오늘 날짜" 고정이라 자정~개장 전(00:00~22:30 KST) 사이 호출 시 실제 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킴 — `lastSessionOpenInstant()`가 `nextTradeDate()`와 같은 패턴으로 날짜 롤백 처리한 버전이므로 이걸 사용
+- `before` 시각 계산이 핵심: `TossPriceApi.resolveMarketSession()`의 `regularSessionActive`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 `Instant.now()`
+- 개장 시각은 "오늘 날짜" 고정값이 아니라 `lastSessionOpenInstant`(날짜 롤백 처리)를 써야 한다 — 고정값은 자정~개장 전(00:00~22:30 KST) 호출 시 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킨다
 - `TossPriceApi.prevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
 - 캔들 배열 인덱스로 확정 종가를 추측하지 말 것 — `count=1`+`before` 방식만 사용 (인덱스 추측은 장마감 후 최신 캔들 오인·프리마켓 구간 stale 버그를 냈음)
 

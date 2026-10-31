@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4 `RestClient`(JDK HttpClient), Jackson, JUnit5 + Mockito + `MockRestServiceServer`, ArchUnit.
 
-**Spec:** `docs/superpowers/specs/2026-10-23-meritz-broker-design.md` (실측 API 사실·엔드포인트·필드명은 spec이 SSOT — 구현자는 반드시 같이 읽는다)
+**Spec:** `docs/superpowers/specs/archive/2026-10-23-meritz-broker-design.md` (실측 API 사실·엔드포인트·필드명은 spec이 SSOT — 구현자는 반드시 같이 읽는다)
 
 ## Global Constraints
 

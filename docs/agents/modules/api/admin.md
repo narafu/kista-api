@@ -1,6 +1,6 @@
 ## com.kista.api.admin (`:api`)
 
-com.kista.api.admin/    ← Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"usecase"·"port" 3개 NamedInterface, service·adapter internal. event/schedule NamedInterface 없음. 오류 로그(`app_error_logs`) 저장은 두 입구가 같은 `AppErrorLogPort.save`로 수렴한다 — root 프로세스 내부 발행분은 `adapter/in/event/AppErrorRaisedListener`, trading-core 발행분은 `adapter/in/redis/AppErrorStreamConsumer`(`@Aspect`는 저장소 전체 금지 — `HexagonalArchitectureTest.no_aspects_in_codebase`, admin→notify 숨은 런타임 결합 없음)
+com.kista.api.admin/    ← Spring Modulith 모듈(CLOSED) — 관리자 조회·정정·재정렬·감사로그·앱오류로그 + 런타임 설정. "domain"·"usecase"·"port" 3개 NamedInterface, service·adapter internal. event/schedule NamedInterface 없음. 오류 로그(`app_error_logs`) 저장은 두 입구가 같은 `AppErrorLogPort.save`로 수렴한다 — root 프로세스 내부 발행분은 `adapter/in/event/AppErrorRaisedListener`, trading-core 발행분은 `adapter/in/redis/AppErrorStreamConsumer`
   domain/model/       ← 관리자 도메인(AdminAnomalies/AdminStats/AppErrorLog/AuditLog) + 표지 예외 own-type(AdminBrokerCredentialException/AdminBrokerRateLimitException/AdminPrivacyTradeConflictException/TradingPolicyUnavailableException — HTTP 상태코드 복원용, contract 대상 아님) + 런타임 설정(RuntimeSettings/BenchmarkSettings/BenchmarkFieldSettings/RuntimeSettingsBundle) — "domain". trading-core 내부 API의 요청·응답 타입은 own-type 복제 없이 `com.kista.shared.contract`(`AccountSummaryResponse`/`OrderResponse`/`StrategyResponse`/`StrategySummaryResponse`/`ReorderRequest·Response`/`TradeCorrectionRequest·Response`/`ReorderTimingAvailabilityResponse`/`PrivacyTradeBaseResponse`/`FidaOrderRequest`/`PrivacyBaseUpdateRequest`/`PrivacyOrderUpdateRequest`/`PrivacyOrderAddRequest`)를 포트·서비스·어댑터가 그대로 쓴다. `AccountSummaryResponse`는 id/userId/accountNo(마스킹 전)/broker/createdAt 5필드로 의도적으로 좁힌 계약(appKey/secretKey 등 평문 비밀값 제외). wire 계약 잠금 → `InternalApiContractTest`, 게이트·잔존 own-type → `docs/agents/own-type-ledger.md`
   application/usecase/ ← AdminPrivacyTradeUseCase/AdminQueryUseCase/AdminReorderUseCase/AdminStrategyUseCase/AdminTradeCorrectionUseCase/AdminUserUseCase/AdminSettingsUseCase/RuntimeSettingsUseCase — "usecase"
   application/port/output/ ← AccountQueryPort/AppErrorLogPort/AuditLogPort/PortfolioQueryPort(텔레그램 `/status`·`/history`용 trading-core 포트폴리오 조회)/PrivacyQueryPort/RuntimeSettingsPort(root 소유 설정: approvalRequired+benchmarks)/TradingPolicyPort(trading-core 소유 정책 위임)/TradingCommandPort/TradingQueryPort/TradingSchedulerCommandPort(trigger only 2메서드) — "port"
@@ -22,3 +22,12 @@ com.kista.api.admin/    ← Spring Modulith 모듈(CLOSED) — 관리자 조회�
 - 기존 운영 행의 DCA 티커 허용값에는 BTC/ETH가 없다(키 단위 백필이라 값 내부는 보충되지 않음) — 코인 DCA를 열 때 관리자 화면에서 DCA 티커에 BTC/ETH를 추가해야 한다.
 - 런타임 설정 응답은 `NON_NULL` 직렬화 사용. 전략 유형에 적용되지 않는 field(예: PRIVACY의 `divisionCount`)는 `null`로 내리지 않고 JSON에서 생략
 - `approvalRequired` 값이 `true → false`로 바뀌면 그 시점의 모든 PENDING 사용자를 기존 `UserUseCase.approve()` 흐름으로 활성화. 설정 갱신은 `RUNTIME_SETTINGS_UPDATE` 감사 로그 기록
+
+### ADMIN 권한 관리
+- ADMIN seed는 `ADMIN_KAKAO_IDS` 환경변수(쉼표 구분)이며, 로그인 시 idempotent하게 promote한다
+- `/api/admin/**` → `hasRole("ADMIN")`, 관리자 액션은 `audit_logs`에 영구 기록한다
+- 로컬: `POST /api/auth/dev-admin-token` → 고정 UUID `...002` ADMIN 발급
+
+### 텔레그램 봇 명령 채널 (adapter.in.telegram)
+- 봇 명령 채널(`TelegramWebhookController` + `TelegramBotService` + `TelegramUpdate`)은 알림 발송이 아니라 **인바운드 관리자 명령**이라 `com.kista.api.admin.adapter.in.telegram`이 소유한다
+- 전송 쪽 규칙(`TelegramHttpClient`)은 `docs/agents/modules/api/notify.md`

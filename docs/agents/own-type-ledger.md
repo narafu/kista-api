@@ -1,8 +1,8 @@
 # own-type 허용 원장
 
-신규 own-type 복제·게이트 판정 전 필수 Read (프로세스 경계 wire 타입은 own-type이 아니라 `com.kista.shared.contract`에 둔다 — 이 원장은 그 밖의 모듈 간 값 타입 대상). 판정 기준((a)(b) 게이트, 증거 의무, 포트 역전 구분, 폐기된 전례, 복제본 필수 조건)은 `constraints.md` "모듈 경계 own-type — 정당화 게이트"에 있다 — 이 파일은 그 기준을 통과해 실제로 허용된 사례 원장이다.
+신규 own-type 복제·게이트 판정 전 필수 Read (이 원장은 모듈 간 값 타입 대상). 판정 기준((a)(b) 게이트, 증거 의무, 포트 역전 구분)은 `constraints.md` "모듈 경계 own-type — 정당화 게이트"에 있다 — 이 파일은 그 기준을 통과해 실제로 허용된 사례 원장이다.
 
-**(a) 순환 불가피 목록은 소멸했다 (`com.kista.shared.contract` 도입)** — 과거 이 자리에는 root(`:api`)와 `:trading-core`가 서로의 클래스를 import할 수 없다는 Gradle 컴파일 경계 때문에 손으로 복제한 own-type 20쌍(`AdminOrderView`/`AdminStrategyView`/`AdminAccountView`/`AdminPrivacyTradeBaseView`/`Admin*Command`·`Admin*Result`/`InvestmentPoint`/`MarketSession`/`TossDailyCandle`/`TradeEventView` 등)이 있었다. 양쪽이 의존하는 `:shared`가 있는 이상 "순환 불가피"는 성립하지 않아, 내부 API 요청·응답·Redis payload 타입은 전부 `com.kista.shared.contract`(→ `docs/agents/modules/shared/contract.md`)로 옮겨 컴파일 타임에 공유한다. 공유 어휘 enum `MarketSession`은 sharedkernel로 승격됐다(함께 승격됐던 `BenchmarkGranularity`는 투자 시리즈가 항상 일별로 단일화되며 삭제). 손동기화 검증 `OwnTypeContractTest`는 삭제됐고 `InternalApiContractTest`가 대신한다. 상세 경위 → `modulith-migration-history.md` "Published Language 도입". **프로세스 경계를 넘는 새 wire 타입을 own-type으로 복제하지 말 것.**
+**프로세스 경계를 넘는 wire 타입(내부 API 요청·응답·Redis payload)은 own-type으로 복제하지 않고 `com.kista.shared.contract`에 둔다**(→ `docs/agents/modules/shared/contract.md`, 강제는 `InternalApiContractTest`). 공유 어휘 enum(`MarketSession` 등)은 sharedkernel.
 
 **남아 있는 (a) 성격 own-type — 표지 예외**: `AdminBrokerCredentialException`/`AdminBrokerRateLimitException`/`AdminPrivacyTradeConflictException`(root `com.kista.api.admin.domain.model`) — trading-core 내부 API의 HTTP 상태코드(422/429/409)를 admin `GlobalExceptionHandler`가 매핑할 수 있는 예외로 되돌리는 표지 클래스. 값 타입이 아니라 예외라 contract 대상이 아니다.
 
@@ -18,6 +18,23 @@
 - `StrategyRefLite`(broker, `MockSimulationDataPort` 확장용 초경량 뷰)
 - `StrategyCreationRequest`(trading.domain.creation, 원시값 5개): 리졸버 4종이 19필드 `RegisterStrategyCommand` 전체 대신 실제로 쓰는 필드만 받는 ISP 좁히기 — 모듈 경계용이 아니라 순수 인터페이스 설계
 - `FidaPlannedOrder`(privacy.domain.model, 원시값 4필드): `trading.domain.model.Order`(15필드) 대신 FIDA가 실제로 보내고 privacy가 실제로 읽는 필드만 받는 ISP 좁히기 — 필드 타입은 `sharedkernel.OrderDirection`/`OrderType`
-- `StrategyRef`(`com.kista.api.benchmark.domain.model`, `Strategy`의 id/type/ticker 3필드만 담는 narrowing): `InvestmentPointsPort.Result.selectedStrategy`와 `BenchmarkComparison.strategy`가 공유. modulith-migration-history.md에 "소멸했다"고 기록된 과거의 동명 trading own-type `StrategyRef`(strategyconfig 병합으로 제거)와는 이름만 같은 별개 타입 — 혼동 금지
+- `StrategyRef`(`com.kista.api.benchmark.domain.model`, `Strategy`의 id/type/ticker 3필드만 담는 narrowing): `InvestmentPointsPort.Result.selectedStrategy`와 `BenchmarkComparison.strategy`가 공유
 - `NotificationRecipient`(notify, `com.kista.api.notify.domain.model` — User 애그리게이트의 알림 발송용 6필드 투영: userId/nickname/notificationChannel/telegramBotToken/telegramChatId/rejectReason): 변환은 gateway 어댑터 경계의 `NotificationRecipients.from(User)`가 맡는다(`modules/api/notify.md`). notify가 User를 모르게 하는 목적 — trading-core `TradingUserProfile`(`trading.domain.model`)과 같은 접근
 - `TradingAccount`(trading, `com.kista.tradingcore.trading.domain.model` — `Account`의 id/userId/nickname/brokerRef 4필드 투영): 변환 `TradingAccount.from(Account)`는 정의 1곳, 호출 경계 3곳(`BatchContextFactory`/`ManualTradingService`/`TradingPreviewService`). `from(Account)`를 도메인 record에 두는 이유: trading 도메인→account 도메인 의존은 허용 범위(리뷰 F8)이고, 3곳에 변환을 복제하는 것보다 1곳 정의가 낫다. `BatchContext`·배치/프리뷰/리포트 경로가 `Account` 애그리게이트 대신 이 투영만 받는다 — 타입 표면 축소이지 자격증명 은닉은 아니다(`brokerRef`(`BrokerAccountRef`)가 자격증명을 그대로 담고, `BrokerAccountRef.toString()`만 마스킹해 로그·예외 메시지 평문 노출을 막는다). 소유권 검증(`verifyOwnedBy`)이 필요한 요청 경로만 `Account`를 유지하고 배치 경로 진입 시 변환. `HexagonalArchitectureTest.trading_batch_path_must_not_carry_account_aggregate`가 잠금(`application.service` 전체 + `BatchContext` 대상 denylist 방식, Account를 정당하게 들고 있는 요청 경로 클래스만 제외)
+
+## 복제본·제3자 구현 설계 규칙 (constraints.md 게이트에서 이관)
+
+**제3자(정의자도 데이터 소유자도 아닌 모듈, 예: web) 구현을 새 설계의 선례로 삼지 말 것** — root(`:api`)는 `:trading-core`를 컴파일 의존하지 않으므로 trading-core 정의 인터페이스를 root가 구현할 수 없다(스타일 문제가 아니라 컴파일 불가). trading-core는 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `TradingCommandHttpAdapter` — trading-core 내부 HTTP 호출).
+
+**복제본을 쓸 때의 필수 조건 2가지**(user_notify_profile 사례에서 실측):
+- **(a) 신규 복제 테이블은 마이그레이션에서 기존 데이터를 반드시 백필한다.** 복제본이 비면 소비처가 빈 결과를 정상 응답으로 받아 기능이 멈춘다. `TradingUserProfilePort` 3개 메서드의 실제 실패 양상이 서로 다르다: `findAllByUserIds()` 빈 맵 → `BatchContextFactory`가 전략마다 `NoSuchElementException`을 던지고 잡아 `errorReportPort.reportError()`로 관리자 알림을 내보낸다(**시끄럽게** 전면 중단 — 전략 수만큼 알림이 쏟아진다). `findByUserId()` 빈 Optional → 전략 등록이 "사용자를 찾을 수 없습니다"로 거부된다. `findAllActive()` 빈 리스트 → `MarketEventNotifier`가 **조용히** 아무에게도 안 보낸다(예외·로그 없음). 셋 중 마지막이 발견이 가장 늦다.
+- **(b) 원본의 모든 쓰기 지점을 전수 확인하고 발행을 건다.** 상태값은 `withStatus`/`withRejection` 같은 도메인 메서드명으로, 설정값은 필드명으로 grep한다. 포트 메서드명만 보고 판단하지 말 것 — `findAllActive()`가 실제로 `UserStatus.ACTIVE` 필터라는 사실은 소비처(`MarketEventNotifier`)와 구 어댑터를 읽어야만 드러났고, 이걸 놓쳤다면 복제본에 `is_active` 컬럼이 빠져 개장·마감 알림이 비활성 사용자에게까지 나갔을 것이다.
+
+## 포트 역전(DIP) 사례
+
+포트 역전은 "포트를 필요로 하는 쪽이 정의하고 데이터를 가진 쪽이 구현"하는 정상 설계라 값 타입 복제가 아니다. own-type 번호를 부여하지 않는다.
+- `ApprovalPolicyPort`: user 정의, admin 구현
+- `BrokerEnabledPort`: account 정의, trading `TradingPolicyService` 구현
+- `AccountOpenOrderCancelPort`: account 정의, trading `AccountOpenOrderCanceller` 구현
+- `MockSimulationDataPort`: broker 정의, trading 구현
+- `HistoricalCandlePort`·`TradingUserProfilePort`는 구현과 소비가 모두 trading-core라 포트 역전이 아닌 일반 출력 포트다. `HistoricalCandlePort`는 `com.kista.tradingcore.stats.application.port.output` 소유(구현 `AlpacaCandleAdapter`, 소비 `BacktestService`)다.

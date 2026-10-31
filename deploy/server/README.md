@@ -126,7 +126,7 @@ JAVA_OPTS=-Xmx1280m -Xms256m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize
 
 ## 배포 시간 제한
 
-없다 — kista-trading은 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/superpowers/specs/2026-10-02-trading-batch-resume-design.md`). 전제: kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
+없다 — kista-trading은 재기동 시 진행 중이던 매매 배치를 재개한다(`docs/superpowers/specs/archive/2026-10-02-trading-batch-resume-design.md`). 전제: kista-trading은 단일 인스턴스·stop-first 교체·`stop_grace_period` ≥ 200s(`.github/tests/compose-invariants.bats`가 잠금). infra compose(postgres·redis) 변경만 kista-infra가 KST 시각 창으로 막는다.
 
 ## 롤백 Runbook
 

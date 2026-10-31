@@ -12,7 +12,7 @@
 
 **Tech Stack:** Java 21, Spring Boot 4 (SmartLifecycle, ApplicationReadyEvent, JdbcTemplate), Flyway, JUnit 5 + Mockito + AssertJ, 로컬 PostgreSQL(`kistadb_test`).
 
-**Spec:** `docs/superpowers/specs/2026-10-02-trading-batch-resume-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-10-02-trading-batch-resume-design.md`
 
 ## Global Constraints
 
@@ -1718,7 +1718,7 @@ EOF
 
 "`waitFor()` 대기 중 `InterruptedException`" 항목을 다음으로 교체한다.
 ```markdown
-- **재기동 종료·재개** (spec `docs/superpowers/specs/2026-10-02-trading-batch-resume-design.md`):
+- **재기동 종료·재개** (spec `docs/superpowers/specs/archive/2026-10-02-trading-batch-resume-design.md`):
   - 종료 처리: 배치는 `TradingBatchRunState`에 스레드와 임계구역(마감 `placeAll`·리포트, 개장 계획~AT_OPEN 접수)을 등록한다. 종료 시 `TradingBatchShutdownCoordinator`(SmartLifecycle, 웹 graceful보다 먼저 stop)가 임계구역 완료를 최대 150s 기다린 뒤 대기 구간만 인터럽트한다. 이 경우 사용자 "미접수" 알림(`BatchInterruptedEvent`)은 억제하고 관리자 "[재기동] … 재개 예정"만 보낸다.
   - 체크포인트: 단계는 `trading.trading_batch_run`(job·KST 거래일)에 남는다. 마감은 `PLANNED → PLACING → PLACED → DONE`, 개장은 `PLACING → DONE`이고 조기 반환도 `DONE`으로 기록한다.
   - 리포트 마커: 전략별 리포트 완료는 `trading.trading_batch_report`에 남는다. `CyclePositionPersistor`가 저장 직후 기록하며, 키가 전략인 이유는 rotation 후에도 유효해야 하기 때문이다.

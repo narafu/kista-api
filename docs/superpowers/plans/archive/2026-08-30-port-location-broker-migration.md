@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 21, Spring Boot 4, Spring Modulith, Gradle, ArchUnit.
 
-**Spec:** `docs/superpowers/specs/2026-08-30-port-location-migration-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md`
 
 ## Global Constraints
 
@@ -250,8 +250,8 @@ grep -n "broker\.domain\.port\|broker.*domain/port" docs/agents/constraints.md
 `docs/superpowers/specs/2026-08-27-spring-modulith-migration-design.md`의 보류 1번 항목 갱신:
 
 ```diff
-- 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(`docs/superpowers/specs/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 중 레거시·finance·notify 완료, 나머지 2개(broker/trading) 진행 예정
-+ 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(`docs/superpowers/specs/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 중 레거시·finance·notify·broker 완료, 나머지 1개(trading) 진행 예정
+- 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(`docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 중 레거시·finance·notify 완료, 나머지 2개(broker/trading) 진행 예정
++ 1. 포트 위치를 domain → application(`usecase`/`port/output`)으로 전환. constraints.md "도메인 포트 인터페이스와 타입 위치 규칙" 개정 필요 — **착수함**(`docs/superpowers/specs/archive/2026-08-30-port-location-migration-design.md` 참고). 레거시→finance→notify→broker→trading 5개 청크 중 레거시·finance·notify·broker 완료, 나머지 1개(trading) 진행 예정
 ```
 
 - [ ] **Step 9: 최종 전체 테스트 스위트 1회 실행**
