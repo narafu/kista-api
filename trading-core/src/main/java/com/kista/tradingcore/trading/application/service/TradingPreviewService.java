@@ -15,6 +15,8 @@ import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -153,6 +155,7 @@ class TradingPreviewService {
         Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
         Map<UUID, BigDecimal> freshBuyByStrategyId = new HashMap<>(); // 전략별 원장 반영 후 신규 BUY 금액 — skip 전략은 없음(0)
         Map<UUID, Integer> freshSellByStrategyId = new HashMap<>(); // 전략별 신규(미저장) SELL 수량 — skip 전략은 없음(0)
+        Map<UUID, BigDecimal> freshCorrectionByStrategyId = new HashMap<>(); // 전략별 신규 BUY 중 INFINITE 보정 주문 금액 — 없으면 없음(0)
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
@@ -171,24 +174,35 @@ class TradingPreviewService {
                 }
             }
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
-                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId));
+                    todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId, freshCorrectionByStrategyId));
         }
-        attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId);
+        attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId, freshCorrectionByStrategyId);
         return attachAccountHoldingsCheck(previews, strategies, account, today, freshSellByStrategyId);
     }
 
     // 계좌 단위로 1회 판정해 모든 전략 카드에 같은 값을 붙인다 — 경고 전용(MOCK·코인·필요 BUY 없음·조회 실패면 null)
     private Map<UUID, NextOrdersPreview> attachAccountCashCheck(Map<UUID, NextOrdersPreview> previews, TradingAccount account,
-                                                                 BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId) {
+                                                                 BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
+                                                                 Map<UUID, BigDecimal> freshCorrectionByStrategyId) {
         Broker broker = account.brokerRef().broker();
         if (previews.isEmpty() || broker == Broker.MOCK || broker.getMarket() != Market.US_STOCK) return previews;
         // 미접수 PLANNED·SUBMITTING BUY(증권사 주문가능금액에 아직 미차감) + 전략별 신규 BUY
         BigDecimal required = freshBuyByStrategyId.values().stream().reduce(totalAccountPlannedBuy, BigDecimal::add);
         if (required.signum() <= 0) return previews;
+        // 보정 주문분 = 신규 보정 BUY + 이미 저장된 PLANNED 보정 BUY
+        // ponytail: SUBMITTING 보정 BUY는 todayOrders(PLANNED·PLACED 조회)에 없어 빠진다 — 접수 중 미리보기 호출이 흔해지면 SUBMITTING 조회를 추가
+        BigDecimal correction = freshCorrectionByStrategyId.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        for (NextOrdersPreview preview : previews.values()) {
+            correction = correction.add(preview.todayOrders().stream()
+                    .filter(o -> o.status() == OrderStatus.PLANNED && o.direction() == OrderDirection.BUY && InfiniteStrategy.isCorrectionLeg(o.orderLeg()))
+                    .map(o -> o.price().multiply(o.quantity()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+        }
+        BigDecimal correctionBuyUsd = correction;
         // 조회 실패·null은 경고만 생략 (fail-open)
         AccountCashCheckPreview check = BrokerCallGuard.tryGet("주문가능 USD 조회: accountId=" + account.id(), () -> {
             BigDecimal available = marginPort.getUsdBuyableAmount(account.brokerRef());
-            return available == null ? null : new AccountCashCheckPreview(available, required, available.compareTo(required) >= 0);
+            return available == null ? null : new AccountCashCheckPreview(available, required, correctionBuyUsd, available.compareTo(required) >= 0);
         }).orElse(null);
         if (check == null) return previews;
         previews.replaceAll((id, preview) -> preview.withAccountCashCheck(check));
@@ -235,7 +249,7 @@ class TradingPreviewService {
                                             List<Order> todayOrders, CyclePosition latestPosition,
                                             StrategyOrderPlanBuilder.PlanResult planResult,
                                             BigDecimal totalAccountPlannedBuy, Map<UUID, BigDecimal> freshBuyByStrategyId,
-                                            Map<UUID, Integer> freshSellByStrategyId) {
+                                            Map<UUID, Integer> freshSellByStrategyId, Map<UUID, BigDecimal> freshCorrectionByStrategyId) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(o.quantity()))
@@ -273,6 +287,10 @@ class TradingPreviewService {
         }
         freshBuyByStrategyId.put(strategy.id(), buyCandidates.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
+                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        freshCorrectionByStrategyId.put(strategy.id(), buyCandidates.stream()
+                .filter(o -> o.direction() == OrderDirection.BUY && InfiniteStrategy.isCorrectionLeg(o.orderLeg()))
                 .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         freshSellByStrategyId.put(strategy.id(), freshOrders.stream()

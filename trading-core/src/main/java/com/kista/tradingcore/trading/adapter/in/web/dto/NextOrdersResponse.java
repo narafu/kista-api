@@ -155,11 +155,13 @@ public record NextOrdersResponse(
             BigDecimal availableUsd,
             @Schema(description = "계좌 전체 오늘 BUY 필요 금액 (PLANNED·SUBMITTING BUY + 전략별 원장 반영 후 신규 BUY, USD) — SUBMITTING은 증권사 차감 여부가 불확실해 보수적으로 포함")
             BigDecimal requiredBuyUsd,
+            @Schema(description = "requiredBuyUsd 중 INFINITE 보정 주문(LOC 1주) 지정가 합계 — 보정 제외 금액은 requiredBuyUsd − correctionBuyUsd. 접수 시에는 지정가 전체가 주문가능금액에서 묶이지만 실제 체결은 전략별 단위금액 안에서 끝난다. 보정 주문이 없으면 0")
+            BigDecimal correctionBuyUsd,
             @Schema(description = "false면 배치 접수 시 증권사가 BUY를 거절할 수 있다")
             boolean sufficient
     ) {
         public static AccountCashCheckSummary from(AccountCashCheckPreview p) {
-            return new AccountCashCheckSummary(p.availableUsd(), p.requiredBuyUsd(), p.sufficient());
+            return new AccountCashCheckSummary(p.availableUsd(), p.requiredBuyUsd(), p.correctionBuyUsd(), p.sufficient());
         }
     }
 

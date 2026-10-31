@@ -442,6 +442,27 @@ class TradingOrderExecutorTest {
     }
 
     @Test
+    @DisplayName("INFINITE 보정 주문은 조회 순서와 무관하게 base 주문 뒤에 접수")
+    void placeOrders_correctionOrdersPlacedAfterBase() {
+        UUID correctionId = UUID.randomUUID(), baseId = UUID.randomUUID();
+        Order correction = new Order(correctionId, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, "INFINITE_CORRECTION_01", BigDecimal.ONE, new BigDecimal("35.00"),
+                OrderStatus.PLANNED, null, null, null);
+        Order base = new Order(baseId, ACCOUNT.id(), STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, "INFINITE_EARLY_AVG_BUY", BigDecimal.valueOf(5), new BigDecimal("40.00"),
+                OrderStatus.PLANNED, null, null, null);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(correction, base)); // 보정이 먼저 조회됨
+        when(brokerPort.place(any(OrderInstruction.class), eq(ACCOUNT_REF))).thenReturn(brokerResult("KIS-1"), brokerResult("KIS-2"));
+
+        List<Order> result = executor().placeOrders(TODAY, ACCOUNT, CYCLE, CURRENT_PRICE, POSITION, null, INFINITE_STRATEGY);
+
+        assertThat(result).extracting(Order::id).containsExactly(baseId, correctionId);
+        InOrder inOrder = inOrder(brokerPort);
+        inOrder.verify(brokerPort).place(eq(instructionOf(base)), eq(ACCOUNT_REF));
+        inOrder.verify(brokerPort).place(eq(instructionOf(correction)), eq(ACCOUNT_REF));
+    }
+
+    @Test
     @DisplayName("markPlaced 1차 실패 시 1회 재시도 후 성공하면 정상 처리")
     void placeOrders_markPlacedFailsOnce_retriesAndSucceeds() {
         UUID orderId = UUID.randomUUID();

@@ -507,6 +507,22 @@ class TradingPreviewServiceTest {
         assertThat(result.accountCashCheck().sufficient()).isFalse();
         assertThat(result.accountCashCheck().availableUsd()).isEqualByComparingTo("300.00");
         assertThat(result.accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("304.32");
+        assertThat(result.accountCashCheck().correctionBuyUsd()).isEqualByComparingTo("0"); // 보정 주문 없음
+    }
+
+    @Test
+    void accountCashCheck_correctionBuyUsd_sumsOnlyCorrectionLegs() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE,
+                PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC, OrderDirection.BUY, 5, new BigDecimal("40.00"), "INFINITE_EARLY_AVG_BUY"), // 200.00
+                PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC, OrderDirection.BUY, 1, new BigDecimal("35.00"), "INFINITE_CORRECTION_01"), // 35.00
+                PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC, OrderDirection.BUY, 1, new BigDecimal("30.00"), "INFINITE_CORRECTION_02")); // 30.00
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("210.00"));
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("265.00");
+        assertThat(result.accountCashCheck().correctionBuyUsd()).isEqualByComparingTo("65.00");
+        assertThat(result.accountCashCheck().sufficient()).isFalse();
     }
 
     @Test

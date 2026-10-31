@@ -117,7 +117,12 @@ public class InfiniteStrategy {
 
     // correction 주문(INFINITE_CORRECTION_01~03) 여부 — 재진입 캡 계산 시 base 주문과 분리하기 위함
     private static boolean isCorrectionLeg(PlannedOrder order) {
-        return order.orderLeg() != null && order.orderLeg().startsWith("INFINITE_CORRECTION_");
+        return isCorrectionLeg(order.orderLeg());
+    }
+
+    // 저장된 주문(Order.orderLeg)도 같은 기준으로 판별 — 미리보기 필요 예수금의 보정 주문분 산출용
+    public static boolean isCorrectionLeg(String orderLeg) {
+        return orderLeg != null && orderLeg.startsWith("INFINITE_CORRECTION_");
     }
 
     private void addCorrectionOrder(LocalDate tradeDate, InfinitePosition position, List<PlannedOrder> newBuys,

@@ -14,6 +14,7 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -112,7 +114,12 @@ class TradingOrderExecutor {
 
     // 주문 목록을 개별 접수 — 건별로 선점(SUBMITTING) 후 접수, 실패·선점 경합 주문은 건너뛰고 다음 주문 계속
     // 계좌(앱키) 단위 호출 간격 게이트는 KisHttpClient.executeWithRetry가 전담(경로: place() → KisOrderApi → KisHttpClient.post()) — 여기서 별도 페이싱 불필요
-    private PlaceResult placeEach(List<Order> orders, TradingAccount account) {
+    private PlaceResult placeEach(List<Order> unordered, TradingAccount account) {
+        // INFINITE 보정 주문은 마지막에 접수 — 증권사는 접수 시 지정가 전체를 묶으므로 예수금이 모자라면 거절이 보정에만 생기고 base는 접수된다
+        // (조회 순서가 비결정적이라 명시 정렬, 정렬은 안정적이라 나머지 순서는 유지)
+        List<Order> orders = unordered.stream()
+                .sorted(Comparator.comparing((Order o) -> InfiniteStrategy.isCorrectionLeg(o.orderLeg())))
+                .toList();
         List<Order> placed = new ArrayList<>();
         List<Order> insufficient = new ArrayList<>();
         for (int i = 0; i < orders.size(); i++) {

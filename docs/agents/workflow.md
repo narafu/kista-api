@@ -47,6 +47,7 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 - **보정 주문 (전후반 공통)**: cap 경로 전용이 아니라 `InfiniteStrategy.buildOrders`가 일반모드 BUY(base) 바로 뒤에 상시 붙이고(isFinalRound·리버스 제외), cap 재산정 시 base와 함께 다시 계산한다. `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
   - 가격 = `K / (누적수량 + 1)` (FLOOR, scale=2) — `buildOrders`에서도 `trimCorrectionsToBudget`을 적용한다 — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip
+  - 접수는 보정 주문을 마지막에 한다(`TradingOrderExecutor.placeEach`가 `INFINITE_CORRECTION_*`를 뒤로 안정 정렬) — 증권사는 접수 시 지정가 × 수량 전체를 주문가능금액에서 묶으므로(체결은 단위금액 안에서 끝나도) 예수금이 모자라면 거절이 보정에만 생기고 base는 접수된다. 미리보기 `accountCashCheck.correctionBuyUsd`는 `requiredBuyUsd` 중 보정 주문 지정가 합계(신규 + 저장된 PLANNED, SUBMITTING 제외)다
   - 보정 합계가 원장 예수금(`position.usdDeposit()`)을 넘으면 `InfiniteStrategy.trimCorrectionsToBudget`이 뒤쪽 보정(03→02→01)부터 생략 — base(수량·가격)는 불변, 지정가 합계가 원장 밖이면 원장 상한 판정이 BUY 전체를 매일 거절해 잔고가 그대로 남고 리버스모드(isFinalRound) 진입도 못 하는 교착이 되기 때문
   - `StrategyLedgerBudget.fit`은 원장 한도가 전체 BUY를 못 담을 때 `CycleOrderStrategy.fitBuysToBudget`(호출자는 `StrategyLedgerBudget` 하나, DCA override 없음)으로 1회 축소(INFINITE=보정 생략, VR=싼 단부터 rung 단위 절단·병합 단 수량 축소, PRIVACY=축소 없음)해 한도 안이면 축소안을 승인·저장하고, base조차 못 담을 때만 거절한다
   - 보정이 생략된 날은 `canSkipOrderComputation`의 correctionComplete(보정 3건 전부 존재)가 성립하지 않아 같은 날 재실행 시 재계산한다 — 같은 leg는 `excludeExisting`이 걸러 중복은 없다
