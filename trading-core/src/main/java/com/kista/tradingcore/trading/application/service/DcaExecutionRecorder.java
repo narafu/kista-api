@@ -81,6 +81,8 @@ class DcaExecutionRecorder {
     // 알림 표기용 규칙 순번만 활성 설정에서 조회 — 편집으로 삭제된 규칙이면 null(문구에서 생략)
     private void publishSkipped(Strategy strategy, TradingAccount account, LocalDate tradeDate, String ruleKey, OrderDirection direction,
                                 DcaSkipReason reason, String detail) {
+        // 조건 미충족은 실패가 아닌 정상 대기라 알림하지 않는다 — 이력(dca_execution)은 남는다
+        if (reason == DcaSkipReason.CONDITION_NOT_MET) return;
         Integer ruleNumber = dcaDetailPort.findActiveByStrategyId(strategy.id()).map(c -> c.ruleNumber(ruleKey)).orElse(null);
         eventPublisher.publishEvent(new DcaRoundSkippedEvent(account.userId(), strategy.id(), account.nickname(),
                 strategy.ticker(), ruleKey, ruleNumber, direction, tradeDate, reason, detail));

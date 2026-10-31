@@ -70,6 +70,14 @@ class DcaExecutionRecorderTest {
     }
 
     @Test
+    void conditionNotMet_recordsHistoryWithoutUserNotification() {
+        when(port.insertIfAbsent(any())).thenReturn(true);
+        recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.BUY, DcaSkipReason.CONDITION_NOT_MET, "RSI 30 이상", null);
+        verify(port).insertIfAbsent(any());
+        verify(publisher, never()).publishEvent(any(DcaRoundSkippedEvent.class));
+    }
+
+    @Test
     void orderRejected_publishesOnlyWhenOrderedRowTransitioned() {
         com.kista.tradingcore.trading.domain.model.Order order = new com.kista.tradingcore.trading.domain.model.Order(UUID.randomUUID(),
                 ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO, OrderType.LOC,
