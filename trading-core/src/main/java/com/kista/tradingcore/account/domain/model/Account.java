@@ -20,12 +20,6 @@ public record Account(
         Instant createdAt,        // DB created_at, 신규 등록 시 null
         Instant apiKeyExpiresAt   // 거래소 API 키 만료 시각 — 업비트만 값
 ) {
-    // 만료일 없는 기존 생성 지점 호환(KIS/Toss/MOCK)
-    public Account(UUID id, UUID userId, String nickname, String accountNo, String appKey, String secretKey,
-                   String brokerAccountCode, Broker broker, Instant createdAt) {
-        this(id, userId, nickname, accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, null);
-    }
-
     // 목록 표시용 증권사 순서 — 운영 중심(메리츠·바이낸스) 먼저, 목록에 없는 증권사는 맨 뒤
     private static final List<Broker> DISPLAY_BROKER_ORDER =
             List.of(Broker.MERITZ, Broker.BINANCE, Broker.TOSS, Broker.KIS, Broker.UPBIT, Broker.MOCK);
@@ -52,7 +46,7 @@ public record Account(
 
     // nickname만 교체 — AccountService.update 전용
     public Account withNickname(String newNickname) {
-        return new Account(id, userId, newNickname != null ? newNickname : nickname,
+        return new Account(id, userId, newNickname,
                 accountNo, appKey, secretKey, brokerAccountCode, broker, createdAt, apiKeyExpiresAt);
     }
 

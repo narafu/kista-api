@@ -207,7 +207,7 @@ class AdminInternalApiIntegrationTest {
     private UUID insertMockAccount(UUID userId) {
         Account saved = accountPort.save(new Account(null, userId, "MOCK테스트계좌",
                 "MOCKACC-" + UUID.randomUUID().toString().substring(0, 8), "key", "secret",
-                null, Broker.MOCK, null));
+                null, Broker.MOCK, null, null));
         return saved.id();
     }
 

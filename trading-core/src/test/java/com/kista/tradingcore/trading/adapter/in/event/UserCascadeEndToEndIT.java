@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.adapter.out;
+package com.kista.tradingcore.trading.adapter.in.event;
 
 import com.kista.shared.kernel.NotificationChannel;
 import com.kista.shared.kernel.TimeZones;
@@ -6,6 +6,7 @@ import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import com.kista.shared.platform.crypto.AesCryptoService;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.usecase.UserTradingDataEraseUseCase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -55,7 +56,7 @@ class UserCascadeEndToEndIT {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired AesCryptoService crypto;
     @Autowired ObjectMapper objectMapper;
-    @MockitoSpyBean UserTradingDataEraser eraser;           // 정리 실패 주입용
+    @MockitoSpyBean UserTradingDataEraseUseCase eraser;          // 정리 실패 주입용
     @MockitoBean TradingErrorReportPort errorReportPort;    // 관리자 텔레그램 대신 호출 검증
 
     private final UUID userId = UUID.randomUUID();
@@ -136,6 +137,18 @@ class UserCascadeEndToEndIT {
         verify(errorReportPort, atLeastOnce()).reportError(any());
         assertThat(jdbcTemplate.queryForObject("SELECT deleted_at IS NOT NULL FROM accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
         assertThat(cascadePublicationStatus()).isEqualTo("COMPLETED");
+    }
+
+    // 프로필 동기화 쓰기 경로(UserNotifyProfileSyncListener → TradingUserProfilePort.applyChange)가 실 컨텍스트에서 커밋되는지
+    @Test
+    void 새_프로필_스냅샷이_복제본에_커밋된다() {
+        republishInTransaction(new UserNotifyProfileChangedEvent(userId, Map.of(), false, null, "chat2",
+                NotificationChannel.FCM, Instant.now()));
+
+        Map<String, Object> profile = jdbcTemplate.queryForMap("SELECT is_active, chat_id, notification_channel FROM user_notify_profile WHERE user_id = ?", userId);
+        assertThat(profile.get("is_active")).isEqualTo(false);
+        assertThat(profile.get("chat_id")).isEqualTo("chat2");
+        assertThat(profile.get("notification_channel")).isEqualTo("FCM");
     }
 
     // 구버전 trading-core가 새 필드(occurredAt 등)가 실린 payload를 받아도 앱 ObjectMapper는 모르는 필드를 무시한다

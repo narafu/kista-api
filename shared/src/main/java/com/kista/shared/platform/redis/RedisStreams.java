@@ -11,6 +11,7 @@ import org.springframework.data.redis.connection.stream.StreamRecords;
 import org.springframework.data.redis.core.StreamOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.RedisStreamCommands.TrimOptions;
 import org.springframework.data.redis.connection.RedisStreamCommands.XAddOptions;
 
 import java.time.Duration;
@@ -42,7 +43,7 @@ public final class RedisStreams {
         redisTemplate.opsForStream().add(StreamRecords.newRecord()
                         .in(streamKey)
                         .ofMap(Collections.singletonMap(PAYLOAD_FIELD, payloadJson)),
-                XAddOptions.maxlen(maxLen).approximateTrimming(true));
+                XAddOptions.trim(TrimOptions.maxLen(maxLen).approximate()));
     }
 
     // 봉투에서 payload JSON 추출

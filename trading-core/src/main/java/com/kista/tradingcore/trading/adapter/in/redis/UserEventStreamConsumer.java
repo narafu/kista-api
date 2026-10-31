@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 // 구독·ack·재기동·XCLAIM 복구는 platform RedisStreamSubscriber가 맡고 여기는 실패 정책·기동·5분 주기 복구 배선만 가진다.
 // 역직렬화 실패(poison)만 ack로 버리고, 재발행(이벤트 저장) 단계의 일시 오류는 pending으로 남겨 XCLAIM 재시도(최대 24회 ≈ 2시간) 후
 // 포기하며 관리자에게 알린다. 프로필 upsert도 occurredAt 버전 가드가 옛 스냅샷을 거르므로 재시도가 안전하다.
-// 재시도 범위 주의: 로컬 리스너(UserCascadeListener·UserNotifyProfileSyncListener)는 재발행 트랜잭션의 AFTER_COMMIT에서 돌아
+// 재시도 범위 주의: 로컬 리스너(TradingUserCascadeListener·UserNotifyProfileSyncListener)는 재발행 트랜잭션의 AFTER_COMMIT에서 돌아
 // 실패가 여기까지 전파되지 않는다(메시지는 ack) — 그 실패는 trading.event_publication에 FAILED로 남고 UserEventResubmitScheduler가 재발행한다.
 // 두 서브클래스의 컨슈머 접두사가 같아 복구 컨슈머 이름(trading-core-recovery)도 같지만 스트림이 달라 pending 추적이 충돌하지 않는다
 abstract class UserEventStreamConsumer extends RedisStreamSubscriber {

@@ -51,7 +51,7 @@ class AccountPersistenceAdapterDbTest extends DataJpaTestBase {
     // 컨버터 적용 증명 — 컬럼 원문은 평문이 아니고, 어댑터로 읽으면 평문이 복원된다
     @Test
     void credentialsAreEncryptedAtRestAndDecryptedOnRead() {
-        Account saved = adapter.save(new Account(null, UUID.randomUUID(), "KIS", "74420614-01", "plain-app", "plain-secret", null, Broker.KIS, null));
+        Account saved = adapter.save(new Account(null, UUID.randomUUID(), "KIS", "74420614-01", "plain-app", "plain-secret", null, Broker.KIS, null, null));
         em.flush();
         em.clear();
 

@@ -115,13 +115,13 @@ class BacktestGoldenTest {
         LocalDate to = START.plusDays(500);
         return switch (scenario) {
             case "infinite" -> new BacktestCommand(StrategyType.INFINITE, StrategyTicker.SOXL, START, to,
-                    new BigDecimal("10000"), 40, null, null, 0, null);
+                    new BigDecimal("10000"), 40, null, null, 0, null, null, null, null, null);
             case "infinite-reverse" -> new BacktestCommand(StrategyType.INFINITE, StrategyTicker.SOXL, START, to,
-                    new BigDecimal("10000"), 20, null, null, 0, null);
+                    new BigDecimal("10000"), 20, null, null, 0, null, null, null, null, null);
             case "vr" -> new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, START, to,
-                    new BigDecimal("2000"), null, new BigDecimal("15"), 2, 100, new BigDecimal("1000"));
+                    new BigDecimal("2000"), null, new BigDecimal("15"), 2, 100, new BigDecimal("1000"), null, null, null, null);
             case "privacy" -> new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL, START, to,
-                    new BigDecimal("10000"), null, null, null, 0, null);
+                    new BigDecimal("10000"), null, null, null, 0, null, null, null, null, null);
             default -> throw new IllegalArgumentException(scenario);
         };
     }

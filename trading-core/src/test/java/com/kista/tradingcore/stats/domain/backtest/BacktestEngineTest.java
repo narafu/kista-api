@@ -60,7 +60,7 @@ class BacktestEngineTest {
     private static BacktestCommand vrCommand(String seed, String initialValue, int intervalWeeks, int recurringAmount) {
         return new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
-                null, BAND_WIDTH, intervalWeeks, recurringAmount, new BigDecimal(initialValue));
+                null, BAND_WIDTH, intervalWeeks, recurringAmount, new BigDecimal(initialValue), null, null, null, null);
     }
 
     @Test
@@ -163,7 +163,7 @@ class BacktestEngineTest {
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("2000"),
                 null, BAND_WIDTH, 1, 0, new BigDecimal("1000"), null, null,
-                new VrRampInput(null, 0, 1, null, null, null, 0, null));
+                new VrRampInput(null, 0, 1, null, null, null, 0, null), null);
 
         BacktestEngine.Output output = engine.run(List.of(
                 candle("2024-01-01", 950, 1000, 900, 950),
@@ -180,13 +180,13 @@ class BacktestEngineTest {
     void 초기V_미입력이면_보유분_평가금이_V가_된다() {
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), BigDecimal.ZERO,
-                null, BAND_WIDTH, 4, 0, null, 3, new BigDecimal("80"));
+                null, BAND_WIDTH, 4, 0, null, 3, new BigDecimal("80"), null, null);
 
         assertThat(BacktestEngine.initialVrValue(command, new BigDecimal("100.005"))).isEqualByComparingTo("300.02");
         // 직접 입력(>0)이 있으면 그 값이 우선
         BacktestCommand explicit = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), BigDecimal.ZERO,
-                null, BAND_WIDTH, 4, 0, new BigDecimal("500"), 3, new BigDecimal("80"));
+                null, BAND_WIDTH, 4, 0, new BigDecimal("500"), 3, new BigDecimal("80"), null, null);
         assertThat(BacktestEngine.initialVrValue(explicit, new BigDecimal("100"))).isEqualByComparingTo("500");
     }
 
@@ -203,7 +203,7 @@ class BacktestEngineTest {
         // 다음 due = 01-12 + 2주 = 01-26 → 01-26 캔들에서 세 번째 사이클 (실행일 01-16을 시작일로 쓰면 01-30으로 밀린다)
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal("2000"),
-                null, BAND_WIDTH, 2, 0, new BigDecimal("1000"), 10, new BigDecimal("100"));
+                null, BAND_WIDTH, 2, 0, new BigDecimal("1000"), 10, new BigDecimal("100"), null, null);
         BacktestEngine.Output output = vrEngine.run(List.of(
                 flat("2024-01-01", 100),
                 flat("2024-01-12", 100),
@@ -395,14 +395,14 @@ class BacktestEngineTest {
     private static BacktestCommand infiniteCommand(String from, String seed, int divisionCount) {
         return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
                 LocalDate.parse(from), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
-                divisionCount, null, null, 0, null);
+                divisionCount, null, null, 0, null, null, null, null, null);
     }
 
     private static BacktestCommand infiniteCommandWithPosition(String from, String seed, int divisionCount,
                                                                 int holdings, String avgPrice) {
         return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
                 LocalDate.parse(from), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
-                divisionCount, null, null, 0, null, holdings, new BigDecimal(avgPrice));
+                divisionCount, null, null, 0, null, holdings, new BigDecimal(avgPrice), null, null);
     }
 
     private static DailyCandle flat(String date, double close) {
@@ -485,7 +485,7 @@ class BacktestEngineTest {
         BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
         BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ,
                 LocalDate.parse("2024-01-02"), LocalDate.parse("2024-12-31"), new BigDecimal("0"),
-                4, null, null, 0, null, 5, null);
+                4, null, null, 0, null, 5, null, null, null);
 
         assertThatThrownBy(() -> infiniteEngine.run(List.of(flat("2024-01-02", 100)), command))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -705,13 +705,13 @@ class BacktestEngineTest {
     private static BacktestCommand privacyCommand(String seed) {
         return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
-                null, null, null, 0, null);
+                null, null, null, 0, null, null, null, null, null);
     }
 
     private static BacktestCommand privacyCommandWithPosition(String seed, int holdings, String avgPrice) {
         return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL,
                 LocalDate.parse("2024-01-01"), LocalDate.parse("2024-12-31"), new BigDecimal(seed),
-                null, null, null, 0, null, holdings, new BigDecimal(avgPrice));
+                null, null, null, 0, null, holdings, new BigDecimal(avgPrice), null, null);
     }
 
     // 기준 매매표 픽스처 — seed ÷ currentCycleStart가 곧 PrivacyStrategy가 산출할 배수(multiple)다

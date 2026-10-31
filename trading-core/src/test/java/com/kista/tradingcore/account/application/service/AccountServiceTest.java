@@ -60,7 +60,7 @@ class AccountServiceTest {
     private Account activeAccount(UUID ownerId) {
         return new Account(accountId, ownerId, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null);
+                Broker.KIS, null, null);
     }
 
     private RegisterAccountCommand registerCmd() {
@@ -154,7 +154,7 @@ class AccountServiceTest {
     @DisplayName("키 수정: 메리츠 새 키가 다른 계좌에 있으면 409")
     void update_credentials_meritz_rejects_key_used_by_other_account() {
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(
-                new Account(accountId, userId, "메리츠", null, "old", "sk", null, Broker.MERITZ, null));
+                new Account(accountId, userId, "메리츠", null, "old", "sk", null, Broker.MERITZ, null, null));
         when(accountPort.existsByDedupeKey("taken")).thenReturn(true);
 
         assertThatThrownBy(() -> accountService.updateCredentials(accountId, userId, new UpdateCredentialsCommand("taken", "sk")))
@@ -198,7 +198,7 @@ class AccountServiceTest {
             Account a = inv.getArgument(0);
             return new Account(UUID.randomUUID(), a.userId(), a.nickname(),
                     a.accountNo(), a.appKey(), a.secretKey(),
-                    a.brokerAccountCode(), a.broker(), null);
+                    a.brokerAccountCode(), a.broker(), null, null);
         });
 
         Account result = accountService.register(userId, registerCmd());
@@ -615,7 +615,7 @@ class AccountServiceTest {
 
         UUID mockId = UUID.randomUUID();
         when(accountPort.requireOwnedAccount(mockId, userId)).thenReturn(
-                new Account(mockId, userId, "모의", "12345678-01", "MOCK", "MOCK", null, Broker.MOCK, null));
+                new Account(mockId, userId, "모의", "12345678-01", "MOCK", "MOCK", null, Broker.MOCK, null, null));
         assertThatThrownBy(() -> accountService.updateCredentials(mockId, userId, new UpdateCredentialsCommand("a", "b")))
                 .isInstanceOf(IllegalArgumentException.class);
 

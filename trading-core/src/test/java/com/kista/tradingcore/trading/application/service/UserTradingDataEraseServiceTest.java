@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.adapter.out;
+package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.account.application.port.output.AccountOpenOrderCancelPort;
 import com.kista.tradingcore.account.application.usecase.AccountUseCase;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class UserTradingDataEraserTest {
+class UserTradingDataEraseServiceTest {
 
     @Mock AccountOpenOrderCancelPort openOrderCancelPort;
     @Mock TradingErrorReportPort errorReportPort;
@@ -39,7 +39,7 @@ class UserTradingDataEraserTest {
     @Mock AccountUseCase accountUseCase;
     @Mock TradingUserProfilePort tradingUserProfilePort;
 
-    @InjectMocks UserTradingDataEraser eraser;
+    @InjectMocks UserTradingDataEraseService eraser;
 
     private final UUID userId = UUID.randomUUID();
 
@@ -84,9 +84,9 @@ class UserTradingDataEraserTest {
     // AFTER_COMMIT 콜백에서 호출되므로 아직 묶여 있는 재발행 트랜잭션에 합류하면 쓰기가 커밋되지 않는다 — 전파 속성을 잠근다
     @Test
     void 전파_속성은_취소_NOT_SUPPORTED_정리_REQUIRES_NEW다() throws NoSuchMethodException {
-        assertThat(UserTradingDataEraser.class.getMethod("cancelOpenOrders", UUID.class).getAnnotation(Transactional.class).propagation())
+        assertThat(UserTradingDataEraseService.class.getMethod("cancelOpenOrders", UUID.class).getAnnotation(Transactional.class).propagation())
                 .isEqualTo(Propagation.NOT_SUPPORTED);
-        assertThat(UserTradingDataEraser.class.getMethod("erase", UUID.class).getAnnotation(Transactional.class).propagation())
+        assertThat(UserTradingDataEraseService.class.getMethod("erase", UUID.class).getAnnotation(Transactional.class).propagation())
                 .isEqualTo(Propagation.REQUIRES_NEW);
     }
 }

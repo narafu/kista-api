@@ -105,7 +105,7 @@ class AccountControllerTest {
         // Toss 계좌 등록: AccountService.register()가 accountSeq 조회까지 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Broker.TOSS, null));
+                        "토스계좌", "131-01-001931", "cid", "csecret", "42", Broker.TOSS, null, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -121,7 +121,7 @@ class AccountControllerTest {
         // KIS 계좌 등록: AccountService.register()가 verifyAccount 통합 처리
         when(accountUseCase.register(any(UUID.class), any(RegisterAccountCommand.class)))
                 .thenReturn(new Account(UUID.fromString(USER_ID), UUID.fromString(USER_ID),
-                        "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null));
+                        "KIS계좌", "74420614", "appKey", "appSecret", null, Broker.KIS, null, null));
 
         mockMvc.perform(post("/api/accounts")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -6,7 +6,6 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.trading.domain.creation.StrategyCreationResolver.ResolvedCreation;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
@@ -28,7 +27,7 @@ class StrategyCreationPersister {
     private final StrategyPort strategyPort;
     private final StrategyVersionPort strategyVersionPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final VrStrategyDetailUseCase vrStrategyLifecycle;
+    private final VrStrategyDetailService vrStrategyDetailService;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -54,7 +53,7 @@ class StrategyCreationPersister {
         if (saved.isInfinite()) {
             strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), resolved.divisionCount()));
         } else if (saved.isVr()) {
-            vrDetail = vrStrategyLifecycle.saveVersionDetail(
+            vrDetail = vrStrategyDetailService.saveVersionDetail(
                     version.id(), resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), d.ramp());
         } else if (saved.isDca()) {
             dcaDetailPort.save(version.id(), d.dca()); // DCA 버전 규칙 (ruleKey는 호출부가 확정)
@@ -74,7 +73,7 @@ class StrategyCreationPersister {
         if (saved.isInfinite()) {
             cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
         } else if (saved.isVr()) {
-            vrStrategyLifecycle.saveInitialCycleDetail(cycle.id(), d.vrValue(), vrDetail);
+            vrStrategyDetailService.saveInitialCycleDetail(cycle.id(), d.vrValue(), vrDetail);
         }
         return saved;
     }

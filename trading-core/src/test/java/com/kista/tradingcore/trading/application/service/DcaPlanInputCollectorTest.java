@@ -271,7 +271,7 @@ class DcaPlanInputCollectorTest {
     @Test
     void mock_account_sell_is_ledger_only() {
         TradingAccount mockAcc = TradingAccount.from(new com.kista.tradingcore.account.domain.model.Account(
-                ctx.account().id(), ctx.account().userId(), "모의", "123-45-678901", "key", "secret", "1", com.kista.shared.kernel.Broker.MOCK, null));
+                ctx.account().id(), ctx.account().userId(), "모의", "123-45-678901", "key", "secret", "1", com.kista.shared.kernel.Broker.MOCK, null, null));
         ctx = new BatchContext(ctx.strategy(), ctx.currentCycle(), mockAcc, ctx.userProfile());
         config(sellRule(DcaShortfallPolicy.PARTIAL));
         ledger = new AccountBalance(4, new BigDecimal("80.00"), BigDecimal.ZERO);

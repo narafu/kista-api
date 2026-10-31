@@ -74,7 +74,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void correctManualFills_liquidatingSell_savesFilledOrdersAndPausesStrategy() {
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
@@ -112,7 +112,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void correctManualFills_sellQuantityGreaterThanHoldings_throws() {
-        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
+        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
@@ -246,7 +246,7 @@ class ManualTradeCorrectionServiceTest {
     }
 
     private Account account() {
-        return new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null);
+        return new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, Broker.KIS, null, null);
     }
 
     private Strategy privacy() {

@@ -23,22 +23,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("UserNotifyProfileSyncListener 단위 테스트")
-class UserNotifyProfileSyncListenerTest {
+@DisplayName("UserNotifyProfilePersistenceAdapter.applyChange 단위 테스트")
+class UserNotifyProfileApplyChangeTest {
 
     @Mock UserNotifyProfileJpaRepository repository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final UUID USER_ID = UUID.randomUUID();
 
-    private UserNotifyProfileSyncListener listener() {
-        return new UserNotifyProfileSyncListener(repository, objectMapper);
+    private UserNotifyProfilePersistenceAdapter adapter() {
+        return new UserNotifyProfilePersistenceAdapter(repository, objectMapper);
     }
 
     @Test
     @DisplayName("프로필 변경 이벤트를 받으면 복제본 행을 upsert 한다")
     void onProfileChanged_upsertsRow() {
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(new UserNotifyProfileChangedEvent(
                 USER_ID, Map.of(NotificationType.MARKET_ALERT, false), true, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -53,7 +53,7 @@ class UserNotifyProfileSyncListenerTest {
     @Test
     @DisplayName("알림 채널을 복제한다")
     void onProfileChanged_storesNotificationChannel() {
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(new UserNotifyProfileChangedEvent(
                 USER_ID, Map.of(), true, null, null, NotificationChannel.FCM));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -67,7 +67,7 @@ class UserNotifyProfileSyncListenerTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", true, null, null, Instant.now(), NotificationChannel.NONE)));
 
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, "t", "c"));
+        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, "t", "c"));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());
@@ -93,7 +93,7 @@ class UserNotifyProfileSyncListenerTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", false, null, null, stored, NotificationChannel.NONE)));
 
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(new UserNotifyProfileChangedEvent(
                 USER_ID, Map.of(), true, null, null, NotificationChannel.NONE, stored.minusSeconds(1)));
 
         verify(repository, never()).save(any());
@@ -107,7 +107,7 @@ class UserNotifyProfileSyncListenerTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", true, null, null, stored, NotificationChannel.NONE)));
 
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(new UserNotifyProfileChangedEvent(
                 USER_ID, Map.of(), false, null, null, NotificationChannel.NONE, occurredAt));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -122,7 +122,7 @@ class UserNotifyProfileSyncListenerTest {
         when(repository.findById(USER_ID)).thenReturn(Optional.of(new UserNotifyProfileEntity(
                 USER_ID, "{}", true, null, null, Instant.now().plusSeconds(3600), NotificationChannel.NONE)));
 
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), false, null, null));
+        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), false, null, null));
 
         verify(repository).save(any());
     }
@@ -138,7 +138,7 @@ class UserNotifyProfileSyncListenerTest {
     @Test
     @DisplayName("비활성 전환 이벤트는 is_active=false로 기록돼 장 이벤트 브로드캐스트에서 빠진다")
     void onProfileChanged_inactiveIsPersisted() {
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), false, null, null));
+        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), false, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());
@@ -148,7 +148,7 @@ class UserNotifyProfileSyncListenerTest {
     @Test
     @DisplayName("telegramBotToken 평문을 엔티티에 담는다(암호화는 컨버터 몫)")
     void onProfileChanged_storesTelegramBotToken() {
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(
+        adapter().applyChange(new UserNotifyProfileChangedEvent(
                 USER_ID, Map.of(), true, "plain-token", "chat-1"));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
@@ -161,7 +161,7 @@ class UserNotifyProfileSyncListenerTest {
     @Test
     @DisplayName("telegramBotToken이 null이면 null을 저장한다")
     void onProfileChanged_nullTelegramBotTokenStoresNull() {
-        listener().onProfileChanged(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, null, null));
+        adapter().applyChange(new UserNotifyProfileChangedEvent(USER_ID, Map.of(), true, null, null));
 
         ArgumentCaptor<UserNotifyProfileEntity> captor = ArgumentCaptor.forClass(UserNotifyProfileEntity.class);
         verify(repository).save(captor.capture());

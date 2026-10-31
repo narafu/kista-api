@@ -32,30 +32,6 @@ public record BacktestCommand(
         }
     }
 
-    // 13개 필드 호출부(테스트 등) 호환용 — 사이클 시드 정책 생략 시 MAX
-    public BacktestCommand(StrategyType type, StrategyTicker ticker, LocalDate from, LocalDate to, BigDecimal seed,
-            Integer divisionCount, BigDecimal vrBandWidth, Integer vrIntervalWeeks, int vrRecurringAmount,
-            BigDecimal vrInitialValue, Integer initialHoldings, BigDecimal initialAvgPrice, VrRampInput vrRampInput) {
-        this(type, ticker, from, to, seed, divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount,
-                vrInitialValue, initialHoldings, initialAvgPrice, vrRampInput, null);
-    }
-
-    // 12개 필드 호출부(테스트 등) 호환용 — 램프 입력 생략 시 운영 기본값
-    public BacktestCommand(StrategyType type, StrategyTicker ticker, LocalDate from, LocalDate to, BigDecimal seed,
-            Integer divisionCount, BigDecimal vrBandWidth, Integer vrIntervalWeeks, int vrRecurringAmount,
-            BigDecimal vrInitialValue, Integer initialHoldings, BigDecimal initialAvgPrice) {
-        this(type, ticker, from, to, seed, divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount,
-                vrInitialValue, initialHoldings, initialAvgPrice, null);
-    }
-
-    // 기존 10개 필드 호출부(테스트 등) 호환용 — initialHoldings/initialAvgPrice 생략 시 null(빈 포지션에서 시작)
-    public BacktestCommand(StrategyType type, StrategyTicker ticker, LocalDate from, LocalDate to, BigDecimal seed,
-            Integer divisionCount, BigDecimal vrBandWidth, Integer vrIntervalWeeks, int vrRecurringAmount,
-            BigDecimal vrInitialValue) {
-        this(type, ticker, from, to, seed, divisionCount, vrBandWidth, vrIntervalWeeks, vrRecurringAmount,
-                vrInitialValue, null, null);
-    }
-
     // 운영 전략 등록과 동일한 기본값 표로 정규화한 VR 램프 파라미터 — 서비스 검증과 엔진 시뮬레이션이 같은 값을 쓴다
     public VrRampParams vrRamp() {
         return vrRampInput.withDefaults(vrRecurringAmount);

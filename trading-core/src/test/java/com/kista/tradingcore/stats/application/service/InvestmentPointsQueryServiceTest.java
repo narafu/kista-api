@@ -78,7 +78,7 @@ class InvestmentPointsQueryServiceTest {
 
     private static Account testAccount(UUID ownerId) {
         return new Account(ACCOUNT_ID, ownerId, "테스트계좌",
-                "74420614", "appKey", "appSecret", null, Broker.KIS, null);
+                "74420614", "appKey", "appSecret", null, Broker.KIS, null, null);
     }
 
     private static StrategyCycle activeCycle(String start, String startDate) {
@@ -134,7 +134,7 @@ class InvestmentPointsQueryServiceTest {
     void PORTFOLIO_scope는_모의계좌를_제외한_전략만_조회한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), mockAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
@@ -181,7 +181,7 @@ class InvestmentPointsQueryServiceTest {
     @Test
     void PORTFOLIO_scope는_크립토_KRW_계좌를_제외한다() {
         UUID cryptoAccountId = UUID.randomUUID();
-        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null);
+        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), crypto));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
@@ -195,7 +195,7 @@ class InvestmentPointsQueryServiceTest {
     @Test
     void excludesBinanceAccount() {
         UUID cryptoAccountId = UUID.randomUUID();
-        Account crypto = new Account(cryptoAccountId, USER_ID, "바이낸스", "n", "k", "s", null, Broker.BINANCE, null);
+        Account crypto = new Account(cryptoAccountId, USER_ID, "바이낸스", "n", "k", "s", null, Broker.BINANCE, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID), crypto));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());

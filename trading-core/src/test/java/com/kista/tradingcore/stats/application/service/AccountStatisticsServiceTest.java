@@ -47,7 +47,7 @@ class AccountStatisticsServiceTest {
         service = new AccountStatisticsService(
                 accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
-        Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
+        Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 

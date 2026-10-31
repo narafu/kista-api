@@ -3,6 +3,7 @@ package com.kista.tradingcore.account.adapter.out.persistence;
 import com.kista.shared.platform.crypto.AesStringConverter;
 import com.kista.shared.platform.persistence.BaseAuditEntity;
 import com.kista.shared.kernel.Broker;
+import com.kista.tradingcore.account.domain.model.Account;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -60,4 +61,20 @@ class AccountEntity extends BaseAuditEntity {
 
     @Column(name = "api_key_expires_at")
     private Instant apiKeyExpiresAt; // 거래소 API 키 만료 시각 — 업비트만 값 (V10 ADD COLUMN이라 물리 순서상 마지막)
+
+    // Account 도메인 모델 → Entity (accountNoHash는 HMAC 비밀키가 필요해 어댑터가 계산해 넘긴다)
+    static AccountEntity fromModel(Account a, String accountNoHash) {
+        AccountEntity e = new AccountEntity();
+        e.id = a.id(); // null이면 @UuidGenerator가 UUID v7 생성
+        e.userId = a.userId();
+        e.nickname = a.nickname();
+        e.accountNo = a.accountNo(); // 업비트는 계좌번호 없음(null)
+        e.accountNoHash = accountNoHash;
+        e.appKey = a.appKey();
+        e.secretKey = a.secretKey();
+        e.brokerAccountCode = a.brokerAccountCode();
+        e.apiKeyExpiresAt = a.apiKeyExpiresAt();
+        e.broker = a.broker();
+        return e;
+    }
 }

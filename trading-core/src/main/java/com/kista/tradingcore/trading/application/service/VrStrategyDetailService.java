@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.application.service.support;
+package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -8,9 +8,8 @@ import com.kista.tradingcore.trading.domain.model.VrSummary;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
-import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,15 +18,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-// VR 전략의 버전 상세·사이클 상세 저장과 요약 조립을 담당 — VrStrategyDetailUseCase 구현체
-@Component
+// VR 전략의 버전 상세·사이클 상세 저장과 요약 조립을 담당
+@Service
 @RequiredArgsConstructor
-public class VrStrategyLifecycle implements VrStrategyDetailUseCase {
+class VrStrategyDetailService {
 
     private final StrategyVrDetailPort strategyVrDetailPort;
     private final StrategyCycleVrPort strategyCycleVrPort;
 
-    @Override
     public StrategyVrDetail saveVersionDetail(UUID strategyVersionId, Integer intervalWeeks,
                                        BigDecimal bandWidth, Integer recurringAmount, VrRampParams ramp) {
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
@@ -37,14 +35,12 @@ public class VrStrategyLifecycle implements VrStrategyDetailUseCase {
                         ramp.initialPoolLimitRate(), ramp.pGraceWeeks(), ramp.pStepWeeks(), ramp.poolLimitFloor()));
     }
 
-    @Override
     public StrategyCycleVrDetail saveInitialCycleDetail(UUID cycleId, BigDecimal initialValue, StrategyVrDetail vrDetail) {
         BigDecimal initialV = initialValue != null ? initialValue : BigDecimal.ZERO;
         return strategyCycleVrPort.save(
                 new StrategyCycleVrDetail(cycleId, initialV, vrDetail.gradientAt(0), vrDetail.poolLimitRateAt(0)));
     }
 
-    @Override
     public Optional<VrSummary> findSummary(UUID strategyId, Optional<StrategyCycle> latestCycle,
                                                     Optional<CyclePosition> openingPosition,
                                                     Optional<CyclePosition> latestPosition) {
@@ -61,17 +57,14 @@ public class VrStrategyLifecycle implements VrStrategyDetailUseCase {
                                 })));
     }
 
-    @Override
     public Map<UUID, StrategyVrDetail> findVrDetailsByVersionIds(Collection<UUID> strategyVersionIds) {
         return strategyVrDetailPort.findByStrategyVersionIds(strategyVersionIds);
     }
 
-    @Override
     public Map<UUID, StrategyCycleVrDetail> findCycleVrDetailsByCycleIds(Collection<UUID> cycleIds) {
         return strategyCycleVrPort.findByCycleIds(cycleIds);
     }
 
-    @Override
     public VrSummary buildSummary(StrategyVrDetail vrDetail, StrategyCycleVrDetail cycleVr,
                                           BigDecimal openingPool, BigDecimal currentPool) {
         if (vrDetail == null || cycleVr == null) return null;

@@ -103,7 +103,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
             throw new SecurityException("본인 또는 그룹 소유자만 멤버를 제거할 수 있습니다");
         }
         // 마지막 멤버가 나가면 그룹은 아무도 초대할 수 없는 고아 상태가 된다 — 회원 탈퇴 시
-        // UserCascadeListener가 적용하는 것과 같은 규칙(활성 멤버 0명 → 그룹도 소프트 삭제, OWNER 승계)을 재사용한다.
+        // FinanceUserDataEraseService(탈퇴 cascade)가 적용하는 것과 같은 규칙(활성 멤버 0명 → 그룹도 소프트 삭제, OWNER 승계)을 재사용한다.
         GroupMembershipSupport.removeMemberAndHandleSuccession(financeGroupPort, groupId, targetUserId);
         log.info("그룹 이탈: groupId={}, targetUserId={}, actorUserId={}", groupId, targetUserId, userId);
     }

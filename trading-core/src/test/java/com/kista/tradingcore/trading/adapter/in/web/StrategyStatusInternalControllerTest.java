@@ -54,7 +54,7 @@ class StrategyStatusInternalControllerTest {
     private static final UUID STRATEGY_ID = UUID.randomUUID();
 
     private static Account account(UUID id) {
-        return new Account(id, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Broker.KIS, null);
+        return new Account(id, UUID.randomUUID(), "계좌", "12345678", "app", "secret", null, Broker.KIS, null, null);
     }
 
     private static Strategy strategy(UUID id, UUID accountId) {

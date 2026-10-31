@@ -11,7 +11,6 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVersionPort;
-import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,7 +33,7 @@ class CycleSnapshotCreator {
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 저장
     private final StrategyVersionPort strategyVersionPort; // VR 재설정 시 버전 교체
-    private final VrStrategyDetailUseCase vrStrategyLifecycle;  // VR 재설정 시 새 버전 상세 저장
+    private final VrStrategyDetailService vrStrategyDetailService;  // VR 재설정 시 새 버전 상세 저장
 
     // 새 StrategyCycle + 시작 스냅샷을 하나의 트랜잭션으로 저장 — 중간 실패 시 고아 사이클 방지
     @Transactional
@@ -85,7 +84,7 @@ class CycleSnapshotCreator {
         StrategyVersion newVersion = strategyVersionPort.save(
                 new StrategyVersion(null, strategyId, nextVersionNo, null, null));
         // 새 램프 파라미터로 VR 버전 상세 저장
-        StrategyVrDetail newDetail = vrStrategyLifecycle.saveVersionDetail(
+        StrategyVrDetail newDetail = vrStrategyDetailService.saveVersionDetail(
                 newVersion.id(), r.intervalWeeks(), r.bandWidth(), r.recurringAmount(), r.ramp());
         // 현재 사이클은 자본 조정 전 포지션을 종가로 평가해 종료한다.
         AccountBalance preAdjustmentBalance = cyclePositionPort.findLatestOne(r.currentCycleId())

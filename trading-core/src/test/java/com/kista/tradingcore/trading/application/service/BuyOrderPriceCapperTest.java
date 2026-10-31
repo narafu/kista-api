@@ -60,7 +60,7 @@ class BuyOrderPriceCapperTest {
     static final TradingAccount ACCOUNT = TradingAccount.from(new Account(
             UUID.randomUUID(), UUID.randomUUID(), "테스트계좌",
             "74420614", "key", "secret", null,
-            Broker.KIS, null));
+            Broker.KIS, null, null));
 
     static final UUID STRATEGY_CYCLE_ID = UUID.randomUUID();
 

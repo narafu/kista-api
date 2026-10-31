@@ -210,6 +210,7 @@ class HexagonalArchitectureTest {
                 "com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService", // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.ManualTradeCorrectionService", // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.AccountOpenOrderCanceller",   // 계좌 삭제 전 미체결 주문 취소(account 정의 포트가 Account를 넘김)
+                "com.kista.tradingcore.trading.application.service.UserTradingDataEraseService", // 탈퇴 미체결 취소(AccountUseCase.listByUser → AccountOpenOrderCancelPort가 Account를 받음)
                 "com.kista.tradingcore.trading.application.service.DcaConfigService"             // 소유권 검증 + 계좌 브로커 시장 규칙 검증
         );
         // 제외 목록 오타·개명 감지 — 이름이 실제 클래스로 존재해야 한다

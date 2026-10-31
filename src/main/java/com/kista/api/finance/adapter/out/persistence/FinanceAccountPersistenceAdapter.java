@@ -50,8 +50,8 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
         // V16에서 uq_finance_accounts_group_name을 DROP — 같은 그룹 안 계좌명 중복이 이제 허용되므로
         // 더 이상 DataIntegrityViolationException을 DuplicateNameException으로 변환할 이유가 없다.
         FinanceAccountEntity entity = FinanceAccountEntity.fromModel(account);
-        if (entity.getAccountNo() != null) {
-            entity.setAccountNoHash(hasher.hash(entity.getAccountNo())); // 전역 중복 체크용 해시 — 평문 기준
+        if (account.accountNo() != null) {
+            entity.setAccountNoHash(hasher.hash(account.accountNo())); // 전역 중복 체크용 해시 — 평문 기준
         }
         return FinanceAccountEntity.toDomain(jpaRepository.saveAndFlush(entity));
     }

@@ -71,7 +71,7 @@ class StrategySeedPreviewServiceTest {
                 null, null, null, null,
                 accountPort, null, null, historyQueryService, null, null, null);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드라 mock(Account.class)로는 null 반환됨
-        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null);
+        account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 
@@ -141,7 +141,7 @@ class StrategySeedPreviewServiceTest {
     @Test
     void mockAccountHasNullAvailableCash() {
         stubInfinitePrice();
-        Account mock = new Account(accountId, userId, "모의", "74420614-01", "key", "secret", null, Broker.MOCK, null);
+        Account mock = new Account(accountId, userId, "모의", "74420614-01", "key", "secret", null, Broker.MOCK, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(mock);
 
         var result = service.strategySeedPreview(accountId, userId, StrategyType.INFINITE, StrategyTicker.SOXL, 20);
@@ -164,7 +164,7 @@ class StrategySeedPreviewServiceTest {
     @Test
     void cryptoAccountHasNullAvailableCashWithoutMarginCall() {
         stubInfinitePrice();
-        Account crypto = new Account(accountId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null);
+        Account crypto = new Account(accountId, userId, "업비트", null, "key", "secret", null, Broker.UPBIT, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(crypto);
 
         var result = service.strategySeedPreview(accountId, userId, StrategyType.INFINITE, StrategyTicker.SOXL, 20);

@@ -1,7 +1,9 @@
 package com.kista.shared.platform.internalapi;
 
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.util.Timeout;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -64,11 +66,14 @@ public class InternalApiClientConfig {
     // 전면 비활성화 — 읽기 전용 어댑터들도 재시도를 원하지 않으므로 공용 빈에서 끄는 게 안전하다.
     private HttpComponentsClientHttpRequestFactory requestFactory(Timeout responseTimeout) {
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(CONNECT_TIMEOUT)
                 .setResponseTimeout(responseTimeout)
                 .build();
         var httpClient = HttpClients.custom()
                 .disableAutomaticRetries()
+                // 연결 타임아웃은 RequestConfig 대신 커넥션 매니저의 ConnectionConfig로 설정(RequestConfig.setConnectTimeout deprecated)
+                .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
+                        .setDefaultConnectionConfig(ConnectionConfig.custom().setConnectTimeout(CONNECT_TIMEOUT).build())
+                        .build())
                 .setDefaultRequestConfig(requestConfig)
                 .build();
         return new HttpComponentsClientHttpRequestFactory(httpClient);

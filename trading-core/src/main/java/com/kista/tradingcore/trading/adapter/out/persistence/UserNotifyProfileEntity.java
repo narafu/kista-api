@@ -50,4 +50,17 @@ class UserNotifyProfileEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "notification_channel", length = 20)
     private NotificationChannel notificationChannel; // 알림 수단, null = 채널 복제 전 행(봇 연결만 판정) — V5 ADD COLUMN이라 맨 뒤
+
+    // 변경 이벤트 스냅샷 반영 — 채널 없는 이벤트(채널 복제 이전 root가 발행)는 저장된 채널을 지우지 않는다(NULL이 되면 봇 연결만 보고 텔레그램을 다시 보내게 된다)
+    void applyChange(String prefsJson, boolean active, String telegramBotToken, String chatId,
+                     Instant version, NotificationChannel channel) {
+        this.notificationPrefsJson = prefsJson;
+        this.active = active;
+        this.telegramBotToken = telegramBotToken;
+        this.chatId = chatId;
+        this.updatedAt = version;
+        if (channel != null) {
+            this.notificationChannel = channel;
+        }
+    }
 }

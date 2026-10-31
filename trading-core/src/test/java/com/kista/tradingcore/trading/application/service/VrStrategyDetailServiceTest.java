@@ -1,4 +1,4 @@
-package com.kista.tradingcore.trading.application.service.support;
+package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -27,13 +27,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("VrStrategyLifecycle 단위 테스트")
-class VrStrategyLifecycleTest {
+@DisplayName("VrStrategyDetailService 단위 테스트")
+class VrStrategyDetailServiceTest {
 
     @Mock StrategyVrDetailPort strategyVrDetailPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort;
 
-    @InjectMocks VrStrategyLifecycle vrStrategyLifecycle;
+    @InjectMocks VrStrategyDetailService vrStrategyDetailService;
 
     @Test
     @DisplayName("saveVersionDetail() recurringAmount null이면 0으로 정규화한다 — 램프 8필드는 호출측 정규화값을 그대로 저장")
@@ -41,7 +41,7 @@ class VrStrategyLifecycleTest {
         UUID versionId = UUID.randomUUID();
         when(strategyVrDetailPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        StrategyVrDetail result = vrStrategyLifecycle.saveVersionDetail(
+        StrategyVrDetail result = vrStrategyDetailService.saveVersionDetail(
                 versionId, 4, new BigDecimal("15.00"), null,
                 new VrRampParams(10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75")));
 
@@ -63,7 +63,7 @@ class VrStrategyLifecycleTest {
                 10, 52, 26, 15, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
         when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        StrategyCycleVrDetail result = vrStrategyLifecycle.saveInitialCycleDetail(
+        StrategyCycleVrDetail result = vrStrategyDetailService.saveInitialCycleDetail(
                 cycleId, new BigDecimal("3000"), vrDetail);
 
         assertThat(result.strategyCycleId()).isEqualTo(cycleId);
@@ -81,7 +81,7 @@ class VrStrategyLifecycleTest {
                 10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
         when(strategyCycleVrPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        StrategyCycleVrDetail result = vrStrategyLifecycle.saveInitialCycleDetail(
+        StrategyCycleVrDetail result = vrStrategyDetailService.saveInitialCycleDetail(
                 cycleId, null, vrDetail);
 
         assertThat(result.value()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -108,7 +108,7 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        Optional<VrSummary> result = vrStrategyLifecycle.findSummary(
+        Optional<VrSummary> result = vrStrategyDetailService.findSummary(
                 strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.of(latestPosition));
 
         assertThat(result).isPresent();
@@ -137,7 +137,7 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        Optional<VrSummary> result = vrStrategyLifecycle.findSummary(
+        Optional<VrSummary> result = vrStrategyDetailService.findSummary(
                 strategyId, Optional.of(latestCycle), Optional.of(openingPosition), Optional.empty());
 
         assertThat(result).isPresent();
@@ -159,7 +159,7 @@ class VrStrategyLifecycleTest {
         when(strategyVrDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(vrDetail));
         when(strategyCycleVrPort.findByCycleId(cycleId)).thenReturn(Optional.of(cycleVr));
 
-        assertThatThrownBy(() -> vrStrategyLifecycle.findSummary(
+        assertThatThrownBy(() -> vrStrategyDetailService.findSummary(
                 strategyId, Optional.of(latestCycle), Optional.empty(), Optional.empty()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션 없음")
@@ -176,7 +176,7 @@ class VrStrategyLifecycleTest {
         StrategyCycleVrDetail cycleVr = new StrategyCycleVrDetail(
                 cycleId, new BigDecimal("3000"), 10, new BigDecimal("0.50"));
 
-        assertThatThrownBy(() -> vrStrategyLifecycle.buildSummary(vrDetail, cycleVr, null, null))
+        assertThatThrownBy(() -> vrStrategyDetailService.buildSummary(vrDetail, cycleVr, null, null))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션 없음");
     }

@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
-import com.kista.tradingcore.trading.application.service.support.VrStrategyLifecycle;
 
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -34,7 +33,7 @@ class CycleSnapshotCreatorTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock StrategyCycleVrPort strategyCycleVrPort;
     @Mock StrategyVersionPort strategyVersionPort;
-    @Mock VrStrategyLifecycle vrStrategyLifecycle;
+    @Mock VrStrategyDetailService vrStrategyDetailService;
 
     @Test
     void createVrCycleAndSnapshot_usesTotalOpeningAssetsForCycleStartAmount() {
@@ -46,7 +45,7 @@ class CycleSnapshotCreatorTest {
         when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService);
         creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
                 new BigDecimal("120.00"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now()));
 
@@ -71,7 +70,7 @@ class CycleSnapshotCreatorTest {
         when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService);
         creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
                 new BigDecimal("600.005"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now()));
 
@@ -126,7 +125,7 @@ class CycleSnapshotCreatorTest {
         when(strategyVersionPort.save(any())).thenReturn(
                 new StrategyVersion(newVersionId, strategyId, 2, null, null));
         VrRampParams ramp = new VrRampParams(10, 52, 26, 10, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50"));
-        when(vrStrategyLifecycle.saveVersionDetail(newVersionId, 4, new BigDecimal("15.00"), 0, ramp))
+        when(vrStrategyDetailService.saveVersionDetail(newVersionId, 4, new BigDecimal("15.00"), 0, ramp))
                 .thenReturn(newDetail);
         when(strategyCyclePort.save(any())).thenAnswer(invocation -> {
             StrategyCycle cycle = invocation.getArgument(0);
@@ -135,7 +134,7 @@ class CycleSnapshotCreatorTest {
         });
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyLifecycle);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService);
         creator.reconfigureVrCycle(new CycleSnapshotCreator.VrReconfiguration(
                 strategyId, currentCycleId, today, 4, new BigDecimal("15.00"), 0, ramp,
                 postAdjustment, closingPrice, new BigDecimal("1000.00"), 0));

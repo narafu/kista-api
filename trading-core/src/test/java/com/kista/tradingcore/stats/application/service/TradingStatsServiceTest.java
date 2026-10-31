@@ -82,7 +82,7 @@ class TradingStatsServiceTest {
     private static Account testAccount() {
         return new Account(ACCOUNT_ID, USER_ID, "테스트계좌",
                 "74420614", "appKey", "appSecret", null,
-                Broker.KIS, null);
+                Broker.KIS, null, null);
     }
 
     private void stubUserWithStrategy() {
@@ -278,7 +278,7 @@ class TradingStatsServiceTest {
         Strategy otherAccountStrategy = new Strategy(otherStrategyId, otherAccountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         Account otherAccount = new Account(otherAccountId, USER_ID, "두번째계좌",
-                "11112222", "appKey", "appSecret", null, Broker.KIS, null);
+                "11112222", "appKey", "appSecret", null, Broker.KIS, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), otherAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID, otherAccountId))).thenReturn(Map.of(
                 ACCOUNT_ID, List.of(STRATEGY), otherAccountId, List.of(otherAccountStrategy)));
@@ -467,7 +467,7 @@ class TradingStatsServiceTest {
     @Test
     void 합산_경로는_크립토_KRW_계좌를_제외하지만_사이클_성과_목록은_포함한다() {
         UUID cryptoAccountId = UUID.randomUUID();
-        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null);
+        Account crypto = new Account(cryptoAccountId, USER_ID, "업비트", "n", "k", "s", null, Broker.UPBIT, null, null);
         Strategy cryptoDca = new Strategy(UUID.randomUUID(), cryptoAccountId, StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.BTC, StrategyCycleSeedType.NONE);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(crypto));
@@ -486,7 +486,7 @@ class TradingStatsServiceTest {
     @Test
     void aggregateExcludesBinanceAccount() {
         UUID binanceAccountId = UUID.randomUUID();
-        Account binance = new Account(binanceAccountId, USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null);
+        Account binance = new Account(binanceAccountId, USER_ID, "바이낸스", null, "k", "s", null, Broker.BINANCE, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), binance));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of());
@@ -501,7 +501,7 @@ class TradingStatsServiceTest {
     void 요약_전략유형비교는_모의계좌_사이클을_제외한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
@@ -518,7 +518,7 @@ class TradingStatsServiceTest {
     void 누적자산추이는_모의계좌_사이클을_제외한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(), mockAccount));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(STRATEGY)));
         StrategyCycle active = activeCycle("1000.00", "2026-06-01");
@@ -537,7 +537,7 @@ class TradingStatsServiceTest {
     void 사이클_성과_목록은_모의계좌_사이클도_포함한다() {
         UUID mockAccountId = UUID.randomUUID();
         Account mockAccount = new Account(mockAccountId, USER_ID, "모의계좌",
-                "00000000", "key", "secret", null, Broker.MOCK, null);
+                "00000000", "key", "secret", null, Broker.MOCK, null, null);
         UUID mockStrategyId = UUID.randomUUID();
         Strategy mockStrategy = new Strategy(mockStrategyId, mockAccountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);

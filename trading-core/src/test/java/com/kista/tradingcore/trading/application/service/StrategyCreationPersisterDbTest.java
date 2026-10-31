@@ -6,7 +6,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.support.DataJpaTestBase;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionInfiniteDetailPort;
-import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,7 +52,7 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
     @Autowired StrategyCreationPersister persister;
     @Autowired JdbcTemplate jdbcTemplate;
     @MockitoBean CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort; // 마지막 저장 단계 — 실패 주입 지점
-    @MockitoBean VrStrategyDetailUseCase vrStrategyDetailUseCase; // INFINITE 경로에선 미호출
+    @MockitoBean VrStrategyDetailService vrStrategyDetailService; // INFINITE 경로에선 미호출
 
     private UUID accountId;
 

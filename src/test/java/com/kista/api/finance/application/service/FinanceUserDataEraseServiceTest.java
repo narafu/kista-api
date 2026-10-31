@@ -1,6 +1,5 @@
-package com.kista.api.finance.adapter.out;
+package com.kista.api.finance.application.service;
 
-import com.kista.shared.kernel.UserDeletedEvent;
 import com.kista.api.finance.application.port.output.AssetSnapshotPort;
 import com.kista.api.finance.application.port.output.FinanceAccountPort;
 import com.kista.api.finance.application.port.output.FinanceBudgetPort;
@@ -27,8 +26,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("finance UserCascadeListener 단위 테스트")
-class UserCascadeListenerTest {
+@DisplayName("FinanceUserDataEraseService 단위 테스트")
+class FinanceUserDataEraseServiceTest {
 
     @Mock FinanceTransactionPort financeTransactionPort;
     @Mock AssetSnapshotPort assetSnapshotPort;
@@ -37,7 +36,7 @@ class UserCascadeListenerTest {
     @Mock FinanceBudgetPort financeBudgetPort;
     @Mock FinanceGroupPort financeGroupPort;
 
-    @InjectMocks UserCascadeListener listener;
+    @InjectMocks FinanceUserDataEraseService service;
 
     private final UUID userId = UUID.randomUUID();
     private final UUID groupId = UUID.randomUUID();
@@ -47,7 +46,7 @@ class UserCascadeListenerTest {
     }
 
     private void fire() {
-        listener.onUserDeleted(new UserDeletedEvent(userId));
+        service.eraseUserData(userId);
     }
 
     @Test

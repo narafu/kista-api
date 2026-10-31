@@ -528,7 +528,7 @@ class ReorderServiceTest {
 
     private Account account() {
         return new Account(ACCOUNT_ID, USER_ID, "Toss", "1234-56", "app", "secret", "seq-1",
-                Broker.TOSS, null);
+                Broker.TOSS, null, null);
     }
 
     private Strategy strategy() {

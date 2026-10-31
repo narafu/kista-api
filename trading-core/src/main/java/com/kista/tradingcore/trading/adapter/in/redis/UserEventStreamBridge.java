@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 // Redis Stream 메시지를 trading-core 프로세스 안에서 로컬 이벤트로 재발행하는 브릿지 —
-// 로컬 cascade/동기화 리스너(탈퇴 정리 UserCascadeListener·프로필 동기화 UserNotifyProfileSyncListener)를
+// 로컬 cascade/동기화 리스너(탈퇴 정리 TradingUserCascadeListener·프로필 동기화 UserNotifyProfileSyncListener)를
 // 원격 전달과 무관하게 재사용하기 위해, 원격 전달 문제를 여기서만 해소한다. 구독·ack·재기동·XCLAIM 복구는 platform
 // RedisStreamSubscriber 서브클래스(UserDeletedStreamConsumer/UserNotifyProfileStreamConsumer)가 맡고,
 // 이 클래스는 역직렬화 + 재발행 위임만 한다. 실패 정책은 UserEventStreamConsumer 참고.

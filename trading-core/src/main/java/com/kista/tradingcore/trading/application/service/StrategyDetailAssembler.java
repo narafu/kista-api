@@ -5,7 +5,6 @@ import com.kista.shared.kernel.StrategyDefaults;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.trading.application.port.output.*;
-import com.kista.tradingcore.trading.application.usecase.VrStrategyDetailUseCase;
 import com.kista.tradingcore.trading.domain.model.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -27,7 +26,7 @@ class StrategyDetailAssembler {
 
     private final StrategyVersionPort strategyVersionPort;
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;
-    private final VrStrategyDetailUseCase vrStrategyLifecycle;      // VR 전략 전용 상세 저장·조회
+    private final VrStrategyDetailService vrStrategyDetailService;      // VR 전략 전용 상세 저장·조회
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final CyclePositionInfiniteDetailPort cyclePositionInfiniteDetailPort;
@@ -59,7 +58,7 @@ class StrategyDetailAssembler {
 
         // VR 전략: 최신 활성 버전 + 최신 사이클 상세를 helper가 합산 — openingPosition/latestPos는 위에서 이미 조회한 값 재사용
         VrSummary vrSummary = strategy.isVr()
-                ? vrStrategyLifecycle.findSummary(strategy.id(), latestCycle, openingPosition, latestPos).orElse(null)
+                ? vrStrategyDetailService.findSummary(strategy.id(), latestCycle, openingPosition, latestPos).orElse(null)
                 : null;
 
         DcaSummary dcaSummary = null;
@@ -101,8 +100,8 @@ class StrategyDetailAssembler {
         Map<UUID, StrategyVersion> activeVersions = strategyVersionPort.findActiveByStrategyIds(strategyIds);
         List<UUID> versionIds = activeVersions.values().stream().map(StrategyVersion::id).toList();
         Map<UUID, StrategyInfiniteDetail> infiniteDetails = strategyInfiniteDetailPort.findByStrategyVersionIds(versionIds);
-        Map<UUID, StrategyVrDetail> vrDetails = vrStrategyLifecycle.findVrDetailsByVersionIds(versionIds);
-        Map<UUID, StrategyCycleVrDetail> cycleVrDetails = vrStrategyLifecycle.findCycleVrDetailsByCycleIds(cycleIds);
+        Map<UUID, StrategyVrDetail> vrDetails = vrStrategyDetailService.findVrDetailsByVersionIds(versionIds);
+        Map<UUID, StrategyCycleVrDetail> cycleVrDetails = vrStrategyDetailService.findCycleVrDetailsByCycleIds(cycleIds);
 
         // DCA만 설정·최근 회차 배치 조회 (각 1회)
         List<UUID> dcaIds = strategies.stream().filter(Strategy::isDca).map(Strategy::id).toList();
@@ -140,7 +139,7 @@ class StrategyDetailAssembler {
                     ? activeVersion.map(StrategyVersion::id)
                             .flatMap(versionId -> Optional.ofNullable(vrDetails.get(versionId)))
                             .flatMap(vrDetail -> latestCycle.flatMap(cycle -> Optional.ofNullable(cycleVrDetails.get(cycle.id())))
-                                    .map(cycleVr -> vrStrategyLifecycle.buildSummary(
+                                    .map(cycleVr -> vrStrategyDetailService.buildSummary(
                                             vrDetail, cycleVr, openingPosition.map(CyclePosition::usdDeposit).orElse(null),
                                             latestPos.map(CyclePosition::usdDeposit).orElse(null))))
                             .orElse(null)

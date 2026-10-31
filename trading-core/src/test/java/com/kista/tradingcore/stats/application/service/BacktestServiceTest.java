@@ -75,13 +75,13 @@ class BacktestServiceTest {
 
     private static BacktestCommand infinite(Integer divisionCount) {
         return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO, SEED,
-                divisionCount, null, null, 0, null);
+                divisionCount, null, null, 0, null, null, null, null, null);
     }
 
     private static BacktestCommand vr(BigDecimal bandWidth, Integer intervalWeeks, int recurring, String initialValue) {
         return new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, SEED,
                 null, bandWidth, intervalWeeks, recurring,
-                initialValue == null ? null : new BigDecimal(initialValue));
+                initialValue == null ? null : new BigDecimal(initialValue), null, null, null, null);
     }
 
     private static BacktestCommand privacy() {
@@ -90,19 +90,19 @@ class BacktestServiceTest {
 
     private static BacktestCommand privacy(LocalDate from, LocalDate to) {
         return new BacktestCommand(StrategyType.PRIVACY, StrategyTicker.SOXL, from, to, SEED,
-                null, null, null, 0, null);
+                null, null, null, 0, null, null, null, null, null);
     }
 
     private static BacktestCommand infiniteWithPosition(BigDecimal seed, Integer holdings, BigDecimal avgPrice) {
         return new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO, seed,
-                null, null, null, 0, null, holdings, avgPrice);
+                null, null, null, 0, null, holdings, avgPrice, null, null);
     }
 
     private static BacktestCommand vrWithPosition(BigDecimal seed, int recurring, String initialValue,
                                                    Integer holdings, BigDecimal avgPrice) {
         return new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, seed,
                 null, new BigDecimal("15"), 4, recurring,
-                initialValue == null ? null : new BigDecimal(initialValue), holdings, avgPrice);
+                initialValue == null ? null : new BigDecimal(initialValue), holdings, avgPrice, null, null);
     }
 
     private static DailyCandle candle(int day, String close) {
@@ -115,7 +115,7 @@ class BacktestServiceTest {
     @Test
     void 전략이_지원하지_않는_종목이면_거부한다() {
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.SOXL, FROM, TO, SEED,
-                null, new BigDecimal("15"), 4, 0, new BigDecimal("1000"));
+                null, new BigDecimal("15"), 4, 0, new BigDecimal("1000"), null, null, null, null);
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -126,7 +126,7 @@ class BacktestServiceTest {
     @Test
     void 시드가_0이하면_거부한다() {
         BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, FROM, TO,
-                BigDecimal.ZERO, null, null, null, 0, null);
+                BigDecimal.ZERO, null, null, null, 0, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -177,7 +177,7 @@ class BacktestServiceTest {
     @Test
     void 시작일이_종료일보다_늦으면_거부한다() {
         BacktestCommand command = new BacktestCommand(StrategyType.INFINITE, StrategyTicker.TQQQ, TO, FROM, SEED,
-                null, null, null, 0, null);
+                null, null, null, 0, null, null, null, null, null);
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -304,7 +304,7 @@ class BacktestServiceTest {
         // poolLimitFloor(0.9) > initialPoolLimitRate(0.75 — 거치식 기본값) → 운영 VrRampValidator와 같은 메시지로 거부
         BacktestCommand command = new BacktestCommand(StrategyType.VR, StrategyTicker.TQQQ, FROM, TO, SEED,
                 null, new BigDecimal("15"), 4, 0, new BigDecimal("1000"), null, null,
-                new VrRampInput(null, null, null, null, null, null, null, new BigDecimal("0.9")));
+                new VrRampInput(null, null, null, null, null, null, null, new BigDecimal("0.9")), null);
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -121,7 +122,7 @@ class UpbitHttpClientTest {
         assertMapped(HttpStatus.UNAUTHORIZED, "jwt_verification", BrokerCredentialException.class);
         assertMapped(HttpStatus.UNAUTHORIZED, "expired_access_key", BrokerCredentialException.class);
         assertMapped(HttpStatus.TOO_MANY_REQUESTS, "too_many_requests", BrokerRateLimitException.class);
-        assertMapped(HttpStatus.I_AM_A_TEAPOT, "blocked", BrokerRateLimitException.class);
+        assertMapped(HttpStatusCode.valueOf(418), "blocked", BrokerRateLimitException.class); // 418 = Upbit IP 차단 — 429와 같이 레이트리밋으로 분류
         assertMapped(HttpStatus.UNAUTHORIZED, "nonce_used", UpbitApiException.class); // 우리 쪽 결함 — 일반 실패
     }
 
@@ -141,7 +142,7 @@ class UpbitHttpClientTest {
                 });
     }
 
-    private void assertMapped(HttpStatus status, String name, Class<? extends RuntimeException> expected) {
+    private void assertMapped(HttpStatusCode status, String name, Class<? extends RuntimeException> expected) {
         server.reset();
         server.expect(requestTo(BASE_URL + "/v1/accounts"))
                 .andRespond(withStatus(status).contentType(MediaType.APPLICATION_JSON)

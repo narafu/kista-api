@@ -542,7 +542,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void accountCashCheck_isNull_andMarginNotCalled_forMockAccount() {
-        Account mock = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "123", "key", "secret", null, Broker.MOCK, null);
+        Account mock = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "123", "key", "secret", null, Broker.MOCK, null, null);
         Strategy mockStrategy = new Strategy(UUID.randomUUID(), mock.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategy.id(), UUID.randomUUID(),
@@ -657,7 +657,7 @@ class TradingPreviewServiceTest {
 
     @Test
     void accountHoldingsCheck_isNull_andSellableNotCalled_forMockAccount() {
-        Account mock = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "123", "key", "secret", null, Broker.MOCK, null);
+        Account mock = new Account(UUID.randomUUID(), UUID.randomUUID(), "모의", "123", "key", "secret", null, Broker.MOCK, null, null);
         Strategy mockStrategy = new Strategy(UUID.randomUUID(), mock.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle mockCycle = new StrategyCycle(UUID.randomUUID(), mockStrategy.id(), UUID.randomUUID(),

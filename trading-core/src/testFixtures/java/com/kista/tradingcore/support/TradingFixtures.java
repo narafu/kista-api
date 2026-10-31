@@ -31,22 +31,22 @@ public final class TradingFixtures {
 
     // 기본 KIS 계좌 (accountNo/appKey/secretKey 기본값 고정)
     public static Account kisAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Broker.KIS, null);
+        return new Account(id, userId, "테스트계좌", "74420614", "key", "secret", null, Broker.KIS, null, null);
     }
 
     // 기본 Toss 계좌 (accountNo/appKey/secretKey/brokerAccountCode 기본값 고정)
     public static Account tossAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Broker.TOSS, null);
+        return new Account(id, userId, "테스트계좌", "123-45-678901", "key", "secret", "1", Broker.TOSS, null, null);
     }
 
     // 기본 업비트 계좌 — 계좌번호 없음(access key가 중복 판정 키)
     public static Account upbitAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "업비트", null, "access-key", "secret-key", null, Broker.UPBIT, null);
+        return new Account(id, userId, "업비트", null, "access-key", "secret-key", null, Broker.UPBIT, null, null);
     }
 
     // 기본 바이낸스 계좌 — 계좌번호 없음(API key가 중복 판정 키)
     public static Account binanceAccount(UUID id, UUID userId) {
-        return new Account(id, userId, "바이낸스", null, "binance-key", "binance-secret", null, Broker.BINANCE, null);
+        return new Account(id, userId, "바이낸스", null, "binance-key", "binance-secret", null, Broker.BINANCE, null, null);
     }
 
     // 배치 경로용 KIS 계좌 투영 — kisAccount와 동일 값

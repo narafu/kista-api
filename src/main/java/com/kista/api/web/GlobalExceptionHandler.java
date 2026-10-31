@@ -48,20 +48,15 @@ public class GlobalExceptionHandler {
     // JDK/Spring 범용 예외(SecurityException·IllegalStateException·NoSuchElementException 등)는 ProblemDetailMappings.GENERIC이 공급한다
     private static final Map<Class<? extends Exception>, Mapping> MAPPINGS = ProblemDetailMappings.withGeneric(Map.ofEntries(
         Map.entry(InvalidRefreshTokenException.class,              new Mapping(HttpStatus.UNAUTHORIZED,           "Unauthorized")),
-        // broker.domain.model.BrokerCredentialException/BrokerRateLimitException 원본은
-        // trading-core 네이티브 컨트롤러(AccountController 등)에서만 던져지므로 trading-core 소유
-        // com.kista.tradingcore.web.TradingExceptionHandler로 이관됨 — 아래는 admin이
-        // TradingCommandHttpAdapter(내부 API 응답 복원)에서 던지는 own-type만 남는다
-        // 코드는 trading-core 원본(BrokerCredential/RateLimit)과 동일 — 내부 API가 status만 전달하므로 root가 같은 코드를 다시 붙인다
+        // 내부 API 응답에서 복원한 Admin* own-type — 원본은 trading-core(TradingExceptionHandler) 소유.
+        // 내부 API가 status만 전달하므로 root가 원본과 같은 code를 다시 붙인다
         Map.entry(AdminBrokerCredentialException.class,             new Mapping(HttpStatus.UNPROCESSABLE_CONTENT,   "Invalid Broker Credentials", ErrorCode.BROKER_CREDENTIAL_INVALID)),
         Map.entry(AdminBrokerRateLimitException.class,              new Mapping(HttpStatus.TOO_MANY_REQUESTS,      "Broker Rate Limit", ErrorCode.BROKER_RATE_LIMITED)),
         // trading-core 정책 API 도달 실패 — 관리자 설정 조회·갱신은 503으로 드러낸다(공개 runtime-config는 서비스가 기본값으로 강등)
         Map.entry(TradingPolicyUnavailableException.class,          new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Trading Core Unavailable", ErrorCode.TRADING_CORE_UNAVAILABLE)),
         // trading-core 캔들 내부 API 503 복원 — 원 장애는 trading-core가 이미 보고했으므로 매핑만(재보고 없음)
         Map.entry(CandleUnavailableException.class,                 new Mapping(HttpStatus.SERVICE_UNAVAILABLE,    "Broker API Error", ErrorCode.BROKER_UNAVAILABLE)),
-        // Account.DuplicateAccountException/ManualTradingException/OrderCancelException/
-        // PrivacyTradeConflictException(trading-core 소유 원본)은 TradingExceptionHandler로 이관됨 —
-        // 아래는 admin이 PrivacyQueryHttpAdapter(내부 API 409 응답 복원)에서 던지는 own-type만 남는다
+        // 내부 API 409 응답에서 복원한 own-type (원본은 trading-core 소유)
         Map.entry(AdminPrivacyTradeConflictException.class,            new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(User.AlreadyActiveException.class,                   new Mapping(HttpStatus.CONFLICT,           "Conflict")),
         Map.entry(FinanceBudget.OverlappingPeriodException.class,      new Mapping(HttpStatus.CONFLICT,           "Conflict")),
@@ -107,8 +102,7 @@ public class GlobalExceptionHandler {
     }
 
     // ── 5xx — 서버 오류, 이벤트로 오류 로그 보고 ────────────────────────────────
-    // KisApiException/TossApiException(trading-core 소유) 핸들러는 TradingExceptionHandler로 이관됐다 —
-    // trading-core의 app_error_logs 저장은 Redis Stream(stream:app.error → admin AppErrorStreamConsumer)으로 전달된다
+    // 증권사 API 예외는 trading-core 소유라 TradingExceptionHandler가 처리한다(오류 로그는 Redis Stream stream:app.error → admin AppErrorStreamConsumer)
 
     // catch-all — MAPPINGS 테이블 우선 조회, 매핑 있으면 4xx 응답(오류 보고 없음) / 없으면 reportUnmapped 후 500 (공통 본문은 ProblemDetailMappings.catchAll)
     @ExceptionHandler(Exception.class)
@@ -123,7 +117,7 @@ public class GlobalExceptionHandler {
     }
 
     // app_error_logs 저장은 admin 리스너가 이벤트로 수행 — 발행 실패(리스너 예외)가 원래 응답을 막지 않도록 격리
-    // (TradingExceptionHandler.reportErrorLog와 동일)
+    // (TradingExceptionHandler.reportErrorLog와 같은 형태 — 합치지 못하는 이유는 docs/agents/modules/api/web.md)
     private void reportErrorLog(Exception ex) {
         try {
             eventPublisher.publishEvent(AppErrorRaisedEvent.of(ex, GlobalExceptionHandler.class.getSimpleName()));

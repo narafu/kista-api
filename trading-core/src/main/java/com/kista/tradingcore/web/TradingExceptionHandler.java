@@ -108,6 +108,7 @@ public class TradingExceptionHandler {
     }
 
     // app_error_logs가 root 소유라 이벤트로 보고 — 발행 실패(리스너 예외)가 원래 응답을 막지 않도록 격리
+    // (root GlobalExceptionHandler.reportErrorLog와 같은 형태 — 합치지 못하는 이유는 docs/agents/modules/tradingcore/web.md)
     // (스택트레이스 전체를 보내고 30줄 truncate는 저장 측(root)에서 수행)
     private void reportErrorLog(Exception ex) {
         try {

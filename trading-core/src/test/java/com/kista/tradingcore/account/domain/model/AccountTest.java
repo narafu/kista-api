@@ -36,6 +36,6 @@ class AccountTest {
 
     private static Account account(Broker broker, long createdEpochSecond) {
         return new Account(UUID.randomUUID(), UUID.randomUUID(), "n", null, "k", "s", null, broker,
-                Instant.ofEpochSecond(createdEpochSecond));
+                Instant.ofEpochSecond(createdEpochSecond), null);
     }
 }
