@@ -28,7 +28,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `StrategyDetailAssembler.java:46-48,124-127` ✔. divisionCount는 `strategy.isInfinite()`일 때만 채워지므로 PRIVACY는 항상 null이다.
   - `matching/domain/model/InfinitePosition.java:60` ✔. `if (divisionCount == 0 ...) return 0.0`.
 - 근거: PRIVACY 전략은 위 경로로 currentRound가 무조건 0.0이 된다. 다른 경로의 기본값은 `StrategyDefaults.DEFAULT_DIVISION_COUNT = 20`이다(`shared/.../StrategyDefaults.java:8`, `CyclePositionPersistor.java:86` 등의 `.orElse(DEFAULT_DIVISION_COUNT)`).
-- 확인할 것: PRIVACY 상세 화면에 회차 표시가 의도된 것인지 여부. 의도라면 주석과 계산식 중 무엇이 맞는가.
+- 확정(사용자, 2026-11-01): divisionCount를 INFINITE에만 채우는 것은 맞다. 이 부분은 수정 대상이 아니다.
+- 남은 확인: PRIVACY의 currentRound를 0.0으로 내리는 것이 의도인가? 의도가 아니라면 VR·DCA처럼 null로 내려야 하는가? 어느 쪽이든 `:168` 주석("INFINITE·PRIVACY만 계산")은 실제 동작과 다르다.
 - 예상 효과: 표시값 정정, 또는 주석 정정.
 - 위험: 높음. `currentRound` 공식(`trading-formulas.md`)에 닿고, 사용자 화면 값이 바뀐다.
 - 가드: 결론이 나면 `StrategyDetailAssembler` 단위 테스트에 PRIVACY currentRound 단언을 추가한다.
