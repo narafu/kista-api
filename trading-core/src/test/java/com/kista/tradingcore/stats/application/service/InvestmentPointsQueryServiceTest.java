@@ -95,7 +95,7 @@ class InvestmentPointsQueryServiceTest {
     @Test
     void STRATEGY_scope는_소유한_전략만_조회한다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(USER_ID));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(testAccount(USER_ID));
         StrategyCycle cycle = activeCycle("100.00", "2026-01-05");
         when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of(cycle));
         when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))
@@ -117,9 +117,8 @@ class InvestmentPointsQueryServiceTest {
         // 옛 api BenchmarkServiceTest의 "소유하지 않은 전략은 포지션을 읽기 전에 거부한다" 불변식이
         // 소유권 검증 로직과 함께 trading 쪽으로 이전됐다 — fast-fail이 실제로 strategyCyclePort/
         // cyclePositionPort 호출보다 먼저 일어나는지는 이제 여기서만 검증된다.
-        UUID otherUserId = UUID.randomUUID();
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(otherUserId));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenThrow(new SecurityException("계좌에 대한 접근 권한이 없습니다"));
 
         assertThatThrownBy(() -> service.fetch(USER_ID, InvestmentPointsQuery.Scope.STRATEGY,
                 STRATEGY_ID, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 2, 23)))
@@ -209,7 +208,7 @@ class InvestmentPointsQueryServiceTest {
     @Test
     void from이_없으면_사이클_시작일_중_최소값을_effectiveFrom으로_쓴다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(STRATEGY);
-        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(testAccount(USER_ID));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(testAccount(USER_ID));
         StrategyCycle cycle = activeCycle("100.00", "2026-01-15");
         when(strategyCyclePort.findByStrategyIds(Set.of(STRATEGY_ID))).thenReturn(List.of(cycle));
         when(cyclePositionPort.findByStrategyAndRange(eq(STRATEGY_ID), eq(Instant.EPOCH), any()))

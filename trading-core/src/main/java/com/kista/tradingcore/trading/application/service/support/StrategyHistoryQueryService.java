@@ -11,6 +11,7 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
 import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.KstDays;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -122,6 +123,6 @@ public class StrategyHistoryQueryService {
 
     private Instant resolveHistoryTo(LocalDate to) {
         var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
-        return resolved.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // to 당일 포함
+        return KstDays.endExclusive(resolved); // to 당일 포함
     }
 }

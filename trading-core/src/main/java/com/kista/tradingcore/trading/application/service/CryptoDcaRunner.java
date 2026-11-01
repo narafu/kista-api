@@ -7,7 +7,7 @@ import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
@@ -17,6 +17,7 @@ import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -45,7 +46,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
     private final CryptoExchanges cryptoExchanges;
     private final CryptoOrderSynchronizer synchronizer;
     private final CryptoDcaRoundExecutor roundExecutor;
-    private final TradingErrorReportPort errorReportPort; // 조립·계좌 실행 실패 관리자 알림
+    private final ApplicationEventPublisher eventPublisher; // 조립·계좌 실행 실패 관리자 알림(TradingErrorEvent 발행)
     // ponytail: in-memory, resets on restart — persist if restart floods matter
     private final Map<String, LocalDate> lastReported = new ConcurrentHashMap<>(); // (대상|메시지) → 마지막 알림 KST 일자
 
@@ -101,7 +102,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
     // 같은 (대상, 예외 클래스)는 KST 하루 1회만 관리자 알림 — 10분 틱마다 반복 발송 방지
     private void reportOncePerDay(UUID target, RuntimeException e, LocalDate today) {
         String key = target + "|" + e.getClass().getName(); // 메시지는 id·시각이 섞여 휘발적이라 클래스로 묶는다
-        if (!today.equals(lastReported.put(key, today))) errorReportPort.reportError(e);
+        if (!today.equals(lastReported.put(key, today))) eventPublisher.publishEvent(new TradingErrorEvent(null, e.getMessage()));
     }
 
     // 조립 불가(사이클·설정·프로필 없음, 종료 사이클)는 예외 — 호출부가 알림 후 제외

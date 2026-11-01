@@ -12,7 +12,6 @@ public record DstInfo(
         Instant marketOpen  // 미 정규장 개장 시각 (KST): DST=22:30, 비DST=23:30
 ) {
 
-    private static final ZoneId NY  = ZoneId.of("America/New_York");
     private static final ZoneId KST = TimeZones.KST;
 
     // --- KST 시각표 SSOT: DST 여부에 따른 각 이벤트 시각 ---
@@ -29,7 +28,7 @@ public record DstInfo(
     private static LocalTime premarketStartTime(boolean isDst) { return isDst ? LocalTime.of(17, 0) : LocalTime.of(18, 0); }
 
     private static boolean resolveDst(Instant instant) {
-        return NY.getRules().isDaylightSavings(instant);
+        return TimeZones.NY.getRules().isDaylightSavings(instant);
     }
 
     private static Instant atKst(LocalDate date, LocalTime time) {

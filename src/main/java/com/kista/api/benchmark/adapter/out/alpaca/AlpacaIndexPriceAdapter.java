@@ -1,6 +1,7 @@
 package com.kista.api.benchmark.adapter.out.alpaca;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.domain.model.IndexPrice;
 import com.kista.api.benchmark.application.port.output.IndexPriceFeedPort;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -20,7 +20,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort {
 
-    private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 
     private final RestClient alpacaRestClient;
     private final AlpacaProperties alpacaProperties;
@@ -54,7 +53,7 @@ public class AlpacaIndexPriceAdapter implements IndexPriceFeedPort {
         return bars.stream()
                 .map(bar -> new IndexPrice(
                         symbol,
-                        Instant.parse(bar.t()).atZone(NEW_YORK).toLocalDate(),
+                        Instant.parse(bar.t()).atZone(TimeZones.NY).toLocalDate(),
                         bar.c()))
                 .toList();
     }

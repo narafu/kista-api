@@ -3,8 +3,9 @@ package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
-import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -18,7 +19,7 @@ import java.time.LocalDate;
 class PrivacyBaseGuard {
 
     private final PrivacyTradeValidationUseCase validationService;
-    private final TradingErrorReportPort errorReportPort; // 가드 발동 관리자 알림 (출력 포트 경유)
+    private final ApplicationEventPublisher eventPublisher; // 가드 발동 관리자 알림 (TradingErrorEvent 발행)
 
     // 이슈가 없으면 base 그대로, 있으면 관리자 알림 후 null. batchLabel은 알림 문구용 배치 이름
     PrivacyTradeBase screen(PrivacyTradeBase base, LocalDate tradeDate, String batchLabel) {
@@ -26,13 +27,13 @@ class PrivacyBaseGuard {
         try {
             PrivacyTradeValidationReport report = validationService.inspect(base);
             if (!report.hasIssues()) return base;
-            errorReportPort.reportError(new IllegalStateException(
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
                     "[PRIVACY] " + batchLabel + " 장전 가드 발동 — 기준 매매표 이상으로 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + "): "
                             + report.summary()));
         } catch (RuntimeException e) {
             // 점검 자체가 실패하면 안전하게 차단(fail-closed)
-            errorReportPort.reportError(new IllegalStateException(
-                    "[PRIVACY] " + batchLabel + " 기준 매매표 점검 실패 — 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + ")", e));
+            eventPublisher.publishEvent(new TradingErrorEvent(null,
+                    "[PRIVACY] " + batchLabel + " 기준 매매표 점검 실패 — 신규 PRIVACY 주문 생성 skip (거래일 " + tradeDate + ")"));
         }
         return null;
     }

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.stats.application.service;
 
 import com.kista.shared.platform.cache.TtlResultCache;
+import com.kista.shared.kernel.KstDays;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -130,7 +131,7 @@ class TradingStatsService implements TradingStatsUseCase {
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
         Instant fromInstant = Instant.EPOCH;
-        Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // KST 자정 경계 — 04:30 배치 스냅샷이 해당 KST 일자에 속함
+        Instant toInstant = KstDays.endExclusive(effectiveTo); // KST 자정 경계 — 04:30 배치 스냅샷이 해당 KST 일자에 속함
 
         List<CycleView> cycles = loadCycles(userId, true).stream()
                 .filter(v -> type == null || v.strategy().type() == type)

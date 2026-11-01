@@ -19,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 // 메리츠 해외주식 시세 — 현재가·전일종가(prices), 확정 종가(candles/days)
 @Slf4j
@@ -71,26 +72,25 @@ class MeritzPriceApi {
     }
 
     Map<StrategyTicker, BigDecimal> getPrices(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker t : tickers) result.put(t, getPrice(t, account));
-        return result;
+        return perTicker(tickers, t -> getPrice(t, account));
     }
 
     Map<StrategyTicker, PriceSnapshot> getPriceSnapshots(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        Map<StrategyTicker, PriceSnapshot> result = new LinkedHashMap<>();
-        for (StrategyTicker t : tickers) result.put(t, getPriceSnapshot(t, account));
-        return result;
+        return perTicker(tickers, t -> getPriceSnapshot(t, account));
     }
 
     Map<StrategyTicker, BigDecimal> getPrevCloses(List<StrategyTicker> tickers, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker t : tickers) result.put(t, getPrevClose(t, account));
-        return result;
+        return perTicker(tickers, t -> getPrevClose(t, account));
     }
 
     Map<StrategyTicker, BigDecimal> getClosingPrices(List<StrategyTicker> tickers, LocalDate tradeDate, BrokerAccountRef account) {
-        Map<StrategyTicker, BigDecimal> result = new LinkedHashMap<>();
-        for (StrategyTicker t : tickers) result.put(t, getClosingPrice(t, tradeDate, account));
+        return perTicker(tickers, t -> getClosingPrice(t, tradeDate, account));
+    }
+
+    // 메리츠 단건 API를 티커마다 호출해 입력 순서대로 담는다(LinkedHashMap — 순서 보존, null 값 허용)
+    private static <V> Map<StrategyTicker, V> perTicker(List<StrategyTicker> tickers, Function<StrategyTicker, V> fetch) {
+        Map<StrategyTicker, V> result = new LinkedHashMap<>();
+        for (StrategyTicker t : tickers) result.put(t, fetch.apply(t));
         return result;
     }
 

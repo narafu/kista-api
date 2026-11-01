@@ -6,11 +6,12 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.application.usecase.UserTradingDataEraseUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,7 @@ import java.util.UUID;
 class UserTradingDataEraseService implements UserTradingDataEraseUseCase {
 
     private final AccountOpenOrderCancelPort openOrderCancelPort;  // 계좌별 전략 PAUSED + 증권사 미체결 취소
-    private final TradingErrorReportPort errorReportPort;          // 취소 실패 관리자 알림
+    private final ApplicationEventPublisher eventPublisher;      // 취소 실패 관리자 알림(TradingErrorEvent 발행)
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
     private final StrategyPort strategyPort;
@@ -49,7 +50,7 @@ class UserTradingDataEraseService implements UserTradingDataEraseUseCase {
                 failed = -1;
             }
             if (failed != 0) {
-                errorReportPort.reportError(new IllegalStateException(
+                eventPublisher.publishEvent(new TradingErrorEvent(null,
                         "탈퇴 사용자 증권사 미체결 취소 실패 — 증권사에서 수동 취소 필요 userId=" + userId + ", accountId=" + account.id()));
             }
         }

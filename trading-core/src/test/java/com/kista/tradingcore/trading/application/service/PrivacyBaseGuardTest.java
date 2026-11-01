@@ -3,9 +3,10 @@ package com.kista.tradingcore.trading.application.service;
 import com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport;
-import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.*;
 class PrivacyBaseGuardTest {
 
     @Mock PrivacyTradeValidationUseCase validationService;
-    @Mock TradingErrorReportPort errorReportPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @InjectMocks PrivacyBaseGuard guard;
 
     PrivacyTradeBase base = new PrivacyTradeBase(
@@ -46,8 +47,7 @@ class PrivacyBaseGuardTest {
 
         assertThat(guard.screen(base, today, "개장 배치")).isNull();
 
-        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("개장 배치")
-                && e.getMessage().contains("MISSING_SELL")));
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains("개장 배치") && t.message().contains("MISSING_SELL")));
     }
 
     @Test
@@ -56,14 +56,14 @@ class PrivacyBaseGuardTest {
 
         assertThat(guard.screen(base, today, "마감 배치")).isSameAs(base);
 
-        verifyNoInteractions(errorReportPort);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
     void screen_nullBase_returnsNull() {
         assertThat(guard.screen(null, today, "마감 배치")).isNull();
 
-        verifyNoInteractions(validationService, errorReportPort);
+        verifyNoInteractions(validationService, eventPublisher);
     }
 
     @Test
@@ -72,7 +72,7 @@ class PrivacyBaseGuardTest {
 
         assertThat(guard.screen(base, today, "마감 배치")).isNull();
 
-        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("점검 실패")));
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains("점검 실패")));
     }
 
     @Test
@@ -82,7 +82,7 @@ class PrivacyBaseGuardTest {
         assertThat(guard.usable(null)).isFalse();
         assertThat(guard.usable(base)).isTrue();
         assertThat(guard.usable(base)).isFalse();
-        verify(errorReportPort, never()).reportError(any());
+        verify(eventPublisher, never()).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
@@ -91,6 +91,6 @@ class PrivacyBaseGuardTest {
 
         assertThat(guard.usable(base)).isFalse();
 
-        verifyNoInteractions(errorReportPort);
+        verifyNoInteractions(eventPublisher);
     }
 }

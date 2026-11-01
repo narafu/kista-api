@@ -20,7 +20,6 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -163,7 +162,6 @@ public class TossPriceApi {
     // 순수 KST/DST 계산만 필요하므로 DstInfo 전체를 참조하지 않고 이 2개 계산만 좁게 복제한다
     // (common/ 승격 대상 아님 — trading 스케쥴링 도메인 클래스 전체를 끌어오는 것이 과함)
 
-    private static final ZoneId NY = ZoneId.of("America/New_York");
 
     // 미국 뉴욕 기준 DST 여부에 따른 개장/마감/프리마켓 시각(KST) — DstInfo와 동일 시각표
     private static LocalTime marketOpenTime(boolean isDst)     { return isDst ? LocalTime.of(22, 30) : LocalTime.of(23, 30); }
@@ -181,7 +179,7 @@ public class TossPriceApi {
 
     // 시각 주입 테스트 시드 — DstInfo의 sessionAt()/lastSessionOpenInstantAt() 패턴과 동일
     static MarketSessionInfo resolveMarketSessionAt(ZonedDateTime nowKst) {
-        boolean isDst = NY.getRules().isDaylightSavings(nowKst.toInstant());
+        boolean isDst = TimeZones.NY.getRules().isDaylightSavings(nowKst.toInstant());
         DayOfWeek day = nowKst.getDayOfWeek();
         LocalTime time = nowKst.toLocalTime();
 

@@ -2,6 +2,7 @@ package com.kista.tradingcore.stats.application.service;
 
 import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
+import com.kista.shared.kernel.KstDays;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.DailyTransaction;
@@ -128,6 +129,6 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
 
     private Instant resolveTo(LocalDate to) {
         var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
-        return resolved.plusDays(1).atStartOfDay(TimeZones.KST).toInstant(); // KST 자정 경계 (to 당일 포함)
+        return KstDays.endExclusive(resolved); // KST 자정 경계 (to 당일 포함)
     }
 }

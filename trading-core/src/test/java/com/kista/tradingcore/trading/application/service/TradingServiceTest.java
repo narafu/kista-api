@@ -89,7 +89,6 @@ class TradingServiceTest {
     @Mock CycleSnapshotCreator cycleSnapshotCreator; // CycleRotationService: StrategyCycle+CyclePosition 원자 저장
     @Mock PrivacyTradePort privacyTradePort;
     @Mock com.kista.tradingcore.privacy.application.usecase.PrivacyTradeValidationUseCase privacyValidation; // 장전 점검 — 기본 이슈 없음
-    @Mock com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort errorReportPort;      // 장전 가드 발동 관리자 알림
     @Mock DcaPlanInputCollector dcaInputCollector; // DCA 입력 수집 — 기존 시나리오는 DCA 전략이 없어 미사용
     @Mock DcaExecutionRecorder dcaExecutionRecorder;
     @Mock StrategyDcaDetailPort dcaDetailPort; // 개장 전 접수 대상(KIS DCA MOO) 판별
@@ -231,7 +230,7 @@ class TradingServiceTest {
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader, dcaDetailPort,
-                new PrivacyBaseGuard(privacyValidation, errorReportPort), cycleStrategies);
+                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies);
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
@@ -1463,8 +1462,7 @@ class TradingServiceTest {
         verify(orderPort, never()).saveAll(anyList());
         verify(brokerOrderPort).place(eq(instructionOf(existingSell)), eq(ACCOUNT_REF)); // 기존 주문은 접수
         verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT_REF));    // 체결 조회·리포트까지 진행
-        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("마감 배치")
-                && e.getMessage().contains("MISSING_SELL")));
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains("마감 배치") && t.message().contains("MISSING_SELL")));
     }
 
     @Test
@@ -1490,7 +1488,7 @@ class TradingServiceTest {
         verify(privacyStrategy, never()).buildOrders(any(), any(), any());
         verify(orderPort, never()).saveAll(anyList());
         verify(brokerOrderPort, never()).place(any(), any());
-        verify(errorReportPort).reportError(any());
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains("장전 가드 발동")));
     }
 
     // 개장 배치 장전 가드 — MISSING_SELL 기준표면 신규 PRIVACY 주문을 만들지 않고 "개장 배치" 알림
@@ -1517,8 +1515,7 @@ class TradingServiceTest {
         verify(privacyStrategy, never()).buildOrders(any(), any(), any());
         verify(orderPort, never()).saveAll(anyList());
         verify(brokerOrderPort, never()).place(any(), any());
-        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains("개장 배치")
-                && e.getMessage().contains("MISSING_SELL")));
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains("개장 배치") && t.message().contains("MISSING_SELL")));
     }
 
     private static com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport missingSellReport() {

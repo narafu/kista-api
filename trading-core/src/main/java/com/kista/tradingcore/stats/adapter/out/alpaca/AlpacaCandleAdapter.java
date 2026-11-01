@@ -1,6 +1,7 @@
 package com.kista.tradingcore.stats.adapter.out.alpaca;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +13,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 
 // HistoricalCandlePort(shared.kernel)는 원래 root com.kista.api.benchmark.adapter.out.alpaca.AlpacaIndexPriceAdapter가
@@ -27,7 +27,6 @@ import java.util.List;
 @RequiredArgsConstructor
 class AlpacaCandleAdapter implements HistoricalCandlePort {
 
-    private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 
     private final RestClient tradingStatsAlpacaRestClient;
     private final AlpacaProperties alpacaProperties;
@@ -35,7 +34,7 @@ class AlpacaCandleAdapter implements HistoricalCandlePort {
     // root의 구 AlpacaIndexPriceAdapter.fetchDailyCandles와 동일 로직(수정주가 sip 피드, to 클램프) — 그대로 이관
     @Override
     public List<DailyCandle> fetchDailyCandles(String symbol, LocalDate from, LocalDate to) {
-        LocalDate latestAllowed = LocalDate.now(NEW_YORK).minusDays(1);
+        LocalDate latestAllowed = LocalDate.now(TimeZones.NY).minusDays(1);
         LocalDate clampedTo = to.isAfter(latestAllowed) ? latestAllowed : to;
         if (clampedTo.isBefore(to)) {
             log.info("{} 과거 일봉 조회 to 클램프: 요청={} → 적용={}", symbol, to, clampedTo);
@@ -68,7 +67,7 @@ class AlpacaCandleAdapter implements HistoricalCandlePort {
         log.info("{} 과거 일봉 {}건 수신 ({} ~ {})", symbol, bars.size(), from, clampedTo);
         return bars.stream()
                 .map(bar -> new DailyCandle(
-                        Instant.parse(bar.t()).atZone(NEW_YORK).toLocalDate(),
+                        Instant.parse(bar.t()).atZone(TimeZones.NY).toLocalDate(),
                         bar.o(), bar.h(), bar.l(), bar.c()))
                 .toList();
     }

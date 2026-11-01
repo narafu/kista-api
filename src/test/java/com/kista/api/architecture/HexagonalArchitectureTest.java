@@ -5,6 +5,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.ZoneId;
 import java.util.Set;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
@@ -29,10 +31,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HexagonalArchitectureTest {
 
     private static JavaClasses classes;
+    private static JavaClasses mainClasses;
 
     @BeforeAll
     static void setUp() {
         classes = new ClassFileImporter().importPackages("com.kista");
+        mainClasses = new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.kista");
     }
 
     @Test
@@ -108,6 +112,27 @@ class HexagonalArchitectureTest {
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")
                 .should().dependOnClassesThat()
                 .haveFullyQualifiedName("com.kista.shared.platform.time.UsTradeDates");
+        rule.check(classes);
+    }
+
+    @Test
+    @DisplayName("ZoneId.of는 TimeZones에서만 호출한다 — 시간대 상수 SSOT")
+    void zoneId_of_must_only_be_called_in_TimeZones() {
+        // 인라인 ZoneId.of("America/New_York") 4벌 재발 방지(CQ-01). main 클래스만 대상 — 테스트는 동적 zone 파싱이 있어 제외
+        ArchRule rule = noClasses()
+                .that().doNotHaveFullyQualifiedName("com.kista.shared.kernel.TimeZones")
+                .should().callMethod(ZoneId.class, "of", String.class);
+        rule.check(mainClasses);
+    }
+
+    @Test
+    @DisplayName("application.service는 TradingErrorReportPort를 직접 쓰지 않는다 — 관리자 알림은 TradingErrorEvent 발행")
+    void application_services_must_not_use_TradingErrorReportPort() {
+        // 포트는 adapter.in(스케쥴러·스트림 컨슈머)이 application.event를 직접 참조하지 않게 둔 우회 경로다(CQ-02). 구현체 TradingErrorReporter만 예외
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..application.service..")
+                .and().doNotHaveSimpleName("TradingErrorReporter")
+                .should().dependOnClassesThat().haveSimpleName("TradingErrorReportPort");
         rule.check(classes);
     }
 

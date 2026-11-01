@@ -6,10 +6,11 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -32,7 +33,7 @@ import static org.mockito.Mockito.when;
 class UserTradingDataEraseServiceTest {
 
     @Mock AccountOpenOrderCancelPort openOrderCancelPort;
-    @Mock TradingErrorReportPort errorReportPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock StrategyPort strategyPort;
@@ -64,7 +65,7 @@ class UserTradingDataEraseServiceTest {
         eraser.cancelOpenOrders(userId);
 
         verify(openOrderCancelPort).cancelOpenOrders(account);
-        verifyNoInteractions(errorReportPort);
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -77,8 +78,8 @@ class UserTradingDataEraseServiceTest {
 
         eraser.cancelOpenOrders(userId);
 
-        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains(throwing.id().toString())));
-        verify(errorReportPort).reportError(argThat(e -> e.getMessage().contains(failing.id().toString())));
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains(throwing.id().toString())));
+        verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent t && t.userId() == null && t.message().contains(failing.id().toString())));
     }
 
     // AFTER_COMMIT 콜백에서 호출되므로 아직 묶여 있는 재발행 트랜잭션에 합류하면 쓰기가 커밋되지 않는다 — 전파 속성을 잠근다

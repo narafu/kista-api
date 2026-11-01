@@ -26,7 +26,7 @@ public class TradingBalanceLoader {
     // 잔고 로드 — preview용: 이력 없음은 skip, 있으면 그대로 반환
     public BalanceLoad tryLoadBalance(Strategy strategy) {
         return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
-                .map(h -> new BalanceLoad(new AccountBalance(h.holdings(), h.avgPrice(), h.usdDeposit()), null))
+                .map(h -> new BalanceLoad(h.toBalance(), null))
                 .orElse(new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
     }
 
@@ -34,6 +34,6 @@ public class TradingBalanceLoader {
     public BalanceLoad loadBalanceOrThrow(Strategy strategy) {
         CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .orElseThrow(() -> new IllegalStateException("전략 이력 없음: strategyId=" + strategy.id()));
-        return new BalanceLoad(new AccountBalance(latest.holdings(), latest.avgPrice(), latest.usdDeposit()), null);
+        return new BalanceLoad(latest.toBalance(), null);
     }
 }

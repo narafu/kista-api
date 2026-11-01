@@ -141,6 +141,8 @@
 - **외부 원본 참조 데이터는 원본 기준 유지**: `us_market_holidays`(US 달력일) 등 KST↔US 변환은 해당 어댑터 내부에서만 `UsTradeDates`(`com.kista.shared.platform.time`)로 한다. 도메인·서비스·orders persistence에서 사용 금지 — 가드 `HexagonalArchitectureTest.usTradeDates_must_only_be_used_by_allowlisted_adapters`(allowlist 어댑터가 코드에 있다)
 - **Toss API**: 주문 접수일(KST) 기준, 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후 `filledAt`(KST) 재필터. 예외: 일봉 캔들 `date()`는 US 세션일이라 `TossPriceApi.getClosingPrice`가 KST 거래일 D를 US 세션 D-1로 변환한다(KIS `fetchConfirmedClose`와 동일)
 - Instant ↔ KST 일자 경계는 `atStartOfDay(TimeZones.KST)` 단일 관용구 — `ZoneOffset.UTC` 자정 경계 금지
+- KST 일자 구간의 상한(당일 포함 반개구간)을 Instant로 바꿀 때는 `KstDays.endExclusive(day)`(`com.kista.shared.kernel`)를 쓴다 — `plusDays(1).atStartOfDay(...)`를 인라인하지 않는다
+- `ZoneId.of`는 `TimeZones` 상수(`KST`·`NY`)로만 — main 코드에서 직접 호출 금지(가드 `zoneId_of_must_only_be_called_in_TimeZones`)
 - 거래일 경계 시각 `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` — preview·수동실행·주문취소는 `DstInfo.nextTradeDate()`를 쓴다
 - 인라인 `.minusDays(1)`/`.plusDays(1)`로 날짜 기준 변환 금지 — `UsTradeDates`/`PrivacyDates` 경유
 

@@ -17,12 +17,13 @@ import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
-import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
+import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.InOrder;
 
 import java.math.BigDecimal;
@@ -57,10 +58,10 @@ class CryptoDcaRunnerTest {
     CryptoExchanges exchanges = mock(CryptoExchanges.class);
     CryptoOrderSynchronizer synchronizer = mock(CryptoOrderSynchronizer.class);
     CryptoDcaRoundExecutor executor = mock(CryptoDcaRoundExecutor.class);
-    TradingErrorReportPort errorReport = mock(TradingErrorReportPort.class);
+    ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     CryptoExchangePort exchange = mock(CryptoExchangePort.class);
     CryptoDcaRunner runner = new CryptoDcaRunner(strategyPort, accountPort, cyclePort, profilePort, dcaDetailPort,
-            exchanges, synchronizer, executor, errorReport);
+            exchanges, synchronizer, executor, eventPublisher);
 
     List<Strategy> strategies = new java.util.ArrayList<>();
     List<Account> accounts = new java.util.ArrayList<>();
@@ -115,7 +116,7 @@ class CryptoDcaRunnerTest {
         doThrow(new IllegalStateException("boom")).when(synchronizer)
                 .sync(any(), argThat((List<BatchContext> l) -> l.get(0).account().id().equals(a.id())), any(), any());
         tick();
-        verify(errorReport, times(1)).reportError(any());
+        verify(eventPublisher, times(1)).publishEvent(any(TradingErrorEvent.class));
         verify(executor).executeAccount(eq(exchange),
                 argThat((List<BatchContext> l) -> l.get(0).strategy().id().equals(sb.id())), any(), eq(NOW));
         verify(executor, never()).executeAccount(any(),
@@ -130,7 +131,7 @@ class CryptoDcaRunnerTest {
         cycles.put(s.id(), new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
                 BigDecimal.ZERO, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 10), null, null));
         tick();
-        verify(errorReport).reportError(any());
+        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
         verify(executor, never()).executeAccount(any(), any(), any(), any());
     }
 
@@ -139,9 +140,9 @@ class CryptoDcaRunnerTest {
         add(TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID()), StrategyType.DCA, false);
         tick();
         runner.runTick(NOW.plusMinutes(10));
-        verify(errorReport, times(1)).reportError(any());
+        verify(eventPublisher, times(1)).publishEvent(any(TradingErrorEvent.class));
         runner.runTick(NOW.plusDays(1));
-        verify(errorReport, times(2)).reportError(any());
+        verify(eventPublisher, times(2)).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
@@ -150,9 +151,9 @@ class CryptoDcaRunnerTest {
         doThrow(new IllegalStateException("boom")).when(synchronizer).sync(any(), anyList(), any(), any());
         tick();
         runner.runTick(NOW.plusMinutes(10));
-        verify(errorReport, times(1)).reportError(any());
+        verify(eventPublisher, times(1)).publishEvent(any(TradingErrorEvent.class));
         runner.runTick(NOW.plusDays(1));
-        verify(errorReport, times(2)).reportError(any());
+        verify(eventPublisher, times(2)).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
@@ -162,7 +163,7 @@ class CryptoDcaRunnerTest {
                 .when(synchronizer).sync(any(), anyList(), any(), any());
         tick();
         runner.runTick(NOW.plusMinutes(10));
-        verify(errorReport, times(1)).reportError(any());
+        verify(eventPublisher, times(1)).publishEvent(any(TradingErrorEvent.class));
     }
 
     @Test
@@ -179,7 +180,7 @@ class CryptoDcaRunnerTest {
         Account upbit = TradingFixtures.upbitAccount(UUID.randomUUID(), UUID.randomUUID());
         add(upbit, StrategyType.DCA, false);
         tick();
-        verify(errorReport).reportError(any());
+        verify(eventPublisher).publishEvent(any(TradingErrorEvent.class));
         verify(executor, never()).executeAccount(any(), any(), any(), any());
     }
 }

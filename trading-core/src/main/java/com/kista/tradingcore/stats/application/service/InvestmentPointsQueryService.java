@@ -3,6 +3,7 @@ package com.kista.tradingcore.stats.application.service;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
+import com.kista.shared.kernel.KstDays;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -52,7 +53,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
         List<Strategy> strategies;
         if (scope == Scope.STRATEGY) {
             selectedStrategy = strategyPort.findByIdOrThrow(strategyId);
-            accountPort.findByIdOrThrow(selectedStrategy.accountId()).verifyOwnedBy(userId);
+            accountPort.requireOwnedAccount(selectedStrategy.accountId(), userId);
             strategies = List.of(selectedStrategy);
         } else {
             List<UUID> accountIds = accountPort.findByUserId(userId).stream()
@@ -71,7 +72,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
         LocalDate effectiveFrom = from != null
                 ? from
                 : cycles.stream().map(StrategyCycle::startDate).min(LocalDate::compareTo).orElse(effectiveTo);
-        Instant toInstant = effectiveTo.plusDays(1).atStartOfDay(TimeZones.KST).toInstant();
+        Instant toInstant = KstDays.endExclusive(effectiveTo);
         List<CyclePosition> positions = scope == Scope.STRATEGY
                 ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
                 : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
