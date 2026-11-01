@@ -57,5 +57,6 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - 토스증권 API: `docs/agents/toss-api.md` (`adapter/out/toss` 작업 시 자동 로드)
 - 메리츠 API: `docs/agents/meritz-api.md` (`adapter/out/meritz` 작업 시 자동 로드)
 - 바이낸스 API: `docs/agents/binance-api.md` (`adapter/out/binance` 작업 시 자동 로드)
+- 업비트 API: `docs/agents/upbit-api.md` (`adapter/out/upbit` 작업 시 자동 로드)
 - Docker/배포/인프라·운영 로그·DB 접속(`ssh kista-server`): `docs/agents/docker-infra.md`
 - 배치 스케줄러 실행 시각: `docs/agents/scheduler-time-table.md`

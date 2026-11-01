@@ -8,7 +8,7 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
   adapter/in/web/     ← internal — CandleInternalController(`/api/internal/broker/candles/latest`, X-Internal-Token) — root market이 `CandlePort`/`BrokerCandle`을 참조하지 않도록 하는 내부 엔드포인트, `contract.broker.DailyCandleResponse`로 컨트롤러 안에서 명시 매핑해 반환, `market.adapter.out.internal.CandleQueryHttpAdapter`가 소비
   adapter/out/kis/    ← KisBrokerAdapter(공통 6개 Port)·KisHttpClient·KisAuthApi·KisOrderApi·KisPriceApi·KisTradingApi + 관리자 시세 2단계(KisAdminPriceSource) → `docs/agents/kis-api.md` (adapter/out/kis 작업 시 자동 로드)
   adapter/out/toss/   ← TossBrokerAdapter(공통 6개 + 통계 5개 Port, 벤더 중립 타입으로 변환)·TossHttpClient·TossAuthApi·토큰 Redis 조정·관리자 시세 1단계(TossAdminPriceSource) → `docs/agents/toss-api.md` (adapter/out/toss 작업 시 자동 로드)
-  adapter/out/upbit/  ← UpbitConfig(upbitRestClient)/UpbitHttpClient(요청별 HS512 JWT — JDK Mac, nonce 매 요청, query_hash=비인코딩 쿼리/본문 key=value SHA512, error.name 매핑: no_authorization_ip→BrokerIpNotAllowedException, out_of_scope→BrokerPermissionDeniedException, invalid_access_key/jwt_verification/expired_access_key→BrokerCredentialException, 429·418→BrokerRateLimitException, 그 외 UpbitApiException)/UpbitMarketRegistry(BTC→KRW-BTC, KRW-USDT 마켓은 김프 전용이라 stats로 이전)/UpbitExchangeAdapter(CryptoExchangePort). 시세(티커·캔들)는 JWT 없이 호출
+  adapter/out/upbit/  ← UpbitConfig(upbitRestClient)/UpbitHttpClient(요청별 HS512 JWT, error.name 매핑)/UpbitMarketRegistry(BTC→KRW-BTC)/UpbitExchangeAdapter(CryptoExchangePort)/UpbitAuthApi(BrokerConnectionTestPort). 시세(티커·캔들)는 JWT 없이 호출 → `docs/agents/upbit-api.md` (adapter/out/upbit 작업 시 자동 로드)
   adapter/out/marketdata/ ← AdminPriceSource(관리자 시세 단계 계약, `@Order`로 Toss=1·KIS=2)/AdminMarketPriceAdapter(단계 순회·누락분만 다음 단계·단계별 warn)
   adapter/out/binance/ ← BinanceExchangeAdapter(CryptoExchangePort)·BinanceHttpClient·BinanceAuthApi(BrokerConnectionTestPort) → `docs/agents/binance-api.md` (adapter/out/binance 작업 시 자동 로드)
   adapter/out/meritz/ ← MeritzBrokerAdapter(공통 6개 Port)·MeritzHttpClient·MeritzAuthApi(BrokerConnectionTestPort) 등 — 계좌번호 없음(앱키가 계좌 식별) → `docs/agents/meritz-api.md` (adapter/out/meritz 작업 시 자동 로드)
@@ -30,7 +30,7 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 - `OrderType.MOO` 매핑: KIS 매도 `31`/매수 `32`(LOO 캡), 미국 매수는 MOO/MOC 불가 → `docs/agents/kis-api.md`. `Broker.supportsOpenAuctionOrders()`가 개장 전 접수 대상 브로커를 가른다.
 
 ### 업비트 코인 DCA 지원
-- `UpbitExchangeAdapter.getCompletedDailyCandles(ticker, count)`: count 1~400, 한 번에 최대 200봉이라 `to` 파라미터로 페이징하며 미완성(오늘) 봉은 제외한다. 주문은 identifier=주문 UUID로 멱등 전송하고 체결 조회는 `executedVolume`을 기준으로 삼는다(→ dca.md "코인 DCA 실행").
+- 일봉 페이징(`to`)·identifier 멱등 전송·체결 판정 등 업비트 어댑터 규칙 → `docs/agents/upbit-api.md` (→ dca.md "코인 DCA 실행").
 - 김프 시세(KRW-USDT·코인 KRW 현재가/일봉)는 stats `UpbitMarketDataAdapter`(무인증 공개 시세)로 이전 — 업비트 거래를 제거해도 남는다.
 
 ### KIS 계좌번호 저장
