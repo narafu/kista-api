@@ -165,11 +165,11 @@ class StrategyDetailAssembler {
                 : latestCycle.map(StrategyCycle::startAmount).orElse(null);
         LocalDate startDate = latestCycle.map(StrategyCycle::startDate).orElse(null);
 
-        // VR·DCA는 currentRound 없음 — INFINITE·PRIVACY만 계산
-        Double currentRound = strategy.isVr() || strategy.isDca() ? null :
+        // 회차는 INFINITE 전용 — 그 외 타입은 null (divisionCount도 INFINITE만 채워진다)
+        Double currentRound = !strategy.isInfinite() ? null :
                 latestPosition.map(pos -> InfinitePosition.calcCurrentRound(
                         pos.avgPrice(), pos.toBalance().wholeShares(), pos.usdDeposit(),
-                        divisionCount == null ? 0 : divisionCount)).orElse(null);
+                        divisionCount)).orElse(null);
 
         // 코인은 소수 원장이라 wholeShares()를 부르지 않는다(StrategyDetail도 코인 보유 수량은 싣지 않음)
         Integer currentHoldings = strategy.ticker().isCrypto() ? null

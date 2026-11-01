@@ -1638,6 +1638,7 @@ class StrategyServiceTest {
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.divisionCount()).isNull();
+        assertThat(single.currentRound()).isNull(); // 회차는 INFINITE 전용 — 보유 이력이 있어도 PRIVACY는 null
         assertThat(single.vr()).isNull();
     }
 
