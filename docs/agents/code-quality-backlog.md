@@ -10,6 +10,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 추출 기준은 CLAUDE.md "코드 철학"을 따른다. 같은 로직이 3곳 이상이고 같은 이유로 함께 바뀌면 추출한다. 2곳이거나 바뀌는 이유가 다르면 "유지 목록"에 이유를 남겨 재제안하지 않는다.
 - 매매 공식(`modules/tradingcore/trading-formulas.md`)에 닿는 항목은 위험을 "높음"으로 둔다. 공식 결과를 바꾸지 않는다는 테스트를 먼저 고정한 뒤 손댄다.
 - 재논의 금지: 메모리 `project_review_refactor_2026_10_31`, `project_2026_07_11_full_review`, `own-type-ledger.md`, `constraints.md`의 확정 판단. 감사 중 그와 겹친 발견은 "유지 목록"에 출처를 적었다.
+- ID는 고정 식별자다. 문서 안 순서(효과 대 위험)와 번호는 일치하지 않을 수 있다.
 - 줄 번호는 감사 시점 HEAD `0b761982d`(2026-11-01) 기준이다. 착수 시 다시 grep한다. ✔는 메인 세션이 직접 재확인한 위치다.
 
 ## 1차 감사 범위와 방법 (2026-11-01)
@@ -94,7 +95,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 
 ### CQ-05 사용자 경로 예외 문구 형식 미준수
 - 주제: 입력 검증·예외 문구. 유형: 비일관성.
-- 위치: 대표 위치만 적는다. 전수 목록은 착수 시 아래 가드 테스트가 출력한다.
+- 위치: 188건이라 전수 목록 대신 재현 명령을 적는다. `grep -rnE 'new (IllegalArgumentException|IllegalStateException|NoSuchElementException|SecurityException)\("' trading-core/src/main/java | grep -v '/broker/adapter/out/\|/stats/adapter/out/'`. 결과에서 리터럴이 `."`로 끝나지 않는 줄이 대상이다. 아래는 대표 위치다.
   - 마침표가 없는 대표:
     - `stats/application/service/BacktestService.java:93-160`
     - `trading/application/service/VrReconfigureService.java:129-157`
@@ -142,7 +143,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 위 6곳은 이벤트도 분기도 없는 "조회 → 대체값" 형태라 `tryGet`과 의미가 같다. 차이는 로그다. `tryGet`은 `RuntimeException`만 잡고 스택 없이 `e.toString()`을 남긴다(`BrokerCallGuard.java:40-44`). 위 6곳은 `Exception`을 잡고 스택을 남긴다.
 - 예상 효과: fail-open 경로를 하나로 통일하고 `CryptoMarketIndicatorService`의 반복 5벌을 제거한다.
 - 위험: 낮음. 로그 형태만 바뀐다(스택 → toString). 체크 예외를 던지는 호출이 있으면 `tryGet`으로 바꿀 수 없으니 착수 시 확인한다.
-- 가드(`constraints.md` 기존 규칙에 덧붙일 문장 초안): "이벤트·분기 없이 로그 후 대체값만 반환하는 경우는 예외 없이 `tryGet`을 쓴다." 어댑터 내부(`CryptoFearGreedIndexAdapter:34`, `CnnFearGreedIndexAdapter:33`)는 `BrokerCallGuard`가 application 계층 소속이라 대상이 아니다(유지 목록 참조).
+- 조건부 대상: 어댑터 2곳(`trading/adapter/out/feargreed/CryptoFearGreedIndexAdapter.java:34`, `CnnFearGreedIndexAdapter.java:33`)도 같은 "warn 후 `Optional.empty`" 형태다. `BrokerCallGuard`는 `broker/application/service/BrokerCallGuard.java` ✔에 있다. adapter.out이 다른 모듈의 `application.service`를 참조해도 되는지(`HexagonalArchitectureTest`·Modulith NamedInterface)는 미확인이다. 착수 시 확인해, 허용되면 포함하고 금지되면 유지 목록으로 옮긴다.
+- 가드(`constraints.md` 기존 규칙에 덧붙일 문장 초안): "이벤트·분기 없이 로그 후 대체값만 반환하는 경우는 예외 없이 `tryGet`을 쓴다."
 - 상태: open.
 
 ### CQ-07 로그 문맥 접두사 형식 혼재
@@ -210,33 +212,6 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 가드: 없음.
 - 상태: open.
 
-### CQ-12 같은 필드 기본값을 여러 층에서 지정
-- 주제: null·기본값. 유형: 중복·비일관성.
-- 위치:
-  - `recurringAmount` null → 0:
-    - `trading/adapter/in/web/dto/TradingCycleRequest.java:68`
-    - `trading/domain/creation/VrCreationResolver.java:29`
-    - `VrRegistration.java:14,44`
-    - `trading/application/service/VrStrategyDetailService.java:31`
-  - `divisionCount`:
-    - DTO는 null → 0(`TradingCycleRequest.java:65`)이다.
-    - resolver는 `DEFAULT_DIVISION_COUNT`(20)를 쓴다: `PrivacyCreationResolver.java:18`, `DcaCreationResolver.java:18`, `VrCreationResolver.java:23`.
-    - 조회 폴백은 `.orElse(DEFAULT_DIVISION_COUNT)`다: `CyclePositionPersistor.java:86`, `CycleRotationService.java:79`, `StrategyDetailAssembler.java:49,128`, `CycleOrderComputer.java:132,136`.
-    - matching 쪽: `InfiniteCycleOrderStrategy.java:113,129` ✔.
-  - `initialUsdDeposit` null → ZERO:
-    - `StrategyCreationService.java:115`
-    - `StrategyCreationPersister.java:64`
-    - `VrRegistration.java:58`
-  - `broker` null → KIS:
-    - `account/adapter/in/web/AccountController.java:121`
-    - `account/application/service/AccountService.java:46`
-- 기준 패턴: `constraints.md` "persistence 기본값". 기본값은 도메인 생성 시점 한 곳에서 정한다.
-- 근거: 위치마다 기본값을 각각 지정한다. DTO의 divisionCount 0과 resolver의 기본값 20이 어떻게 상호작용하는지(0이 기본값으로 대체되는지 그대로 저장되는지)는 미확인이다. 착수 시 `RegisterStrategyCommand` → resolver 경로를 Read한다.
-- 예상 효과: 기본값을 한 곳에서만 지정하고, 0과 20의 불일치 여지를 제거한다.
-- 위험: 중간. 전략 등록 결과가 바뀔 수 있다. INFINITE 분할 수는 공식 입력이다.
-- 가드(`constraints.md` "persistence 기본값" 확장 문장 초안): "web DTO의 `toCommand()`도 기본값을 정하지 않는다. null을 그대로 넘기고 도메인 resolver·팩토리가 정한다."
-- 상태: open.
-
 ### CQ-13 같은 의미 오류의 예외 타입 분기
 - 주제: 입력 검증·예외. 유형: 비일관성.
 - 위치:
@@ -292,7 +267,23 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 ### CQ-17 현재 시각 취득 방식 혼재 (정적 now vs Clock 주입)
 - 주제: 날짜·시간대. 유형: 비일관성. 과설계도 일부 기록한다.
 - 위치:
-  - 정적 `LocalDate.now(TimeZones.KST)` 약 20곳. 예: `TradingService.java:79,158`, `OrderCancelService.java:79`, `StrategyCycle.java:44`.
+  - 정적 `LocalDate.now(TimeZones.KST)` 20곳 ✔:
+    - `broker/adapter/out/toss/TossPriceApi.java:157`
+    - `broker/adapter/out/meritz/MeritzOrderApi.java:154`
+    - `broker/adapter/out/kis/KisTradingApi.java:173`
+    - `privacy/adapter/out/persistence/PrivacyTradePersistenceAdapter.java:124`
+    - `marketcalendar/adapter/in/schedule/MarketCalendarRefreshScheduler.java:34,52,63`
+    - `trading/adapter/in/web/TradingCycleController.java:224,225`
+    - `trading/application/service/TradingService.java:79,158`
+    - `CycleSnapshotCreator.java:97`
+    - `StrategyCreationService.java:135`
+    - `OrderCancelService.java:79`
+    - `support/StrategyHistoryQueryService.java:124`
+    - `trading/domain/model/StrategyCycle.java:44`
+    - `stats/application/service/AccountStatisticsService.java:130`
+    - `TradingStatsService.java:129,302`
+    - `InvestmentPointsQueryService.java:50`
+  - 그 밖의 정적 `Instant.now()` 약 30곳은 재현 명령으로 갈음한다: `grep -rn 'Instant.now()' trading-core/src/main/java`.
   - `Clock`을 주입하는 곳은 8곳이다:
     - `OrderSubmissionReconciler.java:41,48`
     - `CryptoMarketIndicatorService.java:68,75-80`
@@ -326,6 +317,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 ### CQ-19 예외 로그의 스택 포함 여부 혼재
 - 주제: 로깅 형식. 유형: 비일관성.
 - 위치:
+  - 전수 목록은 재현 명령으로 갈음한다: `grep -rnE 'log\.(warn|error)\(' trading-core/src/main/java`. 결과를 마지막 인자가 `e.getMessage()`인 줄과 `e`인 줄로 나눈다.
   - `e.getMessage()`만 남기는 곳 48건. 대표: `OrderSubmitter.java:47,78,97,115,149,164`, `OrderSubmissionReconciler.java:94,97,113`, `TradingPriceFetcher.java:178,192`, `ManualTradingService.java:81,118,144`.
   - 예외 객체를 넘겨 스택을 남기는 곳 28건. 대표: `CryptoMarketIndicatorService.java:119,135,153,211,257`, `TradingService.java:297`, `CycleRotationService.java:92`.
 - 기준 패턴: 미정. 후보는 "예상된 브로커 거절·시세 실패는 `getMessage()`, 예상 밖 오류(관리자 알림 경로)는 예외 객체 전달"이다. 같은 시세 실패가 `TradingPriceFetcher`에서는 메시지만, `CryptoMarketIndicatorService`에서는 스택으로 남는다.
@@ -335,10 +327,67 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 가드: 기준이 정해지면 `constraints.md` 문장으로 둔다.
 - 상태: open(기준 결정 대기).
 
+### CQ-12 같은 필드 기본값을 여러 층에서 지정
+- 주제: null·기본값. 유형: 중복·비일관성.
+- 위치:
+  - `recurringAmount` null → 0:
+    - `trading/adapter/in/web/dto/TradingCycleRequest.java:68`
+    - `trading/domain/creation/VrCreationResolver.java:29`
+    - `VrRegistration.java:14,44`
+    - `trading/application/service/VrStrategyDetailService.java:31`
+  - `divisionCount`:
+    - DTO는 null → 0(`TradingCycleRequest.java:65`)이다.
+    - resolver는 `DEFAULT_DIVISION_COUNT`(20)를 쓴다: `PrivacyCreationResolver.java:18`, `DcaCreationResolver.java:18`, `VrCreationResolver.java:23`.
+    - 조회 폴백은 `.orElse(DEFAULT_DIVISION_COUNT)`다: `CyclePositionPersistor.java:86`, `CycleRotationService.java:79`, `StrategyDetailAssembler.java:49,128`, `CycleOrderComputer.java:132,136`.
+    - matching 쪽: `InfiniteCycleOrderStrategy.java:113,129` ✔.
+  - `initialUsdDeposit` null → ZERO:
+    - `StrategyCreationService.java:115`
+    - `StrategyCreationPersister.java:64`
+    - `VrRegistration.java:58`
+  - `broker` null → KIS:
+    - `account/adapter/in/web/AccountController.java:121`
+    - `account/application/service/AccountService.java:46`
+- 기준 패턴: `constraints.md` "persistence 기본값". 기본값은 도메인 생성 시점 한 곳에서 정한다.
+- 근거: 위치마다 기본값을 각각 지정한다. DTO의 divisionCount 0과 resolver의 기본값 20이 어떻게 상호작용하는지(0이 기본값으로 대체되는지 그대로 저장되는지)는 미확인이다. 착수 시 `RegisterStrategyCommand` → resolver 경로를 Read한다.
+- 예상 효과: 기본값을 한 곳에서만 지정하고, 0과 20의 불일치 여지를 제거한다.
+- 위험: 높음(공식). 전략 등록 결과가 바뀔 수 있고, INFINITE 분할 수는 공식 입력이다. 비공식 필드(broker 기본값 등)만 먼저 분리해 진행할 수 있다.
+- 가드(`constraints.md` "persistence 기본값" 확장 문장 초안): "web DTO의 `toCommand()`도 기본값을 정하지 않는다. null을 그대로 넘기고 도메인 resolver·팩토리가 정한다."
+- 상태: open.
+
 ### CQ-20 USD 금액 scale 리터럴 2 산재와 `MONEY_SCALE` 이중 정의
 - 주제: 금액·수량 스케일. 유형: 중복.
 - 위치:
-  - `setScale(2, RoundingMode.HALF_UP)` 36건 ✔. 대표: `CyclePosition.java:69`, `CyclePositionHistoryEntry.java:30,36`, `CycleSnapshotCreator.java:103`, `StrategyCreationService.java:104`, `TradingStatsService.java:287,288,311`, `MeritzOrderApi.java:208`, `KisResponseParser.java:43`.
+  - `setScale(2, RoundingMode.HALF_UP)` 36건 ✔:
+    - matching:
+      - `matching/domain/model/ReverseModePosition.java:66`
+      - `DcaIndicators.java:41`
+      - `StrategyVrDetail.java:43,47`
+      - `matching/domain/strategy/InfiniteCycleOrderStrategy.java:148`
+      - `DcaConditions.java:73,103`
+      - `PriceCapPolicy.java:23`
+    - broker:
+      - `broker/adapter/out/meritz/MeritzOrderApi.java:208`
+      - `broker/adapter/out/kis/KisResponseParser.java:43`
+      - `broker/domain/model/PresentBalanceResult.java:48,51,56,90,96`
+    - privacy: `privacy/adapter/out/persistence/PrivacyTradePersistenceAdapter.java:118`
+    - trading:
+      - `trading/adapter/out/feargreed/CryptoFearGreedIndexAdapter.java:33`
+      - `CnnFearGreedIndexAdapter.java:32`
+      - `trading/adapter/out/persistence/StrategyDcaRuleEntity.java:106`
+      - `StrategyDcaConditionEntity.java:63`
+      - `trading/application/service/CycleSnapshotCreator.java:103`
+      - `CycleOrderComputer.java:99`
+      - `VrStrategyDetailService.java:75`
+      - `VrCycleRolloverService.java:105,143`
+      - `VrReconfigureService.java:184`
+      - `StrategyCreationService.java:104`
+      - `trading/domain/model/CyclePosition.java:69`
+      - `CyclePositionHistoryEntry.java:30,36`
+    - stats:
+      - `stats/adapter/out/mempool/MempoolBlockHeightAdapter.java:48`
+      - `stats/application/service/TradingStatsService.java:287,288,311`
+      - `stats/domain/backtest/BacktestEngine.java:388,399`
+  - 이 외에 `setScale(MONEY_SCALE, HALF_UP)`, 다른 RoundingMode, `divide(x, 2, HALF_UP)` 형태는 재현 명령으로 찾는다: `grep -rnE 'setScale\(|divide\([^)]*, 2,' trading-core/src/main/java`.
   - `MONEY_SCALE = 2` private 이중 정의 ✔: `matching/domain/model/InfinitePosition.java:16`, `VrPosition.java:16`.
   - 공식 경로의 리터럴:
     - `ReverseModePosition.java:42,66`
@@ -417,7 +466,6 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | persistence SUM null → 0 | `OrderPersistenceAdapter.java:216,251` | 매퍼가 아니라 집계 쿼리 결과 처리다. |
 | `BrokerCallGuard` 밖 raw catch(이벤트·분기 있음) | `ManualTradingService:80,117`, `ReorderService:119`, `OrderSubmitter:66`, `OrderSubmissionReconciler:92,112`, `CryptoDcaRoundExecutor:135,201`, `CryptoDcaRunner:79,94`, `TradingService:295,399`, `TradingBatchGuard:32`, `VrCycleRolloverService:49,83`, `TradingReporter:115`, `TradingOrderExecutor:176`, `CycleRotationService:87`, `PrivacyBaseGuard:32`, `BrokerRouter:138-142` | `constraints.md`가 허용하는 이벤트 발행·분기 처리 예외다. |
 | 재시도·fallback이 있는 raw catch | `TradingPreviewService:148,170`, `TradingPriceFetcher:177,191`, `CryptoOrderSynchronizer:54`, `UserTradingDataEraseService:47` | 재시도·부분 실패 맵·다음 틱 재시도 같은 분기가 있다. |
-| 공포탐욕 어댑터 raw catch | `CryptoFearGreedIndexAdapter.java:34`, `CnnFearGreedIndexAdapter.java:33` | 어댑터 계층이라 application의 `BrokerCallGuard` 대상이 아니다. feargreed 중복은 프로세스 경계로 정당(2026-10-31 확정). |
 | `validateInfiniteMinSeed` fail-open | `StrategyCreationService.java:154` | 의도된 동작(2026-10-31 확정). |
 | `KisAuthApi`/`TossAuthApi` catch | `KisAuthApi:107-167`, `TossAuthApi:118-145` | 공통화 기각 확정(2026-07). |
 | 증권사별 백오프·인터럽트 처리 4벌 | `TossHttpClient.java:72,115`, `KisHttpClient.java:202-204`, `MeritzHttpClient.java:184-186` | 인터럽트 시 동작(전파, false, 예외)이 각 클라이언트의 재시도 계약(주문 중복 위험)에 묶여 있다. 지수+지터 식이 같은 것은 KIS·Meritz 2곳뿐이다. |
