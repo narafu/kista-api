@@ -37,7 +37,7 @@ Java 25 + Spring Boot 4 기반 Hexagonal Architecture + Spring Modulith (Gradle 
 - **README.md 드리프트 감지**: 코드 변경으로 `README.md`(기술 스택 배지 버전, 아키텍처 다이어그램 속 클래스/패키지명, 스케쥴러 실행 시각, 배포 파이프라인 방식 등)의 내용이 실제와 달라지면 같은 작업에서 `README.md`도 함께 수정. kista-ui 쪽 README도 영향받으면 `../kista-ui/README.md`까지 확인
 - **flows.yml 드리프트 감지**: 흐름·상태 전이·통신 경로·기능 목록을 바꾸면 같은 작업에서 `flows.yml`도 갱신 → `constraints.md` "아키텍처 맵 flows.yml 동기화"
 - **완료된 계획 archive 이동**: `docs/superpowers/plans/`의 계획이 구현·배포까지 끝나면 같은 작업(마지막 커밋)에서 계획과 짝 spec을 `git mv`로 `plans/archive/`·`specs/archive/`에 옮기고, 그 경로를 참조하는 문서·memory도 함께 고친다. 남은 후속 작업이 있으면 옮기지 않는다
-- **코드 품질 원장**: trading-core 파일·패키지를 건드리는 작업은 `docs/agents/code-quality-backlog.md`에서 해당 위치 항목을 찾아 같이 해소하고 상태를 갱신한다(새 발견은 같은 형식으로 추가, "유지 목록"은 재제안 금지)
+- **코드 품질 원장**: trading-core 파일·패키지를 건드리는 작업은 `docs/agents/code-quality-backlog.md`를 통째로 읽지 말고 건드리는 파일명으로 grep해 걸리는 항목만 읽고, 같이 해소한 뒤 상태를 갱신한다(새 발견은 같은 형식으로 추가, "유지 목록"에 걸리면 재제안 금지)
 - Git 규칙(push·author·커밋 메시지·배포 가드)은 `docs/agents/constraints.md` "Git 규칙"이 SSOT
 
 @docs/agents/commands.md
