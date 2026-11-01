@@ -1,5 +1,6 @@
 package com.kista.tradingcore.marketcalendar.adapter.in.schedule;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarRefreshPort;
@@ -26,9 +27,9 @@ class MarketCalendarRefreshSchedulerTest {
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         MarketCalendarRefreshScheduler scheduler =
-                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService);
+                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService, FixedClockTestConfig.FIXED);
 
-        int year = LocalDate.now(KST).getYear();
+        int year = LocalDate.now(FixedClockTestConfig.FIXED).getYear();
         when(storePort.countByYear(year)).thenReturn(10L); // 당해 연도는 이미 적재됨
         when(storePort.countByYear(year + 1)).thenReturn(0L);
         when(storePort.countByYear(year + 2)).thenReturn(0L);
@@ -55,9 +56,9 @@ class MarketCalendarRefreshSchedulerTest {
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         MarketCalendarRefreshScheduler scheduler =
-                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService);
+                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService, FixedClockTestConfig.FIXED);
 
-        int year = LocalDate.now(KST).getYear();
+        int year = LocalDate.now(FixedClockTestConfig.FIXED).getYear();
         when(storePort.countByYear(year)).thenReturn(10L);
         when(storePort.countByYear(year + 1)).thenReturn(5L);
         when(storePort.countByYear(year + 2)).thenReturn(1L);
@@ -80,9 +81,9 @@ class MarketCalendarRefreshSchedulerTest {
         SchedulerJobRunner jobRunner = mock(SchedulerJobRunner.class);
         SchedulerLockService lockService = mock(SchedulerLockService.class);
         MarketCalendarRefreshScheduler scheduler =
-                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService);
+                new MarketCalendarRefreshScheduler(refreshPort, storePort, jobRunner, lockService, FixedClockTestConfig.FIXED);
 
-        int year = LocalDate.now(KST).getYear();
+        int year = LocalDate.now(FixedClockTestConfig.FIXED).getYear();
 
         scheduler.refreshForNewYear();
 

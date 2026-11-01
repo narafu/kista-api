@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.YearMonth;
 
@@ -19,10 +20,11 @@ class FinanceRegistrationReminderScheduler {
 
     private final FinanceRegistrationReminderUseCase notifier;
     private final SchedulerLockService schedulerLockService;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Scheduled(cron = "0 0 21 L * *", zone = TimeZones.KST_ID)
     void run() throws InterruptedException {
         schedulerLockService.tryRun("finance-registration-reminder", Duration.ofMinutes(30),
-                () -> notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.now(TimeZones.KST)));
+                () -> notifier.notifyUsersWithoutThisMonthRegistration(YearMonth.now(clock)));
     }
 }

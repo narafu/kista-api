@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -35,6 +36,7 @@ class TokenService implements TokenUseCase {
     private final RefreshTokenPort refreshTokenPort;
     private final BlacklistPort blacklistPort;
     private final UserPort userPort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public String issueRefreshToken(UUID userId, String userAgent) {
@@ -58,7 +60,7 @@ class TokenService implements TokenUseCase {
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenRefreshResult refresh(String rawRefreshToken, String userAgent) {
         String hash = sha256Hex(rawRefreshToken);
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
 
         RefreshToken rt = refreshTokenPort.findByTokenHash(hash)
                 .orElseThrow(() -> {
@@ -105,7 +107,7 @@ class TokenService implements TokenUseCase {
             refreshTokenPort.deleteByTokenHash(hash);
             // AT jti만 차단 — 재로그인 후 새 AT는 영향 없음
             if (jti != null && atExpiresAt != null) {
-                Duration remaining = Duration.between(Instant.now(), atExpiresAt);
+                Duration remaining = Duration.between(Instant.now(clock), atExpiresAt);
                 if (remaining.isPositive()) {
                     blacklistPort.addJti(jti, remaining);
                 }
@@ -121,7 +123,7 @@ class TokenService implements TokenUseCase {
     @Override
     public int cleanupRotatedTokens() {
         // grace 2배 여유를 두어 극단적 지연 요청도 처리 후 삭제
-        return refreshTokenPort.deleteAllRotatedBefore(Instant.now().minus(RT_GRACE.multipliedBy(2)));
+        return refreshTokenPort.deleteAllRotatedBefore(Instant.now(clock).minus(RT_GRACE.multipliedBy(2)));
     }
 
     // package-private — TokenServiceTest에서 직접 테스트
@@ -132,7 +134,7 @@ class TokenService implements TokenUseCase {
     private String issueNewRt(UUID userId, String userAgent) {
         String newRaw = generateRawToken();
         // RefreshToken.issue() — id·rotatedAt·createdAt은 DB가 채움
-        refreshTokenPort.save(RefreshToken.issue(userId, sha256Hex(newRaw), userAgent, Instant.now().plus(RT_TTL)));
+        refreshTokenPort.save(RefreshToken.issue(userId, sha256Hex(newRaw), userAgent, Instant.now(clock).plus(RT_TTL)));
         return newRaw;
     }
 

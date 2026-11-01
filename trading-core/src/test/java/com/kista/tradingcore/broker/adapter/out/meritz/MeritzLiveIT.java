@@ -47,6 +47,7 @@ class MeritzLiveIT {
 
     private BrokerAccountRef account;
     private MeritzAuthApi authApi;
+    private static final java.time.Clock CLOCK = java.time.Clock.system(com.kista.shared.kernel.TimeZones.KST); // 실계좌 라이브 — 시스템 시계
     private MeritzHttpClient http;
     private MeritzBrokerAdapter adapter;
 
@@ -58,10 +59,10 @@ class MeritzLiveIT {
         BrokerTokenCachePort cache = new InMemoryTokenCache();
         RestClient rest = new MeritzConfig().meritzRestClient("https://openapi.imeritz.com:9443");
         JsonMapper mapper = JsonMapper.builder().build();
-        authApi = new MeritzAuthApi(rest, mapper, new DbTokenCoordinator(cache));
+        authApi = new MeritzAuthApi(rest, mapper, new DbTokenCoordinator(cache, CLOCK), CLOCK);
         http = new MeritzHttpClient(rest, authApi, mapper);
         MeritzExchangeRegistry registry = new MeritzExchangeRegistry();
-        adapter = new MeritzBrokerAdapter(new MeritzTradingApi(http), new MeritzOrderApi(http, registry),
+        adapter = new MeritzBrokerAdapter(new MeritzTradingApi(http), new MeritzOrderApi(http, registry, CLOCK),
                 new MeritzPriceApi(http, registry));
         account = new BrokerAccountRef(UUID.randomUUID(), appKey, secret, null, null, Broker.MERITZ);
     }

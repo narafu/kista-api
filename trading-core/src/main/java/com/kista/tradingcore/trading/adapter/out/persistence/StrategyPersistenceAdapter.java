@@ -6,6 +6,7 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -21,6 +22,7 @@ import com.kista.shared.kernel.StrategyTicker;
 class StrategyPersistenceAdapter implements StrategyPort {
 
     private final StrategyJpaRepository jpaRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public List<Strategy> findByAccountId(UUID accountId) {
@@ -50,17 +52,17 @@ class StrategyPersistenceAdapter implements StrategyPort {
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.softDeleteById(id, Instant.now());
+        jpaRepository.softDeleteById(id, Instant.now(clock));
     }
 
     @Override
     public void deleteByAccountId(UUID accountId) {
-        jpaRepository.softDeleteByAccountId(accountId, Instant.now());
+        jpaRepository.softDeleteByAccountId(accountId, Instant.now(clock));
     }
 
     @Override
     public void deleteByUserId(UUID userId) {
-        jpaRepository.softDeleteByUserId(userId, Instant.now());
+        jpaRepository.softDeleteByUserId(userId, Instant.now(clock));
     }
 
     @Override

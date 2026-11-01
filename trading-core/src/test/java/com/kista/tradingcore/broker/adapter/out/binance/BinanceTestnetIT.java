@@ -41,8 +41,8 @@ class BinanceTestnetIT {
     @BeforeEach
     void setUp() {
         RestClient rest = RestClient.builder().requestFactory(HttpClientTimeouts.jdkTimeouts(3_000, 10_000)).build();
-        http = new BinanceHttpClient(rest, JsonMapper.builder().build(), BASE_URL);
-        adapter = new BinanceExchangeAdapter(http, new BinanceSymbolRegistry());
+        http = new BinanceHttpClient(rest, JsonMapper.builder().build(), BASE_URL, java.time.Clock.systemUTC());
+        adapter = new BinanceExchangeAdapter(http, new BinanceSymbolRegistry(), java.time.Clock.systemUTC());
         account = new BrokerAccountRef(UUID.randomUUID(), System.getenv("BINANCE_TESTNET_API_KEY"),
                 System.getenv("BINANCE_TESTNET_SECRET_KEY"), null, null, Broker.BINANCE);
     }

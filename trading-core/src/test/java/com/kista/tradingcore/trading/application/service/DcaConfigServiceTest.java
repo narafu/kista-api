@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.shared.kernel.*;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
@@ -45,7 +46,7 @@ class DcaConfigServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DcaConfigService(strategyPort, accountPort, strategyVersionPort, dcaDetailPort);
+        service = new DcaConfigService(strategyPort, accountPort, strategyVersionPort, dcaDetailPort, FIXED);
         // 시장 규칙 검증용 계좌 — 기존 테스트는 주식(KIS) 계좌
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID))
                 .thenReturn(com.kista.tradingcore.support.TradingFixtures.kisAccount(ACCOUNT_ID, USER_ID));

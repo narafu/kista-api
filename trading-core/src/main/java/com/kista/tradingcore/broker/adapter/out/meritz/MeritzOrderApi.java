@@ -3,7 +3,6 @@ package com.kista.tradingcore.broker.adapter.out.meritz;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.OrderDirection;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.domain.model.CancelInstruction;
@@ -18,6 +17,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -38,6 +38,7 @@ class MeritzOrderApi {
 
     private final MeritzHttpClient http;
     private final MeritzExchangeRegistry exchangeRegistry;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record OrderResponse(
@@ -151,7 +152,7 @@ class MeritzOrderApi {
             }
         }
         // 검색 범위일 뿐 거래일 변환이 아니다 — KST 오늘 기준 앞뒤 여유를 둬 US 날짜 경계를 덮는다
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
         MultiValueMap<String, String> histParams = new LinkedMultiValueMap<>();
         histParams.add("oder_sta_date", today.minusDays(8).format(DateTimeFormatter.BASIC_ISO_DATE));
         histParams.add("oder_fin_date", today.plusDays(1).format(DateTimeFormatter.BASIC_ISO_DATE));

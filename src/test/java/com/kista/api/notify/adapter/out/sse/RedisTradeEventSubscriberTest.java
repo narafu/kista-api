@@ -2,6 +2,7 @@ package com.kista.api.notify.adapter.out.sse;
 
 import com.kista.shared.kernel.Currency;
 import java.math.BigDecimal;
+import java.time.Instant;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import org.junit.jupiter.api.AfterAll;
@@ -67,7 +68,7 @@ class RedisTradeEventSubscriberTest {
 
         // 리스너 등록이 비동기라 발행 전 잠깐의 여유가 필요 — 실패 시 sleep 연장 대신 원인 재확인
         UUID userId = UUID.randomUUID();
-        TradeEventMessage event = TradeEventMessage.sell("TQQQ", BigDecimal.valueOf(3), 45.0, 135.0, "테스트계좌", UUID.randomUUID(), UUID.randomUUID(), Currency.USD);
+        TradeEventMessage event = TradeEventMessage.sell("TQQQ", BigDecimal.valueOf(3), 45.0, 135.0, "테스트계좌", UUID.randomUUID(), UUID.randomUUID(), Currency.USD, Instant.EPOCH);
         String payload = "{\"userId\":\"" + userId + "\",\"event\":"
                 + objectMapper.writeValueAsString(event) + "}";
         await();

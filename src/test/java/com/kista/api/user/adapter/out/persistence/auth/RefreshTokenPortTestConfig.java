@@ -1,5 +1,7 @@
 package com.kista.api.user.adapter.out.persistence.auth;
 
+import com.kista.shared.support.FixedClockTestConfig;
+import java.time.Clock;
 import com.kista.api.user.application.port.output.RefreshTokenPort;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -9,7 +11,7 @@ import org.springframework.context.annotation.Bean;
 public class RefreshTokenPortTestConfig {
 
     @Bean
-    public RefreshTokenPort refreshTokenPort(RefreshTokenJpaRepository repository) {
-        return new RefreshTokenPersistenceAdapter(repository);
+    public RefreshTokenPort refreshTokenPort(RefreshTokenJpaRepository repository, Clock clock) {
+        return new RefreshTokenPersistenceAdapter(repository, clock);
     }
 }

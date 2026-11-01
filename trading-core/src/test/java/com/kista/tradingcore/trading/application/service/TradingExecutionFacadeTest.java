@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +48,7 @@ class TradingExecutionFacadeTest {
 
     @BeforeEach
     void setUp() {
-        facade = new TradingExecutionFacade(tradingService, manualTradingService, orderCancelService, tradingPreviewService);
+        facade = new TradingExecutionFacade(tradingService, manualTradingService, orderCancelService, tradingPreviewService, FIXED);
     }
 
     @Test
@@ -60,10 +62,9 @@ class TradingExecutionFacadeTest {
         verify(tradingService).placeOpenOrders(eq(contexts), dstCaptor.capture());
         verify(tradingService, never()).executeBatch(any(), any());
         DstInfo captured = dstCaptor.getValue();
-        // immediateOpen()은 marketOpen만 과거 시각(호출 직전)으로 설정 — 최근 수 초 이내여야 한다
-        assertThat(captured.marketOpen()).isBeforeOrEqualTo(Instant.now());
-        assertThat(captured.marketOpen()).isAfter(Instant.now().minusSeconds(10));
-        // orderAt/postClose는 스케쥴 고정 시각으로 서로 40분 간격 — immediateClose()의 past 패턴과 달리 절대 같지 않다
+        // immediateOpen(nowKst)은 marketOpen만 과거 시각(호출 직전)으로 설정 — now-1ms 정확값
+        assertThat(captured.marketOpen()).isEqualTo(Instant.now(FIXED).minusMillis(1));
+        // orderAt/postClose는 스케쥴 고정 시각으로 서로 40분 간격 — immediateClose(nowKst)의 past 패턴과 달리 절대 같지 않다
         assertThat(captured.orderAt()).isNotEqualTo(captured.postClose());
     }
 
@@ -78,10 +79,9 @@ class TradingExecutionFacadeTest {
         verify(tradingService).executeBatch(eq(contexts), dstCaptor.capture());
         verify(tradingService, never()).placeOpenOrders(any(), any());
         DstInfo captured = dstCaptor.getValue();
-        // immediateClose()는 주문 시각 대기만 스킵(orderAt=과거) — 체결 확인은 실제 마감 후 시각(postClose)까지 기다린다
-        assertThat(captured.postClose()).isEqualTo(DstInfo.calculate().postClose());
-        assertThat(captured.orderAt()).isBeforeOrEqualTo(Instant.now());
-        assertThat(captured.orderAt()).isAfter(Instant.now().minusSeconds(10));
+        // immediateClose(nowKst)는 주문 시각 대기만 스킵(orderAt=과거) — 체결 확인은 실제 마감 후 시각(postClose)까지 기다린다
+        assertThat(captured.postClose()).isEqualTo(DstInfo.calculate(ZonedDateTime.now(FIXED)).postClose());
+        assertThat(captured.orderAt()).isEqualTo(Instant.now(FIXED).minusMillis(1));
     }
 
     @Test
@@ -128,7 +128,7 @@ class TradingExecutionFacadeTest {
     void preview_delegates() {
         UUID strategyId = UUID.randomUUID();
         UUID requesterId = UUID.randomUUID();
-        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null, null);
+        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(FIXED), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null, null);
         when(tradingPreviewService.preview(strategyId, requesterId)).thenReturn(preview);
 
         NextOrdersPreview result = facade.preview(strategyId, requesterId);
@@ -143,7 +143,7 @@ class TradingExecutionFacadeTest {
         UUID accountId = UUID.randomUUID();
         UUID requesterId = UUID.randomUUID();
         UUID strategyId = UUID.randomUUID();
-        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null, null);
+        NextOrdersPreview preview = new NextOrdersPreview(LocalDate.now(FIXED), null, List.of(), null, List.of(), BigDecimal.ZERO, null, null, null);
         Map<UUID, NextOrdersPreview> previews = Map.of(strategyId, preview);
         when(tradingPreviewService.previewBatch(accountId, requesterId)).thenReturn(previews);
 

@@ -5,6 +5,7 @@
 - 테스트 지원 코드: `:shared` testFixtures(`DataJpaTestBase`/`WebMvcTestSupport`/`application-test.yml`), trading-core `TradingFixtures`·`StubBrokerApiException`, 루트 `DomainFixtures`(User). 루트 테스트는 `testFixtures(project(":shared"))`에 의존하고 trading-core testFixtures에는 의존하지 않는다
 - 슬라이스 테스트(`@DataJpaTest`/`@WebMvcTest`)는 상향 탐색이 각 루트의 앱 클래스를 찾으므로 `@ContextConfiguration`을 쓰지 않는다. 예외: trading-core `SchedulerLockService{Test,DbTest}`(패키지가 `com.kista.shared.platform.scheduling`이라 `@ContextConfiguration(classes = TradingApplication.class)` 유지)
 - `:shared` 빈은 `PlatformAutoConfiguration`이 올린다 — `@WebMvcTest`는 `JwtAuthFilter`/`InternalTokenAuthFilter`를 스캔으로 얻지 못해 필요 시 `@Import`하고, 보안·JWT가 필요 없는 자체 `@EnableAutoConfiguration` 테스트는 `PlatformAutoConfiguration`을 exclude한다(예: `HousingBenchmarkApiDocsTest`)
+- 슬라이스 Clock: `DataJpaTestBase`가 `FixedClockTestConfig`(고정 KST Clock 빈)를 포함한다. `@WebMvcTest`는 Clock이 필요하면 `@Import(FixedClockTestConfig.class)`
 - ArchUnit `failOnEmptyShould=true`(양 프로젝트 test resources) — 규칙 대상이 비면 실패한다
 
 ### 매매·전략 테스트 패턴

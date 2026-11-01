@@ -69,7 +69,7 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
                 .body(TradeCorrectionResponse.class);
     }
 
-    // 순수 조회(DstInfo.calculate()의 로컬 계산)라 도메인 예외가 없다 — 401(INTERNAL_API_TOKEN 미설정)·
+    // 순수 조회(DstInfo.calculate(nowKst)의 로컬 계산)라 도메인 예외가 없다 — 401(INTERNAL_API_TOKEN 미설정)·
     // 5xx(trading 쪽 장애)뿐이며 둘 다 인프라 오류이므로 admin의 GlobalExceptionHandler catch-all(500 +
     // saveErrorLog)로 떨어지는 것이 적절한 동작이다. 의도적으로 onStatus 매핑을 추가하지 않는다.
     @Override

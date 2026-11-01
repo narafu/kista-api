@@ -2,7 +2,6 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyDefaults;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.trading.domain.model.*;
@@ -10,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +33,7 @@ class StrategyDetailAssembler {
     private final StrategyDcaDetailPort dcaDetailPort;             // DCA 활성 설정 조회
     private final DcaExecutionPort dcaExecutionPort;               // DCA 최근 회차 조회
     private final DcaSummaryAssembler dcaSummaryAssembler;         // DCA 조회 요약 조립
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 최신 사이클 개장금액을 조립하고, VR pool은 개장 포지션, 리버스모드는 최신 포지션에서 판단한다. (단건 경로 — 단건 port 호출로 입력 구성 후 assemble 위임)
     StrategyDetail toDetail(Strategy strategy, Market market) {
@@ -75,7 +76,7 @@ class StrategyDetailAssembler {
     // DCA 요약 — 규칙별 배치가 판정 가능한 첫 거래일부터 다음 실행 예정일 계산 + 원장 보유·평단
     private DcaSummary buildDcaSummary(DcaStrategyConfig config, Map<String, DcaExecution> lastByRule, StrategyCycle cycle,
                                        Market market, Optional<CyclePosition> ledger) {
-        return dcaSummaryAssembler.assemble(config, lastByRule, cycle.startDate(), market, LocalDateTime.now(TimeZones.KST),
+        return dcaSummaryAssembler.assemble(config, lastByRule, cycle.startDate(), market, LocalDateTime.now(clock),
                 ledger.map(CyclePosition::holdings).orElse(null), ledger.map(CyclePosition::avgPrice).orElse(null));
     }
 

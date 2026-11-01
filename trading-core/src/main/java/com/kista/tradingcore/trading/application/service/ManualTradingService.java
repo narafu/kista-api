@@ -17,8 +17,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,9 +45,10 @@ class ManualTradingService {
     private final AccountBudgetLock budgetLock;              // 원장 판정+저장 구간 계좌 직렬화 — 배치 원장 판정·재캡과 같은 락
     private final ApplicationEventPublisher eventPublisher; // live 잔고 조회 실패 시 관리자 알림 이벤트 (4xx라 GlobalExceptionHandler가 미기록)
     private final MarketCalendarPort marketCalendarPort;   // 휴장일 수동 실행 차단 — 배치가 접수하지 않는 죽은 PLANNED·휴장일 즉시 접수 방지
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     List<Order> execute(UUID strategyId, UUID requesterId) {
-        return execute(strategyId, requesterId, DstInfo.calculate());
+        return execute(strategyId, requesterId, DstInfo.calculate(ZonedDateTime.now(clock)));
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 개장 여부를 결정론적으로 고정
@@ -62,7 +65,7 @@ class ManualTradingService {
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
 
         // 스케쥴러와 동일 today 계산: KST 04:00 이후면 +1일(= 다음 US 거래일)
-        LocalDate today = DstInfo.nextTradeDate();
+        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
 
         // 휴장 거래일 차단 — 배치(TradingService)와 같은 기준으로 판정
         if (!marketCalendarPort.isMarketOpen(today))
@@ -152,7 +155,7 @@ class ManualTradingService {
     // dst는 execute()에서 주입 — 단위 테스트에서 개장 전/후 분기를 결정론적으로 고정하기 위함
     private void placeAtOpenOrdersIfMarketOpen(Strategy strategy, TradingAccount account, StrategyCycle cycle, LocalDate today,
                                                InfinitePosition position, VrPosition vrPosition, DstInfo dst) {
-        if (Instant.now().isAfter(dst.marketOpen())) {
+        if (Instant.now(clock).isAfter(dst.marketOpen())) {
             // AT_OPEN 주문이 없으면(PRIVACY는 항상, INFINITE도 흔함) 불필요한 라이브 시세 조회를 건너뛴다
             if (orderPort.findAtOpenPlannedByCycleAndDate(cycle.id(), today).isEmpty()) return;
             // BUY cap 판단용 최신 현재가 재조회 — 단일 전략 수동 실행이라 ticker 1개(배치 불필요)

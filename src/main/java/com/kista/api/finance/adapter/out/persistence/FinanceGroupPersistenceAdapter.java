@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -24,6 +25,7 @@ public class FinanceGroupPersistenceAdapter implements FinanceGroupPort {
     private final FinanceGroupJpaRepository groupJpaRepository;
     private final FinanceGroupMemberJpaRepository memberJpaRepository;
     private final FinanceGroupInvitationJpaRepository invitationJpaRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public Optional<UUID> findCurrentGroupId(UUID userId) {
@@ -83,12 +85,12 @@ public class FinanceGroupPersistenceAdapter implements FinanceGroupPort {
 
     @Override
     public void softDeleteMembership(UUID groupId, UUID userId) {
-        memberJpaRepository.softDeleteByGroupIdAndUserId(groupId, userId, Instant.now());
+        memberJpaRepository.softDeleteByGroupIdAndUserId(groupId, userId, Instant.now(clock));
     }
 
     @Override
     public void softDelete(UUID groupId) {
-        groupJpaRepository.softDeleteById(groupId, Instant.now());
+        groupJpaRepository.softDeleteById(groupId, Instant.now(clock));
     }
 
     @Override

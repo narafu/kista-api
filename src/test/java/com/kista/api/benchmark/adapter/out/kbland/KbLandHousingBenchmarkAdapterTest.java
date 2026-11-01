@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.adapter.out.kbland;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.benchmark.domain.model.HousingBenchmarkPrice;
 import com.kista.api.benchmark.domain.model.HousingPriceIndex;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class KbLandHousingBenchmarkAdapterTest {
     void fetchAptQteSalePrices_parsesRegionQuintileMonthlyPrices() {
         RestClient.Builder builder = RestClient.builder().uriBuilderFactory(KbLandConfig.kbLandUriBuilderFactory("https://data-api.kbland.kr")).requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build());
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), FixedClockTestConfig.FIXED);
 
         String responseBody = """
                 {
@@ -86,7 +87,7 @@ class KbLandHousingBenchmarkAdapterTest {
     void fetchAptQteSalePrices_skipsRowsWithMissingQuintileData() {
         RestClient.Builder builder = RestClient.builder().uriBuilderFactory(KbLandConfig.kbLandUriBuilderFactory("https://data-api.kbland.kr")).requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build());
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), FixedClockTestConfig.FIXED);
 
         String responseBody = """
                 {
@@ -160,7 +161,7 @@ class KbLandHousingBenchmarkAdapterTest {
     void fetchWeeklyAptSalePriceIndex_parsesRegionWeeklyIndexAndDropsTrailingChangeRateElement() {
         RestClient.Builder builder = RestClient.builder().uriBuilderFactory(KbLandConfig.kbLandUriBuilderFactory("https://data-api.kbland.kr")).requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build());
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), FixedClockTestConfig.FIXED);
 
         // 날짜리스트 3개, dataList 4개 — 마지막 원소(전주대비 변동률)는 zip에서 잘려야 한다.
         String responseBody = """
@@ -210,7 +211,7 @@ class KbLandHousingBenchmarkAdapterTest {
     void fetchWeeklyAptSalePriceIndex_skipsNullIndexValues() {
         RestClient.Builder builder = RestClient.builder().uriBuilderFactory(KbLandConfig.kbLandUriBuilderFactory("https://data-api.kbland.kr")).requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build());
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), FixedClockTestConfig.FIXED);
 
         String responseBody = """
                 {
@@ -248,7 +249,7 @@ class KbLandHousingBenchmarkAdapterTest {
     void fetchWeeklyAptSalePriceIndex_throwsWhenResultCodeIsNotSuccess() {
         RestClient.Builder builder = RestClient.builder().uriBuilderFactory(KbLandConfig.kbLandUriBuilderFactory("https://data-api.kbland.kr")).requestFactory(KbLandConfig.kbLandRequestFactory()).requestInterceptor(KbLandConfig.kbLandHeaderInterceptor());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build());
+        KbLandHousingBenchmarkAdapter adapter = new KbLandHousingBenchmarkAdapter(builder.build(), FixedClockTestConfig.FIXED);
 
         String responseBody = """
                 {

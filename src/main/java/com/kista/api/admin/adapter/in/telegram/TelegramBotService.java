@@ -2,7 +2,6 @@ package com.kista.api.admin.adapter.in.telegram;
 
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.api.admin.application.port.output.PortfolioQueryPort;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
@@ -14,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -31,6 +31,7 @@ class TelegramBotService {
     private final PortfolioQueryPort portfolioQueryPort;
     private final UserUseCase userUseCase; // /status, /history 조회 전용
     private final AdminUserUseCase adminUserUseCase; // 인라인 버튼 승인/거절 + 감사 로그
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     void handle(TelegramUpdate update) {
         // 인라인 버튼 클릭(callback_query) 처리 — message가 null이므로 별도 분기 필수
@@ -142,7 +143,7 @@ class TelegramBotService {
     }
 
     private String buildHistoryMessage(int days) {
-        LocalDate to = LocalDate.now(TimeZones.KST);
+        LocalDate to = LocalDate.now(clock);
         LocalDate from = to.minusDays(days);
         // adminChatId로 사용자 UUID 조회 — 미설정이면 데이터 없음 메시지
         return userUseCase.findUserIdByTelegramChatId(adminChatId())

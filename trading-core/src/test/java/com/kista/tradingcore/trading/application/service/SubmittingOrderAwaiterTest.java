@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
@@ -37,10 +38,10 @@ class SubmittingOrderAwaiterTest {
     static final Order ORDER = new Order(UUID.randomUUID(), UUID.randomUUID(), CYCLE_ID, TRADE_DATE,
             StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(3),
             new BigDecimal("20.00"), OrderStatus.SUBMITTING, null, null, null);
-    SubmittingOrder LEFTOVER = new SubmittingOrder(ORDER, Instant.now()); // 테스트마다 갓 선점된 잔류(대기 상한 이내)
+    SubmittingOrder LEFTOVER = new SubmittingOrder(ORDER, Instant.now(FIXED)); // 테스트마다 갓 선점된 잔류(대기 상한 이내)
 
     private SubmittingOrderAwaiter awaiter() {
-        return new SubmittingOrderAwaiter(orderPort, Duration.ofMillis(200), Duration.ofMillis(10));
+        return new SubmittingOrderAwaiter(orderPort, Duration.ofMillis(200), Duration.ofMillis(10), FIXED);
     }
 
     @Test
@@ -94,9 +95,9 @@ class SubmittingOrderAwaiterTest {
     @Test
     @DisplayName("선점 후 대기 상한보다 오래된 잔류는 기다리지 않고 즉시 반환 — 런북 정정 전까지 매 취소가 묶이지 않는다")
     void awaitCycle_staleLeftover_returnsImmediately() {
-        SubmittingOrder stale = new SubmittingOrder(ORDER, Instant.now().minus(Duration.ofHours(1)));
+        SubmittingOrder stale = new SubmittingOrder(ORDER, Instant.now(FIXED).minus(Duration.ofHours(1)));
         when(orderPort.findSubmittingByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(stale));
-        SubmittingOrderAwaiter longWait = new SubmittingOrderAwaiter(orderPort, Duration.ofSeconds(60), Duration.ofMillis(10));
+        SubmittingOrderAwaiter longWait = new SubmittingOrderAwaiter(orderPort, Duration.ofSeconds(60), Duration.ofMillis(10), FIXED);
 
         long start = System.nanoTime();
         List<Order> remaining = longWait.awaitCycle(CYCLE_ID, TRADE_DATE);
@@ -109,10 +110,10 @@ class SubmittingOrderAwaiterTest {
     @Test
     @DisplayName("단건 — 오래된 잔류는 기다리지 않고 SUBMITTING 즉시 반환")
     void awaitOrder_staleLeftover_returnsImmediately() {
-        SubmittingOrder stale = new SubmittingOrder(ORDER, Instant.now().minus(Duration.ofHours(1)));
+        SubmittingOrder stale = new SubmittingOrder(ORDER, Instant.now(FIXED).minus(Duration.ofHours(1)));
         when(orderPort.findSubmittingByCycleAndDate(CYCLE_ID, TRADE_DATE)).thenReturn(List.of(stale));
         when(orderPort.findById(ORDER.id())).thenReturn(Optional.of(ORDER));
-        SubmittingOrderAwaiter longWait = new SubmittingOrderAwaiter(orderPort, Duration.ofSeconds(60), Duration.ofMillis(10));
+        SubmittingOrderAwaiter longWait = new SubmittingOrderAwaiter(orderPort, Duration.ofSeconds(60), Duration.ofMillis(10), FIXED);
 
         long start = System.nanoTime();
         assertThat(longWait.awaitOrder(ORDER).status()).isEqualTo(OrderStatus.SUBMITTING);

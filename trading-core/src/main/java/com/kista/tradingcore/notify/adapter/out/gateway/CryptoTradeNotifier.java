@@ -8,6 +8,8 @@ import com.kista.tradingcore.notify.application.port.output.TradingUserNotificat
 import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
+import java.time.Clock;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -20,6 +22,7 @@ class CryptoTradeNotifier {
     private final TradingUserNotificationPort userNotificationPort;         // Telegram/FCM 발송
     private final TradingRealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final TradingUserProfilePort userProfilePort;                   // ID → 프로필 재조회 (EPR 역직렬화 대응)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @TransactionalEventListener(fallbackExecution = true)
     public void onCryptoOrderFilled(CryptoOrderFilledEvent e) {
@@ -31,8 +34,8 @@ class CryptoTradeNotifier {
         double price = e.avgPrice().doubleValue();
         double amount = e.amount().doubleValue();
         TradeEventMessage msg = e.direction() == OrderDirection.SELL
-                ? TradeEventMessage.sell(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId(), e.currency())
-                : TradeEventMessage.buy(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId(), e.currency());
+                ? TradeEventMessage.sell(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId(), e.currency(), Instant.now(clock))
+                : TradeEventMessage.buy(ticker, e.filledQuantity(), price, amount, e.accountNickname(), e.accountId(), e.strategyId(), e.currency(), Instant.now(clock));
         realtimeNotificationPort.notifyTrade(profile.userId(), msg);
     }
 }

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.meritz;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
@@ -57,7 +58,7 @@ class MeritzOrderApiTest {
         server = MockRestServiceServer.bindTo(builder).build();
         when(authApi.getToken(ACCOUNT)).thenReturn("tok");
         api = new MeritzOrderApi(new MeritzHttpClient(builder.build(), authApi, JsonMapper.builder().build(),
-                new CallIntervalGate(0, 20_000), 1), new MeritzExchangeRegistry());
+                new CallIntervalGate(0, 20_000), 1), new MeritzExchangeRegistry(), FixedClockTestConfig.FIXED);
     }
 
     private static String orderResponse(String warn, long orderNo) {

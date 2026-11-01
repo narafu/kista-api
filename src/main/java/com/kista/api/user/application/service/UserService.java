@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -48,6 +49,7 @@ class UserService implements UserUseCase {
     private final ObjectProvider<UserUseCase> userUseCaseProvider; // OAuth 이후 트랜잭션 프록시 재진입
     private final UserNotifyProfilePublisher userNotifyProfilePublisher; // trading-core user_notify_profile 캐시 동기화
     private final AdminSeedPromoter adminSeedPromoter; // ADMIN seed promote 트랜잭션 경계 (login()이 NOT_SUPPORTED라 분리)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     @Transactional(readOnly = true)
@@ -139,7 +141,7 @@ class UserService implements UserUseCase {
         // reason 정규화: trim 후 blank -> null
         String normalizedReason = (reason == null || reason.isBlank()) ? null : reason.trim();
         // REJECTED 전환 + 사유 세팅 + 24h 카운트다운 시작 (lastReappliedAt = now)
-        User updated = user.withRejection(normalizedReason);
+        User updated = user.withRejection(normalizedReason, Instant.now(clock));
         userPort.save(updated);
         log.info("사용자 거절: userId={}", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
@@ -152,7 +154,7 @@ class UserService implements UserUseCase {
     @Override
     public void reapply(UUID userId) {
         User user = userPort.findByIdOrThrow(userId);
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         // register()와 동일한 이유로 잠금 조회 필수 — 관리자의 승인설정 전환과 직렬화한다.
         boolean approvalRequired = approvalPolicyPort.approvalRequiredForUpdate();
 
@@ -193,7 +195,7 @@ class UserService implements UserUseCase {
         User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withRole(role));
         // 2단계: 기존 AT 무효화 — 변경 시각 이전 발급 토큰은 JwtAuthFilter가 401 처리 (refresh로 새 role AT 발급)
-        blacklistPort.markRoleChanged(userId, Instant.now(), TokenConstants.AT_TTL);
+        blacklistPort.markRoleChanged(userId, Instant.now(clock), TokenConstants.AT_TTL);
     }
 
     @Override

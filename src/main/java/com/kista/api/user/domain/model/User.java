@@ -69,10 +69,10 @@ public record User(
     }
 
     // 거절 전용 — REJECTED 전환 + 사유 세팅(덮어쓰기) + lastReappliedAt 갱신(24h 카운트다운 시작)
-    public User withRejection(String reason) {
+    public User withRejection(String reason, Instant now) {
         return new User(id, kakaoId, nickname, email, UserStatus.REJECTED, role,
                 telegramBotToken, telegramChatId, telegramBotUsername, reason,
-                Instant.now(), notificationChannel);
+                now, notificationChannel);
     }
 
     // 텔레그램 설정 교체

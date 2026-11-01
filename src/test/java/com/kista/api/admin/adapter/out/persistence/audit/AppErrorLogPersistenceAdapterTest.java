@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.out.persistence.audit;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.admin.domain.model.AppErrorLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class AppErrorLogPersistenceAdapterTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new AppErrorLogPersistenceAdapter(repo, txManager);
+        adapter = new AppErrorLogPersistenceAdapter(repo, txManager, FixedClockTestConfig.FIXED);
     }
 
     @Test

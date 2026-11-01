@@ -10,6 +10,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -46,12 +47,13 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
             new ParameterizedTypeReference<>() {};
 
     private final RestClient kbLandRestClient; // 빈 이름: kbLandRestClient — baseUrl은 KbLandConfig에서 설정
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public List<HousingBenchmarkPrice> fetchAptQteSalePrices() {
         KbLandData data = fetch(APT_QTE_SALE_PRICE_PATH, PRICE_ENVELOPE, "KB Land 주택 벤치마크");
         LocalDate sourceUpdatedDate = parseUpdatedDate(data.updatedDate());
-        Instant fetchedAt = Instant.now();
+        Instant fetchedAt = Instant.now(clock);
         List<HousingBenchmarkPrice> prices = new ArrayList<>();
 
         // 지역별 dataList를 월별 도메인 행으로 평탄화한다.
@@ -78,7 +80,7 @@ class KbLandHousingBenchmarkAdapter implements HousingBenchmarkFeedPort {
                 WEEKLY_APT_SALE_PRICE_INDEX_PATH + years, INDEX_ENVELOPE, "KB Land 주간 아파트 매매가격지수");
         List<String> baseDates = data.baseDates();
         LocalDate sourceUpdatedDate = parseUpdatedDate(data.updatedDate());
-        Instant fetchedAt = Instant.now();
+        Instant fetchedAt = Instant.now(clock);
         List<HousingPriceIndex> indices = new ArrayList<>();
         if (baseDates == null || data.regionList() == null) {
             return indices;

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.kernel.NotificationChannel;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.shared.kernel.NotificationType;
@@ -29,7 +30,7 @@ class UserNotifyProfilePersistenceAdapterTest {
     private final UUID USER_ID = UUID.randomUUID();
 
     private UserNotifyProfilePersistenceAdapter adapter() {
-        return new UserNotifyProfilePersistenceAdapter(repository, new ObjectMapper());
+        return new UserNotifyProfilePersistenceAdapter(repository, new ObjectMapper(), FixedClockTestConfig.FIXED);
     }
 
     private UserNotifyProfileEntity entity(UUID userId, String prefsJson, boolean active) {

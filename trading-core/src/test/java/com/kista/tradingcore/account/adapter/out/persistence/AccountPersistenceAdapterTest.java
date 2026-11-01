@@ -1,5 +1,6 @@
 package com.kista.tradingcore.account.adapter.out.persistence;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.crypto.AccountNoHasher;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -7,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,13 +26,14 @@ class AccountPersistenceAdapterTest {
 
     @Mock AccountJpaRepository accountJpaRepository;
     @Mock AccountNoHasher hasher;
-    @InjectMocks AccountPersistenceAdapter adapter;
+    AccountPersistenceAdapter adapter;
 
     private final UUID accountId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
+        adapter = new AccountPersistenceAdapter(accountJpaRepository, hasher, FixedClockTestConfig.FIXED);
         // 해시 lenient stub
         lenient().when(hasher.hash(anyString())).thenAnswer(inv -> "hash:" + inv.getArgument(0));
     }

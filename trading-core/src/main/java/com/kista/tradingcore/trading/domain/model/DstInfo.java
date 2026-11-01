@@ -35,12 +35,12 @@ public record DstInfo(
         return date.atTime(time).atZone(KST).toInstant();
     }
 
-    // 현재 KST 기준 주문 가능 시간대 판단 — 주말은 요일 무관 BLOCKED
-    public MarketSession currentSession() {
-        return sessionAt(LocalDate.now(KST).getDayOfWeek(), LocalTime.now(KST));
+    // 주어진 KST 시각 기준 주문 가능 시간대 판단
+    public MarketSession currentSessionAt(ZonedDateTime nowKst) {
+        return sessionAt(nowKst.getDayOfWeek(), nowKst.toLocalTime());
     }
 
-    // 시각 주입식 판단 — 테스트 및 currentSession 공용
+    // 시각 주입식 판단 — currentSessionAt 공용
     MarketSession sessionAt(DayOfWeek day, LocalTime time) {
         if (day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY) return MarketSession.BLOCKED;
         // blocked: [marketClose, premarketStart)
@@ -50,14 +50,12 @@ public record DstInfo(
         return MarketSession.DIRECT;
     }
 
-    // 정규장(marketOpen~marketClose) 진행 중 여부 — DIRECT는 프리마켓+정규장을 모두 포함하므로
-    // "장중이라 당일 봉이 미확정일 수 있는" 구간은 그중 정규장 진행 중일 때뿐 (프리마켓은 이미 확정된 직전 종가 상태)
-    public boolean isRegularSessionActive() {
-        ZonedDateTime now = ZonedDateTime.now(KST);
-        return isRegularSessionActiveAt(now.getDayOfWeek(), now.toLocalTime());
+    // 주어진 KST 시각 기준 정규장 진행 중 여부
+    public boolean isRegularSessionActiveAt(ZonedDateTime nowKst) {
+        return isRegularSessionActiveAt(nowKst.getDayOfWeek(), nowKst.toLocalTime());
     }
 
-    // 시각 주입식 판단 — 테스트 및 isRegularSessionActive 공용
+    // 시각 주입식 판단 — isRegularSessionActiveAt 공용
     boolean isRegularSessionActiveAt(DayOfWeek day, LocalTime time) {
         if (sessionAt(day, time) == MarketSession.BLOCKED) return false;
         // marketOpen~자정~marketClose 래핑 구간만 정규장 진행 중 (그 외 DIRECT 구간은 프리마켓)
@@ -65,36 +63,27 @@ public record DstInfo(
     }
 
     // 가장 최근에 실제로 개장한 정규장의 개장 시각 — marketOpen 필드는 "오늘 날짜" 고정이라
-    // 자정~개장 전(00:00~marketOpen) 사이에 호출하면 실제로 진행 중인 세션(전날 저녁 개장)이 아닌
-    // 미래 시각(오늘 저녁 개장)을 가리키는 문제가 있음. nextTradeDate()의 날짜 롤백과 동일한 패턴.
-    public Instant lastSessionOpenInstant() {
-        return lastSessionOpenInstantAt(ZonedDateTime.now(KST));
-    }
-
-    // 시각 주입식 판단 — 테스트 및 lastSessionOpenInstant 공용
-    Instant lastSessionOpenInstantAt(ZonedDateTime nowKst) {
+    // 자정~개장 전 사이에 호출하면 미래 시각(오늘 저녁 개장)을 가리키므로 전날로 롤백한다 (nextTradeDate와 동일 패턴)
+    public Instant lastSessionOpenInstantAt(ZonedDateTime nowKst) {
         LocalDate date = nowKst.toLocalTime().isBefore(marketOpenTime(isDst))
                 ? nowKst.toLocalDate().minusDays(1)
                 : nowKst.toLocalDate();
         return atKst(date, marketOpenTime(isDst));
     }
 
-    public Duration waitUntilOrderTime() {
-        return Duration.between(Instant.now(), orderAt);
+    public Duration waitUntilOrderTime(Instant now) {
+        return Duration.between(now, orderAt);
     }
 
-    public Duration waitUntilPostClose() {
-        return Duration.between(Instant.now(), postClose);
+    public Duration waitUntilPostClose(Instant now) {
+        return Duration.between(now, postClose);
     }
 
-    public Duration waitUntilMarketOpen() {
-        return Duration.between(Instant.now(), marketOpen);
+    public Duration waitUntilMarketOpen(Instant now) {
+        return Duration.between(now, marketOpen);
     }
 
-    public static DstInfo calculate() {
-        return calculate(ZonedDateTime.now(KST));
-    }
-
+    // 주어진 KST 시각 기준 당일 DstInfo 산출
     public static DstInfo calculate(ZonedDateTime nowKst) {
         boolean isDst = resolveDst(nowKst.toInstant());
         LocalDate date = nowKst.toLocalDate();
@@ -108,17 +97,12 @@ public record DstInfo(
     // 04:30 이후면 당일 배치는 이미 계획 완료 → 다음 세션(익일)이 preview/수동 실행 대상
     private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 30);
 
-    // preview/수동 실행에서 "오늘 매매 기준 날짜" 산출 — 스케쥴러와 동일 로직 SSOT
-    public static LocalDate nextTradeDate() {
-        return nextTradeDateAt(LocalDate.now(KST), LocalTime.now(KST));
-    }
-
     // 주어진 KST 시각 기준 거래일 — 재기동 재개 등 시각을 이미 들고 있는 호출부용
     public static LocalDate nextTradeDate(ZonedDateTime nowKst) {
         return nextTradeDateAt(nowKst.toLocalDate(), nowKst.toLocalTime());
     }
 
-    // 시각 주입식 판단 — 테스트 및 nextTradeDate 공용
+    // 시각 주입식 판단 — nextTradeDate 공용
     static LocalDate nextTradeDateAt(LocalDate today, LocalTime now) {
         return now.isBefore(SCHEDULER_RUN_TIME) ? today : today.plusDays(1);
     }
@@ -126,13 +110,8 @@ public record DstInfo(
     // 개장 배치 발화 시각 — TradingOpenScheduler cron(22:00 KST 월~금)과 동일. 이 시각에 대상 전략을 확정한다(DST 무관)
     private static final LocalTime OPEN_BATCH_FIRE_TIME = LocalTime.of(22, 0);
 
-    // 오늘 시작 전략을 그날 개장 배치 이후에 등록했는지 — 그날 밤 AT_OPEN 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않는다
-    public static boolean openBatchMissedFor(LocalDate scheduledStart) {
-        return openBatchMissedAt(scheduledStart, ZonedDateTime.now(KST));
-    }
-
-    // 시각 주입식 판단 — 테스트 및 openBatchMissedFor 공용
-    static boolean openBatchMissedAt(LocalDate scheduledStart, ZonedDateTime nowKst) {
+    // 시각 주입식 판단 — 오늘 시작 전략을 그날 개장 배치(22:00 KST) 이후에 등록했는지 — 그날 밤 AT_OPEN 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않는다
+    public static boolean openBatchMissedAt(LocalDate scheduledStart, ZonedDateTime nowKst) {
         DayOfWeek day = nowKst.getDayOfWeek();
         return scheduledStart.equals(nowKst.toLocalDate())
                 && day != DayOfWeek.SATURDAY && day != DayOfWeek.SUNDAY
@@ -140,8 +119,8 @@ public record DstInfo(
     }
 
     // 개장 배치용: 거래일 T의 개장 시각(T-1일 저녁) — 자정 이후 재개돼도 이미 지난 개장을 기다리지 않도록 거래일 기준 산출
-    public static DstInfo forOpenBatch(LocalDate tradeDate) {
-        DstInfo now = calculate();
+    public static DstInfo forOpenBatch(LocalDate tradeDate, ZonedDateTime nowKst) {
+        DstInfo now = calculate(nowKst);
         return new DstInfo(now.isDst(), now.orderAt(), now.postClose(),
                 atKst(tradeDate.minusDays(1), marketOpenTime(now.isDst())));
     }
@@ -151,39 +130,32 @@ public record DstInfo(
         return atKst(orderAt.atZone(KST).toLocalDate(), marketCloseTime(isDst));
     }
 
-    // 개장 스케쥴러 수동 트리거용: marketOpen을 과거로 설정해 waitUntilMarketOpen() 스킵
-    public static DstInfo immediateOpen() {
-        ZonedDateTime now = ZonedDateTime.now(KST);
+    // 개장 스케쥴러 수동 트리거용: marketOpen을 과거로 설정해 waitUntilMarketOpen 스킵
+    public static DstInfo immediateOpen(ZonedDateTime now) {
         boolean isDst = resolveDst(now.toInstant());
         LocalDate date = now.toLocalDate();
         return new DstInfo(isDst,
                 atKst(date, orderTime(isDst)),
                 atKst(date, postCloseTime(isDst)),
-                Instant.now().minusMillis(1));
+                now.toInstant().minusMillis(1));
     }
 
     // 마감 스케쥴러 수동 트리거용: 주문 시각 대기만 스킵하고 체결 확인은 실제 마감 후 시각까지 기다린다
     // (postClose를 과거로 두면 접수 직후 리포트가 돌아 살아 있는 LOC가 CANCELLED로 기록되고 체결 없는 포지션이 저장된다)
-    public static DstInfo immediateClose() {
-        ZonedDateTime now = ZonedDateTime.now(KST);
+    public static DstInfo immediateClose(ZonedDateTime now) {
         boolean isDst = resolveDst(now.toInstant());
         LocalDate date = now.toLocalDate();
-        return new DstInfo(isDst, Instant.now().minusMillis(1),
+        return new DstInfo(isDst, now.toInstant().minusMillis(1),
                 atKst(date, postCloseTime(isDst)), atKst(date, marketOpenTime(isDst)));
     }
 
-    // 재주문 시점 가용성 (현재 시각 기준) — 주문시점 셀렉터 disable 판단 SSOT
+    // 재주문 시점 가용성 — 주문시점 셀렉터 disable 판단 SSOT
     public record ReorderTimingAvailability(
             boolean atOpen,     // AT_OPEN 접수 가능 — 개장 전에만
             boolean atClose,    // AT_CLOSE 접수 가능 — 마감 전에만
             boolean immediate   // 즉시 접수 가능 — 정규장 중에만 (개장 후 && 마감 전)
     ) {}
 
-    public ReorderTimingAvailability reorderTimingAvailability() {
-        return reorderTimingAvailabilityAt(Instant.now());
-    }
-
-    // 시각 직접 지정 (테스트 주입용)
     // BLOCKED 시간대(장마감~프리마켓 전, 주말): 전부 불가
     // DIRECT 시간대: beforeOpen이면 AT_OPEN/AT_CLOSE 가능, afterOpen이면 AT_CLOSE/IMMEDIATE 가능
     public ReorderTimingAvailability reorderTimingAvailabilityAt(Instant now) {
@@ -195,15 +167,14 @@ public record DstInfo(
         return new ReorderTimingAvailability(beforeOpen, true, !beforeOpen);
     }
 
-    // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime() 스킵, postClose/marketOpen은 정상 계산
-    public static DstInfo immediate() {
-        ZonedDateTime now = ZonedDateTime.now(KST);
+    // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime 스킵, postClose/marketOpen은 정상 계산
+    public static DstInfo immediate(ZonedDateTime now) {
         boolean isDst = resolveDst(now.toInstant());
         // postTime이 이미 지났으면 내일 날짜 사용 (같은 날 05:10 KST 이후 호출 시 과거 Instant 방지)
         LocalDate targetDate = now.toLocalTime().isBefore(postCloseTime(isDst))
                 ? now.toLocalDate()
                 : now.toLocalDate().plusDays(1);
-        return new DstInfo(isDst, Instant.now().minusMillis(1),
+        return new DstInfo(isDst, now.toInstant().minusMillis(1),
                 atKst(targetDate, postCloseTime(isDst)),
                 atKst(targetDate, marketOpenTime(isDst)));
     }

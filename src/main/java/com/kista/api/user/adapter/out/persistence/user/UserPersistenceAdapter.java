@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
@@ -20,6 +21,7 @@ import com.kista.shared.kernel.UserStatus;
 public class UserPersistenceAdapter implements UserPort {
 
     private final UserJpaRepository jpaRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public Optional<User> findById(UUID id) {
@@ -68,6 +70,6 @@ public class UserPersistenceAdapter implements UserPort {
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.softDeleteById(id, Instant.now());
+        jpaRepository.softDeleteById(id, Instant.now(clock));
     }
 }

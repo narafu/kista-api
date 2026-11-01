@@ -44,7 +44,7 @@ class TossRedisTokenStoreIT {
 
     @BeforeEach
     void setUp() {
-        store = new TossRedisTokenStore(redisTemplate);
+        store = new TossRedisTokenStore(redisTemplate, java.time.Clock.systemUTC());
         scope = "it:" + UUID.randomUUID();
     }
 

@@ -21,10 +21,6 @@ public class TtlResultCache {
     private final ConcurrentMap<Object, Entry> cache = new ConcurrentHashMap<>();
     private final ReentrantLock[] stripes = createStripes(); // 키 해시로 매핑하는 고정 크기 락 배열 — 무한 증가·제거 레이스 없음
 
-    public TtlResultCache() {
-        this(Clock.systemUTC());
-    }
-
     public TtlResultCache(Clock clock) {
         this.clock = clock;
     }

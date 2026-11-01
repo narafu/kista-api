@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import tools.jackson.databind.ObjectMapper;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.shared.kernel.OrderTiming;
@@ -39,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // jakarta 검증 애노테이션이 없던 시절엔 @Valid가 no-op이라 잘못된 요청이 그대로 서비스까지 흘러가
 // 500(NPE 등)으로 뭉개졌다. 여기서는 필수 필드 누락 시 클린한 400을 확인한다.
 @WebMvcTest(TradingInternalCommandController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class, FixedClockTestConfig.class})
 @TestPropertySource(properties = "internal.api.token=test-internal-token")
 @Execution(ExecutionMode.SAME_THREAD)
 class TradingInternalCommandControllerTest {

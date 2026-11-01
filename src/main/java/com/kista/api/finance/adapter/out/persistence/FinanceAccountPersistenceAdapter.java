@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,7 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
 
     private final FinanceAccountJpaRepository jpaRepository;
     private final AccountNoHasher hasher;  // accountNo 전역 중복 체크용 HMAC-SHA256 해시
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public List<FinanceAccount> findMyScope(UUID userId, UUID currentGroupId) {
@@ -58,11 +60,11 @@ public class FinanceAccountPersistenceAdapter implements FinanceAccountPort {
 
     @Override
     public void softDelete(UUID id) {
-        jpaRepository.softDeleteById(id, Instant.now());
+        jpaRepository.softDeleteById(id, Instant.now(clock));
     }
 
     @Override
     public void softDeleteByUserId(UUID userId) {
-        jpaRepository.softDeleteByUserId(userId, Instant.now());
+        jpaRepository.softDeleteByUserId(userId, Instant.now(clock));
     }
 }

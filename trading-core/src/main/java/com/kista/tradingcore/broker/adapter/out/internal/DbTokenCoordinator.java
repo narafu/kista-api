@@ -1,10 +1,9 @@
 package com.kista.tradingcore.broker.adapter.out.internal;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,10 +20,11 @@ public class DbTokenCoordinator implements TokenCoordinator {
     // 계좌별 락 — 같은 계좌 동시 호출이 토큰을 N번 발급하는 것 방지
     private final ConcurrentMap<UUID, ReentrantLock> locks = new ConcurrentHashMap<>();
     private final BrokerTokenCachePort cachePort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
-    @Autowired
-    public DbTokenCoordinator(BrokerTokenCachePort cachePort) {
+    public DbTokenCoordinator(BrokerTokenCachePort cachePort, Clock clock) {
         this.cachePort = cachePort;
+        this.clock = clock;
     }
 
     @Override
@@ -49,7 +49,7 @@ public class DbTokenCoordinator implements TokenCoordinator {
     @Override
     public RecoveredToken recover(UUID accountId, String rejectedToken, TokenIssuer issuer) {
         // accountId+rejectedToken 정확 일치 시만 무효화 — 이미 다른 스레드가 재발급했다면 no-op
-        cachePort.invalidateToken(accountId, rejectedToken, OffsetDateTime.now(TimeZones.KST).minusHours(1));
+        cachePort.invalidateToken(accountId, rejectedToken, OffsetDateTime.now(clock).minusHours(1));
         // 무효화로 캐시가 miss 상태가 되어 obtain이 신규 발급 경로로 재진입한다.
         // 재발급이 파괴적이지 않아 재사용 여부를 판별할 필요가 없어 항상 freshlyIssued=true로 보고한다.
         return new RecoveredToken(obtain(accountId, issuer), true);
@@ -57,13 +57,13 @@ public class DbTokenCoordinator implements TokenCoordinator {
 
     private String issueAndCache(UUID accountId, TokenIssuer issuer) {
         IssuedToken issued = issuer.issue();
-        OffsetDateTime expiresAt = OffsetDateTime.now(TimeZones.KST).plusSeconds(issued.expiresInSeconds());
+        OffsetDateTime expiresAt = OffsetDateTime.now(clock).plusSeconds(issued.expiresInSeconds());
         cachePort.saveToken(accountId, issued.accessToken(), expiresAt);
         return issued.accessToken();
     }
 
     // 만료 1분 전부터 무효 처리 — 경계값 만료 오류(EGW00123) 방지
-    private static OffsetDateTime threshold() {
-        return OffsetDateTime.now(TimeZones.KST).plusMinutes(1);
+    private OffsetDateTime threshold() {
+        return OffsetDateTime.now(clock).plusMinutes(1);
     }
 }

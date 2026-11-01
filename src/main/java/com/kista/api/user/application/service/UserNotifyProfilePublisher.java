@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,6 +25,7 @@ class UserNotifyProfilePublisher {
     private final UserPort userPort;
     private final UserSettingsPort userSettingsPort;
     private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 상태(가입·승인·거절·재신청·ADMIN 승격)·텔레그램·알림 채널이 바뀐 직후 — 설정은 조회해서 채운다
     void publishStatusChanged(User user) {
@@ -45,6 +47,6 @@ class UserNotifyProfilePublisher {
                          NotificationChannel channel) {
         eventPublisher.publishEvent(new UserNotifyProfileChangedEvent(
                 userId, settings.notificationPrefs(), active,
-                telegramBotToken, chatId, channel, Instant.now())); // 스냅샷 시각 — trading-core가 재시도된 옛 스냅샷을 거르는 버전
+                telegramBotToken, chatId, channel, Instant.now(clock))); // 스냅샷 시각 — trading-core가 재시도된 옛 스냅샷을 거르는 버전
     }
 }

@@ -29,7 +29,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -51,6 +53,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private final CycleSnapshotCreator cycleSnapshotCreator; // 버전 교체 + 사이클 종료 + 새 사이클 원자 저장
     private final OrderCancelService orderCancelService;     // 재설정 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;   // 새 사이클 시작 이벤트 발행 + 사용자 알림 실패 시 관리자 알림 이벤트
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
@@ -96,7 +99,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         LocalDate firstStart = strategyCyclePort.findFirstByStrategyId(strategyId)
                 .orElseThrow(() -> new IllegalStateException("VR 최초 사이클 없음: strategyId=" + strategyId))
                 .startDate();
-        LocalDate today = DstInfo.nextTradeDate();
+        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
         long weeks = ChronoUnit.WEEKS.between(firstStart, today);
 
         // 미체결 주문 전체 취소(best-effort) — 위 검증을 모두 통과한 뒤에만 호출 (독립 트랜잭션이라 이후 실패해도 롤백 불가하므로 최대한 뒤로 미룸)

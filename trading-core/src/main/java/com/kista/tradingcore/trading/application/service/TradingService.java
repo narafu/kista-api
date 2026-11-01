@@ -4,7 +4,6 @@ import com.kista.tradingcore.trading.application.service.support.TradingParallel
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchRunState;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
@@ -26,8 +25,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -62,12 +64,13 @@ class TradingService {
     private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(KIS DCA MOO) 판별용 DCA 설정 조회
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
+    private final Clock clock;                                 // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
     private record CyclePlacedState(TradingCandidatePlanner.CycleState state, List<Order> mainOrders) {}
 
     void executeBatch(List<BatchContext> contexts) throws InterruptedException {
-        executeBatch(contexts, DstInfo.calculate());
+        executeBatch(contexts, DstInfo.calculate(ZonedDateTime.now(clock)));
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
@@ -76,7 +79,7 @@ class TradingService {
     }
 
     private void runCloseBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
         // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
         checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.STARTED);
         // 아래 각 조기 반환은 정상 흐름(휴장·시작 전·계산 skip 등)이라 예외/오류 알림 대상이 아니지만,
@@ -119,7 +122,7 @@ class TradingService {
         // 공통 대기 — 주문 시각까지 (모든 전략이 공유하는 단 1회)
         // 이 시점 인터럽트 시 states(증권사 접수 전)는 전부 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
-            waitFor("주문 시각", dst.waitUntilOrderTime(), dst);
+            waitFor("주문 시각", dst.waitUntilOrderTime(Instant.now(clock)), dst);
         } catch (InterruptedException e) {
             if (!runState.isStopping()) {
                 batchGuard.notifyBatchInterrupted(states.stream().map(TradingCandidatePlanner.CycleState::ctx).toList());
@@ -137,7 +140,7 @@ class TradingService {
 
         // 공통 대기 — 마감 시각까지 (모든 전략이 공유하는 단 1회)
         // 이 시점 인터럽트는 사용자 알림 대상 아님 — placedStates는 이미 증권사 접수 완료, 체결 리포트만 지연됨
-        waitFor("마감 시각", dst.waitUntilPostClose(), dst);
+        waitFor("마감 시각", dst.waitUntilPostClose(Instant.now(clock)), dst);
         marketEventNotifier.notifyMarketClose();
 
         // 확정 종가 조회 + 리포트 — 임계구역
@@ -155,7 +158,7 @@ class TradingService {
     // 사전 잔고는 최신 cycle_position(리포트 전이므로 계획 시점과 동일), 리포트 대상 주문은 당일 접수된 적 있는 주문(externalOrderId 보유)
     void resumeCloseReport(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         runState.track(() -> {
-            LocalDate today = LocalDate.now(TimeZones.KST);
+            LocalDate today = LocalDate.now(clock);
             // 원래 배치의 리포트 대상(당일 주문이 있거나 롤오버 판정이 필요한 전략 — planAll과 같은 기준)만
             // PRIVACY 기준 미수신·장중 신규 전략은 원래도 리포트하지 않는다
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
@@ -166,8 +169,8 @@ class TradingService {
             log.info("마감 리포트 재개 — 대상 {}건 (전체 {}건)", targets.size(), contexts.size());
 
             // 마감 전이면 남은 시간만 대기 — 이미 지났으면 마감 알림도 이전 프로세스가 보냈을 수 있어 생략
-            if (dst.waitUntilPostClose().isPositive()) {
-                waitFor("마감 시각", dst.waitUntilPostClose(), dst);
+            if (dst.waitUntilPostClose(Instant.now(clock)).isPositive()) {
+                waitFor("마감 시각", dst.waitUntilPostClose(Instant.now(clock)), dst);
                 marketEventNotifier.notifyMarketClose();
             }
             if (targets.isEmpty()) {
@@ -255,7 +258,8 @@ class TradingService {
 
     // 개장 시각은 거래일 기준 산출 — 자정 이후 재개돼도 이미 지난 개장을 기다리지 않는다
     void placeOpenOrders(List<BatchContext> contexts) throws InterruptedException {
-        placeOpenOrders(contexts, DstInfo.forOpenBatch(DstInfo.nextTradeDate()));
+        ZonedDateTime now = ZonedDateTime.now(clock);
+        placeOpenOrders(contexts, DstInfo.forOpenBatch(DstInfo.nextTradeDate(now), now));
     }
 
     // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회
@@ -264,7 +268,7 @@ class TradingService {
     }
 
     private void runOpenBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
-        LocalDate tradeDate = DstInfo.nextTradeDate(); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 KST 거래일 (자정 이후 재개면 당일)
+        LocalDate tradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(clock)); // 장 개시 스케쥴러 전날 저녁 실행 — 내일이 KST 거래일 (자정 이후 재개면 당일)
         // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
         checkpoint(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
         // 조기 반환도 DONE 기록 — "체크포인트 행 없음 = 미실행"이 성립해야 재개 판정이 cron 누락을 구분한다
@@ -300,7 +304,7 @@ class TradingService {
 
         // 개장 시각까지 대기 — 이 시점 인터럽트 시 contexts 전부가 미처리 — 사용자 알림 대상 (재기동 종료면 재개되므로 제외)
         try {
-            waitFor("개장 시각", dst.waitUntilMarketOpen(), dst);
+            waitFor("개장 시각", dst.waitUntilMarketOpen(Instant.now(clock)), dst);
         } catch (InterruptedException e) {
             if (!runState.isStopping()) batchGuard.notifyBatchInterrupted(started);
             throw e;

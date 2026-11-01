@@ -301,7 +301,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 테스트용 package-private 생성자를 이중으로 두는 패턴이 7곳에 있다(위 Clock 주입 목록).
   - 스케쥴러 2곳의 Clock 필드는 비-final이다(`ApiKeyExpiryScheduler.java:30`, `CryptoDcaScheduler.java:25`).
 - 기준 패턴(확정, 사용자 2026-11-01): 한 번에 Clock 주입으로 통일한다.
-  1. `shared.platform`에 `Clock` 빈 하나(KST)를 둔다.
+  1. 앱 루트 `ClockConfig` 2곳(trading-core·root)에 `Clock` 빈(KST)을 둔다 — platform은 kernel `TimeZones` 의존 금지·`ZoneId.of` 가드 때문에 빈을 둘 수 없음(사용자 결정 2026-11-01). root·shared도 함께 통일.
   2. 서비스·어댑터·스케쥴러는 `X.now(clock)`을 쓴다. 이중 생성자 7곳은 생성자 하나로 정리한다.
   3. 도메인·정적 유틸(`DstInfo`, `StrategyCycle` 등)은 시각을 파라미터로 받는다. `DstInfo`의 인자 없는 메서드는 없앤다(호출 16곳).
   4. 테스트는 `Clock.fixed(...)`를 명시 주입한다. `@InjectMocks`가 `Clock`을 mock으로 채우면 `instant()`가 null이라 NPE가 난다.
@@ -309,7 +309,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 시각 취득 방식 단일화, 날짜 경계 테스트 결정성.
 - 위험: 중간. 매매 배치 경로(`TradingService`, `OrderCancelService` 등)를 건드리지만 같은 시각을 다른 경로로 얻을 뿐 동작은 바뀌지 않는다. 생성자 변경이 테스트에 넓게 번진다.
 - 가드(ArchUnit 초안, 루트 `HexagonalArchitectureTest`): trading-core 클래스가 인자 없는 `now()`(`LocalDate`, `LocalDateTime`, `LocalTime`, `Instant`, `ZonedDateTime`, `OffsetDateTime`)와 `X.now(ZoneId)`, `Clock.system*()`를 호출하지 못하게 한다. 예외는 Clock 빈 정의 클래스 한 곳뿐이다.
-- 상태: open(전용 세션). 가드는 위반 0이어야 넣을 수 있어 다른 작업에 끼워 넣지 않고 한 세션에서 끝낸다.
+- 상태: done(커밋 예정). 가드 `HexagonalArchitectureTest.main_code_must_not_read_system_clock_directly`로 잠금.
 
 ### CQ-18 `TradingCycleResponse.forRegistration`의 15필드 재나열
 - 주제: 매핑. 유형: 보일러플레이트.
@@ -443,7 +443,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 |---|---|---|
 | `CycleHistoryResponse`/`CycleHistoryPageResponse` trading·stats 완전 복제 | `trading/adapter/in/web/dto/`, `stats/adapter/in/web/dto/` (package 줄 외 diff 없음 ✔) | `own-type-ledger.md`가 (b) 외부 계약 분리로 허용한 항목이다. 엔드포인트별 응답 스키마. |
 | `TossPriceApi`의 DstInfo 세션 계산 복제 | `broker/adapter/out/toss/TossPriceApi.java:161-199` ✔ | broker는 trading 도메인을 참조할 수 없다. 주석이 이유와 "common 승격 대상 아님"을 명시한다. NY 상수만 CQ-01에서 처리한다. |
-| `TradingBatchResumer` 04:30 경계 주석 | `trading/adapter/in/schedule/TradingBatchResumer.java:84` ✔ | 요일 조합 판정이라 `nextTradeDate()`와 계산이 다르다. 경계값 문서화 주석이다. |
+| `TradingBatchResumer` 04:30 경계 주석 | `trading/adapter/in/schedule/TradingBatchResumer.java:84` ✔ | 요일 조합 판정이라 `nextTradeDate(ZonedDateTime)`와 계산이 다르다. 경계값 문서화 주석이다. |
 | `MarketSessionSnapshot` 세션 계산 | `marketcalendar/domain/model/MarketSessionSnapshot.java:11,16` | marketcalendar는 trading을 참조하지 않는다. NY 상수만 CQ-01. |
 | `TradingService` 배치 `LocalDate.now(KST)` | `TradingService.java:79,158` ✔ | 체크포인트 키(같은 날짜 수동 실행 DONE과 비교)라 거래일 값이 아니다. 주석에 명시돼 있다. |
 | `CycleSnapshotCreator` `LocalDate.now(KST)` | `CycleSnapshotCreator.java:97` | 주석에 "r.today()(다음 거래일)와 다르다"고 명시돼 있다. |

@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.util.MultiValueMap;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -48,7 +49,7 @@ class TossHoldingsApiTest {
 
     @BeforeEach
     void setUp() {
-        tossHoldingsApi = new TossHoldingsApi(tossHttpClient);
+        tossHoldingsApi = new TossHoldingsApi(tossHttpClient, FIXED);
     }
 
     // exchange-rate API는 getCommon 사용 — 개별 테스트에서 직접 stub

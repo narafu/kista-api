@@ -18,7 +18,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(AssetSnapshotPersistenceAdapter.class)
+@Import({AssetSnapshotPersistenceAdapter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AssetSnapshotPersistenceAdapterTest extends RootDataJpaTestBase {
 

@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
@@ -22,6 +23,7 @@ public class FearGreedScheduler {
     private final FetchFearGreedUseCase fetchFearGreedUseCase;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Scheduled(cron = "0 0 0,12 * * *", zone = "Asia/Seoul") // KST 00:00 / 12:00
     public void run() throws InterruptedException {
@@ -29,6 +31,6 @@ public class FearGreedScheduler {
     }
 
     private void runLocked() {
-        jobRunner.run("공포탐욕지수 수집 스케쥴러", () -> fetchFearGreedUseCase.fetchAndSave(Instant.now()));
+        jobRunner.run("공포탐욕지수 수집 스케쥴러", () -> fetchFearGreedUseCase.fetchAndSave(Instant.now(clock)));
     }
 }

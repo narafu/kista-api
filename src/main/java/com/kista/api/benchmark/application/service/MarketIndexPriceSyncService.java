@@ -1,6 +1,5 @@
 package com.kista.api.benchmark.application.service;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.domain.model.EtfBenchmarkSymbol;
 import com.kista.api.benchmark.domain.model.IndexPrice;
 import com.kista.api.benchmark.application.usecase.SyncMarketIndexPricesUseCase;
@@ -10,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +23,7 @@ class MarketIndexPriceSyncService implements SyncMarketIndexPricesUseCase {
 
     private final IndexPricePort indexPricePort;
     private final IndexPriceFeedPort indexPriceFeedPort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public void syncAndSave() {
@@ -43,7 +44,7 @@ class MarketIndexPriceSyncService implements SyncMarketIndexPricesUseCase {
     private void syncOne(String symbol) {
         LocalDate from = indexPricePort.findMaxTradeDate(symbol)
                 .map(d -> d.plusDays(1)).orElse(EARLIEST_INDEX_DATE);
-        LocalDate to = LocalDate.now(TimeZones.KST);
+        LocalDate to = LocalDate.now(clock);
         if (from.isAfter(to)) return;
         List<IndexPrice> prices = indexPriceFeedPort.fetchDailyCloses(symbol, from, to);
         if (!prices.isEmpty()) {

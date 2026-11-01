@@ -22,7 +22,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // findByStrategyIds — 통계용 여러 전략 사이클 배치 조회 검증 (raw JDBC로 created_at·deleted_at 직접 통제)
-@Import(StrategyCyclePersistenceAdapter.class)
+@Import({StrategyCyclePersistenceAdapter.class})
 @Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
 

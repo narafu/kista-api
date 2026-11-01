@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collection;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
 
     private final StrategyCycleJpaRepository jpaRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public StrategyCycle save(StrategyCycle cycle) {
@@ -88,17 +90,17 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
 
     @Override
     public void deleteByStrategyId(UUID strategyId) {
-        jpaRepository.softDeleteByStrategyId(strategyId, Instant.now());
+        jpaRepository.softDeleteByStrategyId(strategyId, Instant.now(clock));
     }
 
     @Override
     public void deleteByAccountId(UUID accountId) {
-        jpaRepository.softDeleteByAccountId(accountId, Instant.now());
+        jpaRepository.softDeleteByAccountId(accountId, Instant.now(clock));
     }
 
     @Override
     public void deleteByUserId(UUID userId) {
-        jpaRepository.softDeleteByUserId(userId, Instant.now());
+        jpaRepository.softDeleteByUserId(userId, Instant.now(clock));
     }
 
     private StrategyCycle toDomain(StrategyCycleEntity e) {

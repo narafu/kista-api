@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -72,7 +73,7 @@ class ReorderServiceTest {
         lenient().when(brokerOrderCorrectionPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED); // 기본: 취소 접수
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
-                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget, eventPublisher);
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget, eventPublisher, FIXED);
     }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
@@ -538,7 +539,7 @@ class ReorderServiceTest {
 
     private StrategyCycle cycle() {
         return new StrategyCycle(CYCLE_ID, STRATEGY_ID, UUID.randomUUID(), new BigDecimal("6989.00"),
-                null, LocalDate.of(2026, 6, 21), null, Instant.now(), null);
+                null, LocalDate.of(2026, 6, 21), null, Instant.now(FIXED), null);
     }
 
     private Order plannedOrder() {

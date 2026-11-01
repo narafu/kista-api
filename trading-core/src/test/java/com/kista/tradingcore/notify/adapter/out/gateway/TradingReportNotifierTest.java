@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort;
@@ -64,7 +65,7 @@ class TradingReportNotifierTest {
 
     @Test
     void reportEnabled_true이면_리포트를_발송한다() {
-        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
+        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort, FixedClockTestConfig.FIXED);
         TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(), true);
 
         notifier.onTradingReportReady(event);
@@ -74,7 +75,7 @@ class TradingReportNotifierTest {
 
     @Test
     void reportEnabled_false이면_리포트_발송을_생략한다() {
-        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
+        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort, FixedClockTestConfig.FIXED);
         TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(), false);
 
         notifier.onTradingReportReady(event);
@@ -84,7 +85,7 @@ class TradingReportNotifierTest {
 
     @Test
     void reportEnabled_false여도_SSE_알림은_항상_발송된다() {
-        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
+        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort, FixedClockTestConfig.FIXED);
         TradingReportReadyEvent event = new TradingReportReadyEvent(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(buyLeg(), sellLeg()), false);
 
@@ -96,7 +97,7 @@ class TradingReportNotifierTest {
 
     @Test
     void BUY_체결_건별로_SSE_알림을_발송한다() {
-        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
+        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort, FixedClockTestConfig.FIXED);
         TradeLegSummary buy = buyLeg();
         TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(buy), true);
 
@@ -112,7 +113,7 @@ class TradingReportNotifierTest {
 
     @Test
     void SELL_체결_건별로_SSE_알림을_발송한다() {
-        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
+        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort, FixedClockTestConfig.FIXED);
         TradeLegSummary sell = sellLeg();
         TradingReportReadyEvent event = new TradingReportReadyEvent(USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(sell), true);
 
@@ -123,7 +124,7 @@ class TradingReportNotifierTest {
 
     @Test
     void BUY와_SELL이_섞이면_체결건수만큼_SSE_알림이_발송된다() {
-        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort);
+        TradingReportNotifier notifier = new TradingReportNotifier(userNotificationPort, realtimeNotificationPort, userProfilePort, FixedClockTestConfig.FIXED);
         TradingReportReadyEvent event = new TradingReportReadyEvent(
                 USER_ID, ACCOUNT_ID, STRATEGY_ID, ACCOUNT_NICKNAME, REPORT, List.of(buyLeg(), sellLeg()), true);
 

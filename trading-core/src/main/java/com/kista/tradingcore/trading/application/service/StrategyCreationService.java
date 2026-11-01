@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Market;
-import com.kista.shared.kernel.TimeZones;
 
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
@@ -33,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.NoSuchElementException;
@@ -64,6 +64,7 @@ class StrategyCreationService {
     private final StrategyStartAmountCalculator startAmountCalculator; // 시작금액 산출(PRIVACY 중간부터 시작 환산 포함)
     private final CycleOrderStrategies cycleStrategies;         // INFINITE 최소 시드 산출(minRequiredDeposit)
     private final StrategyDetailAssembler detailAssembler;      // 응답 조립(조회 경로와 동일 SSOT)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 응답은 조회 경로와 같은 StrategyDetailAssembler로 조립한다(UI가 POST 응답을 캐시) — 이미 조회한 계좌의 market 재사용
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 잔고 검증·시세 HTTP 호출 포함 — 검증은 트랜잭션 밖, 저장만 creationPersister 트랜잭션
@@ -132,7 +133,7 @@ class StrategyCreationService {
 
     // 시작예정일 — 기본값 오늘(KST), 과거 거부. 상한 없음
     private LocalDate resolveScheduledStart(RegisterStrategyCommand cmd) {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
         LocalDate scheduled = cmd.scheduledStartDate() != null ? cmd.scheduledStartDate() : today;
         if (scheduled.isBefore(today)) {
             throw new IllegalArgumentException("시작예정일(scheduledStartDate)은 오늘 이후여야 합니다");

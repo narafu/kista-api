@@ -21,7 +21,6 @@ import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import com.kista.tradingcore.stats.domain.model.FundingRateQuote;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -67,13 +66,6 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private final HashrateHistoryPort hashrates; // BTC 일별 해시레이트 (Hash Ribbons)
     private final Clock clock; // 조립 시각·오늘 날짜 기준 — 테스트에서 고정
     private final TtlResultCache cache; // 결과 캐시 (single-flight, 정상 10분·전부 실패 1분)
-
-    @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
-    CryptoMarketIndicatorService(UpbitMarketDataPort upbit, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
-                                 BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics,
-                                 CryptoMarketMetricsPort cmc, HashrateHistoryPort hashrates) {
-        this(upbit, binance, fxRates, blockHeight, coinbase, brokerStatistics, cmc, hashrates, Clock.systemUTC());
-    }
 
     CryptoMarketIndicatorService(UpbitMarketDataPort upbit, BinanceMarketDataPort binance, HistoricalFxRatePort fxRates,
                                  BlockHeightPort blockHeight, CoinbaseMarketDataPort coinbase, BrokerStatisticsUseCase brokerStatistics,

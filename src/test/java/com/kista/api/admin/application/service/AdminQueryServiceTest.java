@@ -1,10 +1,13 @@
 package com.kista.api.admin.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
+import java.time.Clock;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.api.admin.domain.model.AdminStats;
 import com.kista.shared.kernel.Broker;
 import com.kista.api.admin.application.port.output.*;
 import com.kista.api.user.application.port.output.UserPort;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,8 +37,15 @@ class AdminQueryServiceTest {
     @Mock AuditLogPort auditLogPort;
     @Mock TradingQueryPort tradingQueryPort;
     @Mock PrivacyQueryPort privacyQueryPort;
+    @Mock AppErrorLogPort appErrorLogPort;
 
-    @InjectMocks AdminQueryService service;
+    final Clock clock = FixedClockTestConfig.FIXED; // 고정 시각
+    AdminQueryService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new AdminQueryService(userPort, accountQueryPort, auditLogPort, tradingQueryPort, privacyQueryPort, appErrorLogPort, clock);
+    }
 
     @Test
     void getStats_상태별_카운트를_단일_GROUP_BY_조회로_합산한다() {
@@ -82,7 +92,7 @@ class AdminQueryServiceTest {
 
         service.listPrivacyBases(30);
 
-        LocalDate expected = LocalDate.now().minusDays(30);
+        LocalDate expected = LocalDate.now(clock).minusDays(30);
         ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);
         verify(privacyQueryPort).findBasesFromTradeDate(captor.capture());
         assertThat(captor.getValue()).isEqualTo(expected);

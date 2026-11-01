@@ -1,13 +1,12 @@
 package com.kista.api.benchmark.application.service;
 
 import com.kista.shared.platform.cache.TtlResultCache;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.domain.model.*;
 import com.kista.api.benchmark.application.usecase.BenchmarkUseCase;
 import com.kista.api.benchmark.application.port.output.*;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -18,7 +17,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 class BenchmarkService implements BenchmarkUseCase {
 
     private static final String SEOUL_REGION_CODE = "1100000000";
@@ -32,9 +30,22 @@ class BenchmarkService implements BenchmarkUseCase {
     private final HousingPriceIndexPort housingPriceIndexPort;
     private final CurrentExchangeRatePort currentExchangeRatePort;
     private final IndexPricePort indexPricePort;
-    private final TtlResultCache statsResultCache = new TtlResultCache(); // 비교 본체 결과 캐시
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
+    private final TtlResultCache statsResultCache; // 비교 본체 결과 캐시
     private final BenchmarkComparisonBuilder comparisonBuilder =
             new BenchmarkComparisonBuilder();
+
+    BenchmarkService(InvestmentPointsPort investmentPointsPort, HousingBenchmarkPricePort housingBenchmarkPricePort,
+                     HousingPriceIndexPort housingPriceIndexPort, CurrentExchangeRatePort currentExchangeRatePort,
+                     IndexPricePort indexPricePort, Clock clock) {
+        this.investmentPointsPort = investmentPointsPort;
+        this.housingBenchmarkPricePort = housingBenchmarkPricePort;
+        this.housingPriceIndexPort = housingPriceIndexPort;
+        this.currentExchangeRatePort = currentExchangeRatePort;
+        this.indexPricePort = indexPricePort;
+        this.clock = clock;
+        this.statsResultCache = new TtlResultCache(clock);
+    }
 
     // 벤치마크 비교 캐시 키 — HOUSING(regionCode 사용, symbol=null) / ETF(symbol 사용, regionCode=null) 공용
     private record BenchmarkComparisonKey(
@@ -146,7 +157,7 @@ class BenchmarkService implements BenchmarkUseCase {
 
     @Override
     public List<HousingBenchmarkPrice> getHousingBenchmarkSeries(LocalDate from, LocalDate to, String regionCode) {
-        EffectiveRange range = EffectiveRange.of(from, to);
+        EffectiveRange range = EffectiveRange.of(from, to, LocalDate.now(clock));
         // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
         String effectiveRegionCode = (regionCode != null && !regionCode.isBlank()) ? regionCode : SEOUL_REGION_CODE;
         return housingBenchmarkPricePort.findByMetricCodeAndRegionCodeAndBaseMonthBetween(
@@ -155,7 +166,7 @@ class BenchmarkService implements BenchmarkUseCase {
 
     @Override
     public List<HousingPriceIndex> getHousingPriceIndexSeries(LocalDate from, LocalDate to, String regionCode) {
-        EffectiveRange range = EffectiveRange.of(from, to);
+        EffectiveRange range = EffectiveRange.of(from, to, LocalDate.now(clock));
         // 지역 미지정 시 서울 기본값 — KB Land 지역 카탈로그는 DB 동적 조회(getHousingBenchmarkRegions) 대상이라 하드코딩 enum 아님
         String effectiveRegionCode = (regionCode != null && !regionCode.isBlank()) ? regionCode : SEOUL_REGION_CODE;
         return housingPriceIndexPort.findByMetricCodeAndRegionCodeAndBaseDateBetween(
@@ -164,19 +175,19 @@ class BenchmarkService implements BenchmarkUseCase {
 
     @Override
     public List<IndexPrice> getEtfPriceSeries(LocalDate from, LocalDate to, EtfBenchmarkSymbol symbol) {
-        EffectiveRange range = EffectiveRange.of(from, to);
+        EffectiveRange range = EffectiveRange.of(from, to, LocalDate.now(clock));
         return indexPricePort.findBySymbolAndRange(symbol.name(), range.from(), range.to());
     }
 
     // from/to 널가드+기본값 적용 — from>to면 예외, 미지정 시 [EARLIEST_BENCHMARK_DATE, 오늘 KST]로 채운다
     private record EffectiveRange(LocalDate from, LocalDate to) {
-        static EffectiveRange of(LocalDate from, LocalDate to) {
+        static EffectiveRange of(LocalDate from, LocalDate to, LocalDate today) {
             if (from != null && to != null && from.isAfter(to)) {
                 throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
             }
             return new EffectiveRange(
                     from != null ? from : EARLIEST_BENCHMARK_DATE,
-                    to != null ? to : LocalDate.now(TimeZones.KST));
+                    to != null ? to : today);
         }
     }
 
@@ -215,8 +226,8 @@ class BenchmarkService implements BenchmarkUseCase {
     }
 
     // 투자 시리즈는 일별이라 clamp 없이 요청값 그대로, 미지정이면 오늘(KST)
-    private static LocalDate effectiveTo(LocalDate requestedTo) {
-        return requestedTo != null ? requestedTo : LocalDate.now(TimeZones.KST);
+    private LocalDate effectiveTo(LocalDate requestedTo) {
+        return requestedTo != null ? requestedTo : LocalDate.now(clock);
     }
 
     // 조회 실패는 CurrentExchangeRateHttpAdapter가 null로 흡수한다
@@ -225,7 +236,7 @@ class BenchmarkService implements BenchmarkUseCase {
         if (midRate == null || midRate.signum() <= 0) {
             return null;
         }
-        return new CurrentExchangeRate(midRate, Instant.now(), "TOSS_INVEST");
+        return new CurrentExchangeRate(midRate, Instant.now(clock), "TOSS_INVEST");
     }
 
 }

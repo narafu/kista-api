@@ -1,5 +1,7 @@
 package com.kista.tradingcore.broker.adapter.out.internal;
 
+import java.time.Clock;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,12 +28,13 @@ class DbTokenCoordinatorTest {
     @Mock BrokerTokenCachePort cachePort;
 
     DbTokenCoordinator coordinator;
+    private static final Clock CLOCK = FixedClockTestConfig.FIXED;
 
     private static final UUID ACCOUNT_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @BeforeEach
     void setUp() {
-        coordinator = new DbTokenCoordinator(cachePort);
+        coordinator = new DbTokenCoordinator(cachePort, CLOCK);
     }
 
     @Test
@@ -59,7 +62,7 @@ class DbTokenCoordinatorTest {
         verify(cachePort).saveToken(eq(ACCOUNT_ID), eq("new-token"), expiresCaptor.capture());
         // KST(+09:00) 기준으로 now+expiresInSeconds가 저장돼야 함
         assertThat(expiresCaptor.getValue().getOffset().getTotalSeconds()).isEqualTo(9 * 3600);
-        assertThat(expiresCaptor.getValue()).isAfter(OffsetDateTime.now().plusMinutes(59));
+        assertThat(expiresCaptor.getValue()).isEqualTo(OffsetDateTime.now(CLOCK).plusSeconds(3600));
     }
 
     @Test

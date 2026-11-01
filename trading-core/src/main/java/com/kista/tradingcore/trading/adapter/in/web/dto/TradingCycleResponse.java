@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.UUID;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 
@@ -114,8 +115,8 @@ public record TradingCycleResponse(
 
     // 등록 응답 — 오늘 개장 배치 이후 등록 여부를 함께 싣는다(판정 SSOT는 DstInfo). 동작은 바꾸지 않고 안내만 —
     // 그날 AT_OPEN 주문은 개장 후 수동 실행(ManualTradingService, UI "바로 주문")으로만 접수할 수 있다
-    public static TradingCycleResponse forRegistration(StrategyDetail detail) {
+    public static TradingCycleResponse forRegistration(StrategyDetail detail, ZonedDateTime nowKst) {
         return of(detail,
-                !detail.strategy().isPrivacy() && !detail.strategy().isDca() && DstInfo.openBatchMissedFor(detail.startDate())); // PRIVACY는 AT_OPEN 주문이 없고 DCA는 자체 판정 기준이 있어 해당 없음
+                !detail.strategy().isPrivacy() && !detail.strategy().isDca() && DstInfo.openBatchMissedAt(detail.startDate(), nowKst)); // PRIVACY는 AT_OPEN 주문이 없고 DCA는 자체 판정 기준이 있어 해당 없음
     }
 }

@@ -66,7 +66,7 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 ### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
 
 - `/api/v1/prices`에는 전일종가 필드가 없음(현재가만 제공) — 반드시 `TossCandleApi.getCandleBefore(symbol, "1d", before)`(캔들 `count=1`)로 별도 조회
-- `before` 시각 계산이 핵심: `TossPriceApi.resolveMarketSession()`의 `regularSessionActive`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 `Instant.now()`
+- `before` 시각 계산이 핵심: `TossPriceApi.resolveMarketSessionAt(nowKst)`의 `regularSessionActive`가 true(정규장 진행 중)면 그 세션의 봉이 아직 미확정이므로 `lastSessionOpenInstant().minusMillis(1)`을 `before`로 사용해 배제, false면 이미 확정된 봉만 있으므로 캡처한 `now`
 - 개장 시각은 "오늘 날짜" 고정값이 아니라 `lastSessionOpenInstant`(날짜 롤백 처리)를 써야 한다 — 고정값은 자정~개장 전(00:00~22:30 KST) 호출 시 진행 중인 세션(전날 저녁 개장)이 아닌 미래 시각을 가리킨다
 - `TossPriceApi.prevCloseCache` 키에 세션 버킷(`"ACTIVE"`/`"CLOSED"`) 포함 — 정규장 종료로 확정 종가가 바뀌는 순간 같은 KST 날짜 내에서도 캐시를 재사용하지 않고 재조회
 - 캔들 배열 인덱스로 확정 종가를 추측하지 말 것 — `count=1`+`before` 방식만 사용 (인덱스 추측은 장마감 후 최신 캔들 오인·프리마켓 구간 stale 버그를 냈음)

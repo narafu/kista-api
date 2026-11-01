@@ -22,6 +22,7 @@ import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -41,6 +42,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
     private final ObjectMapper objectMapper;            // 응답 본문 파싱
     // TokenCoordinator 구현 빈이 여럿이라 구체 타입 주입(KisAuthApi와 동일)
     private final DbTokenCoordinator tokenCoordinator;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     String getToken(BrokerAccountRef account) {
         return tokenCoordinator.obtain(account.id(), () -> issue(account.appKey(), account.secretKey()));
@@ -54,7 +56,7 @@ class MeritzAuthApi implements BrokerConnectionTestPort {
     TokenCoordinator.IssuedToken issue(String appKey, String secretKey) {
         Token token = issueToken(appKey, secretKey);
         return new TokenCoordinator.IssuedToken(token.accessToken(),
-                Duration.between(OffsetDateTime.now(TimeZones.KST), token.expiresAt()).getSeconds());
+                Duration.between(OffsetDateTime.now(clock), token.expiresAt()).getSeconds());
     }
 
     @Override

@@ -34,7 +34,7 @@ import static org.mockito.Mockito.doThrow;
 // 테스트 트랜잭션을 끄고(NOT_SUPPORTED) persister의 @Transactional이 유일한 경계가 되게 한다 — 테스트 트랜잭션 안에서 실패시키면
 // 어차피 테스트 종료 롤백으로 지워져 원자성을 증명하지 못한다. 커밋된 행은 @AfterEach에서 계좌 삭제(FK CASCADE)로 정리.
 @Execution(ExecutionMode.SAME_THREAD)
-@Import(StrategyCreationPersisterDbTest.PersisterTestConfig.class)
+@Import({StrategyCreationPersisterDbTest.PersisterTestConfig.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class StrategyCreationPersisterDbTest extends DataJpaTestBase {
 

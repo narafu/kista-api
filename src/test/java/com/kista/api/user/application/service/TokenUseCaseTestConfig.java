@@ -1,5 +1,7 @@
 package com.kista.api.user.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
+import java.time.Clock;
 import com.kista.api.user.application.usecase.TokenUseCase;
 import com.kista.api.user.application.port.output.BlacklistPort;
 import com.kista.api.user.application.port.output.RefreshTokenPort;
@@ -12,7 +14,7 @@ import org.springframework.context.annotation.Bean;
 public class TokenUseCaseTestConfig {
 
     @Bean
-    public TokenUseCase tokenUseCase(RefreshTokenPort refreshTokenPort, BlacklistPort blacklistPort, UserPort userPort) {
-        return new TokenService(refreshTokenPort, blacklistPort, userPort);
+    public TokenUseCase tokenUseCase(RefreshTokenPort refreshTokenPort, BlacklistPort blacklistPort, UserPort userPort, Clock clock) {
+        return new TokenService(refreshTokenPort, blacklistPort, userPort, clock);
     }
 }

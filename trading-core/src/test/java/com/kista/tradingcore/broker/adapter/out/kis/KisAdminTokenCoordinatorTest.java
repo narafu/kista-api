@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,7 @@ class KisAdminTokenCoordinatorTest {
     @BeforeEach
     void setUp() {
         lenient().when(redis.opsForValue()).thenReturn(ops);
-        coordinator = new KisAdminTokenCoordinator(redis);
+        coordinator = new KisAdminTokenCoordinator(redis, FixedClockTestConfig.FIXED);
     }
 
     @Test

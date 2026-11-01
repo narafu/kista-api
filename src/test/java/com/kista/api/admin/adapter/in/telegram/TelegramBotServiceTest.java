@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.telegram;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.contract.stats.PortfolioCurrentResponse;
 import com.kista.shared.contract.stats.PortfolioOrderResponse;
 import com.kista.shared.kernel.OrderDirection;
@@ -46,7 +47,7 @@ class TelegramBotServiceTest {
 
     @BeforeEach
     void setUp() {
-        sut = new TelegramBotService(telegramHttpClient, PROPS, portfolioQueryPort, userUseCase, adminUserUseCase);
+        sut = new TelegramBotService(telegramHttpClient, PROPS, portfolioQueryPort, userUseCase, adminUserUseCase, FixedClockTestConfig.FIXED);
         // adminChatId로 userId 조회 — status/history 명령에서만 사용, 다른 테스트에서는 미호출
         lenient().when(userUseCase.findUserIdByTelegramChatId(String.valueOf(CHAT_ID))).thenReturn(Optional.of(USER_ID));
     }
@@ -104,7 +105,7 @@ class TelegramBotServiceTest {
         sut.handle(update("/history 14"));
 
         verify(portfolioQueryPort).getHistory(
-                eq(USER_ID), eq(LocalDate.now().minusDays(14)), eq(LocalDate.now()), eq(StrategyTicker.SOXL));
+                eq(USER_ID), eq(LocalDate.now(FixedClockTestConfig.FIXED).minusDays(14)), eq(LocalDate.now(FixedClockTestConfig.FIXED)), eq(StrategyTicker.SOXL));
     }
 
     @Test

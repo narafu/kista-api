@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -82,12 +83,12 @@ class OrderCancelServiceTest {
         cycle = new Strategy(cycleId, accountId, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(strategyCycleId, cycleId, BigDecimal.valueOf(1000),
-                null, LocalDate.now(), null, null, null);
+                null, LocalDate.now(FIXED), null, null, null);
         // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
         service = new OrderCancelService(orderPort, brokerPort, accountPort, cyclePort, strategyCyclePort,
-                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter);
+                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter, FIXED);
         // 취소 범위는 오늘(KST)·다음 거래일 둘 다 — 기본은 오늘 주문 없음, 각 테스트가 다음 거래일(또는 오늘)을 따로 stub
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         lenient().when(orderPort.deletePlannedByCycleAndDate(any(), eq(today))).thenReturn(0);
         lenient().when(orderPort.findPlacedByCycleAndDate(any(), eq(today))).thenReturn(List.of());
         lenient().when(awaiter.awaitCycle(any(), eq(today))).thenReturn(List.of());
@@ -108,16 +109,16 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.deletePlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.deletePlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(1); // 실제 삭제 건수로 집계
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of(order1, order2));
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
 
         assertThat(result.cancelledCount()).isEqualTo(3);
         assertThat(result.failedCount()).isEqualTo(0);
-        verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate()));
+        verify(orderPort).deletePlannedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED))));
         verify(brokerPort, times(2)).cancel(any(), eq(ownedAccount.toBrokerRef()));
         verify(orderPort, times(2)).markCancelled(any());
         verifyNoInteractions(eventPublisher);
@@ -131,7 +132,7 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(LocalDate.now(TimeZones.KST))))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(LocalDate.now(FIXED))))
                 .thenReturn(List.of(todayOrder));
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
@@ -161,7 +162,7 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of(order1, order2));
         // order1은 성공, order2는 KIS 오류
         doReturn(CancelOutcome.CANCELLED).when(brokerPort).cancel(eq(cancelOf(order1)), any());
@@ -186,7 +187,7 @@ class OrderCancelServiceTest {
     void cancelOpenOrders_alreadyFilledConflict_notCountedAsFailure() {
         Order order = placedOrder(UUID.randomUUID(), "ORD_1");
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of(order));
         doReturn(CancelOutcome.ALREADY_FILLED)
                 .when(brokerPort).cancel(eq(cancelOf(order)), any());
@@ -206,7 +207,7 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of(order));
         doThrow(new BrokerCredentialException()).when(brokerPort).cancel(eq(cancelOf(order)), any());
 
@@ -226,7 +227,7 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of(order1, order2));
         // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 주문
         doReturn(CancelOutcome.CANCELLED).when(brokerPort).cancel(eq(cancelOf(order1)), any());
@@ -247,7 +248,7 @@ class OrderCancelServiceTest {
         when(cyclePort.findByIdOrThrow(cycleId)).thenReturn(cycle);
         when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(ownedAccount);
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
-        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate())))
+        when(orderPort.findPlacedByCycleAndDate(eq(strategyCycleId), eq(DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)))))
                 .thenReturn(List.of());
 
         CancelResult result = service.cancelByCycle(cycleId, requesterId);
@@ -391,7 +392,7 @@ class OrderCancelServiceTest {
     @Test
     @DisplayName("cancelOrder: PLACED가 아닌 상태 → OrderCancelException(409)")
     void cancelOrder_notPlaced_throwsIllegalStateException() {
-        Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
+        Order filledOrder = new Order(orderId, accountId, strategyCycleId, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.FILLED, "ORD_99", null, null);
         when(orderPort.findById(orderId)).thenReturn(Optional.of(filledOrder));
@@ -440,13 +441,13 @@ class OrderCancelServiceTest {
     // ---
 
     private Order placedOrder(UUID id, String externalOrderId) {
-        return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.PLACED, externalOrderId, null, null);
     }
 
     private Order plannedOrder(UUID id) {
-        return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.PLANNED, null, null, null);
     }
@@ -454,7 +455,7 @@ class OrderCancelServiceTest {
     // --- 접수 중(SUBMITTING) 주문 — spec 2026-10-16 §3.6 ---
 
     private Order submittingOrder(UUID id) {
-        return new Order(id, accountId, strategyCycleId, LocalDate.now(), StrategyTicker.SOXL,
+        return new Order(id, accountId, strategyCycleId, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(5), BigDecimal.valueOf(25),
                 OrderStatus.SUBMITTING, null, null, null);
     }
@@ -463,7 +464,7 @@ class OrderCancelServiceTest {
     @DisplayName("cancelOpenOrders: 접수 중 주문은 PLANNED 삭제 후 대기 → PLACED가 되면 PLACED 조회에 합류해 증권사 취소")
     void cancelOpenOrders_submittingSettlesToPlaced_cancelsAtBroker() {
         Order settled = placedOrder(UUID.randomUUID(), "ORD_SETTLED");
-        LocalDate next = DstInfo.nextTradeDate();
+        LocalDate next = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
         when(orderPort.deletePlannedByCycleAndDate(strategyCycleId, next)).thenReturn(0);
         when(awaiter.awaitCycle(strategyCycleId, next)).thenReturn(List.of());
@@ -483,7 +484,7 @@ class OrderCancelServiceTest {
     @DisplayName("cancelOpenOrders: 대기 후에도 접수 중이면 재시도 가능한 실패로 집계 + 관리자 알림")
     void cancelOpenOrders_stillSubmitting_countsRetryableFailure() {
         Order stuck = submittingOrder(UUID.randomUUID());
-        LocalDate next = DstInfo.nextTradeDate();
+        LocalDate next = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         when(strategyCyclePort.findLatestByStrategyId(cycleId)).thenReturn(Optional.of(currentCycle));
         when(orderPort.deletePlannedByCycleAndDate(strategyCycleId, next)).thenReturn(0);
         when(awaiter.awaitCycle(strategyCycleId, next)).thenReturn(List.of(stuck));
@@ -530,7 +531,7 @@ class OrderCancelServiceTest {
     // --- 코인(UPBIT) 계좌: 시장가 주문은 즉시 체결되므로 주식 브로커 취소를 호출하지 않는다 ---
 
     private Order cryptoOrder(OrderStatus status) {
-        return new Order(UUID.randomUUID(), accountId, strategyCycleId, LocalDate.now(), StrategyTicker.BTC,
+        return new Order(UUID.randomUUID(), accountId, strategyCycleId, LocalDate.now(FIXED), StrategyTicker.BTC,
                 OrderType.MARKET, OrderTiming.AT_CLOSE, OrderDirection.BUY, new BigDecimal("0.00012345"),
                 BigDecimal.valueOf(100_000_000), status, "upbit-uuid", null, null);
     }

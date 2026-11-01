@@ -20,6 +20,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -53,6 +54,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
     // 관리자 시세 키 전용(ADMIN_TOKEN_ID) — accounts FK가 있는 broker_tokens를 못 써서 Redis 캐시 사용.
     // 키가 앱키별이라 TokenCoordinator 계약(accountId 기준)을 구현하지 않고 appKey를 받는 전용 메서드를 쓴다
     private final KisAdminTokenCoordinator adminCoordinator;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // ── 토큰 발급 / 401 복구 — KisHttpClient가 구체 타입으로 직접 주입 ──────────────
 
@@ -78,7 +80,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
         try {
             TokenResponse response = issueOAuthToken(appKey, appSecret);
             OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());
-            long expiresInSeconds = Duration.between(OffsetDateTime.now(KST), expiresAt).getSeconds();
+            long expiresInSeconds = Duration.between(OffsetDateTime.now(clock), expiresAt).getSeconds();
             return new TokenCoordinator.IssuedToken(response.accessToken(), expiresInSeconds);
         } catch (BrokerCredentialException e) {
             throw e; // 증권사 키 검증 실패는 그대로 전파
@@ -99,7 +101,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
         try {
             // KIS OAuth 호출 — 어느 계좌 캐시에도 저장하지 않고 단기 캐시에만 둬 직후 계좌번호 검증의 재발급을 막는다 (EGW00133)
             TokenResponse response = issueOAuthToken(appKey, secretKey);
-            tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now().plusSeconds(90)));
+            tempTokenCache.put(appKey, new TempTokenEntry(response.accessToken(), Instant.now(clock).plusSeconds(90)));
         } catch (HttpStatusCodeException e) {
             throw kisKeyException(e, "KIS 연결 테스트");
         } catch (RestClientException e) {
@@ -112,7 +114,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
     public BrokerAccountVerification verifyAccount(String appKey, String secretKey, String accountNo) {
         // 1단계: 토큰 확보 — 연결 테스트 단기 캐시 우선, 없으면 신규 발급 (EGW00133 방지)
         String token;
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         TempTokenEntry cached = tempTokenCache.get(appKey);
         if (cached != null && now.isBefore(cached.expiresAt())) {
             log.debug("계좌번호 검증: 단기 캐시 토큰 재사용 (appKey={}...)", appKey.substring(0, Math.min(8, appKey.length())));

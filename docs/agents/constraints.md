@@ -143,7 +143,8 @@
 - Instant ↔ KST 일자 경계는 `atStartOfDay(TimeZones.KST)` 단일 관용구 — `ZoneOffset.UTC` 자정 경계 금지
 - KST 일자 구간의 상한(당일 포함 반개구간)을 Instant로 바꿀 때는 `KstDays.endExclusive(day)`(`com.kista.shared.kernel`)를 쓴다 — `plusDays(1).atStartOfDay(...)`를 인라인하지 않는다
 - `ZoneId.of`는 `TimeZones` 상수(`KST`·`NY`)로만 — main 코드에서 직접 호출 금지(가드 `zoneId_of_must_only_be_called_in_TimeZones`)
-- 거래일 경계 시각 `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` — preview·수동실행·주문취소는 `DstInfo.nextTradeDate()`를 쓴다
+- 거래일 경계 시각 `DstInfo.SCHEDULER_RUN_TIME = 04:30 KST` — preview·수동실행·주문취소는 `DstInfo.nextTradeDate(ZonedDateTime)`를 쓴다
+- 현재 시각은 앱 루트 `ClockConfig`의 KST `Clock` 빈을 주입해 `X.now(clock)`으로 읽는다. 도메인·정적 유틸은 시각을 파라미터로 받는다. 테스트는 `Clock.fixed`(`FixedClockTestConfig`) — 가드 `HexagonalArchitectureTest.main_code_must_not_read_system_clock_directly`
 - 인라인 `.minusDays(1)`/`.plusDays(1)`로 날짜 기준 변환 금지 — `UsTradeDates`/`PrivacyDates` 경유
 
 ### 소프트 삭제(Soft Delete) 패턴

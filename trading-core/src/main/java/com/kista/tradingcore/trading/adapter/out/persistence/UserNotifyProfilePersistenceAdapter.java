@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
 
     private final UserNotifyProfileJpaRepository repository;
     private final ObjectMapper objectMapper;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public Optional<TradingUserProfile> findByUserId(UUID userId) {
@@ -83,7 +85,7 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
         // UserEventResubmitScheduler가 재발행한다(Map<NotificationType,Boolean>이라 실패 가능성 자체가 없음)
         String prefsJson = objectMapper.writeValueAsString(change.notificationPrefs());
         // updated_at = 스냅샷 시각(버전) — 구버전 발행분만 동기화 시각
-        Instant version = change.occurredAt() != null ? change.occurredAt() : Instant.now();
+        Instant version = change.occurredAt() != null ? change.occurredAt() : Instant.now(clock);
         // 기존 행은 필드 갱신, 없으면 신규 생성 — @Id 할당식이라 save()가 곧 upsert
         UserNotifyProfileEntity entity = existing.orElseGet(() -> new UserNotifyProfileEntity(
                 change.userId(), prefsJson, change.active(),
@@ -98,6 +100,6 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
         // 행이 없어도 tombstone을 남긴다 — updated_at(trading 시각)이 탈퇴 전 root에서 만든 프로필 스냅샷(occurredAt)보다 늦어
         // applyChange 버전 가드가 늦게 도착한 스냅샷을 거른다
         NotificationChannel channel = repository.findById(userId).map(UserNotifyProfileEntity::getNotificationChannel).orElse(null);
-        repository.save(new UserNotifyProfileEntity(userId, "{}", false, null, null, Instant.now(), channel));
+        repository.save(new UserNotifyProfileEntity(userId, "{}", false, null, null, Instant.now(clock), channel));
     }
 }

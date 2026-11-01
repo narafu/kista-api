@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
 
@@ -35,6 +36,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +85,7 @@ class ManualTradingServiceTest {
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
     static final StrategyCycle CYCLE = new StrategyCycle(
             UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null,
-            LocalDate.now(), null, null, null
+            LocalDate.now(FIXED), null, null, null
     );
     // DB 잔고 이력 — cycle_position 기반 (TradingBalanceLoader가 읽음)
     static final CyclePosition HISTORY = new CyclePosition(
@@ -119,7 +121,7 @@ class ManualTradingServiceTest {
         service = new ManualTradingService(
                 strategyPort, strategyCyclePort, accountPort, orderPort,
                 priceFetcher, planBuilder, priceCapper, ledgerBudget,
-                orderPlanner, orderExecutor, budgetLock, eventPublisher, marketCalendarPort);
+                orderPlanner, orderExecutor, budgetLock, eventPublisher, marketCalendarPort, FIXED);
         lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
 
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
@@ -149,7 +151,7 @@ class ManualTradingServiceTest {
     }
 
     private static PlannedOrder planned(OrderDirection dir, int qty, String price, String leg) {
-        return PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC, dir, qty, new BigDecimal(price), leg);
+        return PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC, dir, qty, new BigDecimal(price), leg);
     }
 
     @Test
@@ -230,7 +232,7 @@ class ManualTradingServiceTest {
 
     @Test
     void execute_existingOrderToday_throwsAlreadyOrderedToday() {
-        Order existing = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order existing = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null);
@@ -243,12 +245,12 @@ class ManualTradingServiceTest {
     @Test
     void execute_sufficientBalance_savesOrders() {
         // BUY 1주, 원장 충분(usdDeposit=$1,000) → saveAll 호출, 주문 반환
-        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("INFINITE_EARLY_AVG_BUY");
-        Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
+        Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
@@ -268,12 +270,12 @@ class ManualTradingServiceTest {
     // 락 밖 이중 실행 검사 이후 같은 사이클에 배치가 먼저 저장했으면 락 안 재검사에서 거부 — 같은 사이클 중복 주문 방지
     @Test
     void execute_cycleOrderedWhileWaitingForLock_throwsAlreadyOrderedToday() {
-        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("INFINITE_EARLY_AVG_BUY");
-        Order batchSaved = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
+        Order batchSaved = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
@@ -291,7 +293,7 @@ class ManualTradingServiceTest {
     // 같은 계좌의 배치 원장 판정·재캡과 같은 여유분을 이중 사용하지 않도록 원장 판정~PLANNED 저장이 계좌 예산 락 안에서 끝나야 한다
     @Test
     void execute_allocationAndSave_runInsideAccountBudgetLock() throws InterruptedException {
-        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null)
@@ -324,7 +326,7 @@ class ManualTradingServiceTest {
     void execute_buyPriceExceedsCapButCappedAmountFitsBudget_savesOrders() {
         // 원가 100.00×1주=100.00은 원장 usdDeposit(60.00)을 초과하지만,
         // 현재가 50.00 기준 캡(52.50)으로 보정된 뒤 금액(52.50)은 예산 안에 든다
-        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
                 OrderStatus.PLANNED, null, null, null)
@@ -342,7 +344,7 @@ class ManualTradingServiceTest {
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("50.00")));
         // 원장 usdDeposit=60.00 — 캡 전(100.00)은 부족, 캡 후(52.50)는 충분
         stubLedger(new BigDecimal("60.00"));
-        Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(),
+        Order savedOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("52.50"), OrderStatus.PLANNED, null, null, null);
         lenient().when(orderPort.findPlannedByCycleAndDate(eq(CYCLE.id()), any())).thenReturn(List.of());
@@ -359,7 +361,7 @@ class ManualTradingServiceTest {
     // 캡을 적용해도 여전히 예산을 초과하면 거부되어야 한다(캡이 항상 통과시키는 것은 아님을 확인)
     @Test
     void execute_cappedAmountStillExceedsBudget_throwsManualTradingException() {
-        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE,
                 OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
                 OrderStatus.PLANNED, null, null, null)
@@ -403,7 +405,7 @@ class ManualTradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED), null, null, null);
         PrivacyTradeBase base = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
         when(strategyPort.findByIdOrThrow(privacy.id())).thenReturn(privacy);
@@ -430,7 +432,7 @@ class ManualTradingServiceTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
-                new BigDecimal("5000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("5000.00"), null, LocalDate.now(FIXED), null, null, null);
         // VR 잔고 이력 — holdings=5
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
@@ -445,20 +447,20 @@ class ManualTradingServiceTest {
                 10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문 (BUY 1주 + SELL 1주)
-        Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
                 BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("VR_BUY_01");
-        Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order vrSellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("VR_SELL_01");
         UUID vrBuyId = UUID.randomUUID();
         UUID vrSellId = UUID.randomUUID();
-        Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order vrBuyPlanned = new Order(vrBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
                 BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
-        Order vrSellPlanned = new Order(vrSellId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order vrSellPlanned = new Order(vrSellId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
 
@@ -504,7 +506,7 @@ class ManualTradingServiceTest {
 
     @Test
     void execute_vrStrategy_marketOpen_placesAtOpenOrdersWithCorrectArguments() {
-        // 개장 후 수동 실행 — DstInfo.immediateOpen()으로 marketOpen을 과거로 고정해
+        // 개장 후 수동 실행 — DstInfo.immediateOpen(ZonedDateTime.now(FIXED))으로 marketOpen을 과거로 고정해
         // placeAtOpenOrdersIfMarketOpen의 개장 분기를 결정론적으로 강제한다 (실시간 시각 의존 제거)
         VrFixture fx = setUpVrManualExecution();
         when(orderPort.findAtOpenPlannedByCycleAndDate(eq(fx.vrCycle().id()), any()))
@@ -513,7 +515,7 @@ class ManualTradingServiceTest {
         when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
                 .thenReturn(Map.of(StrategyTicker.SOXL, new BigDecimal("21.00")));
 
-        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen());
+        List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, DstInfo.immediateOpen(ZonedDateTime.now(FIXED)));
 
         assertThat(result).hasSize(2);
         // VR 수동실행 plan.position()은 항상 null(VrCycleOrderStrategy.plan()), vrPosition은 non-null,
@@ -527,7 +529,7 @@ class ManualTradingServiceTest {
     void execute_vrStrategy_marketClosed_doesNotPlaceAtOpenOrders() {
         // 개장 전 수동 실행 — marketOpen을 미래로 설정해 개장 분기를 결정론적으로 회피한다
         VrFixture fx = setUpVrManualExecution();
-        Instant future = Instant.now().plusSeconds(3600);
+        Instant future = Instant.now(FIXED).plusSeconds(3600);
         DstInfo marketClosed = new DstInfo(false, future, future, future);
 
         List<Order> result = service.execute(fx.vrStrat().id(), REQUESTER_ID, marketClosed);

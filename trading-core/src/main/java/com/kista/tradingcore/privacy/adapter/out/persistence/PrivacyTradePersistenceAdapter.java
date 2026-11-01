@@ -1,6 +1,5 @@
 package com.kista.tradingcore.privacy.adapter.out.persistence;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.privacy.domain.model.*;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
@@ -11,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
@@ -41,6 +41,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
             orderSort(PrivacyTradeBaseOrderEntity::getDirection, PrivacyTradeBaseOrderEntity::getPrice);
 
     private final PrivacyTradeBaseJpaRepository baseRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     @Transactional
@@ -121,7 +122,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     public Optional<PrivacyCurrentBase> findSeedPreviewBase() {
         // 미리보기는 KST 오늘 거래일 이후에 적용되는 기준표만 사용 — 발행일은 거래일 전날
-        LocalDate todayKst = LocalDate.now(TimeZones.KST);
+        LocalDate todayKst = LocalDate.now(clock);
         return baseRepository
                 .findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
                         PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL)

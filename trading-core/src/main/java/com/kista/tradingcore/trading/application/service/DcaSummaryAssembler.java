@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Market;
+import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
@@ -57,7 +58,7 @@ class DcaSummaryAssembler {
             boolean decidedToday = last != null && last.tradeDate().equals(today);
             return hourPassed || decidedToday ? today.plusDays(1) : today;
         }
-        LocalDate from = DstInfo.nextTradeDate();
+        LocalDate from = DstInfo.nextTradeDate(nowKst.atZone(TimeZones.KST));
         if (last != null && last.tradeDate().equals(from)) from = from.plusDays(1);
         LocalDate afterStart = cycleStartDate.plusDays(1);
         return from.isBefore(afterStart) ? afterStart : from;

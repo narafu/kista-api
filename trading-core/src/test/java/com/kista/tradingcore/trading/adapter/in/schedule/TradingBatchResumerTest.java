@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.schedule;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
@@ -33,7 +34,7 @@ class TradingBatchResumerTest {
 
     @BeforeEach
     void setUp() {
-        resumer = new TradingBatchResumer(batchRunPort, closeScheduler, openScheduler, errorReportPort);
+        resumer = new TradingBatchResumer(batchRunPort, closeScheduler, openScheduler, errorReportPort, FixedClockTestConfig.FIXED);
     }
 
     private static ZonedDateTime kst(int month, int day, int hour, int minute) {

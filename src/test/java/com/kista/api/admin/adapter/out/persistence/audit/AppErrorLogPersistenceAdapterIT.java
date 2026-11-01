@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.out.persistence.audit;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.admin.domain.model.AppErrorLog;
 import com.kista.api.web.RootDataJpaTestBase;
 import jakarta.persistence.EntityManager;
@@ -34,7 +35,7 @@ class AppErrorLogPersistenceAdapterIT extends RootDataJpaTestBase {
 
     @BeforeEach
     void setUp() {
-        adapter = new AppErrorLogPersistenceAdapter(repo, txManager);
+        adapter = new AppErrorLogPersistenceAdapter(repo, txManager, FixedClockTestConfig.FIXED);
     }
 
     // REQUIRES_NEW로 커밋된 행은 @DataJpaTest 롤백 대상이 아니라 별도 트랜잭션으로 정리

@@ -1,5 +1,6 @@
 package com.kista.api.user.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.user.config.AdminBootstrapProperties;
 import com.kista.api.user.application.event.NewUserRegisteredEvent;
 import com.kista.api.user.application.event.UserApprovedEvent;
@@ -62,7 +63,7 @@ class UserServiceTest {
     void setUpRuntimeSettings() {
         userService = new UserService(userPort, userCascadeDeleter, eventPublisher, bootstrapProps,
                 kakaoOAuthPort, blacklistPort, refreshTokenPort, approvalPolicyPort, userUseCaseProvider,
-                userNotifyProfilePublisher, adminSeedPromoter);
+                userNotifyProfilePublisher, adminSeedPromoter, FixedClockTestConfig.FIXED);
         lenient().when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(true);
         lenient().when(userUseCaseProvider.getObject()).thenReturn(userService);
     }
@@ -75,7 +76,7 @@ class UserServiceTest {
     private User rejectedUser(UUID id) {
         // 25h 전 거절 → 24h 쿨다운 경과
         return DomainFixtures.userWithStatus(id, UserStatus.REJECTED,
-                Instant.now().minus(25, ChronoUnit.HOURS));
+                Instant.now(FixedClockTestConfig.FIXED).minus(25, ChronoUnit.HOURS));
     }
 
     private User pendingUserWithCooldown(UUID id, Instant lastReappliedAt) {
@@ -182,7 +183,7 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         when(approvalPolicyPort.approvalRequiredForUpdate()).thenReturn(false);
         when(userPort.findByIdOrThrow(userId)).thenReturn(
-                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
+                pendingUserWithCooldown(userId, Instant.now(FixedClockTestConfig.FIXED).minus(30, ChronoUnit.MINUTES)));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
@@ -198,7 +199,7 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         // 30분 전에 마지막 재신청
         when(userPort.findByIdOrThrow(userId)).thenReturn(
-                pendingUserWithCooldown(userId, Instant.now().minus(30, ChronoUnit.MINUTES)));
+                pendingUserWithCooldown(userId, Instant.now(FixedClockTestConfig.FIXED).minus(30, ChronoUnit.MINUTES)));
 
         assertThatThrownBy(() -> userService.reapply(userId))
                 .isInstanceOf(User.CooldownException.class);
@@ -209,7 +210,7 @@ class UserServiceTest {
     void reapply_pending_after_1h_succeeds() {
         UUID userId = UUID.randomUUID();
         when(userPort.findByIdOrThrow(userId)).thenReturn(
-                pendingUserWithCooldown(userId, Instant.now().minus(2, ChronoUnit.HOURS)));
+                pendingUserWithCooldown(userId, Instant.now(FixedClockTestConfig.FIXED).minus(2, ChronoUnit.HOURS)));
         when(userPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         userService.reapply(userId);
@@ -237,7 +238,7 @@ class UserServiceTest {
     void reapply_rejected_within_24h_throws_cooldown() {
         UUID userId = UUID.randomUUID();
         when(userPort.findByIdOrThrow(userId)).thenReturn(
-                rejectedUserWithCooldown(userId, Instant.now().minus(1, ChronoUnit.HOURS)));
+                rejectedUserWithCooldown(userId, Instant.now(FixedClockTestConfig.FIXED).minus(1, ChronoUnit.HOURS)));
 
         assertThatThrownBy(() -> userService.reapply(userId))
                 .isInstanceOf(User.CooldownException.class);

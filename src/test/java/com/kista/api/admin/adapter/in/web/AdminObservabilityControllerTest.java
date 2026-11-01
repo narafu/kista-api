@@ -1,5 +1,6 @@
 package com.kista.api.admin.adapter.in.web;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AdminObservabilityController.class)
-@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, RootSecurityPolicy.class, JwtAuthFilter.class, InternalTokenAuthFilter.class, FixedClockTestConfig.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class AdminObservabilityControllerTest {
 

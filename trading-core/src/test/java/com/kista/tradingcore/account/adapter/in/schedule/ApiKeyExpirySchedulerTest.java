@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
+import com.kista.shared.kernel.TimeZones;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,10 +30,9 @@ class ApiKeyExpirySchedulerTest {
     AccountPort accountPort = mock(AccountPort.class);
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     SchedulerLockService lock = mock(SchedulerLockService.class);
-    ApiKeyExpiryScheduler scheduler = new ApiKeyExpiryScheduler(accountPort, publisher, lock);
-
     // 2026-10-18 10:00 KST
     Instant now = Instant.parse("2026-10-18T01:00:00Z");
+    ApiKeyExpiryScheduler scheduler = new ApiKeyExpiryScheduler(accountPort, publisher, lock, Clock.fixed(now, TimeZones.KST));
 
     private Account account(Instant expiresAt) {
         return new Account(UUID.randomUUID(), UUID.randomUUID(), "업비트", "n", "a", "s", null, Broker.UPBIT, now, expiresAt);
@@ -40,7 +40,6 @@ class ApiKeyExpirySchedulerTest {
 
     @Test
     void publishesOnlyAt30_7_0DaysLeft() {
-        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
         when(accountPort.findAll()).thenReturn(List.of(
                 account(now.plus(Duration.ofDays(30))), account(now.plus(Duration.ofDays(7))), account(now),
                 account(now.plus(Duration.ofDays(8))), account(null)));
@@ -54,7 +53,6 @@ class ApiKeyExpirySchedulerTest {
 
     @Test
     void expiryDateIsComputedInKst() {
-        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
         // 15:30Z = 다음날 00:30 KST → 오늘(10-18 KST) 기준 만료일 10-25 KST, 7일 전
         Instant expiresAt = Instant.parse("2026-10-24T15:30:00Z");
         when(accountPort.findAll()).thenReturn(List.of(account(expiresAt)));
@@ -69,7 +67,6 @@ class ApiKeyExpirySchedulerTest {
 
     @Test
     void nonUpbitAccountIgnored() {
-        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
         Account kis = new Account(UUID.randomUUID(), UUID.randomUUID(), "KIS", "n", "a", "s", null, Broker.KIS, now, now);
         when(accountPort.findAll()).thenReturn(List.of(kis));
 
@@ -80,7 +77,6 @@ class ApiKeyExpirySchedulerTest {
 
     @Test
     void meritzAccountWithExpiryIsIgnored() {
-        scheduler.clock = Clock.fixed(now, ZoneOffset.UTC);
         // 키 전용 브로커여도 만료 점검 대상은 업비트뿐이다
         Account meritz = new Account(UUID.randomUUID(), UUID.randomUUID(), "메리츠", "n", "a", "s", null, Broker.MERITZ, now, now.plus(Duration.ofDays(7)));
         when(accountPort.findAll()).thenReturn(List.of(meritz));

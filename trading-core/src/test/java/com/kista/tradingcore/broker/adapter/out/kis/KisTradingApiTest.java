@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
@@ -11,7 +12,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,7 +38,12 @@ class KisTradingApiTest {
 
     @Mock KisHttpClient kisHttpClient;
     @Spy KisExchangeRegistry exchangeRegistry = new KisExchangeRegistry();
-    @InjectMocks KisTradingApi api;
+    KisTradingApi api;
+
+    @BeforeEach
+    void setUp() {
+        api = new KisTradingApi(kisHttpClient, exchangeRegistry, FixedClockTestConfig.FIXED);
+    }
 
     private static final BrokerAccountRef ACCOUNT = new BrokerAccountRef(
             UUID.randomUUID(), "appKey", "appSecret",

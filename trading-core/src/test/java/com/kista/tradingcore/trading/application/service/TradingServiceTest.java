@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchGuard;
 import com.kista.tradingcore.trading.application.service.support.TradingParallelRunner;
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
@@ -14,7 +15,6 @@ import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.MarketClosedEvent;
 import com.kista.tradingcore.trading.application.event.TradingErrorEvent;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.broker.domain.model.SellableQuantity;
 import com.kista.shared.kernel.OrderDirection;
@@ -52,6 +52,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.ZonedDateTime;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -105,9 +106,9 @@ class TradingServiceTest {
     AccountBudgetLock budgetLock = spy(new AccountBudgetLock()); // 배치 allocator 경로용 실제 락 + 구간 추적
 
     static final DstInfo PAST_DST = new DstInfo(true,
-            Instant.now().minusSeconds(3600),
-            Instant.now().minusSeconds(1800),
-            Instant.now().minusSeconds(7200)); // marketOpen도 과거로 설정해 대기 skip
+            Instant.now(FIXED).minusSeconds(3600),
+            Instant.now(FIXED).minusSeconds(1800),
+            Instant.now(FIXED).minusSeconds(7200)); // marketOpen도 과거로 설정해 대기 skip
 
     static final BigDecimal PRICE = new BigDecimal("22.00");
 
@@ -121,7 +122,7 @@ class TradingServiceTest {
     );
     static final UUID STRATEGY_VERSION_ID = UUID.randomUUID();
     static final StrategyCycle STRATEGY_CYCLE = new StrategyCycle(
-            UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null
+            UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null
     );
 
     // CyclePosition 기반 잔고 (TradingService가 KIS API 대신 이력에서 읽음)
@@ -182,7 +183,7 @@ class TradingServiceTest {
         StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, cycleStrategies);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, ledgerBudget,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerOrderPort, eventPublisher),
-                new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher),
+                new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher, FIXED),
                 eventPublisher, mock(DcaExecutionRecorder.class));
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
@@ -230,7 +231,7 @@ class TradingServiceTest {
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader, dcaDetailPort,
-                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies);
+                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, FIXED);
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
@@ -240,11 +241,11 @@ class TradingServiceTest {
     @Test
     void execute_slotSavedByManualAfterCandidateCollection_skipsDuplicateSaveButPlaces() throws InterruptedException {
         BigDecimal startPrice = new BigDecimal("20.00");
-        Order template = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order template = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice, OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_NORMAL_BUY");
         UUID manualId = UUID.randomUUID();
-        Order manualSaved = new Order(manualId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order manualSaved = new Order(manualId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice,
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_NORMAL_BUY");
 
@@ -278,14 +279,14 @@ class TradingServiceTest {
         BigDecimal prevClose = new BigDecimal("19.00");  // 전일종가
         // PRICE = "22.00" — 종가 (PostClose 이후)
 
-        Order template = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order template = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice, OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_NORMAL_BUY");
         UUID plannedId = UUID.randomUUID();
-        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice,
                 OrderStatus.PLANNED, null, null, null);
-        Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order placedOrder = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice, OrderStatus.PLACED, "ORD-001", null, null);
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
@@ -339,9 +340,9 @@ class TradingServiceTest {
     @Test
     void executeBatch_todayOrdersExist_skipsPlanningAndProceedsToKis() throws InterruptedException {
         // 수동 실행으로 이미 PLANNED 주문이 존재 → 재계산 skip, KIS 접수만 수행
-        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLANNED, null, null, null);
-        Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order placedOrder = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-001", null, null);
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -389,16 +390,16 @@ class TradingServiceTest {
         BigDecimal executionPrice = new BigDecimal("20.50"); // LOC 체결가 (개장가~종가 사이)
         BigDecimal executionAmount = new BigDecimal("20.50"); // 1주 × $20.50
 
-        Order template = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order template = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice, OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_FRESH_BUY");
         UUID plannedId = UUID.randomUUID();
-        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice,
                 OrderStatus.PLANNED, null, null, null);
-        Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order placedOrder = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), startPrice, OrderStatus.PLACED, "ORD-001", null, null);
-        Execution buyExecution = new Execution(LocalDate.now(), StrategyTicker.SOXL,
+        Execution buyExecution = new Execution(LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderDirection.BUY, 1, executionPrice, executionAmount, "ORD-001");
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
@@ -435,18 +436,18 @@ class TradingServiceTest {
         // AT_OPEN SELL 주문은 개장 시 선접수. AT_CLOSE BUY는 stale-cap 방지를 위해 마감 스케쥴러 전담이라
         // 전략 계산 결과에 섞여 있어도 개장 경로에서는 저장 대상에서 제외돼야 한다 (회귀 가드).
         BigDecimal prevClose = new BigDecimal("19.00");
-        Order buyTemplate  = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order buyTemplate  = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY,  BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_CLOSE_BUY");
-        Order sellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_OPEN_SELL");
 
         UUID sellPlannedId = UUID.randomUUID();
-        Order sellPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order sellPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null);
-        Order sellPlacedKis = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order sellPlacedKis = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLACED, "ORD-SELL-001", null, null);
 
@@ -477,16 +478,16 @@ class TradingServiceTest {
     void placeOpenOrders_existingAtCloseBuy_doesNotBlockMissingAtOpenSell() throws InterruptedException {
         // 기존 AT_CLOSE BUY는 반대 timing/direction 슬롯인 AT_OPEN SELL 생성을 막지 않는다.
         UUID sellPlannedId = UUID.randomUUID();
-        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
-        Order sellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
-        Order sellPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order sellPlanned = new Order(sellPlannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null);
-        Order sellPlacedKis = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order sellPlacedKis = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLACED, "ORD-SELL-002", null, null);
 
@@ -515,7 +516,7 @@ class TradingServiceTest {
         // 매수 금액 초과 → 전략 원장 부족 → 사용자 알람, 저장 건너뜀
         // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY로 대체
         BigDecimal prevClose = new BigDecimal("19.00");
-        Order bigBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order bigBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"), // 50,000 >> usdDeposit=10
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_BUY");
 
@@ -544,7 +545,7 @@ class TradingServiceTest {
     void sellApprovedWithoutSellableCheck() throws InterruptedException {
         BigDecimal prevClose = new BigDecimal("19.00");
         // SELL 100주 — 판매가능수량 조회 없이 저장된다(증권사가 거절하면 접수 단계에서 처리)
-        Order bigSell = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order bigSell = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(100), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_SELL");
 
@@ -566,7 +567,7 @@ class TradingServiceTest {
     @Test
     void placeOpenOrders_saveFailureWithoutExistingOrders_skipsAtOpenPlacement() throws InterruptedException {
         RuntimeException saveFailure = new RuntimeException("save failed");
-        Order sell = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sell = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
 
@@ -590,13 +591,13 @@ class TradingServiceTest {
     @Test
     void placeOpenOrders_cappedBuyExceedsBudget_savesOnlyApprovedSell() throws InterruptedException {
         // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY로 대체
-        Order originalBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order originalBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("60.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_ORIGINAL_BUY");
-        Order sell = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sell = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("45.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_OPEN_SELL");
-        Order cappedBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order cappedBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2), new BigDecimal("52.50"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_CAPPED_BUY");
 
@@ -628,16 +629,16 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle infiniteCycle = new StrategyCycle(UUID.randomUUID(), infinite.id(), UUID.randomUUID(),
-                new BigDecimal("1800.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1800.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("177.61"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("177.61"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition infiniteHistory = new CyclePosition(null, infiniteCycle.id(), new BigDecimal("1800.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         CyclePosition privacyHistory = new CyclePosition(null, privacyCycle.id(), new BigDecimal("177.61"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
-        Order privacyBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
+        Order privacyBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(3), new BigDecimal("101.44"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_PRIVACY_BUY"); // 304.32 > 원장 177.61
 
@@ -676,7 +677,7 @@ class TradingServiceTest {
         Strategy vr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition vrHistory = new CyclePosition(null, vrCycle.id(), new BigDecimal("1000.00"),
                 new BigDecimal("100.00"), new BigDecimal("100.00"), BigDecimal.valueOf(10), null, null);
         CyclePosition vrOpening = CyclePosition.cycleStartSnapshot(
@@ -703,7 +704,7 @@ class TradingServiceTest {
         when(orderPort.sumFilledBuyAmountByCycleId(vrCycle.id())).thenReturn(BigDecimal.ZERO);
 
         // 사다리 BUY 원본: 90.00 — 계획 시점 cap(105.00) 이하라 그대로 PLANNED 저장됨
-        Order originalBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.TQQQ, OrderType.LIMIT,
+        Order originalBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.TQQQ, OrderType.LIMIT,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("90.00"),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_VR_LADDER_BUY_STALE");
@@ -712,12 +713,12 @@ class TradingServiceTest {
 
         // DB에 저장된(것으로 가정하는) PLANNED BUY — 개장 접수 전 캡 재평가 대상
         UUID staleBuyId = UUID.randomUUID();
-        Order stalePlanned = new Order(staleBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.TQQQ,
+        Order stalePlanned = new Order(staleBuyId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(FIXED), StrategyTicker.TQQQ,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("90.00"),
                 OrderStatus.PLANNED, null, null, null);
 
         // AT_OPEN 스코프 보정(capVrIfNeededAtOpen)의 재산정 결과 — cap(84.00)로 재산정된 사다리
-        Order cappedTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.TQQQ, OrderType.LIMIT,
+        Order cappedTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.TQQQ, OrderType.LIMIT,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2), new BigDecimal("84.00"),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_VR_LADDER_BUY_STALE");
@@ -725,7 +726,7 @@ class TradingServiceTest {
                 .thenReturn(List.of(cappedTemplate.toPlanned()));
 
         UUID cappedOrderId = UUID.randomUUID();
-        Order cappedPlanned = new Order(cappedOrderId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(), StrategyTicker.TQQQ,
+        Order cappedPlanned = new Order(cappedOrderId, ACCOUNT.id(), vrCycle.id(), LocalDate.now(FIXED), StrategyTicker.TQQQ,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(2), new BigDecimal("84.00"),
                 OrderStatus.PLANNED, null, null, null);
         // 재캡 총액(84×2=168)이 원본(90)보다 커서 capIfNeeded가 2회 조회한다 — 1차(원장 예산 요청)·2차(원장 예산으로 반영)는
@@ -756,7 +757,7 @@ class TradingServiceTest {
         // 후반 최종회차 등 SELL 없음 — KIS 접수 0건 (정상)
         // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN BUY만 있는 시나리오로 대체
         BigDecimal prevClose = new BigDecimal("19.00");
-        Order buyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_OPEN_BUY");
 
@@ -780,11 +781,11 @@ class TradingServiceTest {
         Strategy dca = new Strategy(UUID.randomUUID(), account.id(), StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), dca.id(), STRATEGY_VERSION_ID, new BigDecimal("1000.00"),
-                null, LocalDate.now().minusDays(1), null, null, null);
+                null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         lenient().when(dcaDetailPort.findActiveByStrategyIds(anyCollection())).thenReturn(Map.of(dca.id(), com.kista.tradingcore.support.TradingFixtures.dcaConfig(
                 com.kista.tradingcore.support.TradingFixtures.stockDcaRule("BUY", OrderDirection.BUY, "100", orderType)))); // 키 "BUY" → leg DCA_BUY
         when(cycleHistoryPort.findLatestOneByStrategyId(dca.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        Order planned = new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order planned = new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("22.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("DCA_BUY");
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(cycle.id()), any())).thenReturn(List.of(planned));
@@ -838,10 +839,10 @@ class TradingServiceTest {
     @Test
     void dca_pre_open_failure_is_reported_and_open_orders_still_placed() throws InterruptedException {
         // 개장 전 DCA 단계 실패가 INFINITE 개장 접수를 막지 않아야 한다
-        Order sellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_OPEN_SELL");
-        Order sellPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order sellPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null);
         stubOpenBatchBasics(ACCOUNT_REF);
@@ -864,12 +865,12 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_interruptedAtMarketOpenWait_notifiesAllContextUsersAndRethrows() {
-        // marketOpen을 충분히 미래로 설정 → waitUntilMarketOpen()이 양수 → Thread.sleep 호출 즉시 인터럽트 플래그로 예외(실제 대기 없음).
+        // marketOpen을 충분히 미래로 설정 → waitUntilMarketOpen(now)이 양수 → Thread.sleep 호출 즉시 인터럽트 플래그로 예외(실제 대기 없음).
         // 300ms였을 땐 느린 CI에서 setup이 그보다 오래 걸려 대기 0 → sleep 미호출로 간헐 실패했다
         DstInfo interruptingDst = new DstInfo(true,
-                Instant.now().minusSeconds(3600),
-                Instant.now().minusSeconds(1800),
-                Instant.now().plusSeconds(60));
+                Instant.now(FIXED).minusSeconds(3600),
+                Instant.now(FIXED).minusSeconds(1800),
+                Instant.now(FIXED).plusSeconds(60));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -888,7 +889,7 @@ class TradingServiceTest {
     void executeBatch_ledgerInsufficient_skipsOrderPlanAndNotifies() throws InterruptedException {
         // 마감 스케쥴러 plan 단계 — 전략 원장 부족 시 PLANNED 저장 건너뜀
         BigDecimal prevClose = new BigDecimal("19.00");
-        Order bigBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order bigBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_BIG_BUY");
 
@@ -918,16 +919,16 @@ class TradingServiceTest {
     @Test
     void executeBatch_originalBuyFitsButPreparedBuyExceedsBudget_rejectsBuyAndSavesSell()
             throws InterruptedException {
-        Order originalBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order originalBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("30.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_ORIGINAL_BUY");
-        Order sell = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sell = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("35.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_CLOSE_SELL");
-        Order cappedBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order cappedBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(2), new BigDecimal("23.10"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_CAPPED_BUY");
-        Order correction = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order correction = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("10.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_CORRECTION_BUY");
 
@@ -1006,7 +1007,7 @@ class TradingServiceTest {
         StrategyCycle succeedingCycle = cycle(succeedingStrategy);
         TradingUserProfile failingUser = TradingFixtures.tradingUserProfile(failingAccount.userId());
         TradingUserProfile succeedingUser = TradingFixtures.tradingUserProfile(succeedingAccount.userId());
-        Order rejectedBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order rejectedBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_REJECTED_BUY");
         RuntimeException notificationFailure = new RuntimeException("account A notification failure");
@@ -1037,15 +1038,15 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase privacyBase = new PrivacyTradeBase(
                 UUID.randomUUID(), new BigDecimal("20.00"), 10, new BigDecimal("20.00"), List.of());
-        Order buy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order buy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(100), new BigDecimal("500.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_PRIVACY_BUY");
-        Order sell = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sell = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("TEST_PRIVACY_SELL");
 
@@ -1068,11 +1069,11 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingAtOpenSell_doesNotBlockMissingAtCloseBuy() throws InterruptedException {
-        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLACED, "ORD-SELL-OPEN", null, null);
         Order buyTemplate = buyTemplate(StrategyTicker.SOXL, "20.00", OrderTiming.AT_CLOSE);
-        Order buyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order buyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LIMIT, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED, null, null, null);
 
@@ -1099,7 +1100,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingConcreteBuyLeg_savesOnlyMissingBuyLegs() throws InterruptedException {
-        Order existing = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existing = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_AVG_BUY", BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED,
                 null, null, null);
@@ -1126,23 +1127,23 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingCompleteInfiniteEarlyConcreteLegs_skipsOrderComputer() throws InterruptedException {
-        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_AVG_BUY", BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order ref = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order ref = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_REF_BUY", BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order correction1 = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order correction1 = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_CORRECTION_01", BigDecimal.valueOf(1), new BigDecimal("19.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order correction2 = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order correction2 = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_CORRECTION_02", BigDecimal.valueOf(1), new BigDecimal("18.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order correction3 = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order correction3 = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_CORRECTION_03", BigDecimal.valueOf(1), new BigDecimal("17.00"), OrderStatus.PLANNED,
                 null, null, null);
@@ -1170,11 +1171,11 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingInfiniteBaseWithoutCorrections_doesNotSkipOrderComputer() throws InterruptedException {
-        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_AVG_BUY", BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order ref = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order ref = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_REF_BUY", BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED,
                 null, null, null);
@@ -1200,21 +1201,21 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_existingCompleteAtCloseBuyLegs_doesNotSkipMissingAtOpenSell() throws InterruptedException {
-        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_AVG_BUY", BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order ref = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order ref = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_REF_BUY", BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED,
                 null, null, null);
         Order correction1 = avg.withLeg("INFINITE_CORRECTION_01");
         Order correction2 = avg.withLeg("INFINITE_CORRECTION_02");
         Order correction3 = avg.withLeg("INFINITE_CORRECTION_03");
-        Order sellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order sellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLANNED, null, null, null).withLeg("INFINITE_LOC_SELL");
-        Order sellPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order sellPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 "INFINITE_LOC_SELL", BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED,
                 null, null, null);
@@ -1241,7 +1242,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_unknownNewTemplateLeg_isRejectedBeforeSave() throws InterruptedException {
-        Order unknown = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order unknown = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("20.00"),
                 OrderStatus.PLANNED, null, null, null);
 
@@ -1263,7 +1264,7 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingPartialInfiniteConcreteLegs_doesNotSkipOrderComputer() throws InterruptedException {
-        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order avg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "INFINITE_EARLY_AVG_BUY", BigDecimal.valueOf(1), new BigDecimal("20.00"), OrderStatus.PLANNED,
                 null, null, null);
@@ -1285,10 +1286,10 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingReverseSellOnly_computesAndSavesReverseBuy() throws InterruptedException {
-        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null).withLeg("REVERSE_INFINITE_LOC_SELL");
-        Order reverseBuy = Order.fromPlanned(PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order reverseBuy = Order.fromPlanned(PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderDirection.BUY, 1, new BigDecimal("21.99"), "REVERSE_INFINITE_LOC_BUY"), null, null);
         CyclePositionInfiniteDetail latestReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
         CyclePositionInfiniteDetail previousReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
@@ -1320,11 +1321,11 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingReverseBuyOnly_computesAndSavesReverseSell() throws InterruptedException {
-        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "REVERSE_INFINITE_LOC_BUY", BigDecimal.valueOf(1), new BigDecimal("21.99"), OrderStatus.PLANNED,
                 null, null, null);
-        Order reverseSell = Order.fromPlanned(PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order reverseSell = Order.fromPlanned(PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderDirection.SELL, 1, new BigDecimal("22.00"), "REVERSE_INFINITE_LOC_SELL"), null, null);
         CyclePositionInfiniteDetail latestReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
         CyclePositionInfiniteDetail previousReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
@@ -1356,15 +1357,15 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_existingReverseSellLegWithBuyDirection_computesAndSavesReverseSell() throws InterruptedException {
-        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "REVERSE_INFINITE_LOC_BUY", BigDecimal.valueOf(1), new BigDecimal("21.99"), OrderStatus.PLANNED,
                 null, null, null);
-        Order wrongDirectionSellLeg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order wrongDirectionSellLeg = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 "REVERSE_INFINITE_LOC_SELL", BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED,
                 null, null, null);
-        Order reverseSell = Order.fromPlanned(PlannedOrder.of(LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order reverseSell = Order.fromPlanned(PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderDirection.SELL, 1, new BigDecimal("22.00"), "REVERSE_INFINITE_LOC_SELL"), null, null);
         CyclePositionInfiniteDetail latestReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
         CyclePositionInfiniteDetail previousReverse = new CyclePositionInfiniteDetail(UUID.randomUUID(), true);
@@ -1402,10 +1403,10 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
-        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(),
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
 
@@ -1434,10 +1435,10 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
-        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(),
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), privacyCycle.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
@@ -1470,7 +1471,7 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
@@ -1497,7 +1498,7 @@ class TradingServiceTest {
         Strategy privacy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle privacyCycle = new StrategyCycle(UUID.randomUUID(), privacy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history = new CyclePosition(null, privacyCycle.id(), new BigDecimal("1000.00"),
                 PRICE, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         PrivacyTradeBase missingSellBase = new PrivacyTradeBase(
@@ -1527,13 +1528,13 @@ class TradingServiceTest {
     @Test
     void executeBatch_skipBranch_recomputesPositionForBuyCapping() throws InterruptedException {
         // 장 개시 스케쥴러 먼저 실행 → 오늘 주문 존재 → skip 분기 → position 재계산 → BUY 접수
-        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existingSell = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_OPEN, OrderDirection.SELL, BigDecimal.valueOf(1), new BigDecimal("25.00"),
                 OrderStatus.PLACED, "ORD-SELL-001", null, null);
-        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(),
+        Order existingBuy = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED),
                 StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE,
                 OrderStatus.PLANNED, null, null, null);
-        Order placedBuy = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order placedBuy = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-BUY-001", null, null);
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
@@ -1569,7 +1570,7 @@ class TradingServiceTest {
         // 두 전략이 같은 ticker → getPriceSnapshots() 1회(시작가), getPrices() 1회(접수 직전 재조회), getClosingPrices() 1회(종가), 단건 fallback 없음
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         Order existingFirst = placedOrder(ACCOUNT, STRATEGY_CYCLE);
@@ -1609,14 +1610,14 @@ class TradingServiceTest {
         BigDecimal placementPrice = new BigDecimal("10.00");   // 접수 직전 재조회 가격 — cap 10.50
         BigDecimal plannedBuyPrice = new BigDecimal("40.00");  // startPrice cap은 통과하지만 placementPrice cap은 초과
 
-        Order template = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order template = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), plannedBuyPrice, OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_REFRESH_BUY");
         UUID plannedId = UUID.randomUUID();
-        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order planned = new Order(plannedId, ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), plannedBuyPrice,
                 OrderStatus.PLANNED, null, null, null);
-        Order placedOrder = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL, OrderType.LOC,
+        Order placedOrder = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), plannedBuyPrice, OrderStatus.PLACED, "ORD-REFRESH", null, null);
 
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY.id())).thenReturn(STRATEGY_CYCLE);
@@ -1651,7 +1652,7 @@ class TradingServiceTest {
         // STRATEGY → 예외 발생, strategy2 → 정상 실행
         Strategy strategy2 = new Strategy(UUID.randomUUID(), ACCOUNT.id(),
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
-        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+        StrategyCycle cycle2 = new StrategyCycle(UUID.randomUUID(), strategy2.id(), UUID.randomUUID(), new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         CyclePosition history2 = new CyclePosition(
                 null, cycle2.id(), new BigDecimal("1000.00"), new BigDecimal("20.00"), new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         Order existingSecond = placedOrder(ACCOUNT, cycle2);
@@ -1681,11 +1682,11 @@ class TradingServiceTest {
 
     @Test
     void executeBatch_interruptedAtOrderWait_notifiesPlannedUserAndRethrows() {
-        // orderAt을 살짝 미래로 설정 → waitUntilOrderTime()이 양수 → Thread.sleep 실제 호출
+        // orderAt을 살짝 미래로 설정 → waitUntilOrderTime(now)이 양수 → Thread.sleep 실제 호출
         DstInfo interruptingDst = new DstInfo(true,
-                Instant.now().plusMillis(300),
-                Instant.now().minusSeconds(1800),
-                Instant.now().minusSeconds(7200));
+                Instant.now(FIXED).plusMillis(300),
+                Instant.now(FIXED).minusSeconds(1800),
+                Instant.now(FIXED).minusSeconds(7200));
 
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -1726,7 +1727,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
         StrategyCycle maintainCycle = new StrategyCycle(
-                UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now().minusDays(1), null, null, null);
+                UUID.randomUUID(), maintainStrategy.id(), UUID.randomUUID(), initDeposit, null, LocalDate.now(FIXED).minusDays(1), null, null, null);
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
@@ -1757,7 +1758,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAX);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         BigDecimal expectedSeed = FRESH_HISTORY.usdDeposit(); // 1000.00
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -1786,7 +1787,7 @@ class TradingServiceTest {
                 UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.MAINTAIN);
         StrategyCycle maxCycle = new StrategyCycle(
-                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                UUID.randomUUID(), maxStrategy.id(), UUID.randomUUID(), new BigDecimal("500.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
 
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
@@ -1838,7 +1839,7 @@ class TradingServiceTest {
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         UUID vrVersionId = UUID.randomUUID();
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vrStrat.id(), vrVersionId,
-                new BigDecimal("5000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("5000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         // VR 잔고 이력 — holdings=5, usdDeposit=$5000 (live 잔고 검증 통과용)
         CyclePosition vrHistory = new CyclePosition(
                 null, vrCycle.id(), new BigDecimal("5000.00"), new BigDecimal("22.00"),
@@ -1853,11 +1854,11 @@ class TradingServiceTest {
                 10, 52, 26, 10, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
 
         // VR buildOrders 결과: LIMIT + AT_OPEN 주문만 반환 (매수 1주 + 매도 1주)
-        Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order vrBuyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY,
                 BigDecimal.valueOf(1), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_VR_BUY");
-        Order vrSellTemplate = new Order(null, null, null, LocalDate.now(), StrategyTicker.SOXL,
+        Order vrSellTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_VR_SELL");
@@ -1908,23 +1909,23 @@ class TradingServiceTest {
 
     private StrategyCycle cycle(Strategy strategy) {
         return new StrategyCycle(UUID.randomUUID(), strategy.id(), UUID.randomUUID(),
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
     }
 
     private Order plannedBuy(TradingAccount account, StrategyCycle cycle, String price) {
-        return new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(), StrategyTicker.SOXL,
+        return new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 BigDecimal.valueOf(1), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
     private Order placedOrder(TradingAccount account, StrategyCycle cycle) {
-        return new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(), StrategyTicker.SOXL,
+        return new Order(UUID.randomUUID(), account.id(), cycle.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LIMIT, OrderTiming.AT_CLOSE, OrderDirection.SELL,
                 BigDecimal.valueOf(1), new BigDecimal("25.00"), OrderStatus.PLACED, "ORD-EXISTING", null, null);
     }
 
     private Order buyTemplate(StrategyTicker ticker, String amount, OrderTiming timing) {
-        return new Order(null, null, null, LocalDate.now(), ticker, OrderType.LIMIT,
+        return new Order(null, null, null, LocalDate.now(FIXED), ticker, OrderType.LIMIT,
                 timing, OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal(amount),
                 OrderStatus.PLANNED, null, null, null)
                 .withLeg("TEST_" + ticker + "_" + timing + "_BUY_" + amount.replace(".", "_"));
@@ -1935,7 +1936,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_scheduledStartEqualsTradeDate_skipsCycleWithoutProcessing() throws InterruptedException {
         // 경계값 — startDate == tradeDate(오늘) → tradeDate.isAfter(startDate)=false → skip
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         StrategyCycle scheduledCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, today, null, null, null);
 
@@ -1952,7 +1953,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_scheduledStartAfterTradeDate_skipsCycleWithoutProcessing() throws InterruptedException {
         // startDate > tradeDate(오늘) → 아직 미도래 → skip (경계값과 동일 분기, 요구사항 완전성 검증용)
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         StrategyCycle futureCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, today.plusDays(5), null, null, null);
 
@@ -1968,7 +1969,7 @@ class TradingServiceTest {
     @Test
     void executeBatch_scheduledStartBeforeTradeDate_executesNormally() throws InterruptedException {
         // startDate < tradeDate(오늘) → 정상 실행 (경계값 바로 다음날)
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, today.minusDays(1), null, null, null);
         Order template = buyTemplate(StrategyTicker.SOXL, "20.00", OrderTiming.AT_CLOSE);
@@ -1991,9 +1992,9 @@ class TradingServiceTest {
 
     @Test
     void placeOpenOrders_scheduledStartEqualsTradeDate_skipsCycleWithoutProcessing() throws InterruptedException {
-        // 개장 스케쥴러는 tradeDate = DstInfo.nextTradeDate()(익일 거래일) 기준 — 실제 계산값을 그대로 경계로 사용
+        // 개장 스케쥴러는 tradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED))(익일 거래일) 기준 — 실제 계산값을 그대로 경계로 사용
         // (월 22:30 발화 시 tradeDate=화, 화 22:30 발화 시 tradeDate=수 — 어느 시각에 실행되든 boundary는 동일 규칙)
-        LocalDate tradeDate = DstInfo.nextTradeDate();
+        LocalDate tradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         StrategyCycle scheduledCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, tradeDate, null, null, null);
 
@@ -2009,7 +2010,7 @@ class TradingServiceTest {
     @Test
     void placeOpenOrders_scheduledStartBeforeTradeDate_executesNormally() throws InterruptedException {
         // startDate가 다음 거래일 하루 전 — 정상적으로 개장 order 생성까지 진행
-        LocalDate tradeDate = DstInfo.nextTradeDate();
+        LocalDate tradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         StrategyCycle startedCycle = new StrategyCycle(UUID.randomUUID(), STRATEGY.id(), STRATEGY_VERSION_ID,
                 new BigDecimal("1000.00"), null, tradeDate.minusDays(1), null, null, null);
         // AT_CLOSE는 이제 개장 스케쥴러에서 생성되지 않음(close 전담) — AT_OPEN으로 생성 확인
@@ -2031,7 +2032,7 @@ class TradingServiceTest {
 
     // 기존 PLANNED 주문이 있는 정상 흐름 stub — 계획 skip 후 접수·리포트까지 진행
     private void stubExistingPlannedFlow() {
-        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLANNED, null, null, null);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
@@ -2050,7 +2051,7 @@ class TradingServiceTest {
 
         service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         InOrder inOrder = inOrder(batchRunPort, brokerOrderPort, kisExecutionPort);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.STARTED);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLANNED);
@@ -2069,8 +2070,8 @@ class TradingServiceTest {
 
         // 시작 기록이 이전 수동 실행의 DONE을 덮어써야 중단 시 재개 판정이 가려지지 않는다
         InOrder inOrder = inOrder(batchRunPort);
-        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.STARTED);
-        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.DONE);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(FIXED), TradingBatchPhase.STARTED);
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(FIXED), TradingBatchPhase.DONE);
         verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.PLANNED));
     }
 
@@ -2080,7 +2081,7 @@ class TradingServiceTest {
 
         service.placeOpenOrders(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
 
-        LocalDate tradeDate = DstInfo.nextTradeDate();
+        LocalDate tradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         InOrder inOrder = inOrder(batchRunPort);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.STARTED);
         inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.OPEN, tradeDate, TradingBatchPhase.DONE);
@@ -2091,15 +2092,15 @@ class TradingServiceTest {
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
-        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(), StrategyTicker.SOXL,
+        Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLANNED, null, null, null);
         // 계획 도중(비임계 구간) 종료 요청 수신 — 이후 주문 시각 대기 진입 즉시 중단
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenAnswer(invocation -> {
             runState.requestStop(Duration.ZERO);
             return List.of(alreadyPlanned);
         });
-        DstInfo futureOrder = new DstInfo(true, Instant.now().plusSeconds(3600),
-                Instant.now().plusSeconds(7200), Instant.now());
+        DstInfo futureOrder = new DstInfo(true, Instant.now(FIXED).plusSeconds(3600),
+                Instant.now(FIXED).plusSeconds(7200), Instant.now(FIXED));
 
         assertThrows(InterruptedException.class, () -> service.executeBatch(
                 List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), futureOrder));
@@ -2107,24 +2108,24 @@ class TradingServiceTest {
         verify(eventPublisher, never()).publishEvent(any(BatchInterruptedEvent.class));
         verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof TradingErrorEvent t
                 && t.message().startsWith("[재기동]")));
-        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(TimeZones.KST), TradingBatchPhase.PLANNED);
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(FIXED), TradingBatchPhase.PLANNED);
         verify(batchRunPort, never()).recordPhase(any(), any(), eq(TradingBatchPhase.PLACING));
         verify(brokerOrderPort, never()).place(any(), any());
     }
 
     @Test
     void resumeCloseReport_skipsReportedStrategy_reportsOthers_recordsDone() throws InterruptedException {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         // 두 번째 전략 — 같은 계좌·종목, 리포트 미완료
         Strategy pendingStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle pendingCycle = new StrategyCycle(UUID.randomUUID(), pendingStrategy.id(), STRATEGY_VERSION_ID,
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         // 세 번째 전략 — 당일 주문 없음(원래 배치의 리포트 대상 아님: PRIVACY 기준 미수신·장중 신규 등)
         Strategy idleStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle idleCycle = new StrategyCycle(UUID.randomUUID(), idleStrategy.id(), STRATEGY_VERSION_ID,
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         BatchContext reported = new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER);
         BatchContext pending = new BatchContext(pendingStrategy, pendingCycle, ACCOUNT, USER);
         BatchContext idle = new BatchContext(idleStrategy, idleCycle, ACCOUNT, USER);
@@ -2155,7 +2156,7 @@ class TradingServiceTest {
 
     @Test
     void resumeCloseReport_includesAlreadyFilledOrders_soFillsAreNotLost() throws InterruptedException {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         // 체결 상태 기록 후 포지션 저장 전에 중단 — 주문은 이미 FILLED라 PLACED 조회로는 빠진다
         Order filled = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(2), PRICE, OrderStatus.FILLED, "ORD-F", null, null);
@@ -2178,12 +2179,12 @@ class TradingServiceTest {
 
     @Test
     void resumeCloseReport_includesVrWithoutOrders_soRolloverIsChecked() throws InterruptedException {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FIXED);
         // VR 전략 — 당일 주문 0건이어도 일반 마감 경로(planAll)처럼 리포트까지 흘러 rollIfDue가 매일 판정돼야 한다
         Strategy vr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), vr.id(), STRATEGY_VERSION_ID,
-                new BigDecimal("1000.00"), null, LocalDate.now().minusDays(1), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
         when(batchRunPort.isReported(today, vr.id())).thenReturn(false);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
         when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.TQQQ, PRICE));

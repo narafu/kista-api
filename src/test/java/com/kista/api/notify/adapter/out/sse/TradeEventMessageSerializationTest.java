@@ -24,7 +24,7 @@ class TradeEventMessageSerializationTest {
     @Test
     @DisplayName("BUY 이벤트 — kind 필드가 문자열 'BUY'로 직렬화")
     void buy_kind_serializes_as_string() throws Exception {
-        TradeEventMessage event = TradeEventMessage.buy("SOXL", BigDecimal.valueOf(5), 22.50, 112.50, "테스트계좌", ACCOUNT_ID, STRATEGY_ID, Currency.USD);
+        TradeEventMessage event = TradeEventMessage.buy("SOXL", BigDecimal.valueOf(5), 22.50, 112.50, "테스트계좌", ACCOUNT_ID, STRATEGY_ID, Currency.USD, Instant.EPOCH);
         String json = objectMapper.writeValueAsString(event);
         assertThat(json).contains("\"kind\":\"BUY\"").contains("\"currency\":\"USD\"")
                 .contains("\"accountId\":\"" + ACCOUNT_ID + "\"")
@@ -34,7 +34,7 @@ class TradeEventMessageSerializationTest {
     @Test
     @DisplayName("SELL 이벤트 — kind 필드가 문자열 'SELL'로 직렬화")
     void sell_kind_serializes_as_string() throws Exception {
-        TradeEventMessage event = TradeEventMessage.sell("SOXL", BigDecimal.valueOf(3), 23.00, 69.00, "테스트계좌", ACCOUNT_ID, STRATEGY_ID, Currency.USD);
+        TradeEventMessage event = TradeEventMessage.sell("SOXL", BigDecimal.valueOf(3), 23.00, 69.00, "테스트계좌", ACCOUNT_ID, STRATEGY_ID, Currency.USD, Instant.EPOCH);
         String json = objectMapper.writeValueAsString(event);
         assertThat(json).contains("\"kind\":\"SELL\"");
     }

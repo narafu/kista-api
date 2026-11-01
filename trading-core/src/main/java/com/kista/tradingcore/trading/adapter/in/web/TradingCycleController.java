@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.adapter.in.web.dto.*;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
@@ -19,8 +18,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -39,6 +40,7 @@ public class TradingCycleController {
     private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
     private final DcaConfigUseCase dcaConfig;                    // DCA 설정 수정
     private final DcaExecutionQuery dcaExecutionQuery;           // DCA 회차 이력 조회
+    private final Clock clock;                                   // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
     @Operation(summary = "내 전체 거래 사이클 목록")
@@ -69,7 +71,7 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody TradingCycleRequest request) {
         TradingCycleResponse body = TradingCycleResponse.forRegistration(
-                tradingCycle.register(userId, accountId, request.toRegisterCommand()));
+                tradingCycle.register(userId, accountId, request.toRegisterCommand()), ZonedDateTime.now(clock));
         // 201 + 신규 리소스 URI
         return ResponseEntity.created(URI.create("/api/trading-cycles/" + body.id())).body(body);
     }
@@ -221,8 +223,9 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        LocalDate resolvedFrom = from != null ? from : LocalDate.now(TimeZones.KST).minusDays(30);
-        LocalDate resolvedTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate resolvedFrom = from != null ? from : today.minusDays(30);
+        LocalDate resolvedTo = to != null ? to : today;
         return StrategyOrdersResponse.from(
                 tradingCycle.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
     }

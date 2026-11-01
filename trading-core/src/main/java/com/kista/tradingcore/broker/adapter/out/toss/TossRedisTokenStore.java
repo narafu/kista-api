@@ -2,7 +2,6 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.kista.shared.platform.crypto.Sha256;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -65,11 +64,6 @@ class TossRedisTokenStore implements TossTokenStore {
 
     private final StringRedisTemplate redisTemplate; // Redis 문자열/해시/스크립트 연산 클라이언트
     private final Clock clock; // canonical 만료 판정용 시계 — 테스트에서 고정 Clock 주입
-
-    @Autowired
-    TossRedisTokenStore(StringRedisTemplate redisTemplate) {
-        this(redisTemplate, Clock.systemUTC());
-    }
 
     TossRedisTokenStore(StringRedisTemplate redisTemplate, Clock clock) {
         this.redisTemplate = redisTemplate;

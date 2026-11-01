@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ class TossCandleApiTest {
 
     @BeforeEach
     void setUp() {
-        tossCandleApi = new TossCandleApi(tossHttpClient);
+        tossCandleApi = new TossCandleApi(tossHttpClient, FixedClockTestConfig.FIXED);
     }
 
     @SuppressWarnings("unchecked")

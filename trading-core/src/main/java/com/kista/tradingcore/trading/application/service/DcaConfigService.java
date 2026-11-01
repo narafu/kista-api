@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -25,6 +26,7 @@ class DcaConfigService implements DcaConfigUseCase {
     private final AccountPort accountPort;
     private final StrategyVersionPort strategyVersionPort;
     private final StrategyDcaDetailPort dcaDetailPort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     @Transactional
@@ -39,7 +41,7 @@ class DcaConfigService implements DcaConfigUseCase {
         DcaStrategyConfig config = requested.withAssignedKeys(current.ruleKeys());
         // nextVersionNo는 soft delete 전에 — @SQLRestriction이 삭제 버전을 가린다 (CycleSnapshotCreator.reconfigureVrCycle과 동일 순서)
         int nextVersionNo = strategyVersionPort.nextVersionNo(strategyId);
-        strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now());
+        strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now(clock));
         StrategyVersion version = strategyVersionPort.save(new StrategyVersion(null, strategyId, nextVersionNo, null, null));
         dcaDetailPort.save(version.id(), config);
     }

@@ -11,7 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 // root market 모듈(공포탐욕지수)이 marketcalendar 값을 직접 참조하지 않도록 하는 내부 전용 엔드포인트 —
@@ -23,6 +25,7 @@ import java.util.List;
 public class MarketCalendarInternalController {
 
     private final MarketCalendarPort marketCalendarPort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @GetMapping("/holidays")
     public List<LocalDate> holidays(@RequestParam int year, @RequestParam int month) {
@@ -36,7 +39,7 @@ public class MarketCalendarInternalController {
 
     @GetMapping("/session")
     public MarketSessionResponse session() {
-        MarketSessionSnapshot snapshot = MarketSessionSnapshot.now();
+        MarketSessionSnapshot snapshot = MarketSessionSnapshot.at(ZonedDateTime.now(clock));
         return new MarketSessionResponse(snapshot.session(), snapshot.isDst());
     }
 }

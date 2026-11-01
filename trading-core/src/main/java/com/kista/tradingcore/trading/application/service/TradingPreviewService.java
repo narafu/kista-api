@@ -34,7 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,6 +61,7 @@ class TradingPreviewService {
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
     private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
     private final SellableQuantityPort sellableQuantityPort; // 종목 실제 판매 가능 수량 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
     // 휴장 여부는 무시하고 항상 강제 계산 — DB 저장 없음
@@ -91,7 +94,7 @@ class TradingPreviewService {
         // 소유권 검증은 Account 애그리게이트로 끝내고, 이후 프리뷰 경로는 투영(TradingAccount)만 사용
         Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
         TradingAccount account = TradingAccount.from(ownedAccount);
-        LocalDate today = DstInfo.nextTradeDate();
+        LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
         // 코인 전략(전부 DCA)은 미리보기 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
         List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
 

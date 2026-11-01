@@ -1,5 +1,7 @@
 package com.kista.api.notify.adapter.out.gateway;
 
+import java.time.Instant;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.telegram.TelegramHttpClient;
 import com.kista.shared.platform.telegram.TelegramProperties;
 import com.kista.api.user.domain.model.User;
@@ -32,7 +34,7 @@ class TelegramUserNotificationAdapterTest {
     @Test
     void notifyRejected_withReason_appendsReasonToMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
-                .withRejection("서류 미비");
+                .withRejection("서류 미비", Instant.now(FixedClockTestConfig.FIXED));
 
         adapter.notifyRejected(DomainFixtures.recipientOf(user));
 
@@ -43,7 +45,7 @@ class TelegramUserNotificationAdapterTest {
     void notifyRejected_reasonWithHtmlChars_isEscaped() {
         // parse_mode=HTML — 미이스케이프 '<'·'&'는 텔레그램 400으로 알림 유실
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
-                .withRejection("<b>서류</b> & 미비");
+                .withRejection("<b>서류</b> & 미비", Instant.now(FixedClockTestConfig.FIXED));
 
         adapter.notifyRejected(DomainFixtures.recipientOf(user));
 
@@ -54,7 +56,7 @@ class TelegramUserNotificationAdapterTest {
     @Test
     void notifyRejected_withNullReason_sendsUnchangedMessage() {
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
-                .withRejection(null);
+                .withRejection(null, Instant.now(FixedClockTestConfig.FIXED));
 
         adapter.notifyRejected(DomainFixtures.recipientOf(user));
 
@@ -65,7 +67,7 @@ class TelegramUserNotificationAdapterTest {
     void notifyRejected_withBlankReason_sendsUnchangedMessage() {
         // UserService.reject()가 blank -> null로 정규화하지만, 어댑터 자체 방어 로직(isBlank 가드)을 직접 검증
         User user = DomainFixtures.telegramUser(UUID.randomUUID(), "user-bot-token", "user-chat-789")
-                .withRejection("   ");
+                .withRejection("   ", Instant.now(FixedClockTestConfig.FIXED));
 
         adapter.notifyRejected(DomainFixtures.recipientOf(user));
 

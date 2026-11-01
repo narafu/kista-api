@@ -17,7 +17,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +34,7 @@ public class TradingInternalCommandController {
     private final ReorderBuyBudgetQuery reorderBuyBudgetQuery;
     private final ManualTradeCorrectionUseCase manualTradeCorrectionUseCase;
     private final MarketCalendarPort marketCalendarPort; // 휴장일 판정 — 비개장일엔 3개 boolean 전부 false
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Operation(summary = "관리자 재주문 접수/취소")
     @PostMapping("/reorder")
@@ -50,10 +53,11 @@ public class TradingInternalCommandController {
     @GetMapping("/reorder-timing-availability")
     public ReorderTimingAvailabilityResponse reorderTimingAvailability() {
         // 현재 거래일(04:30 KST 경계) 기준 — ReorderService 서버 재검증과 같은 판정
-        if (!marketCalendarPort.isMarketOpen(DstInfo.nextTradeDate())) {
+        ZonedDateTime nowKst = ZonedDateTime.now(clock);
+        if (!marketCalendarPort.isMarketOpen(DstInfo.nextTradeDate(nowKst))) {
             return new ReorderTimingAvailabilityResponse(false, false, false);
         }
-        return TradingContractMapper.toResponse(DstInfo.calculate().reorderTimingAvailability());
+        return TradingContractMapper.toResponse(DstInfo.calculate(nowKst).reorderTimingAvailabilityAt(nowKst.toInstant()));
     }
 
     @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문들의 PLANNED BUY 합계·live 주문가능금액(1회 조회)·원본별 환급분. 조회만 하며 차단하지 않습니다.")

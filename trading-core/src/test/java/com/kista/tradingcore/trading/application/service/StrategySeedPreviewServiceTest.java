@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
 import com.kista.tradingcore.account.domain.model.Account;
@@ -66,7 +67,7 @@ class StrategySeedPreviewServiceTest {
         // 시드 미리보기가 쓰는 협력자만 실제 주입, 나머지는 미사용이라 null
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, null, cycleStrategies, privacyTradePort, pricePort,
-                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort, cycleStrategies));
+                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort, cycleStrategies), FIXED);
         service = new StrategyService(
                 null, null, null, null,
                 accountPort, null, null, historyQueryService, null, null, null);

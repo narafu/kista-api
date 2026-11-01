@@ -1,5 +1,7 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
+import com.kista.shared.support.FixedClockTestConfig;
+import org.springframework.context.annotation.Import;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
@@ -66,6 +68,7 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 
+@Import(FixedClockTestConfig.class)
 @WebMvcTest(TradingCycleController.class)
 @Execution(ExecutionMode.SAME_THREAD)
 class TradingCycleControllerTest {

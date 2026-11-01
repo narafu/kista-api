@@ -28,6 +28,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -48,10 +49,12 @@ class ReorderService implements ReorderUseCase {
     private final OrderSubmitter orderSubmitter;      // IMMEDIATE 재주문 선점 → 접수 → 기록 (배치와 같은 경로)
     private final StrategyLedgerBudget ledgerBudget;  // BUY 재주문 전략 원장 상한
     private final ApplicationEventPublisher eventPublisher; // 원장 조회 실패 시 관리자 알림 (비트랜잭션이라 즉시 발송)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public ReorderResult reorder(ReorderCommand command) {
-        return reorder(command, DstInfo.calculate(), Instant.now());
+        Instant now = Instant.now(clock);
+        return reorder(command, DstInfo.calculate(now.atZone(TimeZones.KST)), now);
     }
 
     // 테스트 주입용 — DstInfo + 판정 시각 직접 지정

@@ -1,12 +1,15 @@
 package com.kista.api.architecture;
 
 import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaCodeUnitAccess;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchCondition;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
@@ -16,8 +19,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.MonthDay;
+import java.time.OffsetTime;
+import java.time.OffsetDateTime;
+import java.time.Year;
+import java.time.YearMonth;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackage;
@@ -122,6 +137,47 @@ class HexagonalArchitectureTest {
         ArchRule rule = noClasses()
                 .that().doNotHaveFullyQualifiedName("com.kista.shared.kernel.TimeZones")
                 .should().callMethod(ZoneId.class, "of", String.class);
+        rule.check(mainClasses);
+    }
+
+    @Test
+    @DisplayName("main 코드는 시스템 시계를 직접 읽지 않는다 — Clock 빈 주입")
+    void main_code_must_not_read_system_clock_directly() {
+        // CQ-17: 정적 now()/Clock.system*() 금지, 앱 루트 ClockConfig 2곳만 예외. now(Clock)은 허용
+        // 메서드 호출과 메서드 참조(Instant::now 등)를 모두 검사한다
+        Set<String> nowTypes = Set.of(LocalDate.class, LocalDateTime.class, LocalTime.class, Instant.class,
+                ZonedDateTime.class, OffsetDateTime.class, YearMonth.class, Year.class, MonthDay.class, OffsetTime.class)
+                .stream().map(Class::getName).collect(java.util.stream.Collectors.toSet());
+        DescribedPredicate<JavaAccess<?>> systemClockAccess = new DescribedPredicate<>("system clock access") {
+            @Override
+            public boolean test(JavaAccess<?> a) {
+                String owner = a.getTargetOwner().getName();
+                String name = a.getName();
+                boolean noArg = ((JavaCodeUnitAccess<?>) a).getTarget().getRawParameterTypes().isEmpty();
+                boolean zoneArg = ((JavaCodeUnitAccess<?>) a).getTarget().getRawParameterTypes().size() == 1
+                        && ((JavaCodeUnitAccess<?>) a).getTarget().getRawParameterTypes().get(0).isEquivalentTo(ZoneId.class);
+                if (nowTypes.contains(owner)) {
+                    return name.equals("now") && (noArg || zoneArg);
+                }
+                if (owner.equals(Clock.class.getName())) {
+                    return (name.equals("systemUTC") || name.equals("systemDefaultZone")) && noArg
+                            || name.equals("system") && zoneArg;
+                }
+                return false;
+            }
+        };
+        ArchCondition<JavaClass> readsSystemClock = new ArchCondition<>("read the system clock directly") {
+            @Override
+            public void check(JavaClass javaClass, ConditionEvents events) {
+                Stream.concat(javaClass.getMethodCallsFromSelf().stream(), javaClass.getMethodReferencesFromSelf().stream())
+                        .filter(systemClockAccess)
+                        .forEach(a -> events.add(SimpleConditionEvent.satisfied(javaClass, a.getDescription())));
+            }
+        };
+        ArchRule rule = noClasses()
+                .that().doNotHaveFullyQualifiedName("com.kista.tradingcore.ClockConfig")
+                .and().doNotHaveFullyQualifiedName("com.kista.api.ClockConfig")
+                .should(readsSystemClock);
         rule.check(mainClasses);
     }
 

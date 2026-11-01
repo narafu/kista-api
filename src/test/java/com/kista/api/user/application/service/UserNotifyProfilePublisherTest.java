@@ -1,5 +1,7 @@
 package com.kista.api.user.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
+import java.time.Clock;
 import com.kista.shared.kernel.NotificationType;
 import com.kista.shared.kernel.UserNotifyProfileChangedEvent;
 import com.kista.shared.kernel.UserStatus;
@@ -8,6 +10,7 @@ import com.kista.api.user.application.port.output.UserPort;
 import com.kista.api.user.application.port.output.UserSettingsPort;
 import com.kista.api.user.domain.model.User;
 import com.kista.api.user.domain.model.UserSettings;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +37,13 @@ class UserNotifyProfilePublisherTest {
     @Mock UserSettingsPort userSettingsPort;
     @Mock ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks UserNotifyProfilePublisher publisher;
+    final Clock clock = FixedClockTestConfig.FIXED; // 고정 시각
+    UserNotifyProfilePublisher publisher;
+
+    @BeforeEach
+    void setUp() {
+        publisher = new UserNotifyProfilePublisher(userPort, userSettingsPort, eventPublisher, clock);
+    }
 
     private final UUID USER_ID = UUID.randomUUID();
 

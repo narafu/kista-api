@@ -1,5 +1,9 @@
 package com.kista.api.user.adapter.in.web.security;
 
+import com.kista.shared.kernel.TimeZones;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import java.time.Clock;
 import com.kista.shared.platform.security.JwtDecoderConfig;
 import com.kista.api.user.domain.auth.TokenConstants;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -28,7 +32,7 @@ import com.kista.shared.kernel.UserRole;
 
 // 테스트용 EC P-256 JWK (비공개키 포함) — 프로덕션 키와 무관
 @ExtendWith(SpringExtension.class)
-@Import(JwtIssuerService.class)
+@Import({JwtIssuerService.class, JwtIssuerServiceTest.RealClockConfig.class})
 @TestPropertySource(properties = {
     "jwt.signing-key={\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU\",\"y\":\"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0\",\"d\":\"jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI\",\"use\":\"sig\",\"alg\":\"ES256\",\"kid\":\"test-key-1\"}"
 })
@@ -37,6 +41,15 @@ class JwtIssuerServiceTest {
 
     // 검증용 공개키만 포함한 JWK (비공개키 d 필드 없음)
     private static final String PUBLIC_JWK = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU\",\"y\":\"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0\"}";
+
+    // 발급 토큰을 실시간 JwtDecoder가 검증하므로 고정 시각이 아니라 실제 시계를 쓴다
+    @TestConfiguration
+    static class RealClockConfig {
+        @Bean
+        Clock clock() {
+            return Clock.system(TimeZones.KST);
+        }
+    }
 
     @Autowired
     JwtIssuerService jwtIssuerService;

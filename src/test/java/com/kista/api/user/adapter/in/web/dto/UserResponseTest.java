@@ -1,5 +1,7 @@
 package com.kista.api.user.adapter.in.web.dto;
 
+import java.time.Instant;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.user.domain.model.User;
 import com.kista.api.user.domain.model.UserSettings;
 import com.kista.api.support.DomainFixtures;
@@ -16,7 +18,7 @@ class UserResponseTest {
     void from_rejectedUser_exposesRejectReason() {
         UUID userId = UUID.randomUUID();
         User user = DomainFixtures.userWithStatus(userId, UserStatus.REJECTED)
-                .withRejection("허위 정보 기재");
+                .withRejection("허위 정보 기재", Instant.now(FixedClockTestConfig.FIXED));
         UserSettings settings = UserSettings.defaultFor(userId);
 
         UserResponse response = UserResponse.from(user, settings);
@@ -29,7 +31,7 @@ class UserResponseTest {
         // 과거 REJECTED -> 재신청 승인으로 ACTIVE 전환된 사용자 — reject_reason 컬럼에 값이 남아있어도 노출 금지
         UUID userId = UUID.randomUUID();
         User rejectedThenApproved = DomainFixtures.userWithStatus(userId, UserStatus.REJECTED)
-                .withRejection("잔존 사유")
+                .withRejection("잔존 사유", Instant.now(FixedClockTestConfig.FIXED))
                 .withStatus(UserStatus.ACTIVE);
         UserSettings settings = UserSettings.defaultFor(userId);
 

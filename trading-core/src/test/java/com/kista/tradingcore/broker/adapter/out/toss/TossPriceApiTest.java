@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.toss;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
@@ -40,7 +41,7 @@ class TossPriceApiTest {
 
     @BeforeEach
     void setUp() {
-        tossPriceApi = new TossPriceApi(tossHttpClient, tossCandleApi);
+        tossPriceApi = new TossPriceApi(tossHttpClient, tossCandleApi, FixedClockTestConfig.FIXED);
     }
 
     // Toss API 응답: TossResult<List<PriceItem>> 래퍼 헬퍼
@@ -139,7 +140,7 @@ class TossPriceApiTest {
         var item = new TossPriceApi.PriceItem("SOXL", "25.50");
         when(tossHttpClient.getCommon(eq("/api/v1/prices"), any(), any(ParameterizedTypeReference.class)))
                 .thenReturn(wrap(item));
-        TossCandle candle = new TossCandle(LocalDate.now().minusDays(1), new BigDecimal("23.00"),
+        TossCandle candle = new TossCandle(LocalDate.now(FixedClockTestConfig.FIXED).minusDays(1), new BigDecimal("23.00"),
                 new BigDecimal("23.50"), new BigDecimal("22.50"), new BigDecimal("23.20"), 900L);
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
 
@@ -156,7 +157,7 @@ class TossPriceApiTest {
                 new BigDecimal("91.00"), new BigDecimal("88.50"), new BigDecimal("89.20"), 1200L);
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.of(candle));
 
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now());
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now(FixedClockTestConfig.FIXED));
 
         assertThat(result).isPresent();
         assertThat(result.get()).isEqualByComparingTo("89.20");
@@ -218,7 +219,7 @@ class TossPriceApiTest {
     void fetchPrevCloseUncached_noCandle_returnsEmpty() {
         when(tossCandleApi.getCandleBefore(eq("SOXL"), eq("1d"), any())).thenReturn(Optional.empty());
 
-        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now());
+        Optional<BigDecimal> result = tossPriceApi.fetchPrevCloseUncached("SOXL", Instant.now(FixedClockTestConfig.FIXED));
 
         assertThat(result).isEmpty();
     }

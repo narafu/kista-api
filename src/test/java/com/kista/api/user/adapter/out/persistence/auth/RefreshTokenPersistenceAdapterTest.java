@@ -1,9 +1,10 @@
 package com.kista.api.user.adapter.out.persistence.auth;
 
 import com.kista.api.user.domain.auth.RefreshToken;
+import com.kista.shared.support.FixedClockTestConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -20,7 +21,12 @@ import static org.mockito.Mockito.verify;
 class RefreshTokenPersistenceAdapterTest {
 
     @Mock RefreshTokenJpaRepository repository;
-    @InjectMocks RefreshTokenPersistenceAdapter adapter;
+    RefreshTokenPersistenceAdapter adapter;
+
+    @BeforeEach
+    void setUp() {
+        adapter = new RefreshTokenPersistenceAdapter(repository, FixedClockTestConfig.FIXED);
+    }
 
     @Test
     void save_persistsEntity() {

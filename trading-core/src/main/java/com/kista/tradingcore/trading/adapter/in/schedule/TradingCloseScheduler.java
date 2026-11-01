@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
@@ -31,6 +32,7 @@ public class TradingCloseScheduler {
     private final SchedulerJobRunner jobRunner;
     private final HeartbeatPort heartbeatPort; // dead-man's switch 핑
     private final TradingErrorReportPort errorReportPort; // 수동 트리거 거부 관리자 알림
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     static final LocalTime CRON_TIME = LocalTime.of(4, 30);                // cron 발화 시각 — 당일 마감 접수 창 시작
     static final Duration PLACEMENT_MARGIN = Duration.ofMinutes(10);       // 장마감 10분 전까지만 마감 접수
@@ -47,7 +49,7 @@ public class TradingCloseScheduler {
 
     // 수동 트리거 — 주문 대기 없이 즉시 접수, 리포트는 장마감 후
     public void runNow() throws InterruptedException {
-        runNow(ZonedDateTime.now(TimeZones.KST));
+        runNow(ZonedDateTime.now(clock));
     }
 
     // package-private: 시각 주입으로 접수 창 판정 테스트

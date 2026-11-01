@@ -4,7 +4,6 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.KstDays;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
@@ -22,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +41,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final CycleOrderStrategies cycleOrderStrategies; // 시드 비점유 전략(DCA)의 순투입액을 외부 흐름으로 넘길지 판정
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     private final InvestmentIndexCalculator investmentIndexCalculator = new InvestmentIndexCalculator();
 
     // 원본 BenchmarkService.buildInvestmentContext(private)를 그대로 이식 — 소유권 검증까지
@@ -48,7 +49,7 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     @Override
     public InvestmentPointsResult fetch(UUID userId, Scope scope, UUID strategyId,
                                         LocalDate from, LocalDate to) {
-        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);
         Strategy selectedStrategy = null;
         List<Strategy> strategies;
         if (scope == Scope.STRATEGY) {

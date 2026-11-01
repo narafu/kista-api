@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class AssetSnapshotPersistenceAdapter implements AssetSnapshotPort {
 
     private final FinanceAssetSnapshotJpaRepository jpaRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public List<AssetSnapshot> findMyScope(UUID userId, UUID currentGroupId, LocalDate from, LocalDate to, UUID filterUserId) {
@@ -43,11 +45,11 @@ public class AssetSnapshotPersistenceAdapter implements AssetSnapshotPort {
 
     @Override
     public void softDelete(UUID id) {
-        jpaRepository.softDeleteById(id, Instant.now());
+        jpaRepository.softDeleteById(id, Instant.now(clock));
     }
 
     @Override
     public void softDeleteByUserId(UUID userId) {
-        jpaRepository.softDeleteByUserId(userId, Instant.now());
+        jpaRepository.softDeleteByUserId(userId, Instant.now(clock));
     }
 }

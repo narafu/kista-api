@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import java.util.UUID;
 class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
 
     private final RefreshTokenJpaRepository repository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     @Transactional
@@ -49,7 +51,7 @@ class RefreshTokenPersistenceAdapter implements RefreshTokenPort {
     @Override
     @Transactional
     public int deleteAllExpired() {
-        return repository.deleteAllByExpiresAtBefore(Instant.now());
+        return repository.deleteAllByExpiresAtBefore(Instant.now(clock));
     }
 
     @Override

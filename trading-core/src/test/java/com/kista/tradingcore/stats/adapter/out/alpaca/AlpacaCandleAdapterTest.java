@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.adapter.out.alpaca;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -27,7 +28,7 @@ class AlpacaCandleAdapterTest {
             "test-key", "test-secret", "https://data.test");
 
     private AlpacaCandleAdapter buildAdapter() {
-        return new AlpacaCandleAdapter(builder.build(), properties);
+        return new AlpacaCandleAdapter(builder.build(), properties, FixedClockTestConfig.FIXED);
     }
 
     @Test
@@ -85,7 +86,7 @@ class AlpacaCandleAdapterTest {
     void to가_오늘이면_전일_이전으로_클램프되어_요청된다() {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         AlpacaCandleAdapter adapter = buildAdapter();
-        LocalDate today = LocalDate.now(ZoneId.of("America/New_York"));
+        LocalDate today = LocalDate.now(FixedClockTestConfig.FIXED.withZone(ZoneId.of("America/New_York")));
         LocalDate yesterday = today.minusDays(1);
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://data.test/v2/stocks/TQQQ/bars")))
                 // end 파라미터가 오늘이 아닌 전일 이전 날짜로 클램프되어 나가는지 검증 (403 방지 핵심 로직)

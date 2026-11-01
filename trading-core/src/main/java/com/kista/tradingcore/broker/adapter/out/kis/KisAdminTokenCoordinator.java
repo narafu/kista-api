@@ -5,10 +5,10 @@ import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator.Issued
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator.RecoveredToken;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator.TokenIssuer;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -27,15 +27,16 @@ class KisAdminTokenCoordinator {
     private static final long EXPIRY_MARGIN_SECONDS = 60; // 만료 1분 전 무효화 — DbTokenCoordinator threshold와 동일
 
     private final StringRedisTemplate redis;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     private final ReentrantLock lock = new ReentrantLock(); // JVM 내 동시 발급 방지
     // Redis 장애 대비 JVM 메모리 폴백 — 마지막 발급 토큰(키는 앱키별 구분)과 만료 시각
     private volatile MemoryToken memory;
 
     private record MemoryToken(String key, String token, Instant expiresAt) {}
 
-    @Autowired
-    KisAdminTokenCoordinator(StringRedisTemplate redis) {
+    KisAdminTokenCoordinator(StringRedisTemplate redis, Clock clock) {
         this.redis = redis;
+        this.clock = clock;
     }
 
     String obtain(String appKey, TokenIssuer issuer) {
@@ -82,7 +83,7 @@ class KisAdminTokenCoordinator {
     private String issueAndStore(String key, TokenIssuer issuer) {
         IssuedToken issued = issuer.issue();
         long ttl = Math.max(1, issued.expiresInSeconds() - EXPIRY_MARGIN_SECONDS);
-        memory = new MemoryToken(key, issued.accessToken(), Instant.now().plusSeconds(ttl));
+        memory = new MemoryToken(key, issued.accessToken(), Instant.now(clock).plusSeconds(ttl));
         try {
             redis.opsForValue().set(key, issued.accessToken(), Duration.ofSeconds(ttl));
         } catch (Exception e) {
@@ -98,7 +99,7 @@ class KisAdminTokenCoordinator {
         } catch (Exception e) {
             log.warn("KIS 관리자 토큰 Redis 조회 실패 — 메모리 폴백: {}", e.getMessage());
             MemoryToken m = memory;
-            return m != null && m.key().equals(key) && Instant.now().isBefore(m.expiresAt()) ? m.token() : null;
+            return m != null && m.key().equals(key) && Instant.now(clock).isBefore(m.expiresAt()) ? m.token() : null;
         }
     }
 }

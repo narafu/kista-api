@@ -2,11 +2,9 @@ package com.kista.tradingcore.stats.adapter.out.upbit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.stats.application.port.output.UpbitMarketDataPort;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -39,13 +37,8 @@ class UpbitMarketDataAdapter implements UpbitMarketDataPort {
     private final RestClient restClient; // 무인증 공개 시세용
     private final Clock clock;           // 진행 중 일봉 판정 — 테스트에서 고정
 
-    @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
-    UpbitMarketDataAdapter(RestClient statsUpbitRestClient) {
-        this(statsUpbitRestClient, Clock.system(TimeZones.KST));
-    }
-
-    UpbitMarketDataAdapter(RestClient restClient, Clock clock) {
-        this.restClient = restClient;
+    UpbitMarketDataAdapter(RestClient statsUpbitRestClient, Clock clock) {
+        this.restClient = statsUpbitRestClient;
         this.clock = clock;
     }
 
@@ -94,7 +87,7 @@ class UpbitMarketDataAdapter implements UpbitMarketDataPort {
     // ponytail: broker UpbitExchangeAdapter와 일봉 페이징 중복 — 모듈 경계(stats↛broker adapter) 때문, 업비트 거래 제거 시 broker 쪽이 사라져 해소
     private List<DatedValue> completedDailyCloses(String market, int count) {
         if (count < 1 || count > MAX_COUNT) throw new IllegalArgumentException("일봉 개수는 1~" + MAX_COUNT + "입니다: " + count);
-        LocalDateTime now = LocalDateTime.now(clock.withZone(TimeZones.KST));
+        LocalDateTime now = LocalDateTime.now(clock);
         // 시작일 기준 중복 제거 + 오래된 순 정렬 — 페이지 경계 중복·정렬 미보장 방어
         TreeMap<LocalDate, DatedValue> completed = new TreeMap<>();
         String to = null; // 직전 응답 중 가장 오래된 봉의 UTC 시작 — 업비트 to는 exclusive

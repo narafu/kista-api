@@ -1,6 +1,5 @@
 package com.kista.api.admin.application.service;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.api.admin.domain.model.AdminAnomalies;
 import com.kista.api.admin.domain.model.AdminStats;
@@ -17,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -44,6 +44,7 @@ class AdminQueryService implements AdminQueryUseCase {
     private final TradingQueryPort tradingQueryPort;
     private final PrivacyQueryPort privacyQueryPort;
     private final AppErrorLogPort appErrorLogPort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public AdminStats getStats() {
@@ -67,8 +68,8 @@ class AdminQueryService implements AdminQueryUseCase {
     @Override
     public List<OrderResponse> listTrades(LocalDate from, LocalDate to) {
         // from 미지정 시 기본값: 최근 30일 — orders 테이블 전체 로드 방지
-        LocalDate f = from != null ? from : LocalDate.now(TimeZones.KST).minusDays(30);
-        LocalDate t = to   != null ? to   : LocalDate.now(TimeZones.KST);
+        LocalDate f = from != null ? from : LocalDate.now(clock).minusDays(30);
+        LocalDate t = to   != null ? to   : LocalDate.now(clock);
         return tradingQueryPort.findAllOrders(f, t);
     }
 
@@ -77,13 +78,13 @@ class AdminQueryService implements AdminQueryUseCase {
     public List<AuditLog> listAuditLogs(Instant from, Instant to) {
         if (from == null && to == null) return auditLogPort.findAll();
         Instant f = from != null ? from : Instant.EPOCH;
-        Instant t = to   != null ? to   : Instant.now();
+        Instant t = to   != null ? to   : Instant.now(clock);
         return auditLogPort.findAll(f, t);
     }
 
     @Override
     public AdminAnomalies getAnomalies(int inactiveDays, LocalDate from, LocalDate to) {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
         LocalDate rangeFrom = from != null ? from : today.minusDays(inactiveDays);
         LocalDate rangeTo   = to   != null ? to   : today;
         List<AccountSummaryResponse> allAccounts = accountQueryPort.findAll(null, null);
@@ -122,7 +123,7 @@ class AdminQueryService implements AdminQueryUseCase {
         // days==null → 전체(EPOCH부터). 그 외 KST 기준 최근 N일 발행분 (release_date는 KST 발행일 원본)
         LocalDate fromReleaseDate = days == null
                 ? LocalDate.EPOCH
-                : LocalDate.now(TimeZones.KST).minusDays(days);
+                : LocalDate.now(clock).minusDays(days);
         return privacyQueryPort.findBasesFromTradeDate(fromReleaseDate);
     }
 

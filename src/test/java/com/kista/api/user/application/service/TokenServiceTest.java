@@ -1,5 +1,7 @@
 package com.kista.api.user.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
+import java.time.Clock;
 import com.kista.api.user.domain.auth.InvalidRefreshTokenException;
 import com.kista.api.user.domain.auth.RefreshToken;
 import com.kista.api.user.domain.auth.TokenRefreshResult;
@@ -8,6 +10,7 @@ import com.kista.api.user.application.port.output.BlacklistPort;
 import com.kista.api.user.application.port.output.RefreshTokenPort;
 import com.kista.api.user.application.port.output.UserPort;
 import com.kista.api.support.DomainFixtures;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,7 +38,13 @@ class TokenServiceTest {
     @Mock RefreshTokenPort refreshTokenPort;
     @Mock BlacklistPort blacklistPort;
     @Mock UserPort userPort;
-    @InjectMocks TokenService tokenService;
+    final Clock clock = FixedClockTestConfig.FIXED; // 고정 시각
+    TokenService tokenService;
+
+    @BeforeEach
+    void setUp() {
+        tokenService = new TokenService(refreshTokenPort, blacklistPort, userPort, clock);
+    }
 
     private static final UUID USER_ID = UUID.randomUUID();
 
@@ -51,7 +60,7 @@ class TokenServiceTest {
         assertThat(saved.tokenHash()).isEqualTo(TokenService.sha256Hex(rawToken));
         assertThat(saved.id()).isNull();
         assertThat(saved.rotatedAt()).isNull(); // 신규 발급 — 미회전
-        assertThat(saved.expiresAt()).isAfter(Instant.now().plus(Duration.ofHours(119)));
+        assertThat(saved.expiresAt()).isAfter(Instant.now(clock).plus(Duration.ofHours(119)));
     }
 
     // 정상 갱신: 미회전 RT → markRotated + 새 RT 발급
@@ -59,7 +68,7 @@ class TokenServiceTest {
     void refresh_validToken_rotatesAndIssuesNewToken() {
         String rawToken = "validRawToken12345";
         String hash = TokenService.sha256Hex(rawToken);
-        RefreshToken existing = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), null);
+        RefreshToken existing = makeRt(hash, Instant.now(clock).plus(Duration.ofHours(120)), null);
         User user = mockUser();
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(existing));
@@ -79,8 +88,8 @@ class TokenServiceTest {
     void refresh_rotatedWithinGrace_allowsAndIssuesNewToken() {
         String rawToken = "rotatedToken";
         String hash = TokenService.sha256Hex(rawToken);
-        Instant rotatedAt = Instant.now().minusSeconds(30); // 30초 전 회전 (grace 60초 이내)
-        RefreshToken rotated = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), rotatedAt);
+        Instant rotatedAt = Instant.now(clock).minusSeconds(30); // 30초 전 회전 (grace 60초 이내)
+        RefreshToken rotated = makeRt(hash, Instant.now(clock).plus(Duration.ofHours(120)), rotatedAt);
         User user = mockUser();
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
@@ -98,8 +107,8 @@ class TokenServiceTest {
     void refresh_rotatedBeyondGrace_revokesAllSessions() {
         String rawToken = "staleRotatedToken";
         String hash = TokenService.sha256Hex(rawToken);
-        Instant rotatedAt = Instant.now().minusSeconds(120); // 120초 전 회전 (grace 60초 초과)
-        RefreshToken rotated = makeRt(hash, Instant.now().plus(Duration.ofHours(120)), rotatedAt);
+        Instant rotatedAt = Instant.now(clock).minusSeconds(120); // 120초 전 회전 (grace 60초 초과)
+        RefreshToken rotated = makeRt(hash, Instant.now(clock).plus(Duration.ofHours(120)), rotatedAt);
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rotated));
 
@@ -121,7 +130,7 @@ class TokenServiceTest {
     void refresh_expiredToken_throwsAndCleansUp() {
         String raw = "expiredToken";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken expired = makeRt(hash, Instant.now().minusSeconds(1), null);
+        RefreshToken expired = makeRt(hash, Instant.now(clock).minusSeconds(1), null);
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(expired));
 
@@ -136,9 +145,9 @@ class TokenServiceTest {
     void logout_withJti_deletesRtAndBlacklistsJti() {
         String raw = "logoutToken";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
+        RefreshToken rt = makeRt(hash, Instant.now(clock).plusSeconds(1000), null);
         String jti = UUID.randomUUID().toString();
-        Instant atExpiresAt = Instant.now().plusSeconds(3600); // 미래 만료
+        Instant atExpiresAt = Instant.now(clock).plusSeconds(3600); // 미래 만료
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
 
@@ -154,9 +163,9 @@ class TokenServiceTest {
     void logout_withExpiredAt_skipsJtiBlacklist() {
         String raw = "logoutToken2";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
+        RefreshToken rt = makeRt(hash, Instant.now(clock).plusSeconds(1000), null);
         String jti = UUID.randomUUID().toString();
-        Instant alreadyExpired = Instant.now().minusSeconds(1); // 이미 만료된 AT
+        Instant alreadyExpired = Instant.now(clock).minusSeconds(1); // 이미 만료된 AT
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
 
@@ -170,7 +179,7 @@ class TokenServiceTest {
     void logout_withNullJti_skipsJtiBlacklist() {
         String raw = "logoutToken3";
         String hash = TokenService.sha256Hex(raw);
-        RefreshToken rt = makeRt(hash, Instant.now().plusSeconds(1000), null);
+        RefreshToken rt = makeRt(hash, Instant.now(clock).plusSeconds(1000), null);
 
         given(refreshTokenPort.findByTokenHash(hash)).willReturn(Optional.of(rt));
 
@@ -195,7 +204,7 @@ class TokenServiceTest {
     }
 
     private RefreshToken makeRt(String hash, Instant expiresAt, Instant rotatedAt) {
-        return new RefreshToken(UUID.randomUUID(), USER_ID, hash, "ua", expiresAt, rotatedAt, Instant.now());
+        return new RefreshToken(UUID.randomUUID(), USER_ID, hash, "ua", expiresAt, rotatedAt, Instant.now(clock));
     }
 
     private User mockUser() {

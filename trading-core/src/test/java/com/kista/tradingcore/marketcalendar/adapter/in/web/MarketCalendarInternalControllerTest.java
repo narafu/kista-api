@@ -1,5 +1,6 @@
 package com.kista.tradingcore.marketcalendar.adapter.in.web;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // root market 모듈이 소비하는 내부 전용 캘린더 엔드포인트 — 각 라우트가 MarketCalendarPort로
 // 올바르게 위임하는지만 검증(얇은 pass-through라 예외 시나리오 없음)
 @WebMvcTest(MarketCalendarInternalController.class)
-@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class})
+@Import({SecurityConfig.class, JwtAuthFilter.class, InternalTokenAuthFilter.class, FixedClockTestConfig.class})
 @TestPropertySource(properties = "internal.api.token=test-internal-token")
 @Execution(ExecutionMode.SAME_THREAD)
 class MarketCalendarInternalControllerTest {

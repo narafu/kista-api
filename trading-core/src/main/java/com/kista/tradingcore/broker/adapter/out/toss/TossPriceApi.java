@@ -16,6 +16,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -40,6 +41,7 @@ public class TossPriceApi {
 
     private final TossHttpClient tossHttpClient;
     private final TossCandleApi tossCandleApi; // 전일종가 캔들 조회
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     // 전일종가(prevClose) 캐시 — 종목+거래일(KST)+정규장 진행여부 버킷 단위로 하루 내 재조회 방지.
     // 만료 로직 없음 — 날짜가 바뀌면 키가 자연히 달라지고, 종목 수가 적어(4개) 메모리 증가는 무시 가능.
     private record PrevCloseCacheKey(String symbol, LocalDate date, String bucket) {}
@@ -148,16 +150,17 @@ public class TossPriceApi {
     // 정규장 종료로 확정 종가가 바뀌는 순간에는 캐시를 재사용하지 않고 새로 조회하도록 함
     // 실패(empty)도 캐싱되어 같은 버킷 내 재시도하지 않음(허용된 트레이드오프)
     Optional<BigDecimal> fetchPrevCloseCached(String symbol) {
-        MarketSessionInfo session = resolveMarketSession();
+        ZonedDateTime now = ZonedDateTime.now(clock); // 세션 판정·before·캐시 키가 같은 시각을 공유
+        MarketSessionInfo session = resolveMarketSessionAt(now);
         Instant before = session.regularSessionActive()
                 ? session.lastSessionOpenInstant().minusMillis(1)  // 진행 중인 봉 배제
-                : Instant.now();                                   // 이미 확정된 봉만 존재
+                : now.toInstant();                                 // 이미 확정된 봉만 존재
         String bucket = session.regularSessionActive() ? "ACTIVE" : "CLOSED";
-        PrevCloseCacheKey key = new PrevCloseCacheKey(symbol, LocalDate.now(TimeZones.KST), bucket);
+        PrevCloseCacheKey key = new PrevCloseCacheKey(symbol, now.toLocalDate(), bucket);
         return prevCloseCache.computeIfAbsent(key, k -> fetchPrevCloseUncached(symbol, before));
     }
 
-    // ── trading DstInfo.isRegularSessionActive()/lastSessionOpenInstant() 복제 ──────────────
+    // ── trading DstInfo.isRegularSessionActiveAt()/lastSessionOpenInstantAt() 복제 ──────────────
     // 스케쥴러 오케스트레이션(waitUntilOrderTime 등)과 무관한 "정규장 진행 여부 + 마지막 개장 시각"
     // 순수 KST/DST 계산만 필요하므로 DstInfo 전체를 참조하지 않고 이 2개 계산만 좁게 복제한다
     // (common/ 승격 대상 아님 — trading 스케쥴링 도메인 클래스 전체를 끌어오는 것이 과함)
@@ -172,12 +175,7 @@ public class TossPriceApi {
     // package-private — 테스트에서 시각 주입 시드로 직접 호출 (private record는 같은 패키지 테스트에서도 참조 불가)
     record MarketSessionInfo(boolean regularSessionActive, Instant lastSessionOpenInstant) {}
 
-    // 현재 KST 기준 정규장 진행 여부 + 가장 최근 개장 시각 계산
-    private static MarketSessionInfo resolveMarketSession() {
-        return resolveMarketSessionAt(ZonedDateTime.now(TimeZones.KST));
-    }
-
-    // 시각 주입 테스트 시드 — DstInfo의 sessionAt()/lastSessionOpenInstantAt() 패턴과 동일
+    // 주어진 KST 시각 기준 정규장 진행 여부 + 가장 최근 개장 시각 계산 — DstInfo의 currentSessionAt()/lastSessionOpenInstantAt() 패턴과 동일
     static MarketSessionInfo resolveMarketSessionAt(ZonedDateTime nowKst) {
         boolean isDst = TimeZones.NY.getRules().isDaylightSavings(nowKst.toInstant());
         DayOfWeek day = nowKst.getDayOfWeek();
@@ -233,7 +231,7 @@ public class TossPriceApi {
         }
     }
 
-    // package-private — 테스트에서 before 시각 직접 주입 (DstInfo.calculate() 실시간 호출 우회)
+    // package-private — 테스트에서 before 시각 직접 주입 (DstInfo.calculate(nowKst) 현재 시각 의존 우회)
     Optional<BigDecimal> fetchPrevCloseUncached(String symbol, Instant before) {
         try {
             Optional<TossCandle> candle = tossCandleApi.getCandleBefore(symbol, "1d", before);

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import java.time.Instant;
 import java.util.Optional;
 import com.kista.shared.kernel.NotificationChannel;
@@ -33,7 +34,7 @@ class UserNotifyProfileApplyChangeTest {
     private final UUID USER_ID = UUID.randomUUID();
 
     private UserNotifyProfilePersistenceAdapter adapter() {
-        return new UserNotifyProfilePersistenceAdapter(repository, objectMapper);
+        return new UserNotifyProfilePersistenceAdapter(repository, objectMapper, FixedClockTestConfig.FIXED);
     }
 
     // 어댑터 입력 스냅샷 — 채널·occurredAt 생략 오버로드는 구버전 발행분(null) 의미

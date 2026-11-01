@@ -12,7 +12,6 @@ import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -38,15 +37,9 @@ class OrderSubmissionReconciler {
     private final OrderPort orderPort;
     private final BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     private final ApplicationEventPublisher eventPublisher;
-    private final Clock clock; // 선점 경과 판정용 — 테스트에서 고정 Clock 주입
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     // 이미 알린 잔류 주문 — 접수 경로를 탈 때마다 같은 알림이 반복되지 않게 (ponytail: 프로세스 메모리라 재기동 시 1회 재알림, 잔류는 희귀해 무한 증가 없음)
     private final Set<UUID> alerted = ConcurrentHashMap.newKeySet();
-
-    @Autowired
-    OrderSubmissionReconciler(OrderPort orderPort, BrokerOrderCorrectionPort brokerOrderCorrectionPort,
-                              ApplicationEventPublisher eventPublisher) {
-        this(orderPort, brokerOrderCorrectionPort, eventPublisher, Clock.systemUTC());
-    }
 
     OrderSubmissionReconciler(OrderPort orderPort, BrokerOrderCorrectionPort brokerOrderCorrectionPort,
                               ApplicationEventPublisher eventPublisher, Clock clock) {

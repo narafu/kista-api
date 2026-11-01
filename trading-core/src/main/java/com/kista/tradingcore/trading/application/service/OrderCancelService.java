@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.OrderStatus;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.event.OrderCancelFailedEvent;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
@@ -22,7 +21,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -43,6 +44,7 @@ class OrderCancelService {
     private final ApplicationEventPublisher eventPublisher; // 취소 실패 관리자 알림 — 트랜잭션 내부에서 텔레그램 직접 호출 금지, 커밋 후 이벤트로 위임
     private final OrderCancelStateWriter stateWriter; // self-invocation 프록시 미경유 문제 회피 — DB 쓰기 전용 별도 빈
     private final SubmittingOrderAwaiter awaiter;     // 접수 중(SUBMITTING) 주문의 결과 확정 대기
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
         // 소유권 검증: 전략 → 계좌 → 요청자 일치 확인
@@ -76,7 +78,8 @@ class OrderCancelService {
         requireNoCryptoInFlight(strategyId, account);
 
         // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
-        List<LocalDate> tradeDates = Stream.of(LocalDate.now(TimeZones.KST), DstInfo.nextTradeDate()).distinct().toList();
+        ZonedDateTime now = ZonedDateTime.now(clock);
+        List<LocalDate> tradeDates = Stream.of(now.toLocalDate(), DstInfo.nextTradeDate(now)).distinct().toList();
 
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
         int cancelledCount = 0;

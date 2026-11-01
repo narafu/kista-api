@@ -1,16 +1,17 @@
 package com.kista.tradingcore.trading.adapter.in.schedule;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.usecase.CryptoDcaExecutionUseCase;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import com.kista.shared.kernel.TimeZones;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -25,7 +26,7 @@ class CryptoDcaSchedulerTest {
     SchedulerLockService lock = mock(SchedulerLockService.class);
     CryptoDcaExecutionUseCase useCase = mock(CryptoDcaExecutionUseCase.class);
     HeartbeatPort heartbeat = mock(HeartbeatPort.class);
-    CryptoDcaScheduler scheduler = new CryptoDcaScheduler(useCase, lock, heartbeat);
+    CryptoDcaScheduler scheduler = new CryptoDcaScheduler(useCase, lock, heartbeat, FixedClockTestConfig.FIXED);
 
     @Test
     void lockNameAndDuration() throws Exception {
@@ -35,7 +36,8 @@ class CryptoDcaSchedulerTest {
 
     @Test
     void ticksWithKstNow() throws Exception {
-        scheduler.clock = Clock.fixed(Instant.parse("2026-10-18T04:10:00Z"), ZoneOffset.UTC);
+        CryptoDcaScheduler scheduler = new CryptoDcaScheduler(useCase, lock, heartbeat,
+                Clock.fixed(Instant.parse("2026-10-18T04:10:00Z"), TimeZones.KST));
         scheduler.run();
         var task = ArgumentCaptor.forClass(SchedulerLockService.LockedTask.class);
         verify(lock).tryRun(eq("crypto-dca"), any(), task.capture());

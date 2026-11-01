@@ -6,6 +6,7 @@ import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,16 +23,18 @@ class SubmittingOrderAwaiter {
     private final OrderPort orderPort;
     private final Duration timeout;      // 최대 대기
     private final Duration pollInterval; // 재조회 간격
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Autowired
-    SubmittingOrderAwaiter(OrderPort orderPort) {
-        this(orderPort, Duration.ofSeconds(60), Duration.ofSeconds(1));
+    SubmittingOrderAwaiter(OrderPort orderPort, Clock clock) {
+        this(orderPort, Duration.ofSeconds(60), Duration.ofSeconds(1), clock);
     }
 
-    SubmittingOrderAwaiter(OrderPort orderPort, Duration timeout, Duration pollInterval) {
+    SubmittingOrderAwaiter(OrderPort orderPort, Duration timeout, Duration pollInterval, Clock clock) {
         this.orderPort = orderPort;
         this.timeout = timeout;
         this.pollInterval = pollInterval;
+        this.clock = clock;
     }
 
     // 사이클·거래일의 접수 중 주문이 정리될 때까지 대기 — 타임아웃 시 남은 주문 반환(없으면 빈 목록)
@@ -65,6 +68,6 @@ class SubmittingOrderAwaiter {
     }
 
     private boolean mayStillBeInFlight(SubmittingOrder leftover) {
-        return leftover.submittedAt().plus(timeout).isAfter(Instant.now());
+        return leftover.submittedAt().plus(timeout).isAfter(Instant.now(clock));
     }
 }

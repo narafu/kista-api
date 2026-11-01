@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.in.schedule;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.platform.scheduling.SchedulerJobRunner;
 import com.kista.shared.platform.scheduling.SchedulerLifecycleEvent;
 import com.kista.shared.platform.scheduling.SchedulerLockService;
@@ -80,7 +81,7 @@ class TradingCloseSchedulerTest {
     void setUp() throws InterruptedException {
         // SchedulerJobRunner는 실제 인스턴스로 생성 — 실행 골격(인터럽트/예외 처리)까지 검증
         SchedulerJobRunner jobRunner = new SchedulerJobRunner(events);
-        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort, errorReportPort);
+        scheduler = new TradingCloseScheduler(useCase, strategyPort, schedulerLockService, contextFactory, jobRunner, heartbeatPort, errorReportPort, FixedClockTestConfig.FIXED);
 
         lenient().doAnswer((Answer<Boolean>) invocation -> {
             SchedulerLockService.LockedTask task = invocation.getArgument(2);

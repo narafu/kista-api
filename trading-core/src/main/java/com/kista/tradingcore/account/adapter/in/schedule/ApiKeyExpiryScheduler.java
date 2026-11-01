@@ -27,7 +27,7 @@ public class ApiKeyExpiryScheduler {
     private final AccountPort accountPort;
     private final ApplicationEventPublisher eventPublisher;
     private final SchedulerLockService schedulerLockService;
-    Clock clock = Clock.system(TimeZones.KST); // 테스트에서 고정 Clock으로 교체
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Scheduled(cron = "0 0 10 * * *", zone = TimeZones.KST_ID) // 매일 10:00 KST
     public void run() throws InterruptedException {
@@ -35,7 +35,7 @@ public class ApiKeyExpiryScheduler {
     }
 
     void publishDue() {
-        LocalDate today = LocalDate.now(clock.withZone(TimeZones.KST));
+        LocalDate today = LocalDate.now(clock);
         accountPort.findAll().stream().filter(a -> a.broker().isApiKeyExpiring() && a.apiKeyExpiresAt() != null).forEach(a -> {
             LocalDate expiresOn = a.apiKeyExpiresAt().atZone(TimeZones.KST).toLocalDate();
             long daysLeft = ChronoUnit.DAYS.between(today, expiresOn);

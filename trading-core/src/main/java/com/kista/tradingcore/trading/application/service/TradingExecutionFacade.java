@@ -9,6 +9,8 @@ import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +25,7 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
     private final ManualTradingService manualTradingService;
     private final OrderCancelService orderCancelService;
     private final TradingPreviewService tradingPreviewService;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public void executeBatch(List<BatchContext> contexts) throws InterruptedException {
@@ -36,17 +39,17 @@ class TradingExecutionFacade implements TradingExecutionUseCase {
 
     @Override
     public void placeOpenOrdersNow(List<BatchContext> contexts) throws InterruptedException {
-        tradingService.placeOpenOrders(contexts, DstInfo.immediateOpen());
+        tradingService.placeOpenOrders(contexts, DstInfo.immediateOpen(ZonedDateTime.now(clock)));
     }
 
     @Override
     public void executeBatchNow(List<BatchContext> contexts) throws InterruptedException {
-        tradingService.executeBatch(contexts, DstInfo.immediateClose());
+        tradingService.executeBatch(contexts, DstInfo.immediateClose(ZonedDateTime.now(clock)));
     }
 
     @Override
     public void resumeCloseReport(List<BatchContext> contexts) throws InterruptedException {
-        tradingService.resumeCloseReport(contexts, DstInfo.calculate());
+        tradingService.resumeCloseReport(contexts, DstInfo.calculate(ZonedDateTime.now(clock)));
     }
 
     @Override

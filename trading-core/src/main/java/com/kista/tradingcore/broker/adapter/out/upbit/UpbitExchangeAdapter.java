@@ -5,7 +5,6 @@ import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.CryptoTradingRules;
 import com.kista.shared.kernel.CryptoTradingRules.FeeSide;
 import com.kista.shared.kernel.StrategyTicker;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.broker.domain.model.CryptoBalance;
@@ -13,7 +12,6 @@ import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.broker.domain.model.upbit.UpbitApiException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 
@@ -42,11 +40,6 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
     private final UpbitHttpClient http;          // JWT 서명·오류 매핑 공통
     private final UpbitMarketRegistry registry;  // StrategyTicker ↔ KRW-XXX
     private final Clock clock;                   // 진행 중 일봉 판정 — 테스트에서 고정
-
-    @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
-    UpbitExchangeAdapter(UpbitHttpClient http, UpbitMarketRegistry registry) {
-        this(http, registry, Clock.system(TimeZones.KST));
-    }
 
     UpbitExchangeAdapter(UpbitHttpClient http, UpbitMarketRegistry registry, Clock clock) {
         this.http = http;
@@ -102,7 +95,7 @@ class UpbitExchangeAdapter implements CryptoExchangePort {
 
     private List<CryptoCandle> completedDailyCandles(String market, int count) {
         if (count < 1 || count > MAX_COUNT) throw new IllegalArgumentException("일봉 개수는 1~" + MAX_COUNT + "입니다: " + count);
-        LocalDateTime now = LocalDateTime.now(clock.withZone(TimeZones.KST));
+        LocalDateTime now = LocalDateTime.now(clock);
         // kstDate 기준 중복 제거 + 오래된 순 정렬 — 페이지 경계 중복·정렬 미보장 방어
         TreeMap<LocalDate, CryptoCandle> completed = new TreeMap<>();
         String to = null; // 직전 응답 중 가장 오래된 봉의 UTC 시작 — 업비트 to는 exclusive

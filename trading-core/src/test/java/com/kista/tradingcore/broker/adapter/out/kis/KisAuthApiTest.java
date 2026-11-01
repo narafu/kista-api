@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.adapter.out.internal.DbTokenCoordinator;
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
@@ -48,7 +49,7 @@ class KisAuthApiTest {
         // baseUrl은 이제 RestClient(=KisConfig 빈)에 고정 — 테스트도 KisConfig와 동일하게 builder에 설정
         restClientBuilder = RestClient.builder().baseUrl(BASE_URL);
         server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        api = new KisAuthApi(restClientBuilder.build(), tokenCoordinator, adminCoordinator);
+        api = new KisAuthApi(restClientBuilder.build(), tokenCoordinator, adminCoordinator, FixedClockTestConfig.FIXED);
     }
 
     private void expectOAuthToken(String accessToken, String expiredAt) {

@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Clock;
 import java.time.LocalDate;
 
 @Slf4j
@@ -26,12 +27,13 @@ public class MarketCalendarRefreshScheduler {
     private final MarketHolidayStorePort marketHolidayStorePort;
     private final SchedulerJobRunner jobRunner;
     private final SchedulerLockService schedulerLockService;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 앱 기동 시 당해 연도 캘린더 데이터 없으면 3년치 자동 적재
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() throws InterruptedException {
         schedulerLockService.tryRun("market-calendar-startup", Duration.ofHours(1), () -> {
-            int year = LocalDate.now(TimeZones.KST).getYear();
+            int year = LocalDate.now(clock).getYear();
             if (allYearsPresentSafely(year, 3)) {
                 // 적재할 데이터 없음 — jobRunner 알림 자체를 생략해 매 기동마다 텔레그램 오는 것 방지
                 log.debug("캘린더 {}~{} 이미 적재됨 — 기동 시 초기 적재 스킵", year, year + 2);
@@ -49,7 +51,7 @@ public class MarketCalendarRefreshScheduler {
     }
 
     private void refreshForNewYearLocked() {
-        int year = LocalDate.now(TimeZones.KST).getYear();
+        int year = LocalDate.now(clock).getYear();
         jobRunner.run("연간 캘린더 갱신 스케쥴러", () -> refreshYears(year, 3));
     }
 
@@ -60,7 +62,7 @@ public class MarketCalendarRefreshScheduler {
     }
 
     private void refreshCurrentMonthLocked() {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
         jobRunner.run("월간 캘린더 갱신 스케쥴러",
             () -> marketCalendarRefreshPort.refreshMonth(today.getYear(), today.getMonthValue()));
     }

@@ -548,7 +548,7 @@ flows:
           등록만으로 주문은 나가지 않는다. 배치가 "거래일 > 시작예정일"인 전략만 매매하므로, 시작예정일 D 밤 미국장(D 22:00 개장 배치 · D+1 04:30 마감 배치)부터 매매한다.
           시작예정일이 오늘인데 그날 22:00 개장 배치가 이미 대상을 확정한 뒤 등록하면 그날 밤 장 시작 주문(INFINITE 매도·VR 사다리)은 자동으로 생기지 않는다.
           동작은 그대로 두고 등록 응답(todayOpenBatchMissed)과 화면 안내로 알리며, 개장 뒤 "바로 주문"(수동 실행)으로 접수할 수 있다. 장 마감 주문은 다음 날 04:30 배치가 정상 처리한다.
-        code: [TradingService#filterScheduledStart, DstInfo#openBatchMissedFor, TradingCycleResponse#forRegistration, ManualTradingService#execute]
+        code: [TradingService#filterScheduledStart, DstInfo#openBatchMissedAt, TradingCycleResponse#forRegistration, ManualTradingService#execute]
 
   withdraw:
     title: 회원 탈퇴

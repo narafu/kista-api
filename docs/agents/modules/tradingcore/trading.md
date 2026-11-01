@@ -31,7 +31,7 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
   adapter/out/persistence/ (user_notify_profile 복제본) ← UserNotifyProfileEntity + UserNotifyProfileJpaRepository + UserNotifyProfilePersistenceAdapter(`TradingUserProfilePort` 구현 — 쓰기는 `applyChange`(occurredAt 버전 가드 upsert)·`markDeleted`(tombstone)) — trading-core 소유 사용자 알림·활성여부 읽기 전용 복제본(`trading` 스키마, 원본은 user 소유 `public.users`/`user_settings`/`user_notification_prefs`). 별도 프로세스라 EPR이 전달되지 않으므로 root `UserEventStreamPublisher`가 Redis Stream(`stream:user.notify-profile.changed`/`stream:user.deleted`)으로 XADD하고, trading-core 컨슈머가 로컬 `publishEvent()`로 재발행해 `adapter/in/event/UserNotifyProfileSyncListener`가 받는다(컨슈머·재시도는 위 `adapter/in/redis` 항목, 발행 측은 `fallbackExecution=true` 필수 — `UserService.login()` ADMIN 승격이 `@Transactional(NOT_SUPPORTED)` 구간이라 없으면 통째로 버려진다). `is_active`는 `UserStatus.ACTIVE` 전용 컬럼으로 `findAllActive()`(장 개장·마감 브로드캐스트 대상)가 이것만으로 판별 — `TradingUserProfile` record에는 넣지 않는다. 복제본 DDL은 trading baseline(`db/migration-trading`)이 소유하고, 새 DB에 처음 채울 땐 기존 사용자 백필이 필수다(필수 조건 → constraints.md)
 
 ### TDA 전략 패턴 (InfiniteStrategy)
-- **`preview()` today 오프셋**: 날짜 경계는 KST 04:30 (`DstInfo.SCHEDULER_RUN_TIME`) → `TradingPreviewService`의 `today = DstInfo.nextTradeDate()` SSOT 사용 (미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남)
+- **`preview()` today 오프셋**: 날짜 경계는 KST 04:30 (`DstInfo.SCHEDULER_RUN_TIME`) → `TradingPreviewService`의 `today = DstInfo.nextTradeDate(ZonedDateTime.now(clock))` SSOT 사용 (미적용 시 PRIVACY `findTodayTrade()` 날짜 1일 어긋남)
 - **`INSUFFICIENT_BALANCE` skip 시 position 포함**: skip이어도 `InfinitePosition`을 `CycleOrderStrategy.OrderPlan`에 보존 — 프론트에서 단위금액·현재가·부족 금액 표시 목적
 
 ### VR 전략 패턴 (밸류리밸런싱)

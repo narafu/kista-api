@@ -15,7 +15,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // 3-state 소유축(system/personal/group) 조회·소프트삭제 dual-read-mode 검증
-@Import(FinanceCategoryPersistenceAdapter.class)
+@Import({FinanceCategoryPersistenceAdapter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class FinanceCategoryPersistenceAdapterTest extends RootDataJpaTestBase {
 

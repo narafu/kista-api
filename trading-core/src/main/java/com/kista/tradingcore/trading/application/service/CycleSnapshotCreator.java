@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -18,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -34,11 +34,12 @@ class CycleSnapshotCreator {
     private final StrategyCycleVrPort strategyCycleVrPort; // VR 사이클 상세 저장
     private final StrategyVersionPort strategyVersionPort; // VR 재설정 시 버전 교체
     private final VrStrategyDetailService vrStrategyDetailService;  // VR 재설정 시 새 버전 상세 저장
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 새 StrategyCycle + 시작 스냅샷을 하나의 트랜잭션으로 저장 — 중간 실패 시 고아 사이클 방지
     @Transactional
     StrategyCycle createCycleAndSnapshot(UUID strategyId, UUID versionId, BigDecimal seed, BigDecimal price) {
-        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategyId, versionId, seed));
+        StrategyCycle newCycle = strategyCyclePort.save(StrategyCycle.start(strategyId, versionId, seed, LocalDate.now(clock)));
         cyclePositionPort.save(CyclePosition.cycleStartSnapshot(newCycle.id(), seed, price));
         return newCycle;
     }
@@ -80,7 +81,7 @@ class CycleSnapshotCreator {
         // 방금 삭제한 버전과 동일한 번호를 다시 계산 → uq_strategy_version_strategy_version_no 위반
         int nextVersionNo = strategyVersionPort.nextVersionNo(strategyId);
         // 기존 활성 버전 소프트 삭제 후 새 버전 발급 (버전 이력은 계속 누적)
-        strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now());
+        strategyVersionPort.softDeleteActiveByStrategyId(strategyId, Instant.now(clock));
         StrategyVersion newVersion = strategyVersionPort.save(
                 new StrategyVersion(null, strategyId, nextVersionNo, null, null));
         // 새 램프 파라미터로 VR 버전 상세 저장
@@ -94,7 +95,7 @@ class CycleSnapshotCreator {
         // 새 사이클 + holdings 승계 스냅샷 원자 생성 — 램프 시계(weeks) 기준 gradient/poolLimitRate 재계산 스냅샷
         // 시작일은 오늘(KST) — "지금 당장" 실행되는 액션이라 r.today()(다음 거래일)와 다르다
         return createVrCycleAndSnapshot(new VrCycleStart(strategyId, newVersion.id(), r.postBalance(), r.closingPrice(),
-                r.newValue(), newDetail.gradientAt(r.weeks()), newDetail.poolLimitRateAt(r.weeks()), LocalDate.now(TimeZones.KST)));
+                r.newValue(), newDetail.gradientAt(r.weeks()), newDetail.poolLimitRateAt(r.weeks()), LocalDate.now(clock)));
     }
 
     private static BigDecimal totalAssets(AccountBalance balance, BigDecimal closingPrice) {

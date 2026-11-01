@@ -16,7 +16,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(FinanceTransactionPersistenceAdapter.class)
+@Import({FinanceTransactionPersistenceAdapter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class FinanceTransactionPersistenceAdapterTest extends RootDataJpaTestBase {
 

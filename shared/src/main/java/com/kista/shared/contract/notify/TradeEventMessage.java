@@ -28,13 +28,13 @@ public record TradeEventMessage(
 
     // BUY 체결 이벤트 팩토리 메서드
     public static TradeEventMessage buy(String ticker, BigDecimal quantity, double price, double amount, String nickname,
-                                        UUID accountId, UUID strategyId, Currency currency) {
-        return new TradeEventMessage(Kind.BUY, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId, currency);
+                                        UUID accountId, UUID strategyId, Currency currency, Instant occurredAt) {
+        return new TradeEventMessage(Kind.BUY, ticker, quantity, price, amount, occurredAt, nickname, null, accountId, strategyId, currency);
     }
 
     // SELL 체결 이벤트 팩토리 메서드
     public static TradeEventMessage sell(String ticker, BigDecimal quantity, double price, double amount, String nickname,
-                                         UUID accountId, UUID strategyId, Currency currency) {
-        return new TradeEventMessage(Kind.SELL, ticker, quantity, price, amount, Instant.now(), nickname, null, accountId, strategyId, currency);
+                                         UUID accountId, UUID strategyId, Currency currency, Instant occurredAt) {
+        return new TradeEventMessage(Kind.SELL, ticker, quantity, price, amount, occurredAt, nickname, null, accountId, strategyId, currency);
     }
 }

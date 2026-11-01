@@ -10,6 +10,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -34,6 +35,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     private final CyclePositionJpaRepository positionRepo;
     private final StrategyCycleJpaRepository cycleRepo;     // strategy_cycle 조인: 현재 사이클 조회
     private final StrategyPort strategyPort;            // ticker 조회: strategy_cycle → strategy (trading own-type 포트 경유)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public CyclePosition save(CyclePosition position) {
@@ -149,17 +151,17 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
 
     @Override
     public void deleteByStrategyId(UUID strategyId) {
-        positionRepo.softDeleteByStrategyId(strategyId, Instant.now());
+        positionRepo.softDeleteByStrategyId(strategyId, Instant.now(clock));
     }
 
     @Override
     public void deleteByAccountId(UUID accountId) {
-        positionRepo.softDeleteByAccountId(accountId, Instant.now());
+        positionRepo.softDeleteByAccountId(accountId, Instant.now(clock));
     }
 
     @Override
     public void deleteByUserId(UUID userId) {
-        positionRepo.softDeleteByUserId(userId, Instant.now());
+        positionRepo.softDeleteByUserId(userId, Instant.now(clock));
     }
 
     // cycle_position 목록에서 strategy_cycle → strategy 경유 ticker 맵 구성

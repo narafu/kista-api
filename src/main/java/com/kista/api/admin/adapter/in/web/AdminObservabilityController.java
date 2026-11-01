@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -33,6 +34,7 @@ public class AdminObservabilityController {
 
     private final AdminQueryUseCase adminQuery;
     private final AdminUserUseCase adminUser;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 감사 로그 — 관리자 액션 기록
     @Operation(summary = "감사 로그 조회", description = "관리자 액션 기록을 기간별로 조회합니다.")
@@ -56,7 +58,7 @@ public class AdminObservabilityController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         int safeLimit = Math.min(limit, MAX_LIMIT);
         Instant fromInstant = toInstantOrDefault(from, 0, Instant.EPOCH);
-        Instant toInstant   = toInstantOrDefault(to, 1, Instant.now());
+        Instant toInstant   = toInstantOrDefault(to, 1, Instant.now(clock));
         return adminQuery.listErrorLogs(safeLimit, fromInstant, toInstant).stream()
                 .map(ErrorLogResponse::from)
                 .toList();

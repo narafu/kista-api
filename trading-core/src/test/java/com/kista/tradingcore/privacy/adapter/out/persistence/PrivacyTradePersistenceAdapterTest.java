@@ -1,6 +1,6 @@
 package com.kista.tradingcore.privacy.adapter.out.persistence;
 
-import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.privacy.domain.model.FidaOrderCommand;
 import com.kista.tradingcore.privacy.domain.model.FidaPlannedOrder;
 import com.kista.tradingcore.privacy.domain.model.PrivacyDates;
@@ -24,11 +24,11 @@ import static org.mockito.Mockito.when;
 class PrivacyTradePersistenceAdapterTest {
 
     private final PrivacyTradeBaseJpaRepository baseRepository = mock(PrivacyTradeBaseJpaRepository.class);
-    private final PrivacyTradePersistenceAdapter adapter = new PrivacyTradePersistenceAdapter(baseRepository);
+    private final PrivacyTradePersistenceAdapter adapter = new PrivacyTradePersistenceAdapter(baseRepository, FixedClockTestConfig.FIXED);
 
     @Test
     void findSeedPreviewBase_queries_by_release_date_for_kst_today() {
-        LocalDate todayKst = LocalDate.now(TimeZones.KST);
+        LocalDate todayKst = LocalDate.now(FixedClockTestConfig.FIXED);
         // 버그 수정 검증: 오늘 거래일에 적용되는 발행일(전날)부터 조회해야 함 — 오늘 발행일로 조회하면 하루 누락
         LocalDate expectedReleaseDate = PrivacyDates.releaseDateFor(todayKst);
         PrivacyTradeBaseEntity base = new PrivacyTradeBaseEntity();

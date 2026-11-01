@@ -3,13 +3,13 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.platform.cache.TtlResultCache;
 import com.kista.tradingcore.broker.domain.model.toss.TossCandle;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,7 +29,6 @@ import java.util.Optional;
 // getDailyCandlesBefore: 200봉 단위 페이징 + adjusted=true(분할·배당 조정, 이 경로만)
 @Slf4j
 @Component
-@RequiredArgsConstructor
 class TossCandleApi {
 
     private static final String CANDLES_PATH = "/api/v1/candles";
@@ -41,7 +40,12 @@ class TossCandleApi {
     private static final Duration LATEST_DAILY_TTL = Duration.ofMinutes(2);
 
     private final TossHttpClient tossHttpClient;
-    private final TtlResultCache latestDailyCache = new TtlResultCache(); // 종목별 최신 일봉 600봉 (공용 시세)
+    private final TtlResultCache latestDailyCache; // 종목별 최신 일봉 600봉 (공용 시세)
+
+    TossCandleApi(TossHttpClient tossHttpClient, Clock clock) { // clock: 캐시 TTL 판정 — 테스트에서 Clock.fixed 주입
+        this.tossHttpClient = tossHttpClient;
+        this.latestDailyCache = new TtlResultCache(clock);
+    }
 
     public List<TossCandle> getCandles(String symbol, String interval, LocalDate from, LocalDate to) {
         List<TossCandle> all = new ArrayList<>(); // 오름차순 유지 — 더 오래된 페이지는 앞에 붙인다

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,7 +16,7 @@ class TradeEventMessageTest {
 
     @Test
     void serializesFractionalQuantityAsPlainNumber() {
-        TradeEventMessage e = TradeEventMessage.buy("BTC", new BigDecimal("0.00012345"), 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD);
+        TradeEventMessage e = TradeEventMessage.buy("BTC", new BigDecimal("0.00012345"), 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD, Instant.EPOCH);
         assertThat(mapper.writeValueAsString(e)).contains("\"quantity\":0.00012345");
     }
 
@@ -26,18 +27,18 @@ class TradeEventMessageTest {
     }
 
     private String json(BigDecimal q) {
-        return mapper.writeValueAsString(TradeEventMessage.buy("BTC", q, 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD));
+        return mapper.writeValueAsString(TradeEventMessage.buy("BTC", q, 1.0, 1.0, "n", UUID.randomUUID(), null, Currency.USD, Instant.EPOCH));
     }
 
     @Test
     void buyCarriesCurrency() {
-        assertThat(TradeEventMessage.buy("BTC", BigDecimal.ONE, 65000.0, 10.4, "바낸", UUID.randomUUID(), null, Currency.USDT).currency())
+        assertThat(TradeEventMessage.buy("BTC", BigDecimal.ONE, 65000.0, 10.4, "바낸", UUID.randomUUID(), null, Currency.USDT, Instant.EPOCH).currency())
                 .isEqualTo(Currency.USDT);
     }
 
     @Test
     void serializesCurrencyName() {
-        assertThat(mapper.writeValueAsString(TradeEventMessage.sell("BTC", BigDecimal.ONE, 1.0, 1.0, "n", null, null, Currency.USDT)))
+        assertThat(mapper.writeValueAsString(TradeEventMessage.sell("BTC", BigDecimal.ONE, 1.0, 1.0, "n", null, null, Currency.USDT, Instant.EPOCH)))
                 .contains("\"currency\":\"USDT\"");
     }
 

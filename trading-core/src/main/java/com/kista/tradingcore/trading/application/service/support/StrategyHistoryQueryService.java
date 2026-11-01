@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -47,6 +48,7 @@ public class StrategyHistoryQueryService {
     private final PrivacyTradePort privacyTradePort;
     private final BrokerPricePort brokerPricePort;
     private final UnassignedUsdCalculator unassignedUsd; // 가용 예수금 경고용 계좌 미배정 USD
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
     // 브로커 HTTP(getPrevClose) 호출 포함 → 트랜잭션 없이 실행 (register()와 동일 이유)
@@ -122,7 +124,7 @@ public class StrategyHistoryQueryService {
     }
 
     private Instant resolveHistoryTo(LocalDate to) {
-        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
+        var resolved = to != null ? to : LocalDate.now(clock);
         return KstDays.endExclusive(resolved); // to 당일 포함
     }
 }

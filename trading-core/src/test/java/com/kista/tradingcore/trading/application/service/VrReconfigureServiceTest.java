@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.domain.model.CancelResult;
@@ -27,12 +28,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,7 +70,7 @@ class VrReconfigureServiceTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock BrokerPricePort pricePort;
 
-    @InjectMocks VrReconfigureService service;
+    VrReconfigureService service;
 
     private final UUID strategyId = UUID.randomUUID();
     private final UUID requesterId = UUID.randomUUID();
@@ -89,11 +90,13 @@ class VrReconfigureServiceTest {
 
     @BeforeEach
     void setUp() {
+        service = new VrReconfigureService(strategyPort, accountPort, strategyCyclePort, strategyVrDetailPort, strategyCycleVrPort,
+                cyclePositionPort, pricePort, cycleSnapshotCreator, orderCancelService, eventPublisher, FIXED);
         account = TradingFixtures.kisAccount(accountId, requesterId);
         vrStrategy = new Strategy(strategyId, accountId, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         currentCycle = new StrategyCycle(cycleId, strategyId, strategyVersionId,
-                BigDecimal.valueOf(1000), null, LocalDate.now().minusWeeks(4), null, null, null);
+                BigDecimal.valueOf(1000), null, LocalDate.now(FIXED).minusWeeks(4), null, null, null);
         // 기본 램프: initialGradient=10/gMax=15/gGraceWeeks=gStepWeeks=52,26 / initialPoolLimitRate=0.75/floor=0.50
         currentDetail = new StrategyVrDetail(strategyVersionId, 4, new BigDecimal("15.00"), 0,
                 10, 52, 26, 15, new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
@@ -101,10 +104,10 @@ class VrReconfigureServiceTest {
         latestPosition = new CyclePosition(UUID.randomUUID(), cycleId,
                 new BigDecimal("500.00"), new BigDecimal("95.00"), new BigDecimal("50.00"), BigDecimal.valueOf(10), null, null);
         newCycleAfterReconfigure = new StrategyCycle(UUID.randomUUID(), strategyId, UUID.randomUUID(),
-                BigDecimal.valueOf(500), null, LocalDate.now(), null, null, null);
+                BigDecimal.valueOf(500), null, LocalDate.now(FIXED), null, null, null);
         currentPrice = new BigDecimal("120.00");
-        // 서비스 내부와 동일한 SSOT 호출 — DstInfo.nextTradeDate()는 실제 시각 기준이라 테스트에서도 그대로 재사용
-        today = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate();
+        // 서비스 내부와 동일한 SSOT 호출 — DstInfo.nextTradeDate(고정 시각)를 테스트에서도 그대로 재사용
+        today = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
     }
 
     // reconfigure()가 검증을 통과해 cycleSnapshotCreator.reconfigureVrCycle까지 도달하는 공통 스텁 체인.

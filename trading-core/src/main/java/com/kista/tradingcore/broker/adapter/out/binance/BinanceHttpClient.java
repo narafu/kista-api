@@ -3,7 +3,6 @@ package com.kista.tradingcore.broker.adapter.out.binance;
 import com.kista.tradingcore.broker.domain.model.*;
 import com.kista.tradingcore.broker.domain.model.binance.BinanceApiException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -40,13 +39,8 @@ class BinanceHttpClient {
     private final String baseUrl;              // binance.base-url (테스트넷 전환용)
     private final Clock clock;                 // timestamp 원천 — 테스트에서 고정
 
-    @Autowired // 생성자 2개 — 누락 시 빈 생성 실패(Toss Redis Store 장애 교훈)
     BinanceHttpClient(RestClient binanceRestClient, ObjectMapper objectMapper,
-                      @Value("${binance.base-url:https://api.binance.com}") String baseUrl) {
-        this(binanceRestClient, objectMapper, baseUrl, Clock.systemUTC());
-    }
-
-    BinanceHttpClient(RestClient binanceRestClient, ObjectMapper objectMapper, String baseUrl, Clock clock) {
+                      @Value("${binance.base-url:https://api.binance.com}") String baseUrl, Clock clock) {
         this.binanceRestClient = binanceRestClient;
         this.objectMapper = objectMapper;
         this.baseUrl = baseUrl;

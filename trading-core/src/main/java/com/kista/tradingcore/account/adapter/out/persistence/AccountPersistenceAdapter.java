@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +19,7 @@ public class AccountPersistenceAdapter implements AccountPort {
 
     private final AccountJpaRepository jpaRepository;
     private final AccountNoHasher hasher;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public List<Account> findByUserId(UUID userId) {
@@ -54,12 +56,12 @@ public class AccountPersistenceAdapter implements AccountPort {
 
     @Override
     public void delete(UUID id) {
-        jpaRepository.softDeleteById(id, Instant.now());
+        jpaRepository.softDeleteById(id, Instant.now(clock));
     }
 
     @Override
     public void deleteByUserId(UUID userId) {
-        jpaRepository.softDeleteByUserId(userId, Instant.now());
+        jpaRepository.softDeleteByUserId(userId, Instant.now(clock));
     }
 
     @Override

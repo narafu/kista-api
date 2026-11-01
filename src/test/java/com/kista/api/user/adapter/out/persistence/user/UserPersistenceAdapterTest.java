@@ -18,7 +18,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 // telegramBotToken·email은 AesStringConverter가 암호화 — 컬럼 원문은 평문이 아니고 어댑터로 읽으면 평문이 복원된다
-@Import(UserPersistenceAdapter.class)
+@Import({UserPersistenceAdapter.class})
 @Execution(ExecutionMode.SAME_THREAD)
 class UserPersistenceAdapterTest extends RootDataJpaTestBase {
 

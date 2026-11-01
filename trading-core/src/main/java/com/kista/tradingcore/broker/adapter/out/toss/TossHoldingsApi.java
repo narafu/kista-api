@@ -9,7 +9,6 @@ import com.kista.tradingcore.broker.domain.model.PresentBalanceResult;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import com.kista.tradingcore.broker.domain.model.toss.TossExchangeRate;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
@@ -17,8 +16,8 @@ import org.springframework.util.LinkedMultiValueMap;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -29,7 +28,6 @@ import java.util.stream.Stream;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 class TossHoldingsApi {
 
     // Toss 보유주식 API 경로
@@ -41,7 +39,12 @@ class TossHoldingsApi {
 
     private final TossHttpClient tossHttpClient;
     // USD/KRW 환율 60초 TTL 캐시 — 계좌 무관 전역 스칼라 1개
-    private final UsdKrwRateCache exchangeRateCache = new UsdKrwRateCache(Duration.ofSeconds(60), Instant::now);
+    private final UsdKrwRateCache exchangeRateCache;
+
+    TossHoldingsApi(TossHttpClient tossHttpClient, Clock clock) {
+        this.tossHttpClient = tossHttpClient;
+        this.exchangeRateCache = new UsdKrwRateCache(Duration.ofSeconds(60), clock::instant);
+    }
 
     // ── TossMarginPort ─────────────────────────────────────────────────────────
 

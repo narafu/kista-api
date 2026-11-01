@@ -1,9 +1,9 @@
 package com.kista.tradingcore.trading.application.service;
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -102,7 +102,7 @@ class StrategyServiceTest {
 
     // 현재 사이클 픽스처 (시작금액 1000)
     private static final StrategyCycle CYCLE = new StrategyCycle(
-            CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), null, LocalDate.now(), null, null, null
+            CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), null, LocalDate.now(FIXED), null, null, null
     );
 
     @BeforeEach
@@ -110,7 +110,7 @@ class StrategyServiceTest {
         DcaSummaryAssembler dcaSummaryAssembler = new DcaSummaryAssembler(marketCalendarPort);
         StrategyDetailAssembler detailAssembler = new StrategyDetailAssembler(
                 strategyVersionPort, strategyInfiniteDetailPort, vrStrategyDetailService, strategyCyclePort,
-                cyclePositionPort, cyclePositionInfiniteDetailPort, dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler);
+                cyclePositionPort, cyclePositionInfiniteDetailPort, dcaDetailPort, dcaExecutionPort, dcaSummaryAssembler, FIXED);
         StrategyCreationService creationService = new StrategyCreationService(
                 strategyPort,
                 accountPort,
@@ -125,14 +125,14 @@ class StrategyServiceTest {
                 new StrategyStartAmountCalculator(privacyTradePort),
                 new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
                         new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null))),
-                detailAssembler);
+                detailAssembler, FIXED);
         var historyStrategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(List.of(
                 new com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy(null, null),
                 new com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy(null)));
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
                 privacyTradePort, brokerPricePort,
-                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort, historyStrategies));
+                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort, historyStrategies), FIXED);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,
@@ -143,7 +143,7 @@ class StrategyServiceTest {
                 detailAssembler,
                 historyQueryService,
                 new CycleSnapshotCreator(
-                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService),
+                        strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED),
                 orderCancelService,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
@@ -416,7 +416,7 @@ class StrategyServiceTest {
     void resume_reopens_ended_cycle_with_end_amount_as_seed() {
         StrategyCycle endedCycle = new StrategyCycle(
                 CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), new BigDecimal("874.50"),
-                LocalDate.now().minusDays(5), LocalDate.now(), null, null);
+                LocalDate.now(FIXED).minusDays(5), LocalDate.now(FIXED), null, null);
         CyclePosition lastPosition = CyclePosition.tradeSnapshot(CYCLE_ID,
                 new AccountBalance(0, null, new BigDecimal("874.50")), new BigDecimal("103.20"));
 
@@ -444,7 +444,7 @@ class StrategyServiceTest {
     private void stubEndedCycleResume(String endAmount, String closingPrice) {
         StrategyCycle endedCycle = new StrategyCycle(
                 CYCLE_ID, STRATEGY_ID, STRATEGY_VERSION_ID, new BigDecimal("1000"), new BigDecimal(endAmount),
-                LocalDate.now().minusDays(5), LocalDate.now(), null, null);
+                LocalDate.now(FIXED).minusDays(5), LocalDate.now(FIXED), null, null);
         CyclePosition lastPosition = CyclePosition.tradeSnapshot(CYCLE_ID,
                 new AccountBalance(0, null, new BigDecimal(endAmount)),
                 closingPrice == null ? null : new BigDecimal(closingPrice));
@@ -966,7 +966,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
+                BigDecimal.ZERO, null, LocalDate.now(FIXED), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 BigDecimal.ZERO, null, null, BigDecimal.valueOf(0), null, null);
 
@@ -1056,7 +1056,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("2000"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("2000"), null, null, BigDecimal.valueOf(0), null, null);
         // recurringAmount=0 → 기본 poolLimitRate=0.75 (거치식) — poolLimit 달러 파생은 개장 pool(2000)×0.75=1500.00
@@ -1108,7 +1108,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
 
@@ -1138,7 +1138,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
+                BigDecimal.ZERO, null, LocalDate.now(FIXED), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 BigDecimal.ZERO, null, null, BigDecimal.valueOf(0), null, null);
         // recurringAmount=200(적립식) → 기본 poolLimitRate=1.0, 단 개장 pool=0이므로 파생 poolLimit은 0.00
@@ -1209,7 +1209,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("2000"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("2000"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("2000"), null, null, BigDecimal.valueOf(0), null, null);
 
@@ -1244,7 +1244,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
+                BigDecimal.ZERO, null, LocalDate.now(FIXED), null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1267,7 +1267,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                BigDecimal.ZERO, null, LocalDate.now(), null, null, null);
+                BigDecimal.ZERO, null, LocalDate.now(FIXED), null, null, null);
 
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
         when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
@@ -1293,7 +1293,7 @@ class StrategyServiceTest {
         Strategy savedVrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(vrCycleId, vrStrategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("1000"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition savedPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("1000"), null, null, BigDecimal.valueOf(0), null, null);
 
@@ -1443,7 +1443,7 @@ class StrategyServiceTest {
         Strategy vrStrategy = new Strategy(vrStrategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(vrCycleId, vrStrategyId, vrVersionId,
-                new BigDecimal("1600"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1600"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition latestPos = new CyclePosition(UUID.randomUUID(), vrCycleId,
                 new BigDecimal("700"), null, null, BigDecimal.valueOf(0), null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), vrCycleId,
@@ -1497,7 +1497,7 @@ class StrategyServiceTest {
                 StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle vrCycle = new StrategyCycle(
                 vrCycleId, vrStrategyId, UUID.randomUUID(), new BigDecimal("1600.00"),
-                null, LocalDate.now(), null, null, null);
+                null, LocalDate.now(FIXED), null, null, null);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(vrStrategy)));
         when(strategyCyclePort.findLatestByStrategyIds(List.of(vrStrategyId))).thenReturn(Map.of(vrStrategyId, vrCycle));
@@ -1521,7 +1521,7 @@ class StrategyServiceTest {
         Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition position = new CyclePosition(positionId, cycleId,
                 new BigDecimal("500.00"), null, new BigDecimal("20.00"), BigDecimal.valueOf(10), null, null);
         StrategyVersion version = new StrategyVersion(versionId, strategyId, 1, null, null);
@@ -1564,7 +1564,7 @@ class StrategyServiceTest {
         Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, versionId,
-                new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1600.00"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition openingPosition = new CyclePosition(UUID.randomUUID(), cycleId,
                 new BigDecimal("1000.00"), null, null, BigDecimal.valueOf(0), null, null);
         StrategyVersion version = new StrategyVersion(versionId, strategyId, 1, null, null);
@@ -1615,7 +1615,7 @@ class StrategyServiceTest {
         Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("2000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("2000.00"), null, LocalDate.now(FIXED), null, null, null);
         CyclePosition position = new CyclePosition(positionId, cycleId,
                 new BigDecimal("1500.00"), null, new BigDecimal("30.00"), BigDecimal.valueOf(15), null, null);
 
@@ -1681,7 +1681,7 @@ class StrategyServiceTest {
         Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.VR,
                 StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         StrategyCycle cycle = new StrategyCycle(cycleId, strategyId, UUID.randomUUID(),
-                new BigDecimal("1600.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1600.00"), null, LocalDate.now(FIXED), null, null, null);
 
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
@@ -1716,9 +1716,9 @@ class StrategyServiceTest {
         Strategy strategyB = new Strategy(strategyBId, ACCOUNT_ID, StrategyType.PRIVACY,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle cycleA = new StrategyCycle(cycleAId, strategyAId, STRATEGY_VERSION_ID,
-                new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED), null, null, null);
         StrategyCycle cycleB = new StrategyCycle(cycleBId, strategyBId, STRATEGY_VERSION_ID,
-                new BigDecimal("2000.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("2000.00"), null, LocalDate.now(FIXED), null, null, null);
 
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID)))
@@ -1750,7 +1750,7 @@ class StrategyServiceTest {
         Strategy saved = new Strategy(strategyId, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("1500.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("1500.00"), null, LocalDate.now(FIXED), null, null, null);
 
         RegisterStrategyCommand cmd = infinite().ticker(StrategyTicker.SOXL).deposit("1500").divisionCount(20).holdings(BigDecimal.valueOf(10)).avgPrice(new BigDecimal("45.50")).build();
 
@@ -1785,7 +1785,7 @@ class StrategyServiceTest {
         Strategy saved = new Strategy(strategyId, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 ticker, StrategyCycleSeedType.NONE);
         StrategyCycle savedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
-                new BigDecimal("2200.00"), null, LocalDate.now(), null, null, null);
+                new BigDecimal("2200.00"), null, LocalDate.now(FIXED), null, null, null);
 
         RegisterStrategyCommand cmd = register(StrategyType.PRIVACY).deposit("200").holdings(BigDecimal.valueOf(20)).avgPrice(new BigDecimal("95.00")).build();
 
@@ -1998,7 +1998,7 @@ class StrategyServiceTest {
     @DisplayName("INFINITE register() scheduledStartDate 명시 시 저장되는 StrategyCycle.startDate가 그 값과 일치한다")
     void register_infinite_withScheduledStartDate_setsCycleStartDate() {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
-        LocalDate scheduledStart = LocalDate.now(TimeZones.KST).plusDays(3);
+        LocalDate scheduledStart = LocalDate.now(FIXED).plusDays(3);
         RegisterStrategyCommand cmd = infinite().ticker(StrategyTicker.SOXL).divisionCount(20).scheduledStartDate(scheduledStart).build();
 
         StrategyDetail detail = strategyService.register(USER_ID, ACCOUNT_ID, cmd);
@@ -2022,14 +2022,14 @@ class StrategyServiceTest {
 
         ArgumentCaptor<StrategyCycle> captor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(captor.capture());
-        assertThat(captor.getValue().startDate()).isEqualTo(LocalDate.now(TimeZones.KST));
+        assertThat(captor.getValue().startDate()).isEqualTo(LocalDate.now(FIXED));
     }
 
     @Test
     @DisplayName("VR register() scheduledStartDate가 과거 날짜이면 IllegalArgumentException 발생")
     void register_vr_withPastScheduledStartDate_throws() {
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
-        LocalDate yesterday = LocalDate.now(TimeZones.KST).minusDays(1);
+        LocalDate yesterday = LocalDate.now(FIXED).minusDays(1);
         RegisterStrategyCommand cmd = vr().deposit("1000").intervalWeeks(2).bandWidth("15.00").recurringAmount(0).scheduledStartDate(yesterday).build();
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))

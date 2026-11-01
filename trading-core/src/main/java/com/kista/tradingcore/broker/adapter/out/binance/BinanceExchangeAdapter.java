@@ -12,7 +12,6 @@ import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult.State;
 import com.kista.tradingcore.broker.domain.model.binance.BinanceApiException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -38,11 +37,6 @@ class BinanceExchangeAdapter implements CryptoExchangePort {
     private final BinanceHttpClient http;         // 서명·오류 매핑 공통
     private final BinanceSymbolRegistry registry; // StrategyTicker ↔ BTCUSDT
     private final Clock clock;                    // 진행 중 일봉 판정 — 테스트에서 고정
-
-    @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
-    BinanceExchangeAdapter(BinanceHttpClient http, BinanceSymbolRegistry registry) {
-        this(http, registry, Clock.systemUTC());
-    }
 
     BinanceExchangeAdapter(BinanceHttpClient http, BinanceSymbolRegistry registry, Clock clock) {
         this.http = http;

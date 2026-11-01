@@ -1,5 +1,6 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.contract.notify.TradeEventMessage;
 import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.NotificationType;
@@ -30,7 +31,7 @@ class CryptoTradeNotifierTest {
     TradingUserNotificationPort userPort = mock(TradingUserNotificationPort.class);
     TradingRealtimeNotificationPort realtime = mock(TradingRealtimeNotificationPort.class);
     TradingUserProfilePort profiles = mock(TradingUserProfilePort.class);
-    CryptoTradeNotifier notifier = new CryptoTradeNotifier(userPort, realtime, profiles);
+    CryptoTradeNotifier notifier = new CryptoTradeNotifier(userPort, realtime, profiles, FixedClockTestConfig.FIXED);
     UUID userId = UUID.randomUUID();
     CryptoOrderFilledEvent event = new CryptoOrderFilledEvent(userId, UUID.randomUUID(), UUID.randomUUID(), "업비트",
             StrategyTicker.BTC, OrderDirection.BUY, new BigDecimal("0.00012345"), new BigDecimal("150000000"), new BigDecimal("18518"), Currency.KRW);

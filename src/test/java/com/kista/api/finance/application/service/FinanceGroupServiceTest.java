@@ -1,5 +1,8 @@
 package com.kista.api.finance.application.service;
 
+import org.junit.jupiter.api.BeforeEach;
+import java.time.Clock;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.finance.domain.model.FinanceGroup;
 import com.kista.api.finance.domain.model.FinanceGroupInvitation;
 import com.kista.api.finance.domain.model.FinanceGroupMember;
@@ -8,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -32,7 +34,13 @@ import static org.mockito.Mockito.*;
 class FinanceGroupServiceTest {
 
     @Mock FinanceGroupPort financeGroupPort;
-    @InjectMocks FinanceGroupService financeGroupService;
+    private static final Clock CLOCK = FixedClockTestConfig.FIXED;
+    FinanceGroupService financeGroupService;
+
+    @BeforeEach
+    void setUp() {
+        financeGroupService = new FinanceGroupService(financeGroupPort, CLOCK);
+    }
 
     private final UUID groupId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID(); // 호출 주체(actor)
@@ -46,7 +54,7 @@ class FinanceGroupServiceTest {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.empty());
         when(financeGroupPort.createGroup(userId)).thenReturn(groupId);
         FinanceGroupInvitation invitation = new FinanceGroupInvitation(UUID.randomUUID(), groupId, userId, null,
-                "code1234abcd5678", FinanceGroupInvitation.Status.PENDING, Instant.now().plus(72, ChronoUnit.HOURS), null);
+                "code1234abcd5678", FinanceGroupInvitation.Status.PENDING, Instant.now(CLOCK).plus(72, ChronoUnit.HOURS), null);
         when(financeGroupPort.createInvitation(eq(groupId), eq(userId), anyString(), any(Instant.class)))
                 .thenReturn(invitation);
 
@@ -63,7 +71,7 @@ class FinanceGroupServiceTest {
         when(financeGroupPort.findCurrentGroupId(userId)).thenReturn(Optional.of(groupId));
         when(financeGroupPort.findRole(groupId, userId)).thenReturn(Optional.of(FinanceGroup.MemberRole.OWNER));
         FinanceGroupInvitation invitation = new FinanceGroupInvitation(UUID.randomUUID(), groupId, userId, null,
-                "code1234abcd5678", FinanceGroupInvitation.Status.PENDING, Instant.now().plus(72, ChronoUnit.HOURS), null);
+                "code1234abcd5678", FinanceGroupInvitation.Status.PENDING, Instant.now(CLOCK).plus(72, ChronoUnit.HOURS), null);
         when(financeGroupPort.createInvitation(eq(groupId), eq(userId), anyString(), any(Instant.class)))
                 .thenReturn(invitation);
 
@@ -106,7 +114,7 @@ class FinanceGroupServiceTest {
     @Test
     @DisplayName("PENDING + 미만료 + ACCEPTED + 무그룹 유저 → addMember 후 updateInvitationStatus 순서로 호출")
     void respond_pendingNotExpiredAccepted_noCurrentGroup_callsAddMemberThenUpdateStatus() {
-        FinanceGroupInvitation invitation = pendingInvitation(Instant.now().plus(1, ChronoUnit.HOURS));
+        FinanceGroupInvitation invitation = pendingInvitation(Instant.now(CLOCK).plus(1, ChronoUnit.HOURS));
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
         when(financeGroupPort.findCurrentGroupId(targetUserId)).thenReturn(Optional.empty());
         when(financeGroupPort.updateInvitationStatus(invitation.id(), FinanceGroupInvitation.Status.ACCEPTED, targetUserId))
@@ -123,7 +131,7 @@ class FinanceGroupServiceTest {
     @Test
     @DisplayName("이미 다른 그룹에 소속된 유저가 ACCEPTED 응답하면 MembershipConflictException(409), addMember 호출 안 됨")
     void respond_accepted_alreadyBelongsToAnotherGroup_rejected() {
-        FinanceGroupInvitation invitation = pendingInvitation(Instant.now().plus(1, ChronoUnit.HOURS));
+        FinanceGroupInvitation invitation = pendingInvitation(Instant.now(CLOCK).plus(1, ChronoUnit.HOURS));
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
         when(financeGroupPort.findCurrentGroupId(targetUserId)).thenReturn(Optional.of(UUID.randomUUID()));
 
@@ -138,7 +146,7 @@ class FinanceGroupServiceTest {
     @Test
     @DisplayName("PENDING + 미만료 + DECLINED → updateInvitationStatus만 호출, addMember는 호출 안 됨")
     void respond_pendingNotExpiredDeclined_callsOnlyUpdateStatus() {
-        FinanceGroupInvitation invitation = pendingInvitation(Instant.now().plus(1, ChronoUnit.HOURS));
+        FinanceGroupInvitation invitation = pendingInvitation(Instant.now(CLOCK).plus(1, ChronoUnit.HOURS));
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
         when(financeGroupPort.updateInvitationStatus(invitation.id(), FinanceGroupInvitation.Status.DECLINED, targetUserId))
                 .thenReturn(invitation);
@@ -154,7 +162,7 @@ class FinanceGroupServiceTest {
     @DisplayName("이미 ACCEPTED인 초대에 응답하면 InvalidInvitationStateException")
     void respond_alreadyAccepted_throwsInvalidState() {
         FinanceGroupInvitation invitation = new FinanceGroupInvitation(UUID.randomUUID(), groupId, userId, targetUserId,
-                "codeaccepted1234", FinanceGroupInvitation.Status.ACCEPTED, Instant.now().plus(1, ChronoUnit.HOURS), null);
+                "codeaccepted1234", FinanceGroupInvitation.Status.ACCEPTED, Instant.now(CLOCK).plus(1, ChronoUnit.HOURS), null);
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
 
         assertThatThrownBy(() -> financeGroupService.respondToInvitation(invitation.code(), targetUserId, FinanceGroupInvitation.Status.ACCEPTED))
@@ -167,7 +175,7 @@ class FinanceGroupServiceTest {
     @Test
     @DisplayName("발급자 본인이 자기 초대 코드를 수락하면 SecurityException")
     void respond_selfAccept_throwsSecurityException() {
-        FinanceGroupInvitation invitation = pendingInvitation(Instant.now().plus(1, ChronoUnit.HOURS));
+        FinanceGroupInvitation invitation = pendingInvitation(Instant.now(CLOCK).plus(1, ChronoUnit.HOURS));
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
 
         assertThatThrownBy(() -> financeGroupService.respondToInvitation(invitation.code(), userId, FinanceGroupInvitation.Status.ACCEPTED))
@@ -180,7 +188,7 @@ class FinanceGroupServiceTest {
     @Test
     @DisplayName("만료된 초대는 status가 여전히 PENDING이어도 InvalidInvitationStateException")
     void respond_expiredButStillPending_throwsInvalidState() {
-        FinanceGroupInvitation invitation = pendingInvitation(Instant.now().minus(1, ChronoUnit.HOURS));
+        FinanceGroupInvitation invitation = pendingInvitation(Instant.now(CLOCK).minus(1, ChronoUnit.HOURS));
         when(financeGroupPort.findInvitationByCodeOrThrow(invitation.code())).thenReturn(invitation);
 
         assertThatThrownBy(() -> financeGroupService.respondToInvitation(invitation.code(), targetUserId, FinanceGroupInvitation.Status.ACCEPTED))
@@ -197,8 +205,8 @@ class FinanceGroupServiceTest {
     void leaveGroup_selfLeave_remainingOwner_succeeds() {
         when(financeGroupPort.findRole(groupId, userId)).thenReturn(Optional.of(FinanceGroup.MemberRole.MEMBER));
         when(financeGroupPort.findActiveMembers(groupId)).thenReturn(List.of(
-                new FinanceGroupMember(UUID.randomUUID(), groupId, userId, FinanceGroup.MemberRole.MEMBER, Instant.now(), null),
-                new FinanceGroupMember(UUID.randomUUID(), groupId, targetUserId, FinanceGroup.MemberRole.OWNER, Instant.now(), null)));
+                new FinanceGroupMember(UUID.randomUUID(), groupId, userId, FinanceGroup.MemberRole.MEMBER, Instant.now(CLOCK), null),
+                new FinanceGroupMember(UUID.randomUUID(), groupId, targetUserId, FinanceGroup.MemberRole.OWNER, Instant.now(CLOCK), null)));
 
         financeGroupService.leaveGroup(groupId, userId, userId);
 
@@ -212,7 +220,7 @@ class FinanceGroupServiceTest {
     void leaveGroup_ownerRemovesOther_succeeds() {
         when(financeGroupPort.findRole(groupId, userId)).thenReturn(Optional.of(FinanceGroup.MemberRole.OWNER));
         when(financeGroupPort.findActiveMembers(groupId)).thenReturn(List.of(
-                new FinanceGroupMember(UUID.randomUUID(), groupId, userId, FinanceGroup.MemberRole.OWNER, Instant.now(), null)));
+                new FinanceGroupMember(UUID.randomUUID(), groupId, userId, FinanceGroup.MemberRole.OWNER, Instant.now(CLOCK), null)));
 
         financeGroupService.leaveGroup(groupId, userId, targetUserId);
 
@@ -249,8 +257,8 @@ class FinanceGroupServiceTest {
     void leaveGroup_ownerLeavesWithNoOwnerRemaining_promotesEarliestMember() {
         when(financeGroupPort.findRole(groupId, userId)).thenReturn(Optional.of(FinanceGroup.MemberRole.OWNER));
         UUID laterMemberId = UUID.randomUUID();
-        Instant earlier = Instant.now().minus(10, ChronoUnit.HOURS);
-        Instant later = Instant.now();
+        Instant earlier = Instant.now(CLOCK).minus(10, ChronoUnit.HOURS);
+        Instant later = Instant.now(CLOCK);
         when(financeGroupPort.findActiveMembers(groupId)).thenReturn(List.of(
                 new FinanceGroupMember(UUID.randomUUID(), groupId, laterMemberId, FinanceGroup.MemberRole.MEMBER, later, null),
                 new FinanceGroupMember(UUID.randomUUID(), groupId, targetUserId, FinanceGroup.MemberRole.MEMBER, earlier, null)));
@@ -268,7 +276,7 @@ class FinanceGroupServiceTest {
     void leaveGroup_doesNotTouchAnyResourceData() {
         when(financeGroupPort.findRole(groupId, userId)).thenReturn(Optional.of(FinanceGroup.MemberRole.MEMBER));
         when(financeGroupPort.findActiveMembers(groupId)).thenReturn(List.of(
-                new FinanceGroupMember(UUID.randomUUID(), groupId, targetUserId, FinanceGroup.MemberRole.OWNER, Instant.now(), null)));
+                new FinanceGroupMember(UUID.randomUUID(), groupId, targetUserId, FinanceGroup.MemberRole.OWNER, Instant.now(CLOCK), null)));
 
         financeGroupService.leaveGroup(groupId, userId, userId);
 

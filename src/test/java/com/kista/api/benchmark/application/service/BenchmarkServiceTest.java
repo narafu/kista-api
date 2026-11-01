@@ -1,12 +1,12 @@
 package com.kista.api.benchmark.application.service;
 
-import com.kista.shared.kernel.TimeZones;
+import org.junit.jupiter.api.BeforeEach;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.benchmark.domain.model.*;
 import com.kista.api.benchmark.application.port.output.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -35,7 +35,13 @@ class BenchmarkServiceTest {
     @Mock HousingPriceIndexPort housingPriceIndexPort;
     @Mock CurrentExchangeRatePort currentExchangeRatePort;
     @Mock IndexPricePort indexPricePort;
-    @InjectMocks BenchmarkService statsService;
+    BenchmarkService statsService;
+
+    @BeforeEach
+    void setUp() {
+        statsService = new BenchmarkService(investmentPointsPort, housingBenchmarkPricePort, housingPriceIndexPort,
+                currentExchangeRatePort, indexPricePort, FixedClockTestConfig.FIXED);
+    }
 
     private static final UUID USER_ID = UUID.randomUUID();
     private static final UUID STRATEGY_ID = UUID.randomUUID();
@@ -414,7 +420,7 @@ class BenchmarkServiceTest {
                 eq(HousingBenchmarkPrice.METRIC_APT_QTE_SALE_PRICE), eq("1100000000"),
                 fromCaptor.capture(), toCaptor.capture());
         assertThat(fromCaptor.getValue()).isEqualTo(LocalDate.of(2000, 1, 1));
-        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(TimeZones.KST));
+        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(FixedClockTestConfig.FIXED));
     }
 
     @Test
@@ -475,7 +481,7 @@ class BenchmarkServiceTest {
                 eq(HousingPriceIndex.METRIC_WEEKLY_APT_SALE_PRICE_INDEX), eq("1100000000"),
                 fromCaptor.capture(), toCaptor.capture());
         assertThat(fromCaptor.getValue()).isEqualTo(LocalDate.of(2000, 1, 1));
-        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(TimeZones.KST));
+        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(FixedClockTestConfig.FIXED));
     }
 
     @Test
@@ -543,7 +549,7 @@ class BenchmarkServiceTest {
 
         verify(indexPricePort).findBySymbolAndRange(eq("QQQ"), fromCaptor.capture(), toCaptor.capture());
         assertThat(fromCaptor.getValue()).isEqualTo(LocalDate.of(2000, 1, 1));
-        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(TimeZones.KST));
+        assertThat(toCaptor.getValue()).isEqualTo(LocalDate.now(FixedClockTestConfig.FIXED));
     }
 
     @Test
@@ -615,7 +621,7 @@ class BenchmarkServiceTest {
 
     @Test
     void ETF_비교는_to가_없으면_오늘까지_조회한다() {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(FixedClockTestConfig.FIXED);
         when(investmentPointsPort.fetch(eq(USER_ID), eq(BenchmarkScope.PORTFOLIO), isNull(),
                 any(), any()))
                 .thenReturn(new InvestmentPointsPort.Result(

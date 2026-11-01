@@ -8,6 +8,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,11 +21,13 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
 
     private final AppErrorLogJpaRepository repo; // app_error_logs 테이블 JPA 저장소
     private final TransactionTemplate requiresNewTx; // 저장 전용 독립 트랜잭션(REQUIRES_NEW)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     private static final int MAX_STACK_LINES = 30;
 
     // AppErrorLogJpaRepository가 package-private이라 생성자도 package-private
-    AppErrorLogPersistenceAdapter(AppErrorLogJpaRepository repo, PlatformTransactionManager txManager) {
+    AppErrorLogPersistenceAdapter(AppErrorLogJpaRepository repo, PlatformTransactionManager txManager, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.requiresNewTx = new TransactionTemplate(txManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -75,7 +78,7 @@ class AppErrorLogPersistenceAdapter implements AppErrorLogPort {
     public void softDelete(UUID id) {
         AppErrorLogEntity entity = repo.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("앱 오류 로그를 찾을 수 없습니다: " + id));
-        entity.setDeletedAt(Instant.now());
+        entity.setDeletedAt(Instant.now(clock));
         repo.save(entity);
     }
 

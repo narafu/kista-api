@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -22,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import java.util.Collection;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -53,11 +53,12 @@ class TradingStatsServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
-    @InjectMocks TradingStatsService statsService;
+    TradingStatsService statsService;
 
     // 시드 점유 전략(기본)과 비점유 전략(DCA) 능력 stub — 전략 타입별 occupiesSeed 분기 검증용
     @BeforeEach
     void stubSeedCapability() {
+        statsService = new TradingStatsService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, orderPort, cycleOrderStrategies, FixedClockTestConfig.FIXED);
         CycleOrderStrategy seeded = org.mockito.Mockito.mock(CycleOrderStrategy.class);
         CycleOrderStrategy seedless = org.mockito.Mockito.mock(CycleOrderStrategy.class);
         lenient().when(seeded.occupiesSeed()).thenReturn(true);
@@ -179,7 +180,7 @@ class TradingStatsServiceTest {
     void 시작예정일이_미래인_사이클의_경과일은_0이다() {
         stubUserWithStrategy();
         StrategyCycle scheduled = activeCycle(STRATEGY_ID, "1000.00",
-                LocalDate.now(TimeZones.KST).plusDays(3).toString());
+                LocalDate.now(FixedClockTestConfig.FIXED).plusDays(3).toString());
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(scheduled));
 
         CyclePerformance performance = statsService

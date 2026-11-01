@@ -13,7 +13,7 @@ class DstInfoForOpenBatchTest {
     @Test
     void forOpenBatch_marketOpenIsEveningBeforeTradeDate() {
         // 2026-10-07(수) 거래일 → 개장은 10-06(화) 22:30 KST (10월은 미국 DST)
-        DstInfo dst = DstInfo.forOpenBatch(LocalDate.of(2026, 10, 7));
+        DstInfo dst = DstInfo.forOpenBatch(LocalDate.of(2026, 10, 7), ZonedDateTime.of(2026, 10, 6, 12, 0, 0, 0, TimeZones.KST));
 
         assertThat(dst.marketOpen()).isEqualTo(ZonedDateTime.of(2026, 10, 6, 22, 30, 0, 0, TimeZones.KST).toInstant());
     }

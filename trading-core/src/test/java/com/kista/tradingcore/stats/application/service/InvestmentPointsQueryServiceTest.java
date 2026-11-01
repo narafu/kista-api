@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
@@ -23,7 +24,6 @@ import com.kista.tradingcore.stats.domain.model.InvestmentPointsResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -56,10 +56,11 @@ class InvestmentPointsQueryServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
-    @InjectMocks InvestmentPointsQueryService service;
+    InvestmentPointsQueryService service;
 
     @BeforeEach
     void stubSeedCapability() {
+        service = new InvestmentPointsQueryService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, orderPort, cycleOrderStrategies, FixedClockTestConfig.FIXED);
         CycleOrderStrategy seeded = org.mockito.Mockito.mock(CycleOrderStrategy.class);
         CycleOrderStrategy seedless = org.mockito.Mockito.mock(CycleOrderStrategy.class);
         org.mockito.Mockito.lenient().when(seeded.occupiesSeed()).thenReturn(true);

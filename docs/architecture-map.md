@@ -272,7 +272,7 @@ sequenceDiagram
         Plan->>Led: remaining · fit (전략 원장 상한)
         Plan->>DB: 승인 주문 PLANNED 저장
     end
-    Svc->>Svc: DstInfo.waitUntilOrderTime() (비DST 60분 대기)
+    Svc->>Svc: DstInfo.waitUntilOrderTime(now) (비DST 60분 대기)
     Svc->>B: 접수 대상 현재가 재조회
     Svc->>Exec: BuyOrderPriceCapper 재캡 후 접수
     Exec->>B: AT_CLOSE 주문 접수

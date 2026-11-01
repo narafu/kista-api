@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -37,6 +38,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     private final OrderPort orderPort;
     private final PortfolioPort portfolioPort;
     private final BrokerPricePort brokerPricePort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 체결기준현재잔고 — KIS: CTRP6504R+TTTC2101R 보정 포함 / Toss: 보유종목+예수금 직접 산출
     @Override
@@ -128,7 +130,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
     }
 
     private Instant resolveTo(LocalDate to) {
-        var resolved = to != null ? to : LocalDate.now(TimeZones.KST);
+        var resolved = to != null ? to : LocalDate.now(clock);
         return KstDays.endExclusive(resolved); // KST 자정 경계 (to 당일 포함)
     }
 }

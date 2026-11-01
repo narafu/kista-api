@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.proc.SecurityContext;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
@@ -16,12 +17,16 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class JwtIssuerService {
+
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // ES256 고정 헤더 — 서명 키는 매 발급 시 signingJwk로부터 파싱(JwtDecoderConfig와 동일한 EC 키 소스)
     private static final JwsHeader ES256_HEADER = JwsHeader.with(SignatureAlgorithm.ES256).build();
@@ -31,7 +36,7 @@ public class JwtIssuerService {
 
     // userId를 subject, role을 클레임으로 담은 ES256 서명 JWT 발급
     public String issue(UUID userId, UserRole role) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .id(UUID.randomUUID().toString()) // jti — 로그아웃 시 단일 AT 차단용
                 .subject(userId.toString())

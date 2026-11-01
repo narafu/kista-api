@@ -12,6 +12,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -30,11 +31,12 @@ class AlpacaCandleAdapter implements HistoricalCandlePort {
 
     private final RestClient tradingStatsAlpacaRestClient;
     private final AlpacaProperties alpacaProperties;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // root의 구 AlpacaIndexPriceAdapter.fetchDailyCandles와 동일 로직(수정주가 sip 피드, to 클램프) — 그대로 이관
     @Override
     public List<DailyCandle> fetchDailyCandles(String symbol, LocalDate from, LocalDate to) {
-        LocalDate latestAllowed = LocalDate.now(TimeZones.NY).minusDays(1);
+        LocalDate latestAllowed = LocalDate.now(clock.withZone(TimeZones.NY)).minusDays(1);
         LocalDate clampedTo = to.isAfter(latestAllowed) ? latestAllowed : to;
         if (clampedTo.isBefore(to)) {
             log.info("{} 과거 일봉 조회 to 클램프: 요청={} → 적용={}", symbol, to, clampedTo);

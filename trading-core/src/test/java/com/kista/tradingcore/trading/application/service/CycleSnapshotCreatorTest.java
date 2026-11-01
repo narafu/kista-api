@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import static com.kista.shared.support.FixedClockTestConfig.FIXED;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -39,15 +40,15 @@ class CycleSnapshotCreatorTest {
     void createVrCycleAndSnapshot_usesTotalOpeningAssetsForCycleStartAmount() {
         UUID strategyId = UUID.randomUUID();
         UUID strategyVersionId = UUID.randomUUID();
-        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.00"));
+        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.00"), LocalDate.of(2026, 1, 6));
         AccountBalance postBalance = new AccountBalance(5, new BigDecimal("100.00"), new BigDecimal("1000.00"));
 
         when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
         creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
-                new BigDecimal("120.00"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now()));
+                new BigDecimal("120.00"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now(FIXED)));
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         ArgumentCaptor<CyclePosition> positionCaptor = ArgumentCaptor.forClass(CyclePosition.class);
@@ -64,15 +65,15 @@ class CycleSnapshotCreatorTest {
     void createVrCycleAndSnapshot_roundsFractionalCentStartAmountHalfUp() {
         UUID strategyId = UUID.randomUUID();
         UUID strategyVersionId = UUID.randomUUID();
-        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.01"));
+        StrategyCycle savedCycle = StrategyCycle.start(strategyId, strategyVersionId, new BigDecimal("1600.01"), LocalDate.of(2026, 1, 6));
         AccountBalance postBalance = new AccountBalance(1, new BigDecimal("100.00"), new BigDecimal("1000.00"));
 
         when(strategyCyclePort.save(org.mockito.ArgumentMatchers.any(StrategyCycle.class))).thenReturn(savedCycle);
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
         creator.createVrCycleAndSnapshot(new CycleSnapshotCreator.VrCycleStart(strategyId, strategyVersionId, postBalance,
-                new BigDecimal("600.005"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now()));
+                new BigDecimal("600.005"), new BigDecimal("900.00"), 10, new BigDecimal("0.50"), LocalDate.now(FIXED)));
 
         ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
         verify(strategyCyclePort).save(cycleCaptor.capture());
@@ -134,7 +135,7 @@ class CycleSnapshotCreatorTest {
         });
 
         CycleSnapshotCreator creator = new CycleSnapshotCreator(
-                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService);
+                strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED);
         creator.reconfigureVrCycle(new CycleSnapshotCreator.VrReconfiguration(
                 strategyId, currentCycleId, today, 4, new BigDecimal("15.00"), 0, ramp,
                 postAdjustment, closingPrice, new BigDecimal("1000.00"), 0));

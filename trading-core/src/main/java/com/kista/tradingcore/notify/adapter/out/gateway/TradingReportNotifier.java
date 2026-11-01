@@ -1,6 +1,8 @@
 package com.kista.tradingcore.notify.adapter.out.gateway;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import com.kista.tradingcore.trading.application.port.output.TradingUserProfilePort;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.notify.application.port.output.TradingRealtimeNotificationPort;
@@ -26,6 +28,7 @@ class TradingReportNotifier {
     private final TradingUserNotificationPort userNotificationPort;         // 리포트 알림 발송
     private final TradingRealtimeNotificationPort realtimeNotificationPort; // SSE 실시간 알림
     private final TradingUserProfilePort userProfilePort;                   // ID → TradingUserProfile 재조회 (EPR 역직렬화 대응)
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 트랜잭션 있으면 커밋 후, 없으면 즉시 동기 실행
     @TransactionalEventListener(fallbackExecution = true)
@@ -44,9 +47,9 @@ class TradingReportNotifier {
         for (TradeLegSummary e : event.executions()) {
             TradeEventMessage tradeEvent = e.direction() == OrderDirection.SELL
                     ? TradeEventMessage.sell(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
-                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD)
+                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD, Instant.now(clock))
                     : TradeEventMessage.buy(e.ticker().name(), BigDecimal.valueOf(e.quantity()), e.price().doubleValue(), e.amountUsd().doubleValue(),
-                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD); // 주식 체결 리포트 — US_STOCK 견적 통화
+                            event.accountNickname(), event.accountId(), event.strategyId(), Currency.USD, Instant.now(clock)); // 주식 체결 리포트 — US_STOCK 견적 통화
             realtimeNotificationPort.notifyTrade(profile.userId(), tradeEvent);
         }
         log.info("[{}] SSE 매매 알림 {}건 발송 완료", event.accountNickname(), event.executions().size());

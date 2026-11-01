@@ -7,7 +7,6 @@ import com.kista.api.market.application.usecase.GetFearGreedUseCase;
 import com.kista.api.market.application.port.output.CryptoFearGreedPort;
 import com.kista.api.market.application.port.output.FearGreedSnapshotPort;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -35,11 +34,6 @@ class FearGreedQueryService implements GetFearGreedUseCase {
     private final CryptoFearGreedPort cryptoFearGreedPort;
     private final Clock clock; // since 기준일·캐시 만료 판정 — 테스트에서 고정
     private final TtlResultCache cache; // CRYPTO 이력 캐시 (single-flight)
-
-    @Autowired // 생성자 2개 — 누락 시 빈 생성 실패
-    FearGreedQueryService(FearGreedSnapshotPort fearGreedSnapshotPort, CryptoFearGreedPort cryptoFearGreedPort) {
-        this(fearGreedSnapshotPort, cryptoFearGreedPort, Clock.systemUTC());
-    }
 
     FearGreedQueryService(FearGreedSnapshotPort fearGreedSnapshotPort, CryptoFearGreedPort cryptoFearGreedPort, Clock clock) {
         this.fearGreedSnapshotPort = fearGreedSnapshotPort;

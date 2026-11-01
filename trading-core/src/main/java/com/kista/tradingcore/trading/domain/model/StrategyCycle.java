@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.domain.model;
 
-import com.kista.shared.kernel.TimeZones;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,17 +33,9 @@ public record StrategyCycle(
         this(id, strategyId, null, startAmount, endAmount, startDate, endDate, createdAt, deletedAt);
     }
 
-    // 시작예정일 지정 — 미래 시작예정일 기능 전용, 기존 3-인자 오버로드는 "오늘 시작"으로 위임
+    // 시작예정일 지정 — 시작일은 호출부가 주입한다 (오늘 시작이면 Clock 기준 오늘)
     public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount, LocalDate startDate) {
         return new StrategyCycle(null, strategyId, strategyVersionId,
                 startAmount, null, startDate, null, null, null);
-    }
-
-    public static StrategyCycle start(UUID strategyId, UUID strategyVersionId, BigDecimal startAmount) {
-        return start(strategyId, strategyVersionId, startAmount, LocalDate.now(TimeZones.KST));
-    }
-
-    public static StrategyCycle start(UUID strategyId, BigDecimal startAmount) {
-        return start(strategyId, null, startAmount);
     }
 }

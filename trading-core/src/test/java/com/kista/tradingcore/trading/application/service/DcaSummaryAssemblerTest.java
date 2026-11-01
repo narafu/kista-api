@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.OrderDirection;
@@ -111,7 +112,7 @@ class DcaSummaryAssemblerTest {
 
     @Test
     void firstEligibleDate_skips_start_day_itself() {
-        LocalDate today = DstInfo.nextTradeDate();
+        LocalDate today = DstInfo.nextTradeDate(NOW.atZone(TimeZones.KST));
         assertThat(DcaSummaryAssembler.firstEligibleDate(today.plusDays(3), null, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(4));
         // 시작일이 오늘이면 시작일 당일은 판정 제외 — 다음 날부터
         assertThat(DcaSummaryAssembler.firstEligibleDate(today, null, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
@@ -119,7 +120,7 @@ class DcaSummaryAssemblerTest {
 
     @Test
     void firstEligibleDate_moves_to_next_day_when_today_already_decided() {
-        LocalDate today = DstInfo.nextTradeDate();
+        LocalDate today = DstInfo.nextTradeDate(NOW.atZone(TimeZones.KST));
         DcaExecution decidedToday = DcaExecution.ordered(UUID.randomUUID(), "k", com.kista.shared.kernel.OrderDirection.BUY, today, UUID.randomUUID(), BigDecimal.valueOf(1), BigDecimal.ONE);
         assertThat(DcaSummaryAssembler.firstEligibleDate(today.minusDays(10), decidedToday, STOCK, Market.US_STOCK, NOW)).isEqualTo(today.plusDays(1));
     }

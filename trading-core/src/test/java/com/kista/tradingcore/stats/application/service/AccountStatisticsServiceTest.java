@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.shared.kernel.Broker;
@@ -45,7 +46,7 @@ class AccountStatisticsServiceTest {
     @BeforeEach
     void setUp() {
         service = new AccountStatisticsService(
-                accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort);
+                accountPort, cyclePositionPort, orderPort, portfolioPort, pricePort, FixedClockTestConfig.FIXED);
         // 실제 Account record — account.toBrokerRef()가 인스턴스 메서드
         Account account = new Account(accountId, userId, "테스트계좌", "74420614-01", "key", "secret", null, Broker.KIS, null, null);
         when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);

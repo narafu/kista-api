@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -22,6 +23,7 @@ import java.util.UUID;
 class FinanceGroupService implements FinanceGroupUseCase {
 
     private final FinanceGroupPort financeGroupPort;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     @Transactional(readOnly = true)
@@ -59,7 +61,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
             }
         }
         String code = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        Instant expiresAt = Instant.now().plus(expiresInHours, ChronoUnit.HOURS);
+        Instant expiresAt = Instant.now(clock).plus(expiresInHours, ChronoUnit.HOURS);
         FinanceGroupInvitation invitation = financeGroupPort.createInvitation(targetGroupId, userId, code, expiresAt);
         log.info("그룹 초대 생성: groupId={}, invitedBy={}", targetGroupId, userId);
         return invitation;
@@ -74,7 +76,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
         if (invitation.invitedBy().equals(userId)) {
             throw new SecurityException("본인이 발급한 초대 코드는 본인이 수락할 수 없습니다");
         }
-        if (invitation.status() != FinanceGroupInvitation.Status.PENDING || invitation.expiresAt().isBefore(Instant.now())) {
+        if (invitation.status() != FinanceGroupInvitation.Status.PENDING || invitation.expiresAt().isBefore(Instant.now(clock))) {
             throw new FinanceGroupInvitation.InvalidInvitationStateException("만료되었거나 이미 처리된 초대입니다");
         }
         if (status == FinanceGroupInvitation.Status.ACCEPTED) {

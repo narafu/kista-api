@@ -1,6 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.meritz;
 
-import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.tradingcore.broker.adapter.out.internal.DbTokenCoordinator;
 import com.kista.tradingcore.broker.application.port.output.BrokerTokenCachePort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountVerification;
@@ -20,6 +20,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +39,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class MeritzAuthApiTest {
 
     private static final String BASE = "https://meritz.test";
+    private static final Clock CLOCK = FixedClockTestConfig.FIXED;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Mock DbTokenCoordinator coordinator;
@@ -49,7 +51,7 @@ class MeritzAuthApiTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE);
         server = MockRestServiceServer.bindTo(builder).build();
-        authApi = new MeritzAuthApi(builder.build(), JsonMapper.builder().build(), coordinator);
+        authApi = new MeritzAuthApi(builder.build(), JsonMapper.builder().build(), coordinator, CLOCK);
     }
 
     private void tokenResponse(String expiresDate) {
@@ -63,7 +65,7 @@ class MeritzAuthApiTest {
 
     @Test
     void expiry_uses_expires_date_not_expires_in() {
-        tokenResponse(LocalDateTime.now(TimeZones.KST).plusMinutes(10).format(FMT));
+        tokenResponse(LocalDateTime.now(CLOCK).plusMinutes(10).format(FMT));
 
         var issued = authApi.issue("key", "sec");
 
@@ -80,7 +82,7 @@ class MeritzAuthApiTest {
 
     @Test
     void verify_account_rate_limited_is_rate_limit_exception() {
-        tokenResponse(LocalDateTime.now(TimeZones.KST).plusHours(12).format(FMT));
+        tokenResponse(LocalDateTime.now(CLOCK).plusHours(12).format(FMT));
         server.expect(requestTo(BASE + "/accounts/v1/me/overseas/currencies"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"rsp_cd\":\"EGW00200\",\"rsp_msg\":\"한도\"}"));
@@ -99,7 +101,7 @@ class MeritzAuthApiTest {
 
     @Test
     void verify_credentials_only_issues_token() {
-        tokenResponse(LocalDateTime.now(TimeZones.KST).plusHours(12).format(FMT));
+        tokenResponse(LocalDateTime.now(CLOCK).plusHours(12).format(FMT));
 
         authApi.verifyCredentials("key", "sec");
 
@@ -108,7 +110,7 @@ class MeritzAuthApiTest {
 
     @Test
     void verify_account_returns_null_codes() {
-        tokenResponse(LocalDateTime.now(TimeZones.KST).plusHours(12).format(FMT));
+        tokenResponse(LocalDateTime.now(CLOCK).plusHours(12).format(FMT));
         server.expect(requestTo(BASE + "/accounts/v1/me/overseas/currencies")).andExpect(method(HttpMethod.GET))
                 .andExpect(header("authorization", "Bearer tok"))
                 .andExpect(header("mac_address", "0242AC110002"))
@@ -121,7 +123,7 @@ class MeritzAuthApiTest {
 
     @Test
     void verify_account_without_permission_is_permission_denied() {
-        tokenResponse(LocalDateTime.now(TimeZones.KST).plusHours(12).format(FMT));
+        tokenResponse(LocalDateTime.now(CLOCK).plusHours(12).format(FMT));
         server.expect(requestTo(BASE + "/accounts/v1/me/overseas/currencies"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"rsp_cd\":\"EGW00202\",\"rsp_msg\":\"권한 없음\"}"));

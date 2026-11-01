@@ -18,7 +18,6 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -28,6 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -39,7 +39,6 @@ import com.kista.shared.kernel.StrategyType;
 // 사용자 통계 중 trading 소유 부분 — 실현·미실현 손익 요약/누적 자산 곡선/사이클 성과 목록.
 // housing/ETF 벤치마크 비교는 api의 BenchmarkService(com.kista.api.benchmark)가 계속 소유한다.
 @Service
-@RequiredArgsConstructor
 class TradingStatsService implements TradingStatsUseCase {
 
     // 매매 리포트(체결·포지션 스냅샷 저장) 직후엔 onTradingReportReady가 사용자 키를 비우고, 그 외 변경은 TTL 만료에 맡긴다
@@ -51,7 +50,20 @@ class TradingStatsService implements TradingStatsUseCase {
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
     private final CycleOrderStrategies cycleOrderStrategies; // 전략별 시드 점유 여부(occupiesSeed)로 원금 계산 분기
-    private final TtlResultCache statsResultCache = new TtlResultCache(); // summary/equity-curve 결과 캐시
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
+    private final TtlResultCache statsResultCache; // summary/equity-curve 결과 캐시
+
+    TradingStatsService(AccountPort accountPort, StrategyPort strategyPort, StrategyCyclePort strategyCyclePort,
+                        CyclePositionPort cyclePositionPort, OrderPort orderPort, CycleOrderStrategies cycleOrderStrategies, Clock clock) {
+        this.accountPort = accountPort;
+        this.strategyPort = strategyPort;
+        this.strategyCyclePort = strategyCyclePort;
+        this.cyclePositionPort = cyclePositionPort;
+        this.orderPort = orderPort;
+        this.cycleOrderStrategies = cycleOrderStrategies;
+        this.clock = clock;
+        this.statsResultCache = new TtlResultCache(clock);
+    }
 
     // getSummary 캐시 키
     private record SummaryKey(UUID userId) {}
@@ -127,7 +139,7 @@ class TradingStatsService implements TradingStatsUseCase {
     }
 
     private EquityCurve computeEquityCurve(UUID userId, StrategyType type, LocalDate from, LocalDate to) {
-        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeZones.KST);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(clock);
         // PAUSED 전략처럼 스냅샷 갱신이 멈춘 사이클의 carry-forward 상태를 보장하기 위해
         // 전체 범위 조회 (사용자당 스냅샷 수천 건 규모라 허용)
         Instant fromInstant = Instant.EPOCH;
@@ -300,7 +312,7 @@ class TradingStatsService implements TradingStatsUseCase {
         // 원금이 0인 사이클(VR 적립식 등)은 수익률이 정의되지 않는다.
         BigDecimal returnRate = (pnl != null && principal.signum() != 0)
                 ? pnl.divide(principal, 4, RoundingMode.HALF_UP) : null;
-        LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(TimeZones.KST);
+        LocalDate durationEnd = v.closed() ? c.endDate() : LocalDate.now(clock);
         // 시작예정일이 미래인 사이클은 아직 경과일이 없다 — 음수 대신 0
         int durationDays = (int) Math.max(0, ChronoUnit.DAYS.between(c.startDate(), durationEnd));
         return new CyclePerformance(c.id(), v.strategy().accountId(), v.strategy().type(), v.strategy().ticker(),

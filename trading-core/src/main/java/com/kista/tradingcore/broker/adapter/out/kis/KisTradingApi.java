@@ -1,7 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.*;
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.MultiValueMap;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -45,6 +45,7 @@ class KisTradingApi {
 
     private final KisHttpClient kisHttpClient;
     private final KisExchangeRegistry exchangeRegistry;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     private HoldingResult fetchHolding(BrokerAccountRef account, StrategyTicker ticker) {
         // 보유 종목이 한 페이지를 넘으면 대상 종목이 뒤 페이지에 있을 수 있어 연속조회로 전부 받는다
@@ -170,7 +171,7 @@ class KisTradingApi {
     // 취소 전 원주문 상태 조회 — KIS는 ODNO 필터를 지원하지 않아 종목·기간 목록에서 주문번호로 찾는다(없으면 empty)
     // 검색 범위일 뿐 거래일 변환이 아니다 — 취소 대상은 오늘·다음 거래일 주문이라 KST 오늘 앞뒤 1일이면 덮는다
     Optional<OrderStatusView> findOrder(StrategyTicker ticker, String odno, BrokerAccountRef account) {
-        LocalDate today = LocalDate.now(TimeZones.KST);
+        LocalDate today = LocalDate.now(clock);
         return fetchOrderList(today.minusDays(1), today.plusDays(1), ticker, account).stream()
                 .filter(item -> odno.equals(item.odno()))
                 .findFirst()

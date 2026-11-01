@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.adapter.in.schedule;
 
-import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
@@ -14,6 +13,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -34,11 +34,12 @@ public class TradingBatchResumer {
     private final TradingCloseScheduler closeScheduler;
     private final TradingOpenScheduler openScheduler;
     private final TradingErrorReportPort errorReportPort; // 재개 시작·불가·경고 관리자 알림
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 기동을 막지 않도록 별도 VT에서 실행 — 재개 배치는 대기를 포함해 길게 돈다
     @EventListener(ApplicationReadyEvent.class)
     void onReady() {
-        Thread.ofVirtual().name("trading-batch-resumer").start(() -> resume(ZonedDateTime.now(TimeZones.KST)));
+        Thread.ofVirtual().name("trading-batch-resumer").start(() -> resume(ZonedDateTime.now(clock)));
     }
 
     // 마감·개장 판정 창은 겹치지 않아 최대 하나만 실행된다
@@ -81,7 +82,7 @@ public class TradingBatchResumer {
         closeScheduler.resume();
     }
 
-    // 월~금 22:00~24:00(거래일 익일) 또는 화~토 00:00~04:30(거래일 당일) — DstInfo.nextTradeDate()와 같은 04:30 경계
+    // 월~금 22:00~24:00(거래일 익일) 또는 화~토 00:00~04:30(거래일 당일) — DstInfo.nextTradeDate(ZonedDateTime)와 같은 04:30 경계
     private void resumeOpen(ZonedDateTime nowKst) throws InterruptedException {
         int day = nowKst.getDayOfWeek().getValue();
         LocalTime time = nowKst.toLocalTime();

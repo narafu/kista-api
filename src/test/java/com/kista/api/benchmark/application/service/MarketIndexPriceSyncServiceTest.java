@@ -1,5 +1,6 @@
 package com.kista.api.benchmark.application.service;
 
+import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.api.benchmark.domain.model.IndexPrice;
 import com.kista.api.benchmark.application.port.output.IndexPriceFeedPort;
 import com.kista.api.benchmark.application.port.output.IndexPricePort;
@@ -34,7 +35,7 @@ class MarketIndexPriceSyncServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new MarketIndexPriceSyncService(indexPricePort, indexPriceFeedPort);
+        service = new MarketIndexPriceSyncService(indexPricePort, indexPriceFeedPort, FixedClockTestConfig.FIXED);
     }
 
     @Test
@@ -51,7 +52,7 @@ class MarketIndexPriceSyncServiceTest {
 
     @Test
     void syncAndSave_existingMaxTradeDate_fetchesFromNextDay() {
-        LocalDate maxDate = LocalDate.of(2026, 7, 10);
+        LocalDate maxDate = LocalDate.of(2026, 1, 2);
         when(indexPricePort.findMaxTradeDate(anyString())).thenReturn(Optional.of(maxDate));
         when(indexPriceFeedPort.fetchDailyCloses(anyString(), any(), any())).thenReturn(List.of());
 
@@ -64,7 +65,7 @@ class MarketIndexPriceSyncServiceTest {
 
     @Test
     void syncAndSave_alreadyUpToDate_doesNotCallFeed() {
-        LocalDate today = LocalDate.now(com.kista.shared.kernel.TimeZones.KST);
+        LocalDate today = LocalDate.now(FixedClockTestConfig.FIXED);
         when(indexPricePort.findMaxTradeDate(anyString())).thenReturn(Optional.of(today.plusDays(1)));
 
         service.syncAndSave();

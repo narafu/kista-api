@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
 
     private final FinanceCategoryJpaRepository jpaRepository;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     @Override
     public List<FinanceCategory> findSelectable(UUID userId, UUID currentGroupId, FinanceCategory.Type type) {
@@ -49,12 +51,12 @@ public class FinanceCategoryPersistenceAdapter implements FinanceCategoryPort {
 
     @Override
     public void softDeleteWithChildren(UUID id) {
-        jpaRepository.softDeleteWithChildren(id, Instant.now());
+        jpaRepository.softDeleteWithChildren(id, Instant.now(clock));
     }
 
     @Override
     public void softDeleteByUserId(UUID userId) {
-        jpaRepository.softDeleteByUserId(userId, Instant.now());
+        jpaRepository.softDeleteByUserId(userId, Instant.now(clock));
     }
 
     @Override
