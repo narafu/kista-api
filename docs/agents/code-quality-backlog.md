@@ -322,12 +322,12 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 전수 목록은 재현 명령으로 갈음한다: `grep -rnE 'log\.(warn|error)\(' trading-core/src/main/java`. 결과를 마지막 인자가 `e.getMessage()`인 줄과 `e`인 줄로 나눈다.
   - `e.getMessage()`만 남기는 곳 48건. 대표: `OrderSubmitter.java:47,78,97,115,149,164`, `OrderSubmissionReconciler.java:94,97,113`, `TradingPriceFetcher.java:178,192`, `ManualTradingService.java:81,118,144`.
   - 예외 객체를 넘겨 스택을 남기는 곳 28건. 대표: `CryptoMarketIndicatorService.java:119,135,153,211,257`, `TradingService.java:297`, `CycleRotationService.java:92`.
-- 기준 패턴: 미정. 후보는 "예상된 브로커 거절·시세 실패는 `getMessage()`, 예상 밖 오류(관리자 알림 경로)는 예외 객체 전달"이다. 같은 시세 실패가 `TradingPriceFetcher`에서는 메시지만, `CryptoMarketIndicatorService`에서는 스택으로 남는다.
+- 기준 패턴(확정, 사용자 2026-11-01): 레벨로 가른다. `log.error`는 항상 예외 객체를 마지막 인자로 넘겨 스택을 남긴다. `log.warn`은 `e.getMessage()`만 남긴다(예상된 실패: 브로커 거절, 시세 실패 후 대체값, 재시도 대상). 스택이 필요한 warn은 error로 올린다. `BrokerCallGuard.tryGet`의 `e.toString()`은 warn 폭주 방지 취지라 이 기준과 일치한다.
 - 근거: warn·error 158건 중 위 분포.
 - 예상 효과: 장애 분석 시 스택 유무를 예측할 수 있다.
 - 위험: 낮음.
-- 가드: 기준이 정해지면 `constraints.md` 문장으로 둔다.
-- 상태: open(기준 결정 대기).
+- 가드(`constraints.md` 주석 규칙 옆 문장 초안): "`log.error`는 예외 객체를 마지막 인자로 넘긴다. `log.warn`은 `e.getMessage()`만 남기고 스택이 필요하면 error로 올린다."
+- 상태: open. 착수 시 `CryptoMarketIndicatorService` 5곳(warn+스택)은 메시지만으로, `getMessage()`만 남기는 error는 예외 객체 전달로 바꾼다.
 
 ### CQ-12 같은 필드 기본값을 여러 층에서 지정
 - 주제: null·기본값. 유형: 중복·비일관성.
@@ -419,16 +419,18 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 상태: open.
 
 ### CQ-22 평단가 scale 4와 가격 scale 2 혼재
-- 주제: 금액·수량 스케일. 유형: 비일관성(의도 확인 필요).
+- 주제: 금액·수량 스케일. 유형: 비일관성.
 - 위치:
   - 평단 4자리: `matching/domain/model/AccountBalance.java:82`, `VrReconfigureService.java:165`, `PresentBalanceResult.java:54`.
   - 가격 2자리: CQ-20 참조.
-- 기준 패턴: 미정. `trading-formulas.md`는 `averagePrice`의 scale을 명시하지 않는다.
-- 근거: 같은 USD 단가가 경로에 따라 4자리 또는 2자리다. 의도 여부는 미확인이다.
+- 기준 패턴(확정, 사용자 2026-11-01): 평단은 2자리 HALF_UP으로 계산한다. `cycle_position.avg_price`가 `numeric(20,2)`(`V1__init.sql`, `CyclePositionEntity.java:38` `scale = 2` ✔)라 실제 계약이 이미 2자리다. 4자리는 저장 전 메모리에만 있다가 DB가 다시 반올림한다(이중 반올림).
+- 근거: 같은 USD 단가가 경로에 따라 4자리 또는 2자리다. 이중 반올림은 드물게 1센트 차이를 낸다(예: 45.12449는 4자리 45.1245를 거쳐 저장 시 45.13, 직접 2자리면 45.12).
+- 범위: `AccountBalance.java:82`, `VrReconfigureService.java:165`. `PresentBalanceResult.java:54`는 브로커 잔고 응답 변환이라 제외한다.
+- 절차: (1) 위 경계값으로 현재 결과를 고정하는 테스트를 먼저 넣는다. (2) 2자리로 바꾸고 달라지는 케이스만 확인한다. (3) `trading-formulas.md`에 "averagePrice 2자리 HALF_UP"을 명시한다.
 - 예상 효과: 원장 평단 표시 일관성.
 - 위험: 높음. 평단은 INFINITE·VR 주문가 계산의 입력이다.
-- 가드: 결론 후 `trading-formulas.md`에 averagePrice scale을 명시한다.
-- 상태: open(의도 확인 대기).
+- 가드: `trading-formulas.md` 명시 + 경계값 단위 테스트.
+- 상태: open(전용 작업, 공식 묶음).
 
 ## 유지 목록 (재제안 금지, 이유 기록)
 
