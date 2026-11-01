@@ -45,7 +45,8 @@ E2E_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-e2e-token | jq -r .acces
 ```bash
 scripts/dev-seed/seed.sh   # root(8080)·trading-core(8081) local 기동 상태에서 실행, 재실행 가능
 ```
-- 안전: 로컬 `telegram.bot-token`은 운영과 다른 테스트 봇이어야 하고, `SCHEDULER_ENABLED=true`로 띄웠다면 트리거 후 반드시 끄고 재기동해 `/api/admin/scheduler/*` 404를 확인한다 — 상세(시드 내용·jq·Toss 제약) → `docs/agents/local-dev.md`
+- 안전: 로컬 `telegram.bot-token`은 운영과 다른 테스트 봇이어야 한다 — 상세(시드 내용·jq·Toss 제약) → `docs/agents/local-dev.md`
+- **SCHEDULER_ENABLED 같은 일회성 override로 띄웠다가 원복했다면 재기동 후 실제 동작으로 확인한다.** 예를 들어 `/api/admin/scheduler/*`가 404인지 본다. 검증 전에는 "원복 완료"라고 보고하지 않는다. 환경변수 override(IntelliJ MCP `execute_run_configuration` envs 등)는 persist되지 않는다고 안내돼도 그대로 믿으면 안 된다. 로컬과 운영이 관리자 봇을 공유하고 스케줄러 락은 DB별이라, 켜진 채로 두면 운영과 같은 cron이 돌아 알림이 중복 발송된다.
 
 ### 로컬 2-프로세스 부팅 (root + trading-core)
 root(`app.jar`, 8080)와 `trading-core.jar`(8081)를 동시에 띄워 내부 API 크로스콜을 검증한다. 빌드는 `./gradlew bootJar :trading-core:bootJar`, 두 프로세스 모두 `SPRING_PROFILES_ACTIVE=local` 필요, `internal.api.token`은 양쪽 yml 값을 같게 맞출 것. 상세 절차 → `docs/agents/local-dev.md`
