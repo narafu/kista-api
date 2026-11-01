@@ -309,7 +309,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 시각 취득 방식 단일화, 날짜 경계 테스트 결정성.
 - 위험: 중간. 매매 배치 경로(`TradingService`, `OrderCancelService` 등)를 건드리지만 같은 시각을 다른 경로로 얻을 뿐 동작은 바뀌지 않는다. 생성자 변경이 테스트에 넓게 번진다.
 - 가드(ArchUnit 초안, 루트 `HexagonalArchitectureTest`): trading-core 클래스가 인자 없는 `now()`(`LocalDate`, `LocalDateTime`, `LocalTime`, `Instant`, `ZonedDateTime`, `OffsetDateTime`)와 `X.now(ZoneId)`, `Clock.system*()`를 호출하지 못하게 한다. 예외는 Clock 빈 정의 클래스 한 곳뿐이다.
-- 상태: done(커밋 예정). 가드 `HexagonalArchitectureTest.main_code_must_not_read_system_clock_directly`로 잠금.
+- 상태: done(d7e05294d). 가드 `HexagonalArchitectureTest.main_code_must_not_read_system_clock_directly`로 잠금.
 
 ### CQ-18 `TradingCycleResponse.forRegistration`의 15필드 재나열
 - 주제: 매핑. 유형: 보일러플레이트.
