@@ -19,6 +19,7 @@ import org.springframework.test.context.transaction.TestTransaction;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -40,6 +41,7 @@ class TokenServiceRotationRollbackIT extends RootDataJpaTestBase {
 
     @Autowired TokenUseCase tokenUseCase;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired Clock clock; // 서비스와 같은 고정 Clock — 시드 시각을 서비스 기준에 맞춘다
     @MockitoBean BlacklistPort blacklistPort;
     @MockitoBean UserPort userPort;
 
@@ -63,11 +65,11 @@ class TokenServiceRotationRollbackIT extends RootDataJpaTestBase {
 
         String rawToken = "staleRotatedTokenIT";
         String hash = sha256Hex(rawToken);
-        Instant rotatedAt = Instant.now().minus(Duration.ofSeconds(120)); // grace(60초) 초과 회전
+        Instant rotatedAt = Instant.now(clock).minus(Duration.ofSeconds(120)); // grace(60초) 초과 회전
         jdbcTemplate.update(
                 "INSERT INTO refresh_tokens (id, user_id, token_hash, user_agent, expires_at, rotated_at) VALUES (?, ?, ?, ?, ?, ?)",
                 UUID.randomUUID(), userId, hash, "ua",
-                Timestamp.from(Instant.now().plus(Duration.ofHours(120))), Timestamp.from(rotatedAt));
+                Timestamp.from(Instant.now(clock).plus(Duration.ofHours(120))), Timestamp.from(rotatedAt));
 
         // 테스트 프레임워크가 잡고 있던 트랜잭션을 종료 — 이후 서비스 호출이 진짜 물리 트랜잭션으로 커밋/롤백됨
         TestTransaction.flagForCommit();
