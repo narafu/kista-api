@@ -34,7 +34,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: PRIVACY 상세 currentRound가 0.0에서 null로 바뀐다(화면 값 변경).
 - 위험: 중간. 공식 계산은 바뀌지 않고 표시만 바뀐다. kista-ui가 PRIVACY에서 currentRound를 null로 받아도 깨지지 않는지 확인해야 한다(VR·DCA가 이미 null이라 처리 경로는 있을 가능성이 높으나 미확인).
 - 가드: `StrategyDetailAssembler` 단위 테스트에 "INFINITE 외 타입은 currentRound가 null" 단언을 추가한다.
-- 상태: open.
+- 상태: done(24b885bc5). 가드: `StrategyServiceTest.equivalence_privacy`에 currentRound null 단언 추가(변이 확인 완료).
 
 ## 항목 (효과 대 위험 순, 가드를 먼저 넣으면 재발이 멈추는 항목이 위)
 
