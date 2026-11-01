@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,7 +47,6 @@ public class AssetSnapshotController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(name = "userId", required = false) UUID filterUserId) {
         return assetSnapshotUseCase.list(userId, from, to, filterUserId).stream()
-                .sorted(Comparator.comparing(AssetSnapshot::entryDate).reversed())
                 .map(this::enrich)
                 .toList();
     }
