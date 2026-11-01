@@ -5,6 +5,7 @@ import com.kista.shared.kernel.StrategyTicker;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.NoSuchElementException;
 import java.util.List;
 
 // 코인 시장 지표 묶음 — 섹션은 개별 실패 시 null (부분 응답)
@@ -38,7 +39,7 @@ public record CryptoMarketIndicators(
     // 해시 리본 — current는 history 마지막 점
     public record HashRibbons(DatedHashRibbon current, List<DatedHashRibbon> history) {
         public static HashRibbons of(List<DatedHashRibbon> history) {
-            if (history.isEmpty()) throw new IllegalStateException("해시 리본 이력이 없습니다");
+            if (history.isEmpty()) throw new NoSuchElementException("해시 리본 이력이 없습니다.");
             return new HashRibbons(history.getLast(), history);
         }
     }
@@ -56,7 +57,7 @@ public record CryptoMarketIndicators(
     public record Valuation(DatedValuation current, List<DatedValuation> history) {
         // 빈 이력은 실패로 본다 — non-null 섹션이 빈 history면 isEmpty 판정이 어긋난다
         public static Valuation of(List<DatedValuation> history) {
-            if (history.isEmpty()) throw new IllegalStateException("밸류에이션 이력이 없습니다");
+            if (history.isEmpty()) throw new NoSuchElementException("밸류에이션 이력이 없습니다.");
             return new Valuation(history.getLast(), history);
         }
     }
@@ -64,7 +65,7 @@ public record CryptoMarketIndicators(
     // 선물 롱/숏 계좌 비율 — current는 history 마지막 점
     public record LongShortRatio(BigDecimal longAccount, BigDecimal longShortRatio, List<DatedLongShortRatio> history) {
         public static LongShortRatio of(List<DatedLongShortRatio> history) {
-            if (history.isEmpty()) throw new IllegalStateException("롱/숏 비율 이력이 없습니다");
+            if (history.isEmpty()) throw new NoSuchElementException("롱/숏 비율 이력이 없습니다.");
             return new LongShortRatio(history.getLast().longAccount(), history.getLast().longShortRatio(), history);
         }
     }

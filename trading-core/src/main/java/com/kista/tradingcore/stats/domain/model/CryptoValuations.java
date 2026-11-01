@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.NoSuchElementException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,7 @@ public final class CryptoValuations {
         // 날짜 키 정렬·중복 제거, 진행 중인 오늘 봉(이후 포함) 제외
         Map<LocalDate, BigDecimal> byDate = new TreeMap<>();
         dailyCloses.stream().filter(c -> c.date().isBefore(today)).forEach(c -> byDate.put(c.date(), c.value()));
-        if (byDate.isEmpty()) throw new IllegalStateException("완성 일봉이 없습니다");
+        if (byDate.isEmpty()) throw new NoSuchElementException("완성 일봉이 없습니다.");
 
         List<LocalDate> dates = new ArrayList<>(byDate.keySet());
         List<BigDecimal> closes = new ArrayList<>(byDate.values());

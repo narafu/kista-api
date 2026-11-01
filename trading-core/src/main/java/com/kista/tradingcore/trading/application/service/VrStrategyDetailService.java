@@ -51,7 +51,7 @@ class VrStrategyDetailService {
                                     BigDecimal openingPool = openingPosition
                                             .map(CyclePosition::usdDeposit)
                                             .orElseThrow(() -> new IllegalStateException(
-                                                    "VR 시작 포지션 없음: cycleId=" + cycle.id()));
+                                                    "VR 시작 포지션이 없습니다."));
                                     BigDecimal currentPool = latestPosition.map(CyclePosition::usdDeposit).orElse(null);
                                     return buildSummary(vrDetail, cycleVr, openingPool, currentPool);
                                 })));
@@ -69,7 +69,7 @@ class VrStrategyDetailService {
                                           BigDecimal openingPool, BigDecimal currentPool) {
         if (vrDetail == null || cycleVr == null) return null;
         if (openingPool == null) {
-            throw new IllegalStateException("VR 시작 포지션 없음: openingPool=null");
+            throw new IllegalStateException("VR 시작 포지션이 없습니다.");
         }
         BigDecimal poolLimit = openingPool.multiply(cycleVr.poolLimitRate())
                 .setScale(2, RoundingMode.HALF_UP);

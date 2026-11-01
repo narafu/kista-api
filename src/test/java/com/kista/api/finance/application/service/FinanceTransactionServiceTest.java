@@ -103,7 +103,7 @@ class FinanceTransactionServiceTest {
 
         assertThatThrownBy(() -> transactionService.create(userId, true, command()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("소속된 그룹이 없습니다");
+                .hasMessage("소속된 그룹이 없습니다.");
         verify(transactionPort, never()).save(any());
     }
 

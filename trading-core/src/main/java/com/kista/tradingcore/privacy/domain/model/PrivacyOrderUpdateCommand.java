@@ -13,7 +13,7 @@ public record PrivacyOrderUpdateCommand(
 ) {
     public PrivacyOrderUpdateCommand {
         if (quantity != null && quantity <= 0) {
-            throw new IllegalArgumentException("quantity는 양수여야 합니다: " + quantity);
+            throw new IllegalArgumentException("수량은 양수여야 합니다.");
         }
     }
 }

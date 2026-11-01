@@ -41,7 +41,7 @@ class StrategyDetailAssembler {
         Optional<CyclePosition> openingPosition = strategy.isVr()
                 ? latestCycle.map(cycle -> cyclePositionPort.findFirstOne(cycle.id())
                         .orElseThrow(() -> new IllegalStateException(
-                                "VR 시작 포지션 없음: cycleId=" + cycle.id())))
+                                "VR 시작 포지션이 없습니다.")))
                 : Optional.empty();
 
         Integer divisionCount = strategy.isInfinite()
@@ -118,7 +118,7 @@ class StrategyDetailAssembler {
             Optional<CyclePosition> openingPosition = strategy.isVr()
                     ? latestCycle.map(cycle -> Optional.ofNullable(openingPositions.get(cycle.id()))
                             .orElseThrow(() -> new IllegalStateException(
-                                    "VR 시작 포지션 없음: cycleId=" + cycle.id())))
+                                    "VR 시작 포지션이 없습니다.")))
                     : Optional.empty();
             Optional<StrategyVersion> activeVersion = Optional.ofNullable(activeVersions.get(strategy.id()));
 

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.NoSuchElementException;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,7 +33,7 @@ class CryptoLedgerRecorder {
         UUID cycleId = ctx.currentCycle().id();
         strategyCyclePort.lockForUpdate(cycleId); // 수동 체결 보정과 같은 잠금 — 원장 갱신 직렬화
         Order current = orderPort.findById(order.id())
-                .orElseThrow(() -> new IllegalStateException("주문이 없습니다: orderId=" + order.id()));
+                .orElseThrow(() -> new NoSuchElementException("주문이 없습니다: " + order.id()));
         BigDecimal prevQty = current.filledQuantity() == null ? BigDecimal.ZERO : current.filledQuantity();
         BigDecimal delta = volume.subtract(prevQty);
         if (delta.signum() <= 0) return false;

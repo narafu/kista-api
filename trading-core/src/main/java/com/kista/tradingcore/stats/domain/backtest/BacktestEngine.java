@@ -71,7 +71,7 @@ public class BacktestEngine {
             case VR -> runVr(candles, command);
             case INFINITE -> runInfinite(candles, command);
             // PRIVACY는 기준 매매표가 있어야 주문을 만들 수 있다 — 맵을 받는 3-arg 오버로드를 쓰라는 신호로 명확히 실패시킨다
-            default -> throw new IllegalArgumentException("백테스트 미지원 전략: " + command.type());
+            default -> throw new IllegalArgumentException("이 전략은 백테스트를 지원하지 않습니다.");
         };
     }
 
@@ -417,7 +417,7 @@ public class BacktestEngine {
             int holdings = command.initialHoldings() != null ? command.initialHoldings() : 0;
             BigDecimal avgPrice = holdings > 0 ? command.initialAvgPrice() : null;
             if (holdings > 0 && avgPrice == null) {
-                throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)가 필요합니다");
+                throw new IllegalArgumentException("보유 수량이 있으면 평단가가 필요합니다.");
             }
             BigDecimal seed = command.seedOrZero();
             this.balance = new AccountBalance(holdings, avgPrice, seed);

@@ -37,7 +37,7 @@ class MarketIndexPriceSyncService implements SyncMarketIndexPricesUseCase {
             }
         }
         if (!failed.isEmpty()) {
-            throw new IllegalStateException("동기화 실패 심볼: " + failed);
+            throw new IllegalStateException("동기화에 실패한 심볼은 %s입니다.".formatted(failed));
         }
     }
 

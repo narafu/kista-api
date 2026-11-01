@@ -41,7 +41,7 @@ class VrRegistrationTest {
         var cmd = cmd(BigDecimal.ZERO, 0, new BigDecimal("-1"), VrRampInput.NONE);
         assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(4, 0), EVALUATED))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("VR 전략의 초기 V값(initialVrValue)은 0 이상이어야 합니다");
+                .hasMessage("VR 전략의 초기 V값은 0 이상이어야 합니다.");
     }
 
     @Test
@@ -49,7 +49,7 @@ class VrRegistrationTest {
         var cmd = cmd(BigDecimal.ZERO, -100, new BigDecimal("1000000"), VrRampInput.NONE);
         assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(4, -100), BigDecimal.ZERO))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("인출식 VR 전략의 초기 자산은 10000.00 이상이어야 합니다");
+                .hasMessage("인출식 VR 전략의 초기 자산은 10000.00 이상이어야 합니다.");
     }
 
     @Test
@@ -59,6 +59,6 @@ class VrRegistrationTest {
         var cmd = cmd(BigDecimal.ZERO, 0, null, badRamp);
         assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(0, 0), EVALUATED))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
+                .hasMessage("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
     }
 }

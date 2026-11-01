@@ -16,7 +16,7 @@ public record PrivacyBaseUpdateCommand(
 ) {
     public PrivacyBaseUpdateCommand {
         if (avgPrice != null && avgPrice.signum() <= 0) {
-            throw new IllegalArgumentException("avgPrice는 양수여야 합니다: " + avgPrice);
+            throw new IllegalArgumentException("평단가는 양수여야 합니다.");
         }
     }
 }

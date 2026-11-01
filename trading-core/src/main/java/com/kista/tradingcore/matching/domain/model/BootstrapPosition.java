@@ -16,23 +16,23 @@ public final class BootstrapPosition {
 
     public static BigDecimal validate(BigDecimal holdings, BigDecimal avgPrice, Market market) {
         if (holdings != null && holdings.signum() < 0) {
-            throw new IllegalArgumentException("보유 수량(initialHoldings)은 0 이상이어야 합니다");
+            throw new IllegalArgumentException("보유 수량은 0 이상이어야 합니다.");
         }
         if (avgPrice != null && avgPrice.signum() < 0) {
-            throw new IllegalArgumentException("평단가(initialAvgPrice)는 0 이상이어야 합니다");
+            throw new IllegalArgumentException("평단가는 0 이상이어야 합니다.");
         }
         BigDecimal normalized = holdings != null ? Quantities.normalize(holdings) : BigDecimal.ZERO;
         // 주식은 int 주수로 소비된다(intValueExact) — 범위 초과는 저장 전에 400으로 거부
         if (!market.isCrypto() && normalized.compareTo(MAX_STOCK_HOLDINGS) > 0) {
-            throw new IllegalArgumentException("주식 보유 수량(initialHoldings)이 허용 범위를 넘었습니다");
+            throw new IllegalArgumentException("주식 보유 수량이 허용 범위를 넘었습니다.");
         }
         if (market.isCrypto() ? normalized.scale() > CRYPTO_SCALE : normalized.scale() > 0) {
             throw new IllegalArgumentException(market.isCrypto()
-                    ? "보유 수량(initialHoldings)은 소수 8자리까지 입력할 수 있습니다"
-                    : "주식 보유 수량(initialHoldings)은 정수여야 합니다");
+                    ? "보유 수량은 소수 8자리까지 입력할 수 있습니다."
+                    : "주식 보유 수량은 정수여야 합니다.");
         }
         if (normalized.signum() > 0 && (avgPrice == null || avgPrice.signum() <= 0)) {
-            throw new IllegalArgumentException("보유 수량(initialHoldings)이 있으면 평단가(initialAvgPrice)는 0보다 커야 합니다");
+            throw new IllegalArgumentException("보유 수량이 있으면 평단가는 0보다 커야 합니다.");
         }
         return normalized;
     }

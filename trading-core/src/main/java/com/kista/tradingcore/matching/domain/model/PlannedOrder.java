@@ -55,7 +55,7 @@ public record PlannedOrder(
 
     // 전략 주문 다리 식별자 포맷 — "INFINITE_BUY" + 2 → "INFINITE_BUY_02" (Order.leg와 동일 규칙)
     public static String leg(String prefix, int index) {
-        if (index < 1) throw new IllegalArgumentException("order leg index must be positive: " + index);
+        if (index < 1) throw new IllegalArgumentException("주문 구간 번호(%d)는 1 이상이어야 합니다.".formatted(index));
         return "%s_%02d".formatted(prefix, index);
     }
 

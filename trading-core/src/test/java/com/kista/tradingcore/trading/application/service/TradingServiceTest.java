@@ -1259,7 +1259,7 @@ class TradingServiceTest {
         verify(orderPort, never()).saveAll(anyList());
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null
-                && tee.message().contains("전략 주문 leg 누락")));
+                && tee.message().contains("주문 구간이 누락된 주문이")));
     }
 
     @Test

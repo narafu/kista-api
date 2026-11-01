@@ -37,7 +37,7 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
     private BrokerCapabilitiesPort of(BrokerAccountRef account) {
         BrokerCapabilitiesPort adapter = adapters.get(account.broker());
         if (adapter == null) {
-            throw new IllegalArgumentException("지원하지 않는 증권사: " + account.broker());
+            throw new IllegalArgumentException("지원하지 않는 증권사입니다.");
         }
         return adapter;
     }

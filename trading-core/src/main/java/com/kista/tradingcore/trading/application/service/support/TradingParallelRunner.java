@@ -69,7 +69,7 @@ public class TradingParallelRunner {
                 throw new InterruptedException("병렬 사이클 작업 인터럽트");
             }
             // runSafely가 예외를 격리하므로 정상 경로에서는 도달하지 않음 — 이중 알림 없이 방어적 승격만 수행
-            throw new IllegalStateException("병렬 사이클 작업 실패", e.getCause());
+            throw new IllegalStateException("병렬 사이클 작업에 실패했습니다.", e.getCause());
         }
     }
 
@@ -82,7 +82,7 @@ public class TradingParallelRunner {
             } catch (InterruptedException e) {
                 throw e;
             } catch (Exception e) {
-                throw new IllegalStateException("순차 사이클 작업 실패", e);
+                throw new IllegalStateException("순차 사이클 작업에 실패했습니다.", e);
             }
         }
         return results;

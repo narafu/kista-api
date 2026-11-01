@@ -162,8 +162,7 @@ class VrStrategyDetailServiceTest {
         assertThatThrownBy(() -> vrStrategyDetailService.findSummary(
                 strategyId, Optional.of(latestCycle), Optional.empty(), Optional.empty()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 시작 포지션 없음")
-                .hasMessageContaining(cycleId.toString());
+                .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
 
     @Test
@@ -178,6 +177,6 @@ class VrStrategyDetailServiceTest {
 
         assertThatThrownBy(() -> vrStrategyDetailService.buildSummary(vrDetail, cycleVr, null, null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 시작 포지션 없음");
+                .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
 }

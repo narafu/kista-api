@@ -19,7 +19,7 @@ class BrokerStatisticsService implements BrokerStatisticsUseCase {
     public ExchangeRateQuote currentExchangeRate() {
         // 계좌가 없으므로 환율 제공 증권사를 상수로 고정해 통계 포트를 고른다
         return statisticsPorts.find(EXCHANGE_RATE_BROKER)
-                .orElseThrow(() -> new IllegalStateException(EXCHANGE_RATE_BROKER + " 통계 포트가 등록되어 있지 않아 환율을 조회할 수 없습니다"))
+                .orElseThrow(() -> new IllegalStateException("환율을 제공하는 증권사의 통계 포트가 등록되어 있지 않아 환율을 조회할 수 없습니다."))
                 .getExchangeRate();
     }
 }

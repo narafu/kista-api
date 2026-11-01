@@ -89,7 +89,7 @@ class CycleSnapshotCreator {
                 newVersion.id(), r.intervalWeeks(), r.bandWidth(), r.recurringAmount(), r.ramp());
         // 현재 사이클은 자본 조정 전 포지션을 종가로 평가해 종료한다.
         AccountBalance preAdjustmentBalance = cyclePositionPort.findLatestOne(r.currentCycleId())
-                .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션 없음: cycleId=" + r.currentCycleId()))
+                .orElseThrow(() -> new IllegalStateException("VR 재설정 전 포지션이 없습니다."))
                 .toBalance();
         strategyCyclePort.markEnded(r.currentCycleId(), totalAssets(preAdjustmentBalance, r.closingPrice()), r.today());
         // 새 사이클 + holdings 승계 스냅샷 원자 생성 — 램프 시계(weeks) 기준 gradient/poolLimitRate 재계산 스냅샷

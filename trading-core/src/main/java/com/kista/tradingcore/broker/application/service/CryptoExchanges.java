@@ -26,6 +26,6 @@ public class CryptoExchanges {
     // 코인 거래소가 아니면 IllegalArgumentException → 400
     public CryptoExchangePort of(Broker broker) {
         return Optional.ofNullable(ports.get(broker))
-                .orElseThrow(() -> new IllegalArgumentException("코인 거래소가 아닌 증권사입니다: " + broker));
+                .orElseThrow(() -> new IllegalArgumentException("코인 거래소가 아닌 증권사입니다."));
     }
 }

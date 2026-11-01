@@ -114,8 +114,8 @@ class BuyOrderPriceCapper {
     private void applyIndividualCap(TradingAccount account, UUID strategyCycleId, List<Order> buyOrders,
                                     List<PlannedOrder> plannedBuyOrders, List<PlannedOrder> corrected, BigDecimal cap) {
         if (corrected.size() != plannedBuyOrders.size()) {
-            throw new IllegalStateException("개별 취소 대상 개수 불일치 — capsIndividualOrders() 구현체는 개수·순서를 바꾸면 안 됨: "
-                    + "original=" + plannedBuyOrders.size() + ", corrected=" + corrected.size());
+            throw new IllegalStateException("개별 취소 대상 개수가 보정 전 %d건, 보정 후 %d건으로 달라 보정을 중단합니다."
+                    .formatted(plannedBuyOrders.size(), corrected.size()));
         }
         List<PlannedOrder> changed = new ArrayList<>();
         for (int i = 0; i < buyOrders.size(); i++) {

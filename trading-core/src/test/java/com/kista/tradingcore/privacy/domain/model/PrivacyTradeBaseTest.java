@@ -23,7 +23,7 @@ class PrivacyTradeBaseTest {
     void privacyTradeBase_nullCurrentCycleStart_throws() {
         assertThatThrownBy(() -> new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("20.00"), 10, null, List.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("currentCycleStart 이상");
+                .hasMessageContaining("사이클 시작 금액은 0보다 커야 합니다");
     }
 
     @Test
@@ -31,7 +31,7 @@ class PrivacyTradeBaseTest {
     void privacyTradeBase_nonPositiveCurrentCycleStart_throws() {
         assertThatThrownBy(() -> new PrivacyTradeBase(UUID.randomUUID(), new BigDecimal("20.00"), 10, BigDecimal.ZERO, List.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("currentCycleStart 이상");
+                .hasMessageContaining("사이클 시작 금액은 0보다 커야 합니다");
     }
 
     @Test
@@ -39,7 +39,7 @@ class PrivacyTradeBaseTest {
     void privacyCurrentBase_nullCurrentCycleStart_throws() {
         assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, null, LocalDate.now(), BigDecimal.ZERO, null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("currentCycleStart 이상");
+                .hasMessageContaining("사이클 시작 금액은 0보다 커야 합니다");
     }
 
     @Test
@@ -47,7 +47,7 @@ class PrivacyTradeBaseTest {
     void privacyCurrentBase_nonPositiveCurrentCycleStart_throws() {
         assertThatThrownBy(() -> new PrivacyCurrentBase(StrategyTicker.SOXL, new BigDecimal("-1"), LocalDate.now(), BigDecimal.ZERO, null))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("currentCycleStart 이상");
+                .hasMessageContaining("사이클 시작 금액은 0보다 커야 합니다");
     }
 
     @Test
@@ -73,6 +73,6 @@ class PrivacyTradeBaseTest {
     void privacyPlan_nonPositiveCurrentCycleStart_throws() {
         assertThatThrownBy(() -> new PrivacyPlan(10, BigDecimal.ZERO, List.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("currentCycleStart 이상");
+                .hasMessageContaining("사이클 시작 금액은 0보다 커야 합니다");
     }
 }

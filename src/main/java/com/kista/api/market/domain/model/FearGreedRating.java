@@ -16,7 +16,7 @@ public enum FearGreedRating {
             case "neutral"       -> NEUTRAL;
             case "greed"         -> GREED;
             case "extreme greed" -> EXTREME_GREED;
-            default -> throw new IllegalArgumentException("알 수 없는 공포탐욕 등급: " + label);
+            default -> throw new IllegalArgumentException("알 수 없는 공포탐욕 등급(%s)입니다.".formatted(label));
         };
     }
 }

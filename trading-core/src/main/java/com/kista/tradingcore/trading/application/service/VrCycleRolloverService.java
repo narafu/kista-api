@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.NoSuchElementException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -95,7 +96,7 @@ class VrCycleRolloverService {
 
         // 램프 재계산 기준: 전략 최초 사이클 시작일로부터 경과한 주수 (스냅샷 이월 아닌 매 롤오버 시점 재계산)
         LocalDate firstStart = strategyCyclePort.findFirstByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("VR 최초 사이클 없음: strategyId=" + strategy.id()))
+                .orElseThrow(() -> new NoSuchElementException("VR 최초 사이클이 없습니다: " + strategy.id()))
                 .startDate();
         long weeks = ChronoUnit.WEEKS.between(firstStart, today);
 

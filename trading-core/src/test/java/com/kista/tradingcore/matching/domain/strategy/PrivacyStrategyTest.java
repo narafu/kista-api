@@ -361,7 +361,7 @@ class PrivacyStrategyTest {
         PrivacyPlan base = base(100, List.of(sellNull("12"), sellNull("13")));
         assertThatThrownBy(() -> strategy.buildOrders(balance(100), INITIAL_USD_DEPOSIT, base))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("SELL null quantity는 1개만 허용");
+                .hasMessageContaining("수량이 없는 매도 주문은 1개만 허용");
     }
 
     @Test

@@ -41,7 +41,7 @@ public record DcaStrategyConfig(List<DcaRule> rules) {
     public DcaStrategyConfig withAssignedKeys(Set<String> existingKeys) {
         return new DcaStrategyConfig(rules.stream().map(r -> {
             if (r.ruleKey() == null) return r.withRuleKey(UUID.randomUUID().toString());
-            if (!existingKeys.contains(r.ruleKey())) throw new IllegalArgumentException("존재하지 않는 규칙입니다");
+            if (!existingKeys.contains(r.ruleKey())) throw new IllegalArgumentException("존재하지 않는 규칙입니다.");
             return r;
         }).toList());
     }

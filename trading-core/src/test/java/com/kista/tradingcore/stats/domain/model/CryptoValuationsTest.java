@@ -104,6 +104,6 @@ class CryptoValuationsTest {
     @Test
     void 완성봉이_없으면_실패한다() {
         assertThatThrownBy(() -> CryptoValuations.history(List.of(new DatedValue(TODAY, BigDecimal.ONE)), TODAY, 10))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(java.util.NoSuchElementException.class);
     }
 }

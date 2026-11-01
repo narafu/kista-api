@@ -284,7 +284,7 @@ class BacktestEngineTest {
     void 기준매매표_없는_2arg_경로의_PRIVACY는_예외를_던진다() {
         assertThatThrownBy(() -> engine.run(List.of(candle("2024-01-02", 100, 105, 95, 100)), privacyCommand("1000")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("PRIVACY");
+                .hasMessage("이 전략은 백테스트를 지원하지 않습니다.");
     }
 
     @Test

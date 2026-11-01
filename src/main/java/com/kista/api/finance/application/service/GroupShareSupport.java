@@ -16,7 +16,7 @@ final class GroupShareSupport {
 
     // "소속된 그룹이 없습니다" 메시지의 단일 소유자 — 그룹 필수 검증이 필요한 모든 호출부가 이 메서드를 거친다.
     static UUID requireCurrentGroup(Optional<UUID> currentGroupId) {
-        return currentGroupId.orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다"));
+        return currentGroupId.orElseThrow(() -> new IllegalStateException("소속된 그룹이 없습니다."));
     }
 
     // shareToGroup=true로 신규 생성할 때만 그룹이 필수 — false면 개인 소유라 그룹 없어도 무방.

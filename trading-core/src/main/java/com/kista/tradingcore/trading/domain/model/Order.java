@@ -109,9 +109,4 @@ public record Order(
                 orderType, timing, direction, newLeg, quantity, price, status,
                 externalOrderId, filledQuantity, filledPrice);
     }
-
-    public static String leg(String prefix, int index) {
-        if (index < 1) throw new IllegalArgumentException("order leg index must be positive: " + index);
-        return "%s_%02d".formatted(prefix, index);
-    }
 }

@@ -17,7 +17,7 @@ public record PrivacyPlan(
 ) {
     public PrivacyPlan {
         if (currentCycleStart == null || currentCycleStart.signum() <= 0) {
-            throw new IllegalStateException("[PRIVACY] currentCycleStart 이상: " + currentCycleStart);
+            throw new IllegalStateException("PRIVACY 기준표의 사이클 시작 금액은 0보다 커야 합니다.");
         }
     }
 

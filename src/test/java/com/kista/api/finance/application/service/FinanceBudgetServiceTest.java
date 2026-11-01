@@ -105,7 +105,7 @@ class FinanceBudgetServiceTest {
 
         assertThatThrownBy(() -> budgetService.create(userId, true, command()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("소속된 그룹이 없습니다");
+                .hasMessage("소속된 그룹이 없습니다.");
         verify(budgetPort, never()).save(any());
     }
 

@@ -25,7 +25,7 @@ public record VrRegistration(BigDecimal vrValue, VrRampParams ramp) {
     private static BigDecimal resolveVrValue(RegisterStrategyCommand cmd, BigDecimal evaluatedStockValue) {
         BigDecimal explicit = cmd.initialVrValue();
         if (explicit != null && explicit.signum() < 0) {
-            throw new IllegalArgumentException("VR 전략의 초기 V값(initialVrValue)은 0 이상이어야 합니다");
+            throw new IllegalArgumentException("VR 전략의 초기 V값은 0 이상이어야 합니다.");
         }
         return explicit != null && explicit.signum() > 0 ? explicit : evaluatedStockValue;
     }
@@ -38,7 +38,7 @@ public record VrRegistration(BigDecimal vrValue, VrRampParams ramp) {
                                  BigDecimal vrValue, BigDecimal evaluatedStockValue,
                                  VrRampParams ramp) {
         if (intervalWeeks == null || intervalWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(intervalWeeks)는 1 이상이어야 합니다");
+            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
         }
         BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;

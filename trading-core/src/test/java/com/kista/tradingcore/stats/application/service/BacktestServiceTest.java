@@ -308,7 +308,7 @@ class BacktestServiceTest {
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("poolLimitFloor");
+                .hasMessageContaining("pool 한도율 하한");
     }
 
     // --- 캔들 조달 범위 ---

@@ -127,10 +127,10 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
         FinanceCategory category = financeCategoryPort.findByIdOrThrow(command.categoryId());
         category.verifyAccessibleBy(userId, currentGroupId);
         if (category.type() == FinanceCategory.Type.ASSET) {
-            throw new IllegalArgumentException("자산 카테고리에는 예산을 걸 수 없습니다");
+            throw new IllegalArgumentException("자산 카테고리에는 예산을 걸 수 없습니다.");
         }
         if (command.applyEndDate() != null && command.applyEndDate().isBefore(command.applyStartDate())) {
-            throw new IllegalArgumentException("적용 종료일은 시작일보다 앞설 수 없습니다");
+            throw new IllegalArgumentException("적용 종료일은 시작일보다 앞설 수 없습니다.");
         }
     }
 

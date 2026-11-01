@@ -19,7 +19,7 @@ public class StrategyCreationResolvers {
 
     public StrategyCreationResolver of(StrategyType type) {
         StrategyCreationResolver resolver = byType.get(type);
-        if (resolver == null) throw new IllegalStateException("등록되지 않은 전략 생성 리졸버: " + type);
+        if (resolver == null) throw new IllegalStateException("전략 유형(%s)의 생성 리졸버가 등록되어 있지 않습니다.".formatted(type));
         return resolver;
     }
 }

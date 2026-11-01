@@ -18,7 +18,7 @@ public class CycleOrderStrategies {
 
     public CycleOrderStrategy of(StrategyType type) {
         CycleOrderStrategy s = byType.get(type);
-        if (s == null) throw new IllegalStateException("등록되지 않은 cycleType: " + type);
+        if (s == null) throw new IllegalStateException("전략 유형(%s)의 주문 생성 전략이 등록되어 있지 않습니다.".formatted(type));
         return s;
     }
 }

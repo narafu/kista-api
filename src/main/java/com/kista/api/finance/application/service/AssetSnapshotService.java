@@ -72,7 +72,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         FinanceCategory category = financeCategoryPort.findByIdOrThrow(categoryId);
         category.verifyAccessibleBy(userId, currentGroupId);
         if (category.type() != FinanceCategory.Type.ASSET) {
-            throw new IllegalArgumentException("자산(ASSET) 카테고리만 자산 스냅샷에 사용할 수 있습니다");
+            throw new IllegalArgumentException("자산 카테고리만 자산 스냅샷에 사용할 수 있습니다.");
         }
     }
 

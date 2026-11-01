@@ -127,7 +127,7 @@ class StrategyService implements StrategyUseCase {
         // 1주도 못 사는 원장으로 재개하면 0회차 매수가 원장 상한에 막혀 교착 — 거부
         if (closingPrice != null && latestCycle.endAmount().compareTo(closingPrice) < 0) {
             throw new IllegalStateException(String.format(Locale.US,
-                    "남은 원장($%.2f)이 1주 가격($%.2f)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해 주세요.",
+                    "남은 원장($%.2f)이 1주 가격($%.2f)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해야 합니다.",
                     latestCycle.endAmount(), closingPrice));
         }
         cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), latestCycle.endAmount(), closingPrice);

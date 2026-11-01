@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.NoSuchElementException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,7 @@ public final class CryptoHashRibbons {
     public static List<DatedHashRibbon> history(List<DatedValue> dailyHashratesEh, List<DatedValue> btcDailyCloses,
                                                 LocalDate today, int days) {
         Map<LocalDate, BigDecimal> byDate = completed(dailyHashratesEh, today);
-        if (byDate.isEmpty()) throw new IllegalStateException("완성 해시레이트 점이 없습니다");
+        if (byDate.isEmpty()) throw new NoSuchElementException("완성 해시레이트 점이 없습니다.");
         Map<LocalDate, BigDecimal> priceByDate = completed(btcDailyCloses, today);
         // 가격 SMA는 점 개수 기준 — 날짜별 모멘텀 여부를 미리 계산
         List<LocalDate> priceDates = new ArrayList<>(priceByDate.keySet());

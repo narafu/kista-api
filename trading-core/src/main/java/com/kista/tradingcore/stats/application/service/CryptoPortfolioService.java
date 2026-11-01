@@ -65,7 +65,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
         Account account = requireCryptoAccount(accountId, requesterId);
         Market market = account.broker().getMarket();
         if (tickers.isEmpty() || tickers.stream().anyMatch(t -> !t.tradableOn(market))) {
-            throw new IllegalArgumentException("코인 종목을 1개 이상 지정해주세요.");
+            throw new IllegalArgumentException("코인 종목을 1개 이상 지정해야 합니다.");
         }
         CryptoExchangePort exchange = exchanges.of(account.broker());
         return BrokerCallGuard.wrap("코인 시세 조회", () -> exchange.getCurrentPrices(Set.copyOf(tickers)));
@@ -74,7 +74,7 @@ class CryptoPortfolioService implements CryptoPortfolioUseCase {
     private Account requireCryptoAccount(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         if (!account.broker().isCryptoExchange()) {
-            throw new IllegalArgumentException("코인 계좌가 아닙니다. 주식 계좌는 /portfolio를 사용하세요.");
+            throw new IllegalArgumentException("코인 계좌가 아닙니다. 주식 계좌는 포트폴리오 화면에서 조회해야 합니다.");
         }
         return account;
     }

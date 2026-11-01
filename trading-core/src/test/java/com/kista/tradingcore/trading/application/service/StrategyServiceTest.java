@@ -461,7 +461,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("남은 원장($12.34)이 1주 가격($60.00)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해 주세요.");
+                .hasMessage("남은 원장($12.34)이 1주 가격($60.00)보다 작아 재개할 수 없습니다. 전략을 삭제한 뒤 충분한 투자금으로 다시 등록해야 합니다.");
         verify(strategyCyclePort, never()).save(any());
         verify(cyclePositionPort, never()).save(any());
         verify(strategyPort, never()).save(any());
@@ -1042,7 +1042,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("초기 V값(initialVrValue)은 0 이상이어야 합니다");
+                .hasMessageContaining("초기 V값은 0 이상이어야 합니다");
     }
 
     @Test
@@ -1399,7 +1399,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("poolLimitFloor");
+                .hasMessageContaining("pool 한도율 하한");
 
         verify(strategyPort, never()).save(any());
     }
@@ -1414,7 +1414,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("gMax");
+                .hasMessageContaining("gradient 상한");
 
         verify(strategyPort, never()).save(any());
     }
@@ -1429,7 +1429,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, cmd))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("poolLimitFloor");
+                .hasMessageContaining("pool 한도율 하한");
 
         verify(strategyPort, never()).save(any());
     }
@@ -1505,8 +1505,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 시작 포지션 없음")
-                .hasMessageContaining(vrCycleId.toString());
+                .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
 
     // --- 단건↔배치 동등성 (toDetail vs toDetails) — 목록 조립 리팩토링이 단건 응답과 동일 결과를 내는지 검증 ---
@@ -1690,8 +1689,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.getById(strategyId, USER_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 시작 포지션 없음")
-                .hasMessageContaining(cycleId.toString());
+                .hasMessageContaining("VR 시작 포지션이 없습니다");
 
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
@@ -1700,8 +1698,7 @@ class StrategyServiceTest {
 
         assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 시작 포지션 없음")
-                .hasMessageContaining(cycleId.toString());
+                .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
 
     @Test
@@ -2194,7 +2191,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.UPRO,
                 TradingFixtures.dcaConfig(TradingFixtures.stockDcaRule(DCA_KEY, OrderDirection.BUY, "300", OrderType.MOC)))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("존재하지 않는 규칙입니다");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("존재하지 않는 규칙입니다.");
         verify(strategyPort, never()).save(any());
     }
 

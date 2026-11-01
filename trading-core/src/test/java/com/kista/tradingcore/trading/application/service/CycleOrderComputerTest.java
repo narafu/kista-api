@@ -188,7 +188,7 @@ class CycleOrderComputerTest {
         assertThatThrownBy(() ->
                 computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 시작 포지션 없음");
+                .hasMessage("VR 시작 포지션이 없습니다.");
     }
 
     @Test
@@ -199,7 +199,7 @@ class CycleOrderComputerTest {
         assertThatThrownBy(() ->
                 computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 사이클 상세 없음");
+                .hasMessage("VR 사이클 상세가 없습니다.");
     }
 
     @Test
@@ -213,7 +213,7 @@ class CycleOrderComputerTest {
         assertThatThrownBy(() ->
                 computer.compute(BALANCE, VR_STRATEGY, null, LocalDate.now(), VR_CYCLE, null, "테스트", CURRENT_PRICE))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("VR 전략 버전 상세 없음");
+                .hasMessage("VR 전략 버전 상세가 없습니다.");
     }
 
     @Test

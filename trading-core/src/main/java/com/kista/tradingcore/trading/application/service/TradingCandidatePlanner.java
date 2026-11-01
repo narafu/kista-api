@@ -197,8 +197,8 @@ class TradingCandidatePlanner {
                 .filter(order -> PlannedOrder.UNKNOWN_LEG.equals(order.orderLeg()))
                 .toList();
         if (!unknownLegOrders.isEmpty()) {
-            throw new IllegalStateException("전략 주문 leg 누락: strategyType="
-                    + strategy.type() + ", count=" + unknownLegOrders.size());
+            throw new IllegalStateException("전략 %s의 주문 구간이 누락된 주문이 %d건 있습니다."
+                    .formatted(strategy.type(), unknownLegOrders.size()));
         }
     }
 

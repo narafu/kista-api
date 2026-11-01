@@ -28,7 +28,7 @@ public class VrCreationResolver implements StrategyCreationResolver {
         if (!settings.recurringMode().customizable()) {
             int amount = request.recurringAmount() != null ? request.recurringAmount() : 0;
             if (amount != 0) {
-                throw new IllegalArgumentException("고정 recurringMode는 recurringAmount 0만 허용합니다");
+                throw new IllegalArgumentException("고정 입출금 방식에서는 정기 입출금액을 0으로만 지정할 수 있습니다.");
             }
             return 0;
         }
@@ -37,7 +37,7 @@ public class VrCreationResolver implements StrategyCreationResolver {
             // 그 외 방향은 크기를 알 수 없어 명시 입력을 요구한다 (defaultValue는 방향만 의미, 금액은 의미하지 않음).
             RecurringMode defaultMode = settings.recurringMode().resolve(null);
             if (defaultMode != RecurringMode.HOLD) {
-                throw new IllegalArgumentException("recurringAmount는 필수입니다 (기본 방향: " + defaultMode + ")");
+                throw new IllegalArgumentException("정기 입출금액을 입력해야 합니다.");
             }
             return 0;
         }

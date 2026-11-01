@@ -24,7 +24,7 @@ public class TradingOrderPlanner {
         // leg 없는 주문은 중복 방지 슬롯(timing+direction+leg)에 잡히지 않아 같은 주문이 두 번 나갈 수 있다 — 배치·수동 실행·재캡 공용 차단
         long unknownLegCount = templates.stream().filter(o -> PlannedOrder.UNKNOWN_LEG.equals(o.orderLeg())).count();
         if (unknownLegCount > 0) {
-            throw new IllegalStateException("주문 leg 누락 — 저장 거부: count=" + unknownLegCount);
+            throw new IllegalStateException("주문 구간이 누락된 주문이 %d건 있어 저장을 거부합니다.".formatted(unknownLegCount));
         }
         List<Order> planned = templates.stream()
                 .map(o -> Order.fromPlanned(o, account.id(), strategyCycleId))

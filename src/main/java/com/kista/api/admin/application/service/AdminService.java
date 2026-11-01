@@ -110,11 +110,11 @@ class AdminService implements AdminUserUseCase {
         if (role == UserRole.USER) {
             // 자기 자신 강등 방지
             if (adminId.equals(targetUserId)) {
-                throw new IllegalArgumentException("자기 자신의 역할을 강등할 수 없습니다");
+                throw new IllegalArgumentException("자기 자신의 역할을 강등할 수 없습니다.");
             }
             // 마지막 ADMIN 강등 방지 — 대상이 지금 ADMIN일 때만(이미 USER인 대상의 USER 지정은 관리자 수를 줄이지 않는다)
             if (userPort.findByIdOrThrow(targetUserId).role() == UserRole.ADMIN && userPort.countByRole(UserRole.ADMIN) <= 1) {
-                throw new IllegalStateException("최소 1명의 관리자가 존재해야 합니다");
+                throw new IllegalStateException("최소 1명의 관리자가 존재해야 합니다.");
             }
         }
         // 역할 저장 + 기존 AT 무효화는 user 모듈이 캡슐화한다

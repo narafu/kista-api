@@ -71,7 +71,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         FinanceCategory category = financeCategoryPort.findByIdOrThrow(categoryId);
         category.verifyAccessibleBy(userId, currentGroupId);
         if (category.type() == FinanceCategory.Type.ASSET) {
-            throw new IllegalArgumentException("자산 카테고리는 거래내역에 사용할 수 없습니다");
+            throw new IllegalArgumentException("자산 카테고리는 거래내역에 사용할 수 없습니다.");
         }
     }
 

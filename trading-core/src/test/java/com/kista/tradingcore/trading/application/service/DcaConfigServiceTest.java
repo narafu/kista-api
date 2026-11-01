@@ -127,7 +127,7 @@ class DcaConfigServiceTest {
 
         assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID,
                 config("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, "300")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("존재하지 않는 규칙입니다");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("존재하지 않는 규칙입니다.");
         verify(strategyVersionPort, never()).softDeleteActiveByStrategyId(any(), any());
     }
 

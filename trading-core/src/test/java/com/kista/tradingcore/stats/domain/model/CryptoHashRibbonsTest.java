@@ -139,6 +139,6 @@ class CryptoHashRibbonsTest {
 
     @Test
     void 완성_점이_없으면_예외() {
-        assertThatThrownBy(() -> CryptoHashRibbons.history(List.of(), List.of(), TODAY, 10)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> CryptoHashRibbons.history(List.of(), List.of(), TODAY, 10)).isInstanceOf(java.util.NoSuchElementException.class);
     }
 }

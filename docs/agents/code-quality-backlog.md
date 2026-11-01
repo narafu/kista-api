@@ -135,7 +135,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 사용자 응답 문구를 일관되게 하고, 내부값(enum·UUID) 노출을 차단한다.
 - 위험: 낮음. kista-ui는 문구가 아니라 `code`로 분기한다(`ErrorCode`). 단, UI가 detail 문자열을 그대로 비교하는 곳이 있는지는 착수 시 kista-ui에서 grep한다.
 - 가드(테스트 초안): trading-core 테스트에 소스 스캔 테스트를 추가한다. 대상은 `application`·`domain` 패키지 소스에서 `new (IllegalArgumentException|IllegalStateException)\("` 리터럴이 `."`나 `.")`로 끝나지 않는 것이다. 이를 실패로 보고, 현재 위반은 allowlist로 동결한 뒤 줄여 간다. 내부 무결성 ISE는 대상 패키지에서 빼거나 `NoSuchElementException`(고정 문구)으로 바꾸는 방향을 착수 시 결정한다.
-- 상태: 진행 중. 가드 `ExceptionMessageFormatTest`(루트 architecture, root·trading-core·shared의 application·domain 스캔, 종결 기준 `니다.`)를 도입했다. 사용자 요청 경로의 enum·UUID·변수명 노출과 부재 ISE→NSE 전환으로 175건이 88건이 됐다. 잔여는 `src/test/resources/architecture/exception-message-allowlist.txt`에 동결했다(대부분 배치·내부 무결성·PRIVACY·관리자 경로).
+- 상태: done. 가드 `ExceptionMessageFormatTest`(루트 architecture, root·trading-core·shared의 application·domain 스캔, 종결 기준 `니다.`)를 도입하고 allowlist를 비웠다. 사용자 요청 경로(관리자 포함)는 타입을 유지한 채 한국어 완전문장으로 고치고 enum·UUID·영어 필드명을 뺐다(VR 필드명은 kista-ui 라벨 기준). 배치·내부 무결성 경로의 부재 ISE는 `NoSuchElementException`으로 바꿨다(`CryptoLedgerRecorder`·`CycleRotationService`·`VrCycleRolloverService`·`TradingBalanceLoader`·크립토 지표 도메인). 웹·배치 양쪽 경로는 400→404 변동을 피하려 타입을 유지했다. 응답 상태코드 변경 없음. 안내형 문구("~해 주세요.")도 "~니다."로 통일했다. 미사용 `Order.leg()`는 삭제했다.
 
 ### CQ-06 로그만 남기고 대체값을 돌려주는 raw catch (`BrokerCallGuard.tryGet` 대상)
 - 주제: 브로커·시세 호출 실패 처리. 유형: 비일관성.

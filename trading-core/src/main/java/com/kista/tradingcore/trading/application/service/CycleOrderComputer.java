@@ -87,13 +87,13 @@ class CycleOrderComputer {
         CycleOrderStrategy.PlanContext.VrInputs vrInputs = null;
         if (strategy.isVr()) {
             StrategyCycleVrDetail cycleVr = strategyCycleVrPort.findByCycleId(currentCycle.id())
-                    .orElseThrow(() -> new IllegalStateException("VR 사이클 상세 없음: cycleId=" + currentCycle.id()));
+                    .orElseThrow(() -> new IllegalStateException("VR 사이클 상세가 없습니다."));
             StrategyVrDetail vrDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
-                    .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세 없음: versionId=" + currentCycle.strategyVersionId()));
+                    .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세가 없습니다."));
             BigDecimal poolUsed = orderPort.sumFilledBuyAmountByCycleId(currentCycle.id());
             // poolLimit(달러)은 개장 포지션의 예수금 × 고정 poolLimitRate 스냅샷
             CyclePosition openingPosition = cyclePositionPort.findFirstOne(currentCycle.id())
-                    .orElseThrow(() -> new IllegalStateException("VR 시작 포지션 없음: cycleId=" + currentCycle.id()));
+                    .orElseThrow(() -> new IllegalStateException("VR 시작 포지션이 없습니다."));
             BigDecimal poolLimit = openingPosition.usdDeposit()
                     .multiply(cycleVr.poolLimitRate())
                     .setScale(2, RoundingMode.HALF_UP);

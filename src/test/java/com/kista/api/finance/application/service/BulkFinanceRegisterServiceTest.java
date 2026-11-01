@@ -109,7 +109,7 @@ class BulkFinanceRegisterServiceTest {
 
         assertThatThrownBy(() -> service.register(userId, true, List.of(asset("자산1")), List.of(tx("거래1"))))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("소속된 그룹이 없습니다");
+                .hasMessage("소속된 그룹이 없습니다.");
 
         verify(assetSnapshotUseCase, never()).create(any(), anyBoolean(), any());
         verify(transactionUseCase, never()).create(any(), anyBoolean(), any());

@@ -70,7 +70,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
     @Override
     public FinanceGroupInvitation respondToInvitation(String code, UUID userId, FinanceGroupInvitation.Status status) {
         if (status != FinanceGroupInvitation.Status.ACCEPTED && status != FinanceGroupInvitation.Status.DECLINED) {
-            throw new IllegalArgumentException("초대 응답은 ACCEPTED 또는 DECLINED만 가능합니다");
+            throw new IllegalArgumentException("초대 응답은 수락 또는 거절만 가능합니다.");
         }
         FinanceGroupInvitation invitation = financeGroupPort.findInvitationByCodeOrThrow(code);
         if (invitation.invitedBy().equals(userId)) {

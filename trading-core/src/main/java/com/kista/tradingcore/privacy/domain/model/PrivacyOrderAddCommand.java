@@ -17,10 +17,10 @@ public record PrivacyOrderAddCommand(
 ) {
     public PrivacyOrderAddCommand {
         if (direction == OrderDirection.BUY && quantity == null) {
-            throw new IllegalArgumentException("BUY 주문의 quantity는 null일 수 없습니다");
+            throw new IllegalArgumentException("매수 주문은 수량을 지정해야 합니다.");
         }
         if (quantity != null && quantity <= 0) {
-            throw new IllegalArgumentException("quantity는 양수여야 합니다: " + quantity);
+            throw new IllegalArgumentException("수량은 양수여야 합니다.");
         }
     }
 }

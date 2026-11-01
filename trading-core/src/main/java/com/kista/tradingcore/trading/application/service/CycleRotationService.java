@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.util.NoSuchElementException;
 import java.math.BigDecimal;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyDefaults;
@@ -82,7 +83,7 @@ class CycleRotationService {
 
             // 새 StrategyCycle + 시작 스냅샷 원자적 생성 (시드 결정 방식 stamp)
             StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
-                    .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
+                    .orElseThrow(() -> new NoSuchElementException("활성 전략 버전이 없습니다: " + strategy.id()));
             cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), targetSeed, price);
         } catch (RuntimeException e) {
             // 재등록 실패 시에도 markEnded는 이미 커밋된 상태 — PAUSED 없이 던지면 전략은 ACTIVE인 채

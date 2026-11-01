@@ -27,7 +27,7 @@ public class PrivacyStrategy {
     // initialUsdDeposit ÷ plan.currentCycleStart() 로 배수를 동적 산출
     public List<PlannedOrder> buildOrders(AccountBalance balance, BigDecimal initialUsdDeposit, PrivacyPlan plan) {
         if (initialUsdDeposit == null || initialUsdDeposit.signum() <= 0) {
-            throw new IllegalStateException("[PRIVACY] initialUsdDeposit 이상: " + initialUsdDeposit);
+            throw new IllegalStateException("PRIVACY 초기 예수금은 0보다 커야 합니다.");
         }
         BigDecimal start = plan.currentCycleStart();
         BigDecimal multiple = initialUsdDeposit.divide(start, 2, RoundingMode.FLOOR);
@@ -50,7 +50,7 @@ public class PrivacyStrategy {
             } else {
                 if (t.quantity() == null) {
                     if (nullSellTemplate != null) {
-                        throw new IllegalStateException("[PRIVACY] SELL null quantity는 1개만 허용: ticker=" + t.ticker());
+                        throw new IllegalStateException("%s 기준표에 수량이 없는 매도 주문은 1개만 허용됩니다.".formatted(t.ticker()));
                     }
                     nullSellTemplate = t;
                 } else {

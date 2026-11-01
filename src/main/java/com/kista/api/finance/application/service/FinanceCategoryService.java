@@ -43,7 +43,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         // 그룹 소유 카테고리는 그룹 소유 부모 아래에만 생성한다 — 개인 부모 아래 그룹 자식은
         // 다른 멤버에게 부모 없는 트리 고아로 보이고, shareToGroup()/unshare()의 "같은 소유자 트리" 전제를 깬다
         if (shareToGroup && parent != null && !currentGroupId.equals(parent.groupId())) {
-            throw new IllegalArgumentException("그룹 공유 카테고리는 그룹 공유 부모 아래에만 만들 수 있습니다");
+            throw new IllegalArgumentException("그룹 공유 카테고리는 그룹 공유 부모 아래에만 만들 수 있습니다.");
         }
         UUID ownerGroupId = shareToGroup ? currentGroupId : null;
         FinanceCategory category = new FinanceCategory(null, ownerGroupId, command.parentId(), userId,
@@ -176,12 +176,12 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         }
         FinanceCategory parent = categoryPort.findByIdOrThrow(parentId);
         if (parent.type() != type) {
-            throw new IllegalArgumentException("부모 카테고리와 타입이 일치해야 합니다");
+            throw new IllegalArgumentException("부모 카테고리와 타입이 일치해야 합니다.");
         }
         try {
             parent.verifyAccessibleBy(userId, currentGroupId);
         } catch (SecurityException _) {
-            throw new IllegalArgumentException("다른 그룹의 카테고리를 부모로 지정할 수 없습니다");
+            throw new IllegalArgumentException("다른 그룹의 카테고리를 부모로 지정할 수 없습니다.");
         }
         return parent;
     }

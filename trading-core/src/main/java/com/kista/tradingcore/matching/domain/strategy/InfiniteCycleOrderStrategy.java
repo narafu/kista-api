@@ -108,7 +108,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
         PlanContext.InfiniteInputs inputs = ctx.infinite();
         // 0회차(holdings==0)에서 전일종가 없으면 InfinitePosition 생성 자체가 불가
         if (ctx.balance().wholeShares() == 0 && inputs.prevClosePrice() == null) {
-            throw new IllegalStateException("전일종가 조회 실패: " + ctx.ticker().name());
+            throw new IllegalStateException("%s의 전일 종가를 조회하지 못했습니다.".formatted(ctx.ticker().name()));
         }
         int divisionCount = inputs.divisionCount() != null ? inputs.divisionCount() : StrategyDefaults.DEFAULT_DIVISION_COUNT;
         InfinitePosition position = new InfinitePosition(ctx.balance(), ctx.ticker(), inputs.prevClosePrice(), divisionCount);

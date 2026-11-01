@@ -41,7 +41,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
                                 BigDecimal sellableAfterReserved, BigDecimal fearGreed, BigDecimal currentPrice,
                                 BigDecimal availableCash, CryptoTradingRules tradingRules) {
         public DcaRuleInputs {
-            if (market.isCrypto() && tradingRules == null) throw new IllegalArgumentException("코인 시장은 거래 규칙이 필요합니다");
+            if (market.isCrypto() && tradingRules == null) throw new IllegalArgumentException("코인 시장은 거래 규칙이 필요합니다.");
         }
     }
 

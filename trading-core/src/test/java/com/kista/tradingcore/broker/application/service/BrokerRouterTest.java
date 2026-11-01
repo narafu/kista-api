@@ -196,7 +196,7 @@ class BrokerRouterTest {
     void unknownBroker() {
         assertThatThrownBy(() -> router.getMargin(ref(Broker.MOCK)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("지원하지 않는 증권사: MOCK");
+                .hasMessage("지원하지 않는 증권사입니다.");
     }
 
     private BrokerAccountRef ref(Broker broker) {
