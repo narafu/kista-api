@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import java.util.NoSuchElementException;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -34,16 +35,16 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
     @Override
     public ReorderBuyBudget query(List<UUID> orderIds, LocalDate tradeDate) {
         if (orderIds.isEmpty() || orderIds.size() > MAX_ORDERS) {
-            throw new IllegalArgumentException("orderIds는 1~" + MAX_ORDERS + "건이어야 합니다");
+            throw new IllegalArgumentException("주문은 1~" + MAX_ORDERS + "건까지 선택할 수 있습니다.");
         }
         List<Order> sources = orderIds.stream().distinct()
                 .map(id -> orderPort.findById(id)
-                        .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다.")))
+                        .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다.")))
                 .toList();
         // 같은 계좌 제한 유지 — 일괄 재주문 폼은 한 계좌 단위
         UUID accountId = sources.getFirst().accountId();
         if (sources.stream().anyMatch(o -> !o.accountId().equals(accountId))) {
-            throw new IllegalArgumentException("같은 계좌의 주문만 함께 조회할 수 있습니다");
+            throw new IllegalArgumentException("같은 계좌의 주문만 함께 조회할 수 있습니다.");
         }
         LocalDate date = tradeDate != null ? tradeDate : sources.getFirst().tradeDate();
 
@@ -55,7 +56,7 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
         Map<UUID, ReorderBuyBudget.CycleBudget> cycles = new LinkedHashMap<>();
         sources.stream().map(Order::strategyCycleId).distinct().forEach(cycleId -> {
             StrategyCycle cycle = strategyCyclePort.findById(cycleId)
-                    .orElseThrow(() -> new IllegalArgumentException("전략 사이클을 찾을 수 없습니다."));
+                    .orElseThrow(() -> new NoSuchElementException("전략 사이클을 찾을 수 없습니다."));
             // DCA(시드 비점유) 사이클은 상한 없음 — 키를 생략해 UI가 무제한으로 본다
             if (!ledgerBudget.applies(strategyPort.findByIdOrThrow(cycle.strategyId()).type())) return;
             cycles.put(cycleId, new ReorderBuyBudget.CycleBudget(ledgerBudget.remaining(cycle, date)));

@@ -160,7 +160,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
 
     private FinanceCategory requireSystem(FinanceCategory existing) {
         if (!existing.isSystem()) {
-            throw new IllegalArgumentException("시스템 카테고리가 아닙니다: " + existing.id());
+            throw new IllegalArgumentException("시스템 카테고리가 아닙니다.");
         }
         return existing;
     }

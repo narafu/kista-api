@@ -140,7 +140,7 @@ class ReorderBuyBudgetServiceTest {
         UUID id = UUID.randomUUID();
         when(orderPort.findById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service().query(List.of(id), null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service().query(List.of(id), null)).isInstanceOf(java.util.NoSuchElementException.class);
         assertThatThrownBy(() -> service().query(List.of(), null)).isInstanceOf(IllegalArgumentException.class);
         List<UUID> tooMany = java.util.stream.Stream.generate(UUID::randomUUID)
                 .limit(ReorderBuyBudgetService.MAX_ORDERS + 1).toList();

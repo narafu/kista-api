@@ -54,7 +54,7 @@ class StrategyCyclePortTest {
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(java.util.NoSuchElementException.class)
                 .hasMessageContaining("활성 사이클 없음")
                 .hasMessageContaining(STRATEGY_ID.toString());
     }

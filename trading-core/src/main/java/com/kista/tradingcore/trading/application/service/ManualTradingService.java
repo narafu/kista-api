@@ -59,7 +59,7 @@ class ManualTradingService {
         TradingAccount account = TradingAccount.from(accountPort.requireOwnedAccount(strategy.accountId(), requesterId));
         if (strategy.isDca()) throw new DcaManualExecutionUnsupportedException(); // DCA는 배치 전용(spec 7.5)
         if (!strategy.isActive())
-            throw new IllegalArgumentException("ACTIVE 상태의 전략만 수동 실행 가능합니다");
+            throw new IllegalStateException("활성 상태의 전략만 수동 실행할 수 있습니다.");
 
         // 현재 StrategyCycle 조회 — initialUsdDeposit 필요
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());

@@ -119,7 +119,7 @@ class BacktestServiceTest {
 
         assertThatThrownBy(() -> service.run(command))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("SOXL");
+                .hasMessageContaining("지원하지 않는 종목");
         verify(candlePort, never()).fetchDailyCandles(anyString(), any(), any());
     }
 
@@ -208,7 +208,7 @@ class BacktestServiceTest {
 
         assertThatThrownBy(() -> service.run(infinite(25)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("25");
+                .hasMessageContaining("분할 수");
     }
 
     @Test

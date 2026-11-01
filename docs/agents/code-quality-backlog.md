@@ -135,7 +135,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 사용자 응답 문구를 일관되게 하고, 내부값(enum·UUID) 노출을 차단한다.
 - 위험: 낮음. kista-ui는 문구가 아니라 `code`로 분기한다(`ErrorCode`). 단, UI가 detail 문자열을 그대로 비교하는 곳이 있는지는 착수 시 kista-ui에서 grep한다.
 - 가드(테스트 초안): trading-core 테스트에 소스 스캔 테스트를 추가한다. 대상은 `application`·`domain` 패키지 소스에서 `new (IllegalArgumentException|IllegalStateException)\("` 리터럴이 `."`나 `.")`로 끝나지 않는 것이다. 이를 실패로 보고, 현재 위반은 allowlist로 동결한 뒤 줄여 간다. 내부 무결성 ISE는 대상 패키지에서 빼거나 `NoSuchElementException`(고정 문구)으로 바꾸는 방향을 착수 시 결정한다.
-- 상태: open.
+- 상태: 진행 중. 가드 `ExceptionMessageFormatTest`(루트 architecture, root·trading-core·shared의 application·domain 스캔, 종결 기준 `니다.`)를 도입했다. 사용자 요청 경로의 enum·UUID·변수명 노출과 부재 ISE→NSE 전환으로 175건이 88건이 됐다. 잔여는 `src/test/resources/architecture/exception-message-allowlist.txt`에 동결했다(대부분 배치·내부 무결성·PRIVACY·관리자 경로).
 
 ### CQ-06 로그만 남기고 대체값을 돌려주는 raw catch (`BrokerCallGuard.tryGet` 대상)
 - 주제: 브로커·시세 호출 실패 처리. 유형: 비일관성.
@@ -232,7 +232,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: HTTP 상태 일관성.
 - 위험: 낮음~중간. 응답 상태코드가 바뀐다. kista-ui가 상태코드로 분기하는지는 착수 시 확인한다.
 - 가드: CQ-05 테스트와 함께 `constraints.md` "예외 매핑 SSOT"에 "부재=NoSuchElement, 상태=ISE, 입력=IAE" 한 줄을 추가한다.
-- 상태: open.
+- 상태: done. 활성 사이클·DCA 설정·주문·사이클 부재는 NSE, `ManualTradingService` 상태 위반은 ISE로 통일했다. kista-ui는 detail 문자열로 분기하지 않고(`apiMsg` 표시만), 상태코드 분기는 preview 404(`orderBannerCopy.ts:60`) 하나라 영향이 없다. `ReorderBuyBudgetService`·`ReorderService` 주문 부재는 400에서 404로 바뀐다.
 
 ### CQ-14 KIS·Toss 일반 호출의 429가 `BrokerRateLimitException`으로 변환되지 않음
 - 주제: 브로커 실패 처리. 유형: 비일관성.

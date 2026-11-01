@@ -57,16 +57,16 @@ class AccountService implements AccountUseCase {
         } else if (broker.isKeyOnlyCredentials()) {
             accountNo = null; // 업비트·메리츠는 앱키에 계좌가 묶여 계좌번호를 받지 않는다 — 요청에 와도 무시(저장 안 함)
             if (appKey == null || appKey.isBlank() || secretKey == null || secretKey.isBlank()) {
-                throw new IllegalArgumentException("API 키와 시크릿은 필수입니다");
+                throw new IllegalArgumentException("API 키와 시크릿은 필수입니다.");
             }
         } else if (accountNo == null || accountNo.isBlank()) {
-            throw new IllegalArgumentException("계좌번호는 필수입니다");
+            throw new IllegalArgumentException("계좌번호는 필수입니다.");
         }
         // 람다 캡처를 위한 effectively-final 복사본 (accountNo는 위 분기에서 재할당됨)
         final String resolvedAccountNo = accountNo;
 
         if (accountPort.countByUserId(userId) >= MAX_ACCOUNTS_PER_USER) {
-            throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록 가능합니다");
+            throw new IllegalStateException("계좌는 최대 " + MAX_ACCOUNTS_PER_USER + "개까지 등록할 수 있습니다.");
         }
         // 전역 중복 체크 (크로스-유저, 해시 기반) — 업비트는 access key, 그 외 계좌번호
         String dedupeKey = Account.dedupeKeyOf(broker, resolvedAccountNo, appKey);
@@ -104,7 +104,7 @@ class AccountService implements AccountUseCase {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         // 수정 요청은 등록 전용 제약(@Pattern 계좌번호 등) 때문에 @Valid 없이 받는다 — 별명 필수만 여기서 확인
         if (cmd.nickname() == null || cmd.nickname().isBlank()) {
-            throw new IllegalArgumentException("계좌 별명을 입력해 주세요.");
+            throw new IllegalArgumentException("계좌 별명은 필수입니다.");
         }
         return accountPort.save(account.withNickname(cmd.nickname().strip()));
     }
@@ -148,7 +148,7 @@ class AccountService implements AccountUseCase {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
         // 미체결 주문을 먼저 정리 — 하나라도 증권사 취소에 실패하면 삭제하지 않는다(삭제된 계좌의 주문이 증권사에 남지 않도록)
         if (openOrderCancelPort.cancelOpenOrders(account) > 0) {
-            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 계좌를 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 계좌를 삭제할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
         }
         deletionWriter.delete(accountId);
         log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
@@ -191,6 +191,6 @@ class AccountService implements AccountUseCase {
             String candidate = "%08d-%02d".formatted(digits, suffix);
             if (!accountPort.existsByDedupeKey(candidate)) return candidate;
         }
-        throw new IllegalStateException("모의계좌 번호 생성 재시도 초과");
+        throw new IllegalStateException("모의계좌 번호를 생성하지 못했습니다.");
     }
 }

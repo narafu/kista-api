@@ -2122,7 +2122,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         // 시장 검증이 BootstrapPosition보다 늦으면 "정수여야" 문구가 먼저 나온다
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 dcaCommand(StrategyTicker.BTC, cryptoDcaConfig(), new BigDecimal("0.5"), new BigDecimal("100"))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("계좌와 종목의 시장이 다릅니다: BTC");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("계좌와 종목의 시장이 다릅니다.");
     }
 
     @Test
@@ -2145,7 +2145,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.BTC, dcaConfig(OrderDirection.BUY))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("MARKET");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("코인 DCA 주문유형은 시장가만");
     }
 
     @Test

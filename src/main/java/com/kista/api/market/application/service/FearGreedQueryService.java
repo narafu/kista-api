@@ -44,7 +44,7 @@ class FearGreedQueryService implements GetFearGreedUseCase {
 
     @Override
     public List<FearGreedSnapshot> getRecent(String source, int days) {
-        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일입니다: " + days);
+        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일이어야 합니다.");
         // days일 전 KST 00:00부터 현재까지 시각 범위로 조회
         Instant since = LocalDate.ofInstant(clock.instant(), TimeZones.KST).minusDays(days).atStartOfDay(TimeZones.KST).toInstant();
         if (SOURCE_CRYPTO.equals(source)) {

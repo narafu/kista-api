@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
@@ -60,17 +61,17 @@ class VrReconfigureService implements VrReconfigureUseCase {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.isVr()) {
-            throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다: " + strategyId);
+            throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다.");
         }
 
         // 현재 사이클·버전 상세·사이클 상세·최신 포지션 조회 (모두 조회 전용 — 검증을 외부 호출보다 먼저 끝내기 위해 앞으로 이동)
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         StrategyVrDetail currentDetail = strategyVrDetailPort.findByStrategyVersionId(currentCycle.strategyVersionId())
-                .orElseThrow(() -> new IllegalStateException("VR 전략 버전 상세 없음: strategyId=" + strategyId));
+                .orElseThrow(() -> new NoSuchElementException("VR 전략 버전 상세 없음: strategyId=" + strategyId));
         StrategyCycleVrDetail currentCycleVr = strategyCycleVrPort.findByCycleId(currentCycle.id())
-                .orElseThrow(() -> new IllegalStateException("VR 사이클 상세 없음: cycleId=" + currentCycle.id()));
+                .orElseThrow(() -> new NoSuchElementException("VR 사이클 상세 없음: cycleId=" + currentCycle.id()));
         CyclePosition latestPosition = cyclePositionPort.findLatestOneByStrategyId(strategyId)
-                .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: strategyId=" + strategyId));
+                .orElseThrow(() -> new NoSuchElementException("포지션 이력 없음: strategyId=" + strategyId));
 
         // 파라미터 상속 — 미지정 필드는 현재 활성 버전 값 유지
         BigDecimal bandWidth = cmd.bandWidth() != null ? cmd.bandWidth() : currentDetail.bandWidth();
@@ -97,7 +98,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
 
         // 램프 시계 — 전략 최초 사이클 startDate 기준 경과 주수 (재설정해도 리셋하지 않음)
         LocalDate firstStart = strategyCyclePort.findFirstByStrategyId(strategyId)
-                .orElseThrow(() -> new IllegalStateException("VR 최초 사이클 없음: strategyId=" + strategyId))
+                .orElseThrow(() -> new NoSuchElementException("VR 최초 사이클 없음: strategyId=" + strategyId))
                 .startDate();
         LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
         long weeks = ChronoUnit.WEEKS.between(firstStart, today);
@@ -129,27 +130,27 @@ class VrReconfigureService implements VrReconfigureUseCase {
     private AccountBalance applyCapitalAdjustment(ReconfigureVrCommand cmd, CyclePosition latestPosition) {
         int injectShares = cmd.injectShares() != null ? cmd.injectShares() : 0;
         if (injectShares < 0) {
-            throw new IllegalArgumentException("주입 주식 수(injectShares)는 0 이상이어야 합니다");
+            throw new IllegalArgumentException("주입 주식 수는 0 이상이어야 합니다.");
         }
         BigDecimal injectDeposit = cmd.injectDeposit() != null ? cmd.injectDeposit() : BigDecimal.ZERO;
         if (injectDeposit.signum() < 0) {
-            throw new IllegalArgumentException("주입 예수금(injectDeposit)은 0 이상이어야 합니다");
+            throw new IllegalArgumentException("주입 예수금은 0 이상이어야 합니다.");
         }
         int withdrawShares = cmd.withdrawShares() != null ? cmd.withdrawShares() : 0;
         if (withdrawShares < 0) {
-            throw new IllegalArgumentException("인출 주식 수(withdrawShares)는 0 이상이어야 합니다");
+            throw new IllegalArgumentException("인출 주식 수는 0 이상이어야 합니다.");
         }
         if (withdrawShares > latestPosition.toBalance().wholeShares()) {
             throw new IllegalArgumentException(
-                    "인출 주식 수(withdrawShares)는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다");
+                    "인출 주식 수는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다.");
         }
         BigDecimal withdrawDeposit = cmd.withdrawDeposit() != null ? cmd.withdrawDeposit() : BigDecimal.ZERO;
         if (withdrawDeposit.signum() < 0) {
-            throw new IllegalArgumentException("인출 예수금(withdrawDeposit)은 0 이상이어야 합니다");
+            throw new IllegalArgumentException("인출 예수금은 0 이상이어야 합니다.");
         }
         if (withdrawDeposit.compareTo(latestPosition.usdDeposit()) > 0) {
             throw new IllegalArgumentException(
-                    "인출 예수금(withdrawDeposit)은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다");
+                    "인출 예수금은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다.");
         }
 
         int holdingsAfterWithdrawal = latestPosition.toBalance().wholeShares() - withdrawShares; // VR은 주식 — 정수 수량
@@ -157,7 +158,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         BigDecimal newAvgPrice;
         if (injectShares > 0) {
             if (cmd.injectSharePrice() == null || cmd.injectSharePrice().signum() <= 0) {
-                throw new IllegalArgumentException("주식 주입 시 매수단가(injectSharePrice)는 0보다 커야 합니다");
+                throw new IllegalArgumentException("주식 주입 시 매수단가는 0보다 커야 합니다.");
             }
             BigDecimal existingCost = latestPosition.avgPrice() != null
                     ? latestPosition.avgPrice().multiply(BigDecimal.valueOf(holdingsAfterWithdrawal))

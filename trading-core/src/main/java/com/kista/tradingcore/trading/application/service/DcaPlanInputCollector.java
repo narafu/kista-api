@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import java.util.NoSuchElementException;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.OrderDirection;
@@ -80,7 +81,7 @@ class DcaPlanInputCollector {
                          List<Order> existingOrders, BigDecimal currentPrice, AccountBalance ledger) {
         Strategy strategy = ctx.strategy();
         DcaStrategyConfig config = dcaDetailPort.findActiveByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("DCA 설정이 없습니다: " + strategy.id()));
+                .orElseThrow(() -> new NoSuchElementException("DCA 설정이 없습니다: " + strategy.id()));
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = new ArrayList<>();
         Map<String, Order> recoveries = new LinkedHashMap<>();
         List<Order> todayOrders = null;          // 종결 주문 포함 당일 주문 — 처음 필요할 때 1회 조회

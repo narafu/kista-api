@@ -127,7 +127,7 @@ class AccountServiceTest {
         verify(accountPort).existsByDedupeKey("ak");
         assertThatThrownBy(() -> accountService.register(userId,
                 new RegisterAccountCommand("메리츠", null, " ", "sk", Broker.MERITZ)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다.");
     }
 
     @Test
@@ -147,7 +147,7 @@ class AccountServiceTest {
         verify(accountPort).existsByDedupeKey("ak");
         assertThatThrownBy(() -> accountService.register(userId,
                 new RegisterAccountCommand("바이낸스", null, " ", "sk", Broker.BINANCE)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다");
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("API 키와 시크릿은 필수입니다.");
     }
 
     @Test

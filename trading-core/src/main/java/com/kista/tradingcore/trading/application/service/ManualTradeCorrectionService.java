@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.application.service.support.CycleCloser;
 import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
@@ -60,9 +61,9 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         strategyCyclePort.lockForUpdate(currentCycle.id());
         rejectDuplicateFills(command, currentCycle);
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
-                .orElseThrow(() -> new IllegalStateException("최신 cycle_position이 없습니다: cycleId=" + currentCycle.id()));
+                .orElseThrow(() -> new NoSuchElementException("최신 포지션 이력이 없습니다: cycleId=" + currentCycle.id()));
         if (currentCycle.endDate() != null) {
-            throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다");
+            throw new IllegalStateException("이미 종료된 사이클은 수동 체결 보정을 지원하지 않습니다.");
         }
 
         AccountBalance balance = latest.toBalance();
@@ -87,7 +88,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
             // (VR 사이클을 닫으면 재개가 재오픈하지 않아 좀비 사이클로 영구 정지된다)
             if (!balance.hasHoldings() && endsCycleOnLiquidation) {
                 if (!isLastFill) {
-                    throw new IllegalArgumentException("청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다");
+                    throw new IllegalArgumentException("청산 이후 추가 체결은 같은 요청에서 처리할 수 없습니다.");
                 }
                 updatedStrategy = CycleCloser.closeIfExhausted(strategyCyclePort, strategyPort,
                         updatedStrategy, currentCycle, balance, fill.tradeDate()).strategy();
@@ -117,11 +118,11 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                 .toList();
         long distinctKeys = identified.stream().map(f -> f.tradeDate() + "|" + f.externalOrderId()).distinct().count();
         if (distinctKeys != identified.size()) {
-            throw new IllegalArgumentException("같은 요청에 중복된 증권사 주문번호가 있습니다");
+            throw new IllegalArgumentException("같은 요청에 중복된 증권사 주문번호가 있습니다.");
         }
         if (identified.stream().anyMatch(f -> orderPort.existsByStrategyCycleIdAndTradeDateAndExternalOrderId(
                 currentCycle.id(), f.tradeDate(), f.externalOrderId()))) {
-            throw new IllegalArgumentException("이미 반영된 증권사 주문번호가 포함돼 있습니다");
+            throw new IllegalArgumentException("이미 반영된 증권사 주문번호가 포함돼 있습니다.");
         }
     }
 
@@ -130,15 +131,15 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         boolean crypto = market.isCrypto();
         int scale = Quantities.normalize(fill.quantity()).scale();
         if (crypto ? scale > CRYPTO_SCALE : scale > 0) {
-            throw new IllegalArgumentException(crypto ? "코인 체결 수량은 소수 8자리까지 입력할 수 있습니다"
-                    : "주식 체결 수량은 정수여야 합니다");
+            throw new IllegalArgumentException(crypto ? "코인 체결 수량은 소수 8자리까지 입력할 수 있습니다."
+                    : "주식 체결 수량은 정수여야 합니다.");
         }
     }
 
     // SELL 수량이 현재 holdings를 초과하는지 검증
     private static void validateSellQuantity(ManualTradeCorrectionCommand.Fill fill, AccountBalance balance) {
         if (fill.direction() == OrderDirection.SELL && fill.quantity().compareTo(balance.holdings()) > 0) {
-            throw new IllegalArgumentException("SELL quantity가 현재 holdings를 초과합니다");
+            throw new IllegalArgumentException("매도 수량이 현재 보유 수량을 초과합니다.");
         }
     }
 

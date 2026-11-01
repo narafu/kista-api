@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.port.output;
 
+import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 
 import java.math.BigDecimal;
@@ -19,10 +20,10 @@ public interface StrategyCyclePort {
     // 전략의 현재 사이클 — deleted_at IS NULL 중 createdAt 최신 1건
     Optional<StrategyCycle> findLatestByStrategyId(UUID strategyId);
 
-    // 전략의 현재 활성 사이클 조회, 없으면 IllegalStateException(400, GlobalExceptionHandler) — 구 CycleLookups.requireLatestCycle
+    // 전략의 현재 활성 사이클 조회, 없으면 NoSuchElementException(404, GlobalExceptionHandler) — 구 CycleLookups.requireLatestCycle
     default StrategyCycle requireLatestByStrategyId(UUID strategyId) {
         return findLatestByStrategyId(strategyId)
-                .orElseThrow(() -> new IllegalStateException("활성 사이클 없음: strategyId=" + strategyId));
+                .orElseThrow(() -> new NoSuchElementException("활성 사이클 없음: strategyId=" + strategyId));
     }
 
     // 전략의 최초 사이클 — VR 첫 등록 bootstrap 판정에 사용

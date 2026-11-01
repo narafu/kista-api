@@ -183,7 +183,7 @@ class BenchmarkService implements BenchmarkUseCase {
     private record EffectiveRange(LocalDate from, LocalDate to) {
         static EffectiveRange of(LocalDate from, LocalDate to, LocalDate today) {
             if (from != null && to != null && from.isAfter(to)) {
-                throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+                throw new IllegalArgumentException("시작일은 종료일 이후일 수 없습니다.");
             }
             return new EffectiveRange(
                     from != null ? from : EARLIEST_BENCHMARK_DATE,
@@ -202,7 +202,7 @@ class BenchmarkService implements BenchmarkUseCase {
             BenchmarkScope scope, UUID strategyId, String regionCode, LocalDate from, LocalDate to) {
         validateScopeAndRange(scope, strategyId, from, to);
         if (regionCode == null || regionCode.isBlank()) {
-            throw new IllegalArgumentException("regionCode는 비어있을 수 없습니다");
+            throw new IllegalArgumentException("지역 코드는 비어 있을 수 없습니다.");
         }
     }
 
@@ -212,16 +212,16 @@ class BenchmarkService implements BenchmarkUseCase {
     private static void validateScopeAndRange(
             BenchmarkScope scope, UUID strategyId, LocalDate from, LocalDate to) {
         if (scope == null) {
-            throw new IllegalArgumentException("scope은 필수입니다");
+            throw new IllegalArgumentException("비교 범위는 필수입니다.");
         }
         if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
-            throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
+            throw new IllegalArgumentException("전략 비교에는 전략을 지정해야 합니다.");
         }
         if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
-            throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
+            throw new IllegalArgumentException("포트폴리오 비교에는 전략을 지정할 수 없습니다.");
         }
         if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+            throw new IllegalArgumentException("시작일은 종료일 이후일 수 없습니다.");
         }
     }
 

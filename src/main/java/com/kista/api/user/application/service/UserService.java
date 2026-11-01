@@ -165,7 +165,7 @@ class UserService implements UserUseCase {
                 if (approvalRequired) requireCooldownPassed(user, PENDING_REAPPLY_COOLDOWN_HOURS, now);
             }
             case REJECTED -> requireCooldownPassed(user, REJECTED_REAPPLY_COOLDOWN_HOURS, now);
-            default -> throw new IllegalStateException("재신청 불가 상태: " + user.status());
+            default -> throw new IllegalStateException("현재 상태에서는 재신청할 수 없습니다.");
         }
 
         // 승인 설정에 맞는 상태로 전환하고 기존 재신청 시각과 이벤트 흐름을 보존한다.

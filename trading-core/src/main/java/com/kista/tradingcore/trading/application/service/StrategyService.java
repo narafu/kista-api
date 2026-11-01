@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import java.util.NoSuchElementException;
 import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
 
@@ -64,7 +65,7 @@ class StrategyService implements StrategyUseCase {
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         if (cancelled.retryableFailedCount() > 0) {
-            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 전략을 삭제할 수 없습니다. 잠시 후 다시 시도해 주세요.");
+            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 전략을 삭제할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
         }
         stateWriter.delete(strategyId);
         log.info("전략 삭제: strategyId={}, requesterId={}, cancelledOrders={}", strategyId, requesterId, cancelled.cancelledCount());
@@ -119,7 +120,7 @@ class StrategyService implements StrategyUseCase {
         StrategyCycle latestCycle = strategyCyclePort.findLatestByStrategyId(strategy.id()).orElse(null);
         if (latestCycle == null || latestCycle.endDate() == null) return;
         StrategyVersion activeVersion = strategyVersionPort.findActiveByStrategyId(strategy.id())
-                .orElseThrow(() -> new IllegalStateException("활성 전략 버전이 없습니다: " + strategy.id()));
+                .orElseThrow(() -> new NoSuchElementException("활성 전략 버전이 없습니다: " + strategy.id()));
         BigDecimal closingPrice = cyclePositionPort.findLatestOneByStrategyId(strategy.id())
                 .map(CyclePosition::closingPrice)
                 .orElse(null);
@@ -167,7 +168,7 @@ class StrategyService implements StrategyUseCase {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (strategy.isVr() && cmd.newSeed() != null) {
-            throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 사용하세요");
+            throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다.");
         }
         // VR은 롤오버가 사이클 교체를 맡아 연속 사이클 정책이 NONE으로 고정된다
         if (strategy.isVr() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
@@ -191,14 +192,14 @@ class StrategyService implements StrategyUseCase {
     // 시드 수정: holdings=0 시작점에서만 허용 — strategy_cycle + 최신 cycle_position 함께 보정
     private void updateSeed(UUID strategyId, BigDecimal newSeed) {
         if (newSeed.signum() <= 0) {
-            throw new IllegalArgumentException("예수금은 0보다 커야 합니다");
+            throw new IllegalArgumentException("예수금은 0보다 커야 합니다.");
         }
         StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategyId)
-                .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
+                .orElseThrow(() -> new NoSuchElementException("포지션 이력 없음: " + strategyId));
 
         if (latest.holdings().signum() != 0) {
-            throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다");
+            throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다.");
         }
 
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);

@@ -74,16 +74,16 @@ class DcaRuleTest {
         DcaRule ok = rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("10.50"));
         assertThatCode(() -> ok.requireCompatible(Market.CRYPTO_USDT)).doesNotThrowAnyException();
         assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("10.505")).requireCompatible(Market.CRYPTO_USDT))
-                .withMessage("코인 DCA 금액은 소수 2자리까지 입력할 수 있습니다");
+                .withMessage("코인 DCA 금액은 소수 2자리까지 입력할 수 있습니다.");
         assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4.99")).requireCompatible(Market.CRYPTO_USDT))
-                .withMessage("코인 DCA 금액은 5.00 USDT 이상이어야 합니다");
+                .withMessage("코인 DCA 금액은 5.00 USDT 이상이어야 합니다.");
     }
 
     @Test
     void krwMarketKeepsUpbitMessages() {
         assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("5000.5")).requireCompatible(Market.CRYPTO_KRW))
-                .withMessage("코인 DCA 금액은 원 단위 정수여야 합니다");
+                .withMessage("코인 DCA 금액은 원 단위 정수여야 합니다.");
         assertThatIllegalArgumentException().isThrownBy(() -> rule("a", OrderDirection.BUY, OrderType.MARKET, 9, amount("4999")).requireCompatible(Market.CRYPTO_KRW))
-                .withMessage("코인 DCA 금액은 5,000원 이상이어야 합니다");
+                .withMessage("코인 DCA 금액은 5,000원 이상이어야 합니다.");
     }
 }

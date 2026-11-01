@@ -51,7 +51,7 @@ class BatchContextFactory {
                 if (owner != null && owner.broker().isCryptoExchange()) continue;
                 StrategyCycle currentCycle = cyclesById.get(strategy.id());
                 if (currentCycle == null) {
-                    throw new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id());
+                    throw new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id());
                 }
                 // 종료된 사이클 재선택 차단 — rotation 실패(잔고 조회 오류 등) 시 새 사이클 없이 종료 사이클만 남는 좀비 상태
                 if (currentCycle.endDate() != null) {

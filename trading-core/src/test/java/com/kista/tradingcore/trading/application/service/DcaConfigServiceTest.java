@@ -146,7 +146,7 @@ class DcaConfigServiceTest {
         DcaStrategyConfig crypto = dcaConfig(cryptoDcaRule(KEY, OrderDirection.BUY, "10000", 9));
 
         assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID, crypto))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("MOO 또는 MOC");
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("(MOC)만 허용");
         verify(strategyVersionPort, never()).save(any());
     }
 }

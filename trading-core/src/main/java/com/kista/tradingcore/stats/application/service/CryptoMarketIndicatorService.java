@@ -84,7 +84,7 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
     @Override
     public CryptoMarketIndicators get(int days) {
-        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일입니다: " + days);
+        if (days < 1 || days > MAX_DAYS) throw new IllegalArgumentException("조회 기간은 1~" + MAX_DAYS + "일이어야 합니다.");
         // 전부 실패한 결과는 정상 키에 두지 않고(loader가 null) 별도 키에 1분만 둔다 — 그동안은 빈 결과 재사용, 이후 재조회
         CryptoMarketIndicators[] assembled = new CryptoMarketIndicators[1];
         CryptoMarketIndicators result = cache.getOrCompute(CACHE_KEY, TTL, () -> {

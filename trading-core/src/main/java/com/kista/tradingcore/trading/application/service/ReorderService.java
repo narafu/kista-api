@@ -1,4 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
+import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
 import com.kista.shared.kernel.OrderStatus;
@@ -65,7 +66,7 @@ class ReorderService implements ReorderUseCase {
         Strategy strategy = sel.strategy();
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         Order sourceOrder = orderPort.findById(command.orderId())
-                .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new NoSuchElementException("주문을 찾을 수 없습니다."));
 
         SelectionChain.validate(command.userId(), account, strategy, sourceOrder);
         // 재주문은 주식 정수 수량 전용 — 코인 주문(소수 수량)은 관리자 재주문 대상이 아니다
@@ -73,16 +74,16 @@ class ReorderService implements ReorderUseCase {
             throw new IllegalArgumentException("코인 주문은 재주문할 수 없습니다.");
         }
         if (!sourceOrder.strategyCycleId().equals(currentCycle.id())) {
-            throw new IllegalArgumentException("현재 전략 사이클 주문만 재주문할 수 있습니다");
+            throw new IllegalArgumentException("현재 전략 사이클 주문만 재주문할 수 있습니다.");
         }
         // 미체결(PLANNED·PLACED) 원본만 — 체결·취소·실패한 주문 위에 새 주문을 얹으면 같은 주문이 중복으로 나간다(체결분 보정은 수동 체결 보정)
         if (sourceOrder.status() != OrderStatus.PLANNED && sourceOrder.status() != OrderStatus.PLACED) {
-            throw new IllegalArgumentException("미체결(PLANNED·PLACED) 주문만 재주문할 수 있습니다");
+            throw new IllegalArgumentException("미체결 주문만 재주문할 수 있습니다.");
         }
 
         // leg 없는 과거 주문(UNKNOWN)은 복사해도 슬롯을 식별할 수 없다 — 재주문 대상에서 제외
         if (Order.UNKNOWN_LEG.equals(sourceOrder.orderLeg())) {
-            throw new IllegalArgumentException("주문 구분이 없는 과거 주문은 재주문할 수 없습니다");
+            throw new IllegalArgumentException("주문 구분이 없는 과거 주문은 재주문할 수 없습니다.");
         }
 
         BigDecimal price = requirePrice(command);
@@ -94,7 +95,7 @@ class ReorderService implements ReorderUseCase {
         // 판정 시각 기준 거래일(04:30 KST 경계) — 오늘 KST 일자를 넘기면 포트가 직전 세션을 검사한다
         LocalDate currentTradeDate = DstInfo.nextTradeDate(now.atZone(TimeZones.KST));
         if (!marketCalendarPort.isMarketOpen(currentTradeDate)) {
-            throw new IllegalArgumentException("휴장일에는 재주문할 수 없습니다");
+            throw new IllegalArgumentException("휴장일에는 재주문할 수 없습니다.");
         }
         DstInfo.ReorderTimingAvailability avail = dst.reorderTimingAvailabilityAt(now);
         boolean timingOk = switch (command.timing()) {
@@ -103,12 +104,12 @@ class ReorderService implements ReorderUseCase {
             case IMMEDIATE -> avail.immediate();
         };
         if (!timingOk) {
-            throw new IllegalArgumentException("현재 시장 단계에서 " + command.timing() + " 접수가 불가합니다");
+            throw new IllegalArgumentException("현재 시장 단계에서는 이 접수 방식을 사용할 수 없습니다.");
         }
         // 시점 가용성은 현재 세션 기준이라 재주문도 현재 거래일만 — 다른 날짜면 배치가 접수하지 않거나(과거)
         // 체결 리포트가 짝을 못 찾아 PLACED로 남는다(IMMEDIATE)
         if (!tradeDate.equals(currentTradeDate)) {
-            throw new IllegalArgumentException("현재 거래일(" + currentTradeDate + ") 주문으로만 재주문할 수 있습니다");
+            throw new IllegalArgumentException("현재 거래일(" + currentTradeDate + ") 주문으로만 재주문할 수 있습니다.");
         }
 
         // 1-1. BUY는 전략 원장 상한 검증 — 원본 취소 전에 (거절 시 취소·증권사 호출 없음, 축소 없는 단건)
@@ -168,7 +169,7 @@ class ReorderService implements ReorderUseCase {
         try {
             stateWriter.cancelPlanned(order.id());
         } catch (OrderStateConflictException e) {
-            throw new IllegalArgumentException("원본 주문 상태가 바뀌었습니다. 다시 조회한 뒤 시도해 주세요");
+            throw new IllegalArgumentException("원본 주문 상태가 바뀌었습니다. 다시 조회한 뒤 시도하시기 바랍니다.");
         }
     }
 
@@ -213,14 +214,14 @@ class ReorderService implements ReorderUseCase {
 
     private static BigDecimal requirePrice(ReorderCommand command) {
         if (command.price() == null || command.price().signum() <= 0) {
-            throw new IllegalArgumentException("price는 양수여야 합니다");
+            throw new IllegalArgumentException("가격은 양수여야 합니다.");
         }
         return command.price();
     }
 
     private static int requireQuantity(ReorderCommand command) {
         if (command.quantity() == null || command.quantity() <= 0) {
-            throw new IllegalArgumentException("quantity는 양수여야 합니다");
+            throw new IllegalArgumentException("수량은 양수여야 합니다.");
         }
         return command.quantity();
     }

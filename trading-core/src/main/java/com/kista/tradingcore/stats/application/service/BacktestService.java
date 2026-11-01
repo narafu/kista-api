@@ -91,25 +91,24 @@ class BacktestService implements BacktestUseCase {
     private void validate(BacktestCommand command) {
         if (!command.type().availableTickers().contains(command.ticker())) {
             throw new IllegalArgumentException(
-                    command.type() + " 전략이 지원하지 않는 종목입니다: " + command.ticker());
+                    "이 전략이 지원하지 않는 종목입니다.");
         }
         if (command.seed() != null && command.seed().signum() < 0) {
-            throw new IllegalArgumentException("예수금(seed)은 0 이상이어야 합니다");
+            throw new IllegalArgumentException("예수금은 0 이상이어야 합니다.");
         }
         int initialHoldings = BootstrapPosition.validate(command.initialHoldings() == null ? null : BigDecimal.valueOf(command.initialHoldings()),
                 command.initialAvgPrice(), Market.US_STOCK).intValueExact(); // 백테스트는 주식 전용 — 정수 보유
         boolean hasSeed = command.seed() != null && command.seed().signum() > 0;
         if (!hasSeed && initialHoldings <= 0) {
-            throw new IllegalArgumentException("예수금(seed) 또는 기존 보유(initialHoldings·initialAvgPrice) 중 하나는 있어야 합니다");
+            throw new IllegalArgumentException("예수금 또는 기존 보유(수량·평균단가) 중 하나는 있어야 합니다.");
         }
         if (command.from().isAfter(command.to())) {
-            throw new IllegalArgumentException("시작일(from)이 종료일(to)보다 늦을 수 없습니다");
+            throw new IllegalArgumentException("시작일이 종료일보다 늦을 수 없습니다.");
         }
         if (command.type() == StrategyType.INFINITE && command.divisionCount() != null) {
             List<Integer> allowed = cycleOrderStrategies.of(StrategyType.INFINITE).availableDivisionCounts();
             if (!allowed.contains(command.divisionCount())) {
-                throw new IllegalArgumentException("지원하지 않는 분할 수(divisionCount)입니다: " + command.divisionCount()
-                        + ", 허용값=" + allowed);
+                throw new IllegalArgumentException("분할 수는 " + allowed + " 중 하나여야 합니다.");
             }
         }
         if (command.type() == StrategyType.VR) validateVr(command);
@@ -118,13 +117,13 @@ class BacktestService implements BacktestUseCase {
     // 운영 VrRegistration.resolve()와 동일 규칙 — 허용값·램프 (인출식 최소자산은 validateVrWithdrawal)
     private void validateVr(BacktestCommand command) {
         if (command.vrBandWidth() == null || command.vrBandWidth().signum() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 밴드 폭(vrBandWidth)은 0보다 커야 합니다");
+            throw new IllegalArgumentException("VR 전략의 밴드 폭은 0보다 커야 합니다.");
         }
         if (command.vrIntervalWeeks() == null || command.vrIntervalWeeks() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기(vrIntervalWeeks)는 1 이상이어야 합니다");
+            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1 이상이어야 합니다.");
         }
         if (command.vrInitialValue() != null && command.vrInitialValue().signum() < 0) {
-            throw new IllegalArgumentException("VR 백테스트의 초기 V값(vrInitialValue)은 0 이상이어야 합니다");
+            throw new IllegalArgumentException("VR 백테스트의 초기 V값은 0 이상이어야 합니다.");
         }
         validateVrAllowedValues(command);
         command.vrRamp().validate(command.vrIntervalWeeks(), command.vrBandWidth());
@@ -146,19 +145,16 @@ class BacktestService implements BacktestUseCase {
                 .orElseThrow(() -> new IllegalArgumentException("VR 전략 생성 정책이 없어 백테스트를 실행할 수 없습니다."));
         List<BigDecimal> bandWidths = settings.bandWidth().allowedValues();
         if (bandWidths.stream().noneMatch(v -> v.compareTo(command.vrBandWidth()) == 0)) {
-            throw new IllegalArgumentException("지원하지 않는 밴드 폭(vrBandWidth)입니다: " + command.vrBandWidth()
-                    + ", 허용값=" + bandWidths);
+            throw new IllegalArgumentException("밴드 폭은 " + bandWidths + " 중 하나여야 합니다.");
         }
         // 적립/거치/인출 방향도 운영 VrCreationResolver와 같은 정책 — 고정 정책이면 allowedValues=[HOLD]라 같은 비교로 막힌다
         RecurringMode mode = StrategyCreationResolver.recurringModeOf(command.vrRecurringAmount());
         if (!settings.recurringMode().allowedValues().contains(mode)) {
-            throw new IllegalArgumentException("지원하지 않는 입출금 방식(vrRecurringAmount)입니다: " + mode
-                    + ", 허용값=" + settings.recurringMode().allowedValues());
+            throw new IllegalArgumentException("지원하지 않는 입출금 방식입니다.");
         }
         List<Integer> intervals = settings.intervalWeeks().allowedValues();
         if (!intervals.contains(command.vrIntervalWeeks())) {
-            throw new IllegalArgumentException("지원하지 않는 리밸런싱 주기(vrIntervalWeeks)입니다: " + command.vrIntervalWeeks()
-                    + ", 허용값=" + intervals);
+            throw new IllegalArgumentException("리밸런싱 주기는 " + intervals + " 중 하나여야 합니다.");
         }
     }
 
@@ -208,7 +204,7 @@ class BacktestService implements BacktestUseCase {
     // 수익률 지표는 시작·끝 두 지점만으로 계산한다 — 연속 포인트 델타엔 VR 적립/인출 현금흐름이 섞여 성과로 오인된다
     private BacktestSummary summarize(BacktestEngine.Output output) {
         List<BacktestPoint> points = output.points();
-        if (points.isEmpty()) throw new IllegalStateException("백테스트 구간에 시뮬레이션 가능한 거래일이 없습니다");
+        if (points.isEmpty()) throw new IllegalStateException("백테스트 구간에 시뮬레이션 가능한 거래일이 없습니다.");
 
         BigDecimal firstAsset = points.getFirst().totalAsset();
         BigDecimal lastAsset = points.getLast().totalAsset();

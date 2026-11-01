@@ -36,7 +36,7 @@ class DcaExecutionQueryService implements DcaExecutionQuery {
     public DcaExecutionPage list(UUID strategyId, UUID requesterId, int page, int size) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다: " + strategyId);
+        if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
 
         int safePage = Math.max(page, 0);
         int safeSize = Math.clamp(size, 1, 100);

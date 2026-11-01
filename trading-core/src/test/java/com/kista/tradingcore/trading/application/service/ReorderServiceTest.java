@@ -345,7 +345,7 @@ class ReorderServiceTest {
 
         assertThatThrownBy(() -> reorder(command(OrderTiming.IMMEDIATE), NOW_AFTER_CLOSE))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("IMMEDIATE");
+                .hasMessageContaining("접수 방식");
     }
 
     @Test
@@ -355,7 +355,7 @@ class ReorderServiceTest {
         // NOW_DURING_MARKET = 정규장 중 → AT_OPEN 불가 (개장 이후)
         assertThatThrownBy(() -> reorder(command(OrderTiming.AT_OPEN), NOW_DURING_MARKET))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("AT_OPEN");
+                .hasMessageContaining("접수 방식");
     }
 
     @Test

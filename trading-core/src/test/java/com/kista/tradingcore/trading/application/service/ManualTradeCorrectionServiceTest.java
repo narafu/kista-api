@@ -132,7 +132,7 @@ class ManualTradeCorrectionServiceTest {
 
         assertThatThrownBy(() -> service.correctManualFills(command))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("SELL quantity");
+                .hasMessageContaining("매도 수량");
 
         verify(orderPort, never()).saveAll(any());
         verify(cyclePositionPort, never()).save(any());

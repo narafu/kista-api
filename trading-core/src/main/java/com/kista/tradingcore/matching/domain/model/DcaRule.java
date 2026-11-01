@@ -35,43 +35,43 @@ public record DcaRule(
         Objects.requireNonNull(sizing, "sizing");
         Objects.requireNonNull(shortfall, "shortfall");
         if (sizing.type() == DcaSizingType.HOLDING_PERCENT && direction != OrderDirection.SELL) {
-            throw new IllegalArgumentException("보유 비율 규모는 매도 규칙에서만 쓸 수 있습니다");
+            throw new IllegalArgumentException("보유 비율 규모는 매도 규칙에서만 쓸 수 있습니다.");
         }
         if (orderType != OrderType.MOO && orderType != OrderType.MOC && orderType != OrderType.MARKET) {
-            throw new IllegalArgumentException("DCA 주문유형은 MOO·MOC·MARKET만 허용합니다");
+            throw new IllegalArgumentException("DCA 주문유형은 장 시작 시장가(MOO)·장 마감 시장가(MOC)·시장가만 허용합니다.");
         }
         boolean market = orderType == OrderType.MARKET;
-        if (market != (executionHour != null)) throw new IllegalArgumentException("executionHour는 MARKET(코인) 주문에서만 필수입니다");
-        if (executionHour != null && (executionHour < 0 || executionHour > 23)) throw new IllegalArgumentException("executionHour는 0~23입니다");
+        if (market != (executionHour != null)) throw new IllegalArgumentException("실행 시각은 코인(시장가) 주문에서만 필수입니다.");
+        if (executionHour != null && (executionHour < 0 || executionHour > 23)) throw new IllegalArgumentException("실행 시각은 0~23시여야 합니다.");
         boolean weekly = frequency == DcaFrequency.WEEKLY;
         boolean monthly = frequency == DcaFrequency.MONTHLY;
-        if (weekly != (dayOfWeek != null)) throw new IllegalArgumentException("dayOfWeek는 WEEKLY에서만 필수입니다");
+        if (weekly != (dayOfWeek != null)) throw new IllegalArgumentException("요일은 매주 반복에서만 필수입니다.");
         // 코인(24/7)만 주말 요일 허용
-        if (weekly && !market && (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY)) throw new IllegalArgumentException("주말 요일은 지정할 수 없습니다");
-        if (!monthly && dayOfMonth != null) throw new IllegalArgumentException("dayOfMonth는 MONTHLY에서만 허용합니다");
-        if (dayOfMonth != null && (dayOfMonth < 1 || dayOfMonth > 31)) throw new IllegalArgumentException("dayOfMonth는 1~31입니다");
+        if (weekly && !market && (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY)) throw new IllegalArgumentException("주말 요일은 지정할 수 없습니다.");
+        if (!monthly && dayOfMonth != null) throw new IllegalArgumentException("일자는 매월 반복에서만 지정할 수 있습니다.");
+        if (dayOfMonth != null && (dayOfMonth < 1 || dayOfMonth > 31)) throw new IllegalArgumentException("일자는 1~31일이어야 합니다.");
         conditions = conditions == null ? List.of() : List.copyOf(conditions);
-        if (conditions.size() > MAX_CONDITIONS) throw new IllegalArgumentException("DCA 조건은 최대 " + MAX_CONDITIONS + "개입니다.");
+        if (conditions.size() > MAX_CONDITIONS) throw new IllegalArgumentException("DCA 조건은 최대 " + MAX_CONDITIONS + "개까지 지정할 수 있습니다.");
     }
 
     // 계좌 시장별 규칙 — 등록·수정 시 계좌 증권사 시장으로 호출한다
     public void requireCompatible(Market accountMarket) {
         if (accountMarket.isCrypto()) {
-            if (orderType != OrderType.MARKET) throw new IllegalArgumentException("코인 DCA 주문유형은 MARKET만 허용합니다");
+            if (orderType != OrderType.MARKET) throw new IllegalArgumentException("코인 DCA 주문유형은 시장가만 허용합니다.");
             if (sizing.type() == DcaSizingType.AMOUNT) {
                 BigDecimal amount = sizing.amount();
                 int scale = accountMarket.amountScale(); // 견적 통화 소수 자릿수
                 if (amount.stripTrailingZeros().scale() > scale) {
-                    throw new IllegalArgumentException(scale == 0 ? "코인 DCA 금액은 원 단위 정수여야 합니다"
-                            : "코인 DCA 금액은 소수 " + scale + "자리까지 입력할 수 있습니다");
+                    throw new IllegalArgumentException(scale == 0 ? "코인 DCA 금액은 원 단위 정수여야 합니다."
+                            : "코인 DCA 금액은 소수 " + scale + "자리까지 입력할 수 있습니다.");
                 }
                 if (amount.compareTo(accountMarket.minOrderAmount()) < 0) {
                     throw new IllegalArgumentException("코인 DCA 금액은 "
-                            + accountMarket.quoteCurrency().format(accountMarket.minOrderAmount()) + " 이상이어야 합니다");
+                            + accountMarket.quoteCurrency().format(accountMarket.minOrderAmount()) + " 이상이어야 합니다.");
                 }
             }
         } else if (orderType == OrderType.MARKET) {
-            throw new IllegalArgumentException("주식 DCA 주문유형은 MOO 또는 MOC만 허용합니다");
+            throw new IllegalArgumentException("주식 DCA 주문유형은 장 시작 시장가(MOO) 또는 장 마감 시장가(MOC)만 허용합니다.");
         }
     }
 

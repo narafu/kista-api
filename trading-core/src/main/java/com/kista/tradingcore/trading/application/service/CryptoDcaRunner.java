@@ -110,7 +110,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
                                       Map<UUID, StrategyCycle> cyclesById, Map<UUID, DcaStrategyConfig> configsById,
                                       Map<UUID, TradingUserProfile> profiles) {
         StrategyCycle cycle = cyclesById.get(strategy.id());
-        if (cycle == null) throw new IllegalStateException("활성 사이클 없음: strategyId=" + strategy.id());
+        if (cycle == null) throw new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id());
         if (cycle.endDate() != null) {
             throw new IllegalStateException("[좀비 사이클] 최신 사이클이 이미 종료됨(endDate=" + cycle.endDate()
                     + ") — 전략 확인 필요: strategyId=" + strategy.id());

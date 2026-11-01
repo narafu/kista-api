@@ -49,20 +49,20 @@ public class BenchmarkController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         // 서비스도 동일 검증을 하지만 여기서 fast-fail — 잘못된 파라미터로 서비스·DB 조회를 타지 않도록 의도적 중복
         if (scope == BenchmarkScope.STRATEGY && strategyId == null) {
-            throw new IllegalArgumentException("STRATEGY scope에는 strategyId가 필요합니다");
+            throw new IllegalArgumentException("전략 비교에는 전략을 지정해야 합니다.");
         }
         if (scope == BenchmarkScope.PORTFOLIO && strategyId != null) {
-            throw new IllegalArgumentException("PORTFOLIO scope에는 strategyId를 지정할 수 없습니다");
+            throw new IllegalArgumentException("포트폴리오 비교에는 전략을 지정할 수 없습니다.");
         }
         if (benchmarkType == BenchmarkAssetType.ETF) {
             if (symbol == null) {
-                throw new IllegalArgumentException("benchmarkType=ETF에는 symbol이 필요합니다");
+                throw new IllegalArgumentException("ETF 비교에는 심볼이 필요합니다.");
             }
             return BenchmarkComparisonResponse.from(
                     userStats.getEtfBenchmarkComparison(userId, scope, strategyId, symbol, from, to));
         }
         if (regionCode == null || regionCode.isBlank()) {
-            throw new IllegalArgumentException("regionCode는 비어있을 수 없습니다");
+            throw new IllegalArgumentException("지역 코드는 비어 있을 수 없습니다.");
         }
         return BenchmarkComparisonResponse.from(
                 userStats.getHousingBenchmarkComparison(
@@ -111,7 +111,7 @@ public class BenchmarkController {
         // 서비스도 동일 검증을 하지만 여기서 fast-fail — 잘못된 파라미터로 서비스·DB 조회를 타지 않도록 의도적 중복
         validateRange(from, to);
         if (symbol == null) {
-            throw new IllegalArgumentException("symbol이 필요합니다");
+            throw new IllegalArgumentException("심볼이 필요합니다.");
         }
         EtfPriceSeriesResponse response = EtfPriceSeriesResponse.from(userStats.getEtfPriceSeries(from, to, symbol));
         return ResponseEntity.ok().cacheControl(HOUSING_BENCHMARK_CACHE).body(response);
@@ -120,7 +120,7 @@ public class BenchmarkController {
     // from이 to 이후인 잘못된 범위 요청을 공통으로 거부 — 3개 시계열 엔드포인트가 동일 규칙 공유
     private static void validateRange(LocalDate from, LocalDate to) {
         if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("from은 to 이후일 수 없습니다");
+            throw new IllegalArgumentException("시작일은 종료일 이후일 수 없습니다.");
         }
     }
 

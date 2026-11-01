@@ -49,7 +49,7 @@ class StrategyCreationService {
     private void validateMarket(Account account, DcaStrategyConfig dca, StrategyTicker ticker) {
         Market market = account.broker().getMarket();
         if (!ticker.tradableOn(market)) {
-            throw new IllegalArgumentException("계좌와 종목의 시장이 다릅니다: " + ticker);
+            throw new IllegalArgumentException("계좌와 종목의 시장이 다릅니다.");
         }
         if (dca != null) dca.requireCompatible(market);
     }
@@ -77,7 +77,7 @@ class StrategyCreationService {
         ResolvedCreation resolved = resolveCreationSettings(cmd);
         boolean dca = cmd.type() == StrategyType.DCA;
         if (dca && cmd.dca() == null) {
-            throw new IllegalArgumentException("DCA 설정(dca)은 필수입니다");
+            throw new IllegalArgumentException("DCA 설정은 필수입니다.");
         }
         // 등록 규칙은 전부 신규 — ruleKey를 발급하고 클라이언트가 보낸 키는 400(현재 버전이 없으므로 존재하지 않는 규칙)
         DcaStrategyConfig dcaConfig = dca ? cmd.dca().withAssignedKeys(Set.of()) : null;
@@ -136,7 +136,7 @@ class StrategyCreationService {
         LocalDate today = LocalDate.now(clock);
         LocalDate scheduled = cmd.scheduledStartDate() != null ? cmd.scheduledStartDate() : today;
         if (scheduled.isBefore(today)) {
-            throw new IllegalArgumentException("시작예정일(scheduledStartDate)은 오늘 이후여야 합니다");
+            throw new IllegalArgumentException("시작예정일은 오늘 이후여야 합니다.");
         }
         return scheduled;
     }
@@ -166,9 +166,9 @@ class StrategyCreationService {
     // 전략 타입별 필드 해석은 CycleOrderStrategy와 동일한 capability 패턴(StrategyCreationResolvers)에 위임한다.
     private ResolvedCreation resolveCreationSettings(RegisterStrategyCommand cmd) {
         StrategyCreationSettings settings = strategyCreationPolicyPort.find(cmd.type())
-                .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 전략 생성 정책: " + cmd.type()));
+                .orElseThrow(() -> new IllegalArgumentException("지원하지 않는 전략 유형입니다."));
         if (!settings.enabled()) {
-            throw new IllegalArgumentException("비활성화된 전략 유형은 새로 등록할 수 없습니다: " + cmd.type());
+            throw new IllegalArgumentException("비활성화된 전략 유형은 새로 등록할 수 없습니다.");
         }
         StrategyCreationRequest request =
                 new StrategyCreationRequest(

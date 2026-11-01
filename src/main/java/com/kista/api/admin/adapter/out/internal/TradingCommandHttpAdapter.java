@@ -34,11 +34,11 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
     // trading 쪽 GlobalExceptionHandler(전역 공유)가 매핑한 상태코드를 admin 소유 표지 예외 타입으로 되돌린다 —
     // 없으면 IllegalArgumentException/IllegalStateException/NoSuchElementException/AdminBrokerCredentialException/
     // AdminBrokerRateLimitException이 admin 쪽에서 매핑되지 않는 HttpClientErrorException으로 흘러 500(catch-all)으로 뭉개진다.
-    // 추적한 실패 모드: 계좌·전략 미존재(404), 소유권 불일치·주문 미존재·시점/휴장일 검증 실패·SELL 초과(400,
+    // 추적한 실패 모드: 계좌·전략·주문 미존재(404), 소유권 불일치·시점/휴장일 검증 실패·SELL 초과(400,
     // IllegalArgumentException·IllegalStateException 모두 GlobalExceptionHandler에서 400으로 동일 매핑되므로
     // 되돌릴 때도 하나의 타입으로 합쳐도 관찰 가능한 응답이 동일), 증권사 자격증명 오류(422), 증권사 rate limit(429).
     // 각 케이스는 trading 쪽 GlobalExceptionHandler가 ProblemDetail.detail에 실은 원 메시지를 그대로
-    // 옮겨 담아 admin 운영자가 9가지 거절 사유를 구분할 수 있게 한다(고정 문구로 뭉개지 않음).
+    // 옮겨 담아 admin 운영자가 거절 사유를 구분할 수 있게 한다(고정 문구로 뭉개지 않음).
     @Override
     public ReorderResponse reorder(ReorderRequest command) {
         // 404/400은 공용 팩토리(InternalApiStatusHandlers)로 위임, 422/429는 admin 전용 표지 예외라 그대로 유지
@@ -91,7 +91,7 @@ class TradingCommandHttpAdapter implements TradingCommandPort {
                         .queryParamIfPresent("tradeDate", java.util.Optional.ofNullable(tradeDate))
                         .build())
                 .retrieve();
-        // 계좌 미존재(404)·주문 미존재(400)를 도메인 예외로 되살려 500 catch-all 대신 4xx로 응답
+        // 계좌·주문 미존재(404)를 도메인 예외로 되살려 500 catch-all 대신 4xx로 응답
         spec = InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "계좌를 찾을 수 없습니다");
         return InternalApiStatusHandlers.badRequestAsIllegalArgument(spec, "재주문 예산 조회 요청이 유효하지 않습니다")
                 .body(ReorderBuyBudgetResponse.class);
