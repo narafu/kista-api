@@ -45,12 +45,13 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `marketcalendar/domain/model/MarketSessionSnapshot.java:16`
   - `trading/domain/model/DstInfo.java:15`
   - `stats/adapter/out/alpaca/AlpacaCandleAdapter.java:30` (이름은 `NEW_YORK`)
-- 기준 패턴: `shared/platform/time/TimeZones.KST`. 그 클래스 주석이 "`ZoneId.of("Asia/Seoul")` 인라인 반복 금지"다. `TimeZones.NY`를 추가해 4곳이 참조하게 한다.
+  - 루트 `api/benchmark/adapter/out/alpaca/AlpacaIndexPriceAdapter.java:23` (`NEW_YORK`, 착수 시 추가 발견)
+- 기준 패턴: `shared/kernel/TimeZones.KST`(감사 시 경로 오기 정정). 그 클래스 주석이 "`ZoneId.of("Asia/Seoul")` 인라인 반복 금지"다. `TimeZones.NY`를 추가해 5곳이 참조하게 한다.
 - 근거: `grep 'ZoneId.of("America/New_York")'` 결과 4건/4파일. `TimeZones`에는 KST만 있다.
 - 예상 효과: 시간대 상수의 SSOT를 일원화하고, 신규 코드에서 같은 인라인이 반복되지 않게 막는다.
 - 위험: 낮음. 상수만 치환하고 값은 같다.
-- 가드(ArchUnit 초안, 루트 `HexagonalArchitectureTest`에 `usTradeDates_must_only_be_used_by_allowlisted_adapters`와 나란히 둔다): `noClasses().that().doNotHaveFullyQualifiedName("com.kista.shared.platform.time.TimeZones").should().callMethod(ZoneId.class, "of", String.class)`.
-- 상태: open.
+- 가드(ArchUnit 초안, 루트 `HexagonalArchitectureTest`에 `usTradeDates_must_only_be_used_by_allowlisted_adapters`와 나란히 둔다): `noClasses().that().doNotHaveFullyQualifiedName("com.kista.shared.kernel.TimeZones").should().callMethod(ZoneId.class, "of", String.class)`.
+- 상태: done(5e1b51443). 가드 `zoneId_of_must_only_be_called_in_TimeZones`는 테스트의 동적 zone 파싱 때문에 main 클래스만 대상이다.
 
 ### CQ-02 application 서비스가 TradingErrorReportPort를 직접 호출
 - 주제: 이벤트·관리자 알림. 유형: 비일관성.
@@ -63,7 +64,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: application 계층 알림 방식을 하나로 통일한다.
 - 위험: 낮음. 도착지와 메시지가 같다.
 - 가드(ArchUnit 초안): `noClasses().that().resideInAPackage("..application.service..").and().doNotHaveSimpleName("TradingErrorReporter").should().dependOnClassesThat().haveSimpleName("TradingErrorReportPort")`.
-- 상태: open.
+- 상태: done(5e1b51443). 가드 `application_services_must_not_use_TradingErrorReportPort`.
 
 ### CQ-03 전략 타입 술어로 capability를 우회하는 분기
 - 주제: 전략 타입별 분기. 유형: 비일관성·OOP(capability 대체).
@@ -93,7 +94,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 조회 범위 경계 규칙을 일원화한다.
 - 위험: 낮음.
 - 가드(`constraints.md` "시간 기준 정책"에 추가할 문장 초안): "KST 일자 구간을 Instant로 바꿀 때는 `<헬퍼>`를 쓴다. `plusDays(1).atStartOfDay(...)`를 인라인하지 않는다."
-- 상태: open.
+- 상태: done(5e1b51443). 헬퍼는 `shared/kernel/KstDays.endExclusive`에 뒀다(platform은 kernel의 `TimeZones`를 참조할 수 없음 — `platform_must_not_depend_on_other_modules`). null 기본값은 호출부에 남겼다(CQ-17 Clock 주입과 충돌 방지).
 
 ### CQ-05 사용자 경로 예외 문구 형식 미준수
 - 주제: 입력 검증·예외 문구. 유형: 비일관성.
@@ -177,7 +178,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 보일러플레이트 제거.
 - 위험: 낮음.
 - 가드: 없음(단발).
-- 상태: open. 파일을 건드리면 즉시 수정한다.
+- 상태: done(5e1b51443).
 
 ### CQ-09 소유권 검증의 `verifyOwnedBy` 직접 호출 1곳
 - 주제: 소유권 검증. 유형: 비일관성.
@@ -187,7 +188,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 검증 경로 일원화.
 - 위험: 낮음.
 - 가드: 없음(단발).
-- 상태: open.
+- 상태: done(5e1b51443).
 
 ### CQ-10 `MeritzPriceApi` 다중 티커 루프 4벌
 - 주제: 브로커 어댑터 중복. 유형: 보일러플레이트.
@@ -197,7 +198,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 보일러플레이트 제거.
 - 위험: 낮음.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(5e1b51443).
 
 ### CQ-11 같은 입력 검증의 다중 정의·이중 검증
 - 주제: 입력 검증. 유형: 중복.
@@ -318,7 +319,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 보일러플레이트 제거.
 - 위험: 낮음.
 - 가드: 없음.
-- 상태: open. 파일을 건드리면 즉시 수정한다.
+- 상태: done(5e1b51443).
 
 ### CQ-19 예외 로그의 스택 포함 여부 혼재
 - 주제: 로깅 형식. 유형: 비일관성.
