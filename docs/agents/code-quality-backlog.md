@@ -21,7 +21,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 
 ## 의심 (확인 필요, 코드 수정 전 먼저 확인)
 
-### CQ-00 PRIVACY 상세의 currentRound가 항상 0.0
+### CQ-00 PRIVACY 상세의 currentRound가 항상 0.0 (null이 맞음, 확정)
 - 주제: 매핑·기본값. 유형: 비일관성(버그 의심).
 - 위치:
   - `trading/application/service/StrategyDetailAssembler.java:168-172` ✔. 주석은 "INFINITE·PRIVACY만 계산"인데, `divisionCount == null ? 0 : divisionCount`로 넘긴다.
@@ -29,10 +29,11 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `matching/domain/model/InfinitePosition.java:60` ✔. `if (divisionCount == 0 ...) return 0.0`.
 - 근거: PRIVACY 전략은 위 경로로 currentRound가 무조건 0.0이 된다. 다른 경로의 기본값은 `StrategyDefaults.DEFAULT_DIVISION_COUNT = 20`이다(`shared/.../StrategyDefaults.java:8`, `CyclePositionPersistor.java:86` 등의 `.orElse(DEFAULT_DIVISION_COUNT)`).
 - 확정(사용자, 2026-11-01): divisionCount를 INFINITE에만 채우는 것은 맞다. 이 부분은 수정 대상이 아니다.
-- 남은 확인: PRIVACY의 currentRound를 0.0으로 내리는 것이 의도인가? 의도가 아니라면 VR·DCA처럼 null로 내려야 하는가? 어느 쪽이든 `:168` 주석("INFINITE·PRIVACY만 계산")은 실제 동작과 다르다.
-- 예상 효과: 표시값 정정, 또는 주석 정정.
-- 위험: 높음. `currentRound` 공식(`trading-formulas.md`)에 닿고, 사용자 화면 값이 바뀐다.
-- 가드: 결론이 나면 `StrategyDetailAssembler` 단위 테스트에 PRIVACY currentRound 단언을 추가한다.
+- 확정(사용자, 2026-11-01): PRIVACY의 currentRound는 VR·DCA처럼 null로 내린다. 회차 개념은 INFINITE 전용이다.
+- 수정안: `StrategyDetailAssembler.java:169`의 조건 `strategy.isVr() || strategy.isDca()`를 `!strategy.isInfinite()`로 바꾸고, `:168` 주석을 "INFINITE만 계산"으로 고친다.
+- 예상 효과: PRIVACY 상세 currentRound가 0.0에서 null로 바뀐다(화면 값 변경).
+- 위험: 중간. 공식 계산은 바뀌지 않고 표시만 바뀐다. kista-ui가 PRIVACY에서 currentRound를 null로 받아도 깨지지 않는지 확인해야 한다(VR·DCA가 이미 null이라 처리 경로는 있을 가능성이 높으나 미확인).
+- 가드: `StrategyDetailAssembler` 단위 테스트에 "INFINITE 외 타입은 currentRound가 null" 단언을 추가한다.
 - 상태: open.
 
 ## 항목 (효과 대 위험 순, 가드를 먼저 넣으면 재발이 멈추는 항목이 위)
