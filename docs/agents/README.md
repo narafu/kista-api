@@ -9,7 +9,7 @@ Root entrypoints stay tool-specific:
 
 When adding long-lived project rules, prefer this directory over tool-specific files. Put only bootstrap instructions and tool-specific behavior in the root entrypoint files.
 
-Contents: `commands.md`, `local-dev.md`, `architecture.md`, `constraints.md`, `testing.md`, `flyway.md`, `workflow.md`, `kis-api.md`, `toss-api.md`, `meritz-api.md`, `binance-api.md`, `docker-infra.md`, `scheduler-time-table.md`, `own-type-ledger.md`, `docs/history/modulith-migration-history.md` (history, not auto-loaded), `modules/<api|shared|tradingcore>/<module>.md` (per-module details).
+Contents: `commands.md`, `local-dev.md`, `architecture.md`, `constraints.md`, `testing.md`, `flyway.md`, `workflow.md`, `kis-api.md`, `toss-api.md`, `meritz-api.md`, `binance-api.md`, `docker-infra.md`, `scheduler-time-table.md`, `own-type-ledger.md`, `docs/history/modulith-migration-history.md` (history, not auto-loaded), `modules/tradingcore/dca.md`, `modules/tradingcore/trading-testing.md`, `modules/<api|shared|tradingcore>/<module>.md` (per-module details).
 
 ## Plan/spec documents (`docs/superpowers`)
 

@@ -2,4 +2,4 @@
 
 `com.kista.api.benchmark` 작업 시 필수 문서 (아래 import로 자동 로드):
 
-@../../../../../../docs/agents/modules/api/benchmark.md
+@../../../../../../../docs/agents/modules/api/benchmark.md

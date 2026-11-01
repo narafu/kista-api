@@ -3,4 +3,3 @@
 `com.kista.tradingcore.matching` 작업 시 필수 문서 (아래 import로 자동 로드):
 
 @../../../../../../../../docs/agents/modules/tradingcore/matching.md
-@../../../../../../../../docs/agents/modules/tradingcore/matching.md

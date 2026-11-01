@@ -34,7 +34,7 @@ com.kista.tradingcore.broker/    ← Spring Modulith 모듈(CLOSED) — KIS/Toss
 - Toss: 매수는 캡가(지정가) 기준으로 보정하고, 매도는 0.01 규칙을 적용한다.
 
 ### 업비트 코인 DCA 지원
-- `UpbitExchangeAdapter.getCompletedDailyCandles(ticker, count)`: count 1~400, 한 번에 최대 200봉이라 `to` 파라미터로 페이징하며 미완성(오늘) 봉은 제외한다. 주문은 identifier=주문 UUID로 멱등 전송하고 체결 조회는 `executedVolume`을 기준으로 삼는다(→ trading.md "코인 DCA 실행").
+- `UpbitExchangeAdapter.getCompletedDailyCandles(ticker, count)`: count 1~400, 한 번에 최대 200봉이라 `to` 파라미터로 페이징하며 미완성(오늘) 봉은 제외한다. 주문은 identifier=주문 UUID로 멱등 전송하고 체결 조회는 `executedVolume`을 기준으로 삼는다(→ dca.md "코인 DCA 실행").
 - 김프 시세(KRW-USDT·코인 KRW 현재가/일봉)는 stats `UpbitMarketDataAdapter`(무인증 공개 시세)로 이전 — 업비트 거래를 제거해도 남는다.
 
 ### KIS 계좌번호 DB 저장 방식

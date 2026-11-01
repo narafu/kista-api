@@ -8,7 +8,7 @@
 - ArchUnit `failOnEmptyShould=true`(양 프로젝트 test resources) — 규칙 대상이 비면 실패한다
 
 ### 매매·전략 테스트 패턴
-- 매매 테스트 패턴 → `modules/tradingcore/trading.md` "테스트 패턴", 매칭 커널 → `modules/tradingcore/matching.md` "테스트 패턴"
+- 매매 테스트 패턴 → `modules/tradingcore/trading-testing.md`, 매칭 커널 → `modules/tradingcore/matching.md` "테스트 패턴"
 
 ### @WebMvcTest + Spring Security 패턴
 - `@WebMvcTest` 슬라이스는 커스텀 `SecurityConfig`를 로드하지 않고 Boot 기본 Security가 적용된다. POST는 `.with(csrf())` 필수(없으면 403)
