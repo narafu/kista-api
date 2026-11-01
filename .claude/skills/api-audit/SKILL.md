@@ -31,7 +31,7 @@ user-invocable: true
 
 | # | 관점 | 기준 문서 / 확인 방법 |
 |---|---|---|
-| 1 | 주문안전 | `constraints.md` "@Transactional 내부 외부 시스템 호출 금지"·"Virtual Thread" 절, `docs/agents/workflow.md`(재기동 종료·재개, 예산 배정). 트랜잭션 안 증권사·텔레그램 호출, 트랜잭션 없는 발행 지점의 `AFTER_COMMIT` 리스너(이벤트 유실), `TradingBatchResumer` 재개·재시도 시 같은 거래일 중복 주문 가능성, 예산·예약량 판정 전 접수, `@Async`/`CompletableFuture` |
+| 1 | 주문안전 | `constraints.md` "@Transactional 내부 외부 시스템 호출 금지"·"Virtual Thread" 절, `docs/agents/workflow-batch.md`(재기동 종료·재개)·`docs/agents/workflow-ledger-price.md`(예산 배정). 트랜잭션 안 증권사·텔레그램 호출, 트랜잭션 없는 발행 지점의 `AFTER_COMMIT` 리스너(이벤트 유실), `TradingBatchResumer` 재개·재시도 시 같은 거래일 중복 주문 가능성, 예산·예약량 판정 전 접수, `@Async`/`CompletableFuture` |
 | 2 | 조용한실패 | `own-type-ledger.md` "복제본·제3자 구현 설계 규칙"의 복제본 필수 조건(빈 결과 실패 양상 3종). 빈 Optional·빈 리스트를 정상 응답으로 흘려 기능이 멈추는 경로, catch 후 로그·`errorReportPort`·`TradingErrorEvent` 없이 삼키는 경로, 배치에서 한 계좌 실패가 다른 계좌를 멈추는지, 알림이 조건 미충족으로 무음 skip되는 경로 |
 | 3 | 보안 | `constraints.md` "계좌번호 마스킹"·"상태 종속 민감 필드 마스킹"·"AES-256 암호화 위치"·"보안·필터" 절, `architecture.md` "소유권 검증 패턴". `requireOwnedAccount`/전략 accountId 대조 누락, `@AuthenticationPrincipal UUID` 외 userId 추출, 마스킹 우회, 로그·예외 메시지에 시크릿·계좌번호 노출 |
 | 4 | 영속성 | `constraints.md` "Flyway"·"소프트 삭제"·"Java Enum ↔ DB 컬럼 매핑"·"AES-256 암호화 컬럼 크기" 절, `architecture.md` DB 스키마 5분리. Entity `nullable`과 마이그레이션 NOT NULL 대조(validate가 못 잡음), nativeQuery·JdbcTemplate의 `deleted_at IS NULL` 누락, `@Table(schema)` 누락, 다른 서비스 소유 스키마 참조 |

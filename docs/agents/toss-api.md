@@ -6,7 +6,14 @@
 
 ### 어댑터 구조
 
-클래스 구성·구현 포트는 `modules/tradingcore/broker.md`의 `adapter/out/toss` 항목. `TossHttpClient`는 package-private 공통 헤더 처리이고 `TossConfig`의 `tossRestClient` 빈을 쓴다.
+클래스 구성(아래). `TossHttpClient`는 package-private 공통 헤더 처리이고 `TossConfig`의 `tossRestClient` 빈을 쓴다.
+
+- 구성: adapter/out/toss/   ← TossHttpClient/TossConfig/TossAuthApi/TossCandleApi/TossHoldingsApi/TossOrderApi/TossPriceApi/TossResponseParser/TossResult/UsdKrwRateCache
+- TossDistributedTokenCoordinator + TossRedisTokenStore(계좌·관리자 Redis canonical token; TTL owner lease+원자적 generation INCR; generation counter/canonical generation 비교 Lua fencing CAS; owner-safe unlock; SHA-256 최근 발급 fingerprint 2초 TTL) — 관리자 토큰은 Account가 없어 TokenCoordinator 범위 밖 별도 public 메서드(TossTokenStore)
+- TossAdminPriceSource(관리자 시세 1단계 — TossPriceApi의 대체값 없는 package-private 변형 사용)
+- TossBrokerAdapter(공통 6개 + 통계 5개 Port 구현 — Toss 응답 record를 벤더 중립 타입으로 변환해 노출)
+- DCA 일봉 조회: `CandlePort.getDailyCandlesBefore(symbol, beforeUsSession, count)`: DCA 지표용 일봉 조회(Toss `TossCandleApi` 구현). 200봉 단위로 페이징하며 다음 페이지 `before`는 직전 페이지 가장 오래된 봉 날짜 00:00 UTC이고, 날짜 기준으로 중복을 제거한다. 이 경로만 `adjusted=true`(분할·배당 조정)를 보낸다.
+- DCA 주문 가격: Toss: 매수는 캡가(지정가) 기준으로 보정하고, 매도는 0.01 규칙을 적용한다.
 
 ### 계좌번호 포맷
 
@@ -41,7 +48,7 @@
 
 ### 주문 멱등키 (clientOrderId)
 - `TossOrderApi.place`는 `OrderInstruction.clientOrderId`(= `orders.id` UUID 문자열, 36자 — 허용 패턴 `^[a-zA-Z0-9\-_]+$`·최대 36자 안)를 body에 싣는다. 공식 스펙(`OrderCreateRequest.clientOrderId`·FAQ): 10분 내 같은 키·같은 내용 재요청은 원 주문 결과를 재반환, 원 요청 처리 중이면 409 `request-in-progress`(결과 불명으로 분류), 내용이 다르면 422 `idempotency-key-conflict`. 10분이 지나면 같은 키도 새 주문이다
-- 주문 목록·상세 응답(`Order` 스키마)에는 `clientOrderId`가 없어 사후 조회가 안 된다 — 잔류 SUBMITTING 대사(`OrderSubmissionReconciler`)는 선점 후 2~9분 창에서만 같은 키 재요청으로 원 주문번호를 회수한다(workflow.md "PLANNED 상태 전이 경합")
+- 주문 목록·상세 응답(`Order` 스키마)에는 `clientOrderId`가 없어 사후 조회가 안 된다 — 잔류 SUBMITTING 대사(`OrderSubmissionReconciler`)는 선점 후 2~9분 창에서만 같은 키 재요청으로 원 주문번호를 회수한다(workflow-orders.md "PLANNED 상태 전이 경합")
 - 2026-10-17 실계좌 실측: 같은 키·같은 내용 재요청 → 같은 `orderId` 재반환(200), 같은 키·다른 내용 → 422 `idempotency-key-conflict`(본문 gzip). 409 `request-in-progress`는 공식 openapi.json 응답 예시로 확인
 
 ### 가격 조회 API 3분리 — TossPriceApi
@@ -54,7 +61,7 @@ Toss는 현재가(`/api/v1/prices`)와 전일종가(캔들 API)가 **완전히 �
 
 **소비처 선택 기준**: 실제 주문가 예측/계산(전략 생성 기준가, 다음 주문 미리보기, 매매 실행 시작가)은 `getPrevClose(s)`만 필요 — `getPriceSnapshot`을 쓰면 쓰지도 않는 현재가 API 호출이 낭비된다.
 
-**관리자 시세 1단계(`TossAdminPriceSource`)**: 계좌 브로커와 무관하게 모든 현재가·전일종가·확정 종가 조회의 첫 단계다(`BrokerRouter` 경유)(`workflow.md` "시세 출처"). 위 public 메서드 대신 대체값 없는 package-private 변형을 쓴다 — `fetchPricesPartial`(응답에 있는 종목만, 누락 시 예외 없음), `fetchPrevCloseCached` 성공분만(현재가 폴백 없음), `fetchConfirmedClose` 성공분만(라이브가 폴백 없음). 빠진 종목은 KIS 관리자 → 계좌 순으로 넘어간다. 기존 public 메서드(MOCK·Toss 어댑터 경로)의 예외·폴백 동작은 그대로다. 캔들 실패(empty)도 `prevCloseCache` 버킷에 캐시되므로 그 버킷 동안은 1단계 전일종가가 계속 누락으로 처리된다
+**관리자 시세 1단계(`TossAdminPriceSource`)**: 계좌 브로커와 무관하게 모든 현재가·전일종가·확정 종가 조회의 첫 단계다(`BrokerRouter` 경유)(`workflow-ledger-price.md` "시세 출처"). 위 public 메서드 대신 대체값 없는 package-private 변형을 쓴다 — `fetchPricesPartial`(응답에 있는 종목만, 누락 시 예외 없음), `fetchPrevCloseCached` 성공분만(현재가 폴백 없음), `fetchConfirmedClose` 성공분만(라이브가 폴백 없음). 빠진 종목은 KIS 관리자 → 계좌 순으로 넘어간다. 기존 public 메서드(MOCK·Toss 어댑터 경로)의 예외·폴백 동작은 그대로다. 캔들 실패(empty)도 `prevCloseCache` 버킷에 캐시되므로 그 버킷 동안은 1단계 전일종가가 계속 누락으로 처리된다
 
 ### 전일종가(prevClose) 조회 상세 — TossPriceApi.fetchPrevCloseCached()
 

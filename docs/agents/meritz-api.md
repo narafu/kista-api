@@ -2,6 +2,12 @@
 
 2026-10-23 운영 서버 조회 전용 실측 기준. 구현은 `com.kista.tradingcore.broker.adapter.out.meritz`(벤더 모델 `domain.model.meritz`, internal). 모의 서버가 없어 `Broker.MERITZ`는 관리자 설정에서 **기본 비활성**이다.
 
+### 어댑터 구조
+
+`com.kista.tradingcore.broker.adapter.out.meritz` 구성:
+
+adapter/out/meritz/ ← MeritzHttpClient(본문 `rsp_cd` 기반 응답 판정 — HTTP 500도 본문 파싱, 토큰 거절 `EGW00121`/`EGW00123` 1회 재발급·재시도, GET만 한도 백오프, 앱키별 호출 간격 게이트)/MeritzAuthApi(`BrokerConnectionTestPort`·토큰 발급, 만료는 `expires_date` 기준)/MeritzPriceApi/MeritzTradingApi/MeritzOrderApi(주문·취소, 경고 `warn_cls_code` 1/3은 `warn_cnfr_yn=Y` 1회 재전송, 취소는 당일 주문체결내역에서 원주문 조회)/MeritzExchangeRegistry/MeritzConfig/MeritzBrokerAdapter(공통 6개 Port) — 계좌번호 없음(앱키가 계좌 식별), 상세 → `docs/agents/meritz-api.md`
+
 ### 기본 사실
 - Base `https://openapi.imeritz.com:9443`(`meritz.base-url`, trading-core `application.yml`). 모든 요청 헤더 `authorization: Bearer <token>` + `mac_address`(고정 상수 `0242AC110002`, 값 검증 없음).
 - 계좌번호가 없다: 앱키에 계좌 1개가 묶이며 요청에 `acno`·`asno`·`acnt_pwd`를 넣으면 실패한다. UPBIT처럼 `accountNo=null`, appKey가 식별자(`Account.dedupeKeyOf`)다.

@@ -5,6 +5,12 @@
 
 KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 kista 코드베이스에 특화된 패턴과 운영 중 발견된 주의사항만 기록.
 
+### 어댑터 구조
+
+`com.kista.tradingcore.broker.adapter.out.kis` 구성:
+
+adapter/out/kis/    ← KisHttpClient(공통 헤더 + executeWithRetry: 401 시 거절된 토큰을 조건부 무효화 후 최신 토큰으로 1회 재시도)/KisAuthApi/KisOrderApi/KisPriceApi/KisTradingApi/KisResponseParser/KisExchangeRegistry/KisConfig/KisBrokerAdapter + KisAdminPriceSource(관리자 시세 2단계, `kis.admin-app-key` 미설정 시 비활성)/KisAdminTokenCoordinator(관리자 토큰 Redis `kis:admin:token:<sha256(appKey) 앞 8자>` + JVM 메모리 폴백 — nil UUID id로 `KisAuthApi`가 분기, `TokenCoordinator` 미구현)
+
 ### 토큰·인증
 
 - 모든 KIS 호출은 `KisHttpClient` 경유 (공통 헤더: `authorization`, `appkey`, `appsecret`, `tr_id`, `custtype: P`)
@@ -95,3 +101,7 @@ KIS API 파라미터·응답 필드·TR ID는 공식 문서가 SSOT. 아래는 k
 - 응답 stream에서 enum 외 종목 제거: `.flatMap(o -> StrategyTicker.tryParse(o.pdno()).map(t -> new Foo(t, ...)).stream())`
 - `StrategyTicker.tryParse`가 empty인 항목은 자동 제외(silent drop)
 
+### KIS 계좌번호 DB 저장 방식
+- 계좌번호는 `accounts.account_no`(AES-256 암호화) + `accounts.broker_account_code`(KIS: null, TOSS: accountSeq)에 저장한다
+- KIS API 호출은 `KisHttpClient.splitAccountNo(account.accountNo())` → `[CANO, ACNT_PRDT_CD]` — `-` 기준으로 나누고, 구분자가 없으면 `ACNT_PRDT_CD="01"` 기본값
+- `"74420614-01"` 형태로 저장돼 있으면 `["74420614","01"]`, `"74420614"` 8자리만 저장돼 있으면 기본 `"01"`을 쓴다

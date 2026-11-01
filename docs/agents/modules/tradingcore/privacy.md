@@ -16,4 +16,4 @@ com.kista.tradingcore.privacy/   ← Spring Modulith 모듈(CLOSED) — FIDA 기
   - direction/orderType은 `sharedkernel.OrderDirection`{BUY/SELL} / `OrderType`{LOC/MOC/LIMIT} — VARCHAR + `@Enumerated(STRING)`
   - 저장 순서: **BUY → SELL**, BUY는 price **내림차순**, SELL은 price **오름차순** — `PrivacyTradePersistenceAdapter` 정렬 처리
 - FIDA 수신 흐름: `(tradeDate, ticker)` 없음 → 201 / 내용 동일 → 200(멱등) / 내용 다름 → `PrivacyTradeConflictException` → 409
-- 스케쥴러: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.plan()` → `PrivacyStrategy.buildOrders(balance, initialUsdDeposit, PrivacyPlan)` (`CycleOrderComputer`가 전략별 분기, 스케쥴러 배치 흐름 상세는 `docs/agents/workflow.md`)
+- 스케쥴러: `StrategyType.PRIVACY` → `PrivacyCycleOrderStrategy.plan()` → `PrivacyStrategy.buildOrders(balance, initialUsdDeposit, PrivacyPlan)` (`CycleOrderComputer`가 전략별 분기, 스케쥴러 배치 흐름 상세는 `docs/agents/workflow-batch.md`)
