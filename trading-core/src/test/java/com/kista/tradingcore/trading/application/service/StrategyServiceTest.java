@@ -1638,6 +1638,7 @@ class StrategyServiceTest {
         assertThat(single.currentRound()).isNull(); // 회차는 INFINITE 전용 — 보유 이력이 있어도 PRIVACY는 null
         assertThat(single.vr()).isNull();
         assertThat(single.cycleInProgress()).isTrue(); // 최신 사이클 endDate=null
+        assertThat(single.ledgerUsdDeposit()).isEqualByComparingTo("1500.00"); // 최신 포지션 장부 예수금
     }
 
     @Test
@@ -1668,6 +1669,7 @@ class StrategyServiceTest {
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.cycleInProgress()).isFalse();
+        assertThat(single.ledgerUsdDeposit()).isNull(); // 종료 사이클 + 포지션 stub 없음
     }
 
     @Test
@@ -1700,6 +1702,7 @@ class StrategyServiceTest {
         assertThat(single.currentRound()).isNull();
         assertThat(single.currentHoldings()).isNull();
         assertThat(single.cycleInProgress()).isFalse(); // 사이클 없음
+        assertThat(single.ledgerUsdDeposit()).isNull(); // 포지션 없음
     }
 
     @Test

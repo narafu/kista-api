@@ -33,6 +33,8 @@ import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
+import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
+import com.kista.tradingcore.trading.domain.model.WithdrawCapitalCommand;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
 import com.kista.tradingcore.trading.domain.model.InjectCapitalCommand;
 import com.kista.tradingcore.trading.domain.model.VrSummary;
@@ -81,6 +83,7 @@ class TradingCycleControllerTest {
     @MockitoBean TradingExecutionUseCase tradingExecution;
     @MockitoBean VrReconfigureUseCase vrReconfigure;
     @MockitoBean InjectCapitalUseCase injectCapital;
+    @MockitoBean WithdrawCapitalUseCase withdrawCapital;
     @MockitoBean DcaConfigUseCase dcaConfig;
     @MockitoBean DcaExecutionQuery dcaExecutionQuery;
 
@@ -217,7 +220,7 @@ class TradingCycleControllerTest {
     void update_withSeed_returns200WithUpdatedInitialUsdDeposit() throws Exception {
         Strategy strategy = new Strategy(CYCLE_ID, UUID.randomUUID(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), LocalDate.now(), 20, false, null, 0, null, null, true);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("5000.00"), LocalDate.now(), 20, false, null, 0, null, null, true, null);
         when(tradingCycle.update(eq(CYCLE_ID), any(), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}", CYCLE_ID)
@@ -253,7 +256,7 @@ class TradingCycleControllerTest {
                         com.kista.shared.kernel.StrategyStatus.ACTIVE,
                         com.kista.shared.kernel.StrategyTicker.SOXL,
                         com.kista.shared.kernel.StrategyCycleSeedType.NONE),
-                new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, true);
+                new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, true, null);
         when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
 
         mockMvc.perform(get("/api/trading-cycles").with(authentication(userToken(USER_ID))))
@@ -341,7 +344,7 @@ class TradingCycleControllerTest {
                 new BigDecimal("1000.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 10,
                 10, 52, 26, 10,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.75"));
-        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary, null, true);
+        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary, null, true, null);
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
@@ -371,7 +374,7 @@ class TradingCycleControllerTest {
     void register_omittedDivisionCount_passesRuntimeDefaultSentinel() throws Exception {
         Strategy strategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.now(), 30, false, 0.0, 0, null, null, true);
+        StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.now(), 30, false, 0.0, 0, null, null, true, null);
         when(tradingCycle.register(any(), eq(ACCOUNT_ID), any())).thenReturn(detail);
 
         mockMvc.perform(post("/api/accounts/{accountId}/trading-cycles", ACCOUNT_ID)
@@ -397,7 +400,7 @@ class TradingCycleControllerTest {
                 new BigDecimal("1500.00"), new BigDecimal("2000.00"), new BigDecimal("0.75"), 12,
                 12, 52, 26, 20,
                 new BigDecimal("0.75"), 52, 26, new BigDecimal("0.50"));
-        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary, null, true);
+        StrategyDetail detail = new StrategyDetail(vrStrategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, vrSummary, null, true, null);
         when(tradingCycle.getById(eq(CYCLE_ID), any())).thenReturn(detail);
 
         mockMvc.perform(put("/api/trading-cycles/{id}/vr-config", CYCLE_ID)
@@ -441,7 +444,7 @@ class TradingCycleControllerTest {
         Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(tradingCycle.getById(eq(CYCLE_ID), any())).thenReturn(
-                new StrategyDetail(strategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, null, null, true));
+                new StrategyDetail(strategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, null, null, true, null));
 
         mockMvc.perform(post("/api/trading-cycles/{id}/capital-injection", CYCLE_ID)
                         .with(csrf()).with(authentication(userToken(USER_ID)))
@@ -460,6 +463,49 @@ class TradingCycleControllerTest {
                         .content("{\"depositAmount\": -1}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(injectCapital);
+    }
+
+    @Test
+    void withdrawCapital_success_returns200() throws Exception {
+        Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(tradingCycle.getById(eq(CYCLE_ID), any())).thenReturn(
+                new StrategyDetail(strategy, new BigDecimal("1500"), LocalDate.now(), 20, false, null, 0, null, null, true, new BigDecimal("1000.00")));
+
+        mockMvc.perform(post("/api/trading-cycles/{id}/capital-withdrawal", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\": 500.00}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ledgerUsdDeposit").value(1000.00));
+        verify(withdrawCapital).withdraw(eq(CYCLE_ID), eq(USER_ID), eq(new WithdrawCapitalCommand(new BigDecimal("500.00"))));
+    }
+
+    @Test
+    void capital_tooManyDecimals_returns400() throws Exception {
+        mockMvc.perform(post("/api/trading-cycles/{id}/capital-withdrawal", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"amount\": 1.234}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/trading-cycles/{id}/capital-injection", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositAmount\": 0.004}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(withdrawCapital, injectCapital);
+    }
+
+    @Test
+    void withdrawCapital_negativeOrMissingAmount_returns400() throws Exception {
+        for (String body : new String[]{"{\"amount\": -1}", "{}"}) {
+            mockMvc.perform(post("/api/trading-cycles/{id}/capital-withdrawal", CYCLE_ID)
+                            .with(csrf()).with(authentication(userToken(USER_ID)))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(withdrawCapital);
     }
 
     private static final String KEY = "11111111-1111-1111-1111-111111111111";
@@ -487,7 +533,7 @@ class TradingCycleControllerTest {
                 StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
         return new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.of(2026, 10, 20), null, false, null, 0, null,
                 new DcaSummary(List.of(new DcaSummary.RuleSummary(rule,
-                        LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null)), new BigDecimal("2.5"), new BigDecimal("80.00")), true);
+                        LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 31), null)), new BigDecimal("2.5"), new BigDecimal("80.00")), true, null);
     }
 
     private StrategyDetail dcaDetail() {

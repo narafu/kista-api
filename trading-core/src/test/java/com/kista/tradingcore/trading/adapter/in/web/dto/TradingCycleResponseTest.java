@@ -21,7 +21,7 @@ class TradingCycleResponseTest {
         Strategy strategy = new Strategy(
                 UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, true);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, true, null);
 
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 
@@ -35,7 +35,7 @@ class TradingCycleResponseTest {
         Strategy strategy = new Strategy(
                 UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, false);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, false, null);
 
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 
@@ -48,7 +48,7 @@ class TradingCycleResponseTest {
                 UUID.randomUUID(), UUID.randomUUID(), StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         LocalDate startDate = LocalDate.of(2026, 8, 1);
-        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), startDate, 20, false, null, 0, null, null, true);
+        StrategyDetail detail = new StrategyDetail(strategy, new BigDecimal("1000"), startDate, 20, false, null, 0, null, null, true, null);
 
         TradingCycleResponse response = TradingCycleResponse.from(detail);
 

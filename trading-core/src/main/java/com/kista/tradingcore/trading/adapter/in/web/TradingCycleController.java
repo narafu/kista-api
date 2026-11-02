@@ -4,6 +4,7 @@ import com.kista.tradingcore.trading.adapter.in.web.dto.*;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
 import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
+import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
@@ -40,6 +41,7 @@ public class TradingCycleController {
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
     private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
     private final InjectCapitalUseCase injectCapital;           // PRIVACY·INFINITE 진행 중 사이클 투자금 추가
+    private final WithdrawCapitalUseCase withdrawCapital;       // PRIVACY·INFINITE 진행 중 사이클 투자금 인출
     private final DcaConfigUseCase dcaConfig;                    // DCA 설정 수정
     private final DcaExecutionQuery dcaExecutionQuery;           // DCA 회차 이력 조회
     private final Clock clock;                                   // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -118,6 +120,17 @@ public class TradingCycleController {
             @AuthenticationPrincipal UUID userId,
             @Valid @RequestBody CapitalInjectionRequest request) {
         injectCapital.inject(id, userId, request.toCommand());
+        return TradingCycleResponse.from(tradingCycle.getById(id, userId));
+    }
+
+    // 진행 중 PRIVACY·INFINITE 사이클 투자금 인출 — 장부 예수금·startAmount 차감(브로커 호출 없음)
+    @Operation(summary = "진행 중 사이클 투자금 인출")
+    @PostMapping("/api/trading-cycles/{id}/capital-withdrawal")
+    public TradingCycleResponse withdrawCapital(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId,
+            @Valid @RequestBody CapitalWithdrawalRequest request) {
+        withdrawCapital.withdraw(id, userId, request.toCommand());
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 

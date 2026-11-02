@@ -45,6 +45,8 @@ public record TradingCycleResponse(
         DcaResponse dca,
         @Schema(description = "진행 중인 사이클 존재 여부 — false면 사이클 없음 또는 최신 사이클 종료(투자금 추가 불가, NO_ACTIVE_CYCLE과 동일 기준)", example = "true")
         boolean cycleInProgress,
+        @Schema(description = "최신 포지션 장부 예수금 (USD, 포지션 없으면 null) — 투자금 인출 최대 기준(체결 전 매수 주문 금액은 인출 시 추가로 제외)", example = "1500.00")
+        BigDecimal ledgerUsdDeposit,
         @Schema(description = "등록 응답 전용 — 오늘 시작인데 오늘 개장 배치(22:00 KST, 월~금) 이후 등록돼 오늘 밤 장 시작 주문(INFINITE 매도·VR 사다리)이 자동 생성되지 않으면 true(PRIVACY는 항상 false, 미국 휴장일엔 거짓 양성 가능). 등록 외 응답에선 생략")
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean todayOpenBatchMissed
@@ -112,6 +114,7 @@ public record TradingCycleResponse(
                 detail.vr() != null ? VrSummary.from(detail.vr()) : null,
                 detail.dca() != null ? DcaResponse.from(detail.dca()) : null,
                 detail.cycleInProgress(),
+                detail.ledgerUsdDeposit(),
                 todayOpenBatchMissed
         );
     }

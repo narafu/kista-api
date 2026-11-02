@@ -250,7 +250,8 @@ class TradingService {
                         ps.state().ctx().account().id(),
                         () -> batchGuard.runSafely("체결 리포트", ps.state().ctx(), () -> {
                             // 계획 시점 잔고는 메모리에 오래 남아 그 사이 append된 스냅샷(투자금 추가·수동 보정)을 덮어쓰므로 최신 행으로 재조회
-                            // ponytail: 재조회~스냅샷 저장 사이 ms 단위 경합은 남음(리포터가 사이클 락을 잡지 않음) — 필요 시 리포터에서 lockForUpdate
+                            // ponytail: 재조회~스냅샷 저장 사이에 브로커 호출(미체결 취소·체결 조회)로 수 초 창이 있다. 투자금 추가·인출은 이 창(postClose~리포트 마커)에 거절한다(CapitalInjectionService).
+                            // 수동 체결 보정은 이 창에 막지 않아 같은 경합이 남음 — 필요 시 같은 가드 추가 또는 리포터에서 lockForUpdate
                             AccountBalance reportBalance = cyclePositionPort.findLatestOne(ps.state().ctx().currentCycle().id())
                                     .map(CyclePosition::toBalance).orElse(ps.state().balance());
                             reporter.recordAndNotify(today, ps.state().ctx(), reportBalance,
