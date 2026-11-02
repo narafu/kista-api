@@ -449,6 +449,20 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `DcaPlanInputCollector.cancelledPlacedSell`(주석 "취소 시점 체결량을 DB가 모르므로 상한으로 본다").
 - 근거: CQ-23 이후 취소 확정 직후 체결분이 `filledQuantity`에 기록된다(조회 실패 시 null). BUY 원장 예산은 기록된 체결분만 빼는데 DCA SELL 상한은 여전히 취소된 SELL 수량 전체를 빼서, 가격만 바꾼 SELL 재주문이 원본 수량만큼 이중 차감된다.
 - 수정 방향: `StrategyLedgerBudget.pendingCancelledFill`과 같은 정의(기록 체결분, null이면 전체)로 맞춘다. 리포트 전 날짜만 빼는지도 함께 확인한다.
+- 상태: done. `DcaPlanInputCollector.cancelledPlacedSell`이 `StrategyLedgerBudget.pendingCancelledFill`과 같은 정의(기록된 `filledQuantity`, null이면 주문 수량 전체, `UNKNOWN_LEG` 제외)로 차감하고 마감 리포트 후 날짜(`isReported`)는 차감하지 않는다.
+
+### CQ-25 일시정지 시 취소된 주문의 체결분이 원장에 반영되지 않음
+- 주제: 원장 정확도. 유형: 누락(기존 동작).
+- 위치: `StrategyService.pause` → `OrderCancelService.cancelOpenOrders`, `TradingService.reportAll`(활성 전략만 리포트).
+- 근거: 정지된 전략은 마감 리포트를 타지 않아 정지 직전 장중 부분 체결분이 `cycle_position`에 들어가지 않는다. CQ-23 이후 CANCELLED 행에 체결이 기록돼 통계·VR `poolUsed`에는 보이지만 원장 보유·예수금과 어긋난다. 원장 예산은 오늘·다음 거래일만 보므로 다음 날부터 이 체결분이 빠진다.
+- 수정 방향: 정지된 전략도 당일 취소 체결분이 있으면 리포트(포지션 반영)하거나, 재개 시 대사한다.
+- 상태: open.
+
+### CQ-26 Toss 체결 조회가 전날 저녁 체결을 당일 거래일에서 뺌
+- 주제: 브로커 어댑터 날짜 기준. 유형: 버그 의심(기존 동작).
+- 위치: `TossOrderApi.fetchExecutions`(`filledAt` KST 일자 재필터, `TossOrderApi.java:139-145` 부근).
+- 근거: 거래일 D 주문이 D-1 22:00 이후 장중에 체결되면 `filledAt` 일자가 D-1이라 `getExecutions(D, D)`에서 빠진다. 리포트·취소 직후 체결 기록 모두 체결을 놓친다. Toss는 현재 대시보드 용도라 영향이 작다.
+- 수정 방향: `filledAt`을 거래일 경계(`DstInfo.nextTradeDate`)로 변환해 필터한다. 실계좌 확인 필요.
 - 상태: open.
 
 ## 유지 목록 (재제안 금지, 이유 기록)
