@@ -44,6 +44,7 @@ class OrderCancelService {
     private final ApplicationEventPublisher eventPublisher; // 취소 실패 관리자 알림 — 트랜잭션 내부에서 텔레그램 직접 호출 금지, 커밋 후 이벤트로 위임
     private final OrderCancelStateWriter stateWriter; // self-invocation 프록시 미경유 문제 회피 — DB 쓰기 전용 별도 빈
     private final SubmittingOrderAwaiter awaiter;     // 접수 중(SUBMITTING) 주문의 결과 확정 대기
+    private final CancelledOrderFillRecorder fillRecorder; // 취소 직후 체결량 기록 — 실패해도 취소 결과 불변
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId) {
@@ -83,6 +84,7 @@ class OrderCancelService {
 
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
         int cancelledCount = 0;
+        List<Order> cancelledPlaced = new ArrayList<>(); // 증권사 취소 후 markCancelled한 주문 — 루프 뒤 체결량 기록 대상
         List<Order> placedOrders = new ArrayList<>();
         List<Order> stuckOrders = new ArrayList<>(); // 대기 후에도 접수 결과 미확정 — 증권사에 살아 있을 수 있어 재시도 가능한 실패
         for (LocalDate tradeDate : tradeDates) {
@@ -130,6 +132,7 @@ class OrderCancelService {
                 };
                 if (markCancelled) {
                     stateWriter.markCancelled(order.id());
+                    cancelledPlaced.add(order);
                     cancelledCount++;
                 }
             } catch (Exception e) {
@@ -143,6 +146,9 @@ class OrderCancelService {
                 }
             }
         }
+
+        // 취소 성공분의 체결량을 (거래일, 종목)당 1회 조회해 기록 — 실패는 내부에서 흡수
+        fillRecorder.record(cancelledPlaced, account.toBrokerRef());
 
         // best-effort 실패도 관리자가 인지할 수 있도록 알림 — 트랜잭션 커밋 후 발행(@Transactional 내부 외부 API 호출 금지)
         if (!failures.isEmpty()) {
@@ -203,5 +209,6 @@ class OrderCancelService {
             log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", orderId, order.externalOrderId());
         }
         stateWriter.markCancelled(orderId);
+        fillRecorder.record(List.of(order), account.toBrokerRef()); // 취소 직후 체결량 기록
     }
 }

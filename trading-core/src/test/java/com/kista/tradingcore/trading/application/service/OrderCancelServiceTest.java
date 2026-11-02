@@ -63,6 +63,7 @@ class OrderCancelServiceTest {
     @Mock StrategyPort cyclePort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock CancelledOrderFillRecorder fillRecorder;
     @Mock SubmittingOrderAwaiter awaiter; // 기본 mock은 잔류 없음(빈 목록)
     OrderCancelService service;
 
@@ -86,7 +87,7 @@ class OrderCancelServiceTest {
                 null, LocalDate.now(FIXED), null, null, null);
         // @InjectMocks 대신 수동 생성 — stateWriter는 실제 인스턴스에 mock orderPort를 위임해 기존 verify(orderPort) 검증 유지
         service = new OrderCancelService(orderPort, brokerPort, accountPort, cyclePort, strategyCyclePort,
-                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter, FIXED);
+                eventPublisher, new OrderCancelStateWriter(orderPort), awaiter, fillRecorder, FIXED);
         // 취소 범위는 오늘(KST)·다음 거래일 둘 다 — 기본은 오늘 주문 없음, 각 테스트가 다음 거래일(또는 오늘)을 따로 stub
         LocalDate today = LocalDate.now(FIXED);
         lenient().when(orderPort.deletePlannedByCycleAndDate(any(), eq(today))).thenReturn(0);
@@ -140,6 +141,7 @@ class OrderCancelServiceTest {
         assertThat(result.cancelledCount()).isEqualTo(1);
         verify(brokerPort).cancel(eq(cancelOf(todayOrder)), eq(ownedAccount.toBrokerRef()));
         verify(orderPort).markCancelled(todayOrder.id());
+        verify(fillRecorder).record(List.of(todayOrder), ownedAccount.toBrokerRef()); // 취소 성공분만 모아 1회 기록
     }
 
     @Test
@@ -311,6 +313,7 @@ class OrderCancelServiceTest {
 
         verify(brokerPort).cancel(cancelOf(placed), ownedAccount.toBrokerRef());
         verify(orderPort).markCancelled(orderId);
+        verify(fillRecorder).record(List.of(placed), ownedAccount.toBrokerRef()); // 단건 취소도 체결량 기록
     }
 
     @Test

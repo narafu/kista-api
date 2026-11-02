@@ -23,7 +23,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -125,52 +124,37 @@ class TradingReporter {
     // 원금 집계(filled_quantity > 0)도 같이 보게 한다. 상태를 바꾸면 리포트 재개 시 ownIds에서 빠져 원장이 체결을 잃는다
     private void markFilledOrders(List<Order> mainOrders, List<Order> cancelledOrders, List<Execution> executions) {
         // externalOrderId → 체결 목록 그룹핑 (1:N 체결 허용)
-        Map<String, List<Execution>> byOrderId = executions.stream()
-                .filter(e -> e.externalOrderId() != null && !e.externalOrderId().isBlank())
-                .collect(Collectors.groupingBy(Execution::externalOrderId));
+        Map<String, OrderFill> byOrderId = OrderFill.byExternalOrderId(executions);
 
         for (Order order : cancelledOrders) {
-            List<Execution> matched = order.externalOrderId() == null ? null : byOrderId.get(order.externalOrderId());
-            if (matched == null || matched.isEmpty()) continue;
-            int filledQuantity = sumQuantity(matched);
-            orderPort.markFilled(order.id(), BigDecimal.valueOf(filledQuantity), avgPrice(matched, filledQuantity), OrderStatus.CANCELLED);
-            log.info("[orderId={}] 취소 전 부분 체결 기록 — CANCELLED 유지, 체결수량={}", order.id(), filledQuantity);
+            OrderFill fill = order.externalOrderId() == null ? null : byOrderId.get(order.externalOrderId());
+            if (fill == null) continue;
+            orderPort.markFilled(order.id(), fill.quantity(), fill.avgPrice(), OrderStatus.CANCELLED);
+            log.info("[orderId={}] 취소 전 부분 체결 기록 — CANCELLED 유지, 체결수량={}", order.id(), fill.quantity());
         }
 
         // 리포트 재개는 상태 무관 당일 주문을 mainOrders로 넘긴다 — 취소 주문은 위에서 처리했으니 FILLED로 뒤집지 않는다
         Set<UUID> cancelledIds = cancelledOrders.stream().map(Order::id).collect(Collectors.toSet());
         for (Order order : mainOrders) {
             if (order.externalOrderId() == null || cancelledIds.contains(order.id())) continue;
-            List<Execution> matched = byOrderId.get(order.externalOrderId());
-            if (matched == null || matched.isEmpty()) {
+            OrderFill fill = byOrderId.get(order.externalOrderId());
+            if (fill == null) {
                 // 체결 내역 없음 → 미체결(LOC/MOC 당일 자동 취소) → CANCELLED
                 orderPort.markCancelled(order.id());
                 log.info("[orderId={}] 미체결 → CANCELLED", order.id());
                 continue;
             }
 
-            int filledQuantity = sumQuantity(matched);
-            BigDecimal avgFilledPrice = avgPrice(matched, filledQuantity);
+            int filledQuantity = fill.quantity().intValueExact();
 
             int orderedQuantity = order.quantity() != null ? order.quantity().intValueExact() : 0;
             OrderStatus newStatus = filledQuantity >= orderedQuantity
                     ? OrderStatus.FILLED
                     : OrderStatus.PARTIALLY_FILLED;
 
-            orderPort.markFilled(order.id(), BigDecimal.valueOf(filledQuantity), avgFilledPrice, newStatus);
+            orderPort.markFilled(order.id(), fill.quantity(), fill.avgPrice(), newStatus);
             log.info("[orderId={}] {} → {}, 체결수량={}/{}", order.id(), order.status(), newStatus, filledQuantity, orderedQuantity);
         }
-    }
-
-    private static int sumQuantity(List<Execution> matched) {
-        return matched.stream().mapToInt(Execution::quantity).sum();
-    }
-
-    // 가중평균 체결가: Σ(체결금액) ÷ Σ(체결수량)
-    private static BigDecimal avgPrice(List<Execution> matched, int filledQuantity) {
-        if (filledQuantity <= 0) return BigDecimal.ZERO;
-        BigDecimal totalAmt = matched.stream().map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return totalAmt.divide(BigDecimal.valueOf(filledQuantity), 2, RoundingMode.HALF_UP);
     }
 
     private TradingReport buildReport(LocalDate today, StrategyType strategyType, StrategyTicker ticker, List<Execution> executions) {

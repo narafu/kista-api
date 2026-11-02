@@ -48,6 +48,7 @@ class ReorderService implements ReorderUseCase {
     private final MarketCalendarPort marketCalendarPort;
     private final OrderCancelStateWriter stateWriter; // 원본 취소 DB 기록 — 짧은 트랜잭션
     private final OrderSubmitter orderSubmitter;      // IMMEDIATE 재주문 선점 → 접수 → 기록 (배치와 같은 경로)
+    private final CancelledOrderFillRecorder fillRecorder; // 원본 취소 직후 체결량 기록 — 실패해도 재주문 진행
     private final StrategyLedgerBudget ledgerBudget;  // BUY 재주문 전략 원장 상한
     private final ApplicationEventPublisher eventPublisher; // 원장 조회 실패 시 관리자 알림 (비트랜잭션이라 즉시 발송)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -163,6 +164,7 @@ class ReorderService implements ReorderUseCase {
                 throw new IllegalArgumentException("원본 주문이 이미 체결돼 재주문할 수 없습니다.");
             }
             stateWriter.markCancelled(order.id());
+            fillRecorder.record(List.of(order), account.toBrokerRef()); // 취소 직후 체결량 기록
             return;
         }
         // PLANNED일 때만 전이 — 읽은 뒤 배치가 접수했으면 새 주문을 얹지 않고 중단(원본이 그대로 남아 중복 없음)

@@ -63,6 +63,7 @@ class ReorderServiceTest {
     @Mock BrokerOrderCorrectionPort brokerOrderCorrectionPort;
     @Mock MarketCalendarPort marketCalendarPort;
     @Mock OrderSubmitter orderSubmitter;
+    @Mock CancelledOrderFillRecorder fillRecorder;
     @Mock StrategyLedgerBudget ledgerBudget;
     @Mock org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -73,7 +74,7 @@ class ReorderServiceTest {
         lenient().when(brokerOrderCorrectionPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED); // 기본: 취소 접수
         // stateWriter는 실제 인스턴스에 mock orderPort를 위임 — 기존 verify(orderPort).markCancelled 검증 유지
         service = new ReorderService(accountPort, strategyPort, strategyCyclePort, orderPort,
-                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, ledgerBudget, eventPublisher, FIXED);
+                brokerOrderCorrectionPort, marketCalendarPort, new OrderCancelStateWriter(orderPort), orderSubmitter, fillRecorder, ledgerBudget, eventPublisher, FIXED);
     }
 
     private static final UUID USER_ID    = UUID.fromString("00000000-0000-0000-0000-000000000010");
@@ -137,6 +138,7 @@ class ReorderServiceTest {
         reorder(command(OrderTiming.AT_CLOSE), NOW_BEFORE_OPEN);
 
         verify(orderPort).markCancelled(ORDER_ID);
+        verify(fillRecorder).record(java.util.List.of(placedOrder()), account().toBrokerRef()); // 원본 취소 직후 체결량 기록
         verify(orderPort).saveAll(argOrdersMatch(OrderStatus.PLANNED, OrderTiming.AT_CLOSE));
     }
 

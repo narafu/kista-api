@@ -1,10 +1,13 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -33,5 +36,11 @@ class OrderCancelStateWriter {
     public void markCancelled(UUID orderId) {
         // 브로커 취소 성공 직후에만 호출 — 성공분만 건별 짧은 트랜잭션으로 커밋
         orderPort.markCancelled(orderId);
+    }
+
+    @Transactional
+    public void recordCancelledFill(UUID orderId, BigDecimal filledQuantity, @Nullable BigDecimal filledPrice) {
+        // 취소 직후 조회한 체결량 기록 — 상태는 CANCELLED 유지(마감 리포트가 같은 호출로 덮어써도 값이 같다)
+        orderPort.markFilled(orderId, filledQuantity, filledPrice, OrderStatus.CANCELLED);
     }
 }
