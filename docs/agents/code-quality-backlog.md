@@ -444,6 +444,13 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 수정 방향: 취소 시점에 브로커 체결 조회로 `filledQuantity`를 기록하고, 예산이 CANCELLED 주문의 기록된 체결분만 차감한다. 인출처럼 상한 방식을 쓰면 가격만 바꾸는 재주문이 원본 금액만큼 이중 차감돼 막히므로 부적합하다.
 - 상태: done. 취소 확정 직후 체결 조회로 `filledQuantity`를 기록하고(`CancelledOrderFillRecorder`, fail-open), `StrategyLedgerBudget.remaining`·인출 가능액이 리포트 전 CANCELLED BUY의 기록된 체결분만(모르면 주문 금액 전체) 차감하며, 재주문 사전검사·`ReorderBuyBudgetService`는 원본의 현재 체결량을 조회해 환급분을 미체결분으로 계산한다.
 
+### CQ-24 주식 DCA SELL 상한이 장중 취소된 SELL 수량 전체를 뺌
+- 주제: DCA 판매가능수량 정확도. 유형: 비일관성.
+- 위치: `DcaPlanInputCollector.cancelledPlacedSell`(주석 "취소 시점 체결량을 DB가 모르므로 상한으로 본다").
+- 근거: CQ-23 이후 취소 확정 직후 체결분이 `filledQuantity`에 기록된다(조회 실패 시 null). BUY 원장 예산은 기록된 체결분만 빼는데 DCA SELL 상한은 여전히 취소된 SELL 수량 전체를 빼서, 가격만 바꾼 SELL 재주문이 원본 수량만큼 이중 차감된다.
+- 수정 방향: `StrategyLedgerBudget.pendingCancelledFill`과 같은 정의(기록 체결분, null이면 전체)로 맞춘다. 리포트 전 날짜만 빼는지도 함께 확인한다.
+- 상태: open.
+
 ## 유지 목록 (재제안 금지, 이유 기록)
 
 | 발견 | 위치 | 유지 이유 |
