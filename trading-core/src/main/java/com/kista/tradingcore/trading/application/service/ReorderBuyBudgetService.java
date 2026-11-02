@@ -81,7 +81,14 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
                 .toList();
         Map<UUID, BigDecimal> filled = new LinkedHashMap<>();
         if (placed.isEmpty()) return filled;
-        BrokerAccountRef ref = accountPort.findByIdOrThrow(placed.getFirst().accountId()).toBrokerRef();
+        BrokerAccountRef ref;
+        try {
+            ref = accountPort.findByIdOrThrow(placed.getFirst().accountId()).toBrokerRef();
+        } catch (RuntimeException e) {
+            // 삭제된 계좌 등 — 조회용 미리보기라 막지 않고 전액 환급으로 계산
+            log.warn("재주문 환급 계좌 조회 실패 — 전액 환급으로 계산: {}", e.toString());
+            return filled;
+        }
         placed.stream().collect(Collectors.groupingBy(Order::ticker)).forEach((ticker, orders) -> {
             try {
                 Map<String, OrderFill> fills = fillRecorder.currentFills(date, ticker, ref);

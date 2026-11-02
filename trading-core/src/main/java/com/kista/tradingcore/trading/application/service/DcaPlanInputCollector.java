@@ -21,6 +21,7 @@ import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -62,6 +64,7 @@ class DcaPlanInputCollector {
     private final StrategyDcaDetailPort dcaDetailPort;
     private final DcaExecutionPort dcaExecutionPort;        // 판정 완료 여부 조회 전용(읽기)
     private final UnassignedUsdCalculator unassignedUsd;    // 주식 BUY 가용 USD — 계좌 미배정 현금
+    private final TradingBatchRunPort batchRunPort;         // 마감 리포트 여부 — 리포트 후엔 취소분 체결이 원장에 반영됨
     // (ticker, US 세션) → 검증된 종가 — 세션 이전 확정 봉은 불변이라 배치·전략 간 공유, 실패는 캐시하지 않음
     private final Map<CandleKey, List<BigDecimal>> closeCache = new ConcurrentHashMap<>();
     // 최신 CNN 지수 단기 메모 — 같은 배치의 전략들이 공유, TTL 경과·실패 시 재조회 (spec 6.2)
@@ -114,9 +117,9 @@ class DcaPlanInputCollector {
             }
 
             boolean sell = rule.direction() == OrderDirection.SELL;
-            // 접수 후 취소된 당일 SELL은 일부 체결됐을 수 있는데 원장은 마감 리포트 전까지 줄지 않는다 — 주문 수량 전체를 보수적으로 차감
+            // 리포트 전 접수 후 취소된 당일 SELL의 체결분은 원장이 마감 리포트 전까지 줄지 않는다 — 기록된 체결분(모르면 주문 수량)을 차감
             if (sell && sellable != null && !sellCapped) {
-                sellable = sellable.subtract(cancelledPlacedSell(todayOrders)).max(BigDecimal.ZERO);
+                sellable = sellable.subtract(cancelledPlacedSell(todayOrders, strategy.id(), tradeDate)).max(BigDecimal.ZERO);
                 if (UnassignedUsdCalculator.applies(ctx.account().brokerRef().broker())) {
                     Integer broker = loadBrokerSellable(ctx, tradeDate);
                     sellable = broker == null ? null : sellable.min(BigDecimal.valueOf(broker));
@@ -208,11 +211,15 @@ class DcaPlanInputCollector {
     }
 
     // 같은 사이클·거래일 기존 PLANNED/PLACED SELL 수량 합 — 커널이 같은 배치 앞 규칙 계획분을 따로 빼므로 이전 배치 분만
-    // 증권사 접수(externalOrderId) 후 CANCELLED된 SELL 수량 합 — 취소 시점 체결량을 DB가 모르므로 상한으로 본다
-    private static BigDecimal cancelledPlacedSell(List<Order> todayOrders) {
+    // 마감 리포트 전 증권사 접수(externalOrderId) 후 CANCELLED된 SELL의 체결분 합 — 기록된 체결량, 모름(null)이면 주문 수량 전체를 상한으로 본다
+    // (StrategyLedgerBudget.pendingCancelledFill과 같은 정의, 리포트 후엔 체결분이 이미 원장에 반영돼 0)
+    private BigDecimal cancelledPlacedSell(List<Order> todayOrders, UUID strategyId, LocalDate tradeDate) {
+        if (batchRunPort.isReported(tradeDate, strategyId)) return BigDecimal.ZERO;
         return todayOrders.stream()
-                .filter(o -> o.direction() == OrderDirection.SELL && o.status() == OrderStatus.CANCELLED && o.externalOrderId() != null)
-                .map(Order::quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+                .filter(o -> o.direction() == OrderDirection.SELL && o.status() == OrderStatus.CANCELLED && o.externalOrderId() != null
+                        && !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .map(o -> o.filledQuantity() == null ? o.quantity() : o.filledQuantity())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private static BigDecimal reservedSell(List<Order> existingOrders) {

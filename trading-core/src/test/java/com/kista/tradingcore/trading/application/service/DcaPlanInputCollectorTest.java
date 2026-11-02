@@ -76,10 +76,12 @@ class DcaPlanInputCollectorTest {
     SellableQuantityPort sellablePort = mock(SellableQuantityPort.class);
     StrategyDcaDetailPort dcaDetailPort = mock(StrategyDcaDetailPort.class);
     DcaExecutionPort executionPort = mock(DcaExecutionPort.class);
+    com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort batchRunPort =
+            mock(com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort.class); // isReported 기본 false
     com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator unassigned =
             mock(com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator.class);
     DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort, sellablePort, fearGreedPort, orderPort,
-            dcaDetailPort, executionPort, unassigned);
+            dcaDetailPort, executionPort, unassigned, batchRunPort);
     DcaCycleOrderStrategy kernel = new DcaCycleOrderStrategy();
     DcaCollected collected; // 직전 plan() 호출의 수집 결과 — 복구 대상 단언용
 
@@ -212,17 +214,43 @@ class DcaPlanInputCollectorTest {
         assertSkipped(DcaSkipReason.NO_HOLDINGS);
     }
 
-    @Test
-    void sell_subtracts_cancelled_placed_sell_of_today() {
-        // 원장 10, 앞 배치 SELL 4주 접수 후 취소(일부 체결 가능, 원장은 마감 전까지 그대로) — 4주를 보수적으로 빼 6주만 판다
+    // 원장 10, 앞 배치 SELL 4주 접수 후 취소 — 체결 기록(filledQuantity)에 따라 차감량이 달라진다
+    private void cancelledSell(BigDecimal filledQuantity) {
         config(sellRule(DcaShortfallPolicy.PARTIAL));
         ledger = new AccountBalance(10, new BigDecimal("80.00"), BigDecimal.ZERO);
         Order cancelled = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), TRADE_DATE, StrategyTicker.UPRO,
                 OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.SELL, "DCA_" + KEY2, BigDecimal.valueOf(4), new BigDecimal("91.48"),
-                OrderStatus.CANCELLED, "E9", null, null);
+                OrderStatus.CANCELLED, "E9", filledQuantity, filledQuantity == null ? null : new BigDecimal("91.48"));
         when(orderPort.findByStrategyId(ctx.strategy().id(), TRADE_DATE, TRADE_DATE)).thenReturn(List.of(cancelled));
+    }
+
+    @Test
+    void sell_subtracts_full_quantity_of_cancelled_sell_when_fill_unknown() {
+        cancelledSell(null); // 체결 조회 실패 — 4주 전체를 보수적으로 차감
         assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
                 .extracting(PlannedOrder::quantity).containsExactly(6);
+    }
+
+    @Test
+    void sell_subtracts_only_recorded_fill_of_cancelled_sell() {
+        cancelledSell(BigDecimal.ONE); // 4주 중 1주만 체결 기록
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(9);
+    }
+
+    @Test
+    void sell_does_not_subtract_cancelled_sell_without_fill() {
+        cancelledSell(BigDecimal.ZERO); // 가격만 바꾼 재주문 — 원본 수량 이중 차감 없음
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(10);
+    }
+
+    @Test
+    void sell_does_not_subtract_cancelled_sell_after_report() {
+        cancelledSell(null);
+        when(batchRunPort.isReported(TRADE_DATE, ctx.strategy().id())).thenReturn(true); // 리포트 후 원장에 이미 반영
+        assertThat(plan(EnumSet.of(OrderTiming.AT_CLOSE), List.of(), null, ledger))
+                .extracting(PlannedOrder::quantity).containsExactly(10);
     }
 
     @Test
