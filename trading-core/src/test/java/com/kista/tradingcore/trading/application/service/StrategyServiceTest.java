@@ -1637,6 +1637,37 @@ class StrategyServiceTest {
         assertThat(single.divisionCount()).isNull();
         assertThat(single.currentRound()).isNull(); // 회차는 INFINITE 전용 — 보유 이력이 있어도 PRIVACY는 null
         assertThat(single.vr()).isNull();
+        assertThat(single.cycleInProgress()).isTrue(); // 최신 사이클 endDate=null
+    }
+
+    @Test
+    @DisplayName("동등성: 최신 사이클이 종료된 전략 — 단건·목록 모두 cycleInProgress=false (자금 추가 NO_ACTIVE_CYCLE 기준)")
+    void equivalence_endedCycle_cycleNotInProgress() {
+        UUID strategyId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        Strategy strategy = new Strategy(strategyId, ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle endedCycle = new StrategyCycle(cycleId, strategyId, STRATEGY_VERSION_ID,
+                new BigDecimal("2000.00"), new BigDecimal("2100.00"), LocalDate.now(FIXED).minusDays(10),
+                LocalDate.now(FIXED), null, null);
+
+        // 단건 경로
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(endedCycle));
+
+        StrategyDetail single = strategyService.getById(strategyId, USER_ID);
+
+        // 배치 경로
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, endedCycle));
+
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+
+        assertThat(batch).hasSize(1);
+        assertThat(batch.getFirst()).isEqualTo(single);
+        assertThat(single.cycleInProgress()).isFalse();
     }
 
     @Test
@@ -1668,6 +1699,7 @@ class StrategyServiceTest {
         assertThat(single.divisionCount()).isEqualTo(StrategyDefaults.DEFAULT_DIVISION_COUNT);
         assertThat(single.currentRound()).isNull();
         assertThat(single.currentHoldings()).isNull();
+        assertThat(single.cycleInProgress()).isFalse(); // 사이클 없음
     }
 
     @Test

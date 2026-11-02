@@ -177,6 +177,9 @@ class StrategyDetailAssembler {
         Integer currentHoldings = strategy.ticker().isCrypto() ? null
                 : latestPosition.map(pos -> pos.toBalance().wholeShares()).orElse(null);
 
-        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary);
+        // 진행 중 사이클 여부 — CapitalInjectionService NO_ACTIVE_CYCLE 거절 조건(사이클 없음·최신 사이클 종료)의 반대
+        boolean cycleInProgress = latestCycle.map(cycle -> cycle.endDate() == null).orElse(false);
+
+        return new StrategyDetail(strategy, initialUsdDeposit, startDate, divisionCount, isReverseMode, currentRound, currentHoldings, vrSummary, dcaSummary, cycleInProgress);
     }
 }
