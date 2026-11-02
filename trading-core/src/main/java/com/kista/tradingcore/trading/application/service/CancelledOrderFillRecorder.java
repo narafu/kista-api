@@ -43,6 +43,11 @@ class CancelledOrderFillRecorder {
         });
     }
 
+    // 현재 체결 조회(재주문 환급 계산용) — 실패는 예외로 전파한다(호출자가 fail-open/closed 선택). 주문의 externalOrderId별 합산
+    Map<String, OrderFill> currentFills(LocalDate tradeDate, StrategyTicker ticker, BrokerAccountRef ref) {
+        return OrderFill.byExternalOrderId(executionPort.getExecutions(tradeDate, tradeDate, ticker, ref));
+    }
+
     private void write(List<Order> orders, Map<String, OrderFill> fills) {
         for (Order order : orders) {
             try {

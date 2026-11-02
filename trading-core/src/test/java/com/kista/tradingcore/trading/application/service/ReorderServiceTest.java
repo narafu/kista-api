@@ -32,6 +32,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -445,6 +446,68 @@ class ReorderServiceTest {
 
         assertThat(reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
                 .isEqualTo(OrderStatus.PLACED);
+    }
+
+    @Test
+    void partiallyFilledPlacedSourceShrinksRefund() {
+        // 원본 수량 2 중 1 체결 → 환급 100 (취소해도 체결분은 안 풀림). remaining 300 + 100 = 400 < 500 → 거절
+        stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("300"));
+        when(fillRecorder.currentFills(any(), any(), any()))
+                .thenReturn(Map.of("PLACED-1", new OrderFill(BigDecimal.ONE, new BigDecimal("100.00"))));
+
+        assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
+                .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingException.class)
+                .hasMessage("전략 원장 예수금이 부족합니다.");
+        verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
+    }
+
+    @Test
+    void partiallyFilledPlacedSourceWithinShrunkRefundProceeds() {
+        // remaining 400 + 환급 100 = 500 — 정확히 상한이면 통과
+        stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("400"));
+        when(fillRecorder.currentFills(any(), any(), any()))
+                .thenReturn(Map.of("PLACED-1", new OrderFill(BigDecimal.ONE, new BigDecimal("100.00"))));
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.PLACED, "NEW-EXT-1"));
+
+        assertThat(reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.PLACED);
+    }
+
+    @Test
+    void fillLookupFailureRejectsBeforeAnyCancel() {
+        stubCommon(plannedBuy());
+        when(ledgerBudget.applies(any())).thenReturn(true);
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("1000"));
+        when(fillRecorder.currentFills(any(), any(), any())).thenThrow(new RuntimeException("broker down"));
+
+        assertThatThrownBy(() -> reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET))
+                .isInstanceOf(com.kista.tradingcore.trading.domain.model.ManualTradingException.class)
+                .hasMessageEndingWith("니다.");
+        verify(brokerOrderCorrectionPort, never()).cancel(any(), any());
+        verify(orderPort, never()).markCancelled(any());
+        verifyNoInteractions(orderSubmitter);
+    }
+
+    @Test
+    void placedSellSourceBuyReorderSkipsFillLookup() {
+        // SELL 원본은 환급 0이라 체결 조회가 필요 없다 — 조회가 실패하는 상황이어도 거절되지 않고 조회 자체가 일어나지 않는다
+        stubCommon(placedOrder());
+        when(ledgerBudget.applies(any())).thenReturn(true);
+        when(ledgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("1000"));
+        lenient().when(fillRecorder.currentFills(any(), any(), any())).thenThrow(new RuntimeException("broker down"));
+        Order saved = stubSaved();
+        when(orderSubmitter.submit(eq(saved), any(), any()))
+                .thenReturn(new OrderSubmitter.Submission(OrderSubmitter.Outcome.PLACED, "NEW-EXT-1"));
+
+        assertThat(reorder(buyCommand(OrderTiming.IMMEDIATE), NOW_DURING_MARKET).resultingStatus())
+                .isEqualTo(OrderStatus.PLACED);
+        verify(fillRecorder, never()).currentFills(any(), any(), any());
     }
 
     @Test

@@ -126,7 +126,7 @@ class ReorderService implements ReorderUseCase {
                         command.accountId(), strategy.id(), e.getMessage());
                 throw ManualTradingService.queryFailure(eventPublisher, "재주문", e);
             }
-            BigDecimal limit = remaining.add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate));
+            BigDecimal limit = remaining.add(ReorderBuyBudgetService.refundOf(sourceOrder, tradeDate, filledQuantityOf(sourceOrder, account, tradeDate)));
             if (price.multiply(BigDecimal.valueOf(quantity)).compareTo(limit) > 0) {
                 throw new ManualTradingException("전략 원장 예수금이 부족합니다.");
             }
@@ -148,6 +148,21 @@ class ReorderService implements ReorderUseCase {
         return new ReorderResult(command.userId(), command.accountId(), command.strategyId(),
                 sourceOrder.id(), sourceOrder.status(), placement.status(), placement.externalOrderId(),
                 sourceOrder.price(), sourceOrder.quantity().intValueExact(), direction);
+    }
+
+    // PLACED BUY 원본의 현재 체결량 — 취소해도 체결분은 풀리지 않으므로 환급에서 뺀다. 조회 실패는 fail-closed(취소 전 거절). PLANNED는 0
+    private BigDecimal filledQuantityOf(Order source, Account account, LocalDate tradeDate) {
+        // refundOf가 환급 0으로 보는 원본(SELL·다른 거래일)은 조회하지 않는다 — 조회 실패가 무관한 재주문을 막지 않게
+        if (source.status() != OrderStatus.PLACED || source.externalOrderId() == null
+                || source.direction() != OrderDirection.BUY || !source.tradeDate().equals(tradeDate)) return BigDecimal.ZERO;
+        try {
+            OrderFill fill = fillRecorder.currentFills(source.tradeDate(), source.ticker(), account.toBrokerRef())
+                    .get(source.externalOrderId());
+            return fill == null ? BigDecimal.ZERO : fill.quantity();
+        } catch (RuntimeException e) {
+            log.warn("원본 주문 체결 조회 실패 — 재주문 중단: orderId={}, error={}", source.id(), e.toString());
+            throw new ManualTradingException("원본 주문 체결 조회에 실패해 재주문할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
+        }
     }
 
     // 원본 취소 — PLANNED: DB만 CANCELLED, PLACED: 증권사 취소 + DB CANCELLED (그 밖의 상태는 앞에서 거부됨)

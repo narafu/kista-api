@@ -5,6 +5,8 @@ import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -21,11 +23,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -39,9 +48,11 @@ class ReorderBuyBudgetServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock StrategyPort strategyPort;
     @Mock StrategyLedgerBudget ledgerBudget;
+    @Mock AccountPort accountPort;
+    @Mock CancelledOrderFillRecorder fillRecorder;
 
     private ReorderBuyBudgetService service() {
-        return new ReorderBuyBudgetService(orderPort, strategyCyclePort, strategyPort, ledgerBudget);
+        return new ReorderBuyBudgetService(orderPort, strategyCyclePort, strategyPort, ledgerBudget, accountPort, fillRecorder);
     }
 
     private Order order(UUID cycleId, OrderDirection dir, OrderStatus status, LocalDate date) {
@@ -93,6 +104,51 @@ class ReorderBuyBudgetServiceTest {
         assertThat(r.sourceRefunds().get(a.id())).isEqualByComparingTo("200");
         assertThat(r.sourceRefunds().get(b.id())).isEqualByComparingTo("200");
         assertThat(r.sourceRefunds().get(a2.id())).isEqualByComparingTo("0");
+    }
+
+    private void stubPlacedLookup(Order placed, Supplier<Map<String, OrderFill>> fills) {
+        Account account = mock(Account.class);
+        when(accountPort.findByIdOrThrow(accountId)).thenReturn(account);
+        when(fillRecorder.currentFills(eq(DATE), eq(placed.ticker()), any()))
+                .thenAnswer(i -> fills.get());
+    }
+
+    @Test
+    void 부분_체결된_PLACED_원본은_환급이_체결분만큼_줄어든다() {
+        UUID c = UUID.randomUUID();
+        Order b = order(c, OrderDirection.BUY, OrderStatus.PLACED, DATE).withPlaced("EXT-1"); // 수량 10 x 가격 20 = 200, 5 체결 → 100
+        stubOrders(b);
+        stubCycle(c, "50");
+        stubPlacedLookup(b, () -> Map.of("EXT-1", new OrderFill(new BigDecimal("5"), BigDecimal.TEN)));
+
+        assertThat(service().query(List.of(b.id()), null).sourceRefunds().get(b.id())).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void 같은_종목_PLACED_두_건은_체결_조회_1회() {
+        UUID c = UUID.randomUUID();
+        Order b1 = order(c, OrderDirection.BUY, OrderStatus.PLACED, DATE).withPlaced("EXT-1");
+        Order b2 = order(c, OrderDirection.BUY, OrderStatus.PLACED, DATE).withPlaced("EXT-2");
+        stubOrders(b1, b2);
+        stubCycle(c, "50");
+        stubPlacedLookup(b1, () -> Map.of("EXT-1", new OrderFill(new BigDecimal("5"), BigDecimal.TEN)));
+
+        var r = service().query(List.of(b1.id(), b2.id()), null);
+
+        assertThat(r.sourceRefunds().get(b1.id())).isEqualByComparingTo("100");
+        assertThat(r.sourceRefunds().get(b2.id())).isEqualByComparingTo("200");
+        verify(fillRecorder, times(1)).currentFills(eq(DATE), eq(b1.ticker()), any());
+    }
+
+    @Test
+    void 체결_조회_실패시_전액_환급() {
+        UUID c = UUID.randomUUID();
+        Order b = order(c, OrderDirection.BUY, OrderStatus.PLACED, DATE).withPlaced("EXT-1");
+        stubOrders(b);
+        stubCycle(c, "50");
+        stubPlacedLookup(b, () -> { throw new RuntimeException("broker down"); });
+
+        assertThat(service().query(List.of(b.id()), null).sourceRefunds().get(b.id())).isEqualByComparingTo("200");
     }
 
     @Test

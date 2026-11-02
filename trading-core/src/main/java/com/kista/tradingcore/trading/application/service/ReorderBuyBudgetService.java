@@ -1,8 +1,9 @@
 package com.kista.tradingcore.trading.application.service;
 
-import java.util.NoSuchElementException;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
+import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -11,6 +12,7 @@ import com.kista.tradingcore.trading.application.usecase.ReorderBuyBudgetQuery;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.ReorderBuyBudget;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -18,9 +20,12 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 // 트랜잭션 없음 — 포트 호출마다 자체 트랜잭션(읽기 전용 계산)
+@Slf4j
 @Service
 @RequiredArgsConstructor
 class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
@@ -29,6 +34,8 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
     private final StrategyCyclePort strategyCyclePort;
     private final StrategyPort strategyPort;
     private final StrategyLedgerBudget ledgerBudget;
+    private final AccountPort accountPort;
+    private final CancelledOrderFillRecorder fillRecorder; // PLACED 원본의 현재 체결량 — 환급에서 뺀다
 
     static final int MAX_ORDERS = 50; // 일괄 조회 상한 — 일괄 재주문 폼 한 화면 분량
 
@@ -50,7 +57,9 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
 
         // PLANNED·PLACED BUY 원본은 remaining의 저장된 BUY 차감에 이미 들어 있어 재주문 취소 시 그만큼 풀려난다
         Map<UUID, BigDecimal> sourceRefunds = new LinkedHashMap<>();
-        sources.forEach(o -> sourceRefunds.put(o.id(), refundOf(o, date)));
+        // PLACED 원본은 부분 체결분을 뺀다 — 취소해도 체결분은 풀리지 않는다
+        Map<UUID, BigDecimal> filled = filledQuantities(sources, date);
+        sources.forEach(o -> sourceRefunds.put(o.id(), refundOf(o, date, filled.getOrDefault(o.id(), BigDecimal.ZERO))));
 
         // 사이클별 원장 한도 — live 조회 없음
         Map<UUID, ReorderBuyBudget.CycleBudget> cycles = new LinkedHashMap<>();
@@ -64,11 +73,35 @@ class ReorderBuyBudgetService implements ReorderBuyBudgetQuery {
         return new ReorderBuyBudget(cycles, sourceRefunds);
     }
 
-    // ReorderService도 재사용 — 같은 거래일 PLANNED·PLACED BUY 원본만 환급
-    static BigDecimal refundOf(Order source, LocalDate date) {
+    // 같은 거래일 PLACED BUY 원본의 체결량 — 종목별 1회 조회, 실패 시 해당 종목은 0(전액 환급, fail-open: 조회용 미리보기라 막지 않는다)
+    private Map<UUID, BigDecimal> filledQuantities(List<Order> sources, LocalDate date) {
+        List<Order> placed = sources.stream()
+                .filter(o -> o.direction() == OrderDirection.BUY && o.status() == OrderStatus.PLACED
+                        && o.tradeDate().equals(date) && o.externalOrderId() != null)
+                .toList();
+        Map<UUID, BigDecimal> filled = new LinkedHashMap<>();
+        if (placed.isEmpty()) return filled;
+        BrokerAccountRef ref = accountPort.findByIdOrThrow(placed.getFirst().accountId()).toBrokerRef();
+        placed.stream().collect(Collectors.groupingBy(Order::ticker)).forEach((ticker, orders) -> {
+            try {
+                Map<String, OrderFill> fills = fillRecorder.currentFills(date, ticker, ref);
+                orders.forEach(o -> {
+                    OrderFill f = fills.get(o.externalOrderId());
+                    if (f != null) filled.put(o.id(), f.quantity());
+                });
+            } catch (RuntimeException e) {
+                log.warn("재주문 환급 체결 조회 실패 — 전액 환급으로 계산: {} {}: {}", ticker, date, e.toString());
+            }
+        });
+        return filled;
+    }
+
+    // ReorderService도 재사용 — 같은 거래일 PLANNED·PLACED BUY 원본의 미체결 금액만 환급(취소해도 체결분은 풀리지 않음)
+    static BigDecimal refundOf(Order source, LocalDate date, BigDecimal filledQuantity) {
         boolean cancellable = source.direction() == OrderDirection.BUY
                 && (source.status() == OrderStatus.PLANNED || source.status() == OrderStatus.PLACED)
                 && source.tradeDate().equals(date);
-        return cancellable ? source.price().multiply(source.quantity()) : BigDecimal.ZERO;
+        if (!cancellable) return BigDecimal.ZERO;
+        return source.price().multiply(source.quantity().subtract(filledQuantity).max(BigDecimal.ZERO));
     }
 }
