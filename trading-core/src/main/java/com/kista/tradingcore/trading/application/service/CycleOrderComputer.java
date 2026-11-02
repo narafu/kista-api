@@ -109,10 +109,11 @@ class CycleOrderComputer {
                 balance, strategy.ticker(), tradeDate, label, infiniteInputs, privacyInputs, vrInputs, dcaInputs));
     }
 
-    // 별지점 계산 — 직전 STAR_POINT_WINDOW(5)거래일 종가 평균
+    // 별지점 계산 — INFINITE 상세가 있는 최신 STAR_POINT_WINDOW(5)건(리포트·개장 행)의 종가 평균
+    // 수동 체결 보정 행은 체결가가 closingPrice에 들어가므로 상세 유무로 제외한다
     // 포지션이 없으면(첫날) null 반환 — 호출측에서 첫날 분기 처리
     private BigDecimal computeStarPointPrice(UUID cycleId) {
-        List<CyclePosition> recentPositions = cyclePositionPort.findLatestByCycleId(cycleId, STAR_POINT_WINDOW);
+        List<CyclePosition> recentPositions = cyclePositionPort.findLatestWithInfiniteDetailByCycleId(cycleId, STAR_POINT_WINDOW);
         List<BigDecimal> closingPrices = recentPositions.stream()
                 .map(CyclePosition::closingPrice)
                 .filter(p -> p != null && p.compareTo(BigDecimal.ZERO) > 0)

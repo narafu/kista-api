@@ -15,6 +15,10 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
+import com.kista.tradingcore.trading.domain.model.Order;
+import com.kista.shared.support.FixedClockTestConfig;
+import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -58,6 +62,8 @@ class ManualTradeCorrectionServiceTest {
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock TradingBatchRunPort batchRunPort;
+    @Spy Clock clock = FixedClockTestConfig.FIXED; // 2026-01-06 12:00 KST
 
     @Spy CycleOrderStrategies cycleOrderStrategies = new CycleOrderStrategies(List.of(
             new InfiniteCycleOrderStrategy(null, null),
@@ -108,6 +114,114 @@ class ManualTradeCorrectionServiceTest {
         verify(cyclePositionPort).save(captor.capture());
         assertThat(captor.getValue().holdings()).isZero();
         assertThat(captor.getValue().usdDeposit()).isEqualByComparingTo("7200.05");
+    }
+
+    // ===== 마감 리포트 전 번호 없는 보정 가드 =====
+
+    private static final LocalDate TODAY = LocalDate.now(FixedClockTestConfig.FIXED); // FIXED 시계 = 1/6 12:00 KST(04:30 이후) → 당일 1/6
+
+    private ManualTradeCorrectionCommand guardCommand(LocalDate tradeDate, String externalOrderId) {
+        return new ManualTradeCorrectionCommand(USER_ID, ACCOUNT_ID, STRATEGY_ID,
+                List.of(new ManualTradeCorrectionCommand.Fill(tradeDate, OrderDirection.SELL, BigDecimal.ONE,
+                        new BigDecimal("267.37"), externalOrderId, null)));
+    }
+
+    private void stubGuardFixture(List<Order> ordersOnDate) {
+        stubGuardFixture(ordersOnDate, Broker.KIS);
+    }
+
+    private void stubGuardFixture(List<Order> ordersOnDate, Broker broker) {
+        Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, broker, null, null);
+        Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle cycle = new StrategyCycle(CYCLE_ID, STRATEGY_ID, VERSION_ID, new BigDecimal("6989.00"),
+                null, LocalDate.of(2026, 1, 1), null, Instant.now(), null);
+        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("6665.31"),
+                new BigDecimal("266.65"), new BigDecimal("223.41"), BigDecimal.valueOf(2), Instant.now(), null);
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(cycle);
+        lenient().when(cyclePositionPort.findLatestOne(CYCLE_ID)).thenReturn(Optional.of(latest));
+        lenient().when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(ordersOnDate);
+    }
+
+    private static Order orderWithLeg(String leg) {
+        Order o = org.mockito.Mockito.mock(Order.class);
+        lenient().when(o.orderLeg()).thenReturn(leg);
+        return o;
+    }
+
+    @Test
+    void correctManualFills_unreportedDayWithStrategyOrderAndNoOrderNo_rejected() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")));
+        when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("주문번호");
+
+        verify(cyclePositionPort, never()).save(any());
+        verify(orderPort, never()).saveAll(any());
+    }
+
+    @Test
+    void correctManualFills_nextTradeDateUnreported_rejected() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")));
+        when(batchRunPort.isReported(TODAY.plusDays(1), STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY.plusDays(1), null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("주문번호");
+    }
+
+    @Test
+    void correctManualFills_cryptoAccountUnreported_passes() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")), Broker.UPBIT);
+        lenient().when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(false);
+
+        service.correctManualFills(guardCommand(TODAY, null));
+
+        verify(orderPort).saveAll(any());
+        verify(batchRunPort, never()).isReported(any(), any());
+    }
+
+    @Test
+    void correctManualFills_withExternalOrderNo_passes() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")));
+
+        service.correctManualFills(guardCommand(TODAY, "EXT-1"));
+
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void correctManualFills_alreadyReported_passes() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")));
+        when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(true);
+
+        service.correctManualFills(guardCommand(TODAY, null));
+
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void correctManualFills_pastTradeDate_passes() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY")));
+
+        service.correctManualFills(guardCommand(TODAY.minusDays(1), null));
+
+        verify(orderPort).saveAll(any());
+        verify(batchRunPort, never()).isReported(any(), any());
+    }
+
+    @Test
+    void correctManualFills_onlyManualCorrectionRowsOnDay_passes() {
+        stubGuardFixture(List.of(orderWithLeg(Order.UNKNOWN_LEG)));
+        lenient().when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(false);
+
+        service.correctManualFills(guardCommand(TODAY, null));
+
+        verify(orderPort).saveAll(any());
     }
 
     @Test

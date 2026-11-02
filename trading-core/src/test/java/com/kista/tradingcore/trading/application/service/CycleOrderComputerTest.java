@@ -231,6 +231,22 @@ class CycleOrderComputerTest {
         verify(orderPort, never()).sumFilledBuyAmountByCycleId(any());
     }
 
+    @Test
+    @DisplayName("INFINITE 리버스모드 2일차 — 별지점 창은 상세 있는 포지션 조회(수동 보정 행 제외)를 쓴다")
+    void compute_infiniteReverse_starPointUsesDetailBackedPositions() {
+        UUID cycleId = INFINITE_CYCLE.id();
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleId(cycleId, 2)).thenReturn(List.of(
+                new com.kista.tradingcore.trading.domain.model.CyclePositionInfiniteDetail(UUID.randomUUID(), true),
+                new com.kista.tradingcore.trading.domain.model.CyclePositionInfiniteDetail(UUID.randomUUID(), true)));
+        when(cyclePositionPort.findLatestWithInfiniteDetailByCycleId(cycleId, 5)).thenReturn(List.of());
+
+        computer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
+                LocalDate.now(), INFINITE_CYCLE, null, "테스트", CURRENT_PRICE);
+
+        verify(cyclePositionPort).findLatestWithInfiniteDetailByCycleId(cycleId, 5);
+        verify(cyclePositionPort, never()).findLatestByCycleId(any(), anyInt());
+    }
+
     // ── plan() 경유 생성 시점 cap 미적용 통합 검증 (real VrStrategy) ──────────────
 
     @Test

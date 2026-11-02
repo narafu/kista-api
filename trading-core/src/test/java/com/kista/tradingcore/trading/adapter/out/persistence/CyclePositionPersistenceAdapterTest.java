@@ -302,6 +302,25 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findLatestWithInfiniteDetailByCycleId_excludesPositionsWithoutDetail() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(10, ChronoUnit.HOURS);
+        UUID cycleId = insertCycleChain(accountId, false, false);
+        List<UUID> detailed = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            UUID id = insertPosition(cycleId, new BigDecimal(i + 1), base.plus(i, ChronoUnit.HOURS), false);
+            cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(id, false));
+            detailed.add(id);
+        }
+        // 최신 2건은 수동 보정형(상세 없음) — 창에서 제외돼야 한다
+        insertPosition(cycleId, new BigDecimal("50.00"), base.plus(4, ChronoUnit.HOURS), false);
+        insertPosition(cycleId, new BigDecimal("60.00"), base.plus(5, ChronoUnit.HOURS), false);
+
+        assertThat(cyclePositionAdapter.findLatestWithInfiniteDetailByCycleId(cycleId, 5))
+                .extracting(CyclePosition::id)
+                .containsExactly(detailed.get(2), detailed.get(1), detailed.get(0));
+    }
+
+    @Test
     void findLatestByStrategyId_returnsUpToLimitNewestFirst() {
         Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(10, ChronoUnit.HOURS);
         UUID cycleId = insertCycleChain(accountId, false, false);

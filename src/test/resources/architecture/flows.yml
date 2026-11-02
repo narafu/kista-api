@@ -43,7 +43,7 @@ landscape:
   - group: 사용자 기능
     steps:
       - {id: manual-run, title: 바로 주문·주문 취소, flow: manual-run}
-      - {id: capital-injection, title: 진행 중 사이클 자금 추가, flow: capital-injection}
+      - {id: capital-injection, title: 진행 중 사이클 투자금 추가, flow: capital-injection}
       - {id: notify-settings, title: 알림 설정, flow: notify-settings}
       - {id: finance, title: 가계부, flow: finance}
       - {id: group-share, title: 그룹 공유, flow: group-share}
@@ -854,7 +854,7 @@ flows:
         fail: 다른 사람의 전략이면 403, 없으면 404.
 
   capital-injection:
-    title: 진행 중 사이클 자금 추가 (PRIVACY·INFINITE)
+    title: 진행 중 사이클 투자금 추가 (PRIVACY·INFINITE)
     trigger: 사용자가 전략 상세에서 추가 예수금 또는 추가 주식(수량·매수단가)을 입력한다
     summary: >-
       사이클은 그대로 두고 최신 포지션 행을 갱신(예수금·주식 가산)하고, 사이클 시작 금액에도 추가분을 더한다.
@@ -863,7 +863,7 @@ flows:
       - id: inject
         lane: trading
         to: [db]
-        title: 자금 추가
+        title: 투자금 추가
         desc: >-
           POST /api/trading-cycles/{id}/capital-injection. 내 전략인지 확인하고 PRIVACY·INFINITE만 허용한다. 진행 중인 사이클 행을 잠가 수동 체결 보정과 직렬화한 뒤,
           행 잠금 뒤 사이클을 다시 읽어 종료 여부를 재확인하고, 예수금을 더하고 주식은 가중평균 평단가로 합쳐 최신 포지션 행을 갱신한다(행을 늘리지 않아 INFINITE 리버스 판정·별점가·이력이 그대로다).
@@ -1135,11 +1135,11 @@ flows:
         title: 수동 체결 보정 반영
         desc: >-
           증권사 밖에서 체결된 거래를 체결 명세 배열 순서대로 반영한다. 건마다 SELL 수량이 보유 수량을 넘지 않는지 검증하고, FILLED 주문(장마감 시점·수동 체결 표시)을 기록하고,
-          보유 수량·평단·예수금을 다시 계산해 사이클 포지션 스냅샷을 한 행씩 추가한다. 이미 종료된 사이클은 보정할 수 없다. DCA도 내부 원장이 SSOT라 보정할 수 있고(주식 정수·코인 소수 8자리 수량), 이미 반영된(또는 요청 안에서 겹치는) 증권사 주문번호가 있으면 이중 반영을 막기 위해 거부한다. 모두 한 트랜잭션이라 중간에 실패하면 전부 되돌아간다.
+          보유 수량·평단·예수금을 다시 계산해 사이클 포지션 스냅샷을 한 행씩 추가한다. 이미 종료된 사이클은 보정할 수 없다. DCA도 내부 원장이 SSOT라 보정할 수 있고(주식 정수·코인 소수 8자리 수량), 이미 반영된(또는 요청 안에서 겹치는) 증권사 주문번호가 있으면 이중 반영을 막기 위해 거부한다. 마감 리포트 전인 오늘(KST) 이후 거래일에(코인 계좌 제외) 우리 전략 주문이 있으면 주문번호 없는 체결도 거부한다 — 리포트가 같은 체결을 다시 더하지 않게 한다. 모두 한 트랜잭션이라 중간에 실패하면 전부 되돌아간다.
           현재 kista-ui에는 이 API를 호출하는 화면이 없다(확인한 범위).
         code: [ManualTradeCorrectionService#correctManualFills]
         state: "orders +N행(FILLED) · cycle_position +N행"
-        fail: 보유 수량 초과 SELL 400, 종료된 사이클 400, 최신 포지션 없음 404(NoSuchElementException), 주식 소수 수량 400, 이미 반영된 증권사 주문번호 400. 오류는 관리자 화면에 거절 사유로 보인다.
+        fail: 보유 수량 초과 SELL 400, 종료된 사이클 400, 최신 포지션 없음 404(NoSuchElementException), 주식 소수 수량 400, 이미 반영된 증권사 주문번호 400. 리포트 전 거래일의 주문번호 없는 체결 400. 오류는 관리자 화면에 거절 사유로 보인다.
 
       - id: close-cycle
         lane: trading

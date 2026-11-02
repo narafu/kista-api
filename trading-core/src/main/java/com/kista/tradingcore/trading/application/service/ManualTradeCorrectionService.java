@@ -24,6 +24,7 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,7 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 // 관리자 수동 체결 보정 — fills 순서대로 orders/cycle_position/cycle 종료를 원자적으로 반영
 @Slf4j
@@ -46,6 +50,8 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
+    private final TradingBatchRunPort batchRunPort; // 마감 리포트 완료 여부
+    private final Clock clock;
     private final ApplicationEventPublisher eventPublisher; // 사이클 종료 시 사용자 알림 — 커밋 후 이벤트로 위임
     private static final int CRYPTO_SCALE = 8; // 코인 수량 소수 자릿수 상한 (업비트)
     private final CycleOrderStrategies cycleOrderStrategies; // 청산 시 사이클 종료 여부(endsCycleOnLiquidation) SSOT
@@ -60,6 +66,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         // 사이클 행 잠금 — 동시에 들어온 같은 보정(원 요청 + 재시도)이 중복 검사를 함께 통과하지 않도록 직렬화
         strategyCyclePort.lockForUpdate(currentCycle.id());
         rejectDuplicateFills(command, currentCycle);
+        rejectUnidentifiedFillsBeforeReport(command, account, strategy);
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
                 .orElseThrow(() -> new NoSuchElementException("최신 포지션 이력이 없습니다: cycleId=" + currentCycle.id()));
         if (currentCycle.endDate() != null) {
@@ -123,6 +130,31 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         if (identified.stream().anyMatch(f -> orderPort.existsByStrategyCycleIdAndTradeDateAndExternalOrderId(
                 currentCycle.id(), f.tradeDate(), f.externalOrderId()))) {
             throw new IllegalArgumentException("이미 반영된 증권사 주문번호가 포함돼 있습니다.");
+        }
+    }
+
+    // 마감 리포트 전 거래일의 우리 주문 체결을 주문번호 없이 보정하면 리포트가 같은 체결을 다시 더해 이중 반영된다
+    // 번호가 있으면 리포트가 집계하지 않는 외부 매매거나 rejectDuplicateFills가 막는다
+    // 오늘(KST) 이후 거래일만 — 마감 리포트·재개는 KST 당일 기준이라 어제 이전은 리포트가 끝났거나 재개되지 않는다
+    // 과거에 리포트가 실패한 우리 주문 체결은 번호를 넣으면 중복 검사에 걸리므로 번호 없는 보정을 막지 않는다
+    private void rejectUnidentifiedFillsBeforeReport(ManualTradeCorrectionCommand command, Account account, Strategy strategy) {
+        // 코인 계좌는 마감 리포트를 거치지 않아(markReported 없음) isReported가 항상 false이므로 가드 제외
+        if (account.broker().getMarket().isCrypto()) return;
+        LocalDate reportableFrom = LocalDate.now(clock);
+        Set<LocalDate> dates = new java.util.TreeSet<>();
+        command.fills().stream()
+                .filter(f -> f.externalOrderId() == null || f.externalOrderId().isBlank())
+                .map(ManualTradeCorrectionCommand.Fill::tradeDate)
+                .filter(d -> !d.isBefore(reportableFrom))
+                .forEach(dates::add);
+        for (LocalDate date : dates) {
+            if (batchRunPort.isReported(date, strategy.id())) continue;
+            // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니므로 제외
+            boolean hasStrategyOrder = orderPort.findByStrategyId(strategy.id(), date, date).stream()
+                    .anyMatch(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()));
+            if (hasStrategyOrder) {
+                throw new IllegalArgumentException("마감 리포트 전인 거래일의 체결은 증권사 주문번호를 함께 입력해야 합니다.");
+            }
         }
     }
 

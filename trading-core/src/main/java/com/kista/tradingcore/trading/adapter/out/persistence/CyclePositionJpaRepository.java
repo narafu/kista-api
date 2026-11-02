@@ -18,6 +18,15 @@ interface CyclePositionJpaRepository extends JpaRepository<CyclePositionEntity, 
     // strategy_cycle_id 기준 최신 N건 — 건수는 Pageable이 정한다(Top/First를 붙이면 PartTree가 1건으로 고정) (@SQLRestriction: deleted_at IS NULL 자동 적용)
     List<CyclePositionEntity> findByStrategyCycleIdOrderByCreatedAtDesc(UUID strategyCycleId, Pageable pageable);
 
+    // INFINITE 상세(cycle_position_infinite)가 있는 최신 N건 — 수동 보정 행은 상세가 없어 제외 (native라 deleted_at 수동 명시, 건수는 Pageable)
+    @Query(value = """
+            SELECT cp.* FROM cycle_position cp
+            JOIN cycle_position_infinite cpi ON cpi.cycle_position_id = cp.id
+            WHERE cp.strategy_cycle_id = :cycleId AND cp.deleted_at IS NULL AND cpi.deleted_at IS NULL
+            ORDER BY cp.created_at DESC, cp.id DESC
+            """, nativeQuery = true)
+    List<CyclePositionEntity> findLatestWithInfiniteDetailByCycleId(@Param("cycleId") UUID cycleId, Pageable pageable);
+
     // strategy_cycle_id 기준 개장 포지션 1건 (@SQLRestriction: deleted_at IS NULL 자동 적용)
     Optional<CyclePositionEntity> findTop1ByStrategyCycleIdOrderByCreatedAtAsc(UUID strategyCycleId);
 

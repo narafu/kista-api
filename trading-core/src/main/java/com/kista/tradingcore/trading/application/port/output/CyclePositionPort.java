@@ -24,6 +24,9 @@ public interface CyclePositionPort {
     // 사이클 ID 기준 최신 N개 포지션 (리버스모드 별지점 계산용 — 최근 closing_price 추출)
     List<CyclePosition> findLatestByCycleId(UUID cycleId, int limit);
 
+    // INFINITE 상세가 있는 최신 포지션 N건 — 리포트·등록 개장 행만, 수동 보정·로테이션 개장 행 제외(새 사이클은 보유 0 시작이라 리버스 전 창이 리포트 행으로 참)
+    List<CyclePosition> findLatestWithInfiniteDetailByCycleId(UUID cycleId, int limit);
+
     // 사이클 ID 기준 최신 포지션 1건 — findLatestByCycleId(id, 1).stream().findFirst() 축약
     default Optional<CyclePosition> findLatestOne(UUID cycleId) {
         return findLatestByCycleId(cycleId, 1).stream().findFirst();
@@ -69,7 +72,7 @@ public interface CyclePositionPort {
     // holdings=0 시작점 시드 수정 — 최신 시작점 스냅샷 in-place 갱신
     void updateCycleStartSnapshot(UUID strategyId, BigDecimal newDeposit);
 
-    // 특정 포지션 행의 잔고(보유·평단·예수금) in-place 갱신 — 자금 추가용(행·detail 유지)
+    // 특정 포지션 행의 잔고(보유·평단·예수금) in-place 갱신 — 투자금 추가용(행·detail 유지)
     void updateBalance(UUID cyclePositionId, AccountBalance balance);
 
     // 전략 삭제 시 포지션 일괄 소프트 삭제

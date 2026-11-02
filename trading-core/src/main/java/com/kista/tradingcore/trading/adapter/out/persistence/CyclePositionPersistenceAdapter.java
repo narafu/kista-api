@@ -66,6 +66,14 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     }
 
     @Override
+    public List<CyclePosition> findLatestWithInfiniteDetailByCycleId(UUID cycleId, int limit) {
+        return positionRepo.findLatestWithInfiniteDetailByCycleId(cycleId, PageRequest.of(0, limit))
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<CyclePosition> findFirstOne(UUID cycleId) {
         return positionRepo.findTop1ByStrategyCycleIdOrderByCreatedAtAsc(cycleId)
                 .map(this::toDomain);

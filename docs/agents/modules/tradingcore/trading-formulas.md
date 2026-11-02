@@ -36,7 +36,7 @@ BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준�
 
 ### 리버스모드 별지점 (변경 금지)
 ```
-starPointPrice = 현재 사이클 최신 cycle_position 5건(STAR_POINT_WINDOW)의 closingPrice 평균  (scale=2, HALF_UP — null·0 이하 종가 제외, 남는 값이 없으면 null)
+starPointPrice = 현재 사이클에서 INFINITE 상세(cycle_position_infinite)가 있는 최신 cycle_position 5건(STAR_POINT_WINDOW — 마감 리포트·등록 개장 행. 수동 체결 보정 행은 체결가가 종가 자리에 들어가므로 제외. 로테이션 개장 행은 detail이 없어 제외되나 새 사이클은 보유 0에서 시작해 리버스 진입 전에 창이 리포트 행으로 채워져 영향 없음)의 closingPrice 평균  (scale=2, HALF_UP — null·0 이하 종가 제외, 남는 값이 없으면 null)
 LOC 매도 가격 = starPointPrice, 쿼터매수 LOC 가격 = starPointPrice − 0.01(TICK_SIZE)
 ```
 - 리버스모드 첫날은 별지점 없이 MOC 매도만 낸다 — 별지점은 2일차부터 계산(`CycleOrderComputer.computeStarPointPrice`)
@@ -82,7 +82,7 @@ V' = V + pool/G + recurringAmount + (평가금 − V) / (2√G)  (scale=2 HALF_U
 - 가격 캡: `buyPrice > currentPrice × 1.05`(`PriceCapPolicy`, INFINITE/PRIVACY의 `BuyOrderPriceCapper`와 공용) 이면 cap 가격으로 교체 — scale=2 HALF_UP (currentPrice=null이면 미적용). VR은 매수 사다리 생성 시점(`VrStrategy.buildBuyOrders`)에는 캡을 적용하지 않고, 접수 직전 `BuyOrderPriceCapper`가 `VrCycleOrderStrategy.capBuyOrders()`를 거쳐 `VrStrategy.buildCappedBuyOrders()`로 재산정한다 — INFINITE/PRIVACY와 동일한 공통 보정 경로(전략별 다형성 디스패치는 `CycleOrderStrategy.capBuyOrders()`)
 - rollover due 조건: `cycle.startDate() + intervalWeeks ≤ today` (당일 포함)
 - V′ ≤ 0이면 롤오버 보류 — 사이클 유지, 관리자·사용자 알림. V=0·holdings=0인 채로 롤오버가 진행되는 경우도 `nextValue()` 결과를 그대로 쓴다(예전 존재했던 "V 강제 0 유지" 가드는 폐기됨) — `pool/G+recurringAmount` 항으로 다음 사이클 V가 자연 성장하고, 실제 매수는 항상 pool/poolLimit 실측 잔고 한도 내에서만 이뤄지므로 과다지출 위험이 없다
-- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
+- **운영 중 재설정** (`PUT /api/trading-cycles/{id}/vr-config`, `VrReconfigureUseCase`/`VrReconfigureService`): 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 투자금 추가/인출(수량/예수금)을 "새 `strategy_vr_version` 발급 + 강제 롤오버(현재 사이클 종료→새 사이클 즉시 생성)" 단일 메커니즘으로 처리. VR 전용, 소유권 검증 필수
   - 램프 시계(경과주수)는 재설정해도 리셋하지 않음 — 항상 전략 최초 사이클 startDate 기준
   - 순수 파라미터 수정: V·holdings·usdDeposit 이월. 수량 주입 +N주(단가 Pc): `holdings+=N`, `avgPrice` 가중평균, `V+=N×현재가`. 수량 인출 -N주: holdings·V 감소, 잔여 평단가 유지. 예수금 주입/인출은 usdDeposit만 증감하고 V는 불변
-  - 검증 순서: 램프 파라미터·자본 주입 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정
+  - 검증 순서: 램프 파라미터·투자금 추가 형태(수량 음수 금지 등)·인출식 최소자산 재검증까지 모두 통과한 뒤에만 브로커 미체결 주문 취소(`OrderCancelService`, 별도 트랜잭션이라 이후 실패해도 롤백 불가)를 호출 — 검증 실패 시 브로커에 실주문 취소가 나가지 않도록 순서 고정
