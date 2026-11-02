@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
 
-// 진행 중 사이클 자금 추가 요청 — 예수금·주식 중 최소 하나 필수(서비스에서 검증), 주식은 수량·단가 동시 지정
+// 진행 중 사이클 투자금 추가 요청 — 예수금·주식 중 최소 하나 필수(서비스에서 검증), 주식은 수량·단가 동시 지정
 public record CapitalInjectionRequest(
         @Schema(description = "추가할 예수금 (USD, null=추가 없음)", example = "500.00")
         @Positive BigDecimal depositAmount,

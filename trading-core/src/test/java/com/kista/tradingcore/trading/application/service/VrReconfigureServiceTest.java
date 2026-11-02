@@ -53,7 +53,7 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyCycleSeedType;
 
-// VrReconfigureService 단위 테스트 — 순수 파라미터 수정/자본 주입/램프 시계·검증/소유권 분기 검증
+// VrReconfigureService 단위 테스트 — 순수 파라미터 수정/투자금 추가/램프 시계·검증/소유권 분기 검증
 // package-private VrReconfigureService와 같은 패키지에 위치 (application.service.trading)
 @ExtendWith(MockitoExtension.class)
 @DisplayName("VrReconfigureService 단위 테스트")
@@ -155,7 +155,7 @@ class VrReconfigureServiceTest {
                 r.postBalance(), r.closingPrice(), r.newValue(), r.weeks());
     }
 
-    // --- 1) 순수 파라미터 수정 (자본 주입 없음) ---
+    // --- 1) 순수 파라미터 수정 (투자금 추가 없음) ---
 
     @Test
     @DisplayName("순수 파라미터 수정: bandWidth만 변경 → V 이월, holdings/usdDeposit 불변, 나머지 램프값 상속")
@@ -178,7 +178,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.pGraceWeeks()).isEqualTo(currentDetail.pGraceWeeks());
         assertThat(captured.pStepWeeks()).isEqualTo(currentDetail.pStepWeeks());
         assertThat(captured.poolLimitFloor()).isEqualByComparingTo(currentDetail.poolLimitFloor());
-        // 자본 주입 없음 → holdings/usdDeposit 불변, V 이월
+        // 투자금 추가 없음 → holdings/usdDeposit 불변, V 이월
         assertThat(captured.postBalance().holdings()).isEqualTo(latestPosition.holdings());
         assertThat(captured.postBalance().usdDeposit()).isEqualByComparingTo(latestPosition.usdDeposit());
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
@@ -241,7 +241,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
     }
 
-    // --- 3-1) 자본 인출 ---
+    // --- 3-1) 투자금 인출 ---
 
     @Test
     @DisplayName("수량 인출: holdings 감소, 평단가는 그대로 유지, V -= 인출수량×현재가")
@@ -276,7 +276,7 @@ class VrReconfigureServiceTest {
     }
 
     @Test
-    @DisplayName("인출 주식 수가 보유 수량을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
+    @DisplayName("투자금 인출 주식 수가 보유 수량을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
     void reconfigure_withdrawSharesExceedsHoldings_throws() {
         stubHappyPathChain();
         // latestPosition.holdings() == 10
@@ -289,7 +289,7 @@ class VrReconfigureServiceTest {
     }
 
     @Test
-    @DisplayName("인출 예수금이 보유 예수금을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
+    @DisplayName("투자금 인출 예수금이 보유 예수금을 초과 → IllegalArgumentException, cycleSnapshotCreator 미호출")
     void reconfigure_withdrawDepositExceedsBalance_throws() {
         stubHappyPathChain();
         // latestPosition.usdDeposit() == 500.00

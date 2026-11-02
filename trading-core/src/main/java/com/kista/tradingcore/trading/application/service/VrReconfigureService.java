@@ -36,7 +36,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
-// VR 전략 운영 중 재설정 — 램프 파라미터 교체(새 버전 발급) + 강제 롤오버(현재 사이클 종료→새 사이클) + 선택적 자본 주입
+// VR 전략 운영 중 재설정 — 램프 파라미터 교체(새 버전 발급) + 강제 롤오버(현재 사이클 종료→새 사이클) + 선택적 투자금 추가
 // 램프 시계(경과 주수)는 전략 최초 사이클 startDate 기준으로 고정 — 재설정해도 리셋하지 않음(VrCycleRolloverService와 동일 정책)
 // package-private — application/service/trading 패키지 전용 (CycleSnapshotCreator·OrderCancelService 재사용을 위해 같은 패키지 위치)
 @Slf4j
@@ -78,11 +78,11 @@ class VrReconfigureService implements VrReconfigureUseCase {
         int intervalWeeks = cmd.intervalWeeks() != null ? cmd.intervalWeeks() : currentDetail.intervalWeeks();
         int recurringAmount = cmd.recurringAmount() != null ? cmd.recurringAmount() : currentDetail.recurringAmount();
 
-        // 램프 파라미터 + 자본 주입 형태(주식 수·단가·예수금 부호) 검증 — 외부 브로커 호출(가격 조회·주문 취소) 이전에 전부 완료
+        // 램프 파라미터 + 투자금 추가 형태(주식 수·단가·예수금 부호) 검증 — 외부 브로커 호출(가격 조회·주문 취소) 이전에 전부 완료
         VrRampParams ramp = cmd.vrRamp().inheritFrom(currentDetail);
         ramp.validate(intervalWeeks, bandWidth);
 
-        // 자본 주입/인출 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
+        // 투자금 추가/인출 반영 (수량·예수금) — 결정 9: 순수 파라미터 수정=V 이월/보유량 불변. 현재가 불필요(가격 조회 전 계산 가능)
         AccountBalance postBalance = applyCapitalAdjustment(cmd, latestPosition);
 
         // 현재가 조회 — 수량 주입 시 V 증분·holdings 승계 스냅샷 종가 기준 (구조적 검증 통과 후에만 호출, 실패 시 불필요한 API 호출 방지)
@@ -123,34 +123,34 @@ class VrReconfigureService implements VrReconfigureUseCase {
         }
     }
 
-    // 자본 주입/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: usdDeposit+=X
+    // 투자금 추가/인출 계산 — injectShares>0: holdings+=N, 평단가 가중평균, V+=N×현재가 / injectDeposit: usdDeposit+=X
     // withdrawShares>0: holdings-=N(보유량 초과 불가, 평단가는 그대로 유지 — 잔여 수량의 원가는 불변) / withdrawDeposit: usdDeposit-=X(보유 예수금 초과 불가)
     // 인출을 먼저 반영한 뒤(잔여 수량 기준) 주입의 가중평균을 계산 — 같은 요청에서 인출+주입이 함께 와도 순서가 명확하도록
     // 아무것도 없으면 holdings·avgPrice·usdDeposit 그대로 이월(순수 파라미터 수정)
     private AccountBalance applyCapitalAdjustment(ReconfigureVrCommand cmd, CyclePosition latestPosition) {
         int injectShares = cmd.injectShares() != null ? cmd.injectShares() : 0;
         if (injectShares < 0) {
-            throw new IllegalArgumentException("주입 주식 수는 0 이상이어야 합니다.");
+            throw new IllegalArgumentException("투자금 추가 주식 수는 0 이상이어야 합니다.");
         }
         BigDecimal injectDeposit = cmd.injectDeposit() != null ? cmd.injectDeposit() : BigDecimal.ZERO;
         if (injectDeposit.signum() < 0) {
-            throw new IllegalArgumentException("주입 예수금은 0 이상이어야 합니다.");
+            throw new IllegalArgumentException("투자금 추가 예수금은 0 이상이어야 합니다.");
         }
         int withdrawShares = cmd.withdrawShares() != null ? cmd.withdrawShares() : 0;
         if (withdrawShares < 0) {
-            throw new IllegalArgumentException("인출 주식 수는 0 이상이어야 합니다.");
+            throw new IllegalArgumentException("투자금 인출 주식 수는 0 이상이어야 합니다.");
         }
         if (withdrawShares > latestPosition.toBalance().wholeShares()) {
             throw new IllegalArgumentException(
-                    "인출 주식 수는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다.");
+                    "투자금 인출 주식 수는 보유 수량(" + latestPosition.holdings() + ")을 초과할 수 없습니다.");
         }
         BigDecimal withdrawDeposit = cmd.withdrawDeposit() != null ? cmd.withdrawDeposit() : BigDecimal.ZERO;
         if (withdrawDeposit.signum() < 0) {
-            throw new IllegalArgumentException("인출 예수금은 0 이상이어야 합니다.");
+            throw new IllegalArgumentException("투자금 인출 예수금은 0 이상이어야 합니다.");
         }
         if (withdrawDeposit.compareTo(latestPosition.usdDeposit()) > 0) {
             throw new IllegalArgumentException(
-                    "인출 예수금은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다.");
+                    "투자금 인출 예수금은 보유 예수금(" + latestPosition.usdDeposit() + ")을 초과할 수 없습니다.");
         }
 
         int holdingsAfterWithdrawal = latestPosition.toBalance().wholeShares() - withdrawShares; // VR은 주식 — 정수 수량
@@ -158,7 +158,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         BigDecimal newAvgPrice;
         if (injectShares > 0) {
             if (cmd.injectSharePrice() == null || cmd.injectSharePrice().signum() <= 0) {
-                throw new IllegalArgumentException("주식 주입 시 매수단가는 0보다 커야 합니다.");
+                throw new IllegalArgumentException("투자금 추가 주식의 매수단가는 0보다 커야 합니다.");
             }
             BigDecimal existingCost = latestPosition.avgPrice() != null
                     ? latestPosition.avgPrice().multiply(BigDecimal.valueOf(holdingsAfterWithdrawal))

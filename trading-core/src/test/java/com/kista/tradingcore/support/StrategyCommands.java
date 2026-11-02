@@ -88,11 +88,11 @@ public final class StrategyCommands {
         private Integer intervalWeeks;                 // 리밸런싱 주기
         private Integer recurringAmount;               // 주기당 추가 예수금
         private VrRampInput vrRamp = VrRampInput.NONE; // 램프 입력
-        private Integer injectShares;                  // 주입 주식 수
+        private Integer injectShares;                  // 투자금 추가 주식 수
         private BigDecimal injectSharePrice;           // 주입 주식 매수단가
-        private BigDecimal injectDeposit;              // 주입 예수금
-        private Integer withdrawShares;                // 인출 주식 수
-        private BigDecimal withdrawDeposit;            // 인출 예수금
+        private BigDecimal injectDeposit;              // 투자금 추가 예수금
+        private Integer withdrawShares;                // 투자금 인출 주식 수
+        private BigDecimal withdrawDeposit;            // 투자금 인출 예수금
 
         private Reconfigure() {
         }

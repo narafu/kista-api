@@ -1641,7 +1641,7 @@ class StrategyServiceTest {
     }
 
     @Test
-    @DisplayName("동등성: 최신 사이클이 종료된 전략 — 단건·목록 모두 cycleInProgress=false (자금 추가 NO_ACTIVE_CYCLE 기준)")
+    @DisplayName("동등성: 최신 사이클이 종료된 전략 — 단건·목록 모두 cycleInProgress=false (투자금 추가 NO_ACTIVE_CYCLE 기준)")
     void equivalence_endedCycle_cycleNotInProgress() {
         UUID strategyId = UUID.randomUUID();
         UUID cycleId = UUID.randomUUID();

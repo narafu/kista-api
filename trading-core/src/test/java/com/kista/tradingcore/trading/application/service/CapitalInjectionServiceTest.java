@@ -161,7 +161,7 @@ class CapitalInjectionServiceTest {
         when(strategyCyclePort.requireLatestByStrategyId(strategyId)).thenReturn(open, ended);
 
         assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
-                .isInstanceOf(IllegalStateException.class).hasMessage("진행 중인 사이클이 없어 자금을 추가할 수 없습니다.");
+                .isInstanceOf(IllegalStateException.class).hasMessage("진행 중인 사이클이 없어 투자금을 추가할 수 없습니다.");
         verify(cyclePositionPort, never()).updateBalance(any(), any());
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
     }
@@ -211,7 +211,7 @@ class CapitalInjectionServiceTest {
             when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(
                     new Strategy(strategyId, accountId, type, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE));
             assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
-                    .isInstanceOf(IllegalArgumentException.class).hasMessage("자금 추가는 PRIVACY·INFINITE 전략만 지원합니다.");
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("투자금 추가는 PRIVACY·INFINITE 전략만 지원합니다.");
         }
         verify(cyclePositionPort, never()).save(any());
     }
@@ -220,7 +220,7 @@ class CapitalInjectionServiceTest {
     void rejects_endedCycle() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), LocalDate.of(2026, 2, 1));
         assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
-                .isInstanceOf(IllegalStateException.class).hasMessage("진행 중인 사이클이 없어 자금을 추가할 수 없습니다.");
+                .isInstanceOf(IllegalStateException.class).hasMessage("진행 중인 사이클이 없어 투자금을 추가할 수 없습니다.");
         verify(strategyCyclePort, never()).lockForUpdate(any());
     }
 }

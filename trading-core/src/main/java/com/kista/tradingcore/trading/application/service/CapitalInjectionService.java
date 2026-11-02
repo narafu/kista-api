@@ -20,14 +20,14 @@ import java.math.RoundingMode;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
-// 진행 중 사이클 자금 추가 — 사이클은 유지하고 최신 포지션 행을 in-place 갱신(append하면 리버스 판정·별점가·이력이 왜곡), startAmount에 추가분을 가산한다 (브로커 호출·주문 취소 없음)
+// 진행 중 사이클 투자금 추가 — 사이클은 유지하고 최신 포지션 행을 in-place 갱신(append하면 리버스 판정·별점가·이력이 왜곡), startAmount에 추가분을 가산한다 (브로커 호출·주문 취소 없음)
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 class CapitalInjectionService implements InjectCapitalUseCase {
 
-    private static final String NO_ACTIVE_CYCLE = "진행 중인 사이클이 없어 자금을 추가할 수 없습니다.";
+    private static final String NO_ACTIVE_CYCLE = "진행 중인 사이클이 없어 투자금을 추가할 수 없습니다.";
 
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
@@ -52,7 +52,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
             throw new IllegalArgumentException("추가 금액과 수량은 0보다 커야 합니다.");
         }
         if (!strategy.isPrivacy() && !strategy.isInfinite()) {
-            throw new IllegalArgumentException("자금 추가는 PRIVACY·INFINITE 전략만 지원합니다.");
+            throw new IllegalArgumentException("투자금 추가는 PRIVACY·INFINITE 전략만 지원합니다.");
         }
         // ponytail: StrategyStatus가 ACTIVE/PAUSED 두 값뿐이라 상태 검사는 생략 — 값이 늘면 여기서 거른다
         StrategyCycle locked = strategyCyclePort.requireLatestByStrategyId(strategyId);
@@ -87,7 +87,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), cycle.startAmount().add(deposit).add(injectedCost));
 
-        log.info("[strategyId={}] 자금 추가: deposit={}, shares={}, sharePrice={}, holdings={}, usdDeposit={}",
+        log.info("[strategyId={}] 투자금 추가: deposit={}, shares={}, sharePrice={}, holdings={}, usdDeposit={}",
                 strategyId, deposit, shares, cmd.sharePrice(), newBalance.holdings(), newBalance.usdDeposit());
     }
 }

@@ -2155,7 +2155,7 @@ class TradingServiceTest {
         verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
     }
 
-    // 계획 시점 잔고(X)가 아니라 리포트 시점 최신 포지션(Y, 사이에 append된 자금 추가·수동 보정)이 스냅샷 기준이어야 한다
+    // 계획 시점 잔고(X)가 아니라 리포트 시점 최신 포지션(Y, 사이에 append된 투자금 추가·수동 보정)이 스냅샷 기준이어야 한다
     @Test
     void report_usesLatestPositionAtReportTime_notPlanTimeBalance() throws InterruptedException {
         LocalDate today = LocalDate.now(FIXED);

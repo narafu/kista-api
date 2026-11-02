@@ -159,7 +159,7 @@ class TradingService {
     }
 
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 남은 마감 대기 후 리포트 마커 없는 전략만 리포트
-    // 사전 잔고는 최신 cycle_position(리포트 직전 재조회 — 계획 이후 append된 자금 추가·보정 스냅샷 포함), 리포트 대상 주문은 당일 접수된 적 있는 주문(externalOrderId 보유)
+    // 사전 잔고는 최신 cycle_position(리포트 직전 재조회 — 계획 이후 append된 투자금 추가·보정 스냅샷 포함), 리포트 대상 주문은 당일 접수된 적 있는 주문(externalOrderId 보유)
     void resumeCloseReport(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         runState.track(() -> {
             LocalDate today = LocalDate.now(clock);
@@ -249,7 +249,7 @@ class TradingService {
                 .map(ps -> new TradingParallelRunner.Task<Void>(
                         ps.state().ctx().account().id(),
                         () -> batchGuard.runSafely("체결 리포트", ps.state().ctx(), () -> {
-                            // 계획 시점 잔고는 메모리에 오래 남아 그 사이 append된 스냅샷(자금 추가·수동 보정)을 덮어쓰므로 최신 행으로 재조회
+                            // 계획 시점 잔고는 메모리에 오래 남아 그 사이 append된 스냅샷(투자금 추가·수동 보정)을 덮어쓰므로 최신 행으로 재조회
                             // ponytail: 재조회~스냅샷 저장 사이 ms 단위 경합은 남음(리포터가 사이클 락을 잡지 않음) — 필요 시 리포터에서 lockForUpdate
                             AccountBalance reportBalance = cyclePositionPort.findLatestOne(ps.state().ctx().currentCycle().id())
                                     .map(CyclePosition::toBalance).orElse(ps.state().balance());
