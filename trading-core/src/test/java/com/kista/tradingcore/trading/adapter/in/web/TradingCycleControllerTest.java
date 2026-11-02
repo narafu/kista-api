@@ -32,7 +32,9 @@ import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
 import com.kista.tradingcore.trading.application.usecase.TradingExecutionUseCase;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
+import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
 import com.kista.tradingcore.trading.application.usecase.VrReconfigureUseCase;
+import com.kista.tradingcore.trading.domain.model.InjectCapitalCommand;
 import com.kista.tradingcore.trading.domain.model.VrSummary;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -78,6 +80,7 @@ class TradingCycleControllerTest {
     @MockitoBean StrategyUseCase tradingCycle;
     @MockitoBean TradingExecutionUseCase tradingExecution;
     @MockitoBean VrReconfigureUseCase vrReconfigure;
+    @MockitoBean InjectCapitalUseCase injectCapital;
     @MockitoBean DcaConfigUseCase dcaConfig;
     @MockitoBean DcaExecutionQuery dcaExecutionQuery;
 
@@ -431,6 +434,32 @@ class TradingCycleControllerTest {
                         .content("{\"injectShares\": -1}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(vrReconfigure);
+    }
+
+    @Test
+    void injectCapital_success_returns200() throws Exception {
+        Strategy strategy = new Strategy(CYCLE_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
+                StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        when(tradingCycle.getById(eq(CYCLE_ID), any())).thenReturn(
+                new StrategyDetail(strategy, new BigDecimal("2000"), LocalDate.now(), null, false, null, 0, null, null));
+
+        mockMvc.perform(post("/api/trading-cycles/{id}/capital-injection", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositAmount\": 500.00, \"shares\": 10, \"sharePrice\": 45.50}"))
+                .andExpect(status().isOk());
+        verify(injectCapital).inject(eq(CYCLE_ID), eq(USER_ID),
+                eq(new InjectCapitalCommand(new BigDecimal("500.00"), 10, new BigDecimal("45.50"))));
+    }
+
+    @Test
+    void injectCapital_negativeDeposit_returns400() throws Exception {
+        mockMvc.perform(post("/api/trading-cycles/{id}/capital-injection", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"depositAmount\": -1}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(injectCapital);
     }
 
     private static final String KEY = "11111111-1111-1111-1111-111111111111";

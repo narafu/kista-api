@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.port.output;
 
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 
@@ -67,6 +68,9 @@ public interface CyclePositionPort {
 
     // holdings=0 시작점 시드 수정 — 최신 시작점 스냅샷 in-place 갱신
     void updateCycleStartSnapshot(UUID strategyId, BigDecimal newDeposit);
+
+    // 특정 포지션 행의 잔고(보유·평단·예수금) in-place 갱신 — 자금 추가용(행·detail 유지)
+    void updateBalance(UUID cyclePositionId, AccountBalance balance);
 
     // 전략 삭제 시 포지션 일괄 소프트 삭제
     void deleteByStrategyId(UUID strategyId);

@@ -231,7 +231,7 @@ class TradingServiceTest {
                 marketEventNotifier,
                 new TradingParallelRunner(0), // 순차 모드 — 기존 테스트 결정성 보존
                 batchGuard, candidatePlanner, batchRunPort, runState, balanceLoader, dcaDetailPort,
-                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, FIXED);
+                new PrivacyBaseGuard(privacyValidation, eventPublisher), cycleStrategies, cycleHistoryPort, FIXED);
         // 기준표 장전 점검 기본값: 이슈 없음 — 가드 발동 시나리오만 개별 stub
         lenient().when(privacyValidation.inspect(any(PrivacyTradeBase.class)))
                 .thenReturn(new com.kista.tradingcore.privacy.domain.model.PrivacyTradeValidationReport(List.of()));
@@ -2152,6 +2152,32 @@ class TradingServiceTest {
         verify(cycleHistoryPort, never()).findLatestOneByStrategyId(STRATEGY.id());
         verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(idleCycle.id())));
         verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    // 계획 시점 잔고(X)가 아니라 리포트 시점 최신 포지션(Y, 사이에 append된 자금 추가·수동 보정)이 스냅샷 기준이어야 한다
+    @Test
+    void report_usesLatestPositionAtReportTime_notPlanTimeBalance() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        Order placed = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-1", null, null);
+        when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(false);
+        when(orderPort.findByStrategyId(STRATEGY.id(), today, today)).thenReturn(List.of(placed));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        // X: 계획 시점 잔고(balanceLoader 경유)
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(new CyclePosition(
+                null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
+        // Y: 리포트 시점 최신 포지션
+        when(cycleHistoryPort.findLatestOne(STRATEGY_CYCLE.id())).thenReturn(Optional.of(new CyclePosition(
+                UUID.randomUUID(), STRATEGY_CYCLE.id(), new BigDecimal("1777.00"), PRICE, PRICE, BigDecimal.valueOf(15), null, null)));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of(
+                new Execution(today, StrategyTicker.SOXL, OrderDirection.BUY, 1, PRICE, PRICE, "ORD-1")));
+
+        service.resumeCloseReport(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // Y(15주, 1777.00)에 이 체결(BUY 1주 × PRICE)이 얹힌다 — X(10주, 1000.00) 기준이 아님
+        verify(cycleHistoryPort).save(argThat(p -> p.holdings().compareTo(BigDecimal.valueOf(16)) == 0
+                && p.usdDeposit().compareTo(new BigDecimal("1777.00").subtract(PRICE)) == 0));
     }
 
     @Test

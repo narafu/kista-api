@@ -1,4 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchGuard;
 import com.kista.tradingcore.trading.application.service.support.TradingParallelRunner;
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
@@ -64,6 +67,7 @@ class TradingService {
     private final StrategyDcaDetailPort dcaDetailPort;         // 개장 전 접수 대상(KIS DCA MOO) 판별용 DCA 설정 조회
     private final PrivacyBaseGuard privacyBaseGuard;           // PRIVACY 기준표 장전 점검 — 이슈 시 신규 PRIVACY 주문 생성 차단
     private final CycleOrderStrategies cycleOrderStrategies;   // 리포트 재개 대상 판정 — 주문 0건이어도 롤오버 판정이 필요한 전략(VR)
+    private final CyclePositionPort cyclePositionPort;       // 리포트 직전 최신 포지션 재조회 — 계획~리포트 사이 append된 스냅샷 보존
     private final Clock clock;                                 // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 증권사 접수 결과: 사이클 상태 + 접수된 주문 목록
@@ -155,7 +159,7 @@ class TradingService {
     }
 
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 남은 마감 대기 후 리포트 마커 없는 전략만 리포트
-    // 사전 잔고는 최신 cycle_position(리포트 전이므로 계획 시점과 동일), 리포트 대상 주문은 당일 접수된 적 있는 주문(externalOrderId 보유)
+    // 사전 잔고는 최신 cycle_position(리포트 직전 재조회 — 계획 이후 append된 자금 추가·보정 스냅샷 포함), 리포트 대상 주문은 당일 접수된 적 있는 주문(externalOrderId 보유)
     void resumeCloseReport(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
         runState.track(() -> {
             LocalDate today = LocalDate.now(clock);
@@ -241,7 +245,11 @@ class TradingService {
                 .map(ps -> new TradingParallelRunner.Task<Void>(
                         ps.state().ctx().account().id(),
                         () -> batchGuard.runSafely("체결 리포트", ps.state().ctx(), () -> {
-                            reporter.recordAndNotify(today, ps.state().ctx(), ps.state().balance(),
+                            // 계획 시점 잔고는 메모리에 오래 남아 그 사이 append된 스냅샷(자금 추가·수동 보정)을 덮어쓰므로 최신 행으로 재조회
+                            // ponytail: 재조회~스냅샷 저장 사이 ms 단위 경합은 남음(리포터가 사이클 락을 잡지 않음) — 필요 시 리포터에서 lockForUpdate
+                            AccountBalance reportBalance = cyclePositionPort.findLatestOne(ps.state().ctx().currentCycle().id())
+                                    .map(CyclePosition::toBalance).orElse(ps.state().balance());
+                            reporter.recordAndNotify(today, ps.state().ctx(), reportBalance,
                                     closingPrices.get(ps.state().ctx().strategy().ticker()),
                                     ps.mainOrders(), ps.state().privacyBase());
                             return null;

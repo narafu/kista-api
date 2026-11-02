@@ -43,6 +43,7 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - **holdings=0에도 사이클 유지** — `endsCycleOnLiquidation()=false`, `CyclePositionPersistor`가 종료 미발동
 - **N주 롤오버**: `VrCycleRolloverService.rollIfDue()` — `CyclePositionPersistor`의 포지션 저장 직후 매일 판정, due이면 V′ 계산 후 기존 사이클 종료 + 새 사이클 원자 생성 (V′≤0 보류 등 규칙 → trading-formulas.md). gradient·poolLimitRate는 스냅샷 이월이 아닌 전략 최초 사이클 startDate 기준 경과주수로 매번 재계산
 - **운영 중 재설정**: `VrReconfigureService`(package-private) + `VrReconfigureUseCase` — `PUT /api/trading-cycles/{id}/vr-config`로 밴드폭·주기·적립금·램프 파라미터 수정 + 선택적 자본 주입/인출을 새 버전 발급+강제 롤오버 1회로 처리. 상세 규칙 → trading-formulas.md "VR 공식"
+- **진행 중 자금 추가**: `CapitalInjectionService`(package-private) + `InjectCapitalUseCase` — `POST /api/trading-cycles/{id}/capital-injection`(PRIVACY·INFINITE만). 사이클을 유지하고 `lockForUpdate` 후 잠금 뒤 재조회한 사이클의 최신 포지션 행을 in-place 갱신(예수금·주식 가중평균 평단가 — append하면 INFINITE 리버스 판정·별점가·이력이 왜곡, `updateSeed`와 같은 방식), `startAmount`에 추가분 가산(위 비-VR `holdings=0` 갱신 규칙의 예외). 마감 리포트(`TradingService.reportAll`)는 저장 직전 최신 포지션을 재조회해 이런 중간 변경을 덮어쓰지 않는다
 
 ### Account ↔ Strategy 분리
 계좌·전략은 별도 aggregate — 필드 구성은 코드가 SSOT, 아래는 코드로 자명하지 않은 제약·역할만 기록.

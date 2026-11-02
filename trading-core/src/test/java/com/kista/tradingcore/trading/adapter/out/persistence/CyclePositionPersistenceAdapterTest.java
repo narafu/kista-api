@@ -108,6 +108,31 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void updateBalance_updatesOnlyBalanceFieldsInPlace() {
+        Strategy strategy = strategyAdapter.save(new Strategy(
+                null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
+        StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
+                null, strategy.id(), version.id(), new BigDecimal("1000.00"), null, LocalDate.now(), null, null, null));
+        CyclePosition saved = cyclePositionAdapter.save(new CyclePosition(
+                null, cycle.id(), new BigDecimal("900.00"), new BigDecimal("30.00"), BigDecimal.TEN, BigDecimal.valueOf(5), null, null));
+        entityManager.flush();
+
+        cyclePositionAdapter.updateBalance(saved.id(), new com.kista.tradingcore.matching.domain.model.AccountBalance(
+                BigDecimal.valueOf(8), new BigDecimal("12.5000"), new BigDecimal("1200.00")));
+        entityManager.flush();
+        entityManager.clear();
+
+        CyclePosition reloaded = cyclePositionAdapter.findLatestOne(cycle.id()).orElseThrow();
+        assertThat(reloaded.id()).isEqualTo(saved.id());
+        assertThat(reloaded.holdings()).isEqualByComparingTo("8");
+        assertThat(reloaded.avgPrice()).isEqualByComparingTo("12.5000");
+        assertThat(reloaded.usdDeposit()).isEqualByComparingTo("1200.00");
+        assertThat(reloaded.closingPrice()).isEqualByComparingTo("30.00");
+    }
+
+    @Test
     void save_holdings_numericRoundTrip_normalized() {
         Strategy strategy = strategyAdapter.save(new Strategy(
                 null, accountId, StrategyType.INFINITE,

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -148,6 +150,16 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         positionRepo.save(latest);
     }
 
+
+    @Override
+    public void updateBalance(UUID cyclePositionId, AccountBalance balance) {
+        CyclePositionEntity entity = positionRepo.findById(cyclePositionId)
+                .orElseThrow(() -> new NoSuchElementException("포지션 이력이 없습니다: cyclePositionId=" + cyclePositionId));
+        entity.setHoldings(balance.holdings());
+        entity.setAvgPrice(balance.avgPrice());
+        entity.setUsdDeposit(balance.usdDeposit());
+        positionRepo.save(entity);
+    }
 
     @Override
     public void deleteByStrategyId(UUID strategyId) {
