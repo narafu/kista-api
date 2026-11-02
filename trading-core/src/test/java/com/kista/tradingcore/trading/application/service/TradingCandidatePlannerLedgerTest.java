@@ -15,6 +15,7 @@ import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchGuard;
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
 import com.kista.tradingcore.trading.application.service.support.TradingParallelRunner;
@@ -52,7 +53,7 @@ class TradingCandidatePlannerLedgerTest {
         ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
         CycleOrderStrategies strategies = new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(null, null)));
         TradingCandidatePlanner planner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, strategies,
-                new StrategyLedgerBudget(positionPort, orderPort, strategies), null, publisher,
+                new StrategyLedgerBudget(positionPort, orderPort, mock(TradingBatchRunPort.class), strategies), null, publisher,
                 new TradingBatchGuard(publisher), new AccountBudgetLock(), null, null, new TradingParallelRunner(0));
 
         TradingAccount account = TradingFixtures.tradingAccount(UUID.randomUUID(), UUID.randomUUID());

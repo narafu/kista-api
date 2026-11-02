@@ -14,6 +14,7 @@ import com.kista.tradingcore.matching.domain.strategy.PrivacyCycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.VrCycleOrderStrategy;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -27,6 +28,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class StrategyLedgerBudgetTest {
@@ -35,7 +38,8 @@ class StrategyLedgerBudgetTest {
 
     CyclePositionPort positionPort = mock(CyclePositionPort.class);
     OrderPort orderPort = mock(OrderPort.class);
-    StrategyLedgerBudget budget = new StrategyLedgerBudget(positionPort, orderPort, new CycleOrderStrategies(List.of(
+    TradingBatchRunPort batchRunPort = mock(TradingBatchRunPort.class);
+    StrategyLedgerBudget budget = new StrategyLedgerBudget(positionPort, orderPort, batchRunPort, new CycleOrderStrategies(List.of(
             new InfiniteCycleOrderStrategy(null, null), new PrivacyCycleOrderStrategy(null),
             new VrCycleOrderStrategy(null), new DcaCycleOrderStrategy())));
 
@@ -122,5 +126,67 @@ class StrategyLedgerBudgetTest {
                 saved(c, OrderDirection.BUY, OrderStatus.SUBMITTING, 1, "100"),
                 saved(c, OrderDirection.SELL, OrderStatus.PLACED, 1, "50")));
         assertThat(budget.remaining(c, DAY)).isEqualByComparingTo("600");
+    }
+
+    private static Order cancelledBuy(StrategyCycle c, int qty, String price, String ext, String leg, String filledQty, String filledPrice) {
+        return new Order(UUID.randomUUID(), UUID.randomUUID(), c.id(), DAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, leg, BigDecimal.valueOf(qty), new BigDecimal(price), OrderStatus.CANCELLED, ext,
+                filledQty == null ? null : new BigDecimal(filledQty), filledPrice == null ? null : new BigDecimal(filledPrice));
+    }
+
+    private BigDecimal remainingWithCancelled(StrategyCycle c, Order... cancelled) {
+        when(positionPort.findLatestOne(c.id())).thenReturn(Optional.of(
+                new CyclePosition(null, c.id(), new BigDecimal("1000"), null, null, BigDecimal.ZERO, null, null)));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(c.id(), DAY)).thenReturn(List.of());
+        when(orderPort.findCancelledByCycleAndDate(c.id(), DAY)).thenReturn(List.of(cancelled));
+        return budget.remaining(c, DAY);
+    }
+
+    @Test
+    void remainingSubtractsRecordedFillOfCancelledBuyBeforeReport() {
+        StrategyCycle c = cycle("1000");
+        when(batchRunPort.isReported(DAY, c.strategyId())).thenReturn(false);
+        // 3주 체결 @ 9.50 = 28.50 — 주문 금액 전체(100)가 아니라 체결분만, 미체결(0, price null)은 0
+        assertThat(remainingWithCancelled(c,
+                cancelledBuy(c, 10, "10.00", "E1", "L", "3", "9.50"),
+                cancelledBuy(c, 10, "10.00", "E2", "L", "0", null))).isEqualByComparingTo("971.50");
+    }
+
+    @Test
+    void remainingChargesFullAmountWhenCancelledFillUnknown() {
+        StrategyCycle c = cycle("1000");
+        when(batchRunPort.isReported(DAY, c.strategyId())).thenReturn(false);
+        assertThat(remainingWithCancelled(c, cancelledBuy(c, 10, "10.00", "E1", "L", null, null))).isEqualByComparingTo("900");
+    }
+
+    @Test
+    void remainingIgnoresCancelledAfterReport() {
+        StrategyCycle c = cycle("1000");
+        when(batchRunPort.isReported(DAY, c.strategyId())).thenReturn(true);
+        assertThat(remainingWithCancelled(c, cancelledBuy(c, 10, "10.00", "E1", "L", "3", "9.50"))).isEqualByComparingTo("1000");
+        verify(orderPort, never()).findCancelledByCycleAndDate(c.id(), DAY);
+    }
+
+    @Test
+    void remainingIgnoresSellUnplacedAndUnknownLegCancelled() {
+        StrategyCycle c = cycle("1000");
+        when(batchRunPort.isReported(DAY, c.strategyId())).thenReturn(false);
+        Order sell = saved(c, OrderDirection.SELL, OrderStatus.CANCELLED, 10, "10.00");
+        assertThat(remainingWithCancelled(c, sell,
+                cancelledBuy(c, 10, "10.00", null, "L", null, null),                       // 접수 전 취소
+                cancelledBuy(c, 10, "10.00", "E1", Order.UNKNOWN_LEG, null, null)))        // 수동 보정 행
+                .isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void repricedReorderWithZeroFillOriginalDoesNotDoubleCharge() {
+        StrategyCycle c = cycle("1000");
+        when(batchRunPort.isReported(DAY, c.strategyId())).thenReturn(false);
+        when(positionPort.findLatestOne(c.id())).thenReturn(Optional.of(
+                new CyclePosition(null, c.id(), new BigDecimal("1000"), null, null, BigDecimal.ZERO, null, null)));
+        // 원본(0 체결, 취소) + 가격만 바꾼 재주문(PLACED 100) → 약정 100만 잡힌다
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(c.id(), DAY)).thenReturn(List.of(saved(c, OrderDirection.BUY, OrderStatus.PLACED, 10, "10")));
+        when(orderPort.findCancelledByCycleAndDate(c.id(), DAY)).thenReturn(List.of(cancelledBuy(c, 10, "10.00", "E1", "L", "0", null)));
+        assertThat(budget.remaining(c, DAY)).isEqualByComparingTo("900");
     }
 }

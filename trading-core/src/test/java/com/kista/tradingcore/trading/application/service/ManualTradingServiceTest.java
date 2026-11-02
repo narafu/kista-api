@@ -114,7 +114,7 @@ class ManualTradingServiceTest {
                 balanceLoader, kisPricePort, privacyTradePort, orderComputer, cycleStrategies, privacyBaseGuard, orderPort, null);
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(
                 orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
-        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, cycleStrategies);
+        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cyclePositionPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
 
         // ManualTradingService 필드 목록에 orderPlanner가 포함돼 있다(배치 TradingCandidatePlanner와 동일하게
         // 원장 통과 결과를 저장하는 데 필요 — 브리핑 원안 생성자 호출에는 누락돼 있어 여기서 보정한다)

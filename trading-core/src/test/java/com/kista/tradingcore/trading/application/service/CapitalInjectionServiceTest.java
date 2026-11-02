@@ -76,7 +76,7 @@ class CapitalInjectionServiceTest {
 
     private CapitalInjectionService newService(Clock clock) {
         return new CapitalInjectionService(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, orderPort, batchRunPort,
-                new StrategyLedgerBudget(cyclePositionPort, orderPort, cycleOrderStrategies), clock);
+                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock);
     }
 
     private void stub(StrategyType type, BigDecimal holdings, BigDecimal avg, LocalDate endDate) {
@@ -258,6 +258,12 @@ class CapitalInjectionServiceTest {
                 new BigDecimal(quantity), new BigDecimal(price), OrderStatus.CANCELLED, externalOrderId, null, null);
     }
 
+    private Order cancelledFilled(LocalDate date, String price, String quantity, String filledQuantity, String filledPrice) {
+        return new Order(null, accountId, cycleId, date, StrategyTicker.SOXL, OrderType.LIMIT, OrderTiming.AT_OPEN, OrderDirection.BUY, "LOC_BUY",
+                new BigDecimal(quantity), new BigDecimal(price), OrderStatus.CANCELLED, "E1", new BigDecimal(filledQuantity),
+                filledPrice == null ? null : new BigDecimal(filledPrice));
+    }
+
     private void withdrawRejected(String amount, Class<? extends RuntimeException> type, String message) {
         assertThatThrownBy(() -> service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal(amount))))
                 .isInstanceOf(type).hasMessage(message);
@@ -323,7 +329,7 @@ class CapitalInjectionServiceTest {
     void withdraw_rejects_overLedgerDeposit() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
         withdrawRejected("500.01", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $500.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $500.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     @Test
@@ -337,7 +343,7 @@ class CapitalInjectionServiceTest {
 
         // 가용 = 500 − 100 − 100 = 300
         withdrawRejected("300.01", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
         service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("200.00");
     }
@@ -349,7 +355,7 @@ class CapitalInjectionServiceTest {
         when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, NEXT)).thenReturn(List.of(
                 order(NEXT, OrderDirection.BUY, "100.00", "6"))); // 600 > 장부 500
         withdrawRejected("1", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $0.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $0.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     @Test
@@ -380,7 +386,7 @@ class CapitalInjectionServiceTest {
         when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, NEXT)).thenReturn(List.of(
                 order(NEXT, OrderDirection.BUY, "0.0033", "1000.5"))); // 3.30165 약정 → 가용 496.69835 (반올림이면 496.70)
         withdrawRejected("496.70", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $496.69를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $496.69를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     // ===== 마감 리포트 창 가드 — FIXED(12:00 KST, 비DST postClose 06:10 이후), 기본은 미보고·오늘 주문 없음(통과) =====
@@ -443,7 +449,7 @@ class CapitalInjectionServiceTest {
 
         // 가용 = 500 − 100 − 100 = 300
         withdrawRejected("300.01", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     @Test
@@ -470,5 +476,17 @@ class CapitalInjectionServiceTest {
         service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
 
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void withdraw_subtractsOnlyRecordedFillOfCancelledBuy() {
+        stub(StrategyType.INFINITE, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        when(orderPort.findCancelledByCycleAndDate(cycleId, TODAY)).thenReturn(List.of(
+                cancelledFilled(TODAY, "10.00", "10", "3", "9.50"),   // 체결 28.50
+                cancelledFilled(TODAY, "10.00", "10", "0", null)));   // 미체결 0
+
+        // 가용 = 500 − 28.50 = 471.50 (주문 금액 전체 100 × 2가 아님)
+        withdrawRejected("471.51", IllegalArgumentException.class,
+                "투자금 인출 금액이 인출 가능액 $471.50를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 }

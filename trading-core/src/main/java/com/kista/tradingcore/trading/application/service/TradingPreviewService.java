@@ -283,7 +283,8 @@ class TradingPreviewService {
         LedgerCheckPreview ledgerCheck = null;
         List<PlannedOrder> buyCandidates = freshOrders; // 원장 fit 후 신규 주문 — 원장 상한 제외(DCA)면 freshOrders 그대로
         if (ledgerBudget.applies(strategy.type()) && freshOrders.stream().anyMatch(o -> o.direction() == OrderDirection.BUY)) {
-            BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, Optional.ofNullable(latestPosition), todayOrders);
+            BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, Optional.ofNullable(latestPosition), todayOrders,
+                    ledgerBudget.unreportedCancelledBuys(currentCycle, today));
             StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(strategy.type(), freshOrders, remainingLedger);
             ledgerCheck = new LedgerCheckPreview(remainingLedger, fit.requiredBuyUsd(), !fit.rejected(), fit.trimmed());
             buyCandidates = fit.orders(); // 거절이면 BUY 없음, 축소면 축소 후 금액

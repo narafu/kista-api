@@ -24,6 +24,7 @@ import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
 import com.kista.tradingcore.trading.application.service.support.TradingBatchGuard;
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
@@ -73,7 +74,7 @@ class TradingCandidatePlannerDcaTest {
 
     @BeforeEach
     void setUp() {
-        ledgerBudget = new StrategyLedgerBudget(mock(CyclePositionPort.class), orderPort, STRATEGIES);
+        ledgerBudget = new StrategyLedgerBudget(mock(CyclePositionPort.class), orderPort, mock(TradingBatchRunPort.class), STRATEGIES);
         planner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, STRATEGIES, ledgerBudget, null,
                 publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), mock(DcaPlanInputCollector.class), recorder,
                 new TradingParallelRunner(0));

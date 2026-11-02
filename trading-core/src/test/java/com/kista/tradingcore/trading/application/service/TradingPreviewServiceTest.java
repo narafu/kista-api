@@ -364,7 +364,7 @@ class TradingPreviewServiceTest {
         // 배치 조회한 사이클 최신 포지션과 이미 로드한 당일 주문(없음)이 그대로 원장 계산에 넘어가야 한다
         CyclePosition latest = mock(CyclePosition.class);
         when(cyclePositionPort.findLatestByCycleIds(any())).thenReturn(Map.of(STRATEGY_CYCLE.id(), latest));
-        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), eq(Optional.of(latest)), eq(List.of()))).thenReturn(new BigDecimal("177.61"));
+        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), eq(Optional.of(latest)), eq(List.of()), any())).thenReturn(new BigDecimal("177.61"));
         when(ledgerBudget.fit(eq(StrategyType.INFINITE), eq(List.of(buy)), eq(new BigDecimal("177.61"))))
                 .thenReturn(new StrategyLedgerBudget.LedgerFit(List.of(), new BigDecimal("304.32"), false, true));
 
@@ -604,7 +604,7 @@ class TradingPreviewServiceTest {
         PlannedOrder original = buyOrder(StrategyTicker.SOXL, 8, "38.04");
         stubPlan(STRATEGY, STRATEGY_CYCLE, original);
         when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(true);
-        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), any(), any())).thenReturn(new BigDecimal("100.00"));
+        when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), any(), any(), any())).thenReturn(new BigDecimal("100.00"));
         when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(new BigDecimal("50.00"));
         when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("1000.00"));
         // 축소: 8주 -> 2주 (76.08) + PLANNED 50

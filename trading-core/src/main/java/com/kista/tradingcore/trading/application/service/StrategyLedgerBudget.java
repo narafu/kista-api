@@ -9,6 +9,7 @@ import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -27,26 +28,45 @@ class StrategyLedgerBudget {
 
     private final CyclePositionPort cyclePositionPort;
     private final OrderPort orderPort;
+    private final TradingBatchRunPort batchRunPort;
     private final CycleOrderStrategies cycleOrderStrategies;
 
     // 원장 적용 결과 — orders: SELL 그대로 + BUY(원본·축소안·제거), requiredBuyUsd: 원본 BUY 총액
     record LedgerFit(List<PlannedOrder> orders, BigDecimal requiredBuyUsd, boolean trimmed, boolean rejected) {}
 
-    // 사이클의 신규 BUY 가용 한도 — 최신 원장(첫 거래일처럼 포지션이 없으면 시작 금액)에서 같은 날 저장된 BUY(PLANNED·SUBMITTING·PLACED)를 한 번만 뺀다
+    // 사이클의 신규 BUY 가용 한도 — 최신 원장(첫 거래일처럼 포지션이 없으면 시작 금액)에서 같은 날 저장된 BUY(PLANNED·SUBMITTING·PLACED)와 리포트 전 취소 BUY의 보류 체결분을 한 번만 뺀다
     BigDecimal remaining(StrategyCycle cycle, LocalDate tradeDate) {
         return remaining(cycle, cyclePositionPort.findLatestOne(cycle.id()),
-                orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), tradeDate));
+                orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), tradeDate),
+                unreportedCancelledBuys(cycle, tradeDate));
     }
 
-    // 이미 조회한 최신 포지션·같은 날 PLANNED/SUBMITTING/PLACED 주문으로 계산하는 순수 버전 — 미리보기 배치 N+1 방지용, 공식은 여기 한 곳
-    BigDecimal remaining(StrategyCycle cycle, Optional<CyclePosition> latest, List<Order> sameDayOrders) {
+    // 이미 조회한 최신 포지션·같은 날 PLANNED/SUBMITTING/PLACED 주문·리포트 전 취소 BUY(unreportedCancelledBuys)로 계산하는 순수 버전 — 미리보기·인출이 미리 모은 목록을 넘긴다(미리보기의 취소 목록은 전략당 조회), 공식은 여기 한 곳
+    BigDecimal remaining(StrategyCycle cycle, Optional<CyclePosition> latest, List<Order> sameDayOrders, List<Order> unreportedCancelled) {
         BigDecimal ledger = latest.map(CyclePosition::usdDeposit).orElse(cycle.startAmount());
         if (ledger == null) ledger = BigDecimal.ZERO;
         BigDecimal committed = sameDayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
                 .map(o -> o.price().multiply(o.quantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return ledger.subtract(committed);
+        return ledger.subtract(committed).subtract(pendingCancelledFill(unreportedCancelled));
+    }
+
+    // 마감 리포트 전 거래일의 취소 BUY(증권사 접수분, 레그 확인된 것) — 리포트 후엔 체결분이 이미 장부에 반영돼 빈 목록
+    List<Order> unreportedCancelledBuys(StrategyCycle cycle, LocalDate tradeDate) {
+        if (batchRunPort.isReported(tradeDate, cycle.strategyId())) return List.of();
+        return orderPort.findCancelledByCycleAndDate(cycle.id(), tradeDate).stream()
+                .filter(o -> o.direction() == OrderDirection.BUY && o.externalOrderId() != null && !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .toList();
+    }
+
+    // 보류 체결분 — 체결량 기록이 있으면 체결 금액, 모름(null, 체결 조회 실패)이면 주문 금액 전체를 상한으로 본다
+    BigDecimal pendingCancelledFill(List<Order> unreportedCancelled) {
+        return unreportedCancelled.stream()
+                .map(o -> o.filledQuantity() == null
+                        ? o.price().multiply(o.quantity())
+                        : o.filledPrice() == null ? BigDecimal.ZERO : o.filledQuantity().multiply(o.filledPrice()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     // 원장 상한 적용 대상 여부 — DCA처럼 시드를 점유하지 않는 전략은 상한 제외(fit·재주문 공용)

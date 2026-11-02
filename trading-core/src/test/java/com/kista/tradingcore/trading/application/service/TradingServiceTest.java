@@ -180,7 +180,7 @@ class TradingServiceTest {
 
         BuyOrderPriceCapper priceCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, cycleStrategies, strategyCyclePort);
         TradingPriceFetcher priceFetcher = new TradingPriceFetcher(kisPricePort, eventPublisher, privacyTradePort);
-        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, cycleStrategies);
+        StrategyLedgerBudget ledgerBudget = new StrategyLedgerBudget(cycleHistoryPort, orderPort, mock(TradingBatchRunPort.class), cycleStrategies);
         TradingOrderExecutor orderExecutor = new TradingOrderExecutor(orderPort, priceCapper, cycleStrategies, ledgerBudget,
                 new AccountBudgetLock(), new OrderSubmitter(orderPort, brokerOrderPort, eventPublisher),
                 new OrderSubmissionReconciler(orderPort, brokerOrderPort, eventPublisher, FIXED),
