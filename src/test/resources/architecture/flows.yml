@@ -877,7 +877,7 @@ flows:
         title: 투자금 인출
         desc: >-
           POST /api/trading-cycles/{id}/capital-withdrawal. 추가와 같이 내 전략·PRIVACY·INFINITE·진행 중 사이클을 확인하고 사이클 행을 잠근 뒤 재조회한다.
-          인출 가능액은 최신 장부 예수금에서 오늘·다음 거래일의 체결 전 매수 주문 금액을 뺀 값이며, 이를 넘거나 인출 후 시작 금액이 0 이하가 되면 거절한다.
+          인출 가능액은 최신 장부 예수금에서 오늘·다음 거래일의 체결 전 매수 주문 금액과 아직 마감 리포트 전인 날짜의 장중 취소된 매수 주문 금액(취소 시점 체결량을 몰라 주문 금액 전체를 상한으로 본다)을 뺀 값이며, 이를 넘거나 인출 후 시작 금액이 0 이하가 되면 거절한다.
           통과하면 최신 포지션 행의 예수금과 사이클 시작 금액을 같은 금액만큼 줄인다(브로커 호출·강제 매도 없음, 다음 주문 계산부터 반영).
         code: [TradingCycleController#withdrawCapital, CapitalInjectionService#withdraw, StrategyCyclePort#lockForUpdate, StrategyCyclePort#updateStartAmount, CyclePositionPort#updateBalance]
         state: "최신 cycle_position.usd_deposit -= 인출액 · strategy_cycle.start_amount -= 인출액"
@@ -1147,11 +1147,11 @@ flows:
         title: 수동 체결 보정 반영
         desc: >-
           증권사 밖에서 체결된 거래를 체결 명세 배열 순서대로 반영한다. 건마다 SELL 수량이 보유 수량을 넘지 않는지 검증하고, FILLED 주문(장마감 시점·수동 체결 표시)을 기록하고,
-          보유 수량·평단·예수금을 다시 계산해 사이클 포지션 스냅샷을 한 행씩 추가한다. 이미 종료된 사이클은 보정할 수 없다. DCA도 내부 원장이 SSOT라 보정할 수 있고(주식 정수·코인 소수 8자리 수량), 이미 반영된(또는 요청 안에서 겹치는) 증권사 주문번호가 있으면 이중 반영을 막기 위해 거부한다. 마감 리포트 전인 오늘(KST) 이후 거래일에(코인 계좌 제외) 우리 전략 주문이 있으면 주문번호 없는 체결도 거부한다 — 리포트가 같은 체결을 다시 더하지 않게 한다. 모두 한 트랜잭션이라 중간에 실패하면 전부 되돌아간다.
+          보유 수량·평단·예수금을 다시 계산해 사이클 포지션 스냅샷을 한 행씩 추가한다. 이미 종료된 사이클은 보정할 수 없다. DCA도 내부 원장이 SSOT라 보정할 수 있고(주식 정수·코인 소수 8자리 수량), 이미 반영된(또는 요청 안에서 겹치는) 증권사 주문번호가 있으면 이중 반영을 막기 위해 거부한다. 마감 리포트 전인 오늘(KST) 이후 거래일에(코인 계좌 제외) 우리 전략 주문이 있으면 주문번호 없는 체결도 거부한다 — 리포트가 같은 체결을 다시 더하지 않게 한다. 오늘 postClose 이후 리포트 마커 전이고 오늘 전략 주문이 있으면(코인 계좌 제외) 마감 리포트가 읽은 잔고로 새 행을 쓰며 보정 스냅샷을 무시하므로 거부한다. 모두 한 트랜잭션이라 중간에 실패하면 전부 되돌아간다.
           현재 kista-ui에는 이 API를 호출하는 화면이 없다(확인한 범위).
         code: [ManualTradeCorrectionService#correctManualFills]
         state: "orders +N행(FILLED) · cycle_position +N행"
-        fail: 보유 수량 초과 SELL 400, 종료된 사이클 400, 최신 포지션 없음 404(NoSuchElementException), 주식 소수 수량 400, 이미 반영된 증권사 주문번호 400. 리포트 전 거래일의 주문번호 없는 체결 400. 오류는 관리자 화면에 거절 사유로 보인다.
+        fail: 보유 수량 초과 SELL 400, 종료된 사이클 400, 최신 포지션 없음 404(NoSuchElementException), 주식 소수 수량 400, 이미 반영된 증권사 주문번호 400. 리포트 전 거래일의 주문번호 없는 체결 400, 오늘 마감 리포트 진행 중이면 400. 오류는 관리자 화면에 거절 사유로 보인다.
 
       - id: close-cycle
         lane: trading

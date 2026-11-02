@@ -437,6 +437,13 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 가드: `trading-formulas.md` 명시 + 경계값 단위 테스트.
 - 상태: open(전용 작업, 공식 묶음).
 
+### CQ-23 재주문·배치 원장 예산이 장중 부분체결 후 취소된 BUY 체결분을 모름
+- 주제: 원장 예산 정확도. 유형: 누락.
+- 위치: `StrategyLedgerBudget.remaining`, `ReorderBuyBudgetService`의 refund 계산.
+- 근거: 취소 시점 체결량을 DB가 모른다. 원본이 장중 부분체결 후 취소되고 재주문하면, 체결분은 마감 리포트 전까지 장부에 없어 원장 계획을 초과해 매수할 수 있다. 투자금 인출(`CapitalInjectionService.withdraw`)은 취소된 BUY 금액 전체를 상한으로 빼서 막았다.
+- 수정 방향: 취소 시점에 브로커 체결 조회로 `filledQuantity`를 기록하고, 예산이 CANCELLED 주문의 기록된 체결분만 차감한다. 인출처럼 상한 방식을 쓰면 가격만 바꾸는 재주문이 원본 금액만큼 이중 차감돼 막히므로 부적합하다.
+- 상태: open.
+
 ## 유지 목록 (재제안 금지, 이유 기록)
 
 | 발견 | 위치 | 유지 이유 |

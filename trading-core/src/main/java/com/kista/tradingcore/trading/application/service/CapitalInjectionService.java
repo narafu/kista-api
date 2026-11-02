@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
@@ -111,18 +112,27 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         StrategyCycle cycle = locked.cycle();
         CyclePosition latest = locked.latest();
 
-        // 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정. 오늘 마감 전 주문과 22:00 개장 배치가 미리 저장한 다음 거래일 주문이
+        // 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정 − 장중 취소된 BUY 상한. 오늘 마감 전 주문과 22:00 개장 배치가 미리 저장한 다음 거래일 주문이
         // 장부 예수금으로 체결되므로 두 날짜를 모두 빼야 체결 후 usdDeposit이 음수가 되지 않는다(StrategyLedgerBudget.remaining과 같은 약정 정의)
         LocalDate today = LocalDate.now(clock);
         LocalDate nextTradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
-        List<Order> committedOrders = Stream.of(today, nextTradeDate).distinct()
+        List<LocalDate> dates = Stream.of(today, nextTradeDate).distinct().toList();
+        List<Order> committedOrders = dates.stream()
                 .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
                 .toList();
-        BigDecimal available = ledgerBudget.remaining(cycle, Optional.of(latest), committedOrders);
+        // 장중 일부 체결 후 취소된 BUY의 체결분은 마감 리포트 전까지 장부에 없고 취소 시점 체결량도 DB가 모르므로 주문 금액 전체를 상한으로 뺀다(DcaPlanInputCollector.cancelledPlacedSell과 같은 방식).
+        // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다. 재주문으로 원본이 취소되고 새 주문이 생기면 둘 다 잡혀 덜 인출되지만, 돈이 나가는 쪽이라 보수적 상한이 맞다
+        BigDecimal cancelledBuys = dates.stream()
+                .filter(date -> !batchRunPort.isReported(date, strategy.id()))
+                .flatMap(date -> orderPort.findCancelledByCycleAndDate(cycle.id(), date).stream())
+                .filter(o -> o.direction() == OrderDirection.BUY && o.externalOrderId() != null && !Order.UNKNOWN_LEG.equals(o.orderLeg()))
+                .map(o -> o.price().multiply(o.quantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal available = ledgerBudget.remaining(cycle, Optional.of(latest), committedOrders).subtract(cancelledBuys);
         if (amount.compareTo(available) > 0) {
             // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관), 음수 가용액은 0으로 표시, 표시액을 그대로 요청해도 통과하도록 내림
             throw new IllegalArgumentException(("투자금 인출 금액이 인출 가능액 $%s를 초과합니다. "
-                    + "장부 예수금에서 체결 전 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.")
+                    + "장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.")
                     .formatted(String.format(Locale.US, "%,.2f", available.max(BigDecimal.ZERO).setScale(2, RoundingMode.DOWN))));
         }
         BigDecimal newStartAmount = cycle.startAmount().subtract(amount);
@@ -176,6 +186,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         return new LockedCycle(cycle, latest);
     }
 
+    // 같은 기준: ManualTradeCorrectionService#rejectDuringReportWindow
     // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전) 거절 — 리포트는 postClose 이후 읽은 최신 포지션 잔고에 브로커 호출(수 초) 뒤 체결을 반영해 새 행을 append하므로,
     // 그 사이 커밋된 in-place 변경(예수금)은 덮어써지고 startAmount 변경만 남는다. postClose 이전 변경은 리포트가 재조회하므로 안전하다.
     // 리포트가 실패해 마커가 안 찍히면 그날은 계속 거절된다(다음 날 해제). 주문 없는 전략은 리포트 대상이 아니므로 제외(TradingService.resumeCloseReport와 같은 기준)

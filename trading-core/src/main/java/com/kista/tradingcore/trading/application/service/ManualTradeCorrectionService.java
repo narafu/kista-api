@@ -10,6 +10,7 @@ import com.kista.shared.kernel.Quantities;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionResult;
+import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
@@ -35,6 +36,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -65,6 +67,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         // 사이클 행 잠금 — 동시에 들어온 같은 보정(원 요청 + 재시도)이 중복 검사를 함께 통과하지 않도록 직렬화
         strategyCyclePort.lockForUpdate(currentCycle.id());
+        rejectDuringReportWindow(account, strategy);
         rejectDuplicateFills(command, currentCycle);
         rejectUnidentifiedFillsBeforeReport(command, account, strategy);
         CyclePosition latest = cyclePositionPort.findLatestOne(currentCycle.id())
@@ -115,6 +118,22 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                 command.userId(), account.id(), strategy.id(), command.fills().size(), balance.holdings(), cycleEnded);
 
         return buildResult(account, strategy, command, balance, updatedStrategy, cycleEnded);
+    }
+
+    // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전) 거절 — 리포트는 postClose 이후 읽은 최신 포지션 잔고에 브로커 호출(수 초) 뒤 체결을 반영해 새 행을 append하므로,
+    // 그 사이 append한 보정 스냅샷은 무시된다. 같은 기준: CapitalInjectionService#requireOutsideReportWindow
+    private void rejectDuringReportWindow(Account account, Strategy strategy) {
+        // 코인 계좌는 마감 리포트가 없어 제외 (rejectUnidentifiedFillsBeforeReport와 같은 이유)
+        if (account.broker().getMarket().isCrypto()) return;
+        if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(clock.instant()).isPositive()) return;
+        LocalDate today = LocalDate.now(clock);
+        if (batchRunPort.isReported(today, strategy.id())) return;
+        // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니므로 제외
+        boolean hasStrategyOrder = orderPort.findByStrategyId(strategy.id(), today, today).stream()
+                .anyMatch(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()));
+        if (hasStrategyOrder) {
+            throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.");
+        }
     }
 
     // 같은 체결 재반영 방지 — 타임아웃 후 재요청 등으로 cycle_position·orders가 이중 반영되지 않게 한다

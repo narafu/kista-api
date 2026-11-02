@@ -130,7 +130,14 @@ class ManualTradeCorrectionServiceTest {
         stubGuardFixture(ordersOnDate, Broker.KIS);
     }
 
+    // 기본 픽스처는 postClose 이전 시각(2026-01-06 04:00 KST)으로 돌려 리포트 창 가드를 통과시킨다 — 번호 없는 보정 가드 테스트용
     private void stubGuardFixture(List<Order> ordersOnDate, Broker broker) {
+        stubWindowFixture(ordersOnDate, broker);
+        lenient().doReturn(Instant.parse("2026-01-05T19:00:00Z")).when(clock).instant();
+    }
+
+    // FIXED 시각(12:00 KST, postClose 이후) 그대로인 픽스처 — 마감 리포트 창 가드 테스트용
+    private void stubWindowFixture(List<Order> ordersOnDate, Broker broker) {
         Account account = new Account(ACCOUNT_ID, USER_ID, "KIS", "12345678", "app", "secret", null, broker, null, null);
         Strategy strategy = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
@@ -387,5 +394,59 @@ class ManualTradeCorrectionServiceTest {
 
     private static ManualTradeCorrectionCommand command(ManualTradeCorrectionCommand.Fill... fills) {
         return new ManualTradeCorrectionCommand(USER_ID, ACCOUNT_ID, STRATEGY_ID, List.of(fills));
+    }
+
+    // ===== 마감 리포트 창 가드 — FIXED(12:00 KST)는 postClose 이후 =====
+    private static final String WINDOW_MSG = "오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.";
+
+    @Test
+    void reportWindow_afterPostCloseUnreportedWithStrategyOrder_rejected() {
+        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.KIS);
+        when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1")))
+                .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_MSG);
+
+        verify(cyclePositionPort, never()).save(any());
+        verify(orderPort, never()).saveAll(any());
+    }
+
+    @Test
+    void reportWindow_alreadyReported_passes() {
+        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.KIS);
+        when(batchRunPort.isReported(TODAY, STRATEGY_ID)).thenReturn(true);
+
+        service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
+
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void reportWindow_onlyUnknownLegOrdersToday_passes() {
+        stubWindowFixture(List.of(orderWithLeg(Order.UNKNOWN_LEG)), Broker.KIS);
+
+        service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
+
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void reportWindow_cryptoAccount_passes() {
+        stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.UPBIT);
+
+        service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
+
+        verify(orderPort).saveAll(any());
+        verify(batchRunPort, never()).isReported(any(), any());
+    }
+
+    @Test
+    void reportWindow_beforePostClose_passes() {
+        stubGuardFixture(List.of(orderWithLeg("LOC_BUY"))); // 04:00 KST
+
+        service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
+
+        verify(orderPort).saveAll(any());
+        verify(batchRunPort, never()).isReported(any(), any());
     }
 }

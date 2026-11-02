@@ -253,6 +253,11 @@ class CapitalInjectionServiceTest {
                 new BigDecimal(quantity), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
+    private Order cancelled(LocalDate date, OrderDirection direction, String price, String quantity, String externalOrderId, String leg) {
+        return new Order(null, accountId, cycleId, date, StrategyTicker.SOXL, OrderType.LIMIT, OrderTiming.AT_OPEN, direction, leg,
+                new BigDecimal(quantity), new BigDecimal(price), OrderStatus.CANCELLED, externalOrderId, null, null);
+    }
+
     private void withdrawRejected(String amount, Class<? extends RuntimeException> type, String message) {
         assertThatThrownBy(() -> service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal(amount))))
                 .isInstanceOf(type).hasMessage(message);
@@ -318,7 +323,7 @@ class CapitalInjectionServiceTest {
     void withdraw_rejects_overLedgerDeposit() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
         withdrawRejected("500.01", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $500.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $500.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     @Test
@@ -332,7 +337,7 @@ class CapitalInjectionServiceTest {
 
         // 가용 = 500 − 100 − 100 = 300
         withdrawRejected("300.01", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
         service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
         assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("200.00");
     }
@@ -344,7 +349,7 @@ class CapitalInjectionServiceTest {
         when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, NEXT)).thenReturn(List.of(
                 order(NEXT, OrderDirection.BUY, "100.00", "6"))); // 600 > 장부 500
         withdrawRejected("1", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $0.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $0.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     @Test
@@ -375,7 +380,7 @@ class CapitalInjectionServiceTest {
         when(orderPort.findPlannedOrPlacedByCycleAndDate(cycleId, NEXT)).thenReturn(List.of(
                 order(NEXT, OrderDirection.BUY, "0.0033", "1000.5"))); // 3.30165 약정 → 가용 496.69835 (반올림이면 496.70)
         withdrawRejected("496.70", IllegalArgumentException.class,
-                "투자금 인출 금액이 인출 가능액 $496.69를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+                "투자금 인출 금액이 인출 가능액 $496.69를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
     }
 
     // ===== 마감 리포트 창 가드 — FIXED(12:00 KST, 비DST postClose 06:10 이후), 기본은 미보고·오늘 주문 없음(통과) =====
@@ -426,5 +431,44 @@ class CapitalInjectionServiceTest {
 
         service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null));
         verify(cyclePositionPort).updateBalance(eq(latestId), any());
+    }
+
+    @Test
+    void withdraw_subtractsCancelledPlacedBuysOfUnreportedDates() {
+        stub(StrategyType.INFINITE, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        when(orderPort.findCancelledByCycleAndDate(cycleId, TODAY)).thenReturn(List.of(
+                cancelled(TODAY, OrderDirection.BUY, "10.00", "10", "E1", "LOC_BUY")));  // 100
+        when(orderPort.findCancelledByCycleAndDate(cycleId, NEXT)).thenReturn(List.of(
+                cancelled(NEXT, OrderDirection.BUY, "20.00", "5", "E2", "LOC_BUY")));    // 100
+
+        // 가용 = 500 − 100 − 100 = 300
+        withdrawRejected("300.01", IllegalArgumentException.class,
+                "투자금 인출 금액이 인출 가능액 $300.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소된 매수 주문 금액을 뺀 만큼 인출할 수 있습니다.");
+    }
+
+    @Test
+    void withdraw_ignoresCancelledOfReportedDate() {
+        stub(StrategyType.INFINITE, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        when(batchRunPort.isReported(TODAY, strategyId)).thenReturn(true); // 체결분이 이미 장부에 반영됨
+        lenient(orderPort.findCancelledByCycleAndDate(cycleId, TODAY)).thenReturn(List.of(
+                cancelled(TODAY, OrderDirection.BUY, "10.00", "10", "E1", "LOC_BUY")));
+
+        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
+
+        verify(orderPort, never()).findCancelledByCycleAndDate(cycleId, TODAY);
+        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void withdraw_ignoresCancelledBeforePlacement_sell_unknownLeg() {
+        stub(StrategyType.INFINITE, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        when(orderPort.findCancelledByCycleAndDate(cycleId, TODAY)).thenReturn(List.of(
+                cancelled(TODAY, OrderDirection.BUY, "10.00", "10", null, "LOC_BUY"),            // 접수 전 취소
+                cancelled(TODAY, OrderDirection.SELL, "10.00", "10", "E1", "LOC_SELL"),          // SELL
+                cancelled(TODAY, OrderDirection.BUY, "10.00", "10", "E2", Order.UNKNOWN_LEG)));  // 수동 보정 행
+
+        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("500.00")));
+
+        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("0.00");
     }
 }
