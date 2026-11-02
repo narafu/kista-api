@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -21,11 +20,6 @@ class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfi
     private final CyclePositionInfiniteJpaRepository jpaRepository;
 
     @Override
-    public Optional<CyclePositionInfiniteDetail> findByCyclePositionId(UUID cyclePositionId) {
-        return jpaRepository.findById(cyclePositionId).map(this::toDomain);
-    }
-
-    @Override
     public List<CyclePositionInfiniteDetail> findLatestByCycleId(UUID cycleId, int limit) {
         return jpaRepository.findByStrategyCycleIdOrderByCreatedAtDesc(cycleId, PageRequest.of(0, limit))
                 .stream()
@@ -34,11 +28,11 @@ class CyclePositionInfiniteDetailPersistenceAdapter implements CyclePositionInfi
     }
 
     @Override
-    public Map<UUID, CyclePositionInfiniteDetail> findByCyclePositionIds(Collection<UUID> cyclePositionIds) {
-        if (cyclePositionIds.isEmpty()) return Map.of();
-        return jpaRepository.findAllById(cyclePositionIds).stream()
-                .map(this::toDomain)
-                .collect(Collectors.toMap(CyclePositionInfiniteDetail::cyclePositionId, d -> d));
+    public Map<UUID, CyclePositionInfiniteDetail> findLatestByCycleIds(Collection<UUID> cycleIds) {
+        if (cycleIds.isEmpty()) return Map.of();
+        return jpaRepository.findLatestByStrategyCycleIdIn(cycleIds).stream()
+                .collect(Collectors.toMap(CyclePositionInfiniteJpaRepository.LatestRow::getCycleId,
+                        r -> new CyclePositionInfiniteDetail(r.getCyclePositionId(), r.getReverseMode())));
     }
 
     @Override

@@ -168,7 +168,8 @@ class TradingService {
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
                     .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
                     .filter(ctx -> cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
-                            || !orderPort.findByStrategyId(ctx.strategy().id(), today, today).isEmpty())
+                            || orderPort.findByStrategyId(ctx.strategy().id(), today, today).stream()
+                            .anyMatch(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))) // 수동 보정 행만 있는 전략은 리포트 대상 아님
                     .toList();
             log.info("마감 리포트 재개 — 대상 {}건 (전체 {}건)", targets.size(), contexts.size());
 
@@ -197,7 +198,10 @@ class TradingService {
                             // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
                             // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
                             orderPort.findByStrategyId(ctx.strategy().id(), today, today).stream()
-                                    .filter(order -> order.externalOrderId() != null).toList())));
+                                    .filter(order -> order.externalOrderId() != null)
+                                    // 수동 체결 보정 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외 — 일반 경로와 동일
+                                    .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                                    .toList())));
                 }
                 reportAll(placedStates, closingPrices, today);
                 checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);

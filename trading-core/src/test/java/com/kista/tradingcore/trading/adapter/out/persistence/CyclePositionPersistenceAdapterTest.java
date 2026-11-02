@@ -103,8 +103,6 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(positionRows).isEqualTo(1);
         assertThat(detailRows).isEqualTo(1);
         assertThat(auditedRows).isEqualTo(1);
-        assertThat(cyclePositionInfiniteDetailAdapter.findByCyclePositionId(saved.id()))
-                .contains(new CyclePositionInfiniteDetail(saved.id(), true));
     }
 
     @Test
@@ -332,35 +330,30 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
-    void findByCyclePositionIds_returnsDetailsKeyedByPositionId() {
-        Strategy strategy = strategyAdapter.save(new Strategy(
-                null, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
-        ));
-        StrategyVersion version = strategyVersionAdapter.save(new StrategyVersion(null, strategy.id(), 1, null, null));
-        StrategyCycle cycle = strategyCycleAdapter.save(new StrategyCycle(
-                null, strategy.id(), version.id(), new BigDecimal("1000.00"),
-                null, LocalDate.now(), null, null, null
-        ));
-        CyclePosition posA = cyclePositionAdapter.save(CyclePosition.initialSnapshot(cycle.id(), new BigDecimal("1000.00")));
-        CyclePosition posB = cyclePositionAdapter.save(new CyclePosition(
-                null, cycle.id(), new BigDecimal("900.00"),
-                new BigDecimal("25.00"), new BigDecimal("24.00"), BigDecimal.valueOf(5), null, null
-        ));
-        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(posA.id(), false));
-        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(posB.id(), true));
+    void findLatestByCycleIds_skipsPositionsWithoutDetail_andKeysByCycle() {
+        Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(3, ChronoUnit.HOURS);
+        // 사이클 1: 오래된 상세(true) 뒤에 상세 없는 수동 보정형 포지션이 최신
+        UUID cycle1 = insertCycleChain(accountId, false, false);
+        UUID detailed = insertPosition(cycle1, new BigDecimal("1000.00"), base, false);
+        insertPosition(cycle1, new BigDecimal("900.00"), base.plus(1, ChronoUnit.HOURS), false);
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(detailed, true));
+        // 사이클 2: 상세 2건 — 최신(false)이 선택돼야 한다
+        UUID cycle2 = insertCycleChain(accountId, false, false);
+        UUID older = insertPosition(cycle2, new BigDecimal("1000.00"), base, false);
+        UUID newer = insertPosition(cycle2, new BigDecimal("900.00"), base.plus(1, ChronoUnit.HOURS), false);
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(older, true));
+        cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(newer, false));
 
-        var result = cyclePositionInfiniteDetailAdapter.findByCyclePositionIds(
-                List.of(posA.id(), posB.id(), UUID.randomUUID()));
+        var result = cyclePositionInfiniteDetailAdapter.findLatestByCycleIds(List.of(cycle1, cycle2, UUID.randomUUID()));
 
         assertThat(result).hasSize(2);
-        assertThat(result.get(posA.id()).isReverseMode()).isFalse();
-        assertThat(result.get(posB.id()).isReverseMode()).isTrue();
+        assertThat(result.get(cycle1)).isEqualTo(new CyclePositionInfiniteDetail(detailed, true));
+        assertThat(result.get(cycle2)).isEqualTo(new CyclePositionInfiniteDetail(newer, false));
     }
 
     @Test
-    void findByCyclePositionIds_emptyCollection_returnsEmptyMap() {
-        assertThat(cyclePositionInfiniteDetailAdapter.findByCyclePositionIds(List.of())).isEmpty();
+    void findLatestDetailByCycleIds_emptyCollection_returnsEmptyMap() {
+        assertThat(cyclePositionInfiniteDetailAdapter.findLatestByCycleIds(List.of())).isEmpty();
     }
 
     @Test

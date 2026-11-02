@@ -188,7 +188,8 @@ class TradingServiceTest {
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService, batchRunPort);
+                strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService, batchRunPort,
+                org.springframework.transaction.support.TransactionOperations.withoutTransaction());
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, brokerOrderPort, orderPort,
                 positionPersistor, eventPublisher, cycleStrategies);
@@ -2133,7 +2134,7 @@ class TradingServiceTest {
         when(batchRunPort.isReported(today, pendingStrategy.id())).thenReturn(false);
         when(batchRunPort.isReported(today, idleStrategy.id())).thenReturn(false);
         Order pendingOrder = new Order(UUID.randomUUID(), ACCOUNT.id(), pendingCycle.id(), today, StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-9", null, null);
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "BUY_LOC", BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-9", null, null);
         when(orderPort.findByStrategyId(pendingStrategy.id(), today, today)).thenReturn(List.of(pendingOrder));
         when(orderPort.findByStrategyId(idleStrategy.id(), today, today)).thenReturn(List.of());
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -2159,7 +2160,7 @@ class TradingServiceTest {
     void report_usesLatestPositionAtReportTime_notPlanTimeBalance() throws InterruptedException {
         LocalDate today = LocalDate.now(FIXED);
         Order placed = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-1", null, null);
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "BUY_LOC", BigDecimal.valueOf(1), PRICE, OrderStatus.PLACED, "ORD-1", null, null);
         when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(false);
         when(orderPort.findByStrategyId(STRATEGY.id(), today, today)).thenReturn(List.of(placed));
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
@@ -2185,7 +2186,7 @@ class TradingServiceTest {
         LocalDate today = LocalDate.now(FIXED);
         // 체결 상태 기록 후 포지션 저장 전에 중단 — 주문은 이미 FILLED라 PLACED 조회로는 빠진다
         Order filled = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
-                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(2), PRICE, OrderStatus.FILLED, "ORD-F", null, null);
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "BUY_LOC", BigDecimal.valueOf(2), PRICE, OrderStatus.FILLED, "ORD-F", null, null);
         Order failed = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.FAILED, null, null, null);
         when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(false);
@@ -2201,6 +2202,35 @@ class TradingServiceTest {
 
         verify(orderPort).markFilled(filled.id(), BigDecimal.valueOf(2), PRICE.setScale(2), OrderStatus.FILLED);
         verify(orderPort, never()).markCancelled(failed.id()); // 접수 안 된(externalOrderId 없음) 주문은 제외
+    }
+
+    @Test
+    void resumeCloseReport_excludesManualCorrectionOrders_fromOwnOrders() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        Order own = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "BUY_LOC", BigDecimal.valueOf(2), PRICE,
+                OrderStatus.FILLED, "ORD-OWN", BigDecimal.valueOf(2), PRICE);
+        // 수동 체결 보정 행 — 포지션을 이미 직접 기록했으므로 재개 리포트가 다시 더하면 안 된다
+        Order manual = Order.filledManual(ACCOUNT.id(), STRATEGY_CYCLE.id(), today, StrategyTicker.SOXL,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(3), PRICE, "ORD-MANUAL");
+        Order manualWithId = new Order(UUID.randomUUID(), manual.accountId(), manual.strategyCycleId(), manual.tradeDate(),
+                manual.ticker(), manual.orderType(), manual.timing(), manual.direction(), manual.orderLeg(),
+                manual.quantity(), manual.price(), manual.status(), manual.externalOrderId(),
+                manual.filledQuantity(), manual.filledPrice());
+        when(batchRunPort.isReported(today, STRATEGY.id())).thenReturn(false);
+        when(orderPort.findByStrategyId(STRATEGY.id(), today, today)).thenReturn(List.of(own, manualWithId));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(new CyclePosition(
+                null, STRATEGY_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of(
+                new Execution(today, StrategyTicker.SOXL, OrderDirection.BUY, 2, PRICE, PRICE.multiply(BigDecimal.TWO), "ORD-OWN"),
+                new Execution(today, StrategyTicker.SOXL, OrderDirection.BUY, 3, PRICE, PRICE.multiply(BigDecimal.valueOf(3)), "ORD-MANUAL")));
+
+        service.resumeCloseReport(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(orderPort).markFilled(eq(own.id()), any(), any(), eq(OrderStatus.FILLED));
+        verify(orderPort, never()).markFilled(eq(manualWithId.id()), any(), any(), any());
     }
 
     @Test

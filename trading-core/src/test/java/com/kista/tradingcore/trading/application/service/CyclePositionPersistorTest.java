@@ -93,7 +93,8 @@ class CyclePositionPersistorTest {
         persistor = new CyclePositionPersistor(
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
                 strategyCyclePort, cycleRotationService, eventPublisher,
-                cycleOrderStrategies, vrCycleRolloverService, batchRunPort);
+                cycleOrderStrategies, vrCycleRolloverService, batchRunPort,
+                org.springframework.transaction.support.TransactionOperations.withoutTransaction());
     }
 
     // --- VR 전략 테스트 ---

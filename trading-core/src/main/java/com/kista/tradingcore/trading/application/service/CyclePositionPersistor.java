@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ class CyclePositionPersistor {
     private final CycleOrderStrategies cycleOrderStrategies;                    // 전략 타입별 capability 조회
     private final VrCycleRolloverService vrCycleRolloverService;                // VR N주 롤오버
     private final TradingBatchRunPort batchRunPort;                             // 전략별 당일 리포트 완료 마커 (재개 시 중복 리포트 방지)
+    private final TransactionOperations transactionOperations;                  // 포지션·상세·리포트 마커 원자 커밋
 
     // execute() 종료 시 포지션 1건 적재, holdings==0이면 사이클 rotation 정책 처리
     void saveCyclePosition(LocalDate today, AccountBalance balance, BatchContext ctx,
@@ -48,12 +50,16 @@ class CyclePositionPersistor {
         boolean prevHadHoldings = !prevPositions.isEmpty() && prevPositions.getFirst().toBalance().hasHoldings();
 
         CyclePosition position = CyclePosition.tradeSnapshot(currentCycle.id(), balance, price);
-        CyclePosition savedPosition = cyclePositionPort.save(position);
-        if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
-            cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), newReverseMode));
-        }
-        // 리포트 완료 마커 — rotation이 새 사이클을 만들어도 재개 판정이 유지되도록 전략 키 (저장 직후·rotation 전)
-        batchRunPort.markReported(today, strategy.id());
+        // 포지션·상세·리포트 마커를 한 트랜잭션으로 — 사이에서 중단되면 재개가 체결을 이중 반영한다
+        // 리포트 완료 마커는 rotation이 새 사이클을 만들어도 재개 판정이 유지되도록 전략 키 (저장 직후·rotation 전)
+        final boolean reverseMode = newReverseMode;
+        transactionOperations.executeWithoutResult(status -> {
+            CyclePosition savedPosition = cyclePositionPort.save(position);
+            if (cycleOrderStrategies.of(strategy.type()).tracksReverseMode()) {
+                cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(savedPosition.id(), reverseMode));
+            }
+            batchRunPort.markReported(today, strategy.id());
+        });
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리

@@ -168,7 +168,6 @@ class StrategyServiceTest {
                 .thenAnswer(invocation -> Optional.of(new StrategyInfiniteDetail(invocation.getArgument(0), 20)));
         lenient().when(strategyInfiniteDetailPort.save(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(cyclePositionInfiniteDetailPort.findByCyclePositionId(any())).thenReturn(Optional.empty());
         lenient().when(cyclePositionInfiniteDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(strategyVrDetailPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(strategyCycleVrPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -600,7 +599,6 @@ class StrategyServiceTest {
         when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
         when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
-        when(cyclePositionInfiniteDetailPort.findByCyclePositionId(latest.id())).thenReturn(Optional.empty());
 
         strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000")));
 
@@ -1533,7 +1531,7 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyId(strategyId)).thenReturn(Optional.of(cycle));
         when(strategyInfiniteDetailPort.findActiveByStrategyId(strategyId)).thenReturn(Optional.of(infiniteDetail));
         when(cyclePositionPort.findLatestOneByStrategyId(strategyId)).thenReturn(Optional.of(position));
-        when(cyclePositionInfiniteDetailPort.findByCyclePositionId(positionId)).thenReturn(Optional.of(reverseDetail));
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleId(cycleId, 1)).thenReturn(List.of(reverseDetail));
 
         StrategyDetail single = strategyService.getById(strategyId, USER_ID);
 
@@ -1544,7 +1542,7 @@ class StrategyServiceTest {
         when(cyclePositionPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, position));
         when(strategyVersionPort.findActiveByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, version));
         when(strategyInfiniteDetailPort.findByStrategyVersionIds(List.of(versionId))).thenReturn(Map.of(versionId, infiniteDetail));
-        when(cyclePositionInfiniteDetailPort.findByCyclePositionIds(List.of(positionId))).thenReturn(Map.of(positionId, reverseDetail));
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, reverseDetail));
 
         List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
 
@@ -1733,7 +1731,7 @@ class StrategyServiceTest {
         verify(strategyInfiniteDetailPort, never()).findActiveByStrategyId(any());
         verify(strategyVrDetailPort, never()).findActiveByStrategyId(any());
         verify(strategyCycleVrPort, never()).findByCycleId(any());
-        verify(cyclePositionInfiniteDetailPort, never()).findByCyclePositionId(any());
+        verify(cyclePositionInfiniteDetailPort, never()).findLatestByCycleId(any(), anyInt());
     }
 
     // --- register() 중간부터 시작 (bootstrap position) ---

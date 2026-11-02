@@ -27,7 +27,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `trading/application/service/StrategyDetailAssembler.java:168-172` ✔. 주석은 "INFINITE·PRIVACY만 계산"인데, `divisionCount == null ? 0 : divisionCount`로 넘긴다.
   - `StrategyDetailAssembler.java:46-48,124-127` ✔. divisionCount는 `strategy.isInfinite()`일 때만 채워지므로 PRIVACY는 항상 null이다.
   - `matching/domain/model/InfinitePosition.java:60` ✔. `if (divisionCount == 0 ...) return 0.0`.
-- 근거: PRIVACY 전략은 위 경로로 currentRound가 무조건 0.0이 된다. 다른 경로의 기본값은 `StrategyDefaults.DEFAULT_DIVISION_COUNT = 20`이다(`shared/.../StrategyDefaults.java:8`, `CyclePositionPersistor.java:86` 등의 `.orElse(DEFAULT_DIVISION_COUNT)`).
+- 근거: PRIVACY 전략은 위 경로로 currentRound가 무조건 0.0이 된다. 다른 경로의 기본값은 `StrategyDefaults.DEFAULT_DIVISION_COUNT = 20`이다(`shared/.../StrategyDefaults.java:8`, `CyclePositionPersistor.java:92` 등의 `.orElse(DEFAULT_DIVISION_COUNT)`).
 - 확정(사용자, 2026-11-01): divisionCount를 INFINITE에만 채우는 것은 맞다. 이 부분은 수정 대상이 아니다.
 - 확정(사용자, 2026-11-01): PRIVACY의 currentRound는 VR·DCA처럼 null로 내린다. 회차 개념은 INFINITE 전용이다.
 - 수정안: `StrategyDetailAssembler.java:169`의 조건 `strategy.isVr() || strategy.isDca()`를 `!strategy.isInfinite()`로 바꾸고, `:168` 주석을 "INFINITE만 계산"으로 고친다.
@@ -156,7 +156,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 기준 형식 `[strategyId={}]`, 29건:
     - `CycleRotationService.java:48,63,92,95,98`
     - `VrCycleRolloverService.java:50,55,64,70,84,90,107,126,133,145,164`
-    - `CyclePositionPersistor.java:57,66,93,96`
+    - `CyclePositionPersistor.java:63,72,99,102`
     - `TradingBatchGuard.java:33,44,51,61`
   - 벗어난 곳(본문 중간 `strategyId=`):
     - `trading/application/service/StrategyService.java:70,87,100,187,206`
@@ -345,7 +345,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `divisionCount`:
     - DTO는 null → 0(`TradingCycleRequest.java:65`)이다.
     - resolver는 `DEFAULT_DIVISION_COUNT`(20)를 쓴다: `PrivacyCreationResolver.java:18`, `DcaCreationResolver.java:18`, `VrCreationResolver.java:23`.
-    - 조회 폴백은 `.orElse(DEFAULT_DIVISION_COUNT)`다: `CyclePositionPersistor.java:86`, `CycleRotationService.java:79`, `StrategyDetailAssembler.java:49,128`, `CycleOrderComputer.java:132,136`.
+    - 조회 폴백은 `.orElse(DEFAULT_DIVISION_COUNT)`다: `CyclePositionPersistor.java:92`, `CycleRotationService.java:79`, `StrategyDetailAssembler.java:50,130`, `CycleOrderComputer.java:132,136`.
     - matching 쪽: `InfiniteCycleOrderStrategy.java:113,129` ✔.
   - `initialUsdDeposit` null → ZERO:
     - `StrategyCreationService.java:115`

@@ -52,8 +52,10 @@ class StrategyDetailAssembler {
 
         Optional<CyclePosition> latestPos = cyclePositionPort.findLatestOneByStrategyId(strategy.id());
 
-        boolean isReverseMode = latestPos
-                .flatMap(pos -> cyclePositionInfiniteDetailPort.findByCyclePositionId(pos.id()))
+        // 리버스모드는 최신 사이클의 최신 INFINITE 상세 기준 — 수동 보정 행(상세 없음)이 최신 포지션이어도 유지된다
+        boolean isReverseMode = latestCycle
+                .map(cycle -> cyclePositionInfiniteDetailPort.findLatestByCycleId(cycle.id(), 1))
+                .flatMap(list -> list.stream().findFirst())
                 .map(CyclePositionInfiniteDetail::isReverseMode)
                 .orElse(false);
 
@@ -109,9 +111,8 @@ class StrategyDetailAssembler {
         Map<UUID, DcaStrategyConfig> dcaConfigs = dcaIds.isEmpty() ? Map.of() : dcaDetailPort.findActiveByStrategyIds(dcaIds);
         Map<UUID, Map<String, DcaExecution>> dcaLast = dcaIds.isEmpty() ? Map.of() : dcaExecutionPort.findLatestByStrategyIds(dcaIds);
 
-        List<UUID> positionIds = latestPositions.values().stream().map(CyclePosition::id).toList();
         Map<UUID, CyclePositionInfiniteDetail> infinitePositionDetails =
-                cyclePositionInfiniteDetailPort.findByCyclePositionIds(positionIds);
+                cyclePositionInfiniteDetailPort.findLatestByCycleIds(cycleIds);
 
         return strategies.stream().map(strategy -> {
             Optional<StrategyCycle> latestCycle = Optional.ofNullable(latestCycles.get(strategy.id()));
@@ -131,8 +132,8 @@ class StrategyDetailAssembler {
 
             Optional<CyclePosition> latestPos = latestCycle.flatMap(cycle -> Optional.ofNullable(latestPositions.get(cycle.id())));
 
-            boolean isReverseMode = latestPos
-                    .flatMap(pos -> Optional.ofNullable(infinitePositionDetails.get(pos.id())))
+            boolean isReverseMode = latestCycle
+                    .flatMap(cycle -> Optional.ofNullable(infinitePositionDetails.get(cycle.id())))
                     .map(CyclePositionInfiniteDetail::isReverseMode)
                     .orElse(false);
 
