@@ -109,9 +109,9 @@ class HexagonalArchitectureTest {
     }
 
     @Test
-    @DisplayName("UsTradeDates는 6개 KIS/Toss/Meritz/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
+    @DisplayName("UsTradeDates는 7개 KIS/Toss/Meritz/캘린더 어댑터에서만 사용한다 — 시간 기준 정책 allowlist 강제")
     void usTradeDates_must_only_be_used_by_allowlisted_adapters() {
-        // constraints.md "시간 기준 정책"의 UsTradeDates 허용 규칙을 강제 — 허용 클래스 목록은 이 테스트가 SSOT, US 거래일 변환은 이 6개 클래스 내부
+        // constraints.md "시간 기준 정책"의 UsTradeDates 허용 규칙을 강제 — 허용 클래스 목록은 이 테스트가 SSOT, US 거래일 변환은 이 7개 클래스 내부
         // 전용, 도메인·서비스·orders persistence에서 사용 금지. 클래스 단위 allowlist(메서드 단위 아님) —
         // TossPriceApi는 getClosingPrice 메서드만 실사용하지만 메서드 단위 강제는 ArchUnit 복잡도
         // 대비 이득이 낮음. ClassFileImporter가 테스트 클래스도 import하므로(DoNotIncludeTests 미지정),
@@ -122,6 +122,7 @@ class HexagonalArchitectureTest {
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.kis.KisTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.kis.KisPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.toss.TossPriceApi")
+                .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.toss.TossOrderApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.meritz.MeritzPriceApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.broker.adapter.out.meritz.MeritzTradingApi")
                 .and().doNotHaveFullyQualifiedName("com.kista.tradingcore.marketcalendar.adapter.out.persistence.MarketCalendarPersistenceAdapter")

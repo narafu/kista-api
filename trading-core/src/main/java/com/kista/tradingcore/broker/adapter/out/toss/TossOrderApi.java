@@ -10,6 +10,8 @@ import com.kista.tradingcore.broker.domain.model.OrderInstruction;
 import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
+import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.platform.time.UsTradeDates;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
@@ -93,8 +95,8 @@ class TossOrderApi {
         String cursor = null;
         boolean hasNext = true;
 
-        // Toss API는 주문 접수일 기준으로 from/to 필터링 — 전날 저녁 접수된 주문이 당일 장마감에 체결되는 경우 누락 방지
-        // 1일 앞당겨 조회 후 filledAt(체결일, KST +09:00) 기준으로 요청 날짜 범위 재필터링
+        // Toss API는 주문 접수일(KST) 기준으로 from/to 필터링 — 거래일 D 주문은 D-1 저녁에 접수되므로
+        // 1일 앞당겨 조회 후 filledAt에서 산출한 KST 거래일 기준으로 요청 날짜 범위 재필터링
         LocalDate queryFrom = from.minusDays(1);
 
         while (hasNext) {
@@ -143,8 +145,8 @@ class TossOrderApi {
         BigDecimal price     = TossResponseParser.parseBdOrZero(order.execution().averageFilledPrice());
         BigDecimal amountUsd = parseAmountUsd(order.execution().filledAmount(), price, filledQuantity);
 
-        // filledAt(KST +09:00) 기반 체결일 — 없으면 요청 from 날짜 fallback
-        LocalDate tradeDate = parseFilledDate(order.execution().filledAt(), from);
+        // filledAt 기반 KST 거래일 — 없으면 요청 from 날짜 fallback
+        LocalDate tradeDate = parseTradeDate(order.execution().filledAt(), from);
 
         // queryFrom~to로 넓게 조회했으므로 체결일이 요청 범위(from~to) 밖이면 제외
         if (tradeDate.isBefore(from) || tradeDate.isAfter(to)) return Optional.empty();
@@ -154,12 +156,13 @@ class TossOrderApi {
         return Optional.of(new Execution(tradeDate, ticker, direction, filledQuantity, price, amountUsd, order.orderId()));
     }
 
-    // filledAt 문자열 → KST 날짜 파싱 — null·공백이면 요청 from 날짜 fallback (queryFrom 아님)
-    private LocalDate parseFilledDate(String filledAtStr, LocalDate from) {
-        // filledAt은 KST(+09:00) — toLocalDate()로 KST 날짜 추출
-        return (filledAtStr != null && !filledAtStr.isBlank())
-                ? OffsetDateTime.parse(filledAtStr).toLocalDate()
-                : from;
+    // filledAt → KST 거래일 — 체결 시각의 뉴욕 일자(US 세션일) + 1일 (KIS ord_dt·메리츠와 같은 규칙, DST·프리/애프터마켓 포함)
+    // KST 달력일을 그대로 쓰면 D-1 22:00 이후 장중 체결이 D-1로 잡혀 getExecutions(D, D)에서 빠진다
+    // null·공백이면 요청 from 날짜 fallback (queryFrom 아님)
+    private LocalDate parseTradeDate(String filledAtStr, LocalDate from) {
+        if (filledAtStr == null || filledAtStr.isBlank()) return from;
+        LocalDate usSessionDate = OffsetDateTime.parse(filledAtStr).atZoneSameInstant(TimeZones.NY).toLocalDate();
+        return UsTradeDates.toKstTradeDate(usSessionDate);
     }
 
     // filledAmount 파싱 — 명시값 우선, null·공백이면 price × quantity로 산출 (nullable 가드)

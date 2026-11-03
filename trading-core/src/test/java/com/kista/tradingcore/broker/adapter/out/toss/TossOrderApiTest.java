@@ -278,6 +278,40 @@ class TossOrderApiTest {
         assertThat(result.getFirst().quantity()).isEqualTo(2);
     }
 
+    @ParameterizedTest(name = "{0} 체결 → 거래일 {1} 조회 포함={2}")
+    @DisplayName("filledAt은 뉴욕 일자+1 KST 거래일로 판정 — 전날 저녁 장중·자정 이후·애프터마켓 체결이 거래일 D에 포함")
+    @CsvSource({
+            // 서머타임(EDT, 뉴욕 자정 = KST 13:00) — 거래일 D=2026-06-17
+            "2026-06-16T12:59:59+09:00, 2026-06-17, false", // 뉴욕 6/15 23:59 → 거래일 6/16
+            "2026-06-16T13:00:00+09:00, 2026-06-17, true",  // 뉴욕 6/16 00:00 → 거래일 6/17
+            "2026-06-16T21:59:00+09:00, 2026-06-17, true",  // 프리마켓
+            "2026-06-16T22:00:00+09:00, 2026-06-17, true",  // 정규장 장중 (CQ-26 회귀)
+            "2026-06-17T04:29:00+09:00, 2026-06-17, true",
+            "2026-06-17T04:30:00+09:00, 2026-06-17, true",  // 애프터마켓
+            "2026-06-17T13:00:00+09:00, 2026-06-17, false", // 뉴욕 6/17 00:00 → 거래일 6/18
+            // 표준시(EST, 뉴욕 자정 = KST 14:00) — 거래일 D=2026-01-15
+            "2026-01-14T13:59:59+09:00, 2026-01-15, false",
+            "2026-01-14T14:00:00+09:00, 2026-01-15, true",
+            "2026-01-14T23:30:00+09:00, 2026-01-15, true",  // 정규장 개장
+            "2026-01-15T06:00:00+09:00, 2026-01-15, true",  // 정규장 마감
+            "2026-01-15T14:00:00+09:00, 2026-01-15, false"
+    })
+    void getExecutions_tradeDateFromFilledAtNewYorkDate(String filledAt, LocalDate tradeDate, boolean included) {
+        TossOrderApi.OrderExecutionItem exec = new TossOrderApi.OrderExecutionItem("1", "25.00", "25.00", filledAt);
+        TossOrderApi.OrderItem item = new TossOrderApi.OrderItem("oid-6", "BUY", exec);
+        TossOrderApi.OrdersResponse closedResp = new TossOrderApi.OrdersResponse(List.of(item), null, false);
+        TossOrderApi.OrdersResponse openResp   = new TossOrderApi.OrdersResponse(List.of(), null, false);
+
+        when(tossHttpClient.get(anyString(), any(), any(), any(ParameterizedTypeReference.class)))
+            .thenReturn(wrapOrders(closedResp))
+            .thenReturn(wrapOrders(openResp));
+
+        List<Execution> result = tossOrderApi.getExecutions(tradeDate, tradeDate, StrategyTicker.SOXL, ACCOUNT);
+
+        assertThat(result).hasSize(included ? 1 : 0);
+        if (included) assertThat(result.getFirst().tradeDate()).isEqualTo(tradeDate);
+    }
+
     @Test
     @DisplayName("averageFilledPrice=null → price=ZERO, amountUsd는 명시값 우선")
     void getExecutions_nullPrice_fallbackAmount() {

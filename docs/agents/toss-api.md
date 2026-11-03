@@ -37,7 +37,8 @@
 ### 날짜 처리 (KIS와 다름)
 
 - `TossOrderApi.fetchExecutions()`: Toss는 **주문 접수일(KST)** 기준 날짜 필터링 — 변환 없이 KST 날짜 그대로 전달
-- **`queryFrom = from - 1일`**: 전날 저녁 선접수 주문이 당일 장마감에 체결될 수 있어 1일 앞당겨 조회 후, `filledAt(KST)` 기반 필터링
+- **`queryFrom = from - 1일`**: 거래일 D 주문은 D-1 저녁에 접수되므로 1일 앞당겨 조회한 뒤, 체결의 거래일로 재필터링
+- **체결 거래일 = `filledAt`의 뉴욕 일자 + 1일**(`UsTradeDates.toKstTradeDate`, KIS `ord_dt`·메리츠와 같은 규칙): KST 경계는 서머타임 13:00 / 표준시 14:00이라 프리마켓~애프터마켓 체결이 모두 같은 거래일에 묶인다. KST 달력일을 쓰면 D-1 22:00 이후 장중 체결이 D-1로 잡혀 `getExecutions(D, D)`에서 빠졌다(CQ-26). 한계: 토스 주간거래(KST 낮) 체결도 같은 규칙으로 분류되지만 kista 주문은 DAY/CLS만 써서 해당 없음. 실계좌 `filledAt` 오프셋 표기는 미실측
 - KIS(US 거래일 기준, `UsTradeDates` 변환 필요)와 반대 방향 — 혼용 금지
 - **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙).
 
