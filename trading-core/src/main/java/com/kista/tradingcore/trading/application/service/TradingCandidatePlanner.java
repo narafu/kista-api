@@ -172,7 +172,7 @@ class TradingCandidatePlanner {
         validateConcreteOrderLegs(strategy, preparedOrders);
         List<PlannedOrder> creatableOrders = filterCreatableOrders(
                 preparedOrders, existingOrders, creatableTimings);
-        PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
+        PrivacyTradeBase privacyBaseForState = strategy.requiresPrivacyBase() ? privacyBase : null;
         CycleState state = new CycleState(ctx, balance, planOpt.get().position(), planOpt.get().vrPosition(), price, privacyBaseForState);
         return new CyclePlanCandidate(state, creatableOrders, !existingOrders.isEmpty(), planOpt.get().referencePrices());
     }
@@ -222,7 +222,7 @@ class TradingCandidatePlanner {
         // PRIVACY: price 전달 — BuyOrderPriceCapper.capIfNeeded(type=PRIVACY, ...)에서 현재가 기반 BUY 가격 캡 적용
         // VR: privacyBase 오염 방지 (혼합 배치 시 hasPrivacy=true로 조회됐을 수 있음)
         // VR은 canSkipOrderComputation()이 항상 false라 이 메서드에 도달하지 않음 — vrPosition은 항상 null로 둔다
-        PrivacyTradeBase privacyBaseForState = strategy.isPrivacy() ? privacyBase : null;
+        PrivacyTradeBase privacyBaseForState = strategy.requiresPrivacyBase() ? privacyBase : null;
         return new CycleState(ctx, balance, null, null, price, privacyBaseForState);
     }
 

@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.broker.application.service.CryptoExchanges;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
@@ -56,7 +55,7 @@ public class CryptoDcaRunner implements CryptoDcaExecutionUseCase {
         lastReported.values().removeIf(d -> !d.equals(today)); // 지난 날짜 항목 정리
         // 코인 DCA 전략만 — 계좌 판정은 account 조회 후
         List<Strategy> dcaStrategies = strategyPort.findAllActive().stream()
-                .filter(s -> s.type() == StrategyType.DCA).toList();
+                .filter(Strategy::isDca).toList();
         if (dcaStrategies.isEmpty()) return;
         Map<UUID, TradingAccount> accountsById = accountPort.findAll().stream()
                 .map(TradingAccount::from)

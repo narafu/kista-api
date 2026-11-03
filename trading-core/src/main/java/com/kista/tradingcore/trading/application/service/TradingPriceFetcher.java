@@ -77,7 +77,7 @@ class TradingPriceFetcher {
         });
 
         // 기준 매매표 조회 (PRIVACY)
-        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().isPrivacy());
+        boolean hasPrivacy = contexts.stream().anyMatch(c -> c.strategy().requiresPrivacyBase());
         PrivacyTradeBase privacyBase = hasPrivacy
                 ? privacyTradePort.findTodayTrade(date).orElse(null)
                 : null;

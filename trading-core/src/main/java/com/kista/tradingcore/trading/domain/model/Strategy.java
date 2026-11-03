@@ -41,6 +41,11 @@ public record Strategy(
         return type == StrategyType.PRIVACY;
     }
 
+    // 기준 매매표(PRIVACY)가 필요한 전략인지 — 타입 술어가 아니라 capability가 SSOT
+    public boolean requiresPrivacyBase() {
+        return type.capability().requiresPrivacyBase();
+    }
+
     public boolean isDca() {
         return type == StrategyType.DCA;
     }

@@ -54,7 +54,6 @@ class TradingService {
     private final MarketCalendarPort marketCalendarPort;        // 미국 시장 개장일 확인 (DB 캐시)
     private final ApplicationEventPublisher eventPublisher;    // 관리자·사용자 알림 이벤트 발행 (오류·휴장·잔고부족)
     private final OrderPort orderPort;                         // 계획 주문 저장·조회
-    private final StrategyCyclePort strategyCyclePort;         // 현재 StrategyCycle 조회
     private final TradingPriceFetcher priceFetcher;            // 가격 일괄 조회 + 단건 fallback
     private final TradingOrderExecutor orderExecutor;          // BUY 가격 보정 + 증권사 접수
     private final TradingReporter reporter;                    // 체결 조회 + 이력 저장 + 알림
@@ -194,6 +193,11 @@ class TradingService {
                 .toList();
         if (targets.isEmpty()) return;
         log.info("정지 전략 마감 리포트 — 대상 {}건", targets.size());
+        reportRebuilt(targets, today);
+    }
+
+    // 접수 이후 상태를 재구성해 리포트 — 정지 전략·재개 공용, 가격 컨텍스트·확정 종가는 대상 기준으로 조회(기준표 screen 미적용)
+    private void reportRebuilt(List<BatchContext> targets, LocalDate today) throws InterruptedException {
         TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(targets, today);
         Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
         reportAll(rebuildPlacedStates(targets, priceCtx, today), closingPrices, today);
@@ -215,7 +219,7 @@ class TradingService {
                     new TradingCandidatePlanner.CycleState(ctx,
                             balanceLoader.loadBalanceOrThrow(ctx.strategy()).balance(),
                             null, null, null,
-                            ctx.strategy().isPrivacy() ? priceCtx.privacyBase() : null),
+                            ctx.strategy().requiresPrivacyBase() ? priceCtx.privacyBase() : null),
                     // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
                     // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
                     reportableOrders(ctx.strategy().id(), today))));
@@ -251,10 +255,7 @@ class TradingService {
 
             runState.critical(() -> {
                 // 기준표 미점검(screen 미적용)은 의도 — 정보성 로테이션 최소금액 알림만 일반 마감 경로와 다르고 매매 영향 없음
-                TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(targets, today);
-                Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
-                List<CyclePlacedState> placedStates = rebuildPlacedStates(targets, priceCtx, today);
-                reportAll(placedStates, closingPrices, today);
+                reportRebuilt(targets, today);
                 checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
                 return null;
             });
@@ -311,12 +312,6 @@ class TradingService {
                         })))
                 .toList();
         parallelRunner.runAll(tasks);
-    }
-
-    // package-private: DstInfo 주입으로 단위 테스트에서 sleep 우회 (단건 경로)
-    void execute(Strategy strategy, TradingAccount account, TradingUserProfile userProfile, DstInfo dst) throws InterruptedException {
-        StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
-        executeBatch(List.of(new BatchContext(strategy, currentCycle, account, userProfile)), dst);
     }
 
     // 개장 시각은 거래일 기준 산출 — 자정 이후 재개돼도 이미 지난 개장을 기다리지 않는다

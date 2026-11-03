@@ -67,8 +67,8 @@ class StrategyOrderPlanBuilder {
                     : BrokerCallGuard.wrap("전일종가 조회",
                             () -> brokerPricePort.getPrevClose(strategy.ticker(), account.brokerRef()));
         }
-        // PrivacyTradePort에는 이 조합 전용 헬퍼가 없어 동일 로직을 인라인
-        PrivacyTradeBase privacyBase = strategy.isPrivacy() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;
+        // 기준 매매표 필요 여부는 전략 capability 기준
+        PrivacyTradeBase privacyBase = strategy.requiresPrivacyBase() ? privacyTradePort.findTodayTrade(today).orElse(null) : null;
 
         // 장전 점검 이슈 기준표는 쓰지 않는다 — 미리보기는 반복 호출되므로 알림 없이 조용히 차단(알림은 배치 가드 담당)
         if (privacyBase != null && !privacyBaseGuard.usable(privacyBase)) {
