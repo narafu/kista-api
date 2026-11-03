@@ -13,6 +13,7 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.matching.domain.model.*;
+import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
@@ -82,22 +83,32 @@ class TradingService {
         runState.track(() -> runCloseBatch(contexts, dst));
     }
 
-    private void runCloseBatch(List<BatchContext> contexts, DstInfo dst) throws InterruptedException {
+    private void runCloseBatch(List<BatchContext> allContexts, DstInfo dst) throws InterruptedException {
+        // 정지 전략은 체결 리포트 전용 — 계획·접수 없이 활성 리포트 뒤에 따로 처리한다
+        Map<Boolean, List<BatchContext>> split = allContexts.stream()
+                .collect(Collectors.partitioningBy(ctx -> ctx.strategy().status() == StrategyStatus.PAUSED));
+        List<BatchContext> paused = split.get(true);
+        List<BatchContext> contexts = split.get(false);
         LocalDate today = LocalDate.now(clock);
         // 시작 기록 — 같은 날짜 수동 실행이 남긴 DONE을 덮어써, 이 배치가 중단되면 재개 대상이 되게 한다
         checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.STARTED);
         // 아래 각 조기 반환은 정상 흐름(휴장·시작 전·계산 skip 등)이라 예외/오류 알림 대상이 아니지만,
         // "리포트가 안 왔는데 원인이 안 보이는" 재발 시 로그만으로 중단 지점을 특정하기 위해 사유를 남긴다.
         // 조기 반환도 DONE 기록 — "체크포인트 행 없음 = 미실행"이 성립해야 재개 판정이 cron 누락을 구분한다
-        if (contexts.isEmpty()) {
+        if (allContexts.isEmpty()) {
             log.info("매매 배치 중단 — 대상 전략 0건");
             checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
             return;
         }
 
-        // 시장 개장 여부 확인 (1회) — 모든 전략 공통, 가격 조회 전 조기 반환
+        // 시장 개장 여부 확인 (1회) — 모든 전략 공통, 가격 조회 전 조기 반환 (휴장일엔 정지 리포트도 없음)
         if (!isMarketOpen(today)) {
             checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            return;
+        }
+        if (contexts.isEmpty()) {
+            log.info("매매 배치 중단 — 활성 대상 전략 0건 (정지 전략 {}건)", paused.size());
+            finishWithPausedReport(paused, today, dst);
             return;
         }
 
@@ -106,7 +117,7 @@ class TradingService {
         List<BatchContext> started = filterScheduledStart(contexts, today);
         if (started.isEmpty()) {
             log.info("매매 배치 중단 — 시작예정일 미도래로 대상 {}건 전량 제외", contextsBeforeScheduledFilter);
-            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            finishWithPausedReport(paused, today, dst);
             return;
         }
 
@@ -118,7 +129,7 @@ class TradingService {
         if (states.isEmpty()) {
             log.warn("매매 배치 중단 — 전략 계산 결과 0건 (대상 {}건 전량 skip, 원인은 위 '주문 계획 오류'/'전략 계산 skip' 로그 참고)",
                     started.size());
-            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            finishWithPausedReport(paused, today, dst);
             return;
         }
         checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLANNED);
@@ -153,9 +164,63 @@ class TradingService {
             Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
             // recordAndNotifyExecutions — 전략별: 체결 조회 + 이력 저장 + 알림
             reportAll(placedStates, closingPrices, today);
+            reportPausedStrategies(paused, today);
             checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
             return null;
         });
+    }
+
+    // 활성 전략이 리포트할 게 없는 날의 마무리 — 정지 리포트 대상이 있으면 마감 후 리포트하고 DONE
+    private void finishWithPausedReport(List<BatchContext> paused, LocalDate today, DstInfo dst) throws InterruptedException {
+        if (paused.isEmpty()) {
+            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            return;
+        }
+        // 접수할 게 없으니 PLACED로 기록 — 대기 중 재기동되면 접수 마감 이후라도 리포트 재개(resumeCloseReport)가 정지 전략을 이어받는다
+        checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.PLACED);
+        waitFor("마감 시각", dst.waitUntilPostClose(Instant.now(clock)), dst);
+        runState.critical(() -> {
+            reportPausedStrategies(paused, today);
+            checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+            return null;
+        });
+    }
+
+    // 정지 전략의 당일 접수 주문 체결을 원장에 반영 — 종가·가격 컨텍스트는 정지 대상 기준으로 따로 조회
+    private void reportPausedStrategies(List<BatchContext> paused, LocalDate today) throws InterruptedException {
+        List<BatchContext> targets = paused.stream()
+                .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
+                .filter(ctx -> !reportableOrders(ctx.strategy().id(), today).isEmpty())
+                .toList();
+        if (targets.isEmpty()) return;
+        log.info("정지 전략 마감 리포트 — 대상 {}건", targets.size());
+        TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(targets, today);
+        Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
+        reportAll(rebuildPlacedStates(targets, priceCtx, today), closingPrices, today);
+    }
+
+    // 당일 접수된 적 있는 주문(externalOrderId 보유) — 수동 체결 보정 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
+    private List<Order> reportableOrders(UUID strategyId, LocalDate today) {
+        return orderPort.findByStrategyId(strategyId, today, today).stream()
+                .filter(order -> order.externalOrderId() != null)
+                .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
+                .toList();
+    }
+
+    // 접수 이후 리포트 단계 상태 재구성 — 사전 잔고는 최신 cycle_position, 전략별 실패는 격리
+    private List<CyclePlacedState> rebuildPlacedStates(List<BatchContext> targets, TradingPriceFetcher.PriceContext priceCtx, LocalDate today) throws InterruptedException {
+        List<CyclePlacedState> placedStates = new ArrayList<>();
+        for (BatchContext ctx : targets) {
+            batchGuard.runSafely("리포트 재개 준비", ctx, () -> placedStates.add(new CyclePlacedState(
+                    new TradingCandidatePlanner.CycleState(ctx,
+                            balanceLoader.loadBalanceOrThrow(ctx.strategy()).balance(),
+                            null, null, null,
+                            ctx.strategy().isPrivacy() ? priceCtx.privacyBase() : null),
+                    // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
+                    // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
+                    reportableOrders(ctx.strategy().id(), today))));
+        }
+        return placedStates;
     }
 
     // 재기동 재개 — 접수 완료(PLACED) 이후 중단분: 남은 마감 대기 후 리포트 마커 없는 전략만 리포트
@@ -165,9 +230,12 @@ class TradingService {
             LocalDate today = LocalDate.now(clock);
             // 원래 배치의 리포트 대상(당일 주문이 있거나 롤오버 판정이 필요한 전략 — planAll과 같은 기준)만
             // PRIVACY 기준 미수신·장중 신규 전략은 원래도 리포트하지 않는다
+            // 정지 전략은 주문이 있을 때만(롤오버 판정 제외 — 주문 없는 정지 VR에 0체결 스냅샷 방지)
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
                     .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
-                    .filter(ctx -> cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
+                    .filter(ctx -> ctx.strategy().status() == StrategyStatus.PAUSED
+                            ? !reportableOrders(ctx.strategy().id(), today).isEmpty()
+                            : cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
                             || orderPort.findByStrategyId(ctx.strategy().id(), today, today).stream()
                             .anyMatch(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))) // 수동 보정 행만 있는 전략은 리포트 대상 아님
                     .toList();
@@ -187,22 +255,7 @@ class TradingService {
                 // 기준표 미점검(screen 미적용)은 의도 — 정보성 로테이션 최소금액 알림만 일반 마감 경로와 다르고 매매 영향 없음
                 TradingPriceFetcher.PriceContext priceCtx = priceFetcher.loadPriceContext(targets, today);
                 Map<StrategyTicker, BigDecimal> closingPrices = priceFetcher.fetchClosingPrices(priceCtx.cycleTickers(), today, priceCtx.priceAccount());
-                List<CyclePlacedState> placedStates = new ArrayList<>();
-                for (BatchContext ctx : targets) {
-                    // 전략별 재구성 실패는 격리 — 다른 전략 리포트는 계속
-                    batchGuard.runSafely("리포트 재개 준비", ctx, () -> placedStates.add(new CyclePlacedState(
-                            new TradingCandidatePlanner.CycleState(ctx,
-                                    balanceLoader.loadBalanceOrThrow(ctx.strategy()).balance(),
-                                    null, null, null,
-                                    ctx.strategy().isPrivacy() ? priceCtx.privacyBase() : null),
-                            // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져
-                            // 체결 없는 포지션이 저장된다 — 상태 무관 당일 접수분을 다시 넘긴다(체결 반영은 브로커 체결 내역 기준이라 재기록 무해)
-                            orderPort.findByStrategyId(ctx.strategy().id(), today, today).stream()
-                                    .filter(order -> order.externalOrderId() != null)
-                                    // 수동 체결 보정 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외 — 일반 경로와 동일
-                                    .filter(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))
-                                    .toList())));
-                }
+                List<CyclePlacedState> placedStates = rebuildPlacedStates(targets, priceCtx, today);
                 reportAll(placedStates, closingPrices, today);
                 checkpoint(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
                 return null;

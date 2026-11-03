@@ -119,6 +119,22 @@ class TradingCloseSchedulerTest {
     }
 
     @Test
+    void run_addsPausedStrategiesWithOrders_activeWinsOnDuplicate() throws InterruptedException {
+        Strategy active = mockStrategy();
+        Strategy pausedOnly = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
+                StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        Strategy pausedDuplicate = active.withStatus(StrategyStatus.PAUSED); // 두 쿼리 사이 정지된 같은 전략
+        when(strategyPort.findAllActive()).thenReturn(List.of(active));
+        when(strategyPort.findPausedWithReportableOrders(LocalDate.now(FixedClockTestConfig.FIXED)))
+                .thenReturn(List.of(pausedDuplicate, pausedOnly));
+        when(contextFactory.buildAll(List.of(active, pausedOnly))).thenReturn(List.of());
+
+        scheduler.run();
+
+        verify(contextFactory).buildAll(List.of(active, pausedOnly));
+    }
+
+    @Test
     void run_noActiveStrategies_callsExecuteBatchWithEmptyList() throws InterruptedException {
         when(strategyPort.findAllActive()).thenReturn(List.of());
         when(contextFactory.buildAll(List.of())).thenReturn(List.of());

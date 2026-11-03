@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategySummary;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,13 @@ class StrategyPersistenceAdapter implements StrategyPort {
     public List<Strategy> findAllActive() {
         // ACTIVE 사용자의 ACTIVE 전략 전체 조회 (스케쥴러용)
         return jpaRepository.findAllActiveStrategies().stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Strategy> findPausedWithReportableOrders(LocalDate tradeDate) {
+        return jpaRepository.findPausedWithReportableOrders(tradeDate, Order.UNKNOWN_LEG).stream()
                 .map(this::toDomain)
                 .toList();
     }

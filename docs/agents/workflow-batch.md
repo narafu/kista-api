@@ -4,7 +4,7 @@
 
 ## 스케쥴러 실행 흐름
 - 매매 스케쥴러(`TradingOpenScheduler`/`TradingCloseScheduler`)는 `:trading-core`의 `kista-trading` 프로세스에서 실행된다(`kista-scheduler`엔 매매 빈이 없음 — 시간표 → `scheduler-time-table.md`)
-- 스케쥴러 기동: `TradingCloseScheduler` 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 orderAt 05:30까지 대기) → `StrategyPort.findAllActive()`로 ACTIVE 사이클 목록 조회
+- 스케쥴러 기동: `TradingCloseScheduler` 화~토 04:30 KST (DST 장마감 30분 전, 비DST는 orderAt 05:30까지 대기) → `StrategyPort.findAllActive()`로 ACTIVE 사이클 목록 조회. 여기에 **정지 전략 리포트 전용 대상**이 합류한다(`findPausedWithReportableOrders(오늘)` — PAUSED·활성 프로필·삭제 안 됨이고 당일(KST 거래일) 접수된 주문(`external_order_id` 보유, `UNKNOWN` leg 제외, 상태 무관)이 있는 전략, 두 목록 중복은 ACTIVE 우선). 정지 전략은 계획·접수 없이 활성 리포트 뒤에 체결 리포트만 받는다(`TradingService.reportPausedStrategies` — 마커가 있으면 건너뛰고, 종가·가격 컨텍스트는 정지 대상 기준으로 따로 조회). 활성 대상이 0건이거나 시작예정일·계산 결과로 전량 제외된 날도 정지 리포트가 있으면 postClose까지 기다린 뒤 리포트하고 `DONE`을 기록한다(휴장일엔 정지 리포트 없음). 정지 전략의 리포트는 포지션 저장과 청산 시 사이클 종료(`markEnded`)만 기록하고 rotation·사이클 완료 알림·VR 롤오버는 하지 않는다(`CyclePositionPersistor` — 재개가 `reopenCycleIfEnded`로 새 사이클을 열고, VR 롤오버는 재개 후 따라잡는다. 이미 종료된 사이클의 전략은 `findPausedWithReportableOrders`가 제외한다)
 - context 리스트 빌드: 사이클별 계좌·사용자 조회 (실패 시 해당 사이클 skip + `TradingErrorReportPort.reportError`) → `TradingExecutionUseCase.executeBatch(contexts)` 1회 호출(`TradingExecutionFacade` → `TradingService`)
 - `TradingService.executeBatch()`: 고유 ticker 수집 → 가격 1회 일괄 조회 → leg-aware 슬롯별 후보 수집 → 신규 BUY 가격 cap·correction 사전 계산 → 전략별 원장 상한 판정 → 사이클별 접수·리포트 병렬 실행 (`TradingParallelRunner`, 계좌 groupKey별 동시 상한 `app.trading.parallel-per-account`=2, 각 실패 격리 catch + 오류 알림, 결과는 제출 순서 보존). 상한 0 이하이면 호출 스레드 순차 인라인 실행 — 단위 테스트는 `new TradingParallelRunner(0)`으로 결정성 확보
 - **leg-aware 주문 생성**: 신규 전략 주문은 내부 `orders.order_leg`로 주문 leg를 식별한다. 슬롯은 `timing + direction + orderLeg`로 식별한다. 기존 주문이 있더라도 점유되지 않은 concrete leg만 후보로 남겨 `PLANNED` 저장한다. **`AT_CLOSE` 슬롯(INFINITE BUY, PRIVACY BUY/SELL, VR bootstrap 등)은 마감 스케쥴러가 전담 생성**하며, 개장 스케쥴러는 `AT_OPEN` 슬롯만 생성·선접수한다 (AT_CLOSE 캡이 개장 시점 가격으로 고정되는 stale-cap 방지).
@@ -21,7 +21,7 @@
   - 체크포인트: 단계는 `trading.trading_batch_run`(job·KST 거래일)에 남는다. 마감은 `STARTED → PLANNED → PLACING → PLACED → DONE`, 개장은 `STARTED → PLACING → DONE`이다. 조기 반환도 `DONE`으로 기록하고, 시작 시 `STARTED`가 같은 날짜 수동 실행의 `DONE`을 덮어쓴다. 종료 요청 이후에는 배치 시작·임계구역 신규 진입이 거부된다(`requestStop`과 같은 락에서 판정).
   - 리포트 마커: 전략별 리포트 완료는 `trading.trading_batch_report`에 남는다. `CyclePositionPersistor`가 포지션 저장 직후 기록하며, 키가 전략인 이유는 rotation 후에도 유효해야 하기 때문이다.
   - 기동 시 재개: `TradingBatchResumer`(ApplicationReadyEvent)가 처리한다. `local` 프로파일에선 비활성이다 — 로컬은 상시 기동이 아니라 기동마다 "[재개 불가]"가 운영과 같은 관리자 봇(`TELEGRAM_CHAT_ID`)으로 나갔다.
-    - 마감 배치(화~토 04:30~22:00): 행 없음·`PLANNED`·`PLACING`이고 장마감 10분 전 이전이면 전체 재실행한다(`PLACING`은 이중 접수 경고). `PLACED`면 리포트만 재개한다(`resumeCloseReport` — 대상은 당일 주문이 있거나 롤오버 판정이 필요한(VR) 전략 중 마커가 없는 것, 사전 잔고는 최신 `cycle_position`, 대상 주문은 DB PLACED). 접수 마감을 지났으면 관리자 알림만 보낸다.
+    - 마감 배치(화~토 04:30~22:00): 행 없음·`PLANNED`·`PLACING`이고 장마감 10분 전 이전이면 전체 재실행한다(`PLACING`은 이중 접수 경고). `PLACED`면 리포트만 재개한다(`resumeCloseReport` — 대상은 당일 주문이 있거나 롤오버 판정이 필요한(VR) 전략 중 마커가 없는 것이며, 정지 전략은 롤오버 판정 절 없이 당일 접수 주문이 있을 때만 포함, 사전 잔고는 최신 `cycle_position`, 대상 주문은 DB PLACED). 접수 마감을 지났으면 관리자 알림만 보낸다.
     - 개장 배치(월~금 22:00~ / 화~토 ~04:30): 행 없음·`PLACING`이면 재실행한다(`DstInfo.forOpenBatch` — 자정 이후 재개도 지난 개장을 기다리지 않음). 개장 배치(22:00 KST)는 KIS DCA AT_OPEN 주문을 `waitUntilMarketOpen(now)` 전에 계획·접수한 뒤, 나머지 AT_OPEN을 개장 후 접수한다.
     - 락: 재개는 `SchedulerLockService.takeOver`로 이전 프로세스 락을 인수한다. 자기 프로세스 락(기동 직후 cron 선발화)은 인수하지 않는다.
   - 전제: **`kista-trading` 단일 인스턴스 + 이전 컨테이너 종료 후 기동(겹침 없음)**.

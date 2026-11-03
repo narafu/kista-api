@@ -8,6 +8,7 @@ import com.kista.tradingcore.trading.application.port.output.HeartbeatPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
+import com.kista.tradingcore.trading.domain.model.Strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -15,6 +16,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.ZonedDateTime;
@@ -63,7 +70,7 @@ public class TradingCloseScheduler {
         }
         schedulerLockService.tryRun("trading-close", Duration.ofHours(3), () ->
                 jobRunner.run("마감 매매 스케쥴러 수동",
-                        () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                        () -> contextFactory.buildAll(closeBatchStrategies()),
                         useCase::executeBatchNow));
     }
 
@@ -76,16 +83,26 @@ public class TradingCloseScheduler {
     public void resumeReport() throws InterruptedException {
         schedulerLockService.takeOver("trading-close", Duration.ofHours(3), () -> {
             boolean completed = jobRunner.run("마감 리포트 재개",
-                    () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                    () -> contextFactory.buildAll(closeBatchStrategies()),
                     useCase::resumeCloseReport);
             if (completed) heartbeatPort.pingClose(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
         });
     }
 
+    // 마감 배치 대상 = ACTIVE + 정지됐지만 당일 접수 주문이 있는 전략(체결 리포트 전용) — 중복은 ACTIVE 우선
+    private List<Strategy> closeBatchStrategies() {
+        List<Strategy> active = strategyPort.findAllActive();
+        Set<UUID> activeIds = active.stream().map(Strategy::id).collect(Collectors.toSet());
+        return Stream.concat(active.stream(),
+                        strategyPort.findPausedWithReportableOrders(LocalDate.now(clock)).stream()
+                                .filter(s -> !activeIds.contains(s.id())))
+                .toList();
+    }
+
     private void runLocked() throws InterruptedException {
         // 복수종목 현재가 1회 일괄 조회 후 사이클별 순차 실행
         boolean completed = jobRunner.run("마감 매매 스케쥴러",
-                () -> contextFactory.buildAll(strategyPort.findAllActive()),
+                () -> contextFactory.buildAll(closeBatchStrategies()),
                 useCase::executeBatch);
         if (completed) heartbeatPort.pingClose(); // 실패·인터럽트 시 미발송 — dead-man's switch가 실패도 감지
     }

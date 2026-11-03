@@ -11,7 +11,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import com.kista.tradingcore.trading.domain.model.Order;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import com.kista.shared.kernel.StrategyType;
@@ -24,6 +30,7 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
         StrategyInfiniteDetailPersistenceAdapter.class,
         StrategyVersionPersistenceAdapter.class
 })
+@Execution(ExecutionMode.SAME_THREAD) // @DataJpaTest + parallel execution — 트랜잭션 경합 방지
 class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
     @Autowired JdbcTemplate jdbcTemplate;
@@ -176,5 +183,70 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
                 ORDER BY column_name
                 """, String.class))
                 .containsExactly("deleted_at:timestamp with time zone:YES", "division_count:integer:NO");
+    }
+
+    private static final LocalDate TRADE_DATE = LocalDate.of(2026, 11, 3);
+
+    // 정지 리포트 조회용 시나리오 — 계좌·프로필·전략·버전·사이클·주문 1건을 만들고 전략 id 반환
+    private UUID seedStrategyWithOrder(String strategyStatus, LocalDate orderDate, String externalOrderId, String leg) {
+        UUID acct = insertAccountOfUser(Boolean.TRUE);
+        UUID strategyId = UUID.randomUUID();
+        UUID versionId = UUID.randomUUID();
+        UUID cycleId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, 'INFINITE', 'SOXL', ?, 'NONE', now(), now())",
+                strategyId, acct, strategyStatus);
+        jdbcTemplate.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, 1, now())", versionId, strategyId);
+        jdbcTemplate.update(
+                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                cycleId, strategyId, versionId, new BigDecimal("1000.00"), TRADE_DATE.minusDays(5));
+        jdbcTemplate.update(
+                "INSERT INTO orders (account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, order_leg, price, quantity, status, external_order_id, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', ?, 22.00, 5, 'CANCELLED', ?, now(), now())",
+                acct, cycleId, orderDate, leg, externalOrderId);
+        return strategyId;
+    }
+
+    private List<UUID> pausedIds() {
+        entityManager.flush();
+        entityManager.clear();
+        return strategyAdapter.findPausedWithReportableOrders(TRADE_DATE).stream().map(Strategy::id).toList();
+    }
+
+    @Test
+    void findPausedWithReportableOrders_includesPausedWithTodaysSubmittedOrder() {
+        UUID paused = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-1", "BUY_LOC");
+
+        assertThat(pausedIds()).containsExactly(paused);
+    }
+
+    @Test
+    void findPausedWithReportableOrders_excludesActiveOtherDateUnknownLegAndNoExternalId() {
+        seedStrategyWithOrder("ACTIVE", TRADE_DATE, "ORD-1", "BUY_LOC");
+        seedStrategyWithOrder("PAUSED", TRADE_DATE.minusDays(1), "ORD-2", "BUY_LOC");
+        seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-3", Order.UNKNOWN_LEG);
+        seedStrategyWithOrder("PAUSED", TRADE_DATE, null, "BUY_LOC");
+
+        assertThat(pausedIds()).isEmpty();
+    }
+
+    @Test
+    void findPausedWithReportableOrders_excludesSoftDeletedStrategyAccountAndCycle() {
+        UUID deletedStrategy = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-1", "BUY_LOC");
+        jdbcTemplate.update("UPDATE strategy SET deleted_at = now() WHERE id = ?", deletedStrategy);
+        UUID deletedAccount = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-2", "BUY_LOC");
+        jdbcTemplate.update("UPDATE accounts SET deleted_at = now() WHERE id = (SELECT account_id FROM strategy WHERE id = ?)", deletedAccount);
+        UUID deletedCycle = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-3", "BUY_LOC");
+        jdbcTemplate.update("UPDATE strategy_cycle SET deleted_at = now() WHERE strategy_id = ?", deletedCycle);
+
+        assertThat(pausedIds()).isEmpty();
+    }
+
+    @Test
+    void findPausedWithReportableOrders_excludesEndedCycle() {
+        UUID ended = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-1", "BUY_LOC");
+        jdbcTemplate.update("UPDATE strategy_cycle SET end_date = ? WHERE strategy_id = ?", TRADE_DATE, ended);
+
+        assertThat(pausedIds()).isEmpty();
     }
 }

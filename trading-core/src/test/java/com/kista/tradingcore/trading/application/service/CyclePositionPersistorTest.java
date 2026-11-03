@@ -222,4 +222,43 @@ class CyclePositionPersistorTest {
         verify(cycleRotationService, never()).rotate(any(), any(), any(), any(), any(), any());
         verifyNoInteractions(vrCycleRolloverService);
     }
+
+    @Test
+    @DisplayName("PAUSED INFINITE 청산 — markEnded만 기록, rotate·완료 이벤트 건너뜀")
+    void paused_infinite_liquidation_marksEndedOnly() {
+        Strategy strategy = infiniteStrategy().withStatus(StrategyStatus.PAUSED);
+        StrategyCycle cycle = cycle(strategy.id());
+        CyclePosition prevPos = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), BigDecimal.valueOf(5), Instant.now(), null);
+        when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of(prevPos));
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of());
+        when(strategyInfiniteDetailPort.findByStrategyVersionId(VERSION_ID)).thenReturn(java.util.Optional.empty());
+        when(cyclePositionPort.save(any())).thenReturn(new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1050.00"), PRICE, null, BigDecimal.valueOf(0), Instant.now(), null));
+        AccountBalance balance = new AccountBalance(0, null, new BigDecimal("1050.00"));
+
+        persistor.saveCyclePosition(TODAY, balance, new BatchContext(strategy, cycle, ACCOUNT, USER), PRICE, null);
+
+        verify(cyclePositionPort).save(any());
+        verify(batchRunPort).markReported(TODAY, STRATEGY_ID);
+        verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
+        verify(cycleRotationService, never()).rotate(any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("PAUSED VR — 포지션은 저장하되 rollIfDue 건너뜀")
+    void paused_vr_skipsRollover() {
+        Strategy strategy = vrStrategy().withStatus(StrategyStatus.PAUSED);
+        StrategyCycle cycle = cycle(strategy.id());
+        when(cyclePositionPort.findLatestByCycleId(CYCLE_ID, 1)).thenReturn(List.of());
+        when(cyclePositionPort.save(any())).thenReturn(new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1000.00"), PRICE, new BigDecimal("45.00"), BigDecimal.valueOf(10), Instant.now(), null));
+        AccountBalance balance = new AccountBalance(10, new BigDecimal("45.00"), new BigDecimal("1000.00"));
+
+        persistor.saveCyclePosition(TODAY, balance, new BatchContext(strategy, cycle, ACCOUNT, USER), PRICE, null);
+
+        verify(cyclePositionPort).save(any());
+        verifyNoInteractions(vrCycleRolloverService);
+    }
 }

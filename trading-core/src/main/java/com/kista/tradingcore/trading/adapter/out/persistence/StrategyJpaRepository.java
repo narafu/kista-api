@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +49,20 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
               AND s.deleted_at IS NULL AND a.deleted_at IS NULL
             """, nativeQuery = true)
     List<StrategyEntity> findAllActiveStrategies();
+
+    // 정지 전략 중 진행 중 사이클(end_date null)에 당일 접수 주문(상태 무관)이 있는 전략 — 마감 배치가 체결을 원장에 반영하는 리포트 전용
+    @Query(value = """
+            SELECT s.* FROM strategy s
+            JOIN accounts a ON s.account_id = a.id
+            JOIN user_notify_profile p ON p.user_id = a.user_id
+            WHERE p.is_active AND s.status = 'PAUSED'
+              AND s.deleted_at IS NULL AND a.deleted_at IS NULL
+              AND EXISTS (SELECT 1 FROM orders o JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
+                          WHERE sc.strategy_id = s.id AND sc.deleted_at IS NULL AND sc.end_date IS NULL
+                            AND o.trade_date = :tradeDate AND o.external_order_id IS NOT NULL
+                            AND o.order_leg <> :unknownLeg)
+            """, nativeQuery = true)
+    List<StrategyEntity> findPausedWithReportableOrders(@Param("tradeDate") LocalDate tradeDate, @Param("unknownLeg") String unknownLeg);
 
     @Modifying
     @Query("UPDATE StrategyEntity s SET s.deletedAt = :now WHERE s.id = :id")

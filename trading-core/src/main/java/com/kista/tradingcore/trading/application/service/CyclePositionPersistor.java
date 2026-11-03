@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import com.kista.shared.kernel.StrategyDefaults;
+import com.kista.shared.kernel.StrategyStatus;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
@@ -62,6 +63,8 @@ class CyclePositionPersistor {
         });
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
+        boolean paused = strategy.status() == StrategyStatus.PAUSED;
+
         // holdings==0이면서 이전에 보유 이력이 있을 때만 사이클 종료 처리
         // (0회차 매수 실패 케이스: startSnapshot→tradeSnapshot 모두 holdings=0이므로 여기서 걸림)
         // endsCycleOnLiquidation()=false인 전략(VR)은 holdings=0에 사이클 종료 미발동
@@ -69,14 +72,20 @@ class CyclePositionPersistor {
                 && cycleOrderStrategies.of(strategy.type()).endsCycleOnLiquidation()) {
             // 사이클 종료 기록 — 종료금액=청산 후 통합주문가능금액, 종료일자=KST 매매일
             strategyCyclePort.markEnded(currentCycle.id(), balance.usdDeposit(), today);
+            // 정지 전략은 사이클 종료만 기록한다 — 재개 시 StrategyService.reopenCycleIfEnded가 endAmount로 새 사이클을 연다.
+            // 정지 중 자동 새 사이클·알림은 하지 않으며, 건너뛰면 재개 후 직전 스냅샷 holdings=0이라 prevHadHoldings=false가 돼 사이클이 영영 안 닫힌다
+            if (paused) {
+                log.info("[strategyId={}] 정지 전략 청산 — 사이클 종료만 기록 (rotation·알림 건너뜀)", strategy.id());
+                return;
+            }
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
             eventPublisher.publishEvent(new CycleCompletedEvent(ctx.userProfile().userId(), ctx.account().id(), ctx.account().nickname(),
                     strategy.type(), strategy.ticker(), strategy.cycleSeedType()));
             cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.userProfile(), price, privacyBase);
         }
 
-        // 포지션 저장 직후 N주 롤오버 판정 (매일 1회 — due 미도래면 내부에서 no-op)
-        if (cycleOrderStrategies.of(strategy.type()).requiresRolloverCheck()) {
+        // 포지션 저장 직후 N주 롤오버 판정 (매일 1회 — due 미도래면 내부에서 no-op). 정지 전략은 건너뛴다 — rollIfDue가 재개 후 따라잡는다
+        if (!paused && cycleOrderStrategies.of(strategy.type()).requiresRolloverCheck()) {
             vrCycleRolloverService.rollIfDue(ctx, balance, price, today);
         }
     }

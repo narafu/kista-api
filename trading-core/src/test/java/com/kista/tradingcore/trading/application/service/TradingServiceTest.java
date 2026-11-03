@@ -2036,7 +2036,7 @@ class TradingServiceTest {
         Order alreadyPlanned = new Order(UUID.randomUUID(), ACCOUNT.id(), STRATEGY_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.SOXL,
                 OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(1), PRICE, OrderStatus.PLANNED, null, null, null);
         stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.SOXL, new PriceSnapshot(PRICE, PRICE)));
-        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+        lenient().when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
         when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
         when(cycleHistoryPort.findLatestOneByStrategyId(STRATEGY.id())).thenReturn(Optional.of(NORMAL_HISTORY));
         when(orderPort.findPlannedOrPlacedByCycleAndDate(eq(STRATEGY_CYCLE.id()), any())).thenReturn(List.of(alreadyPlanned));
@@ -2251,6 +2251,144 @@ class TradingServiceTest {
         service.resumeCloseReport(List.of(new BatchContext(vr, vrCycle, ACCOUNT, USER)), PAST_DST);
 
         verify(vrRolloverService).rollIfDue(any(), any(), any(), eq(today));
+    }
+
+    // --- 정지 전략 마감 리포트 (CQ-25) ---
+
+    private static final UUID PAUSED_ID = UUID.randomUUID();
+    private static final Strategy PAUSED = new Strategy(PAUSED_ID, ACCOUNT.id(), StrategyType.INFINITE,
+            StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE); // 활성 전략(SOXL)과 다른 종목
+    private static final StrategyCycle PAUSED_CYCLE = new StrategyCycle(UUID.randomUUID(), PAUSED_ID, STRATEGY_VERSION_ID,
+            new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
+
+    private Order pausedOrder(OrderStatus status, String externalId, String leg) {
+        return new Order(UUID.randomUUID(), ACCOUNT.id(), PAUSED_CYCLE.id(), LocalDate.now(FIXED), StrategyTicker.TQQQ,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, leg, BigDecimal.valueOf(2), PRICE, status, externalId, null, null);
+    }
+
+    // 정지 전략 리포트 공통 stub — 가격·잔고·체결 조회
+    private void stubPausedReport(Order... orders) throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true);
+        lenient().when(batchRunPort.isReported(today, PAUSED_ID)).thenReturn(false);
+        lenient().when(orderPort.findByStrategyId(PAUSED_ID, today, today)).thenReturn(List.of(orders));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
+        lenient().when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.TQQQ, PRICE));
+        lenient().when(cycleHistoryPort.findLatestOneByStrategyId(PAUSED_ID)).thenReturn(Optional.of(new CyclePosition(
+                null, PAUSED_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
+        lenient().when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+    }
+
+    @Test
+    void executeBatch_pausedWithCancelledPartialFill_isReportedAndRecordsFill() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        Order cancelled = pausedOrder(OrderStatus.CANCELLED, "ORD-C", "BUY_LOC");
+        stubPausedReport(cancelled);
+        when(orderPort.findCancelledByCycleAndDate(PAUSED_CYCLE.id(), today)).thenReturn(List.of(cancelled));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of(
+                new Execution(today, StrategyTicker.TQQQ, OrderDirection.BUY, 1, PRICE, PRICE, "ORD-C")));
+
+        service.executeBatch(List.of(new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(orderPort).markFilled(cancelled.id(), BigDecimal.ONE, PRICE.setScale(2), OrderStatus.CANCELLED);
+        verify(cycleHistoryPort).save(argThat(p -> p.strategyCycleId().equals(PAUSED_CYCLE.id())));
+        verify(vrRolloverService, never()).rollIfDue(any(), any(), any(), any());
+    }
+
+    @Test
+    void executeBatch_pausedWithAlreadyFilledPlacedOrder_isPassedAsMainOrder() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        Order placed = pausedOrder(OrderStatus.PLACED, "ORD-P", "BUY_LOC");
+        stubPausedReport(placed);
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of(
+                new Execution(today, StrategyTicker.TQQQ, OrderDirection.BUY, 2, PRICE, PRICE.multiply(BigDecimal.TWO), "ORD-P")));
+
+        service.executeBatch(List.of(new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(orderPort).markFilled(placed.id(), BigDecimal.valueOf(2), PRICE.setScale(2), OrderStatus.FILLED);
+    }
+
+    @Test
+    void executeBatch_onlyPausedStrategies_stillReportsAndRecordsDone() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        stubPausedReport(pausedOrder(OrderStatus.PLACED, "ORD-P", "BUY_LOC"));
+
+        service.executeBatch(List.of(new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        InOrder inOrder = inOrder(kisExecutionPort, batchRunPort);
+        inOrder.verify(kisExecutionPort).getExecutions(any(), any(), any(), eq(ACCOUNT_REF));
+        inOrder.verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+        verify(brokerOrderPort, never()).place(any(), any()); // 접수 없음
+    }
+
+    @Test
+    void executeBatch_pausedAlreadyReported_isSkipped() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        stubPausedReport(pausedOrder(OrderStatus.PLACED, "ORD-P", "BUY_LOC"));
+        when(batchRunPort.isReported(today, PAUSED_ID)).thenReturn(true);
+
+        service.executeBatch(List.of(new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(kisExecutionPort, never()).getExecutions(any(), any(), any(), any());
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, today, TradingBatchPhase.DONE);
+    }
+
+    @Test
+    void executeBatch_pausedOnlyTicker_closingPriceFetchedForPausedTargets() throws InterruptedException {
+        stubPausedReport(pausedOrder(OrderStatus.PLACED, "ORD-P", "BUY_LOC")); // 정지 TQQQ 전용
+        stubExistingPlannedFlow(); // 활성 SOXL (같은 매처 stub을 뒤에서 덮어쓴다)
+        // 종가 조회를 티커 목록별로 구분 — TQQQ 포함 목록은 TQQQ 종가만, 그 외는 SOXL 종가만 돌려준다
+        BigDecimal tqqqClose = new BigDecimal("33.00");
+        lenient().when(kisPricePort.getClosingPrices(argThat(t -> t != null && t.contains(StrategyTicker.TQQQ)), any(LocalDate.class), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.TQQQ, tqqqClose));
+        lenient().when(kisPricePort.getClosingPrices(argThat(t -> t != null && !t.contains(StrategyTicker.TQQQ)), any(LocalDate.class), eq(ACCOUNT_REF)))
+                .thenReturn(Map.of(StrategyTicker.SOXL, PRICE));
+
+        service.executeBatch(List.of(new BatchContext(STRATEGY, STRATEGY_CYCLE, ACCOUNT, USER),
+                new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        // 정지 전략 포지션은 정지 대상 종가(TQQQ)로 저장된다
+        verify(cycleHistoryPort).save(argThat(pos -> pos.strategyCycleId().equals(PAUSED_CYCLE.id())
+                && tqqqClose.compareTo(pos.closingPrice()) == 0));
+
+        // 활성 종가 조회(SOXL)와 별개로 정지 대상 종가 조회(TQQQ 포함)가 한 번 더 일어난다
+        verify(kisPricePort, times(2)).getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF));
+        verify(kisPricePort).getClosingPrices(argThat(t -> t.contains(StrategyTicker.TQQQ)), any(LocalDate.class), eq(ACCOUNT_REF));
+    }
+
+    @Test
+    void executeBatch_holiday_noPausedReport() throws InterruptedException {
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        service.executeBatch(List.of(new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(orderPort, never()).findByStrategyId(any(), any(), any());
+        verify(kisExecutionPort, never()).getExecutions(any(), any(), any(), any());
+        verify(batchRunPort).recordPhase(TradingBatchJob.CLOSE, LocalDate.now(FIXED), TradingBatchPhase.DONE);
+    }
+
+    @Test
+    void resumeCloseReport_pausedVrWithoutOrders_isNotTarget_pausedWithOrdersIs() throws InterruptedException {
+        LocalDate today = LocalDate.now(FIXED);
+        Strategy pausedVr = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.VR,
+                StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        StrategyCycle vrCycle = new StrategyCycle(UUID.randomUUID(), pausedVr.id(), STRATEGY_VERSION_ID,
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(1), null, null, null);
+        when(batchRunPort.isReported(any(), any())).thenReturn(false);
+        when(orderPort.findByStrategyId(pausedVr.id(), today, today)).thenReturn(List.of());
+        when(orderPort.findByStrategyId(PAUSED_ID, today, today)).thenReturn(List.of(pausedOrder(OrderStatus.PLACED, "ORD-P", "BUY_LOC")));
+        stubStartSnapshots(ACCOUNT_REF, Map.of(StrategyTicker.TQQQ, new PriceSnapshot(PRICE, PRICE)));
+        when(kisPricePort.getClosingPrices(anyList(), any(LocalDate.class), eq(ACCOUNT_REF))).thenReturn(Map.of(StrategyTicker.TQQQ, PRICE));
+        when(cycleHistoryPort.findLatestOneByStrategyId(PAUSED_ID)).thenReturn(Optional.of(new CyclePosition(
+                null, PAUSED_CYCLE.id(), new BigDecimal("1000.00"), PRICE, PRICE, BigDecimal.valueOf(10), null, null)));
+        when(kisExecutionPort.getExecutions(any(), any(), any(), eq(ACCOUNT_REF))).thenReturn(List.of());
+
+        service.resumeCloseReport(List.of(new BatchContext(pausedVr, vrCycle, ACCOUNT, USER),
+                new BatchContext(PAUSED, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(cycleHistoryPort).save(argThat(p -> p.strategyCycleId().equals(PAUSED_CYCLE.id())));
+        verify(cycleHistoryPort, never()).save(argThat(p -> p.strategyCycleId().equals(vrCycle.id())));
+        verify(kisExecutionPort, times(1)).getExecutions(any(), any(), any(), eq(ACCOUNT_REF));
     }
 
     // 계좌 예산 락 구간 안에서만 true — 승인분 PLANNED 저장이 락 안에서 커밋되는지 검증용

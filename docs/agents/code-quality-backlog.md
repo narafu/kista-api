@@ -456,13 +456,20 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `StrategyService.pause` → `OrderCancelService.cancelOpenOrders`, `TradingService.reportAll`(활성 전략만 리포트).
 - 근거: 정지된 전략은 마감 리포트를 타지 않아 정지 직전 장중 부분 체결분이 `cycle_position`에 들어가지 않는다. CQ-23 이후 CANCELLED 행에 체결이 기록돼 통계·VR `poolUsed`에는 보이지만 원장 보유·예수금과 어긋난다. 원장 예산은 오늘·다음 거래일만 보므로 다음 날부터 이 체결분이 빠진다.
 - 수정 방향: 정지된 전략도 당일 취소 체결분이 있으면 리포트(포지션 반영)하거나, 재개 시 대사한다.
-- 상태: open.
+- 상태: done. 마감 배치가 당일 접수 주문이 있는 정지 전략도 체결 리포트 전용으로 처리하고(청산 시 사이클 종료 `markEnded`만 기록하고 rotation·사이클 완료 알림·VR 롤오버는 하지 않는다 — 재개가 `reopenCycleIfEnded`로 새 사이클을 열고 VR 롤오버는 재개 후 따라잡는다) 재기동 리포트 재개에도 같은 규칙을 적용했다.
 
 ### CQ-26 Toss 체결 조회가 전날 저녁 체결을 당일 거래일에서 뺌
 - 주제: 브로커 어댑터 날짜 기준. 유형: 버그 의심(기존 동작).
 - 위치: `TossOrderApi.fetchExecutions`(`filledAt` KST 일자 재필터, `TossOrderApi.java:139-145` 부근).
 - 근거: 거래일 D 주문이 D-1 22:00 이후 장중에 체결되면 `filledAt` 일자가 D-1이라 `getExecutions(D, D)`에서 빠진다. 리포트·취소 직후 체결 기록 모두 체결을 놓친다. Toss는 현재 대시보드 용도라 영향이 작다.
 - 수정 방향: `filledAt`을 거래일 경계(`DstInfo.nextTradeDate`)로 변환해 필터한다. 실계좌 확인 필요.
+- 상태: open.
+
+### CQ-27 투자금 추가·수동 보정 리포트 창 판정이 정지 전략의 리포트 비대상 주문까지 "리포트 전"으로 봄
+- 주제: 운영 정합성. 유형: 비일관성(기존 동작, CQ-25로 악화되지 않음).
+- 위치: `CapitalInjectionService.requireOutsideReportWindow`(`CapitalInjectionService.java:189-200`), `ManualTradeCorrectionService.rejectDuringReportWindow`(`ManualTradeCorrectionService.java:125-136`).
+- 근거: 두 판정은 외부번호 없는 당일 주문(정지로 PLANNED만 취소된 경우)도 "리포트 전"으로 본다. 정지 전략 리포트 대상은 외부번호 보유 주문만이라, 그런 정지 전략은 마커가 안 찍혀 postClose~자정 투자금 추가·인출·수동 보정이 거절된다.
+- 수정 방향: 창 판정에도 `externalOrderId != null` 조건을 맞추거나 `TradingService.reportableOrders`를 공용화한다.
 - 상태: open.
 
 ## 유지 목록 (재제안 금지, 이유 기록)

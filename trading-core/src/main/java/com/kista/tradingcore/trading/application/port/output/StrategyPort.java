@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.application.port.output;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategySummary;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,9 @@ public interface StrategyPort {
 
     // 사용자 ACTIVE + 전략 ACTIVE 전체 조회 (스케쥴러용)
     List<Strategy> findAllActive();
+
+    // PAUSED 전략 중 tradeDate에 접수된 주문(외부번호 보유·수동 보정 제외)이 있는 전략 — 마감 리포트 전용
+    List<Strategy> findPausedWithReportableOrders(LocalDate tradeDate);
 
     Strategy save(Strategy strategy);
     void delete(UUID id);
