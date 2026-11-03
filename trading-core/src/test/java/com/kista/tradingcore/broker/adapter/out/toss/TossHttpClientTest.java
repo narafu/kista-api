@@ -2,6 +2,7 @@ package com.kista.tradingcore.broker.adapter.out.toss;
 
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.DisplayName;
@@ -232,8 +233,8 @@ class TossHttpClientTest {
     }
 
     @Test
-    @DisplayName("공통 API 429가 재시도 한도(2회)를 넘기면 TossApiException")
-    void getCommon_throwsTossApiException_when429Persists() {
+    @DisplayName("공통 API 429가 재시도 한도(2회)를 넘기면 BrokerRateLimitException")
+    void getCommon_throwsBrokerRateLimitException_when429Persists() {
         TossHttpClient client = newClient();
         when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
         for (int i = 0; i < 3; i++) {
@@ -241,8 +242,21 @@ class TossHttpClientTest {
         }
 
         assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}))
-                .isInstanceOf(TossApiException.class)
-                .hasMessageContaining("429");
+                .isInstanceOf(BrokerRateLimitException.class);
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("계좌 API 429는 재시도 없이 BrokerRateLimitException")
+    void get_throwsBrokerRateLimitException_on429WithoutRetry() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token-0");
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThatThrownBy(() -> client.get(PATH, ACCOUNT, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}))
+                .isInstanceOf(BrokerRateLimitException.class);
+
+        verify(tossAuthApi, never()).recoverToken(any(), anyString(), anyString(), anyString(), anyBoolean());
         server.verify();
     }
 

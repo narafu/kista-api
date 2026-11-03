@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.adapter.out.internal.CallIntervalGate;
 import com.kista.tradingcore.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -123,7 +124,7 @@ class KisHttpClient {
 
     // 401 → 실패한 요청의 토큰만 조건부 무효화 후 최신 토큰으로 1회 재시도한다.
     // retryOnRateLimit=true: 조회(GET) 전용 — EGW00201 감지 시 추가 백오프 재시도까지 안전. false: 주문 접수/취소(POST) — 재시도 안 함(중복 위험 배제, 사전 게이트로만 방어)
-    // RestClientException은 KisApiException으로 래핑 → GlobalExceptionHandler 503
+    // RestClientException은 KisApiException으로 래핑 → 503, 호출 한도 초과(EGW00201·HTTP 429)는 재시도 소진 후 BrokerRateLimitException → 429
     // 확정 거절(rejected) 분류: 송신 전 실패(토큰 확보·게이트)와 증권사가 응답으로 거부한 경우만 — I/O·본문 없는 5xx는 결과 불명
     private <T> T executeWithRetry(String trId, BrokerAccountRef account, boolean retryOnRateLimit, Function<HttpHeaders, T> call) {
         String token;
@@ -174,11 +175,15 @@ class KisHttpClient {
         }
     }
 
-    // HTTP 오류 응답 → 4xx이거나 접수 전 거부가 확인된 코드(EGW00201 초당 거래건수 초과)면 확정 거절, 그 외 5xx는 결과 불명
-    // (게이트웨이 타임아웃 계열 msg_cd는 접수 여부를 알 수 없어 확정 거절로 보지 않는다 — 실계좌 표본 확보 시 목록 확장)
-    private KisApiException httpFailure(String prefix, HttpStatusCodeException e) {
+    // HTTP 오류 응답 → 호출 한도 초과(EGW00201 또는 HTTP 429)는 BrokerRateLimitException(429 매핑, 접수 전 거부라 확정 거절),
+    // 그 외 4xx는 확정 거절, 5xx는 결과 불명 (게이트웨이 타임아웃 계열 msg_cd는 접수 여부를 알 수 없어 확정 거절로 보지 않는다 — 실계좌 표본 확보 시 목록 확장)
+    private RuntimeException httpFailure(String prefix, HttpStatusCodeException e) {
         String message = prefix + e.getStatusCode() + " " + e.getResponseBodyAsString();
-        return e.getStatusCode().is4xxClientError() || isRateLimited(e)
+        if (isRateLimited(e) || e.getStatusCode().value() == 429) {
+            log.warn("KIS 호출 한도 초과: {}", message); // BrokerRateLimitException은 상세를 싣지 않아 여기서 남긴다
+            return new BrokerRateLimitException();
+        }
+        return e.getStatusCode().is4xxClientError()
                 ? KisApiException.rejected(message, e)
                 : new KisApiException(message, e);
     }

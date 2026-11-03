@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.tradingcore.broker.adapter.out.internal.ErrorBodyDecoder;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.toss.TossApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,18 +54,21 @@ class TossHttpClient {
     public <T> T getCommon(String path, MultiValueMap<String, String> params,
                            ParameterizedTypeReference<T> typeRef) {
         String url = UriComponentsBuilder.fromPath(path).queryParams(params).toUriString();
-        // 429(rate-limit-exceeded) 재시도 — 관리자 토큰 공용 시세 조회(멱등 GET)만 대상, 주문 등 계좌 API는 재시도하지 않는다
+        return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken, tossAuthApi::recoverAdminToken,
+                token -> retryOnTooManyRequests(path, () -> {
+                    HttpHeaders headers = buildHeaders(null, token);
+                    return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
+                }));
+    }
+
+    // 429(rate-limit-exceeded) 재시도 — 관리자 토큰 공용 시세 조회(멱등 GET)만 대상, 주문 등 계좌 API는 재시도하지 않는다
+    // 한도 소진·인터럽트 시 429를 그대로 던지면 executeWithBackoffRetry가 BrokerRateLimitException으로 변환한다
+    private <T> T retryOnTooManyRequests(String path, Supplier<T> call) {
         for (int rateLimitRetry = 0; ; rateLimitRetry++) {
             try {
-                return executeWithBackoffRetry("관리자", path, tossAuthApi::getAdminToken,
-                        tossAuthApi::recoverAdminToken,
-                        token -> {
-                            HttpHeaders headers = buildHeaders(null, token);
-                            return tossRestClient.get().uri(url).headers(h -> h.addAll(headers)).retrieve().body(typeRef);
-                        });
-            } catch (TossApiException e) {
-                if (!(e.getCause() instanceof HttpClientErrorException.TooManyRequests)
-                        || rateLimitRetry >= MAX_RATE_LIMIT_RETRIES) {
+                return call.get();
+            } catch (HttpClientErrorException.TooManyRequests e) {
+                if (rateLimitRetry >= MAX_RATE_LIMIT_RETRIES) {
                     throw e;
                 }
                 log.warn("Toss 429 — 공통 API 재시도 {}/{}: path={}", rateLimitRetry + 1, MAX_RATE_LIMIT_RETRIES, path);
@@ -142,6 +146,10 @@ class TossHttpClient {
             try {
                 return call.apply(token);
             } catch (HttpClientErrorException e) {
+                if (e.getStatusCode().value() == 429) {
+                    log.warn("Toss 429 — 호출 한도 초과: path={}, body={}", path, e.getResponseBodyAsString());
+                    throw new BrokerRateLimitException(); // 429 매핑 — 호출 단위 재시도는 getCommon만 한다
+                }
                 if (e.getStatusCode().value() != 401) {
                     String body = e.getResponseBodyAsString();
                     String errorCode = ErrorBodyDecoder.decode(objectMapper, body, TossErrorBody.class)

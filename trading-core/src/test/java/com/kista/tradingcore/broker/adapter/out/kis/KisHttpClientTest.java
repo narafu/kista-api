@@ -2,6 +2,8 @@ package com.kista.tradingcore.broker.adapter.out.kis;
 
 import com.kista.tradingcore.broker.adapter.out.internal.TokenCoordinator;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
+import com.kista.tradingcore.broker.domain.model.BrokerApiException;
+import com.kista.tradingcore.broker.domain.model.BrokerRateLimitException;
 import com.kista.tradingcore.broker.domain.model.kis.KisApiException;
 import com.kista.shared.kernel.Broker;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +32,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
@@ -173,8 +176,8 @@ class KisHttpClientTest {
     }
 
     @Test
-    @DisplayName("GET: EGW00201이 MAX_RATE_LIMIT_RETRIES+1회 연속 → KisApiException")
-    void throwsKisApiException_whenRateLimitedBeyondMaxRetries() {
+    @DisplayName("GET: EGW00201이 MAX_RATE_LIMIT_RETRIES+1회 연속 → BrokerRateLimitException")
+    void throwsBrokerRateLimitException_whenRateLimitedBeyondMaxRetries() {
         when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
         expectGet(HttpStatus.INTERNAL_SERVER_ERROR, RATE_LIMIT_BODY);
         expectGet(HttpStatus.INTERNAL_SERVER_ERROR, RATE_LIMIT_BODY);
@@ -182,8 +185,7 @@ class KisHttpClientTest {
 
         KisHttpClient client = newClient();
         assertThatThrownBy(() -> client.tradingGet(TR_ID, PATH, ACCOUNT, String.class, p -> {}))
-                .isInstanceOf(KisApiException.class)
-                .hasMessageContaining("KIS API 오류");
+                .isInstanceOf(BrokerRateLimitException.class);
 
         // MAX_RATE_LIMIT_RETRIES=2 → attempt 0,1은 재시도, attempt 2에서 최종 실패 → 총 3회 호출
         server.verify();
@@ -191,7 +193,7 @@ class KisHttpClientTest {
     }
 
     @Test
-    @DisplayName("POST(주문 접수): EGW00201 → 재시도 없이 즉시 KisApiException")
+    @DisplayName("POST(주문 접수): EGW00201 → 재시도 없이 즉시 BrokerRateLimitException")
     void doesNotRetryRateLimit_onPost() {
         when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
         server.expect(requestTo(BASE_URL + PATH))
@@ -200,10 +202,23 @@ class KisHttpClientTest {
 
         KisHttpClient client = newClient();
         assertThatThrownBy(() -> client.post(TR_ID, PATH, ACCOUNT, "{}", String.class))
-                .isInstanceOf(KisApiException.class)
-                .hasMessageContaining("KIS API 오류");
+                .isInstanceOf(BrokerRateLimitException.class);
 
         // retryOnRateLimit=false — 접수/취소는 재시도하지 않음(사전 호출 간격 게이트로 별도 대응)
+        server.verify();
+    }
+
+    @Test
+    @DisplayName("HTTP 429 → 재시도 없이 BrokerRateLimitException")
+    void convertsHttp429_toBrokerRateLimitException() {
+        when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
+        server.expect(requestTo(BASE_URL + PATH))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).body(""));
+
+        assertThatThrownBy(() -> newClient().post(TR_ID, PATH, ACCOUNT, "{}", String.class))
+                .isInstanceOf(BrokerRateLimitException.class);
+
         server.verify();
     }
 
@@ -286,11 +301,13 @@ class KisHttpClientTest {
     }
 
     @Test
-    @DisplayName("POST 오류 응답에 KIS msg_cd 존재 → 확정 거절")
-    void post_errorWithKisMsgCd_isRejected() {
+    @DisplayName("POST 5xx + EGW00201 → BrokerRateLimitException, 확정 거절로 판정")
+    void post_egw00201_isRejection() {
         when(kisAuthApi.getToken(any(), anyString(), anyString())).thenReturn("token");
         expectPost(withServerError().body(RATE_LIMIT_BODY));
-        assertThat(postFailure().isRejected()).isTrue();
+        assertThatThrownBy(() -> newClient().post(TR_ID, PATH, ACCOUNT, "{}", String.class))
+                .isInstanceOfSatisfying(BrokerRateLimitException.class,
+                        e -> assertThat(BrokerApiException.isRejection(e)).isTrue());
     }
 
     @Test
