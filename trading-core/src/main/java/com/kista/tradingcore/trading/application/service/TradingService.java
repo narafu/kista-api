@@ -233,11 +233,9 @@ class TradingService {
             // 정지 전략은 주문이 있을 때만(롤오버 판정 제외 — 주문 없는 정지 VR에 0체결 스냅샷 방지)
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
                     .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
-                    .filter(ctx -> ctx.strategy().status() == StrategyStatus.PAUSED
-                            ? !reportableOrders(ctx.strategy().id(), today).isEmpty()
-                            : cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
-                            || orderPort.findByStrategyId(ctx.strategy().id(), today, today).stream()
-                            .anyMatch(order -> !Order.UNKNOWN_LEG.equals(order.orderLeg()))) // 수동 보정 행만 있는 전략은 리포트 대상 아님
+                    .filter(ctx -> ctx.strategy().status() != StrategyStatus.PAUSED
+                            && cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
+                            || CloseReportScope.awaitsCloseReport(ctx.strategy(), orderPort.findByStrategyId(ctx.strategy().id(), today, today)))
                     .toList();
             log.info("마감 리포트 재개 — 대상 {}건 (전체 {}건)", targets.size(), contexts.size());
 

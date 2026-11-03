@@ -429,6 +429,32 @@ class CapitalInjectionServiceTest {
         verify(cyclePositionPort).updateBalance(eq(latestId), any());
     }
 
+    private void stubPausedStrategy() {
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(
+                new Strategy(strategyId, accountId, StrategyType.PRIVACY, StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+    }
+
+    @Test
+    void reportWindow_passes_whenPausedAndOrdersNeverPlaced() {
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        stubPausedStrategy();
+        stubTodayOrder("LOC_BUY"); // 접수 안 된 PLANNED 주문 — 정지 전략은 마감 리포트 대상 아님
+
+        service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null));
+        verify(cyclePositionPort).updateBalance(eq(latestId), any());
+    }
+
+    @Test
+    void reportWindow_rejects_whenPausedWithPlacedOrder() {
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+        stubPausedStrategy();
+        when(orderPort.findByStrategyId(strategyId, TODAY, TODAY)).thenReturn(List.of(
+                order(TODAY, OrderDirection.BUY, "10.00", "1").withLeg("LOC_BUY").withPlaced("EXT-1")));
+
+        assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
+                .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_ADD);
+    }
+
     @Test
     void reportWindow_passes_beforePostClose() {
         // 2026-01-06 04:00 KST(= 2026-01-05T19:00Z) — 비DST postClose 06:10 이전

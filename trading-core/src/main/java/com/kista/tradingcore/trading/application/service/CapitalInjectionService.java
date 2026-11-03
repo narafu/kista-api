@@ -185,7 +185,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     // 같은 기준: ManualTradeCorrectionService#rejectDuringReportWindow
     // 마감 리포트 창(오늘 postClose 이후 ~ 리포트 마커 전) 거절 — 리포트는 postClose 이후 읽은 최신 포지션 잔고에 브로커 호출(수 초) 뒤 체결을 반영해 새 행을 append하므로,
     // 그 사이 커밋된 in-place 변경(예수금)은 덮어써지고 startAmount 변경만 남는다. postClose 이전 변경은 리포트가 재조회하므로 안전하다.
-    // 리포트가 실패해 마커가 안 찍히면 그날은 계속 거절된다(다음 날 해제). 주문 없는 전략은 리포트 대상이 아니므로 제외(TradingService.resumeCloseReport와 같은 기준)
+    // 리포트가 실패해 마커가 안 찍히면 그날은 계속 거절된다(다음 날 해제). 리포트 대상이 아닌 전략(주문 없음, 정지 전략의 미접수 주문)은 제외(CloseReportScope)
     private void requireOutsideReportWindow(Strategy strategy, String message) {
         if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(clock.instant()).isPositive()) {
             return;
@@ -194,9 +194,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         if (batchRunPort.isReported(today, strategy.id())) {
             return;
         }
-        boolean hasStrategyOrder = orderPort.findByStrategyId(strategy.id(), today, today).stream()
-                .anyMatch(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()));
-        if (hasStrategyOrder) {
+        if (CloseReportScope.awaitsCloseReport(strategy, orderPort.findByStrategyId(strategy.id(), today, today))) {
             throw new IllegalStateException(message);
         }
     }

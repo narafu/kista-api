@@ -430,6 +430,36 @@ class ManualTradeCorrectionServiceTest {
         verify(orderPort).saveAll(any());
     }
 
+    private static Order orderWithLegAndExternalId(String leg, String externalOrderId) {
+        Order o = orderWithLeg(leg);
+        lenient().when(o.externalOrderId()).thenReturn(externalOrderId);
+        return o;
+    }
+
+    private void stubPaused() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.PAUSED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+    }
+
+    @Test
+    void reportWindow_pausedWithOnlyUnplacedOrders_passes() {
+        stubWindowFixture(List.of(orderWithLegAndExternalId("LOC_BUY", null)), Broker.KIS);
+        stubPaused();
+
+        service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1"));
+
+        verify(orderPort).saveAll(any());
+    }
+
+    @Test
+    void reportWindow_pausedWithPlacedOrder_rejected() {
+        stubWindowFixture(List.of(orderWithLegAndExternalId("LOC_BUY", "EXT-0")), Broker.KIS);
+        stubPaused();
+
+        assertThatThrownBy(() -> service.correctManualFills(guardCommand(TODAY.minusDays(1), "EXT-1")))
+                .isInstanceOf(IllegalStateException.class).hasMessage(WINDOW_MSG);
+    }
+
     @Test
     void reportWindow_cryptoAccount_passes() {
         stubWindowFixture(List.of(orderWithLeg("LOC_BUY")), Broker.UPBIT);

@@ -470,7 +470,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `CapitalInjectionService.requireOutsideReportWindow`(`CapitalInjectionService.java:189-200`), `ManualTradeCorrectionService.rejectDuringReportWindow`(`ManualTradeCorrectionService.java:125-136`).
 - 근거: 두 판정은 외부번호 없는 당일 주문(정지로 PLANNED만 취소된 경우)도 "리포트 전"으로 본다. 정지 전략 리포트 대상은 외부번호 보유 주문만이라, 그런 정지 전략은 마커가 안 찍혀 postClose~자정 투자금 추가·인출·수동 보정이 거절된다.
 - 수정 방향: 창 판정에도 `externalOrderId != null` 조건을 맞추거나 `TradingService.reportableOrders`를 공용화한다.
-- 상태: open.
+- 상태: done. 마감 리포트 대상 판정을 `CloseReportScope.awaitsCloseReport`로 공용화해 마감 배치·투자금 추가/인출·수동 보정이 같은 기준(정지 전략은 접수 주문 보유 시만)을 쓴다.
 
 ## 유지 목록 (재제안 금지, 이유 기록)
 

@@ -128,10 +128,8 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(clock.instant()).isPositive()) return;
         LocalDate today = LocalDate.now(clock);
         if (batchRunPort.isReported(today, strategy.id())) return;
-        // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니므로 제외
-        boolean hasStrategyOrder = orderPort.findByStrategyId(strategy.id(), today, today).stream()
-                .anyMatch(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()));
-        if (hasStrategyOrder) {
+        // 리포트 대상 판정은 마감 배치와 같은 기준(CloseReportScope)
+        if (CloseReportScope.awaitsCloseReport(strategy, orderPort.findByStrategyId(strategy.id(), today, today))) {
             throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.");
         }
     }
