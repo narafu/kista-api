@@ -699,6 +699,23 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("update() DCA의 연속 사이클 정책을 NONE 외 값으로 바꾸면 저장 전에 거절한다")
+    void update_dcaCycleSeedType_nonNone_throws() {
+        Strategy dcaStrategy = new Strategy(
+                STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
+                StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dcaStrategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.update(
+                STRATEGY_ID, USER_ID, new UpdateStrategyCommand(StrategyCycleSeedType.MAX, null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("연속 사이클 정책");
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
     @DisplayName("update() 호출 시 소유자가 아니면 SecurityException이 발생한다 (→ 403)")
     void update_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();

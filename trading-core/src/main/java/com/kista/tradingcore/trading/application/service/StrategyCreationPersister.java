@@ -49,15 +49,20 @@ class StrategyCreationPersister {
         StrategyVersion version = strategyVersionPort.save(
                 new StrategyVersion(null, saved.id(), strategyVersionPort.nextVersionNo(saved.id()), null, null)
         );
-        StrategyVrDetail vrDetail = null;
-        if (saved.isInfinite()) {
-            strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), resolved.divisionCount()));
-        } else if (saved.isVr()) {
-            vrDetail = vrStrategyDetailService.saveVersionDetail(
+        // default 없는 switch 식 — StrategyType 추가 시 여기서 컴파일 오류가 나 detail 저장 누락을 막는다
+        StrategyVrDetail vrDetail = switch (saved.type()) {
+            case INFINITE -> {
+                strategyInfiniteDetailPort.save(new StrategyInfiniteDetail(version.id(), resolved.divisionCount()));
+                yield null;
+            }
+            case VR -> vrStrategyDetailService.saveVersionDetail(
                     version.id(), resolved.intervalWeeks(), resolved.bandWidth(), resolved.recurringAmount(), d.ramp());
-        } else if (saved.isDca()) {
-            dcaDetailPort.save(version.id(), d.dca()); // DCA 버전 규칙 (ruleKey는 호출부가 확정)
-        }
+            case DCA -> {
+                dcaDetailPort.save(version.id(), d.dca()); // DCA 버전 규칙 (ruleKey는 호출부가 확정)
+                yield null;
+            }
+            case PRIVACY -> null; // version detail 없음
+        };
 
         // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
         // startAmount 산출 규칙은 호출부(StrategyCreationService) 소유
@@ -70,10 +75,10 @@ class StrategyCreationPersister {
                         cycle.id(), normalizedInitialUsdDeposit, d.initialHoldings(), d.initialAvgPrice(), d.marketPrice()))
                 : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
 
-        if (saved.isInfinite()) {
-            cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
-        } else if (saved.isVr()) {
-            vrStrategyDetailService.saveInitialCycleDetail(cycle.id(), d.vrValue(), vrDetail);
+        switch (saved.type()) {
+            case INFINITE -> cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));
+            case VR -> vrStrategyDetailService.saveInitialCycleDetail(cycle.id(), d.vrValue(), vrDetail);
+            case PRIVACY, DCA -> { } // cycle detail 없음
         }
         return saved;
     }

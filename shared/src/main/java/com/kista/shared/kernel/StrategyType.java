@@ -24,12 +24,12 @@ public enum StrategyType {
         return switch (this) {
             case INFINITE -> StrategyCapability.basic(
                     EnumSet.of(StrategyTicker.MAGX, StrategyTicker.USD, StrategyTicker.TQQQ, StrategyTicker.SOXL),
-                    false, false, true, List.of(20, 30, 40));
-            case PRIVACY -> StrategyCapability.basic(EnumSet.of(StrategyTicker.SOXL), true, true, false, List.of());
-            case VR -> StrategyCapability.basic(EnumSet.of(StrategyTicker.TQQQ), true, false, false, List.of());
+                    false, false, true, true, List.of(20, 30, 40));
+            case PRIVACY -> StrategyCapability.basic(EnumSet.of(StrategyTicker.SOXL), true, true, false, true, List.of());
+            case VR -> StrategyCapability.basic(EnumSet.of(StrategyTicker.TQQQ), true, false, false, false, List.of());
             case DCA -> new StrategyCapability(
                     EnumSet.of(StrategyTicker.UPRO, StrategyTicker.QLD, StrategyTicker.BTC, StrategyTicker.ETH),
-                    false, false, false, List.of(),
+                    false, false, false, false, List.of(),
                     List.of(OrderType.MOO, OrderType.MOC, OrderType.MARKET), List.of(OrderDirection.BUY, OrderDirection.SELL),
                     List.of(DcaFrequency.values()), List.of(DcaIndicator.values()));
         };

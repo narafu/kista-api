@@ -58,7 +58,7 @@ class StrategyTypeCapabilityTest {
     @Test
     @DisplayName("빈 availableTickers(Set.of())도 예외 없이 빈 집합으로 방어 복사한다")
     void emptyAvailableTickersIsAccepted() {
-        StrategyCapability c = StrategyCapability.basic(Set.of(), false, false, false, List.of());
+        StrategyCapability c = StrategyCapability.basic(Set.of(), false, false, false, false, List.of());
         assertThat(c.availableTickers()).isEmpty();
         assertThat(c.divisionCounts()).isEmpty();
     }

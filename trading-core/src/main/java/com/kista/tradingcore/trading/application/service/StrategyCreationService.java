@@ -107,9 +107,9 @@ class StrategyCreationService {
         // VR 전략 파라미터 해석·검증 — V값은 시장가×보유수량 기준 (비VR은 null)
         VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialStockValue) : null;
 
-        // VR seed type은 NONE으로 고정하고 나머지는 기존 요청 기본 규칙을 유지한다.
-        StrategyCycleSeedType seedType = cmd.type() == StrategyType.VR || dca
-                ? StrategyCycleSeedType.NONE  // VR·DCA는 NONE 강제 (순환 재등록 불가)
+        // 연속 사이클 정책을 지원하지 않는 전략(VR·DCA)은 NONE으로 강제하고 나머지는 요청 값을 따른다.
+        StrategyCycleSeedType seedType = !cmd.type().capability().supportsCycleSeed()
+                ? StrategyCycleSeedType.NONE  // capability.supportsCycleSeed=false는 NONE 강제
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
         // 시작금액 산출 — 예수금 null은 0으로 취급

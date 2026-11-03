@@ -67,13 +67,13 @@ class BacktestService implements BacktestUseCase {
 
         // PRIVACY만 날짜별 기준 매매표를 미리 조달한다 — 도메인 엔진은 DB I/O를 할 수 없다
         Map<LocalDate, PrivacyTradeBase> privacyBases = Map.of();
-        if (command.type() == StrategyType.PRIVACY) {
+        if (command.type().capability().requiresPrivacyBase()) {
             privacyBases = loadPrivacyBases(candles);
             addRangeClampWarning(candles, privacyBases, warnings);
         }
 
         BacktestEngine engine = new BacktestEngine(cycleOrderStrategies); // 무상태 순수 클래스 — Spring 빈 아님
-        BacktestEngine.Output output = command.type() == StrategyType.PRIVACY
+        BacktestEngine.Output output = command.type().capability().requiresPrivacyBase()
                 ? engine.run(candles, command, privacyBases)
                 : engine.run(candles, command);
 

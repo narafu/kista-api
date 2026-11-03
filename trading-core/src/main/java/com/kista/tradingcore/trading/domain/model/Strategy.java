@@ -46,6 +46,11 @@ public record Strategy(
         return type.capability().requiresPrivacyBase();
     }
 
+    // 연속 사이클 정책 선택 가능 여부 — capability가 SSOT
+    public boolean supportsCycleSeed() {
+        return type.capability().supportsCycleSeed();
+    }
+
     public boolean isDca() {
         return type == StrategyType.DCA;
     }

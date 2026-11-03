@@ -71,7 +71,7 @@ public class BacktestEngine {
             case VR -> runVr(candles, command);
             case INFINITE -> runInfinite(candles, command);
             // PRIVACY는 기준 매매표가 있어야 주문을 만들 수 있다 — 맵을 받는 3-arg 오버로드를 쓰라는 신호로 명확히 실패시킨다
-            default -> throw new IllegalArgumentException("이 전략은 백테스트를 지원하지 않습니다.");
+            case PRIVACY, DCA -> throw new IllegalArgumentException("이 전략은 백테스트를 지원하지 않습니다.");
         };
     }
 

@@ -174,9 +174,9 @@ class StrategyService implements StrategyUseCase {
         if (strategy.isVr() && cmd.newSeed() != null) {
             throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다.");
         }
-        // VR은 롤오버가 사이클 교체를 맡아 연속 사이클 정책이 NONE으로 고정된다
-        if (strategy.isVr() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
-            throw new IllegalArgumentException("VR 전략의 연속 사이클 정책은 변경할 수 없습니다.");
+        // 연속 사이클 정책 미지원 전략(VR·DCA)은 NONE으로 고정된다
+        if (!strategy.supportsCycleSeed() && cmd.cycleSeedType() != null && cmd.cycleSeedType() != StrategyCycleSeedType.NONE) {
+            throw new IllegalArgumentException(strategy.type().getDescription() + " 전략의 연속 사이클 정책은 변경할 수 없습니다.");
         }
 
         StrategyCycleSeedType seedType = cmd.cycleSeedType() != null
