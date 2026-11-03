@@ -80,7 +80,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 기준표 요구 판정을 capability로 일원화한다.
 - 위험: 중간. 배치·프리뷰의 주문 계획 입력이 바뀐다. 결과는 같아야 한다.
 - 가드(`constraints.md` 규칙 문장 초안): "전략 타입별 동작 차이는 `CycleOrderStrategy`/`StrategyCapability` capability로 묻는다. 서비스에서 `isPrivacy()`·`isVr()` 등으로 동작 입력을 고르는 분기를 새로 만들지 않는다. 표시·필터·타입 가드 예외만 허용한다. 타입 질의는 `type() == StrategyType.X` 대신 `Strategy.isX()`를 쓴다."
-- 상태: done. `Strategy.requiresPrivacyBase()`(capability 위임)로 기준표 판정 5곳을 일원화했고, `CryptoDcaRunner`는 `Strategy::isDca`를 쓴다.
+- 상태: done(f52f4f67f). `Strategy.requiresPrivacyBase()`(capability 위임)로 기준표 판정 5곳을 일원화했고, `CryptoDcaRunner`는 `Strategy::isDca`를 쓴다.
 
 ### CQ-04 KST 일자 → Instant 조회 상한 변환 4곳 반복
 - 주제: 날짜·시간대. 유형: 중복.
