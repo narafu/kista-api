@@ -463,7 +463,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `TossOrderApi.fetchExecutions`(`filledAt` KST 일자 재필터, `TossOrderApi.java:139-145` 부근).
 - 근거: 거래일 D 주문이 D-1 22:00 이후 장중에 체결되면 `filledAt` 일자가 D-1이라 `getExecutions(D, D)`에서 빠진다. 리포트·취소 직후 체결 기록 모두 체결을 놓친다. Toss는 현재 대시보드 용도라 영향이 작다.
 - 수정 방향: `filledAt`을 거래일 경계(`DstInfo.nextTradeDate`)로 변환해 필터한다. 실계좌 확인 필요.
-- 상태: done(커밋 해시 기록 예정). broker는 trading `DstInfo`를 쓸 수 없어 04:30 경계 대신 KIS·메리츠와 같은 "US 세션일 + 1" 규칙을 택했다 — `filledAt`의 뉴욕 일자를 `UsTradeDates.toKstTradeDate`로 바꿔 필터하고 `TossOrderApi`를 UsTradeDates allowlist에 추가했다. 경계는 `TossOrderApiTest.getExecutions_tradeDateFromFilledAtNewYorkDate`가 잠근다. 실계좌 `filledAt` 실측은 미검증.
+- 상태: done(4f02195e5). broker는 trading `DstInfo`를 쓸 수 없어 04:30 경계 대신 KIS·메리츠와 같은 "US 세션일 + 1" 규칙을 택했다 — `filledAt`의 뉴욕 일자를 `UsTradeDates.toKstTradeDate`로 바꿔 필터하고 `TossOrderApi`를 UsTradeDates allowlist에 추가했다. 경계는 `TossOrderApiTest.getExecutions_tradeDateFromFilledAtNewYorkDate`가 잠근다. 실계좌 `filledAt` 실측은 미검증.
 
 ### CQ-27 투자금 추가·수동 보정 리포트 창 판정이 정지 전략의 리포트 비대상 주문까지 "리포트 전"으로 봄
 - 주제: 운영 정합성. 유형: 비일관성(기존 동작, CQ-25로 악화되지 않음).
