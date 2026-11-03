@@ -245,7 +245,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 관리자·사용자 응답에서 rate limit을 일관되게 식별한다.
 - 위험: 중간. 주문 POST 재시도 정책과 얽힌다. KIS는 주문 POST를 재시도하지 않는다. 확정 기각된 "KisAuthApi/TossAuthApi catch 공통화"와는 대상(인증 vs 일반 호출)이 다르다.
 - 가드: `KisHttpClientTest`·`TossHttpClientTest`에 "429/EGW00201 → BrokerRateLimitException" 단언을 넣었다. `constraints.md` "브로커 호출 실패 정책"에 HTTP 클라이언트 변환 규칙을 추가했다.
-- 상태: done(2dc6cd156). KIS는 `KisHttpClient.httpFailure`(GET 백오프 재시도 소진 후, POST는 즉시), Toss는 `executeWithBackoffRetry`에서 변환한다. Toss `getCommon`의 429 재시도는 호출 람다 안(`retryOnTooManyRequests`)으로 옮겨 유지했다. `isRejection`이 이미 확정 거절로 보므로 주문 판정은 그대로다. 후속: `BrokerRouter.adminFirst`가 계좌 보충의 429를 관리자 부분 결과보다 우선해 전파하던 것을 일시 오류로 보고 부분 결과 우선으로 바꿨다(422만 항상 전파). Toss `getCommon` 백오프 중 인터럽트는 KIS와 같게 확정 거절 `TossApiException`(503)으로 던진다.
+- 상태: done(2dc6cd156). KIS는 `KisHttpClient.httpFailure`(GET 백오프 재시도 소진 후, POST는 즉시), Toss는 `executeWithBackoffRetry`에서 변환한다. Toss `getCommon`의 429 재시도는 호출 람다 안(`retryOnTooManyRequests`)으로 옮겨 유지했다. `isRejection`이 이미 확정 거절로 보므로 주문 판정은 그대로다. 후속(e128a2bf4): `BrokerRouter.adminFirst`가 계좌 보충의 429를 관리자 부분 결과보다 우선해 전파하던 것을 일시 오류로 보고 부분 결과 우선으로 바꿨다(422만 항상 전파). Toss `getCommon` 백오프 중 인터럽트는 KIS와 같게 확정 거절 `TossApiException`(503)으로 던진다.
 
 ### CQ-15 전략 detail 저장의 타입 if/else 라우팅
 - 주제: 전략 타입별 분기. 유형: OOP(capability 대체).
