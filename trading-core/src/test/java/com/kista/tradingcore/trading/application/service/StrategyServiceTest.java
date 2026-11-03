@@ -52,6 +52,8 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import com.kista.shared.kernel.StrategyDefaults;
 
 @ExtendWith(MockitoExtension.class)
@@ -438,6 +440,39 @@ class StrategyServiceTest {
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
         verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "MAINTAIN, 1200, 1000",   // 수익 후 — 시작 시드로 복귀
+            "MAINTAIN, 874.50, 874.50", // 손실 후 — 남은 원장
+            "MAX, 1200, 1200",
+            "NONE, 1200, 1200"
+    })
+    @DisplayName("resume() — 종료 사이클 재오픈 시드는 cycleSeedType 정책을 따른다(MAINTAIN=min(시작 시드, 종료 원장))")
+    void resume_reopen_seed_follows_cycle_seed_type(StrategyCycleSeedType seedType, String endAmount, String expectedSeed) {
+        stubEndedCycleResume(endAmount, "60.00");
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY.withCycleSeedType(seedType));
+        when(strategyCyclePort.save(any(StrategyCycle.class))).thenAnswer(i -> i.getArgument(0));
+
+        strategyService.resume(STRATEGY_ID, USER_ID);
+
+        ArgumentCaptor<StrategyCycle> cycleCaptor = ArgumentCaptor.forClass(StrategyCycle.class);
+        verify(strategyCyclePort).save(cycleCaptor.capture());
+        assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo(expectedSeed);
+    }
+
+    @Test
+    @DisplayName("resume() — MAINTAIN은 1주 미만 판정도 재오픈 시드(min) 기준이다")
+    void resume_maintain_rejects_when_reopen_seed_below_one_share() {
+        stubEndedCycleResume("1200", "1100.00"); // 시작 시드 1000 < 1주 1100 ≤ 종료 원장 1200
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY.withCycleSeedType(StrategyCycleSeedType.MAINTAIN));
+
+        assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("남은 원장($1000.00)이 1주 가격($1100.00)보다 작아");
+        verify(strategyCyclePort, never()).save(any());
+        verify(strategyPort, never()).save(any());
     }
 
     private void stubEndedCycleResume(String endAmount, String closingPrice) {

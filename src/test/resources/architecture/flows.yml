@@ -918,12 +918,12 @@ flows:
         title: 재개와 종료 사이클 재오픈
         desc: >-
           이미 ACTIVE면 거부한다. VR이 아닌 전략은 사이클이 청산으로 끝나 일시정지된 경우(연속 정책 NONE 등) 최신 사이클에 종료일이 남아 있는데,
-          상태만 ACTIVE로 되돌리면 배치가 "종료된 사이클"로 판단해 계속 건너뛴다. 그래서 재개할 때 종료된 사이클의 최종 금액을 시드로 하는 새 사이클과 초기 포지션을 열고 상태를 ACTIVE로 바꾼다.
+          상태만 ACTIVE로 되돌리면 배치가 "종료된 사이클"로 판단해 계속 건너뛴다. 그래서 재개할 때 새 사이클과 초기 포지션을 열고 상태를 ACTIVE로 바꾼다. 시드는 종료된 사이클의 최종 금액이고, 연속 정책 MAINTAIN이면 rotation과 같이 min(시작 시드, 최종 금액)이다(정지 중 청산된 사이클 포함).
           VR 전략은 이 재오픈에서 제외한다(VR은 청산으로 사이클이 끝나지 않고 롤오버·재설정이 새 사이클을 항상 만든다).
         code: [StrategyService#resume, StrategyService#reopenCycleIfEnded, CycleSnapshotCreator#createCycleAndSnapshot]
         cond: 최신 사이클에 종료일이 있을 때(VR 제외)
         state: "strategy → ACTIVE · 종료 사이클이면 strategy_cycle +1 · cycle_position +1"
-        fail: 종료 사이클의 최종 금액이 1주 가격(최신 종가) 미만이면 400(삭제 후 재등록 안내), 이미 활성이면 400, 활성 전략 버전이 없으면 404(NoSuchElementException).
+        fail: 재오픈 시드가 1주 가격(최신 종가) 미만이면 400(삭제 후 재등록 안내), 이미 활성이면 400, 활성 전략 버전이 없으면 404(NoSuchElementException).
 
       - id: delete
         lane: trading
