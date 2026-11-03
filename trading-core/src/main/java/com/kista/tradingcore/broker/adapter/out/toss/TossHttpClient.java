@@ -62,7 +62,8 @@ class TossHttpClient {
     }
 
     // 429(rate-limit-exceeded) 재시도 — 관리자 토큰 공용 시세 조회(멱등 GET)만 대상, 주문 등 계좌 API는 재시도하지 않는다
-    // 한도 소진·인터럽트 시 429를 그대로 던지면 executeWithBackoffRetry가 BrokerRateLimitException으로 변환한다
+    // 한도 소진 시 429를 그대로 던지면 executeWithBackoffRetry가 BrokerRateLimitException으로 변환한다
+    // 대기 중 인터럽트(배포·강제종료)는 호출 한도가 아니라 처리 중단이라 확정 거절 TossApiException(503)으로 던진다(KIS와 동일)
     private <T> T retryOnTooManyRequests(String path, Supplier<T> call) {
         for (int rateLimitRetry = 0; ; rateLimitRetry++) {
             try {
@@ -76,7 +77,7 @@ class TossHttpClient {
                     Thread.sleep(RATE_LIMIT_BACKOFF_MILLIS * (rateLimitRetry + 1));
                 } catch (InterruptedException _) {
                     Thread.currentThread().interrupt();
-                    throw e; // 종료 중 — 재시도하지 않고 원래 429 실패를 전파
+                    throw TossApiException.rejected("Toss API 오류(재시도 대기 중 인터럽트): " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
                 }
             }
         }

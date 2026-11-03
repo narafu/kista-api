@@ -167,17 +167,30 @@ class BrokerRouterTest {
     }
 
     @Test
-    @DisplayName("다건: 계좌 보충의 인증·한도 예외는 관리자 결과가 있어도 그대로 전파한다")
-    void multiPropagatesCredentialAndRateLimitEvenWithAdminPartial() {
+    @DisplayName("다건: 계좌 보충의 인증 예외는 관리자 결과가 있어도 그대로 전파한다")
+    void multiPropagatesCredentialEvenWithAdminPartial() {
         BrokerAccountRef kisRef = ref(Broker.KIS);
         List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
         List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
         when(admin.getPrices(both)).thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.ONE));
-        when(kis.getPrices(missing, kisRef))
-                .thenThrow(new BrokerCredentialException())
-                .thenThrow(new BrokerRateLimitException());
+        when(kis.getPrices(missing, kisRef)).thenThrow(new BrokerCredentialException());
 
         assertThatThrownBy(() -> router.getPrices(both, kisRef)).isInstanceOf(BrokerCredentialException.class);
+    }
+
+    @Test
+    @DisplayName("다건: 계좌 보충의 호출 한도 예외는 관리자 결과가 있으면 부분 결과를 반환하고, 비어 있으면 전파한다")
+    void multiKeepsAdminPartialOnRateLimit() {
+        BrokerAccountRef kisRef = ref(Broker.KIS);
+        List<StrategyTicker> both = List.of(StrategyTicker.SOXL, StrategyTicker.TQQQ);
+        List<StrategyTicker> missing = List.of(StrategyTicker.TQQQ);
+        when(admin.getPrices(both))
+                .thenReturn(Map.of(StrategyTicker.SOXL, BigDecimal.ONE))
+                .thenReturn(Map.of());
+        when(kis.getPrices(missing, kisRef)).thenThrow(new BrokerRateLimitException());
+        when(kis.getPrices(both, kisRef)).thenThrow(new BrokerRateLimitException());
+
+        assertThat(router.getPrices(both, kisRef)).containsOnlyKeys(StrategyTicker.SOXL);
         assertThatThrownBy(() -> router.getPrices(both, kisRef)).isInstanceOf(BrokerRateLimitException.class);
     }
 

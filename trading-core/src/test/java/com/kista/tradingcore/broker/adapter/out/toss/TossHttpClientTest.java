@@ -247,6 +247,24 @@ class TossHttpClientTest {
     }
 
     @Test
+    @DisplayName("공통 API 429 백오프 대기 중 인터럽트되면 재시도 없이 확정 거절 TossApiException")
+    void getCommon_throwsRejectedTossApiException_whenInterruptedDuringBackoff() {
+        TossHttpClient client = newClient();
+        when(tossAuthApi.getAdminToken()).thenReturn("admin-token-0");
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        Thread.currentThread().interrupt(); // 백오프 sleep이 즉시 InterruptedException을 던지게 한다
+        try {
+            assertThatThrownBy(() -> client.getCommon(PATH, new LinkedMultiValueMap<>(), new ParameterizedTypeReference<String>() {}))
+                    .isInstanceOfSatisfying(TossApiException.class, e -> assertThat(e.isRejected()).isTrue());
+            assertThat(Thread.currentThread().isInterrupted()).isTrue(); // 인터럽트 상태 복원
+        } finally {
+            Thread.interrupted(); // 다음 테스트에 인터럽트 상태가 새지 않게 정리
+        }
+        server.verify();
+    }
+
+    @Test
     @DisplayName("계좌 API 429는 재시도 없이 BrokerRateLimitException")
     void get_throwsBrokerRateLimitException_on429WithoutRetry() {
         TossHttpClient client = newClient();

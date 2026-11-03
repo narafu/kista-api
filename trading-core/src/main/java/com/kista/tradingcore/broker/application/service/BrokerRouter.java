@@ -125,6 +125,7 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
 
     // 관리자 시세로 먼저 조회하고 누락 종목만 계좌 어댑터로 보충
     // 계좌 보충이 실패하면 관리자 결과가 있을 때 부분 결과를 반환(누락 종목은 호출부가 처리), 비어 있으면 예외 전파(503/422/429 보존)
+    // 자격증명 오류(422)만 사용자 조치가 필요해 부분 결과가 있어도 전파한다 — 호출 한도(429)는 일시 오류라 부분 결과를 우선한다
     private static Map<StrategyTicker, BigDecimal> adminFirst(
             List<StrategyTicker> tickers,
             Function<List<StrategyTicker>, Map<StrategyTicker, BigDecimal>> admin,
@@ -135,8 +136,8 @@ class BrokerRouter implements PortfolioPort, MarginPort, SellableQuantityPort,
         if (missing.isEmpty()) return result;
         try {
             result.putAll(account.apply(missing));
-        } catch (BrokerCredentialException | BrokerRateLimitException e) {
-            throw e; // 사용자 조치가 필요한 신호(422/429)는 부분 결과로 가리지 않는다
+        } catch (BrokerCredentialException e) {
+            throw e; // 사용자 조치가 필요한 신호(422)는 부분 결과로 가리지 않는다
         } catch (RuntimeException e) {
             if (result.isEmpty()) throw e;
             log.warn("계좌 시세 보충 실패, 관리자 부분 결과 반환 (누락 {}): {}", missing, e.getMessage());
