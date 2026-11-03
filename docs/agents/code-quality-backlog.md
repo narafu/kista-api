@@ -147,8 +147,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: fail-open 경로를 하나로 통일하고 `CryptoMarketIndicatorService`의 반복 5벌을 제거한다.
 - 위험: 낮음. 로그 형태만 바뀐다(스택 → toString). 체크 예외를 던지는 호출이 있으면 `tryGet`으로 바꿀 수 없으니 착수 시 확인한다.
 - 조건부 대상: 어댑터 2곳(`trading/adapter/out/feargreed/CryptoFearGreedIndexAdapter.java:34`, `CnnFearGreedIndexAdapter.java:33`)도 같은 "warn 후 `Optional.empty`" 형태다. `BrokerCallGuard`는 `broker/application/service/BrokerCallGuard.java` ✔에 있다. adapter.out이 다른 모듈의 `application.service`를 참조해도 되는지(`HexagonalArchitectureTest`·Modulith NamedInterface)는 미확인이다. 착수 시 확인해, 허용되면 포함하고 금지되면 유지 목록으로 옮긴다.
-- 가드(`constraints.md` 기존 규칙에 덧붙일 문장 초안): "이벤트·분기 없이 로그 후 대체값만 반환하는 경우는 예외 없이 `tryGet`을 쓴다."
-- 상태: open.
+- 가드: `constraints.md` "브로커 호출 실패 정책"에 "이벤트·분기 없이 로그 후 대체값만 반환하는 경우는 예외 없이 `tryGet`을 쓴다" 문장을 추가했다.
+- 상태: done(커밋 해시 기록 예정). 서비스 6곳과 공포탐욕 어댑터 2곳을 `tryGet`으로 바꿨다. adapter.out → `broker.application.service` 의존은 ArchUnit(inbound만 금지)·broker "application" NamedInterface가 허용한다. `CryptoMarketIndicatorService`의 2값 묶음 3곳은 지역 record로 원자성을 유지했다.
 
 ### CQ-07 로그 문맥 접두사 형식 혼재
 - 주제: 로깅 형식. 유형: 비일관성.
@@ -244,8 +244,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: `BrokerCallGuard.isBrokerTyped`와 `BrokerRouter.java:138-142`(`adminFirst`)는 `BrokerRateLimitException`만 429로 보존한다. 그래서 KIS·Toss 일반 호출의 429는 다른 경로로 처리된다. `TradingExceptionHandler`에서 `BrokerApiException` 하위가 어떤 상태로 매핑되는지는 미확인이다.
 - 예상 효과: 관리자·사용자 응답에서 rate limit을 일관되게 식별한다.
 - 위험: 중간. 주문 POST 재시도 정책과 얽힌다. KIS는 주문 POST를 재시도하지 않는다. 확정 기각된 "KisAuthApi/TossAuthApi catch 공통화"와는 대상(인증 vs 일반 호출)이 다르다.
-- 가드: 착수 시 결정한다. 어댑터별 HTTP 클라이언트 테스트에 "429 → BrokerRateLimitException" 단언을 넣는다.
-- 상태: open.
+- 가드: `KisHttpClientTest`·`TossHttpClientTest`에 "429/EGW00201 → BrokerRateLimitException" 단언을 넣었다. `constraints.md` "브로커 호출 실패 정책"에 HTTP 클라이언트 변환 규칙을 추가했다.
+- 상태: done(커밋 해시 기록 예정). KIS는 `KisHttpClient.httpFailure`(GET 백오프 재시도 소진 후, POST는 즉시), Toss는 `executeWithBackoffRetry`에서 변환한다. Toss `getCommon`의 429 재시도는 호출 람다 안(`retryOnTooManyRequests`)으로 옮겨 유지했다. `isRejection`이 이미 확정 거절로 보므로 주문 판정은 그대로다. 부수 효과: `BrokerRouter.adminFirst`는 계좌 보충의 429를 부분 결과로 가리지 않고 전파한다(기존 정책, Meritz·Upbit와 같아짐).
 
 ### CQ-15 전략 detail 저장의 타입 if/else 라우팅
 - 주제: 전략 타입별 분기. 유형: OOP(capability 대체).

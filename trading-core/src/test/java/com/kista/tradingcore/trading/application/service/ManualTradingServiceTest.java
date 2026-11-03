@@ -385,6 +385,30 @@ class ManualTradingServiceTest {
         verify(orderPort, never()).saveAll(anyList());
     }
 
+    // 캡 판단용 현재가 조회가 예외면 캡을 적용하지 않고 원가 그대로 검증한다(fetchStartPriceOrNull 폴백)
+    @Test
+    void execute_startPriceFetchFails_capNotApplied() {
+        Order buyTemplate = new Order(null, null, null, LocalDate.now(FIXED), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, BigDecimal.valueOf(1), new BigDecimal("100.00"),
+                OrderStatus.PLANNED, null, null, null)
+                .withLeg("INFINITE_EARLY_AVG_BUY");
+        when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
+                .thenReturn(List.of(buyTemplate.toPlanned()));
+        when(kisPricePort.getPrices(eq(List.of(StrategyTicker.SOXL)), eq(ACCOUNT_REF)))
+                .thenThrow(new RuntimeException("시세 오류"));
+        // TradingPriceFetcher는 포트 실패를 삼키고 관리자 알림을 발행한다 — 그 발행마저 실패해 fetchPrices가 던지는 경로
+        doThrow(new RuntimeException("알림 발행 실패")).when(eventPublisher).publishEvent(any(Object.class));
+        // 원장 usdDeposit=60.00 — 캡 미적용 원가(100.00)는 부족
+        stubLedger(new BigDecimal("60.00"));
+
+        assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID))
+                .isInstanceOf(ManualTradingException.class)
+                .hasMessage("전략 원장 예수금이 부족합니다.");
+
+        verify(infiniteStrategy, never()).buildCappedBuyOrders(any(), any(), anyList(), any());
+    }
+
     // NO_CYCLE_HISTORY skip은 planBuilder.build()가 내부적으로 tryLoadBalance(soft skip)를 쓰면서
     // 조용한 List.of() 무동작으로 바뀌었던 리뷰 발견 결함을 고정하는 회귀 테스트 —
     // 이력 없는 전략은 사용자가 원인을 알 수 없는 무동작이 아니라 명시적 4xx로 거부돼야 한다

@@ -124,7 +124,7 @@
 
 ### 파라미터 개수·브로커 호출 실패 정책
 - 메서드 파라미터 8개 이상이거나 같은 타입이 인접해 자리 바뀜이 조용히 통과할 수 있으면 record로 묶는다 — 같은 값을 이미 담은 기존 record(`VrRampParams`·`ResolvedCreation` 등)가 있으면 새로 만들지 말고 재사용
-- 브로커·시세 호출 실패 정책은 `BrokerCallGuard`로 통일: 실패 시 중단은 `wrap`(fail-closed), 건너뛰고 대체값으로 진행은 `tryGet`(fail-open). 신규 코드는 서비스에서 브로커 호출을 raw `catch (RuntimeException)`으로 감싸지 않는다 — 단 이벤트 발행·분기 처리가 필요한 경우(예: 실패 종목 집계, 관리자 알림 이벤트)는 예외(기존 catch는 대부분 이 예외에 해당)
+- 브로커·시세 호출 실패 정책은 `BrokerCallGuard`로 통일: 실패 시 중단은 `wrap`(fail-closed), 건너뛰고 대체값으로 진행은 `tryGet`(fail-open). 신규 코드는 서비스에서 브로커 호출을 raw `catch (RuntimeException)`으로 감싸지 않는다 — 단 이벤트 발행·분기 처리가 필요한 경우(예: 실패 종목 집계, 관리자 알림 이벤트)는 예외(기존 catch는 대부분 이 예외에 해당). 이벤트·분기 없이 로그 후 대체값만 반환하는 경우는 예외 없이 `tryGet`을 쓴다. 벤더 rate limit(HTTP 429·벤더 한도 코드)은 각 어댑터 HTTP 클라이언트에서 `BrokerRateLimitException`으로 변환한다
 
 ### 주석 규칙
 - 신규 코드는 주석을 함께 쓴다 — 필드는 `// 역할 한 줄` 인라인, 비즈니스 로직 블록 직전에 단계 설명 한 줄, 코드값은 `"840" // 국가코드: 미국` 형식

@@ -3,6 +3,7 @@ package com.kista.tradingcore.stats.application.service;
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.platform.cache.TtlResultCache;
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.stats.application.port.output.BinanceMarketDataPort;
 import com.kista.tradingcore.stats.application.port.output.BlockHeightPort;
 import com.kista.tradingcore.stats.application.port.output.CoinbaseMarketDataPort;
@@ -20,7 +21,6 @@ import com.kista.tradingcore.stats.domain.model.CryptoValuations;
 import com.kista.tradingcore.stats.domain.model.DatedPremiumPair;
 import com.kista.tradingcore.stats.domain.model.DatedValue;
 import com.kista.tradingcore.stats.domain.model.FundingRateQuote;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 // 코인 시장 지표 조립 — 섹션별 실패 격리(null) + 10분 인메모리 캐시(전부 실패 결과는 1분, 장기 일봉·도미넌스/알트 시즌/해시레이트 이력은 다음 UTC 자정까지)
-@Slf4j
 @Service
 class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
 
@@ -101,33 +100,24 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         Instant now = clock.instant();
         LocalDate today = now.atZone(ZoneOffset.UTC).toLocalDate();
 
-        // (a) 업비트 USDT 현재가·일봉
-        BigDecimal usdtPrice;
-        List<DatedValue> usdtCandles;
-        try {
-            usdtPrice = upbit.getUsdtKrwPrice();
-            usdtCandles = upbit.getCompletedUsdtKrwDailyCloses(MAX_DAYS);
-        } catch (Exception e) {
-            log.warn("업비트 USDT 시세 조회 실패", e);
-            usdtPrice = null;
-            usdtCandles = null;
-        }
+        // (a) 업비트 USDT 현재가·일봉 — 둘 다 성공해야 채택
+        record UsdtKrw(BigDecimal price, List<DatedValue> candles) {}
+        UsdtKrw usdtKrw = BrokerCallGuard.tryGet("업비트 USDT 시세", () -> new UsdtKrw(
+                upbit.getUsdtKrwPrice(), upbit.getCompletedUsdtKrwDailyCloses(MAX_DAYS))).orElse(null);
+        BigDecimal usdtPrice = usdtKrw == null ? null : usdtKrw.price();
+        List<DatedValue> usdtCandles = usdtKrw == null ? null : usdtKrw.candles();
         boolean upbitOk = usdtPrice != null;
 
-        // (b) 공식 환율 현재값·과거(주말·휴일 채움)
-        BigDecimal fxCurrent;
-        Map<LocalDate, BigDecimal> fxByDate;
-        try {
+        // (b) 공식 환율 현재값·과거(주말·휴일 채움) — 둘 다 성공해야 채택
+        record Fx(BigDecimal current, Map<LocalDate, BigDecimal> byDate) {}
+        Fx fx = BrokerCallGuard.tryGet("공식 환율", () -> {
             BigDecimal current = brokerStatistics.currentExchangeRate().midRate();
-            fxByDate = CryptoPremiums.fillForward(
+            return new Fx(current, CryptoPremiums.fillForward(
                     fxRates.getUsdKrwRates(today.minusDays(MAX_DAYS + FX_MARGIN_DAYS), today),
-                    today.minusDays(MAX_DAYS), today);
-            fxCurrent = current;
-        } catch (Exception e) {
-            log.warn("공식 환율 조회 실패", e);
-            fxCurrent = null;
-            fxByDate = Map.of();
-        }
+                    today.minusDays(MAX_DAYS), today));
+        }).orElse(null);
+        BigDecimal fxCurrent = fx == null ? null : fx.current();
+        Map<LocalDate, BigDecimal> fxByDate = fx == null ? Map.of() : fx.byDate();
 
         Premium usdtPremium = null;
         if (upbitOk && fxCurrent != null) {
@@ -136,78 +126,67 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
         }
 
         // (c) 코인베이스 USDT-USD 현재가·일봉 — 실패하면 모든 종목의 코인베이스 프리미엄만 null
-        BigDecimal cbUsdtPrice;
-        List<DatedValue> cbUsdtCloses;
-        try {
-            cbUsdtPrice = coinbase.getUsdPrice(USDT);
-            cbUsdtCloses = coinbase.getUsdDailyClosesSince(USDT, today.minusDays(MAX_DAYS));
-        } catch (Exception e) {
-            log.warn("코인베이스 USDT 시세 조회 실패", e);
-            cbUsdtPrice = null;
-            cbUsdtCloses = null;
-        }
+        record UsdtUsd(BigDecimal price, List<DatedValue> closes) {}
+        UsdtUsd cbUsdt = BrokerCallGuard.tryGet("코인베이스 USDT 시세", () -> new UsdtUsd(
+                coinbase.getUsdPrice(USDT), coinbase.getUsdDailyClosesSince(USDT, today.minusDays(MAX_DAYS)))).orElse(null);
+        BigDecimal cbUsdtPrice = cbUsdt == null ? null : cbUsdt.price();
+        List<DatedValue> cbUsdtCloses = cbUsdt == null ? null : cbUsdt.closes();
 
         // 바이낸스 데이터는 UTC 일자 키가 스펙 — KST 단일 기준의 명시적 예외
         Instant fundingFrom = today.atStartOfDay().toInstant(ZoneOffset.UTC).minus(Duration.ofDays(MAX_DAYS));
         // 현재가는 전 종목 한 번에 조회 — 실패하면 김프 섹션만 null
-        Map<StrategyTicker, BigDecimal> krwPrices = upbitOk ? guard("업비트 현재가", () -> upbit.getKrwPrices(TICKERS)) : null;
+        Map<StrategyTicker, BigDecimal> krwPrices = upbitOk ? BrokerCallGuard.tryGet("업비트 현재가", () -> upbit.getKrwPrices(TICKERS)).orElse(null) : null;
         List<TickerIndicators> tickers = new ArrayList<>();
         List<DatedValue> btcCloses = null; // Hash Ribbons 가격 모멘텀용 — 실패하면 섹션 null
         for (StrategyTicker t : TICKERS) {
             // 장기 일봉은 김프 추이·밸류에이션이 공유 — 실패하면 두 섹션 모두 null (조립당 종목별 1회 조회)
-            List<DatedValue> closes = guard("장기 일봉 " + t, () -> dailyCloses(t, now));
+            List<DatedValue> closes = BrokerCallGuard.tryGet("장기 일봉 " + t, () -> dailyCloses(t, now)).orElse(null);
             if (t == StrategyTicker.BTC) btcCloses = closes;
             // 바이낸스 현물 현재가는 김프·코인베이스 프리미엄이 공유 — 실패하면 두 섹션 모두 null
-            BigDecimal spot = guard("바이낸스 현재가 " + t, () -> binance.getSpotPrice(t));
+            BigDecimal spot = BrokerCallGuard.tryGet("바이낸스 현재가 " + t, () -> binance.getSpotPrice(t)).orElse(null);
             KimchiPremium kimchi = null;
             if (upbitOk && krwPrices != null && closes != null && spot != null) {
                 final BigDecimal tetherPrice = usdtPrice;
                 final List<DatedValue> usdtC = usdtCandles;
                 final BigDecimal fxNow = fxCurrent;
                 final Map<LocalDate, BigDecimal> fxMap = fxByDate;
-                kimchi = guard("김프 " + t, () -> kimchi(t, spot, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap));
+                kimchi = BrokerCallGuard.tryGet("김프 " + t, () -> kimchi(t, spot, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap)).orElse(null);
             }
             Premium coinbasePremium = null;
             if (cbUsdtPrice != null && closes != null && spot != null) {
                 final BigDecimal usdtUsd = cbUsdtPrice;
                 final List<DatedValue> usdtUsdCloses = cbUsdtCloses;
-                coinbasePremium = guard("코인베이스 프리미엄 " + t, () -> new Premium(
+                coinbasePremium = BrokerCallGuard.tryGet("코인베이스 프리미엄 " + t, () -> new Premium(
                         CryptoPremiums.premiumPercent(coinbase.getUsdPrice(t.name()), spot.multiply(usdtUsd)),
-                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyClosesSince(t.name(), today.minusDays(MAX_DAYS)), usdtUsdCloses, closes, today)));
+                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyClosesSince(t.name(), today.minusDays(MAX_DAYS)), usdtUsdCloses, closes, today))).orElse(null);
             }
-            FundingRate funding = guard("펀딩비 " + t, () -> {
+            FundingRate funding = BrokerCallGuard.tryGet("펀딩비 " + t, () -> {
                 FundingRateQuote q = binance.getFundingRate(t);
                 return new FundingRate(q.rate(), q.nextFundingTime(),
                         CryptoPremiums.fundingDailyAverage(binance.getFundingHistory(t, fundingFrom)));
-            });
-            OpenInterest oi = guard("OI " + t, () -> new OpenInterest(binance.getOpenInterestHistory(t)));
+            }).orElse(null);
+            OpenInterest oi = BrokerCallGuard.tryGet("OI " + t, () -> new OpenInterest(binance.getOpenInterestHistory(t))).orElse(null);
             Valuation valuation = closes == null ? null
-                    : guard("밸류에이션 " + t, () -> Valuation.of(CryptoValuations.history(closes, today, MAX_DAYS)));
-            LongShortRatio longShort = guard("롱숏 비율 " + t, () -> LongShortRatio.of(binance.getLongShortAccountRatioHistory(t)));
+                    : BrokerCallGuard.tryGet("밸류에이션 " + t, () -> Valuation.of(CryptoValuations.history(closes, today, MAX_DAYS))).orElse(null);
+            LongShortRatio longShort = BrokerCallGuard.tryGet("롱숏 비율 " + t, () -> LongShortRatio.of(binance.getLongShortAccountRatioHistory(t))).orElse(null);
             tickers.add(new TickerIndicators(t, kimchi, funding, oi, valuation, longShort, coinbasePremium));
         }
-        Halving halving = guard("반감기", () -> Halving.of(blockHeight.currentBtcHeight(), now));
+        Halving halving = BrokerCallGuard.tryGet("반감기", () -> Halving.of(blockHeight.currentBtcHeight(), now)).orElse(null);
 
         // 시장 전체 지표 — BTC 도미넌스: 오늘 점이 섞여도 MAX_DAYS개가 남게 하나 더 요청
-        DailyIndicator btcDominance = guard("BTC 도미넌스", () -> new DailyIndicator(cmc.btcDominance(),
-                beforeToday(untilUtcMidnight(DOMINANCE_HISTORY_CACHE_KEY, now, () -> cmc.btcDominanceDaily(MAX_DAYS + 1)), today)));
+        DailyIndicator btcDominance = BrokerCallGuard.tryGet("BTC 도미넌스", () -> new DailyIndicator(cmc.btcDominance(),
+                beforeToday(untilUtcMidnight(DOMINANCE_HISTORY_CACHE_KEY, now, () -> cmc.btcDominanceDaily(MAX_DAYS + 1)), today))).orElse(null);
         // 알트 시즌: 현재값 실패면 섹션 null, 이력만 실패하면 현재값만 유지
         DailyIndicator altcoinSeason = null;
-        BigDecimal altIndex = guard("알트 시즌 지수", cmc::altcoinSeasonIndex);
+        BigDecimal altIndex = BrokerCallGuard.tryGet("알트 시즌 지수", cmc::altcoinSeasonIndex).orElse(null);
         if (altIndex != null) {
-            List<DatedValue> altHistory;
-            try {
-                altHistory = beforeToday(untilUtcMidnight(ALTCOIN_SEASON_HISTORY_CACHE_KEY, now,
-                        () -> cmc.altcoinSeasonDaily(today.minusDays(MAX_DAYS), today)), today);
-            } catch (Exception e) {
-                log.warn("알트 시즌 이력 조회 실패 — 현재값만", e);
-                altHistory = List.of();
-            }
+            List<DatedValue> altHistory = BrokerCallGuard.tryGet("알트 시즌 이력", () -> beforeToday(untilUtcMidnight(ALTCOIN_SEASON_HISTORY_CACHE_KEY, now,
+                    () -> cmc.altcoinSeasonDaily(today.minusDays(MAX_DAYS), today)), today)).orElse(List.of()); // 이력만 실패하면 현재값만 유지
             altcoinSeason = new DailyIndicator(altIndex, altHistory);
         }
         List<DatedValue> hashRibbonCloses = btcCloses;
-        HashRibbons hashRibbons = hashRibbonCloses == null ? null : guard("Hash Ribbons", () -> HashRibbons.of(CryptoHashRibbons.history(
-                untilUtcMidnight(HASHRATES_CACHE_KEY, now, hashrates::dailyHashratesEh), hashRibbonCloses, today, MAX_DAYS)));
+        HashRibbons hashRibbons = hashRibbonCloses == null ? null : BrokerCallGuard.tryGet("Hash Ribbons", () -> HashRibbons.of(CryptoHashRibbons.history(
+                untilUtcMidnight(HASHRATES_CACHE_KEY, now, hashrates::dailyHashratesEh), hashRibbonCloses, today, MAX_DAYS))).orElse(null);
         return new CryptoMarketIndicators(now, usdtPremium, List.copyOf(tickers), halving, btcDominance, altcoinSeason, hashRibbons);
     }
 
@@ -239,15 +218,5 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
     private <T> T untilUtcMidnight(String key, Instant now, Supplier<T> loader) {
         Instant nextUtcMidnight = now.atZone(ZoneOffset.UTC).toLocalDate().plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC);
         return cache.getOrCompute(key, Duration.between(now, nextUtcMidnight), loader);
-    }
-
-    // 섹션 실패 시 null + 경고 로그
-    private static <T> T guard(String section, Supplier<T> s) {
-        try {
-            return s.get();
-        } catch (Exception e) {
-            log.warn("코인 지표 섹션 조회 실패 ({})", section, e);
-            return null;
-        }
     }
 }

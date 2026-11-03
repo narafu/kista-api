@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.feargreed;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,17 +24,14 @@ class CnnFearGreedIndexAdapter implements FearGreedIndexPort {
 
     @Override
     public Optional<BigDecimal> latest() {
-        try {
+        return BrokerCallGuard.tryGet("[DCA] CNN 공포탐욕지수", () -> {
             CnnResponse response = fearGreedRestClient.get().uri(URL).retrieve().body(CnnResponse.class);
             if (response == null || response.current() == null || response.current().score() == null) {
                 log.warn("[DCA] CNN 공포탐욕지수 현재값 없음");
-                return Optional.empty();
+                return null;
             }
-            return Optional.of(BigDecimal.valueOf(response.current().score()).setScale(2, RoundingMode.HALF_UP));
-        } catch (RuntimeException e) {
-            log.warn("[DCA] CNN 공포탐욕지수 조회 실패", e);
-            return Optional.empty();
-        }
+            return BigDecimal.valueOf(response.current().score()).setScale(2, RoundingMode.HALF_UP);
+        });
     }
 
     // CNN 응답 중 fear_and_greed 블록만 사용

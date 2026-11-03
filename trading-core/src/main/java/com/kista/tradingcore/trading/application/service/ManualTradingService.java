@@ -141,12 +141,8 @@ class ManualTradingService {
 
     // BUY 가격 캡 판단용 현재가 — 조회 실패 시 캡 미적용(null이면 prepareForAllocation이 원본 그대로 반환)
     private BigDecimal fetchStartPriceOrNull(Strategy strategy, TradingAccount account) {
-        try {
-            return priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker());
-        } catch (Exception e) {
-            log.warn("[{}] 캡 판단용 현재가 조회 실패 — 캡 미적용: {}", account.nickname(), e.getMessage());
-            return null;
-        }
+        return BrokerCallGuard.tryGet(account.nickname() + " 캡 판단용 현재가",
+                () -> priceFetcher.fetchPrices(List.of(strategy.ticker()), account.brokerRef()).get(strategy.ticker())).orElse(null);
     }
 
     // 개장 이후 수동 실행 시 AT_OPEN 주문 즉시 접수 (개장 전이면 개장 스케쥴러가 담당)

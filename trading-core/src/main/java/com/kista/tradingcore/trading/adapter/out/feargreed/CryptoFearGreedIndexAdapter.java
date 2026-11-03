@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.feargreed;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
 import com.kista.tradingcore.trading.application.port.output.CryptoFearGreedIndexPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,17 +25,14 @@ class CryptoFearGreedIndexAdapter implements CryptoFearGreedIndexPort {
 
     @Override
     public Optional<BigDecimal> latest() {
-        try {
+        return BrokerCallGuard.tryGet("[DCA] 코인 공포탐욕지수", () -> {
             AltResponse response = fearGreedRestClient.get().uri(URL).retrieve().body(AltResponse.class);
             if (response == null || response.data() == null || response.data().isEmpty()) {
                 log.warn("[DCA] 코인 공포탐욕지수 값 없음");
-                return Optional.empty();
+                return null;
             }
-            return Optional.of(new BigDecimal(response.data().getFirst().value()).setScale(2, RoundingMode.HALF_UP));
-        } catch (RuntimeException e) {
-            log.warn("[DCA] 코인 공포탐욕지수 조회 실패", e);
-            return Optional.empty();
-        }
+            return new BigDecimal(response.data().getFirst().value()).setScale(2, RoundingMode.HALF_UP);
+        });
     }
 
     // alternative.me 응답 중 data 배열만 사용
