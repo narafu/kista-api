@@ -5,13 +5,10 @@ import com.kista.shared.contract.account.AccountSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -29,19 +26,6 @@ class AccountQueryHttpAdapter implements AccountQueryPort {
                     return b.build();
                 })
                 .retrieve().body(new ParameterizedTypeReference<List<AccountSummaryResponse>>() {});
-    }
-
-    @Override
-    public Optional<AccountSummaryResponse> findById(UUID accountId) {
-        try {
-            return Optional.ofNullable(internalApiRestClient.get()
-                    .uri("/api/internal/accounts/{id}", accountId)
-                    .retrieve().body(AccountSummaryResponse.class));
-        } catch (HttpClientErrorException.NotFound _) {
-            // trading-core 쪽 findByIdOrThrow가 NoSuchElementException -> 404로 매핑되는 경우 —
-            // 없음을 나타내는 Optional.empty()로 되돌린다
-            return Optional.empty();
-        }
     }
 
     @Override

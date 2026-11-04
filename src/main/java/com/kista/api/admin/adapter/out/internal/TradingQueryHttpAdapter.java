@@ -60,19 +60,6 @@ class TradingQueryHttpAdapter implements TradingQueryPort {
     }
 
     @Override
-    public List<OrderResponse> findStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate) {
-        // trading 쪽 컨트롤러가 소유권 불일치 시 NoSuchElementException(→404)을 던진다 —
-        // 여기서 되돌리지 않으면 admin의 GlobalExceptionHandler가 매핑하지 못하는
-        // HttpClientErrorException.NotFound로 흘러 500(catch-all)으로 뭉개진다.
-        RestClient.ResponseSpec spec = internalApiRestClient.get()
-                .uri(b -> b.path("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/orders")
-                        .queryParam("tradeDate", tradeDate).build(accountId, strategyId))
-                .retrieve();
-        return InternalApiStatusHandlers.notFoundAsNoSuchElement(spec, "전략이 해당 계좌에 속하지 않습니다")
-                .body(new ParameterizedTypeReference<List<OrderResponse>>() {});
-    }
-
-    @Override
     public List<LocalDate> findStrategyTradeDates(UUID accountId, UUID strategyId) {
         RestClient.ResponseSpec spec = internalApiRestClient.get()
                 .uri("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/trade-dates", accountId, strategyId)

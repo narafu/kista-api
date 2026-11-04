@@ -99,32 +99,6 @@ class AdminQueryServiceTest {
     }
 
     @Test
-    void listStrategyOrders_포트로_위임한다() {
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
-        LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        when(tradingQueryPort.findStrategyOrders(accountId, strategyId, tradeDate)).thenReturn(List.of());
-
-        service.listStrategyOrders(accountId, strategyId, tradeDate);
-
-        verify(tradingQueryPort).findStrategyOrders(accountId, strategyId, tradeDate);
-    }
-
-    @Test
-    void listStrategyOrders_소유권_불일치는_포트가_던진_예외를_그대로_전파한다() {
-        // 소유권 검증은 trading-core 내부 컨트롤러로 이전됨 — TradingQueryHttpAdapter가
-        // 404 응답을 NoSuchElementException으로 되돌려 던지고, 여기서는 그대로 전파만 확인
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000111");
-        LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        when(tradingQueryPort.findStrategyOrders(accountId, strategyId, tradeDate))
-                .thenThrow(new NoSuchElementException("전략이 해당 계좌에 속하지 않습니다"));
-
-        assertThatThrownBy(() -> service.listStrategyOrders(accountId, strategyId, tradeDate))
-                .isInstanceOf(NoSuchElementException.class);
-    }
-
-    @Test
     void listStrategyTradeDates_포트로_위임한다() {
         UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
         UUID strategyId = UUID.fromString("00000000-0000-0000-0000-000000000030");
@@ -134,18 +108,6 @@ class AdminQueryServiceTest {
         List<LocalDate> result = service.listStrategyTradeDates(accountId, strategyId);
 
         assertThat(result).containsExactly(LocalDate.of(2026, 7, 1));
-    }
-
-    @Test
-    void findAccount_ID로_단일_계좌를_조회한다() {
-        UUID accountId = UUID.fromString("00000000-0000-0000-0000-000000000020");
-        AccountSummaryResponse account = new AccountSummaryResponse(accountId, UUID.randomUUID(), null, "74420614", Broker.KIS, null);
-        when(accountQueryPort.findById(accountId)).thenReturn(Optional.of(account));
-
-        Optional<AccountSummaryResponse> result = service.findAccount(accountId);
-
-        assertThat(result).isPresent().contains(account);
-        verify(accountQueryPort).findById(accountId);
     }
 
     @Test

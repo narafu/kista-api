@@ -17,7 +17,6 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
@@ -132,10 +131,4 @@ class AdminService implements AdminUserUseCase {
         auditLogPort.log(adminId, "USER_DELETE", "USER", targetUserId, null);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public Optional<UserSummary> findUser(UUID userId) {
-        // 단건 조회 — 전체 풀스캔 대신 ID 기반 직접 조회
-        return userSummaryPort.findById(userId);
-    }
 }

@@ -140,18 +140,6 @@ class TradingQueryHttpAdapterTest {
         assertThat(result.getFirst().id()).isEqualTo(strategyId);
     }
 
-    // trading-core의 TradingInternalQueryController.requireStrategyOwnedByAccount가 소유권
-    // 불일치 시 NoSuchElementException(→404)을 던진다 — 어댑터가 이를 되돌리지 못하면 admin의
-    // GlobalExceptionHandler가 매핑하지 못하는 HttpClientErrorException.NotFound로 흘러 500이 된다.
-    @Test
-    void findStrategyOrders_404_응답은_NoSuchElementException으로_변환된다() {
-        server.enqueue(new MockResponse.Builder().code(404).build());
-
-        assertThatThrownBy(() -> adapter.findStrategyOrders(
-                UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 7, 1)))
-                .isInstanceOf(NoSuchElementException.class);
-    }
-
     @Test
     void findStrategyTradeDates_404_응답은_NoSuchElementException으로_변환된다() {
         server.enqueue(new MockResponse.Builder().code(404).build());
@@ -159,15 +147,4 @@ class TradingQueryHttpAdapterTest {
         assertThatThrownBy(() -> adapter.findStrategyTradeDates(UUID.randomUUID(), UUID.randomUUID()))
                 .isInstanceOf(NoSuchElementException.class);
     }
-
-    @Test
-    void findStrategyOrders_정상_응답은_그대로_반환한다() {
-        server.enqueue(new MockResponse.Builder()
-                .code(200).addHeader("Content-Type", "application/json").body("[]").build());
-
-        var result = adapter.findStrategyOrders(UUID.randomUUID(), UUID.randomUUID(), LocalDate.of(2026, 7, 1));
-
-        assertThat(result).isEmpty();
-    }
 }
-

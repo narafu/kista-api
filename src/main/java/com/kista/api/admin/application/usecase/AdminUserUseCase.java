@@ -4,7 +4,6 @@ import com.kista.api.user.domain.model.UserSummary;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import com.kista.shared.kernel.UserRole;
 import com.kista.shared.kernel.UserStatus;
@@ -20,7 +19,4 @@ public interface AdminUserUseCase {
     void rejectUserByTelegram(String chatId, UUID targetUserId);
     void changeRole(UUID adminId, UUID targetUserId, UserRole role);
     void deleteUser(UUID adminId, UUID targetUserId);
-
-    // 단일 사용자 뷰 조회 — listStrategyOrders 전용 (전체 조회 후 ID 필터)
-    Optional<UserSummary> findUser(UUID userId);
 }

@@ -17,6 +17,5 @@ public interface TradingQueryPort {
     List<StrategyResponse> findStrategiesByAccountId(UUID accountId);
     Map<UUID, List<StrategyResponse>> findStrategiesByAccountIds(Set<UUID> accountIds);
     Map<UUID, StrategySummaryResponse> findStrategySummariesByCycleIds(Set<UUID> cycleIds);
-    List<OrderResponse> findStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate);
     List<LocalDate> findStrategyTradeDates(UUID accountId, UUID strategyId);
 }

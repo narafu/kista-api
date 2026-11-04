@@ -179,26 +179,4 @@ class AdminServiceTest {
         verify(userUseCase).deleteMe(targetId);
         verify(auditLogPort).log(eq(adminId), eq("USER_DELETE"), eq("USER"), eq(targetId), any());
     }
-
-    @Test
-    void findUser_존재하는_사용자ID로_조회시_반환한다() {
-        UUID targetId = UUID.randomUUID();
-        UserSummary view = new UserSummary(targetId, "테스트", UserStatus.ACTIVE, UserRole.USER, Instant.now());
-        when(userSummaryPort.findById(targetId)).thenReturn(Optional.of(view));
-
-        Optional<UserSummary> result = adminService.findUser(targetId);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().id()).isEqualTo(targetId);
-    }
-
-    @Test
-    void findUser_존재하지_않는_사용자ID로_조회시_empty를_반환한다() {
-        UUID otherId = UUID.randomUUID();
-        when(userSummaryPort.findById(otherId)).thenReturn(Optional.empty());
-
-        Optional<UserSummary> result = adminService.findUser(otherId);
-
-        assertThat(result).isEmpty();
-    }
 }

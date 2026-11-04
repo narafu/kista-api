@@ -53,34 +53,6 @@ class AccountInternalControllerTest {
     }
 
     @Test
-    void 계좌_단건_조회_성공() throws Exception {
-        // findByIdOrThrow는 AccountPort의 default 메서드 — Mockito mock은 default 메서드도
-        // override하므로 findById가 아닌 findByIdOrThrow 자체를 직접 stub해야 한다 (testing.md 참고)
-        UUID accountId = UUID.randomUUID();
-        given(accountPort.findByIdOrThrow(accountId)).willReturn(mockAccount(accountId));
-
-        mockMvc.perform(get("/api/internal/accounts/{id}", accountId)
-                        .header("X-Internal-Token", VALID_TOKEN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(accountId.toString()))
-                // appKey/secretKey(복호화된 브로커 자격증명)가 내부망 응답에 실리지 않는지 확인
-                .andExpect(jsonPath("$.appKey").doesNotExist())
-                .andExpect(jsonPath("$.secretKey").doesNotExist())
-                .andExpect(jsonPath("$.nickname").value("테스트계좌")); // 계좌 별칭은 관리자 화면 표시용으로 노출
-    }
-
-    @Test
-    void 계좌_단건_조회_없으면_404() throws Exception {
-        UUID accountId = UUID.randomUUID();
-        given(accountPort.findByIdOrThrow(accountId))
-                .willThrow(new java.util.NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
-
-        mockMvc.perform(get("/api/internal/accounts/{id}", accountId)
-                        .header("X-Internal-Token", VALID_TOKEN))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
     void 내부_토큰이_없으면_401을_반환한다() throws Exception {
         mockMvc.perform(get("/api/internal/accounts"))
                 .andExpect(status().isUnauthorized());

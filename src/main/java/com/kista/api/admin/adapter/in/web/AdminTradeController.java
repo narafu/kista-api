@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -59,28 +58,6 @@ public class AdminTradeController {
             @PathVariable UUID accountId,
             @PathVariable UUID strategyId) {
         return adminQuery.listStrategyTradeDates(accountId, strategyId);
-    }
-
-    @Operation(summary = "전략별 주문 목록 조회", description = "지정한 거래일(tradeDate)의 주문 목록을 반환합니다.")
-    @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
-    public List<AdminTradeResponse> listStrategyOrders(
-            @PathVariable UUID accountId,
-            @PathVariable UUID strategyId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        List<OrderResponse> orders = adminQuery.listStrategyOrders(accountId, strategyId, tradeDate).stream()
-                .filter(order -> accountId.equals(order.accountId()))
-                .toList();
-        if (orders.isEmpty()) return List.of();
-        // 단일 계좌만 조회 — 전체 풀스캔 불필요
-        AccountSummaryResponse account = adminQuery.findAccount(accountId)
-                .orElseThrow(() -> new NoSuchElementException("계좌를 찾을 수 없습니다: " + accountId));
-        UserSummary user = adminUser.findUser(account.userId())
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + account.userId()));
-        Map<UUID, AccountSummaryResponse> accountMap = Map.of(accountId, account);
-        Map<UUID, UserSummary> userMap = Map.of(account.userId(), user);
-        Set<UUID> cycleIds = orders.stream().map(OrderResponse::strategyCycleId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<UUID, StrategySummaryResponse> strategySummaryMap = adminQuery.getStrategySummariesByCycleIds(cycleIds);
-        return orders.stream().map(o -> AdminTradeResponse.from(o, accountMap, userMap, strategySummaryMap)).toList();
     }
 
     // 관리자 수동 체결 보정 — fills 배열 순서대로 여러 건을 원자적으로 반영

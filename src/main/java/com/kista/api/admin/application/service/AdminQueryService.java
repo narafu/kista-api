@@ -22,7 +22,6 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -138,22 +137,8 @@ class AdminQueryService implements AdminQueryUseCase {
     }
 
     @Override
-    public List<OrderResponse> listStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate) {
-        // 소유권 검증(경로 accountId ↔ 전략 accountId)은 데이터를 가진 trading-core 쪽으로 이전됨
-        // (TradingInternalQueryController.requireStrategyOwnedByAccount) — 불일치 시 404가
-        // TradingQueryHttpAdapter에서 NoSuchElementException으로 재구성돼 전파된다
-        return tradingQueryPort.findStrategyOrders(accountId, strategyId, tradeDate);
-    }
-
-    @Override
     public List<LocalDate> listStrategyTradeDates(UUID accountId, UUID strategyId) {
         return tradingQueryPort.findStrategyTradeDates(accountId, strategyId);
-    }
-
-    @Override
-    public Optional<AccountSummaryResponse> findAccount(UUID accountId) {
-        // 단일 계좌 조회 — 전체 계좌 풀스캔 없이 ID 기반 직접 조회. HTTP 어댑터라 @Transactional 밖
-        return accountQueryPort.findById(accountId);
     }
 
     @Override

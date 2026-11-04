@@ -63,42 +63,6 @@ class TradingInternalQueryControllerTest {
                 .andExpect(status().isOk());
     }
 
-    // 소유권 검증 실패 — TradingQueryHttpAdapter가 404를 NoSuchElementException으로
-    // 되돌리는 계약의 상대편. 여기서 404가 실제로 나오는지 확인한다.
-    @Test
-    void listStrategyOrders_다른_계좌의_전략이면_404() throws Exception {
-        UUID accountId = UUID.randomUUID();
-        UUID otherAccountId = UUID.randomUUID();
-        UUID strategyId = UUID.randomUUID();
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        given(strategyPort.findByIdOrThrow(strategyId)).willReturn(strategy);
-
-        mockMvc.perform(get("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/orders",
-                        otherAccountId, strategyId)
-                        .header("X-Internal-Token", VALID_TOKEN)
-                        .param("tradeDate", "2026-07-01"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void listStrategyOrders_계좌ID가_일치하면_200() throws Exception {
-        UUID accountId = UUID.randomUUID();
-        UUID strategyId = UUID.randomUUID();
-        LocalDate tradeDate = LocalDate.of(2026, 7, 1);
-        Strategy strategy = new Strategy(strategyId, accountId, StrategyType.INFINITE,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
-        given(strategyPort.findByIdOrThrow(strategyId)).willReturn(strategy);
-        given(orderPort.findByStrategyId(strategyId, tradeDate, tradeDate)).willReturn(List.of());
-
-        mockMvc.perform(get("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/orders",
-                        accountId, strategyId)
-                        .header("X-Internal-Token", VALID_TOKEN)
-                        .param("tradeDate", "2026-07-01"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
-    }
-
     @Test
     void listStrategyTradeDates_다른_계좌의_전략이면_404() throws Exception {
         UUID accountId = UUID.randomUUID();

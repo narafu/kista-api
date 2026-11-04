@@ -13,7 +13,6 @@ import org.springframework.web.client.RestClient;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -81,33 +80,6 @@ class AccountQueryHttpAdapterTest {
         assertThat(view.userId()).isEqualTo(userId);
         assertThat(view.accountNo()).isEqualTo("74420614-01");
         assertThat(view.broker()).isEqualTo(Broker.KIS);
-    }
-
-    @Test
-    void findById_정상_응답은_Optional로_감싼다() {
-        UUID id = UUID.randomUUID();
-        server.enqueue(new MockResponse.Builder()
-                .code(200).addHeader("Content-Type", "application/json")
-                .body("""
-                    {"id":"%s","userId":"%s","accountNo":"74420614-01","broker":"KIS","createdAt":"2026-07-01T00:00:00Z"}
-                    """.formatted(id, UUID.randomUUID()))
-                .build());
-
-        Optional<AccountSummaryResponse> result = adapter.findById(id);
-
-        assertThat(result).isPresent();
-        assertThat(result.get().id()).isEqualTo(id);
-    }
-
-    // trading-core의 AccountInternalController.findAccount가 계좌 없음 시 NoSuchElementException
-    // (→404)을 던진다 — 어댑터가 이를 Optional.empty()로 되돌리지 못하면 예외가 그대로 전파된다.
-    @Test
-    void findById_404_응답은_Optional_empty로_변환된다() {
-        server.enqueue(new MockResponse.Builder().code(404).build());
-
-        Optional<AccountSummaryResponse> result = adapter.findById(UUID.randomUUID());
-
-        assertThat(result).isEmpty();
     }
 
     @Test

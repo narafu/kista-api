@@ -9,14 +9,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
 // admin의 AccountQueryHttpAdapter가 소비하는 내부 전용 읽기 엔드포인트 — X-Internal-Token 인증.
 // Account를 그대로 반환하지 않는다 — appKey/secretKey(복호화된 브로커 자격증명)까지 내부망으로
@@ -50,12 +48,6 @@ public class AccountInternalController {
                 })
                 .map(AccountInternalController::toResponse)
                 .toList();
-    }
-
-    @Operation(summary = "계좌 단건 조회", description = "없으면 404.")
-    @GetMapping("/{id}")
-    public AccountSummaryResponse findAccount(@PathVariable UUID id) {
-        return toResponse(accountPort.findByIdOrThrow(id));
     }
 
     // 관리자 대시보드 통계(AdminQueryService.getStats())용 — 전체 계좌 수

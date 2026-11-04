@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,16 +37,9 @@ public interface AdminQueryUseCase {
     // 여러 계좌 ID → 전략 목록 배치 조회 (관리자 계좌 목록 전략 표시용)
     Map<UUID, List<StrategyResponse>> listStrategiesByAccountIds(Set<UUID> accountIds);
 
-    // 선택한 전략의 특정 거래일 주문 목록 조회
-    // accountId로 경로 계층 정합성 검증 — 전략이 해당 계좌 소속이 아니면 NoSuchElementException
-    List<OrderResponse> listStrategyOrders(UUID accountId, UUID strategyId, LocalDate tradeDate);
-
     // 선택한 전략의 distinct 거래일 목록 조회 (관리자 주문 보정 거래일 드롭다운용)
     // accountId로 경로 계층 정합성 검증 — 전략이 해당 계좌 소속이 아니면 NoSuchElementException
     List<LocalDate> listStrategyTradeDates(UUID accountId, UUID strategyId);
-
-    // 단일 계좌 조회 — listStrategyOrders 전용 (전체 풀스캔 불필요)
-    Optional<AccountSummaryResponse> findAccount(UUID accountId);
 
     // 앱 에러 로그 조회 / 소프트 삭제 — AdminObservabilityController 전용(from/to 기본값은 컨트롤러가 EPOCH/now로 대입)
     List<AppErrorLog> listErrorLogs(int limit, Instant from, Instant to);

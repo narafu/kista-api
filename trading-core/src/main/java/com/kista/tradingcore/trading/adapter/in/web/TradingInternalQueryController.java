@@ -67,16 +67,6 @@ public class TradingInternalQueryController {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> TradingContractMapper.toResponse(e.getValue())));
     }
 
-    @Operation(summary = "전략 단건 주문 조회")
-    @GetMapping("/accounts/{accountId}/strategies/{strategyId}/orders")
-    public List<OrderResponse> listStrategyOrders(
-            @PathVariable UUID accountId, @PathVariable UUID strategyId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        requireStrategyOwnedByAccount(accountId, strategyId);
-        return orderPort.findByStrategyId(strategyId, tradeDate, tradeDate).stream()
-                .map(TradingContractMapper::toResponse).toList();
-    }
-
     @Operation(summary = "전략 단건 거래일 목록")
     @GetMapping("/accounts/{accountId}/strategies/{strategyId}/trade-dates")
     public List<LocalDate> listStrategyTradeDates(@PathVariable UUID accountId, @PathVariable UUID strategyId) {
