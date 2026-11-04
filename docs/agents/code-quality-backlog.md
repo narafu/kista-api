@@ -580,10 +580,10 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `isPrivacy` 기준표 외 단순 타입 가드·필터·표시 | `DcaExecutionQueryService:39`, `DcaConfigService:34`, `VrReconfigureService:59`, `ManualTradingService:57`, `TradingStatsService:136,150`, `TradingCycleResponse:100`, `CycleHistoryResponse:28` | 동작 분기가 아니라 타입 가드·필터·표시다. CQ-03 규칙의 허용 범위. |
 | `StrategyDetailAssembler` 단건/일괄 분기 두 벌 | `StrategyDetailAssembler.java:40-65`, `117-149` | 단건과 일괄(N+1 회피) 조회 형태가 달라 의도적으로 둘이다. 순수 조립은 이미 `assemble()`로 공용화돼 있다. |
 | `DcaCycleOrderStrategy.withLimits` 9필드 복사 | `matching/domain/strategy/DcaCycleOrderStrategy.java:85-87` | 이미 파일 안 헬퍼로 한 곳에 모였다. 호출처는 이 파일뿐이다. |
-| 주문 상태 판정 서비스 산재 | `ReorderService:76,150,193`, `ReorderBuyBudgetService:69`, `OrderCancelService:60,159,163,177,185`, `DcaPlanInputCollector:157`, `CryptoOrderSynchronizer:64,70`, `OrderSubmissionReconciler:86`, `TradingReporter:102`, `TradingPreviewService:197` | 같은 조합은 `PLANNED \|\| PLACED` 2곳뿐이고, 나머지는 조합이 제각각이다. 같은 이유로 바뀌는 3곳 이상이 없다. 같은 조합이 3곳이 되면 `Order` 판정 메서드로 올린다. |
+| 주문 상태 판정 서비스 산재 | `OrderCancelService:60,159,163,177,185`, `DcaPlanInputCollector:157`, `CryptoOrderSynchronizer:64,70`, `OrderSubmissionReconciler:86`, `TradingReporter:102`, `TradingPreviewService:197` | `PLANNED \|\| PLACED` 조합은 재주문 제거(2026-11-04)로 서비스에 남지 않았고, 나머지는 조합이 제각각이다. 같은 이유로 바뀌는 3곳 이상이 없다. 같은 조합이 3곳이 되면 `Order` 판정 메서드로 올린다. |
 | `TradingErrorEvent(null, ...)` 29곳 | 13파일 ✔ | 생성자 한 줄이라 헬퍼로 묶어도 이득이 없다. |
 | `VrCycleRolloverService` 등 `e.getMessage()`만 보내는 알림 | `VrCycleRolloverService:51,86`, `VrReconfigureService:118` | 문맥 보강은 CQ-07·CQ-19의 기준이 정해지면 함께 본다. 별도 항목으로 두지 않는다. |
-| 소유권 응답 코드 400/404/403 | `SelectionChain.java:27-41`, `StrategyStatusInternalController.java:34`, `TradingInternalQueryController.java:90-95` | `SelectionChain` 호출처는 `ReorderService`·`ManualTradeCorrectionService`뿐이다 ✔. 둘 다 내부 토큰 경로(root admin 대리 호출)로, userId가 바디로 들어와 입력 오류(400)가 맞다. 소유권 중복 제거는 기각 확정(2026-07). |
+| 소유권 응답 코드 400/404/403 | `SelectionChain.java:27-41`, `StrategyStatusInternalController.java:34`, `TradingInternalQueryController.java:90-95` | `SelectionChain` 호출처는 `ManualTradeCorrectionService`뿐이다 ✔(재주문 제거, 2026-11-04). 내부 토큰 경로(root admin 대리 호출)로, userId가 바디로 들어와 입력 오류(400)가 맞다. 소유권 중복 제거는 기각 확정(2026-07). |
 | `TradingStatsService`·`PortfolioService` 필터 방식 | `TradingStatsService.java:148-151`, `PortfolioService.java:25,33` | userId 범위로 조회해 남의 accountId는 빈 결과가 된다(주석 명시). 검증 누락이 아니다. |
 | 내부 컨트롤러 소유권 검증 없음 | `PrivacyBaseInternalController`, `PrivacyInternalQueryController`, `FidaOrderController`, `AccountInternalController` | `/api/internal/**` X-Internal-Token 경로라 설계상 의도다. |
 | `TradingCycleController` update에 `@Valid` 없음 | `TradingCycleController.java:92` | 같은 DTO의 `@NotNull type`(`TradingCycleRequest.java:18-19` ✔, "등록 시 필수")이 수정 요청에는 맞지 않는다. |
@@ -591,7 +591,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `DcaConfigRequest` 등 DTO compact constructor의 IAE | `DcaConfigRequest.java:17-18`, `DcaRuleRequest.java:34` | "[field: message]" 형식 대신 사용자 문구로 400을 내려는 의도이며 주석(`:16`)에 있다. |
 | `UserNotifyProfilePersistenceAdapter` `occurredAt` 폴백 | `UserNotifyProfilePersistenceAdapter.java:86` | 이벤트 필드 주석이 "null이면 구버전 발행분"이라고 명시한다 ✔(`shared/kernel/UserNotifyProfileChangedEvent.java:18`). 레거시 nullable 예외다. |
 | persistence SUM null → 0 | `OrderPersistenceAdapter.java:216,251` | 매퍼가 아니라 집계 쿼리 결과 처리다. |
-| `BrokerCallGuard` 밖 raw catch(이벤트·분기 있음) | `ManualTradingService:80,117`, `ReorderService:119`, `OrderSubmitter:66`, `OrderSubmissionReconciler:92,112`, `CryptoDcaRoundExecutor:135,201`, `CryptoDcaRunner:79,94`, `TradingService:295,399`, `TradingBatchGuard:32`, `VrCycleRolloverService:49,83`, `TradingReporter:115`, `TradingOrderExecutor:176`, `CycleRotationService:87`, `PrivacyBaseGuard:32`, `BrokerRouter:138-142` | `constraints.md`가 허용하는 이벤트 발행·분기 처리 예외다. |
+| `BrokerCallGuard` 밖 raw catch(이벤트·분기 있음) | `ManualTradingService:80,117`, `OrderSubmitter:66`, `OrderSubmissionReconciler:92,112`, `CryptoDcaRoundExecutor:135,201`, `CryptoDcaRunner:79,94`, `TradingService:295,399`, `TradingBatchGuard:32`, `VrCycleRolloverService:49,83`, `TradingReporter:115`, `TradingOrderExecutor:176`, `CycleRotationService:87`, `PrivacyBaseGuard:32`, `BrokerRouter:138-142` | `constraints.md`가 허용하는 이벤트 발행·분기 처리 예외다. |
 | 재시도·fallback이 있는 raw catch | `TradingPreviewService:148,170`, `TradingPriceFetcher:177,191`, `CryptoOrderSynchronizer:54`, `UserTradingDataEraseService:47` | 재시도·부분 실패 맵·다음 틱 재시도 같은 분기가 있다. |
 | `validateInfiniteMinSeed` fail-open | `StrategyCreationService.java:154` | 의도된 동작(2026-10-31 확정). |
 | `KisAuthApi`/`TossAuthApi` catch | `KisAuthApi:107-167`, `TossAuthApi:118-145` | 공통화 기각 확정(2026-07). |
@@ -603,7 +603,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | Binance·Upbit 역방향 티커 조회 동형 | `BinanceSymbolRegistry.java:31`, `UpbitMarketRegistry.java:21` | 2곳. |
 | 어댑터 `toDomain/toEntity` vs 엔티티 메서드 | `AccountEntity.java:66`, `StrategyDcaRuleEntity.java:87,109`, `StrategyDcaConditionEntity.java:56,67`, `UsMarketHolidayEntity.java:25` | `AccountEntity`는 해시 인자 때문이고, DCA는 부모-자식 조립 때문이다. MapStruct 도입 거부 확정(2026-10-31). |
 | web 응답 Mapper 클래스와 DTO `from()` 병존 | `TradingContractMapper`, `StatsContractMapper`, `PrivacyContractMapper` vs `*Response.from` | `Order` → DTO 3종은 포함 필드가 달라 단순 중복이 아니다. contract 매핑(내부 API)과 사용자 응답 DTO는 계약이 다르다. |
-| `isCryptoExchange()` 분기 8개 서비스 | `BatchContextFactory:51`, `ReorderService:69`, `OrderCancelService:57,93,159`, `CryptoDcaRunner:62`, `StrategyCreationService:73`, `TradingPreviewService:71,96`, `CryptoPortfolioService:76` | 전략 타입이 아니라 증권사 capability 술어다. 이미 capability 형태다. |
+| `isCryptoExchange()` 서비스 분기 | `BatchContextFactory:51`, `OrderCancelService:57,93,159`, `CryptoDcaRunner:62`, `StrategyCreationService:73`, `TradingPreviewService:71,96`, `CryptoPortfolioService:76` | 전략 타입이 아니라 증권사 capability 술어다. 이미 capability 형태다. |
 | `BootstrapPosition`·`BacktestEngine` 평단 필수 규칙 | `BootstrapPosition.java:35`, `BacktestEngine.java:420` | 2곳. |
 | "사용자를 찾을 수 없습니다" 복제 | `BatchContextFactory.java:71`, `CryptoDcaRunner.java:122` | 2곳. |
 | `String accountNo` 원시값 | 어댑터 9개 외 | 포트·어댑터 경계의 wire 값이다. 애그리게이트 내부는 `BrokerAccountRef`가 이미 묶는다. |
