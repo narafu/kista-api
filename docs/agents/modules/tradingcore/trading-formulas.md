@@ -15,7 +15,7 @@ targetPrice = averagePrice × (1 + targetProfitRate)  (scale=2, HALF_UP)
 ```
 - `usdDeposit` = 통합주문가능금액 (KIS `TTTC2101R` `itgr_ord_psbl_amt`, 미국 행 필터링) — 원화 자동 환전 포함, totalAssets 계산에 사용
 - `currentRound`는 floor 없이 소수점 허용
-- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (수학적으로 currentRound < divisionCount/2 여부와 동치)
+- **전반/후반 분기**: `priceOffsetRate > 0` → 전반, `≤ 0` → 후반 (priceOffsetRate가 scale=2 반올림이라 currentRound < divisionCount/2와 정확히 동치는 아니다 — 경계 직전(예: SOXL 20분할 currentRound≥9.76, TQQQ ≥9.67)에서 0.00으로 반올림돼 후반으로 판정된다)
 - **전반**: LOC 매수①(unitAmount/2/averagePrice, 평단가, 내림 결과가 0이어도 최소 1주) + LOC 매수②((unitAmount − averagePrice×매수①수량)/referencePrice, 기준가 — 잔여가 0 이하면 매수② 없음, 아니면 최소 1주) + LOC 매도(holdings/4, referencePrice+0.01) + 지정가 매도(holdings-holdings/4, targetPrice)
 - **후반 unitAmount>usdDeposit 또는 referencePrice>usdDeposit**(리버스 진입 조건도 같은 isFinalRound 판정): MOC 매도(holdings/4)만 / **후반 unitAmount≤usdDeposit 그리고 referencePrice≤usdDeposit**: LOC 매수(unitAmount/referencePrice, referencePrice) + LOC 매도 + 지정가 매도
 - isFinalRound(리버스 진입)에 isEarlyStage 가드가 필요 없는 이유: holdings ≥ 1·원장 ≥ 0이면 전반부에서는 성립하지 않는다(전반 ⇒ 원장 > 매입액 ≥ 평단, 기준가 ≤ 평단×(1+targetProfitRate))

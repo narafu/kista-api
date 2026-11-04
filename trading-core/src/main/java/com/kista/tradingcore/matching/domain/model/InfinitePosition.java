@@ -84,7 +84,7 @@ public record InfinitePosition(
 
     // --- TDA 지향: 비즈니스 조건 판단 메서드 (Tell, Don't Ask) ---
 
-    // 전반(priceOffsetRate>0) / 후반(priceOffsetRate≤0) — 수학적으로 currentRound < 10 / ≥ 10과 동치
+    // 전반(priceOffsetRate>0) / 후반(priceOffsetRate≤0) — priceOffsetRate scale=2 반올림이라 currentRound 경계 직전(SOXL 20분할 ≥9.76)도 후반으로 판정된다
     public boolean isEarlyStage() {
         return priceOffsetRate().compareTo(BigDecimal.ZERO) > 0;
     }

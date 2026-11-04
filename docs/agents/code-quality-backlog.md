@@ -472,6 +472,69 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 수정 방향: 창 판정에도 `externalOrderId != null` 조건을 맞추거나 `TradingService.reportableOrders`를 공용화한다.
 - 상태: done(0b558c401). 마감 리포트 대상 판정을 `CloseReportScope.awaitsCloseReport`로 공용화해 마감 배치·투자금 추가/인출·수동 보정이 같은 기준(정지 전략은 접수 주문 보유 시만)을 쓴다.
 
+### CQ-28 마감 접수 후~장마감 사이 재주문이 리포트에서 빠짐
+- 주제: 원장 정확도·주문 안전. 유형: 버그(기존 동작). 위험: 높음(빈도 낮음).
+- 위치: `TradingService.java:279-292`(리포트 `mainOrders` = 접수 시점 메모리 목록 + 그 시점 PLACED), `ReorderService.java:101-113,194-197`, `DstInfo.java:161-167`(IMMEDIATE 허용 창 개장 후~마감 전), `TradingReporter.java:65-68,99-101,138`.
+- 근거: 마감 배치 접수(DST 04:30)와 장마감(05:00) 사이 IMMEDIATE 재주문은 `ownIds` 밖이라 체결이 원장에 반영되지 않고, 잔여 취소도 FILLED/CANCELLED 기록도 되지 않아 PLACED로 남는다. PRIVACY는 다음 날 보유 보정이 같은 수량을 다시 산다. 같은 창의 AT_CLOSE 재주문은 PLANNED로만 저장되고 원본만 취소된다.
+- 수정 방향: 재주문 허용 창을 마감 배치 접수 전까지로 좁히거나, 리포트가 당일 PLACED를 리포트 시점에 다시 조회한다. 설계는 brainstorming부터 한다.
+- 상태: open(2026-11-04 검토 발견, 줄 번호는 서브에이전트 보고 기준이라 미확인).
+
+### CQ-29 마커 커밋 뒤 `markEnded`·`rotate` 실패 시 사이클이 영구히 닫히지 않음
+- 주제: 사이클 수명. 유형: 버그(기존 동작). 위험: 중간.
+- 위치: `CyclePositionPersistor.java:57-63`(포지션·상세·리포트 마커 한 트랜잭션) 대 `:71-85`(트랜잭션 밖 `markEnded`·`rotate`).
+- 근거: 커밋 뒤 DB 오류나 SIGKILL이 나면 재개는 마커를 보고 건너뛰고, 다음 날 최신 holdings=0이라 `prevHadHoldings=false`가 되어 종료·회전이 다시 일어나지 않는다. NONE seed INFINITE면 PAUSED되지 않고 0회차 매수를 이어 간다.
+- 수정 방향: 종료·회전을 마커와 같은 트랜잭션에 넣거나, 재개가 "청산됐는데 열린 사이클"을 감지해 종료를 재시도한다.
+- 상태: open(2026-11-04, 미확인).
+
+### CQ-30 INFINITE 리버스모드 쿼터매수 BUY에 cap 미적용
+- 주제: 주문 안전. 유형: 누락(기존 동작). 위험: 중간(매매 공식 인접 — 높음 규칙 적용).
+- 위치: `InfiniteCycleOrderStrategy.java:141`(`OrderPlan(null, …)`), `:155`, `:165-167`, `BuyOrderPriceCapper.java:54`.
+- 근거: 리버스모드는 position이 null이라 `needsCapCheck`가 false이고 `capBuyOrders`가 원본을 돌려준다. 예: 별지점 30.00, 현재가 27.00이면 cap 28.35인데 29.99 LOC가 그대로 접수된다. `workflow-capper.md`에 리버스 제외 기술이 없다. Toss CLS 범위 초과 취소 여부는 미확인.
+- 수정 방향: 리버스 BUY도 cap 대상에 넣거나, 제외가 의도라면 `workflow-capper.md`에 이유를 기록한다.
+- 상태: open(2026-11-04, 미확인).
+
+### CQ-31 재캡이 이미 PLACED된 평단가 매수①을 재생성
+- 주제: 주문 안전·멱등성. 유형: 버그(재실행 전제). 위험: 낮음~중간.
+- 위치: `BuyOrderPriceCapper.java:72,149-155`(PLANNED BUY만 조회), `InfiniteStrategy.java:92-97`.
+- 근거: AVG는 PLACED이고 REF·보정만 PLANNED인 상태에서 재조회 가격 하락으로 cap이 걸리면 `computeEarlyBuys`가 buy1=null로 보고 `INFINITE_EARLY_AVG_BUY`를 새로 저장한다. `savePlannedOrders`는 중복 슬롯을 거르지 않고 orders에 UNIQUE 제약도 없다.
+- 수정 방향: 재캡 입력에 PLACED leg를 반영하거나, 같은 사이클·거래일·leg 중복 저장을 막는다.
+- 상태: open(2026-11-04, 미확인).
+
+### CQ-32 PRIVACY 실거래 기준표 조회에 거래일 정확 일치 가드 없음
+- 주제: 날짜 기준. 유형: 비일관성(기존 동작). 위험: 낮음.
+- 위치: `PrivacyTradePersistenceAdapter.java:138`(`>=` ASC 첫 건), `TradingPriceFetcher.java:82`, `StrategyOrderPlanBuilder.java:71`. 대비: `BacktestService.java:183-187`은 `appliesTo`로 거른다.
+- 근거: D-1 발행분이 없고 그 뒤 발행분이 이미 있으면 PLANNED가 미래 거래일로 저장돼 당일 접수에서 빠진다. 운영은 수신이 07:00경이라 04:30 배치에 미래분이 거의 없다.
+- 수정 방향: 실거래 경로도 거래일 일치를 검사한다.
+- 상태: open(2026-11-04, 미확인).
+
+### CQ-33 통계·원장 경계의 낮은 우선순위 정합성 묶음
+- 주제: 통계 정확도. 유형: 정의·경계(기존 동작). 위험: 낮음.
+- 위치·근거:
+  - VR 롤오버 지연 구멍: `VrCycleRolloverService.java:145`가 `markEnded(evaluationDate)`로 닫으므로, 재시도로 today > evaluationDate면 그 사이 날짜에는 옛 사이클이 endDate 규칙으로 빠지고 새 사이클 스냅샷은 아직 없어 전략이 곡선에서 빠진다(`TradingStatsService.buildPoints`).
+  - VR 종료금액 시점 혼합: due일 종가에 오늘 매매 후 holdings를 곱한다(`VrCycleRolloverService.java:119-126`). 지연 시 그 사이 체결이 옛 사이클 평가에 섞인다.
+  - 본전 사이클이 패배로 집계: 승률은 `realizedPnl().signum() > 0`만 승으로 센다(`TradingStatsService.toTypeStats`).
+  - 수동 체결 보정이 과거 trade_date로 SELL을 넣으면 DCA `withdrawnOn`(trade_date 기준)과 스냅샷(createdAt 기준)이 어긋나 그 사이 곡선 자산이 매도대금만큼 부푼다(`CycleView` `ponytail:` 주석).
+  - 곡선 체인 보정의 surplus가 후속 사이클의 현재 startAmount를 쓴다(`TradingStatsService.chainAdjustment`). 회전 뒤 투자금 추가·인출이나 시드 수정이 있으면 자산선과 원금선이 같은 양만큼 함께 움직인다. 손익선은 맞다. 투자금 이력 테이블(새 세션 후속)로 회전 시점의 시작금액을 알게 되면 함께 고친다.
+  - 종료 처리가 안 된 선행 사이클(CQ-29 상황)은 체인 보정에서 빠지고 후속 사이클 제외 규칙으로만 사라져 손익이 끊긴다. CQ-29를 고치면 해소된다.
+  - `TtlResultCache.getOrCompute`에 세대(버전) 검사가 없다. 무효화 직전에 계산을 시작한 스레드가 무효화 뒤 옛 결과를 다시 넣으면 5분 TTL 동안 유지된다. TradingReportReady 무효화도 같다.
+  - 전략 등록(`StrategyService.register`), 계좌 삭제 캐스케이드(`AccountCascadeListener`), 크립토 원장 스냅샷(`CryptoLedgerRecorder`)은 `StrategyCapitalChangedEvent`를 발행하지 않아 최대 5분 동안 옛 값이 보인다.
+  - PRIVACY 보유 초과분은 BUY 감액으로만 흡수되고 매도로 따라잡지 않는다(`PrivacyStrategy.java:207-227`). 테스트로 고정된 동작이지만 문서화되지 않았다.
+- 수정 방향: 항목별로 정의를 정한 뒤 처리한다. PRIVACY 초과분은 의도 확인 후 `modules/tradingcore/privacy.md`에 기록한다.
+- 상태: open(2026-11-04).
+
+### CQ-34 PRIVACY·INFINITE 경계 테스트 누락
+- 주제: 테스트 고정. 유형: 누락. 위험: 중간(공식 인접).
+- 위치·근거: 아래 경계 테스트가 없다.
+  - priceOffsetRate 반올림 경계(currentRound 9.7~10)
+  - divisionCount 30·40에서의 INFINITE 수량과 리버스 매도 수량
+  - 리버스 BUY가 cap을 넘는 경우
+  - PRIVACY 기준표 거래일 ≠ 배치 거래일
+  - `CyclePositionPersistor`에서 마커 커밋 뒤 `markEnded`·`rotate`가 예외를 던지는 경우
+  - 재캡 입력이 부분 PLANNED(AVG PLACED)인 경우
+  - 리포트 중 재주문 PLACED 체결 반영
+- 수정 방향: CQ-28~32를 고치면서 해당 테스트를 함께 넣는다. 반올림 경계는 단독으로 먼저 고정할 수 있다.
+- 상태: open(2026-11-04).
+
 ## 유지 목록 (재제안 금지, 이유 기록)
 
 | 발견 | 위치 | 유지 이유 |
