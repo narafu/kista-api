@@ -14,8 +14,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -45,6 +47,7 @@ class StrategyService implements StrategyUseCase {
     private final StrategyHistoryQueryService historyQueryService; // 시드 미리보기 + 조회 2종
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
     private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
+    private final ApplicationEventPublisher eventPublisher;       // stats 캐시 무효화 이벤트 발행
     private final StrategyStateWriter stateWriter;                 // 일시중지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
@@ -68,6 +71,7 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 전략을 삭제할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
         }
         stateWriter.delete(strategyId);
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId)); // 삭제된 전략의 사이클이 통계에서 빠지므로 캐시 무효화
         log.info("전략 삭제: strategyId={}, requesterId={}, cancelledOrders={}", strategyId, requesterId, cancelled.cancelledCount());
     }
 
@@ -96,7 +100,7 @@ class StrategyService implements StrategyUseCase {
         if (strategy.isActive()) {
             throw new IllegalStateException("이미 활성화된 전략입니다.");
         }
-        reopenCycleIfEnded(strategy);
+        reopenCycleIfEnded(strategy, requesterId);
         strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
         log.info("전략 재개: strategyId={}", strategyId);
     }
@@ -112,7 +116,7 @@ class StrategyService implements StrategyUseCase {
     // 그 상태에서 status만 ACTIVE로 되돌리면 종료된 사이클(endDate 있음)이 여전히 "최신 사이클"로 남아
     // BatchContextFactory가 매 배치마다 좀비 사이클로 판정해 skip — 재개가 실제로는 매매를 재개시키지 못한다.
     // 재개 시점에 종료 사이클의 원장 금액(endAmount)을 그대로 승계한 새 사이클을 열어 이를 방지한다.
-    private void reopenCycleIfEnded(Strategy strategy) {
+    private void reopenCycleIfEnded(Strategy strategy, UUID requesterId) {
         // VR은 endsCycleOnLiquidation()=false라 이 경로로 종료되지 않는다(항상 rollover/재설정이 원자적으로
         // 대체 사이클을 만든다) — 그 불변식이 깨졌을 때 여기서 VR 상세(strategy_cycle_vr) 없는 사이클을
         // 만들어버리는 사고를 막기 위해 명시적으로 제외한다
@@ -135,6 +139,7 @@ class StrategyService implements StrategyUseCase {
                     seed, closingPrice));
         }
         cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), seed, closingPrice);
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId)); // 새 사이클 생성 — stats 캐시 무효화
         log.info("[strategyId={}] 재개 — 종료된 사이클 재오픈: seed={} ({})", strategy.id(), seed, strategy.cycleSeedType());
     }
 
@@ -187,6 +192,7 @@ class StrategyService implements StrategyUseCase {
 
         if (cmd.newSeed() != null) {
             updateSeed(strategyId, cmd.newSeed());
+            eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
         }
 
         log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);

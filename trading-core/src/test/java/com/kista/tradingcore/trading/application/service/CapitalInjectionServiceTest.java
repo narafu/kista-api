@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -58,6 +59,7 @@ class CapitalInjectionServiceTest {
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock TradingBatchRunPort batchRunPort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
 
@@ -76,7 +78,7 @@ class CapitalInjectionServiceTest {
 
     private CapitalInjectionService newService(Clock clock) {
         return new CapitalInjectionService(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, orderPort, batchRunPort,
-                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock);
+                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock, eventPublisher);
     }
 
     private void stub(StrategyType type, BigDecimal holdings, BigDecimal avg, LocalDate endDate) {
@@ -110,6 +112,7 @@ class CapitalInjectionServiceTest {
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(userId));
     }
 
     @Test
@@ -282,6 +285,7 @@ class CapitalInjectionServiceTest {
         assertThat(p.holdings()).isEqualByComparingTo("10");
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("800.00"));
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(userId));
     }
 
     @Test

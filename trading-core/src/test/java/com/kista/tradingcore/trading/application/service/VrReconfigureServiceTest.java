@@ -184,6 +184,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.newValue()).isEqualByComparingTo(currentCycleVr.value());
 
         verify(orderCancelService).cancelByCycle(strategyId, requesterId);
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(requesterId));
     }
 
     // --- 2) 수량 주입 ---
@@ -216,6 +217,9 @@ class VrReconfigureServiceTest {
         // 이 이벤트 타입만 실패시켜야 카탈로그 fallback(TradingErrorEvent 발행)까지 함께 실패하지 않는다.
         org.mockito.Mockito.doThrow(new RuntimeException("텔레그램 발송 실패"))
                 .when(eventPublisher).publishEvent(any(NewCycleStartedEvent.class));
+        // 자본 변경 이벤트는 정상 발행 — strict stubs의 인자 불일치 오탐 방지
+        org.mockito.Mockito.lenient().doNothing().when(eventPublisher)
+                .publishEvent(any(com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent.class));
         ReconfigureVrCommand cmd = reconfigureVr().bandWidth("20.00").build();
 
         service.reconfigure(strategyId, requesterId, cmd);

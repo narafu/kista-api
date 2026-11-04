@@ -85,7 +85,8 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
                 .map(StrategyCycle::id)
                 .collect(Collectors.toSet());
         Map<UUID, NavigableMap<LocalDate, BigDecimal>> netInvested = seedlessCycleIds.isEmpty()
-                ? Map.of() : orderPort.findFilledNetInvestedByCycleIds(seedlessCycleIds);
+                ? Map.of() : orderPort.findFilledFlowsByCycleIds(seedlessCycleIds).entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().netInvested()));
 
         List<InvestmentPoint> investmentPoints = investmentIndexCalculator.calculate(
                 cycles, positions, effectiveFrom, effectiveTo, netInvested);

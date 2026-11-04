@@ -4,6 +4,7 @@ import com.kista.tradingcore.trading.application.service.support.CycleCloser;
 import com.kista.tradingcore.trading.application.service.support.SelectionChain;
 
 import com.kista.tradingcore.trading.application.event.CycleEndedEvent;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Market;
 import com.kista.shared.kernel.Quantities;
@@ -111,6 +112,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                     updatedStrategy.type(), updatedStrategy.ticker(), updatedStrategy.cycleSeedType()));
         }
         orderPort.saveAll(manualOrders);
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(command.userId())); // FILLED 주문·스냅샷 추가 — stats 캐시 무효화
 
         // trading 쪽 독립 감사 기록 — admin 프록시(AdminTradeCorrectionService.auditLogPort)와 별개로,
         // 내부 엔드포인트를 직접 호출한 경우에도 trading 로그에는 반드시 남긴다

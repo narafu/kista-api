@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -111,9 +112,12 @@ class VrReconfigureService implements VrReconfigureUseCase {
                 strategyId, currentCycle.id(), today, intervalWeeks, bandWidth, recurringAmount, ramp,
                 postBalance, currentPrice, newValue, weeks));
 
+        // stats 캐시 무효화 — @EventListener라 동기 실행되며, 트랜잭션 동기화가 활성이면 afterCommit에 아니면 즉시 비운다
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
+
         // 사용자 알림 이벤트 발행 — 실패해도 재설정 자체는 이미 완료된 상태이므로 로그만 남기고 무시
-        // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 fallbackExecution 리스너를 즉시 동기 실행하므로 try/catch가 유효함
-        // (향후 @Transactional을 붙이면 리스너가 AFTER_COMMIT으로 지연 실행되어 이 try/catch가 무력화됨에 주의)
+        // 이 클래스/메서드가 비-트랜잭션이라 publishEvent가 리스너를 즉시 동기 실행하므로 try/catch가 유효함
+        // (향후 @Transactional을 붙이면 AFTER_COMMIT 리스너가 지연 실행되어 이 try/catch가 무력화됨에 주의)
         try {
             eventPublisher.publishEvent(new NewCycleStartedEvent(requesterId, account.id(), account.nickname(),
                     strategy.type(), strategy.ticker(), postBalance.usdDeposit()));

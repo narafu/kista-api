@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.port.output;
 
 import com.kista.shared.kernel.OrderStatus;
+import com.kista.tradingcore.trading.domain.model.CycleFilledFlows;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
 import com.kista.shared.kernel.StrategyTicker;
@@ -10,7 +11,6 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -105,7 +105,7 @@ public interface OrderPort {
     // 계좌의 미완료(PLANNED·SUBMITTING·PLACED) 주문 — 날짜 무관(자정 넘김 대비), 거래일·생성 시각 오름차순 (코인 주문 동기화용)
     List<Order> findOpenByAccountId(UUID accountId);
 
-    // 사이클별 일자(KST 거래일)별 누적 순투입액 = Σ(BUY 체결금액) − Σ(SELL 체결금액), 체결 주문 전체(수동 보정·취소 전 부분 체결 포함).
-    // 체결 주문이 없는 사이클은 키 없음 (DCA 원금 계산용 — 통계 N+1 방지 일괄 조회)
-    Map<UUID, NavigableMap<LocalDate, BigDecimal>> findFilledNetInvestedByCycleIds(Collection<UUID> strategyCycleIds);
+    // 사이클별 일자(KST 거래일)별 누적 BUY 체결금액·누적 SELL 체결금액(수동 보정·취소 전 부분 체결 포함 체결 주문 전체). 체결 주문이 없는 사이클은 키 없음
+    // (DCA 원금 = 누적 매수원가, 자산 = 보유 평가 + 누적 매도대금, 순투입 = netInvested() 계산용 — 통계 N+1 방지 일괄 조회)
+    Map<UUID, CycleFilledFlows> findFilledFlowsByCycleIds(Collection<UUID> strategyCycleIds);
 }

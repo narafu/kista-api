@@ -17,7 +17,7 @@
 - 여러 모듈을 집계하는 inbound 관심사(크로스모듈 컨트롤러·전역 `@ControllerAdvice`)는 `com.kista.api.web`, trading-core 전역 web 관심사(`TradingExceptionHandler`)는 `com.kista.tradingcore.web`에 둔다. 특정 애그리게이트 컨트롤러는 그 모듈의 `adapter/in/web`
 - persistence base entity·대칭키 암호화·스케쥴러 공통 골격은 `com.kista.shared.platform`에 둔다. 주문생성 알고리즘 커널(전략 계산·position 값객체·`PlannedOrder`·`AccountBalance`)은 `com.kista.tradingcore.matching`(`"kernel"`)에 둔다. 가드: `HexagonalArchitectureTest.platform_must_not_depend_on_other_modules`·`matching_must_not_depend_on_other_modules`
 - 같은 하위 패키지 이름(`domain/strategy` 등)을 모듈마다 다른 의미로 재사용하지 않는다(matching `domain/strategy`=주문생성 전략, trading `domain/creation`=등록 정책). 값 타입은 `domain/model/<x>`, 도메인 로직과 그 값이 한 하위 도메인이면 한 패키지로 둔다(stats `domain/backtest`)
-- `@Configuration`·`@TransactionalEventListener` 리스너·`@Scheduled`는 `application/service`에 두지 않는다(설정=`<module>/config`, 저장 트리거 리스너=`adapter/in/event`, 스케쥴러=`adapter/in/schedule`). 기존 예외: `TradingStatsService`의 캐시 무효화 `@EventListener`
+- `@Configuration`·`@TransactionalEventListener` 리스너·`@Scheduled`는 `application/service`에 두지 않는다(설정=`<module>/config`, 저장 트리거 리스너=`adapter/in/event`, 스케쥴러=`adapter/in/schedule`). 기존 예외: `TradingStatsService`의 캐시 무효화 `@EventListener`(TradingReportReady·StrategyCapitalChanged 두 이벤트를 받고, 트랜잭션 동기화가 활성이면 afterCommit에 비운다. `@TransactionalEventListener`를 쓰지 않는 이유는 메모리 캐시 무효화에 EPR `event_publication` 행이 남지 않게 하기 위해서다)
 - `@Aspect`는 저장소 전체에서 금지(가드 `no_aspects_in_codebase` — 모듈 간 런타임 결합이 생긴다, 횡단 관심사는 이벤트로)
 
 모듈 간 참조가 얽히면 own-type 정의(아래 게이트 통과 시) 또는 이벤트 발행(`@TransactionalEventListener`, EPR 재시도) 패턴을 사용한다. 이관 경위는 `docs/history/modulith-migration-history.md`(필요시 Read).

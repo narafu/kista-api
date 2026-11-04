@@ -31,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -74,6 +75,7 @@ class StrategyServiceTest {
     @Mock MarginPort marginPort;
     @Mock BrokerPricePort brokerPricePort;                  // 중간부터 시작 — 등록 시점 시장가(전일종가) 조회
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort; // 신규 전략 생성 설정 조회
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock OrderPort orderPort;                                   // 전략별 주문 내역 조회
     @Mock com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort privacyTradePort; // 시드 미리보기 PRIVACY 기준표
     @Mock StrategyDcaDetailPort dcaDetailPort;                   // DCA 버전 설정 포트
@@ -147,6 +149,7 @@ class StrategyServiceTest {
                 new CycleSnapshotCreator(
                         strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED),
                 orderCancelService,
+                eventPublisher,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
@@ -369,6 +372,7 @@ class StrategyServiceTest {
         inOrder.verify(cyclePositionPort).deleteByStrategyId(STRATEGY_ID);
         inOrder.verify(strategyCyclePort).deleteByStrategyId(STRATEGY_ID);
         inOrder.verify(strategyPort).delete(STRATEGY_ID);
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID)); // stats 캐시 무효화
     }
 
     @Test
@@ -440,6 +444,7 @@ class StrategyServiceTest {
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
         verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID)); // 새 사이클 생성 → stats 캐시 무효화
     }
 
     @ParameterizedTest
@@ -601,6 +606,7 @@ class StrategyServiceTest {
         assertThat(result.initialUsdDeposit()).isEqualTo(new BigDecimal("1000"));
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
         verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -639,6 +645,7 @@ class StrategyServiceTest {
 
         verify(strategyCyclePort).updateStartAmount(CYCLE_ID, new BigDecimal("3000"));
         verify(cyclePositionPort).updateCycleStartSnapshot(STRATEGY_ID, new BigDecimal("3000"));
+        verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID));
     }
 
     @Test

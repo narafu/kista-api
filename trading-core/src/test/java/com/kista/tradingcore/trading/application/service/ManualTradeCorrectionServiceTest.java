@@ -109,6 +109,7 @@ class ManualTradeCorrectionServiceTest {
         verify(strategyPort).save(argThat(s -> s.id().equals(STRATEGY_ID) && s.status() == StrategyStatus.PAUSED));
         // 청산 발생 → 사이클 종료 이벤트 발행
         verify(eventPublisher).publishEvent(any(CycleEndedEvent.class));
+        verify(eventPublisher).publishEvent(any(com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent.class)); // stats 캐시 무효화
 
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());

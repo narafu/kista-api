@@ -19,8 +19,10 @@ import com.kista.tradingcore.trading.domain.model.WithdrawCapitalCommand;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
@@ -57,6 +59,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     private final TradingBatchRunPort batchRunPort;
     private final StrategyLedgerBudget ledgerBudget;
     private final Clock clock;
+    private final ApplicationEventPublisher eventPublisher; // stats 캐시 무효화 이벤트 발행
 
     @Override
     public void inject(UUID strategyId, UUID requesterId, InjectCapitalCommand cmd) {
@@ -95,6 +98,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), cycle.startAmount().add(deposit).add(injectedCost));
 
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
         log.info("[strategyId={}] 투자금 추가: deposit={}, shares={}, sharePrice={}, holdings={}, usdDeposit={}",
                 strategyId, deposit, shares, cmd.sharePrice(), newBalance.holdings(), newBalance.usdDeposit());
     }
@@ -143,6 +147,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), newStartAmount);
 
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
         log.info("[strategyId={}] 투자금 인출: amount={}, usdDeposit={}, startAmount={}",
                 strategyId, amount, newBalance.usdDeposit(), newStartAmount);
     }

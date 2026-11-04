@@ -27,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.kista.tradingcore.trading.domain.model.CycleFilledFlows;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -163,9 +164,9 @@ class InvestmentPointsQueryServiceTest {
                 LocalDate.of(2026, 1, 5), null, Instant.parse("2026-01-05T00:00:00Z"), null);
         ArgumentCaptor<Set<UUID>> idsCaptor = ArgumentCaptor.forClass(Set.class);
         when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of(cycle));
-        when(orderPort.findFilledNetInvestedByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(),
-                new TreeMap<>(Map.of(LocalDate.of(2026, 1, 5), new BigDecimal("100"),
-                        LocalDate.of(2026, 1, 6), new BigDecimal("200")))));
+        when(orderPort.findFilledFlowsByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(),
+                new CycleFilledFlows(new TreeMap<>(Map.of(LocalDate.of(2026, 1, 5), new BigDecimal("100"),
+                        LocalDate.of(2026, 1, 6), new BigDecimal("200"))), new TreeMap<>())));
         when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
                 depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
                 depositSnapshot(cycle.id(), "200.00", "2026-01-06T01:00:00Z")));
