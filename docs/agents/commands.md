@@ -14,32 +14,13 @@
 # 테스트 실패 진단: stdout보다 XML이 신뢰성 높음
 grep -l 'failures="[1-9]' build/test-results/test/TEST-*.xml   # 실패가 있는 테스트 XML 파일 목록
 ```
-
-### 배포 스크립트 검증 (Docker)
-```bash
-# bats(.github/tests) — 판정 스크립트·원격 배포 스크립트(docker 스텁)
-docker run --rm -v "$(pwd):/code" -w /code --entrypoint sh bats/bats:latest \
-  -c "apk add -q git; git config --global --add safe.directory '*'; bats .github/tests"
-docker run --rm -v "$(pwd):/mnt" -w /mnt koalaman/shellcheck:stable .github/scripts/*.sh deploy/hooks/*.sh .github/tests/stub/gh
-docker run --rm -v "$(pwd):/repo" -w /repo rhysd/actionlint:latest
-bash .github/scripts/check-migrations.sh origin/main   # 마이그레이션 불변·expand/contract
-```
-- Windows Git Bash: docker 볼륨 마운트 시 `MSYS_NO_PATHCONV=1` + `$(cygpath -aw .)` 사용
 - 로컬 테스트 JVM은 Gradle `testJvmSlot` 빌드 서비스로 한 번에 하나만 뜬다(`CI` 환경변수 없을 때) — `test integration`처럼 여러 테스트 태스크를 한 번에 돌려도 순차 실행
 
-### 로컬 admin 토큰 발급 (DevAuthController, local 프로파일 전용)
-```bash
-# 일반 사용자 토큰
-TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-token | jq -r .accessToken)
-curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/admin/_ping  # 403 기대
+### 배포 스크립트 검증 (Docker)
+bats·shellcheck·actionlint·마이그레이션 검사 명령 → `.github/CLAUDE.md` (`.github` 작업 시 자동 로드)
 
-# ADMIN 토큰 (고정 UUID 00000000-0000-0000-0000-000000000002)
-ADMIN_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-admin-token | jq -r .accessToken)
-curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  # 200 기대
-
-# E2E 전용 빈 사용자 토큰 (고정 UUID ...0003, dev 시드 미적용 — kista-ui account-cache E2E가 사용)
-E2E_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-e2e-token | jq -r .accessToken)
-```
+### 로컬 dev 토큰 발급 (DevAuthController, local 프로파일 전용)
+`POST /api/auth/dev-token`(일반)·`dev-admin-token`(ADMIN, `...0002`)·`dev-e2e-token`(E2E 빈 사용자, `...0003`) → curl 예시는 `docs/agents/local-dev.md`
 
 ### 로컬 dev 시드 (kista-ui 화면 검증용)
 ```bash

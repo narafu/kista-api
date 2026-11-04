@@ -1,6 +1,20 @@
 # 로컬 개발 환경 상세
 
-자주 쓰는 한 줄 명령은 `commands.md`, 여기는 dev 시드·2-프로세스 부팅 절차.
+자주 쓰는 한 줄 명령은 `commands.md`, 여기는 dev 토큰·dev 시드·2-프로세스 부팅 절차.
+
+### 로컬 dev 토큰 발급 (DevAuthController, local 프로파일 전용)
+```bash
+# 일반 사용자 토큰
+TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-token | jq -r .accessToken)
+curl -i -H "Authorization: Bearer $TOKEN" localhost:8080/api/admin/_ping  # 403 기대
+
+# ADMIN 토큰 (고정 UUID 00000000-0000-0000-0000-000000000002)
+ADMIN_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-admin-token | jq -r .accessToken)
+curl -i -H "Authorization: Bearer $ADMIN_TOKEN" localhost:8080/api/admin/_ping  # 200 기대
+
+# E2E 전용 빈 사용자 토큰 (고정 UUID ...0003, dev 시드 미적용 — kista-ui account-cache E2E가 사용)
+E2E_TOKEN=$(curl -s -X POST localhost:8080/api/auth/dev-e2e-token | jq -r .accessToken)
+```
 
 ### 로컬 dev 시드 (kista-ui 화면 검증용)
 ```bash
