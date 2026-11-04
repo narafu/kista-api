@@ -514,7 +514,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - VR 종료금액 시점 혼합: due일 종가에 오늘 매매 후 holdings를 곱한다(`VrCycleRolloverService.java:119-126`). 지연 시 그 사이 체결이 옛 사이클 평가에 섞인다.
   - 본전 사이클이 패배로 집계: 승률은 `realizedPnl().signum() > 0`만 승으로 센다(`TradingStatsService.toTypeStats`).
   - 수동 체결 보정이 과거 trade_date로 SELL을 넣으면 DCA `withdrawnOn`(trade_date 기준)과 스냅샷(createdAt 기준)이 어긋나 그 사이 곡선 자산이 매도대금만큼 부푼다(`CycleView` `ponytail:` 주석).
-  - 곡선 체인 보정의 surplus가 후속 사이클의 현재 startAmount를 쓴다(`TradingStatsService.chainAdjustment`). 회전 뒤 투자금 추가·인출이나 시드 수정이 있으면 자산선과 원금선이 같은 양만큼 함께 움직인다. 손익선은 맞다. 투자금 이력 테이블(새 세션 후속)로 회전 시점의 시작금액을 알게 되면 함께 고친다.
+  - 곡선 체인 보정의 surplus가 후속 사이클의 현재 startAmount를 쓴다(`TradingStatsService.chainAdjustment`). 회전 뒤 투자금 추가·인출이나 시드 수정이 있으면 자산선과 원금선이 같은 양만큼 함께 움직인다. 손익선은 맞다. CQ-35(투자금 이력 테이블)로 회전 시점의 시작금액을 알게 되면 함께 고친다.
   - 종료 처리가 안 된 선행 사이클(CQ-29 상황)은 체인 보정에서 빠지고 후속 사이클 제외 규칙으로만 사라져 손익이 끊긴다. CQ-29를 고치면 해소된다.
   - `TtlResultCache.getOrCompute`에 세대(버전) 검사가 없다. 무효화 직전에 계산을 시작한 스레드가 무효화 뒤 옛 결과를 다시 넣으면 5분 TTL 동안 유지된다. TradingReportReady 무효화도 같다.
   - 전략 등록(`StrategyService.register`), 계좌 삭제 캐스케이드(`AccountCascadeListener`), 크립토 원장 스냅샷(`CryptoLedgerRecorder`)은 `StrategyCapitalChangedEvent`를 발행하지 않아 최대 5분 동안 옛 값이 보인다.
@@ -534,6 +534,27 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 리포트 중 재주문 PLACED 체결 반영
 - 수정 방향: CQ-28~32를 고치면서 해당 테스트를 함께 넣는다. 반올림 경계는 단독으로 먼저 고정할 수 있다.
 - 상태: open(2026-11-04).
+
+### CQ-35 투자금 추가·인출 이력이 남지 않아 과거 원금선이 소급 변경됨
+- 주제: 통계 정확도. 유형: 누락(기존 동작). 위험: 중간(마이그레이션 필요).
+- 위치: `CapitalInjectionService.java:96,144`(`updateStartAmount`만 호출, 이력은 `log.info`만), `TradingStatsService.CycleView.principalOn`(시드 점유 전략은 날짜와 무관하게 현재 `startAmount`), `:95,143`(`updateBalance(latest.id())`로 최신 스냅샷을 제자리 수정).
+- 근거: 06-01 시드 10,000, 06-20 5,000 추가 → 06-01~06-19 원금선이 15,000이 되어 과거가 −33%로 보인다. 정지 전략은 최신 행이 며칠 전이라 과거 자산값도 바뀐다. 이력 테이블·이벤트·감사 기록이 없다(trading-core V1~V13 확인).
+- 수정 방향: `cycle_capital_events(cycle_id, trade_date, amount)` 같은 이력 테이블을 만들어 일자별 원금 시계열(NavigableMap)로 바꾸고, 스냅샷을 제자리 수정하지 않고 새 행을 추가한다. 과거분은 복원할 수 없으니 운영 로그로 백필할지 포기할지 정한다. CQ-33의 체인 surplus 문제도 함께 해소한다.
+- 상태: open(2026-11-04, 새 세션 brainstorming 대상).
+
+### CQ-36 VR "실현손익"에 팔지 않은 평가익이 포함됨
+- 주제: 통계 정의. 유형: 정의 문제(기존 동작). 위험: 중간.
+- 위치: `VrCycleRolloverService.java:137-145`, `CycleSnapshotCreator.java:94`(종료금액 = 예수금 + holdings × 종가), `TradingStatsService.CycleView.realizedPnl`.
+- 근거: 롤오버 때 보유분은 팔리지 않고 승계된다(avgPrice 승계, `CycleSnapshotCreator.java:67`). 그런데 endAmount가 시가 평가라 종료 사이클 realizedPnl이 미실현분을 포함하고, 승률·평균 수익률은 N주 구간 수익률이 된다. 총손익(실현 + 미실현)은 맞다.
+- 수정 방향(사용자 결정 대기): (a) UI 라벨만 "구간 손익"으로 바꾼다. (b) 근사값: Σ(SELL 체결금액 − 직전 스냅샷 avgPrice × SELL 수량)를 orders·cycle_position만으로 조회한다. (c) 정확한 값: 매도 체결 시 사이클별 `realized_pnl`을 기록한다(같은 날 매수·매도 순서, 수동 보정, 투자금 추가의 avgPrice 제자리 수정까지 반영하려면 필요).
+- 상태: open(2026-11-04, 방향 미정).
+
+### CQ-37 전략 삭제 시 과거 성과가 통계에서 소급 소멸
+- 주제: 통계 정책. 유형: 기능 공백(기존 동작). 위험: 중간(스케쥴러 판정 영향).
+- 위치: `StrategyEntity.java:22`(`@SQLRestriction`), `StrategyPersistenceAdapter.java:80`(`findAllByAccountIdIn`), `StrategyStatus`(ACTIVE·PAUSED만 있음).
+- 근거: 소프트 삭제된 전략의 사이클·스냅샷이 실현손익·승률·곡선에서 빠진다. 사용자는 "보고 싶어서 남길 것"과 "치우려고 지운 것"을 구분하고 싶어 한다.
+- 수정 방향(사용자 추천안 동의): `StrategyStatus.ARCHIVED`(보관)를 신설한다. 보관하면 매매를 멈추고 목록에서 숨기되 통계는 유지하고, 삭제는 지금처럼 통계에서도 뺀다. 스케쥴러·상태 판정의 `!= PAUSED` 형태를 전수 점검한다(보관 전략이 매매되면 안 된다). kista-ui에 보관 버튼·보관함 목록·삭제 확인 문구를 추가한다.
+- 상태: open(2026-11-04, 새 세션 brainstorming 대상).
 
 ## 유지 목록 (재제안 금지, 이유 기록)
 
