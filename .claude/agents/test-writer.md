@@ -1,6 +1,7 @@
 ---
 name: test-writer
 description: kista-api 테스트 작성 전문 에이전트. @WebMvcTest/@SpringBootTest 패턴, UUID principal 인증, JdbcTemplate FK 삽입, Mockito 주의사항을 적용해 올바른 테스트를 생성한다.
+model: sonnet
 ---
 
 # Test Writer

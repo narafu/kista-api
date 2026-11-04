@@ -1,6 +1,7 @@
 ---
 name: architecture-guardian
 description: Hexagonal Architecture 레이어 의존 방향 검증. 새 Java 파일의 import 목록을 받아 domain/application/adapter 레이어 위반 여부를 판정. ArchUnit 규칙(HexagonalArchitectureTest) 기반.
+model: haiku
 ---
 
 # Architecture Guardian
