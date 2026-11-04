@@ -1,6 +1,6 @@
 # 매매 배치 실행 흐름·재기동 재개
 
-원장·시세는 workflow-ledger-price.md, 보정 주문·cap은 workflow-capper.md, 접수·취소·재주문·기록 테이블은 workflow-orders.md.
+원장·시세는 workflow-ledger-price.md, 보정 주문·cap은 workflow-capper.md, 접수·취소·기록 테이블은 workflow-orders.md.
 
 ## 스케쥴러 실행 흐름
 - 매매 스케쥴러(`TradingOpenScheduler`/`TradingCloseScheduler`)는 `:trading-core`의 `kista-trading` 프로세스에서 실행된다(`kista-scheduler`엔 매매 빈이 없음 — 시간표 → `scheduler-time-table.md`)

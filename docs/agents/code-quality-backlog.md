@@ -477,7 +477,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `TradingService.java:279-292`(리포트 `mainOrders` = 접수 시점 메모리 목록 + 그 시점 PLACED), `ReorderService.java:101-113,194-197`, `DstInfo.java:161-167`(IMMEDIATE 허용 창 개장 후~마감 전), `TradingReporter.java:65-68,99-101,138`.
 - 근거: 마감 배치 접수(DST 04:30)와 장마감(05:00) 사이 IMMEDIATE 재주문은 `ownIds` 밖이라 체결이 원장에 반영되지 않고, 잔여 취소도 FILLED/CANCELLED 기록도 되지 않아 PLACED로 남는다. PRIVACY는 다음 날 보유 보정이 같은 수량을 다시 산다. 같은 창의 AT_CLOSE 재주문은 PLANNED로만 저장되고 원본만 취소된다.
 - 수정 방향: 재주문 허용 창을 마감 배치 접수 전까지로 좁히거나, 리포트가 당일 PLACED를 리포트 시점에 다시 조회한다. 설계는 brainstorming부터 한다.
-- 상태: open(2026-11-04 검토 발견, 줄 번호는 서브에이전트 보고 기준이라 미확인).
+- 상태: 해소(2026-11-04) — 재검증 결과 기술한 경로는 재현되지 않았다(자정 이후 DstInfo.calculate의 marketOpen이 당일 22:30이라 IMMEDIATE가 닫혀 있고, 04:30 이후 재주문은 nextTradeDate 검사로 다음 거래일 주문이 된다). 대신 자정~장마감 IMMEDIATE 차단·AT_OPEN 허용 판정 오류와 원본 거래일 미검사를 찾았고, 운영 사용 0건이라 관리자 재주문 기능 자체를 제거했다.
 
 ### CQ-29 마커 커밋 뒤 `markEnded`·`rotate` 실패 시 사이클이 영구히 닫히지 않음
 - 주제: 사이클 수명. 유형: 버그(기존 동작). 위험: 중간.
@@ -531,8 +531,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - PRIVACY 기준표 거래일 ≠ 배치 거래일
   - `CyclePositionPersistor`에서 마커 커밋 뒤 `markEnded`·`rotate`가 예외를 던지는 경우
   - 재캡 입력이 부분 PLANNED(AVG PLACED)인 경우
-  - 리포트 중 재주문 PLACED 체결 반영
-- 수정 방향: CQ-28~32를 고치면서 해당 테스트를 함께 넣는다. 반올림 경계는 단독으로 먼저 고정할 수 있다.
+- 수정 방향: CQ-29~32를 고치면서 해당 테스트를 함께 넣는다. 반올림 경계는 단독으로 먼저 고정할 수 있다.
 - 상태: open(2026-11-04).
 
 ### CQ-35 투자금 추가·인출 이력이 남지 않아 과거 원금선이 소급 변경됨

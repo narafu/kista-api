@@ -60,7 +60,7 @@ class TradingReporter {
         // today는 KST — KIS는 어댑터에서 toUtc 변환, Toss는 KST 날짜 그대로 전달
         List<Execution> executions = executionPort.getExecutions(today, today, strategy.ticker(), account.brokerRef());
         // 원장 = 우리 매매 원칙의 기록, 외부 매매는 수동 보정으로만 반영 (spec 3장 원장 원칙) — 자기 주문(externalOrderId) 체결만 사용
-        // 당일 취소·재주문된 주문(CANCELLED)도 부분 체결분이 있을 수 있어 자기 주문에 포함 — 수동 체결 보정 FILLED 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
+        // 당일 취소된 주문(CANCELLED)도 부분 체결분이 있을 수 있어 자기 주문에 포함 — 수동 체결 보정 FILLED 행(UNKNOWN_LEG)은 포지션을 직접 기록했으므로 제외
         // 외부 주문번호가 없는 체결은 우리 것이 아닌 것으로 본다 (ownIds에 null이 없어 걸러짐)
         List<Order> cancelledOrders = orderPort.findCancelledByCycleAndDate(ctx.currentCycle().id(), today);
         Set<String> ownIds = Stream.concat(mainOrders.stream(), cancelledOrders.stream())

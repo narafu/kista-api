@@ -9,4 +9,4 @@
 - `workflow-batch.md` — 배치 단계·마감/개장 경로·수동 트리거·실행 결과·오류 알림, "재기동 종료·재개", MarketSession(DIRECT|BLOCKED). 배치 흐름·재기동·수동 실행을 건드릴 때.
 - `workflow-ledger-price.md` — 전략별 원장 상한(`StrategyLedgerBudget`), 재캡 재진입, 브로커 토큰, "시세 출처". 예산 배정·BUY 상한·시세 조회를 건드릴 때.
 - `workflow-capper.md` — BuyOrderPriceCapper 보정 주문(INFINITE·PRIVACY·VR별 cap·보정). cap·보정 주문을 건드릴 때.
-- `workflow-orders.md` — 미체결 주문 정리·재주문, 접수 선점(SUBMITTING), "PLANNED 상태 전이 경합", 수동 체결 보정, orders/cycle_position 기록 테이블 구분. 접수·취소·재주문·기록을 건드릴 때.
+- `workflow-orders.md` — 미체결 주문 정리, 접수 선점(SUBMITTING), "PLANNED 상태 전이 경합", 수동 체결 보정, orders/cycle_position 기록 테이블 구분. 접수·취소·기록을 건드릴 때.

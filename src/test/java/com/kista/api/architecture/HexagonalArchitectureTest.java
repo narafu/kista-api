@@ -295,9 +295,7 @@ class HexagonalArchitectureTest {
         // Account 타입을 선언·보관하지 않으므로 제외 대상이 아니다 — 나중에 Account를 직접 다루게 되면 이 규칙이 잡는다.
         Set<String> accountAllowed = Set.of(
                 "com.kista.tradingcore.trading.application.service.support.SelectionChain",      // 소유권 검증(verifyOwnedBy)
-                "com.kista.tradingcore.trading.application.service.ReorderService",              // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.OrderCancelService",           // 소유권 검증
-                "com.kista.tradingcore.trading.application.service.ReorderBuyBudgetService",      // 관리자 재주문 예산 조회 — 원본 계좌 brokerRef로 체결 조회
                 "com.kista.tradingcore.trading.application.service.VrReconfigureService",        // 소유권 검증
                 "com.kista.tradingcore.trading.application.service.StrategyCreationService",     // 계좌 소유권·브로커 검증
                 "com.kista.tradingcore.trading.application.service.StrategyService",             // 계좌 소유권 검증

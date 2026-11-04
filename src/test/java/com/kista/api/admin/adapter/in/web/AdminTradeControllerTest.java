@@ -5,19 +5,15 @@ import com.kista.shared.kernel.Broker;
 import com.kista.shared.platform.security.InternalTokenAuthFilter;
 import com.kista.shared.platform.security.JwtAuthFilter;
 import com.kista.shared.platform.security.SecurityConfig;
-import com.kista.shared.contract.trading.ReorderResponse;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminReorderUseCase;
 import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.api.admin.application.usecase.AdminUserUseCase;
 import com.kista.shared.platform.security.TokenBlacklistPort;
-import com.kista.api.admin.application.port.output.TradingCommandPort;
-import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -64,8 +60,6 @@ class AdminTradeControllerTest {
     @MockitoBean AdminQueryUseCase adminQuery;
     @MockitoBean AdminUserUseCase adminUser;
     @MockitoBean AdminTradeCorrectionUseCase adminTradeCorrection;
-    @MockitoBean AdminReorderUseCase adminReorder;
-    @MockitoBean TradingCommandPort tradingCommandPort;
 
     private static final UUID ADMIN_UUID = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID USER_UUID  = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -254,86 +248,5 @@ class AdminTradeControllerTest {
                 .andExpect(status().isOk());
 
         verify(adminTradeCorrection).correctManualFills(org.mockito.ArgumentMatchers.eq(ADMIN_UUID), org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    void reorder_adminRole_returns200() throws Exception {
-        String body = """
-                {
-                  "userId": "00000000-0000-0000-0000-000000000010",
-                  "accountId": "00000000-0000-0000-0000-000000000020",
-                  "strategyId": "00000000-0000-0000-0000-000000000030",
-                  "orderId": "00000000-0000-0000-0000-000000000050",
-                  "timing": "AT_CLOSE",
-                  "tradeDate": "2026-07-01",
-                  "quantity": 3,
-                  "price": 250.00,
-                  "memo": "reorder memo"
-                }
-                """;
-        when(adminReorder.reorder(org.mockito.ArgumentMatchers.eq(ADMIN_UUID), org.mockito.ArgumentMatchers.any()))
-                .thenReturn(new ReorderResponse(
-                        UUID.fromString("00000000-0000-0000-0000-000000000010"),
-                        UUID.fromString("00000000-0000-0000-0000-000000000020"),
-                        UUID.fromString("00000000-0000-0000-0000-000000000030"),
-                        UUID.fromString("00000000-0000-0000-0000-000000000050"),
-                        OrderStatus.PLANNED,
-                        OrderStatus.PLANNED,
-                        null,
-                        new BigDecimal("236.54"),
-                        1,
-                        OrderDirection.SELL
-                ));
-
-        mockMvc.perform(post("/api/admin/trades/reorders")
-                        .with(csrf())
-                        .with(authentication(adminToken(ADMIN_UUID)))
-                        .contentType("application/json")
-                        .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultingStatus").value("PLANNED"));
-    }
-
-    @Test
-    void getReorderTiming_adminRole_tradingDay_returnsTimingFlags() throws Exception {
-        // 개장 여부 판정은 trading-core 내부 API 구현부로 이관됨 — 컨트롤러는 포트 결과를 그대로 반환
-        when(tradingCommandPort.reorderTimingAvailability())
-                .thenReturn(new ReorderTimingAvailabilityResponse(true, true, false));
-
-        mockMvc.perform(get("/api/admin/trades/reorder-timing")
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.atOpen").isBoolean())
-                .andExpect(jsonPath("$.atClose").isBoolean())
-                .andExpect(jsonPath("$.immediate").isBoolean());
-    }
-
-    @Test
-    void getReorderTiming_adminRole_holiday_returnsAllFalse() throws Exception {
-        // 비개장일 판정도 trading-core 쪽에서 이미 반영된 결과를 그대로 전달
-        when(tradingCommandPort.reorderTimingAvailability())
-                .thenReturn(new ReorderTimingAvailabilityResponse(false, false, false));
-
-        mockMvc.perform(get("/api/admin/trades/reorder-timing")
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.atOpen").value(false))
-                .andExpect(jsonPath("$.atClose").value(false))
-                .andExpect(jsonPath("$.immediate").value(false));
-    }
-
-    @Test
-    void getReorderBuyBudget_adminRole_returnsBudget() throws Exception {
-        UUID orderId = UUID.randomUUID();
-        when(tradingCommandPort.reorderBuyBudget(List.of(orderId), java.time.LocalDate.of(2026, 10, 6)))
-                .thenReturn(new com.kista.shared.contract.trading.ReorderBuyBudgetResponse(
-                        Map.of(orderId, new BigDecimal("300")), Map.of(orderId, new BigDecimal("200"))));
-
-        mockMvc.perform(get("/api/admin/trades/reorder-buy-budget")
-                        .param("orderIds", orderId.toString()).param("tradeDate", "2026-10-06")
-                        .with(authentication(adminToken(ADMIN_UUID))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.cycleRemaining['" + orderId + "']").value(300))
-                .andExpect(jsonPath("$.sourceRefunds['" + orderId + "']").value(200));
     }
 }

@@ -14,7 +14,7 @@ public record PlannedOrder(
         StrategyTicker ticker,      // 거래 종목
         LocalDate tradeDate,        // 거래일
         OrderType orderType,        // LOC/MOC/LIMIT
-        OrderTiming timing,         // AT_OPEN/AT_CLOSE/IMMEDIATE
+        OrderTiming timing,         // AT_OPEN/AT_CLOSE
         OrderDirection direction,   // BUY/SELL
         String orderLeg,            // 전략 주문 다리 식별자
         Integer quantity,           // 주문 수량 (nullable — SELL "잔량 전부")

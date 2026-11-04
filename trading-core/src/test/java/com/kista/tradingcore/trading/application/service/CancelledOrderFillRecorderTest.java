@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.OrderTiming;
@@ -21,7 +20,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -104,13 +102,5 @@ class CancelledOrderFillRecorderTest {
         verify(executionPort, times(1)).getExecutions(DAY, DAY, StrategyTicker.SOXL, ref);
         verify(executionPort, times(1)).getExecutions(DAY, DAY, StrategyTicker.TQQQ, ref);
         verify(stateWriter, times(3)).recordCancelledFill(any(), any(), any());
-    }
-
-    @Test
-    void MOCK_현재_체결_조회는_시뮬레이션을_부르지_않고_체결_없음을_돌려준다() {
-        // MOCK getExecutions는 PLACED 주문 전부를 일봉으로 체결 시뮬레이션하므로 재주문 환급 판단에 쓰면 미체결 원본이 체결로 오판된다
-        when(ref.broker()).thenReturn(Broker.MOCK);
-        assertThat(recorder.currentFills(DAY, StrategyTicker.SOXL, ref)).isEmpty();
-        verifyNoInteractions(executionPort);
     }
 }

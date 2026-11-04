@@ -125,7 +125,7 @@ public class MockBrokerAdapter implements BrokerCapabilitiesPort {
     // MOC: 항상 체결(종가) / MOO: 체결가 시가(매수는 시가<=캡 지정가일 때만) / LOC: 매수는 종가<=지정가, 매도는 종가>=지정가 (체결가는 종가)
     // LIMIT: 일봉 OHLC 터치로 판정 — 매수는 저가<=지정가(체결가 min(지정가, 시가)), 매도는 고가>=지정가(체결가 max(지정가, 시가))
     // (LIMIT은 백테스트 FillSimulator.simulate와 동일 규칙 — 백테스트는 DCA 미지원이라 MOO를 만들지 않는다)
-    // ponytail: 장중 접수 주문(수동 실행·재주문)도 시가·장중 터치 혜택을 받음 — 접수 시각 이후 분봉으로 판정하면 개선 가능
+    // ponytail: 장중 접수 주문(수동 실행)도 시가·장중 터치 혜택을 받음 — 접수 시각 이후 분봉으로 판정하면 개선 가능
     @Override
     public List<Execution> getExecutions(LocalDate from, LocalDate to, StrategyTicker ticker, BrokerAccountRef account) {
         // 실제 호출부(TradingReporter)는 항상 from==to(당일)로만 호출 — to를 거래일로 사용

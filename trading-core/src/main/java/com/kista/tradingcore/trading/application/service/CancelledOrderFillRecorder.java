@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
@@ -42,13 +41,6 @@ class CancelledOrderFillRecorder {
                 log.warn("취소 주문 체결 기록 실패 — {} {}: {}", key.ticker(), key.tradeDate(), e.toString());
             }
         });
-    }
-
-    // 현재 체결 조회(재주문 환급 계산용) — 실패는 예외로 전파한다(호출자가 fail-open/closed 선택). 주문의 externalOrderId별 합산
-    Map<String, OrderFill> currentFills(LocalDate tradeDate, StrategyTicker ticker, BrokerAccountRef ref) {
-        // MOCK 체결 조회는 실제 체결이 아니라 PLACED 주문 전부를 일봉으로 시뮬레이션한다 — 미체결 원본을 체결로 오판하지 않게 체결 없음으로 본다
-        if (ref.broker() == Broker.MOCK) return Map.of();
-        return OrderFill.byExternalOrderId(executionPort.getExecutions(tradeDate, tradeDate, ticker, ref));
     }
 
     private void write(List<Order> orders, Map<String, OrderFill> fills) {

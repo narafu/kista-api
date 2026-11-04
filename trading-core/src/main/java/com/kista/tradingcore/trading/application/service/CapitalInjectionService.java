@@ -124,7 +124,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
                 .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
                 .toList();
         // 장중 일부 체결 후 취소된 BUY의 체결분은 마감 리포트 전까지 장부에 없다 — 취소 직후 기록된 체결분을 빼고, 체결 조회가 실패해 기록이 없는(null) 건은 주문 금액 전체를 상한으로 뺀다.
-        // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다(unreportedCancelledBuys). 재주문으로 원본이 취소되고 새 주문이 생기면 새 주문 약정과 원본 체결분이 함께 잡히지만 원본 체결분은 실제 체결 금액이라 중복이 아니다
+        // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다(unreportedCancelledBuys).
         List<Order> cancelledOrders = dates.stream()
                 .flatMap(date -> ledgerBudget.unreportedCancelledBuys(cycle, date).stream())
                 .toList();

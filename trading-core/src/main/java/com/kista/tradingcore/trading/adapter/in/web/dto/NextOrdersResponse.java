@@ -92,7 +92,7 @@ public record NextOrdersResponse(
             int quantity,               // 주문 수량
             @Schema(description = "주문 가격 (LOC/MOC는 참고용)")
             BigDecimal price,           // 주문 가격 (LOC/MOC는 참고용)
-            @Schema(description = "접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치, IMMEDIATE=즉시)", example = "AT_CLOSE")
+            @Schema(description = "접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)", example = "AT_CLOSE")
             OrderTiming timing  // 접수 시점
     ) {
         public static OrderItem from(PlannedOrder o) {
@@ -116,7 +116,7 @@ public record NextOrdersResponse(
             BigDecimal price,
             @Schema(description = "주문 상태 (취소 가능 여부 판단용)", example = "PLANNED")
             OrderStatus status,
-            @Schema(description = "접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치, IMMEDIATE=즉시)", example = "AT_CLOSE")
+            @Schema(description = "접수 시점 (AT_OPEN=개장 선접수, AT_CLOSE=마감 배치)", example = "AT_CLOSE")
             OrderTiming timing  // 접수 시점
     ) {
         public static TodayOrderItem from(Order o) {

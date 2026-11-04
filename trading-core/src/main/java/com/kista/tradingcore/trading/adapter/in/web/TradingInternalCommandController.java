@@ -1,27 +1,13 @@
 package com.kista.tradingcore.trading.adapter.in.web;
 
-import com.kista.shared.contract.trading.ReorderBuyBudgetResponse;
-import com.kista.shared.contract.trading.ReorderRequest;
-import com.kista.shared.contract.trading.ReorderResponse;
-import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
-import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.application.usecase.ManualTradeCorrectionUseCase;
-import com.kista.tradingcore.trading.application.usecase.ReorderBuyBudgetQuery;
-import com.kista.tradingcore.trading.application.usecase.ReorderUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.UUID;
 
 // admin의 TradingCommandHttpAdapter가 소비하는 내부 전용 쓰기 엔드포인트 — X-Internal-Token 인증
 @Tag(name = "내부 API", description = "서버 간 내부 호출 전용 엔드포인트 (X-Internal-Token 인증)")
@@ -30,40 +16,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TradingInternalCommandController {
 
-    private final ReorderUseCase reorderUseCase;
-    private final ReorderBuyBudgetQuery reorderBuyBudgetQuery;
     private final ManualTradeCorrectionUseCase manualTradeCorrectionUseCase;
-    private final MarketCalendarPort marketCalendarPort; // 휴장일 판정 — 비개장일엔 3개 boolean 전부 false
-    private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
-
-    @Operation(summary = "관리자 재주문 접수/취소")
-    @PostMapping("/reorder")
-    public ReorderResponse reorder(@RequestBody @Valid ReorderRequest request) {
-        return TradingContractMapper.toResponse(reorderUseCase.reorder(TradingContractMapper.toCommand(request)));
-    }
 
     @Operation(summary = "관리자 수동 체결 보정")
     @PostMapping("/trade-corrections")
     public TradeCorrectionResponse correctManualFills(@RequestBody @Valid TradeCorrectionRequest request) {
         return TradingContractMapper.toResponse(
                 manualTradeCorrectionUseCase.correctManualFills(TradingContractMapper.toCommand(request)));
-    }
-
-    @Operation(summary = "재주문 시점 가용성 조회", description = "비개장일엔 3개 boolean 전부 false를 반환합니다.")
-    @GetMapping("/reorder-timing-availability")
-    public ReorderTimingAvailabilityResponse reorderTimingAvailability() {
-        // 현재 거래일(04:30 KST 경계) 기준 — ReorderService 서버 재검증과 같은 판정
-        ZonedDateTime nowKst = ZonedDateTime.now(clock);
-        if (!marketCalendarPort.isMarketOpen(DstInfo.nextTradeDate(nowKst))) {
-            return new ReorderTimingAvailabilityResponse(false, false, false);
-        }
-        return TradingContractMapper.toResponse(DstInfo.calculate(nowKst).reorderTimingAvailabilityAt(nowKst.toInstant()));
-    }
-
-    @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문들의 PLANNED BUY 합계·live 주문가능금액(1회 조회)·원본별 환급분. 조회만 하며 차단하지 않습니다.")
-    @GetMapping("/reorder-buy-budget")
-    public ReorderBuyBudgetResponse reorderBuyBudget(@RequestParam List<UUID> orderIds,
-                                                     @RequestParam(required = false) LocalDate tradeDate) {
-        return TradingContractMapper.toResponse(reorderBuyBudgetQuery.query(orderIds, tradeDate));
     }
 }

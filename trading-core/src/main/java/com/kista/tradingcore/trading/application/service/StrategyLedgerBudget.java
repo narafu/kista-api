@@ -69,7 +69,7 @@ class StrategyLedgerBudget {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    // 원장 상한 적용 대상 여부 — DCA처럼 시드를 점유하지 않는 전략은 상한 제외(fit·재주문 공용)
+    // 원장 상한 적용 대상 여부 — DCA처럼 시드를 점유하지 않는 전략은 상한 제외(fit 공용)
     boolean applies(StrategyType type) {
         return cycleOrderStrategies.of(type).occupiesSeed();
     }

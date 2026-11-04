@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-// 주문 1건 증권사 접수 단일 경로 — 선점(PLANNED→SUBMITTING) → 접수 → PLACED/FAILED 기록. 배치 접수·재주문 즉시 접수 공용
+// 주문 1건 증권사 접수 단일 경로 — 선점(PLANNED→SUBMITTING) → 접수 → PLACED/FAILED 기록. 배치 접수 공용
 // 결과 불명(I/O·타임아웃 등)은 SUBMITTING으로 남겨 어떤 재실행도 재접수하지 않는다 — 대사·런북 정정 대상
 @Component
 @RequiredArgsConstructor

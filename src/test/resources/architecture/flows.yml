@@ -60,7 +60,7 @@ landscape:
     steps:
       - {id: admin-approve, title: 가입 승인·반려, flow: signup}
       - {id: admin-runtime, title: 런타임 매매 정책, flow: admin-runtime}
-      - {id: admin-orders, title: 재주문·체결 보정, flow: admin-orders}
+      - {id: admin-orders, title: 체결 보정, flow: admin-orders}
       - {id: admin-scheduler, title: 스케쥴러 수동 실행, flow: admin-scheduler}
       - {id: admin-privacy, title: PRIVACY 기준표 수동 보정, flow: fida-receive}
       - {id: admin-error-logs, title: 오류 로그, flow: admin-error-logs}
@@ -223,7 +223,7 @@ flows:
         lane: trading
         to: [db]
         title: 주문 체결 상태 기록
-        desc: 접수했던 주문을 체결 내역과 외부 주문번호로 맞춰 체결·부분체결로 기록하고, 체결이 없는 주문은 취소로 기록한다. 같은 사이클·거래일에 취소·재주문된 주문(CANCELLED)에 취소 전 부분 체결이 있으면 상태는 취소로 둔 채 체결 수량·평균가를 기록해, 원장과 원금 집계(VR 누적 매수금·DCA 순투입액)·거래 내역이 같은 체결을 보게 한다.
+        desc: 접수했던 주문을 체결 내역과 외부 주문번호로 맞춰 체결·부분체결로 기록하고, 체결이 없는 주문은 취소로 기록한다. 같은 사이클·거래일에 취소된 주문(CANCELLED)에 취소 전 부분 체결이 있으면 상태는 취소로 둔 채 체결 수량·평균가를 기록해, 원장과 원금 집계(VR 누적 매수금·DCA 순투입액)·거래 내역이 같은 체결을 보게 한다.
         code: [TradingReporter#markFilledOrders]
         state: "orders → FILLED / PARTIALLY_FILLED / CANCELLED"
 
@@ -1057,89 +1057,42 @@ flows:
         fail: 취소 불가 상태면 409(ORDER_NOT_CANCELLABLE), 남의 주문이면 403, 주문이 없으면 404. 증권사 취소가 실패하면 예외가 그대로 전파되고 주문은 PLACED로 남는다.
 
   admin-orders:
-    title: 관리자 주문 정정·재주문·수동 체결 보정
-    trigger: 관리자 화면(주문 정정 — AdminTradesWorkbench)에서 사용자·계좌·전략을 고르고 재주문하거나 수동 체결 보정 API를 호출
+    title: 관리자 수동 체결 보정
+    trigger: 관리자가 수동 체결 보정 API를 호출
     summary: >-
-      관리자가 특정 사용자의 오늘 주문을 가격·수량·방향을 바꿔 다시 내거나(원본은 취소), 증권사 밖에서 체결된 거래를 장부에 반영한다.
+      관리자가 증권사 밖에서 체결된 거래를 장부에 반영한다.
       브라우저 → kista-ui → kista-api(관리자 권한·감사 로그) → 내부 HTTP → kista-trading(실제 처리) 순으로 흐른다.
     steps:
-      - id: select
-        lane: ui
-        to: [api]
-        title: 재주문 대상·시점 선택
-        desc: >-
-          관리자가 사용자 → 증권사 → 계좌 → 전략을 차례로 고르면 그 전략의 거래일(KST 04:30 이후면 다음 날 — 배치·바로 주문과 같은 기준) 주문 목록이 뜨고,
-          미체결(PLANNED·PLACED) 주문마다 새 가격·수량·방향과 주문 시점(장 시작 AT_OPEN·장마감 AT_CLOSE·즉시 IMMEDIATE)을 입력한다. 체결·취소·실패한 주문은 입력이 잠긴다.
-          시점 셀렉터는 지금 시장 단계에서 가능한 것만 활성화하고(휴장일이면 전부 비활성), 전략 상태(일시정지·재개) 토글도 같은 화면에 있다.
-          요청은 kista-ui의 /api/admin 중계 라우트가 Caddy 규칙상 kista-api(/api/admin/**, 스케쥴러 수동 실행만 kista-scheduler)로 보낸다.
-        code: [AdminTradeController#getReorderTiming, AdminAccountController#updateStrategyStatus]
-        fail: ADMIN이 아니면 403. 시점 조회가 실패하면 기존 값을 유지한다.
-
       - id: forward
         lane: api
         to: [trading]
         title: 내부 호출로 trading에 전달
         desc: >-
-          kista-api의 관리자 컨트롤러는 로직 없이 요청을 trading의 내부 API(/api/internal/trading/reorder, /trade-corrections)로 넘긴다.
-          브로커 취소·접수를 동기로 감싸는 쓰기 호출이라 응답 타임아웃이 긴 전용 클라이언트를 쓴다. trading이 돌려준 400·404·422·429는 관리자에게 같은 의미의 오류로 되살려 보여 준다.
-        code: [AdminTradeController#reorder, AdminTradeController#correctManualFills, TradingCommandHttpAdapter#reorder, TradingCommandHttpAdapter#correctManualFills, TradingInternalCommandController#reorder, TradingInternalCommandController#correctManualFills]
-        fail: 계좌·전략 없음 404, 소유 불일치·검증 실패 400, 증권사 자격증명 오류 422, 증권사 호출 한도 429. 그 밖의 장애는 500.
+          kista-api의 관리자 컨트롤러는 로직 없이 요청을 trading의 내부 API(/api/internal/trading/trade-corrections)로 넘긴다.
+          쓰기 호출이라 응답 타임아웃이 긴 전용 클라이언트를 쓴다. trading이 돌려준 400·404는 관리자에게 같은 의미의 오류로 되살려 보여 준다.
+          요청은 kista-ui의 /api/admin 중계 라우트가 Caddy 규칙상 kista-api(/api/admin/**)로 보낸다.
+        code: [AdminTradeController#correctManualFills, TradingCommandHttpAdapter#correctManualFills, TradingInternalCommandController#correctManualFills]
+        fail: ADMIN이 아니면 403. 계좌·전략 없음 404, 소유 불일치·검증 실패 400. 그 밖의 장애는 500.
 
       - id: select-chain
         lane: trading
         to: [db]
         title: 대상 선택 체인 검증
         desc: >-
-          계좌가 지정한 사용자 소유인지, 전략이 그 계좌 소속인지, 주문이 그 계좌 소속인지 확인한다. 재주문은 추가로 원본 주문이 현재 전략 사이클의
-          미체결(PLANNED·PLACED) 주문이어야 하고 가격·수량이 양수여야 한다 — 체결된 주문 위에 같은 주문이 중복으로 나가지 않도록(체결분은 수동 체결 보정).
-        code: [SelectionChain#resolveAndValidate, ReorderService#reorder]
+          계좌가 지정한 사용자 소유인지, 전략이 그 계좌 소속인지 확인한다.
+        code: [SelectionChain#resolveAndValidate]
         fail: 어긋나면 400(내부 호출이 400으로 되살아 관리자 화면에 거절 사유가 표시된다).
-
-      - id: timing-check
-        lane: trading
-        to: [db]
-        title: 휴장일·주문 시점 서버 재검증
-        desc: >-
-          화면에서 막았더라도 서버가 원본을 건드리기 전에 다시 확인한다. 현재 거래일(KST 04:30 경계 — 화면 시점 조회와 같은 기준)이 휴장이 아닌지, 선택한 시점이 지금 시장 단계에서 허용되는지, 재주문 거래일이 현재 거래일인지 본다.
-          개장 전에는 AT_OPEN·AT_CLOSE, 개장 후에는 AT_CLOSE·IMMEDIATE만 허용하고, 장마감 직후부터 프리마켓 전과 주말은 모두 불가다.
-        code: [DstInfo#reorderTimingAvailabilityAt, MarketCalendarPort#isMarketOpen]
-        fail: 400 "휴장일에는 재주문할 수 없습니다", "현재 시장 단계에서는 이 접수 방식을 사용할 수 없습니다." 또는 "현재 거래일(...) 주문으로만 재주문할 수 있습니다".
-
-      - id: cancel-source
-        lane: trading
-        to: [broker, db]
-        title: 원본 주문 취소
-        desc: >-
-          시점 검증을 통과한 뒤에만 원본을 취소한다. 원본이 PLANNED면 DB에서만 CANCELLED로, PLACED면 증권사 취소 후 CANCELLED로 바꾸고 취소 직후 체결분을 기록한다(조회 실패는 무시).
-        code: [ReorderService#reorder, CancelledOrderFillRecorder#record]
-        state: "원본 orders → CANCELLED"
-        fail: >-
-          증권사 취소가 실패하면 예외가 전파되어 재주문 전체가 중단된다(원본은 PLACED로 남는다).
-          PLANNED로 읽은 원본을 그 사이 배치가 접수했으면 400 "원본 주문 상태가 바뀌었습니다"로 중단한다(새 주문을 얹지 않는다).
-
-      - id: reorder-place
-        lane: trading
-        to: [broker, db]
-        title: 재주문 생성(예약 또는 즉시 접수)
-        desc: >-
-          원본의 종목·주문 유형·다리 정보를 이어받아 새 주문을 만든다(방향·거래일을 생략하면 원본 값). AT_OPEN·AT_CLOSE는 PLANNED로 저장만 하고 개장 배치·마감 배치가 접수한다.
-          IMMEDIATE는 먼저 PLANNED로 저장한 뒤 배치와 같은 선점 경로로 증권사에 접수한다 — 성공은 PLACED, 확정 거절은 FAILED, 결과 불명은 SUBMITTING으로 남기며 오류를 던지지 않는다. 저장이 실패하면 증권사에 보내지 않는다. BUY는 원본 취소 전에 전략 원장 잔여 + 원본 미체결분 환급을 넘으면 거절한다(PLACED 원본은 체결 조회, 실패 시 거절) — 화면의 BUY 예산 조회는 경고용이다.
-        code: [Order#reorder, ReorderService#reorder, OrderSubmitter#submit]
-        state: "새 orders → PLANNED(AT_OPEN·AT_CLOSE) / PLACED·FAILED·SUBMITTING(IMMEDIATE)"
-        fail: >-
-          즉시 접수 실패는 응답 자체는 200이고 resultingStatus가 FAILED로 돌아온다(화면에는 재주문 처리 결과로 표시).
-          증권사 접수는 됐는데 DB 저장이 실패하면 FAILED로 쓰지 않고 PLACED로 응답하며 관리자에게 [DB 불일치] 알림을 보낸다(재시도로 중복 주문이 나가지 않도록).
 
       - id: audit
         lane: api
         to: [db]
         title: 감사 로그 기록
         desc: >-
-          trading 응답이 돌아오면 kista-api가 관리자 ID와 함께 재주문(REORDER) 감사 로그를 남긴다. 시점, 원본 주문의 이전 상태·가격·수량, 새 방향·가격·수량, 결과 상태, 메모가 들어간다.
-          수동 체결 보정은 처리 건수·사이클 종료 여부와 체결 명세(거래일·방향·수량·가격·외부 주문번호·메모)를 남긴다.
+          trading 응답이 돌아오면 kista-api가 관리자 ID와 함께 수동 체결 보정 감사 로그를 남긴다.
+          처리 건수·사이클 종료 여부와 체결 명세(거래일·방향·수량·가격·외부 주문번호·메모)를 남긴다.
           trading도 같은 요청을 자체 로그에 남겨 내부 엔드포인트를 직접 호출한 경우를 놓치지 않는다.
-        code: [AdminReorderService#reorder, AdminTradeCorrectionService#correctManualFills]
-        state: "audit_logs +1행 (REORDER / TRADE_MANUAL_CORRECTION)"
+        code: [AdminTradeCorrectionService#correctManualFills]
+        state: "audit_logs +1행 (TRADE_MANUAL_CORRECTION)"
 
       - id: correction
         lane: trading
@@ -1764,19 +1717,18 @@ lifecycles:
     transitions:
       - {to: PLANNED, title: 배치 원장 상한 판정 후 저장, code: [TradingCandidatePlanner#saveAllocatedOrders], tag: 개장·마감, flow: close-batch/plan}
       - {to: PLANNED, title: 수동 실행, code: [ManualTradingService#execute], tag: 사용자, flow: manual-run/allocate}
-      - {to: PLANNED, title: 관리자 재주문 (예약), desc: AT_OPEN/AT_CLOSE 재주문은 PLANNED로 저장한다., code: [ReorderService#reorder], tag: 관리자, flow: admin-orders/reorder-place}
       - {to: FILLED, title: 관리자 수동 체결 보정, desc: 증권사 밖에서 체결된 거래를 바로 FILLED로 기록한다., code: [ManualTradeCorrectionService#correctManualFills, Order#filledManual], tag: 관리자, flow: admin-orders/correction}
       - {from: PLANNED, to: SUBMITTING, title: 접수 직전 선점, desc: "행을 잠그고 PLANNED일 때만 바꾼 뒤 증권사에 보낸다. 그 사이 취소·삭제·재캡됐으면 보내지 않는다.", code: [OrderSubmitter#submit, TradingOrderExecutor#placeOrders, TradingOrderExecutor#placeAtOpenOrders], flow: close-batch/place}
       - {from: SUBMITTING, to: PLACED, title: 증권사 접수, desc: "SUBMITTING일 때만 기록한다. 기록이 실패하면 SUBMITTING으로 남아 자동 재접수되지 않는다(관리자 알림·런북 정정).", code: [OrderSubmitter#submit], flow: close-batch/place}
       - {from: SUBMITTING, to: PLACED, title: Toss 잔류 대사, desc: "다음 접수 경로 진입 시 선점 후 2~9분 지난 Toss 주문만 같은 멱등키(clientOrderId)로 재요청해 원 주문번호를 회수한다. KIS·창 밖은 관리자 알림 후 런북 정정.", code: [OrderSubmissionReconciler#reconcile], flow: close-batch/place}
       - {from: SUBMITTING, to: FAILED, title: 접수 확정 거절, desc: "송신 전 실패나 증권사 응답 거부만 FAILED. 연결 끊김·타임아웃·게이트웨이 5xx는 결과 불명으로 SUBMITTING 유지.", code: [OrderSubmitter#submit], flow: close-batch/place}
       - {from: PLANNED, to: CANCELLED, title: BUY cap 재보정, desc: 접수 직전 가격 cap이 바뀐 BUY는 취소하고 보정 주문을 새 PLANNED로 저장한다., code: [BuyOrderPriceCapper#capIfNeeded], flow: close-batch/place}
-      - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder, ReorderService#reorder], flow: manual-run/cancel-one}
+      - {from: PLANNED, to: CANCELLED, title: 사용자·관리자 취소, code: [OrderCancelService#cancelOrder], flow: manual-run/cancel-one}
       - {from: PLANNED, title: 사이클 단위 일괄 취소, desc: "전체 취소·일시정지·전략/계좌 삭제가 같은 규칙을 쓴다. 미접수 PLANNED는 상태를 바꾸지 않고 행을 지운다.", code: [OrderCancelService#cancelByCycle, OrderCancelService#cancelOpenOrders, OrderCancelStateWriter#deletePlanned], tag: 사용자, flow: manual-run/cancel-all}
       - {from: PLACED, to: FILLED, title: 전량 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: PARTIALLY_FILLED, title: 부분 체결 확인, code: [TradingReporter#markFilledOrders], flow: close-batch/order-status}
       - {from: PLACED, to: CANCELLED, title: 미체결 마감, desc: "체결이 없으면 취소로 기록한다(전 증권사 마감 전 명시 취소, 이미 종결된 주문은 CancelOutcome 반환으로 알림 없이 넘김).", code: [TradingReporter#markFilledOrders, TradingReporter#cancelUnresolvedOrders], flow: close-batch/order-status}
-      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelOpenOrders, ReorderService#reorder], flow: manual-run/cancel-one}
+      - {from: PLACED, to: CANCELLED, title: 사용자·관리자 취소, desc: 증권사 취소 성공 뒤에 기록한다., code: [OrderCancelService#cancelOrder, OrderCancelService#cancelOpenOrders], flow: manual-run/cancel-one}
 
   batch-run:
     title: 매매 배치 체크포인트

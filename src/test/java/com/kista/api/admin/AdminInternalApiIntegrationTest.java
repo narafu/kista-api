@@ -1,17 +1,10 @@
 package com.kista.api.admin;
 
-import com.kista.shared.kernel.OrderStatus;
-import com.kista.api.admin.application.port.output.TradingCommandPort;
-import com.kista.api.admin.application.usecase.AdminReorderUseCase;
 import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
-import com.kista.shared.contract.trading.ReorderRequest;
-import com.kista.shared.contract.trading.ReorderResponse;
-import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
-import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.TimeZones;
@@ -32,9 +25,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-// admin의 reorder/trade-correction이 실제로 /api/internal/trading/** HTTP 왕복을 거쳐 trading-core에 도달하는지 검증
+// admin의 trade-correction이 실제로 /api/internal/trading/** HTTP 왕복을 거쳐 trading-core에 도달하는지 검증
 // (mocked port 아님) — MOCK 브로커 계좌 + 실 DB 픽스처로 전체 Spring 컨텍스트를 띄운다.
 // 서버가 자기 자신을 호출하므로 internal.api.base-url이 실제 리스닝 포트를 가리켜야 한다 — RANDOM_PORT는
 // InternalApiClientConfig의 @ConfigurationProperties가 bean 생성 시점(웹서버 기동 전)에 base-url을 eager
@@ -59,9 +51,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @Execution(ExecutionMode.SAME_THREAD) // 실 DB 연결 + 고정 포트 — 병렬 실행 시 트랜잭션/포트 충돌 방지 관례
 class AdminInternalApiIntegrationTest {
 
-    @Autowired private AdminReorderUseCase adminReorderUseCase;
     @Autowired private AdminTradeCorrectionUseCase adminTradeCorrectionUseCase;
-    @Autowired private TradingCommandPort tradingCommandPort; // reorder 가용성 실측 + 배선 확인용
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private AccountPort accountPort; // account_no/app_key/secret_key는 AES-GCM 암호화 컬럼이라 raw INSERT 불가 — 실 어댑터로 생성
 
@@ -77,68 +67,6 @@ class AdminInternalApiIntegrationTest {
             jdbcTemplate.update("DELETE FROM users WHERE id = ?", userId);
         }
         createdUserIds.clear();
-    }
-
-    @Test
-    void MOCK_계좌_재주문이_내부_API를_왕복해_PLANNED로_접수된다() {
-        // 재주문 접수는 실시간 KST 요일/시각(DstInfo)에 무조건 게이팅된다(BLOCKED 시간대·주말 전부 불가) —
-        // 테스트 클럭을 주입할 수 없으므로 실제 가용성을 먼저 조회(=배선 검증 겸용)하고, 불가 구간이면 스킵한다.
-        ReorderTimingAvailabilityResponse avail = tradingCommandPort.reorderTimingAvailability();
-        assumeTrue(avail.atClose(), "BLOCKED 시간대 또는 주말 — 지금은 재주문 접수가 불가능한 구간이라 스킵");
-
-        UUID userId = UUID.randomUUID();
-        createdUserIds.add(userId);
-        UUID strategyId = UUID.randomUUID();
-        UUID versionId = UUID.randomUUID();
-        UUID cycleId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
-        LocalDate today = LocalDate.now(TimeZones.KST);
-
-        seedMarketHoliday(today); // 휴장일 캘린더 데이터 없으면 isMarketOpen()이 무조건 폐장으로 폴백
-
-        jdbcTemplate.update(
-                "INSERT INTO users (id, kakao_id, status, role, created_at, updated_at) VALUES (?, ?, 'ACTIVE', 'USER', now(), now())",
-                userId, "kakao_" + userId);
-        UUID accountId = insertMockAccount(userId);
-        jdbcTemplate.update(
-                "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) "
-                        + "VALUES (?, ?, 'INFINITE', 'SOXL', 'ACTIVE', 'NONE', now(), now())",
-                strategyId, accountId);
-        jdbcTemplate.update(
-                "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, 1, now())",
-                versionId, strategyId);
-        jdbcTemplate.update(
-                "INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) "
-                        + "VALUES (?, ?, ?, ?, ?, now())",
-                cycleId, strategyId, versionId, new BigDecimal("1000.00"), today);
-        jdbcTemplate.update(
-                "INSERT INTO orders (id, account_id, strategy_cycle_id, trade_date, ticker, order_type, timing, direction, price, quantity, status, created_at, updated_at) "
-                        + "VALUES (?, ?, ?, ?, 'SOXL', 'LOC', 'AT_CLOSE', 'BUY', ?, ?, 'PLANNED', now(), now())",
-                orderId, accountId, cycleId, today, new BigDecimal("20.00"), 1);
-
-        ReorderRequest command = new ReorderRequest(
-                userId, accountId, strategyId, orderId,
-                OrderTiming.AT_CLOSE, today, OrderDirection.BUY, 2, new BigDecimal("21.00"), "통합테스트");
-
-        ReorderResponse result = adminReorderUseCase.reorder(userId, command); // adminId는 감사 로그 FK용 — 소유자 재사용
-
-        assertThat(result.sourceOrderId()).isEqualTo(orderId);
-        assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLANNED);
-
-        // 실제 HTTP 왕복이 DB까지 반영됐는지 — 원본 주문 취소 + 신규 PLANNED 주문 생성
-        Integer cancelledCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM orders WHERE id = ? AND status = 'CANCELLED'", Integer.class, orderId);
-        assertThat(cancelledCount).isEqualTo(1);
-
-        Integer newPlannedCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM orders WHERE strategy_cycle_id = ? AND status = 'PLANNED' AND id != ? AND quantity = 2",
-                Integer.class, cycleId, orderId);
-        assertThat(newPlannedCount).isEqualTo(1);
-
-        Integer auditCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM audit_logs WHERE admin_id = ? AND action = 'REORDER' AND target_id = ?",
-                Integer.class, userId, orderId);
-        assertThat(auditCount).isEqualTo(1);
     }
 
     @Test

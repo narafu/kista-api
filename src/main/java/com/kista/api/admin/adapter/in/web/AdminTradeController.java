@@ -1,19 +1,13 @@
 package com.kista.api.admin.adapter.in.web;
 
 import com.kista.api.admin.adapter.in.web.dto.AdminManualTradeCorrectionRequest;
-import com.kista.api.admin.adapter.in.web.dto.AdminReorderRequest;
-import com.kista.api.admin.adapter.in.web.dto.AdminReorderResponse;
 import com.kista.api.admin.adapter.in.web.dto.AdminTradeCorrectionResponse;
 import com.kista.api.admin.adapter.in.web.dto.AdminTradeResponse;
-import com.kista.api.admin.adapter.in.web.dto.ReorderBuyBudgetResponse;
-import com.kista.api.admin.adapter.in.web.dto.ReorderTimingAvailabilityResponse;
 import com.kista.shared.contract.account.AccountSummaryResponse;
 import com.kista.shared.contract.trading.OrderResponse;
 import com.kista.shared.contract.trading.StrategySummaryResponse;
 import com.kista.api.user.domain.model.UserSummary;
-import com.kista.api.admin.application.port.output.TradingCommandPort;
 import com.kista.api.admin.application.usecase.AdminQueryUseCase;
-import com.kista.api.admin.application.usecase.AdminReorderUseCase;
 import com.kista.api.admin.application.usecase.AdminTradeCorrectionUseCase;
 import com.kista.api.admin.application.usecase.AdminUserUseCase;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,8 +43,6 @@ public class AdminTradeController {
     private final AdminQueryUseCase adminQuery;  // 거래·계좌 조회 (최근 30일 전체, accountId → userId 매핑)
     private final AdminUserUseCase adminUser;   // userId → nickname 매핑용
     private final AdminTradeCorrectionUseCase adminTradeCorrection; // 관리자 수동 체결 보정
-    private final AdminReorderUseCase adminReorder;                 // 관리자 재주문
-    private final TradingCommandPort tradingCommandPort;            // 재주문 시점 가용성 조회(개장 여부 판정 포함)
 
     // 전체 거래 내역 목록 — 일괄 조회로 N+1 방지
     @Operation(summary = "전체 거래 내역 조회", description = "일괄 조회로 N+1을 방지합니다. from/to로 기간 필터링 가능합니다.")
@@ -99,31 +91,6 @@ public class AdminTradeController {
             @RequestBody @Valid AdminManualTradeCorrectionRequest request) {
         return AdminTradeCorrectionResponse.from(
                 adminTradeCorrection.correctManualFills(adminId, request.toCommand()));
-    }
-
-    // 재주문 시점 가용성 조회 — UI 주문시점 셀렉터 disable 판단용
-    @Operation(summary = "재주문 시점 가용성 조회", description = "UI 주문시점 셀렉터의 disable 여부 판단에 사용합니다.")
-    @GetMapping("/trades/reorder-timing")
-    public ReorderTimingAvailabilityResponse getReorderTiming() {
-        // 개장 여부 판정은 trading-core 쪽 내부 API 구현부(MarketCalendarPort.isMarketOpen)로 이관됨
-        return ReorderTimingAvailabilityResponse.from(tradingCommandPort.reorderTimingAvailability());
-    }
-
-    // BUY 재주문 예산 조회 — UI 경고용, 서버 차단 없음
-    @Operation(summary = "BUY 재주문 예산 일괄 조회", description = "같은 계좌 원본 주문 1~50건. 원본 주문의 BUY 재주문 가용액 = cycleRemaining[원본 strategyCycleId] + 해당 원본의 sourceRefunds. DCA 사이클은 원장 상한이 없어 cycleRemaining에 키가 없습니다.")
-    @GetMapping("/trades/reorder-buy-budget")
-    public ReorderBuyBudgetResponse getReorderBuyBudget(
-            @RequestParam List<UUID> orderIds,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate tradeDate) {
-        return ReorderBuyBudgetResponse.from(tradingCommandPort.reorderBuyBudget(orderIds, tradeDate));
-    }
-
-    @Operation(summary = "관리자 재주문")
-    @PostMapping("/trades/reorders")
-    public AdminReorderResponse reorder(
-            @AuthenticationPrincipal UUID adminId,
-            @RequestBody @Valid AdminReorderRequest request) {
-        return AdminReorderResponse.from(adminReorder.reorder(adminId, request.toCommand()));
     }
 
     // accountId → AccountSummaryResponse 전체 매핑 (N+1 방지용 일괄 조회)

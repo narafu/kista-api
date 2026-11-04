@@ -1,14 +1,7 @@
 package com.kista.api.admin.adapter.out.internal;
 
-import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.contract.trading.TradeCorrectionRequest;
-import com.kista.shared.contract.trading.ReorderRequest;
-import com.kista.shared.contract.trading.ReorderResponse;
-import com.kista.shared.contract.trading.ReorderTimingAvailabilityResponse;
-import com.kista.api.admin.domain.model.AdminBrokerCredentialException;
-import com.kista.api.admin.domain.model.AdminBrokerRateLimitException;
 import com.kista.shared.contract.trading.TradeCorrectionResponse;
-import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyStatus;
 import mockwebserver3.MockResponse;
@@ -47,19 +40,12 @@ class TradingCommandHttpAdapterTest {
                 .baseUrl(server.url("/").toString())
                 .requestFactory(new HttpComponentsClientHttpRequestFactory(httpClient))
                 .build();
-        // 테스트에서는 read/write 타임아웃 분리가 무의미하므로 동일 클라이언트를 양쪽에 주입
-        adapter = new TradingCommandHttpAdapter(client, client);
+        adapter = new TradingCommandHttpAdapter(client);
     }
 
     @AfterEach
     void tearDown() throws IOException {
         server.close();
-    }
-
-    private static ReorderRequest reorderCommand() {
-        return new ReorderRequest(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                OrderTiming.AT_CLOSE, LocalDate.of(2026, 7, 1), OrderDirection.SELL,
-                2, new BigDecimal("250.00"), "memo");
     }
 
     private static TradeCorrectionRequest correctionCommand() {
@@ -70,29 +56,6 @@ class TradingCommandHttpAdapterTest {
     }
 
     // --- 정상 경로 ---
-
-    @Test
-    void reorder_요청_경로와_바디를_전송하고_응답을_역직렬화한다() throws InterruptedException {
-        UUID orderId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        ReorderRequest command = reorderCommand();
-        server.enqueue(new MockResponse.Builder()
-                .code(200).addHeader("Content-Type", "application/json")
-                .body("""
-                    {"userId":"%s","accountId":"%s","strategyId":"%s","sourceOrderId":"%s",
-                     "originalStatus":"PLANNED","resultingStatus":"PLANNED","newOrderExternalId":null}
-                    """.formatted(userId, command.accountId(), command.strategyId(), orderId))
-                .build());
-
-        ReorderResponse result = adapter.reorder(command);
-
-        assertThat(result.sourceOrderId()).isEqualTo(orderId);
-        assertThat(result.originalStatus()).isEqualTo(OrderStatus.PLANNED);
-        assertThat(result.resultingStatus()).isEqualTo(OrderStatus.PLANNED);
-        RecordedRequest recorded = server.takeRequest();
-        assertThat(recorded.getTarget()).isEqualTo("/api/internal/trading/reorder");
-        assertThat(recorded.getMethod()).isEqualTo("POST");
-    }
 
     @Test
     void correctManualFills_요청_경로와_바디를_전송하고_응답을_역직렬화한다() throws InterruptedException {
@@ -119,113 +82,9 @@ class TradingCommandHttpAdapterTest {
         assertThat(recorded.getMethod()).isEqualTo("POST");
     }
 
-    @Test
-    void reorderTimingAvailability_응답을_역직렬화한다() throws InterruptedException {
-        server.enqueue(new MockResponse.Builder()
-                .code(200).addHeader("Content-Type", "application/json")
-                .body("""
-                    {"atOpen":true,"atClose":true,"immediate":false}
-                    """)
-                .build());
-
-        ReorderTimingAvailabilityResponse result = adapter.reorderTimingAvailability();
-
-        assertThat(result.atOpen()).isTrue();
-        assertThat(result.atClose()).isTrue();
-        assertThat(result.immediate()).isFalse();
-        RecordedRequest recorded = server.takeRequest();
-        assertThat(recorded.getTarget()).isEqualTo("/api/internal/trading/reorder-timing-availability");
-        assertThat(recorded.getMethod()).isEqualTo("GET");
-    }
-
-    @Test
-    void reorderBuyBudget_쿼리파라미터를_실어_응답을_역직렬화한다() throws InterruptedException {
-        server.enqueue(new MockResponse.Builder()
-                .code(200).addHeader("Content-Type", "application/json")
-                .body("""
-                    {"cycleRemaining":{"33333333-3333-3333-3333-333333333333":1000},"sourceRefunds":{"11111111-1111-1111-1111-111111111111":200}}
-                    """)
-                .build());
-        UUID orderId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-        UUID other = UUID.fromString("22222222-2222-2222-2222-222222222222");
-
-        var result = adapter.reorderBuyBudget(List.of(orderId, other), java.time.LocalDate.of(2026, 10, 6));
-
-        assertThat(result.cycleRemaining().get(UUID.fromString("33333333-3333-3333-3333-333333333333"))).isEqualByComparingTo("1000");
-        assertThat(result.sourceRefunds().get(orderId)).isEqualByComparingTo("200");
-        RecordedRequest recorded = server.takeRequest();
-        assertThat(recorded.getTarget()).isEqualTo("/api/internal/trading/reorder-buy-budget?orderIds=" + orderId
-                + "&orderIds=" + other + "&tradeDate=2026-10-06");
-        assertThat(recorded.getMethod()).isEqualTo("GET");
-    }
-
-    @Test
-    void reorderBuyBudget_400은_IllegalArgument_404는_NoSuchElement로_변환한다() {
-        server.enqueue(new MockResponse.Builder().code(400).build());
-        server.enqueue(new MockResponse.Builder().code(404).build());
-
-        assertThatThrownBy(() -> adapter.reorderBuyBudget(List.of(UUID.randomUUID()), null))
-                .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> adapter.reorderBuyBudget(List.of(UUID.randomUUID()), null))
-                .isInstanceOf(NoSuchElementException.class);
-    }
-
     // --- 실패 모드 변환 ---
     // trading-core 쪽 GlobalExceptionHandler(전역 공유)가 매핑한 상태코드를 admin의
     // GlobalExceptionHandler가 다시 매핑할 수 있는 원래 예외 타입으로 되돌려야 한다.
-
-    @Test
-    void reorder_404_응답은_NoSuchElementException으로_변환된다() {
-        server.enqueue(new MockResponse.Builder().code(404).build());
-
-        assertThatThrownBy(() -> adapter.reorder(reorderCommand()))
-                .isInstanceOf(NoSuchElementException.class);
-    }
-
-    @Test
-    void reorder_400_응답은_IllegalArgumentException으로_변환된다() {
-        server.enqueue(new MockResponse.Builder().code(400).build());
-
-        assertThatThrownBy(() -> adapter.reorder(reorderCommand()))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    // trading 쪽 GlobalExceptionHandler가 ProblemDetail.detail에 실은 실제 거절 사유가
-    // 고정 문구로 뭉개지지 않고 admin 운영자에게 그대로 전달돼야 한다
-    @Test
-    void reorder_400_응답의_ProblemDetail_상세메시지를_그대로_전달한다() {
-        server.enqueue(new MockResponse.Builder()
-                .code(400).addHeader("Content-Type", "application/problem+json")
-                .body("""
-                    {"type":"about:blank","title":"Invalid Request","status":400,
-                     "detail":"현재 시장 단계에서 IMMEDIATE 접수가 불가합니다"}
-                    """)
-                .build());
-
-        assertThatThrownBy(() -> adapter.reorder(reorderCommand()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("현재 시장 단계에서 IMMEDIATE 접수가 불가합니다");
-    }
-
-    @Test
-    void reorder_422_응답은_AdminBrokerCredentialException으로_변환된다() {
-        server.enqueue(new MockResponse.Builder().code(422).build());
-
-        assertThatThrownBy(() -> adapter.reorder(reorderCommand()))
-                .isInstanceOf(AdminBrokerCredentialException.class);
-    }
-
-    @Test
-    void reorder_429_응답은_AdminBrokerRateLimitException으로_변환된다() throws InterruptedException {
-        // 자동 재시도 비활성화 — 429 응답 1건만으로 즉시 매핑돼야 한다(실제 브로커 주문을
-        // 유발하는 쓰기 요청을 라이브러리 기본값으로 재전송하면 안 됨 — InternalApiClientConfig 참고)
-        server.enqueue(new MockResponse.Builder().code(429).build());
-
-        assertThatThrownBy(() -> adapter.reorder(reorderCommand()))
-                .isInstanceOf(AdminBrokerRateLimitException.class);
-
-        assertThat(server.getRequestCount()).isEqualTo(1);
-    }
 
     @Test
     void correctManualFills_404_응답은_NoSuchElementException으로_변환된다() {

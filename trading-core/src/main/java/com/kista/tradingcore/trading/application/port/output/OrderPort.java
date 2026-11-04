@@ -18,7 +18,7 @@ public interface OrderPort {
     // 계획 주문 일괄 저장 (신규 PLANNED 상태)
     void saveAll(List<Order> orders);
 
-    // 주문 단건 저장 후 id가 채워진 도메인 반환 (재주문 즉시 접수 — 선점 전 id 확보용)
+    // 주문 단건 저장 후 id가 채워진 도메인 반환 (선점 전 id 확보용)
     Order save(Order order);
 
     // 특정 사이클·날짜의 PLANNED 주문 조회 (waitForOrderTime 이후 실행 단계에서 호출)
@@ -27,7 +27,7 @@ public interface OrderPort {
     // 특정 사이클·날짜의 PLACED 주문 조회 (수동 실행 감지 및 이중 실행 방지용)
     List<Order> findPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
-    // 특정 사이클·거래일의 CANCELLED 주문 조회 (당일 취소·재주문 전 부분 체결분의 원장 반영용 — 체결 필터의 자기 주문 판정)
+    // 특정 사이클·거래일의 CANCELLED 주문 조회 (당일 취소 전 부분 체결분의 원장 반영용 — 체결 필터의 자기 주문 판정)
     List<Order> findCancelledByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate);
 
     // 증권사 접수 직전 선점 — PLANNED에서만 SUBMITTING 전이, 그 사이 취소·삭제·재캡됐으면 OrderStateConflictException(HTTP를 보내지 않는다)

@@ -95,14 +95,6 @@ public record Order(
                 OrderStatus.PLANNED, null, null, null);
     }
 
-    // 관리자 재주문용 PLANNED 신규 주문 — 원본에서 계좌·사이클·종목·주문유형 승계, direction/price/timing 명시 재정의
-    public static Order reorder(Order source, LocalDate tradeDate, OrderDirection direction,
-                                int quantity, BigDecimal price, OrderTiming timing) {
-        return new Order(null, source.accountId(), source.strategyCycleId(), tradeDate,
-                source.ticker(), source.orderType(), timing, direction, source.orderLeg(), BigDecimal.valueOf(quantity), price,
-                OrderStatus.PLANNED, null, null, null);
-    }
-
     // 전략 주문 다리 식별자만 교체한 새 주문
     public Order withLeg(String newLeg) {
         return new Order(id, accountId, strategyCycleId, tradeDate, ticker,

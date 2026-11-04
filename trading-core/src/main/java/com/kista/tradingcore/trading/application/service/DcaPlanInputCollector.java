@@ -108,7 +108,7 @@ class DcaPlanInputCollector {
             LocalDate usSession = marketCalendarPort.usSessionDateOf(tradeDate);
             if (!DcaSchedule.isExecutionDay(usSession, rule, marketCalendarPort::isUsSessionOpen)) continue;
 
-            // PLANNED/PLACED 외 상태(FILLED 등)로 넘어간 당일 규칙 주문 — 이력만 누락된 경우 재주문하지 않고 복구
+            // PLANNED/PLACED 외 상태(FILLED 등)로 넘어간 당일 규칙 주문 — 이력만 누락된 경우 다시 접수하지 않고 복구
             if (todayOrders == null) todayOrders = orderPort.findByStrategyId(strategy.id(), tradeDate, tradeDate);
             Optional<Order> terminal = todayOrders.stream().filter(o -> rule.orderLeg().equals(o.orderLeg())).findFirst();
             if (terminal.isPresent()) {
