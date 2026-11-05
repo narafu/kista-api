@@ -8,3 +8,11 @@ com.kista.api.web/       ← Spring Modulith 앱셸 모듈. `@ApplicationModule(
   AdminSchedulerController ← benchmark "schedule" 소비 — KbLand 스케쥴러 수동 트리거(`/api/admin/scheduler/kbland-*`). 클래스 레벨 `@ConditionalOnProperty(scheduler.enabled)`라 kista-api role에선 빈 미등록(오라우팅 시 404)
   dto/                 ← MetaBundle·EnumMeta·StrategyTypeMeta(`from(StrategyType)` — `StrategyType.capability()`에서 조립)·TickerMeta
   (유지 판단) GlobalExceptionHandler.reportErrorLog ← `TradingExceptionHandler.reportErrorLog`와 8줄 동형(발행 실패 격리)이지만 합치지 않는다. 합칠 자리가 없다 — `shared.platform`(`ProblemDetailMappings`)은 `shared.kernel`(`AppErrorRaisedEvent`)을 참조할 수 없고(`platform_must_not_depend_on_other_modules`), `kernel`은 JDK만 쓰는 outbound-zero라 `ApplicationEventPublisher`를 받는 헬퍼를 둘 수 없다. 합치려면 새 클래스가 필요하고 그 비용이 2곳·8줄 중복보다 크다(추출 기준: 3곳 이상). 3번째 호출처가 생기면 재검토
+
+### GlobalExceptionHandler 자동 예외 처리
+- Controller에서 catch/rethrow 하지 않는다 — 도메인 예외 → HTTP 코드 매핑은 `GlobalExceptionHandler`가 SSOT
+- **예외 매핑 SSOT**: advice별 `MAPPINGS` 테이블 하나가 기준이다 — `ProblemDetailMappings.withGeneric(...)` + `catchAll`로 처리하고, 같은 예외를 `@ExceptionHandler` 목록에 중복 나열하지 않는다(헤더·고유 로직이 필요한 전용 핸들러만 별도 메서드: `User.CooldownException`, `BrokerApiException`, 검증 실패 등)
+  - 범용 예외 타입 선택: 부재=`NoSuchElementException`(404, 고정 문구라 메시지에 진단용 id 허용), 상태=`IllegalStateException`, 입력=`IllegalArgumentException`(둘 다 400, 메시지 원문이 detail). application·domain의 IAE/ISE 리터럴은 "~니다."로 끝나야 한다 — 가드 `ExceptionMessageFormatTest`(기존 위반은 `exception-message-allowlist.txt`에 동결, 고치면 지운다)
+- **ProblemDetail 응답 계약**: `detail`은 사용자에게 그대로 보여줄 수 있는 한국어 문구다(완전한 문장은 "~습니다."+마침표). 내부 정보(URL·응답 바디·계좌번호·enum 원문·영어 프레임워크 메시지)는 detail에 싣지 말고 로그로 — 영어 내부 정보인 프레임워크 예외는 `Mapping.fixedDetail`로 고정 문구를 쓴다. 예외: 검증 실패(`MethodArgumentNotValidException`)는 "[field: message]" 형식 유지
+- **기계 판독 코드 `code`**: UI가 분기하거나 문구를 달리 보여줘야 하는 예외만 `ErrorCode`(`com.kista.shared.platform.web`)를 `Mapping`에 지정한다. 상수 이름 변경·삭제 금지(kista-ui 계약). 추가 절차: ① `ErrorCode` 상수 ② 핸들러 `Mapping(status, title, code, fixedDetail)` ③ 같은 예외 클래스가 여러 의미면 서브클래스 분리(`resolve()`가 계층 하위부터 탐색 — 예: `AlreadyOrderedTodayException`) ④ openapi는 `ErrorCodeOpenApiCustomizer`가 자동 반영 → kista-ui `gen:types` + 문구 매핑
+- **내부 API 경유 한계**: root 내부 API 어댑터는 trading-core 응답의 status만 보고 `Admin*` 예외를 되살린다. 같은 status에 서로 다른 코드가 실려 오는 경로가 생기면 `InternalApiErrorDetails`가 `code`도 읽어 전달하도록 확장한다

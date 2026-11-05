@@ -6,7 +6,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 
 - 작업이 아래 "위치"에 적힌 파일이나 패키지를 건드리면 그 항목도 같은 작업에서 처리한다. 원장 전체를 읽지 말고 건드리는 파일명으로 grep해(`grep -n '<파일명>' docs/agents/code-quality-backlog.md`) 걸린 항목만 읽는다. 범위가 크면 착수 전에 사용자에게 알린다.
 - 처리하면 "상태"를 `done(<커밋 해시>)`로 바꾸고, 그 항목의 "가드"도 함께 넣는다.
-- 작업 중 새로 발견한 비일관성·중복은 같은 형식으로 추가한다. 근거는 grep으로 확인한 file:line만 적는다(`constraints.md` "증거 의무"). 추정은 "미확인"이라고 명시한다.
+- 작업 중 새로 발견한 비일관성·중복은 같은 형식으로 추가한다. 근거는 grep으로 확인한 file:line만 적는다(`own-type-ledger.md` "증거 의무"). 추정은 "미확인"이라고 명시한다.
 - 추출 기준은 CLAUDE.md "코드 철학"을 따른다. 같은 로직이 3곳 이상이고 같은 이유로 함께 바뀌면 추출한다. 2곳이거나 바뀌는 이유가 다르면 "유지 목록"에 이유를 남겨 재제안하지 않는다.
 - 매매 공식(`modules/tradingcore/trading-formulas.md`)에 닿는 항목은 위험을 "높음"으로 둔다. 공식 결과를 바꾸지 않는다는 테스트를 먼저 고정한 뒤 손댄다.
 - 재논의 금지: 메모리 `project_review_refactor_2026_10_31`, `project_2026_07_11_full_review`, `own-type-ledger.md`, `constraints.md`의 확정 판단. 감사 중 그와 겹친 발견은 "유지 목록"에 출처를 적었다.
@@ -89,11 +89,11 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `stats/application/service/AccountStatisticsService.java:125-132`(`resolveFrom/To`). 위와 문자 그대로 같다.
   - `stats/application/service/TradingStatsService.java:133`
   - `stats/application/service/InvestmentPointsQueryService.java:74`
-- 기준 패턴: `atStartOfDay(TimeZones.KST)` 관용구(`constraints.md` "시간 기준 정책"). 반개구간 상한 `to.plusDays(1).atStartOfDay(KST).toInstant()`를 `shared/platform/time` 헬퍼 하나로 둔다. 예: `KstDays.endExclusive(LocalDate)`.
+- 기준 패턴: `atStartOfDay(TimeZones.KST)` 관용구(`modules/shared/platform.md` "시간 기준 정책"). 반개구간 상한 `to.plusDays(1).atStartOfDay(KST).toInstant()`를 `shared/platform/time` 헬퍼 하나로 둔다. 예: `KstDays.endExclusive(LocalDate)`.
 - 근거: `grep 'plusDays(1).atStartOfDay(TimeZones.KST)'` 결과 4건/4파일. 셋 다 to가 null이면 `LocalDate.now(TimeZones.KST)`로 채운다.
 - 예상 효과: 조회 범위 경계 규칙을 일원화한다.
 - 위험: 낮음.
-- 가드(`constraints.md` "시간 기준 정책"에 추가할 문장 초안): "KST 일자 구간을 Instant로 바꿀 때는 `<헬퍼>`를 쓴다. `plusDays(1).atStartOfDay(...)`를 인라인하지 않는다."
+- 가드(`modules/shared/platform.md` "시간 기준 정책"에 추가할 문장 초안): "KST 일자 구간을 Instant로 바꿀 때는 `<헬퍼>`를 쓴다. `plusDays(1).atStartOfDay(...)`를 인라인하지 않는다."
 - 상태: done(5e1b51443). 헬퍼는 `shared/kernel/KstDays.endExclusive`에 뒀다(platform은 kernel의 `TimeZones`를 참조할 수 없음 — `platform_must_not_depend_on_other_modules`). null 기본값은 호출부에 남겼다(CQ-17 Clock 주입과 충돌 방지).
 
 ### CQ-05 사용자 경로 예외 문구 형식 미준수
@@ -127,7 +127,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
     - `CycleOrderComputer.java:90,92,96`
     - `StrategyDetailAssembler.java:42,119`
     - `support/TradingBalanceLoader.java:36`
-- 기준 패턴: `constraints.md` "ProblemDetail 응답 계약". detail은 한국어 완전문장 "~습니다."이고 마침표를 찍으며 내부 정보를 싣지 않는다. 준수 예: `OrderCancelService.java:62,161,180,187,196`.
+- 기준 패턴: `modules/api/web.md` "ProblemDetail 응답 계약". detail은 한국어 완전문장 "~습니다."이고 마침표를 찍으며 내부 정보를 싣지 않는다. 준수 예: `OrderCancelService.java:62,161,180,187,196`.
 - 근거:
   - `ProblemDetailMappings.GENERIC` ✔는 `IllegalArgumentException`과 `IllegalStateException`을 400으로 매핑하고, 메시지 원문을 그대로 detail로 쓴다. `NoSuchElementException`만 고정 문구다.
   - 자동 분류(배치·어댑터 포함, 188건): 마침표 없음 88, 마침표 없음+내부값 50, 준수 40, 준수+값 5, 영어 5.
@@ -231,7 +231,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 같은 의미가 404 또는 400으로 다르게 응답된다.
 - 예상 효과: HTTP 상태 일관성.
 - 위험: 낮음~중간. 응답 상태코드가 바뀐다. kista-ui가 상태코드로 분기하는지는 착수 시 확인한다.
-- 가드: CQ-05 테스트와 함께 `constraints.md` "예외 매핑 SSOT"에 "부재=NoSuchElement, 상태=ISE, 입력=IAE" 한 줄을 추가한다.
+- 가드: CQ-05 테스트와 함께 `modules/api/web.md` "예외 매핑 SSOT"에 "부재=NoSuchElement, 상태=ISE, 입력=IAE" 한 줄을 추가한다.
 - 상태: done. 활성 사이클·DCA 설정·주문·사이클 부재는 NSE, `ManualTradingService` 상태 위반은 ISE로 통일했다. kista-ui는 detail 문자열로 분기하지 않고(`apiMsg` 표시만), 상태코드 분기는 preview 404(`orderBannerCopy.ts:60`) 하나라 영향이 없다. `ReorderBuyBudgetService`·`ReorderService` 주문 부재는 400에서 404로 바뀐다.
 
 ### CQ-14 KIS·Toss 일반 호출의 429가 `BrokerRateLimitException`으로 변환되지 않음
@@ -567,7 +567,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `CycleSnapshotCreator` `LocalDate.now(KST)` | `CycleSnapshotCreator.java:97` | 주석에 "r.today()(다음 거래일)와 다르다"고 명시돼 있다. |
 | `DcaSummaryAssembler` `plusDays(1)` | `DcaSummaryAssembler.java:58-62` ✔ | KST 안에서 다음 실행 후보일을 계산한다. 기준 변환(KST↔US, 발행일↔거래일)이 아니다. |
 | 조회 범위 `minusDays`/`plusDays` | `KisTradingApi:174`, `MeritzOrderApi:156-157`, `TradingCycleController:224`, `UpbitExchangeAdapter:118` 등 | 단순 조회 창이다. 기준 변환이 아니다. |
-| stats 크립토 `ZoneOffset.UTC` | `CoinMarketCapAdapter`, `CoinbaseMarketDataAdapter`, `MempoolBlockHeightAdapter`, `BinanceMarketDataAdapter`, `CryptoPremiums:81`, `CryptoMarketIndicatorService:110,159,248` | 외부 원본(UTC 일봉)을 그대로 유지한다(`constraints.md` "외부 원본 참조 데이터"). Toss 캔들 커서(`TossPriceApi.java:57,99`)가 UTC인 것이 API 요구인지는 미확인이다. |
+| stats 크립토 `ZoneOffset.UTC` | `CoinMarketCapAdapter`, `CoinbaseMarketDataAdapter`, `MempoolBlockHeightAdapter`, `BinanceMarketDataAdapter`, `CryptoPremiums:81`, `CryptoMarketIndicatorService:110,159,248` | 외부 원본(UTC 일봉)을 그대로 유지한다(`modules/shared/platform.md` "외부 원본 참조 데이터"). Toss 캔들 커서(`TossPriceApi.java:57,99`)가 UTC인 것이 API 요구인지는 미확인이다. |
 | 총자산 계산 5곳 | `InfinitePosition.java:43`, `CycleSnapshotCreator.java:100-104`, `CyclePosition.java:66-70`, `CyclePositionHistoryEntry.java:36`, `VrCycleRolloverService.java:142` ✔ | 의미가 서로 다르다: 종가/평단 폴백, scale 유무, 평가액 기준, 종료금액 계약. `VrCycleRolloverService`는 공식이다. |
 | 수량 내림 FLOOR vs DOWN | `VrCycleOrderStrategy.java:85`, `VrStrategy.java:99`(DOWN), 그 외 FLOOR | 양수 입력에서 결과가 같다. 공식 코드를 표기 통일만 위해 바꾸는 이득이 비용보다 작다. |
 | `InfinitePosition:119` scale 없는 divide | `matching/domain/model/InfinitePosition.java:119` | 공식 코드라 변경하지 않는다. 기록만. |

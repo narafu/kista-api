@@ -41,6 +41,7 @@
 - **체결 거래일 = `filledAt`의 뉴욕 일자 + 1일**(`UsTradeDates.toKstTradeDate`, KIS `ord_dt`·메리츠와 같은 규칙): KST 경계는 서머타임 13:00 / 표준시 14:00이라 프리마켓~애프터마켓 체결이 모두 같은 거래일에 묶인다. KST 달력일을 쓰면 D-1 22:00 이후 장중 체결이 D-1로 잡혀 `getExecutions(D, D)`에서 빠졌다(CQ-26). 한계: 토스 주간거래(KST 낮) 체결도 같은 규칙으로 분류되지만 kista 주문은 DAY/CLS만 써서 해당 없음. 실계좌 `filledAt` 오프셋 표기는 미실측
 - KIS(US 거래일 기준, `UsTradeDates` 변환 필요)와 반대 방향 — 혼용 금지
 - **예외 — 일봉 캔들**: `TossCandleApi`의 `TossCandle.date()`는 timestamp(ISO8601 UTC)에서 파생한 **US 세션일**이다. `TossPriceApi.getClosingPrice(ticker, kstTradeDate)`는 KST 거래일 D의 확정 종가로 US 세션 D-1 봉을 조회해야 하므로 `UsTradeDates.toUsTradeDate` 변환 후 `date().equals(usSessionDate)` 필터 — 봉 없으면 현재가 폴백 (KIS `KisPriceApi.fetchConfirmedClose`와 동일 규칙).
+- **Toss API**: 주문 접수일(KST) 기준, 변환 없음. `TossOrderApi.fetchExecutions()`는 전날 저녁 선접수 대응으로 `queryFrom = from - 1일` 조회 후, `filledAt`의 뉴욕 일자(US 세션일)를 `UsTradeDates.toKstTradeDate`로 바꾼 KST 거래일로 재필터(KST 달력일을 쓰면 D-1 22:00 이후 장중 체결이 D에서 빠진다). 예외: 일봉 캔들 `date()`는 US 세션일이라 `TossPriceApi.getClosingPrice`가 KST 거래일 D를 US 세션 D-1로 변환한다(KIS `fetchConfirmedClose`와 동일)
 
 ### 판매 가능 수량 — 보유 수량 사용
 - `SellableQuantityPort` 계약은 "미체결 매도를 빼지 않은 보유 수량"(KIS `ovrs_cblc_qty`·Mock 최신 포지션과 동일)이고, 소비처(수동 SELL 검증·`DcaPlanInputCollector`의 주식 DCA SELL 상한)가 DB PLANNED/SUBMITTING/PLACED SELL 예약을 직접 뺀다

@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// IAE·ISE 메시지는 GENERIC 매핑이 원문 그대로 ProblemDetail detail로 내보낸다(constraints.md "ProblemDetail 응답 계약").
+// IAE·ISE 메시지는 GENERIC 매핑이 원문 그대로 ProblemDetail detail로 내보낸다(modules/api/web.md "ProblemDetail 응답 계약").
 // application·domain 패키지의 리터럴 메시지가 합쇼체 완전문장("~니다.")으로 끝나는지 소스 스캔으로 고정한다.
 class ExceptionMessageFormatTest {
 

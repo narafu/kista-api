@@ -1,6 +1,6 @@
 # own-type 허용 원장
 
-신규 own-type 복제·게이트 판정 전 필수 Read (이 원장은 모듈 간 값 타입 대상). 판정 기준((a)(b) 게이트, 증거 의무, 포트 역전 구분)은 `constraints.md` "모듈 경계 own-type — 정당화 게이트"에 있다 — 이 파일은 그 기준을 통과해 실제로 허용된 사례 원장이다.
+신규 own-type 복제·게이트 판정 전 필수 Read (이 원장은 모듈 간 값 타입 대상). 판정 기준((a)(b) 게이트, 증거 의무, 포트 역전 구분)은 아래 "모듈 경계 own-type — 정당화 게이트"에 있다 — 이 파일은 그 기준을 통과해 실제로 허용된 사례 원장이다.
 
 **프로세스 경계를 넘는 wire 타입(내부 API 요청·응답·Redis payload)은 own-type으로 복제하지 않고 `com.kista.shared.contract`에 둔다**(→ `docs/agents/modules/shared/contract.md`, 강제는 `InternalApiContractTest`). 공유 어휘 enum(`MarketSession` 등)은 sharedkernel.
 
@@ -22,7 +22,22 @@
 - `NotificationRecipient`(notify, `com.kista.api.notify.domain.model` — User 애그리게이트의 알림 발송용 6필드 투영: userId/nickname/notificationChannel/telegramBotToken/telegramChatId/rejectReason): 변환은 gateway 어댑터 경계의 `NotificationRecipients.from(User)`가 맡는다(`modules/api/notify.md`). notify가 User를 모르게 하는 목적 — trading-core `TradingUserProfile`(`trading.domain.model`)과 같은 접근
 - `TradingAccount`(trading, `com.kista.tradingcore.trading.domain.model` — `Account`의 id/userId/nickname/brokerRef 4필드 투영): 변환 `TradingAccount.from(Account)`는 정의 1곳, 호출 경계 3곳(`BatchContextFactory`/`ManualTradingService`/`TradingPreviewService`). `from(Account)`를 도메인 record에 두는 이유: trading 도메인→account 도메인 의존은 허용 범위(리뷰 F8)이고, 3곳에 변환을 복제하는 것보다 1곳 정의가 낫다. `BatchContext`·배치/프리뷰/리포트 경로가 `Account` 애그리게이트 대신 이 투영만 받는다 — 타입 표면 축소이지 자격증명 은닉은 아니다(`brokerRef`(`BrokerAccountRef`)가 자격증명을 그대로 담고, `BrokerAccountRef.toString()`만 마스킹해 로그·예외 메시지 평문 노출을 막는다). 소유권 검증(`verifyOwnedBy`)이 필요한 요청 경로만 `Account`를 유지하고 배치 경로 진입 시 변환. `HexagonalArchitectureTest.trading_batch_path_must_not_carry_account_aggregate`가 잠금(`application.service` 전체 + `BatchContext` 대상 denylist 방식, Account를 정당하게 들고 있는 요청 경로 클래스만 제외)
 
-## 복제본·제3자 구현 설계 규칙 (constraints.md 게이트에서 이관)
+## 모듈 경계 own-type — 정당화 게이트
+**프로세스 경계(root `:api` ↔ `:trading-core`)를 넘는 wire 타입(내부 HTTP API 요청·응답 body, Redis payload)은 own-type 복제가 아니라 `com.kista.shared.contract`(`:shared`)에 선언해 양쪽이 컴파일 타임에 공유한다 — 이 게이트를 거치지 않는다.** contract는 JDK+sharedkernel만 참조하는 outbound-zero 값 타입이라 양쪽이 의존할 수 있다. 새 내부 엔드포인트는 (1) `contract.<채널>`에 record를 두고 (2) trading-core 컨트롤러가 도메인 → contract로 매핑하며(도메인 record를 wire에 직접 반환 금지) (3) root 어댑터가 contract를 그대로 포트 시그니처에 쓴다. `InternalApiContractTest`가 이 규칙을 강제한다. 공유 어휘(enum 등)는 sharedkernel, wire 스키마(필드명이 곧 계약)는 contract — `docs/agents/modules/shared/contract.md`.
+
+아래 게이트는 wire 타입이 아닌 **모듈 간 값 타입** 복제에 적용된다. 값 타입을 다른 모듈에 복제(own-type)하는 것은 다음 둘 중 하나를 만족할 때만 정당하다. 아니면 복제가 아니라 sharedkernel 승격 또는 소유권 이동 대상이다.
+- **(a) 순환 불가피**: 통합하면 모듈 순환이 생기고, 소유권 이동으로도 끊을 수 없다.
+- **(b) 외부 계약 분리**: 두 값 집합이 각기 다른 외부 계약(증권사 wire 포맷, DB 컬럼, 업스트림 피드, HTTP 응답 스키마)에 묶여 독립적으로 버전이 오를 수 있다.
+
+**(b) 주장 시 증거 의무**: "외부 계약에 묶여 있다"는 서술만으로는 통과하지 못한다 — 그 값이 wire 포맷 변환 코드(어댑터의 switch/if 매핑, 예: `KisOrderApi.resolveOrderDvsn`)에서 실제로 소비되는지 grep으로 확인해 파일:라인을 근거로 남기고, 확인 없는 "~로 보인다/추정된다" 단정은 문서에 적지 않는다.
+
+포트 역전(DIP)은 값 타입 복제가 아니라 이 게이트 대상이 아니다 — 사례 → 아래 "포트 역전(DIP) 사례".
+
+**복제본(replica)·제3자 구현**: 정의자도 데이터 소유자도 아닌 모듈(예: web)의 구현을 선례로 삼지 않고, 모듈 경계를 넘는 데이터 의존은 "소유자 이벤트 + 소비자 소유 복제본" 또는 내부 HTTP API 중에서 고른다. 신규 복제 테이블은 마이그레이션에서 **기존 데이터를 반드시 백필**하고, 원본의 **모든 쓰기 지점을 전수 확인해 발행**을 건다(복제본 필수 조건 2가지·빈 결과 실패 양상 3종 → 아래 "복제본·제3자 구현 설계 규칙").
+
+(a)(b) 어느 쪽도 아니면 복제하지 말고 sharedkernel 승격 또는 소유권 이동을 먼저 검토한다.
+
+## 복제본·제3자 구현 설계 규칙
 
 **제3자(정의자도 데이터 소유자도 아닌 모듈, 예: web) 구현을 새 설계의 선례로 삼지 말 것** — root(`:api`)는 `:trading-core`를 컴파일 의존하지 않으므로 trading-core 정의 인터페이스를 root가 구현할 수 없다(스타일 문제가 아니라 컴파일 불가). trading-core는 자기 스키마(`trading.user_notify_profile`)에 사용자 알림·활성여부 복제본을 두고 자기 포트를 자기가 구현하며(`UserNotifyProfilePersistenceAdapter`), user는 `UserNotifyProfileChangedEvent`(sharedkernel)/`UserDeletedEvent`만 발행한다. 모듈 경계를 넘는 데이터 의존은 (1) 소유자가 데이터를 밀어주는 이벤트 + 소비자 소유 복제본, 또는 (2) 내부 HTTP API(`TradingCommandPort`/`TradingQueryPort` 계열) 중에서 고른다(후자의 예: `TradingCommandHttpAdapter` — trading-core 내부 HTTP 호출).
 

@@ -1,8 +1,10 @@
 ## Flyway 상세 규칙
 
-핵심 금지 규칙(적용된 마이그레이션 수정 금지·서비스별 디렉토리·타 서비스 스키마 참조 금지·expand/contract·enum VARCHAR)은 `constraints.md` "Flyway"에 있다. 이 문서는 마이그레이션을 작성·배포할 때 필요한 상세다. 파일 생성 절차는 `.claude/skills/flyway-migration`.
+핵심 금지 규칙은 `constraints.md` "Flyway"에 요약돼 있고 이 문서는 마이그레이션을 작성·배포할 때 필요한 상세다. 파일 생성 절차는 `.claude/skills/flyway-migration`.
 
 ### 서비스별 Flyway
+- 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지**(V1 포함) — checksum 불일치로 기동 즉시 크래시한다. 새 마이그레이션은 소유 서비스 디렉토리의 최신 버전 다음 번호로 만든다.
+- 신규 테이블은 소유 서비스 디렉토리에만 추가한다(스키마 소유 → architecture.md "DB 스키마 5분리").
 - root는 `src/main/resources/db/migration`(이력 `flyway_schema_history_api`, 기본 스키마 `public`), trading-core는 `trading-core/src/main/resources/db/migration-trading`(이력 `flyway_schema_history_trading`, 기본 스키마 `trading`)이다. 스키마 소유 표 → architecture.md "DB 스키마 5분리".
 - 다른 서비스 소유 스키마 테이블을 참조하면(FK 포함) trading baseline이 root 테이블에 의존해 fresh DB 기동이 실패한다.
 - 두 서비스 모두 `V1__init.sql` baseline 하나로 스쿼시돼 있다(옛 공용 `public.flyway_schema_history`는 롤백 증거로 운영 DB에 보존, 수정·삭제 금지). 스키마 재편 이행 릴리스는 자동 롤백이 불가능하다 → `deploy/server/schema-reorg/RUNBOOK.md`
@@ -30,7 +32,7 @@ Modulith EPR은 이벤트를 FQCN(`event_type`), 리스너를 FQCN+메서드(`li
 - **컬럼 순서**: `pk, fk, 비즈니스 컬럼…, created_at, updated_at, deleted_at` 순서 고정. Entity 필드 선언 순서와 일치시킨다.
 - PostgreSQL `ADD COLUMN`은 항상 맨 뒤다. 특정 위치를 강제하려면 테이블 재생성 패턴(`CREATE TABLE _new + INSERT SELECT + DROP + RENAME`)을 쓴다. 재생성 패턴에서 named UNIQUE 제약은 `ALTER TABLE xxx_old DROP CONSTRAINT foo;`를 RENAME 직후·CREATE 전에 넣어야 한다(unnamed UNIQUE는 Postgres가 자동으로 새 이름을 만든다).
 - **FK 추가 시 `ON DELETE CASCADE` 여부를 반드시 명시**한다(기본값 `ON DELETE RESTRICT`).
-- 암호화 저장 컬럼은 VARCHAR(512) 이상 → constraints.md "AES-256 암호화".
+- 암호화 저장 컬럼은 VARCHAR(512) 이상 → `modules/shared/platform.md` "AES-256 암호화 위치·컬럼 크기".
 
 ### 로컬 checksum mismatch (로컬 전용)
 로컬 파일을 수정해 Flyway checksum이 어긋나면 서비스별 이력 테이블(`flyway_schema_history_api`/`flyway_schema_history_trading`)에서 `DELETE ... WHERE version = 'N'` + 해당 테이블 DROP 후 앱을 재시작한다.
