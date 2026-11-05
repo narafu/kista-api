@@ -14,7 +14,7 @@ com.kista.tradingcore.matching/  ← Spring Modulith 모듈(CLOSED) — 주문�
   - PRIVACY + 기준 매매표 없는 날 → `skipReason="NO_PRIVACY_BASE"` (basePrice/minSeed=null)
 - **신규 전략 타입 추가 시**: `StrategyType` enum case + `CycleOrderStrategy` 구현체 1개만 추가하면 메타 capability·최소시드·UI 자동 반영
 
-매매 공식(변경 금지 SSOT)은 이 모듈이 소비하지만 `docs/agents/modules/tradingcore/trading-formulas.md`에 별도 보관한다(matching/trading 양쪽 shim에서 import).
+매매 공식(변경 금지 SSOT)은 이 모듈이 소비하지만 `docs/agents/modules/tradingcore/trading-formulas.md`에 별도 보관한다. **공식을 건드리면 작업 전 반드시 Read한다.**
 
 ### DCA 전략 (무조건 적립식, 다중 규칙)
 - `DcaCycleOrderStrategy`(`matching.domain.strategy`): 주식은 공통 `plan`(규칙마다 `decideRule` → `DcaRuleDecision` `Planned`/`Skipped`), 코인은 `CryptoDcaRoundExecutor`가 `decideRule`을 직접 호출한다. `occupiesSeed()=false`(usd_deposit 0), `needsCapCheck=false`. 주식 BUY 부족 정책은 `decideRule`이 `DcaRuleInputs.availableCash`(계좌 미배정 USD — 수집기가 계산)로 직접 판정한다: 가용 수량 = `floor(가용 / 캡가)`, REJECT는 부족하면 `INSUFFICIENT_BALANCE` skip, PARTIAL은 가용 수량으로 축소(1주도 못 사면 `INSUFFICIENT_BALANCE`). `plan()`이 앞 규칙의 BUY(수량 × 캡가)를 뒤 규칙 가용에서 빼 규칙 합계가 가용을 넘지 않게 한다(SELL의 `plannedSell`과 같은 방식). `availableCash=null`은 조회 실패 → `DATA_UNAVAILABLE`, MOCK·US 주식 외는 `DcaCycleOrderStrategy.UNLIMITED_CASH`(상한 없음). 주식 SELL 상한 `sellableAfterReserved`는 수집기가 min(원장 쪽, 증권사 판매가능수량 − 계좌 예약 SELL)로 계산해 넘기고(MOCK·US 주식 외는 원장만), null이면 "판매가능수량 조회 실패" `DATA_UNAVAILABLE` skip이다. 코인 지갑 차감은 `CryptoDcaRoundExecutor` 몫이라 `plan()` 누적은 주식 전용이다.
