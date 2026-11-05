@@ -4,8 +4,8 @@
 
 ### 서비스별 Flyway
 - 운영 DB에 **이미 적용된 마이그레이션 파일은 절대 수정 금지**(V1 포함) — checksum 불일치로 기동 즉시 크래시한다. 새 마이그레이션은 소유 서비스 디렉토리의 최신 버전 다음 번호로 만든다.
-- 신규 테이블은 소유 서비스 디렉토리에만 추가한다(스키마 소유 → architecture.md "DB 스키마 5분리").
-- root는 `src/main/resources/db/migration`(이력 `flyway_schema_history_api`, 기본 스키마 `public`), trading-core는 `trading-core/src/main/resources/db/migration-trading`(이력 `flyway_schema_history_trading`, 기본 스키마 `trading`)이다. 스키마 소유 표 → architecture.md "DB 스키마 5분리".
+- 신규 테이블은 소유 서비스 디렉토리에만 추가한다(스키마 소유 → 이 문서 "DB 스키마 5분리").
+- root는 `src/main/resources/db/migration`(이력 `flyway_schema_history_api`, 기본 스키마 `public`), trading-core는 `trading-core/src/main/resources/db/migration-trading`(이력 `flyway_schema_history_trading`, 기본 스키마 `trading`)이다. 스키마 소유 표 → 이 문서 "DB 스키마 5분리".
 - 다른 서비스 소유 스키마 테이블을 참조하면(FK 포함) trading baseline이 root 테이블에 의존해 fresh DB 기동이 실패한다.
 - 두 서비스 모두 `V1__init.sql` baseline 하나로 스쿼시돼 있다(옛 공용 `public.flyway_schema_history`는 롤백 증거로 운영 DB에 보존, 수정·삭제 금지). 스키마 재편 이행 릴리스는 자동 롤백이 불가능하다 → `deploy/server/schema-reorg/RUNBOOK.md`
 - 이력이 스쿼시된 적이 있어 문서에 특정 버전 번호(`V24` 등)를 근거로 쓰지 않는다. 버전은 `git log`로 추적하고 문서에는 "어떤 컬럼/제약이 어느 파일에 있는지"만 기록한다.
@@ -36,3 +36,7 @@ Modulith EPR은 이벤트를 FQCN(`event_type`), 리스너를 FQCN+메서드(`li
 
 ### 로컬 checksum mismatch (로컬 전용)
 로컬 파일을 수정해 Flyway checksum이 어긋나면 서비스별 이력 테이블(`flyway_schema_history_api`/`flyway_schema_history_trading`)에서 `DELETE ... WHERE version = 'N'` + 해당 테이블 DROP 후 앱을 재시작한다.
+
+## DB 스키마 5분리
+
+DB 스키마 5분리, 소유 서비스별(같은 DB `kistadb`·같은 DB 유저). root(`:api`): `public`(users/refresh_tokens/user_settings/user_notification_prefs/admin_runtime_settings/audit_logs/app_error_logs/fcm_device_tokens 등 인증/관리자/로그/알림 성격 플랫폼 공통 + `scheduler_locks`/`event_publication`)·`finance`(가계부)·`kista_ref`(외부 참조·시장 데이터 — housing_benchmark_prices/housing_price_indices/market_index_prices/fear_greed_snapshots). `:trading-core`: `trading`(accounts/broker_tokens/strategy·strategy_version 계열/strategy_cycle 계열/cycle_position 계열/orders + `user_notify_profile` 복제본 + `scheduler_locks`/`event_publication` **사본** — root `public`에 의존하지 않도록 자체 보유)·`trading_ref`(us_market_holidays + FIDA PRIVACY 기준 매매표 privacy_trade_bases/privacy_trade_base_orders, 전역 공유·비개인 데이터가 기준). `KisTokenEntity`(`broker_tokens`)는 trading 소유. Flyway도 서비스별(이력 `flyway_schema_history_api`/`flyway_schema_history_trading`, 디렉토리·절차는 이 문서 상단)이며 각자 소유 스키마 테이블만 만든다. **다른 서비스 소유 스키마 테이블은 참조 금지(FK 포함)**. `event_publication`이 서비스별 2개라 EPR 재발행 소유도 갈린다(root=`kista-scheduler`, trading=`kista-trading` → constraints.md Git 규칙). 신규 테이블은 소유 서비스 기준으로 분류해 Entity에 `@Table(schema=...)` 명시(public도 명시 — search_path 첫 스키마가 root는 `finance`·trading은 `trading`이라 생략 시 validate 실패) — nativeQuery/JdbcTemplate/raw SQL은 Hikari `connection-init-sql`의 search_path(root `finance, kista_ref, public` / trading `trading, trading_ref`)로 unqualified 이름이 자동 해석되므로 스키마 접두사 불필요(trading 프로세스는 root `public` 테이블을 볼 수 없다). 재편 경위 → `docs/history/modulith-migration-history.md` "DB 스키마 재편"

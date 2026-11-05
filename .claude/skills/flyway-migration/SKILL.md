@@ -14,7 +14,7 @@ description: Flyway 마이그레이션 파일 생성 — 서비스별 디렉토�
 | `public` / `finance` / `kista_ref` | root(`:api`) | `src/main/resources/db/migration` | `flyway_schema_history_api` |
 | `trading` / `trading_ref` | `:trading-core` | `trading-core/src/main/resources/db/migration-trading` | `flyway_schema_history_trading` |
 
-테이블→스키마 소유 표는 `docs/agents/architecture.md` "DB 스키마 5분리" 참고. 새 테이블은 스키마 한정 이름(`trading.orders` 등)으로 만든다.
+테이블→스키마 소유 표는 `docs/agents/flyway.md` "DB 스키마 5분리" 참고. 새 테이블은 스키마 한정 이름(`trading.orders` 등)으로 만든다.
 
 bash 명령으로 해당 서비스 디렉토리의 최신 버전 확인 후 +1:
   ls src/main/resources/db/migration/ | sort -V | tail -3                       # root
