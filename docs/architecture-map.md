@@ -15,7 +15,7 @@
 ## L0 시스템 컨텍스트
 
 ```mermaid
-flowchart LR
+flowchart TB
     UI["kista-ui<br/>Next.js"]
     FIDA["FIDA<br/>PRIVACY 기준표 발행"]
 
@@ -50,10 +50,10 @@ flowchart LR
     API & SCH --> PG
     TRD --> PG
 
-    TRD --> KIS & TOSS & ALPACA
-    API --> KAKAO & FCM
-    SCH --> KB & FG & ALPACA
-    API & SCH & TRD --> TG
+    %% 외부 API를 맨 아래 한 줄에 놓으려고 화살표 길이(-)로 rank를 맞춘다: API·SCH는 rank 2, TRD는 rank 3
+    TRD ---> KIS & TOSS & ALPACA & TG
+    API ----> KAKAO & FCM & TG
+    SCH ----> KB & FG & ALPACA & TG
 ```
 
 - 라우팅 SSOT: `deploy/server/caddy/kista-api.caddy` (`CaddyRoutingTest`가 컨트롤러 경로와 대조)
