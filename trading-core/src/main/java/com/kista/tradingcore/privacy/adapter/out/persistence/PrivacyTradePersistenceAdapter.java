@@ -134,8 +134,8 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     @Override
     @Transactional(readOnly = true)
     public Optional<PrivacyTradeBase> findTodayTrade(LocalDate today) {
-        // today는 KST 거래일, >= 로 조회 — 오늘(토/공휴일)에 다음 거래일(월) 매매표도 인식
-        return baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
+        // today는 KST 거래일 — 발행일이 정확히 D-1인 기준표만 사용(없으면 empty, 미래 기준표를 끌어오지 않는다)
+        return baseRepository.findWithOrdersByReleaseDateAndTicker(
                         PrivacyDates.releaseDateFor(today), StrategyTicker.SOXL)
                 .map(entity -> {
                     LocalDate kstTradeDate = PrivacyDates.tradeDateOf(entity.getReleaseDate()); // 발행일 → 적용 거래일

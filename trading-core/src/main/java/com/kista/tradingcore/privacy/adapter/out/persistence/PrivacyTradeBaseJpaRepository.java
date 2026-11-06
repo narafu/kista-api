@@ -17,7 +17,7 @@ interface PrivacyTradeBaseJpaRepository extends JpaRepository<PrivacyTradeBaseEn
     Optional<PrivacyTradeBaseEntity> findFirstByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(LocalDate releaseDate, StrategyTicker ticker);
 
     @EntityGraph(attributePaths = "orders")
-    Optional<PrivacyTradeBaseEntity> findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(LocalDate releaseDate, StrategyTicker ticker);
+    Optional<PrivacyTradeBaseEntity> findWithOrdersByReleaseDateAndTicker(LocalDate releaseDate, StrategyTicker ticker);
 
     // N+1 방지: 주문(orders)을 join fetch, DISTINCT로 기준 매매표 중복 제거, 발행일 내림차순
     @Query("SELECT DISTINCT b FROM PrivacyTradeBaseEntity b LEFT JOIN FETCH b.orders "

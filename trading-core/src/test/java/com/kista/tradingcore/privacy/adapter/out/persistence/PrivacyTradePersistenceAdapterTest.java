@@ -124,15 +124,24 @@ class PrivacyTradePersistenceAdapterTest {
         base.setCurrentCycleRealizedPnl(BigDecimal.ZERO);
         base.setHoldings(10);
 
-        when(baseRepository.findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
+        when(baseRepository.findWithOrdersByReleaseDateAndTicker(
                         PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL))
                 .thenReturn(Optional.of(base));
 
         var result = adapter.findTodayTrade(todayKst);
 
         assertThat(result).isPresent();
-        verify(baseRepository).findFirstWithOrdersByReleaseDateGreaterThanEqualAndTickerOrderByReleaseDateAsc(
+        verify(baseRepository).findWithOrdersByReleaseDateAndTicker(
                 PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL);
     }
 
+    @Test
+    void findTodayTrade_without_prev_day_release_returns_empty() {
+        LocalDate todayKst = LocalDate.of(2026, 7, 15);
+        // D-1 발행분이 없으면 이후 발행분이 있어도 정확 일치 조회라 empty
+        when(baseRepository.findWithOrdersByReleaseDateAndTicker(PrivacyDates.releaseDateFor(todayKst), StrategyTicker.SOXL))
+                .thenReturn(Optional.empty());
+
+        assertThat(adapter.findTodayTrade(todayKst)).isEmpty();
+    }
 }

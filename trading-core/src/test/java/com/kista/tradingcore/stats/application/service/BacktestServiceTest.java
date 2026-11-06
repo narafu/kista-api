@@ -359,9 +359,10 @@ class BacktestServiceTest {
         when(planner.plan(any())).thenReturn(Optional.empty());
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(1, "100"), candle(3, "100"), candle(5, "100")));
-        // findTodayTrade는 release_date >= 조회일 중 가장 이른 1건 — 어느 날 조회에도 1/5 세션 적용분(적용 거래일 1/6)이 딸려온다
+        // 1/5 세션 적용분(적용 거래일 1/6)만 존재 — 그 이전 거래일 조회는 정확 일치 실패로 empty
         PrivacyTradeBase base = baseFor(LocalDate.of(2024, 1, 6));
-        when(privacyTradePort.findTodayTrade(any())).thenReturn(Optional.of(base));
+        when(privacyTradePort.findTodayTrade(any())).thenAnswer(inv ->
+                inv.getArgument(0, LocalDate.class).equals(base.trades().getFirst().tradeDate()) ? Optional.of(base) : Optional.empty());
 
         BacktestResult result = service.run(privacy());
 
@@ -384,27 +385,6 @@ class BacktestServiceTest {
     }
 
     @Test
-    void PRIVACY_적용_거래일이_다른_기준표는_look_ahead_방지로_버린다() {
-        when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
-        when(planner.plan(any())).thenReturn(Optional.empty());
-        when(candlePort.fetchDailyCandles(anyString(), any(), any()))
-                .thenReturn(List.of(candle(1, "100"), candle(2, "100"), candle(3, "100")));
-        // 1/3 세션 적용분(적용 거래일 1/4) — 1/2 세션(적용 거래일 1/3) 조회에도 이게 딸려온다
-        when(privacyTradePort.findTodayTrade(any()))
-                .thenReturn(Optional.of(baseFor(LocalDate.of(2024, 1, 4))));
-
-        service.run(privacy());
-
-        // 엔진에 전달된 맵에 1/2가 들어가면 미래 기준표로 매매하는 셈 — 1/3만 남아야 한다
-        // 1/1 계획은 1/2 세션 기준표(없음), 1/2 계획은 1/3 세션 기준표(있음), 1/3은 마지막 캔들이라 계획하지 않는다
-        ArgumentCaptor<CycleOrderStrategy.PlanContext> ctxCaptor =
-                ArgumentCaptor.forClass(CycleOrderStrategy.PlanContext.class);
-        verify(planner, org.mockito.Mockito.times(2)).plan(ctxCaptor.capture());
-        assertThat(ctxCaptor.getAllValues().getFirst().privacy().privacyPlan()).isNull();
-        assertThat(ctxCaptor.getAllValues().get(1).privacy().privacyPlan()).isNotNull();
-    }
-
-    @Test
     void PRIVACY_월요일_세션도_그날_발행분_기준표를_적용한다() {
         when(cycleOrderStrategies.of(StrategyType.PRIVACY)).thenReturn(planner);
         when(planner.plan(any())).thenReturn(Optional.empty());
@@ -412,13 +392,13 @@ class BacktestServiceTest {
         // 세션 1/5 주문은 1/4 캔들에서, 세션 1/8 주문은 1/5 캔들에서 계획된다
         when(candlePort.fetchDailyCandles(anyString(), any(), any()))
                 .thenReturn(List.of(candle(4, "100"), candle(5, "100"), candle(8, "100")));
-        // 실제 어댑터 재현 — release_date >= (조회일 − 1일) 중 가장 이른 발행분을 적용 거래일(발행일 + 1일)로 변환해 반환
+        // 실제 어댑터 재현 — release_date == (조회일 − 1일) 발행분을 적용 거래일(발행일 + 1일)로 변환해 반환
         List<LocalDate> releaseDates = List.of(
                 LocalDate.of(2024, 1, 4), LocalDate.of(2024, 1, 5), LocalDate.of(2024, 1, 8));
         when(privacyTradePort.findTodayTrade(any())).thenAnswer(invocation -> {
-            LocalDate releaseFrom = invocation.getArgument(0, LocalDate.class).minusDays(1);
+            LocalDate releaseDate = invocation.getArgument(0, LocalDate.class).minusDays(1);
             return releaseDates.stream()
-                    .filter(release -> !release.isBefore(releaseFrom))
+                    .filter(release -> release.equals(releaseDate))
                     .findFirst()
                     .map(release -> baseFor(release.plusDays(1)));
         });

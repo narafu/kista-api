@@ -506,7 +506,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `PrivacyTradePersistenceAdapter.java:138`(`>=` ASC 첫 건), `TradingPriceFetcher.java:82`, `StrategyOrderPlanBuilder.java:71`. 대비: `BacktestService.java:183-187`은 `appliesTo`로 거른다.
 - 근거: D-1 발행분이 없고 그 뒤 발행분이 이미 있으면 PLANNED가 미래 거래일로 저장돼 당일 접수에서 빠진다. 운영은 수신이 07:00경이라 04:30 배치에 미래분이 거의 없다.
 - 수정 방향: 실거래 경로도 거래일 일치를 검사한다.
-- 상태: open(2026-11-04, 미확인).
+- 상태: done(2026-11-06) — `findTodayTrade`를 `release_date = releaseDateFor(today)` 정확 일치(`findWithOrdersByReleaseDateAndTicker`)로 바꾸고 BacktestService `appliesTo` 필터를 제거했다. 근거: 운영 PRIVACY 78개 거래일 모두 D-1 기준표가 있어 결과 동일, `>=`(910f20dc8)의 주말 월요일 매매표 인식 의도는 월요일 발행이 04:30 이후라 실거래·미리보기에 실익이 없다. 기준표가 없으면 empty → 기존 NO_PRIVACY_BASE skip 경로.
 
 ### CQ-33 통계·원장 경계의 낮은 우선순위 정합성 묶음
 - 주제: 통계 정확도. 유형: 정의·경계(기존 동작). 위험: 낮음.
