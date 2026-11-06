@@ -186,7 +186,7 @@ class TradingServiceTest {
         // CyclePositionPersistor: 포지션 스냅샷 저장 책임 분리 (TradingReporter에서 추출)
         CyclePositionPersistor positionPersistor = new CyclePositionPersistor(
                 cycleHistoryPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, rotationService, eventPublisher, cycleStrategies, vrRolloverService, batchRunPort,
+                strategyCyclePort, rotationService, cycleStrategies, vrRolloverService, batchRunPort,
                 org.springframework.transaction.support.TransactionOperations.withoutTransaction());
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, brokerOrderPort, orderPort,

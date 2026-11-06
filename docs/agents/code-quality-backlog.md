@@ -538,7 +538,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - 30·40분할: `InfinitePositionTest.priceOffsetRate_zeroBoundary_movesWithDivisionCount`·`isFinalRound_boundary_30_40div`·`quantities_30div`·`quantities_40div`, `ReverseModePositionTest.sellQuantity_dividesByHalfDivisionCount`. `InfinitePosition.isFinalRound` 주석의 "⟺ currentRound > 19"는 20분할 전용 표현(실제 경계는 div−1) — 주석만 어긋남, 다음 InfinitePosition 수정 때 고친다.
   - 리버스 BUY cap 초과: CQ-30에서 cap 적용으로 바꾸며 `BuyOrderPriceCapperTest.reverseQuotaBuy_exceedingCap_capsPriceAndRecomputesQuantity`·`reverseQuotaBuy_withinCap_unchanged`로 대체.
   - PRIVACY 기준표 날짜 ≠ 거래일: `PrivacyTradeBaseJpaRepositoryDbTest`(실 DB, T−2·T만 있으면 T−1 조회 empty). `(release_date, ticker)` UNIQUE 제약 있음(trading V1).
-  - 마커 커밋 뒤 `markEnded` 예외: CQ-29의 `CyclePositionPersistorDbTest.saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails`. `rotate` 예외: `saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38`(현재 동작 고정, CQ-38).
+  - 마커 커밋 뒤 `markEnded` 예외: CQ-29의 `CyclePositionPersistorDbTest.saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails`. `rotate` 예외: `saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38`(원장·마커 보존, PAUSE는 `CycleRotationServiceTest`가 고정 — CQ-38).
   - 재캡 부분 PLANNED: CQ-31의 `BuyOrderPriceCapperTest.capIfNeeded_avgLegAlreadyPlaced_doesNotResaveAvgLeg`.
 
 ### CQ-35 투자금 추가·인출 이력이 남지 않아 과거 원금선이 소급 변경됨
@@ -566,8 +566,12 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 배치 복구. 유형: 버그(CQ-29 계열). 위험: 중간(발생 시 매매 정지, 자동 복구 없음).
 - 위치: `CyclePositionPersistor.saveCyclePosition`(position·`markEnded`·`markReported` 커밋 뒤 `CycleCompletedEvent` 발행 → `cycleRotationService.rotate`), `StrategyService.resume`(`isActive()`면 거부, `reopenCycleIfEnded`는 재개 경로에서만 호출).
 - 근거: `rotate`가 예외를 던지면 사이클 종료·리포트 마커는 이미 커밋돼 재개가 건너뛴다. 전략은 ACTIVE인데 최신 사이클이 종료된 상태라 매 배치 좀비 사이클로 skip된다. 사용자가 정지→재개해야 `reopenCycleIfEnded`로 풀린다. 완료 이벤트도 이미 발행돼 사용자에게는 정상 순환처럼 보인다. 고정: `CyclePositionPersistorDbTest.saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38`.
-- 수정 방향(미정): (a) 배치 시작 시 "ACTIVE + 최신 사이클 종료 + 후속 사이클 없음"을 감지해 rotation을 재시도한다. (b) rotate를 마커 트랜잭션 안으로 넣는다(외부 호출 없음을 확인해야 함). (c) 최소한 관리자 알림. 운영 발생 이력부터 조회한다.
-- 상태: open(2026-11-06).
+- 운영 이력(2026-11-06 조회): 최신 사이클이 종료된 전략 0건(상태 무관), `app_error_logs`(2026-06-26~)의 좀비·재등록 실패 0건, 종료→다음 사이클 공백 >1일 0건.
+- 원인 범위: rotate에는 외부 HTTP가 없고, 생성 블록은 이미 실패 시 PAUSE했다. ACTIVE 좀비는 그 try 밖 실패에서만 생겼다 — persistor가 rotate 직전에 트랜잭션 밖에서 발행한 `CycleCompletedEvent`의 인라인 리스너(`requireProfile` 예외 시 rotate 미호출), `calcLastPositionDeposit` 읽기, NONE·1주 미만 분기의 pause.
+- 기각: (a) 배치 시작 시 재시도는 price·privacyBase가 필요하고 진입점이 늘어 과하다. (b) 마커 트랜잭션 통합은 rotate 실패 시 청산 스냅샷(매도 후 원장)까지 롤백해 다음 배치가 매도 전 원장으로 매매한다. (c) 관리자 알림은 `BatchContextFactory`에 이미 있다.
+- 해소: `CycleCompletedEvent` 발행을 rotate의 try 맨 앞으로 옮기고 try를 메서드 전체로 넓혔다. 어느 단계든 실패하면 PAUSE 후 rethrow하고, PAUSED + 종료 사이클은 `reopenCycleIfEnded`가 처리한다. 고정: `CycleRotationServiceTest`(리스너·원장 조회 실패 시 PAUSE, 완료→새 사이클 알림 순서), `CyclePositionPersistorDbTest..._cq38`(원장·마커 보존).
+- 남은 한계(수용): PAUSE 사실을 사용자에게 알리지 않는다(관리자는 `TradingBatchGuard`로 받는다). 리스너 외 실패면 완료 알림은 이미 나간 뒤다.
+- 상태: done(2026-11-06).
 
 ## 유지 목록 (재제안 금지, 이유 기록)
 

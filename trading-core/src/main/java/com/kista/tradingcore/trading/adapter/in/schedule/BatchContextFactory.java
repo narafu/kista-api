@@ -53,7 +53,7 @@ class BatchContextFactory {
                 if (currentCycle == null) {
                     throw new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id());
                 }
-                // 종료된 사이클 재선택 차단 — rotation 실패(잔고 조회 오류 등) 시 새 사이클 없이 종료 사이클만 남는 좀비 상태
+                // 종료된 사이클 재선택 차단 — rotation이 PAUSE에도 실패한 경우(DB 장애 등) 새 사이클 없이 종료 사이클만 남는 좀비 상태
                 if (currentCycle.endDate() != null) {
                     IllegalStateException zombie = new IllegalStateException(
                             "[좀비 사이클] 최신 사이클이 이미 종료됨(endDate=" + currentCycle.endDate()

@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.OrderDirection;
+import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
@@ -26,6 +27,7 @@ import com.kista.shared.kernel.StrategyDefaults;
 
 // 사이클 종료(holdings==0) 시 CycleSeedType 정책에 따라 새 StrategyCycle + 시작 스냅샷 생성
 // NONE → 전략 PAUSED / MAX → 내부 원장 / MAINTAIN → min(시작 시드, 직전 사이클 최종 원장) — 증권사 잔고 조회 없음
+// 완료 이벤트(CycleCompletedEvent) 발행도 여기서 — 어떤 리스너 예외든 PAUSE 보장 try 안에서 나가야 좀비(ACTIVE+종료 사이클)가 안 생긴다
 // package-private — application/service 패키지 전용
 @Service
 @RequiredArgsConstructor
@@ -43,34 +45,39 @@ class CycleRotationService {
     void rotate(Strategy strategy, StrategyCycle currentCycle, TradingAccount account, TradingUserProfile userProfile,
                 BigDecimal price, PrivacyTradeBase privacyTradeBase) {
 
-        if (strategy.cycleSeedType() == StrategyCycleSeedType.NONE) {
-            // NONE → 전략 PAUSED (연속 없음)
-            strategyPort.pause(strategy.id());
-            log.info("[strategyId={}] 사이클 종료 (NONE) → PAUSED", strategy.id());
-            return;
-        }
-
-        // 시드는 전략 자신의 원장(마지막 CyclePosition.usdDeposit)만으로 정한다 — 원장 이상으로 키울 수 없으므로 부족 분기가 없다
-        BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle);
-        BigDecimal targetSeed = strategy.cycleSeedType() == StrategyCycleSeedType.MAX
-                ? maxSeed
-                : currentCycle.startAmount().min(maxSeed); // MAINTAIN: 손실 뒤엔 남은 돈으로, 수익 뒤엔 원래 시드로
-
-        // 1주도 못 사는 시드는 0회차 매수가 원장 상한에 막혀 교착 — 새 사이클 없이 PAUSED (가격 모르면 0 이하만 판정)
-        // 관리자 알림은 최소금액 미달과 같은 이벤트, 사용자에게는 자동 일시정지 알림
-        boolean belowOneShare = price != null ? targetSeed.compareTo(price) < 0 : targetSeed.signum() <= 0;
-        if (belowOneShare) {
-            strategyPort.pause(strategy.id());
-            log.warn("[strategyId={}] 원장 1주 미만({} < {}) — 새 사이클 없이 PAUSED", strategy.id(), targetSeed, price);
-            eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
-                    0, targetSeed, strategy.ticker(), null, 0, false, OrderDirection.BUY));
-            eventPublisher.publishEvent(new StrategyAutoPausedEvent(userProfile.userId(), account.id(), account.nickname(),
-                    strategy.type(), strategy.ticker(), targetSeed, price));
-            return;
-        }
-
         BigDecimal minRequired;
+        BigDecimal targetSeed; // try 밖(생성 성공 뒤 알림)에서도 쓴다
         try {
+            // 완료 이벤트는 맨 앞 — NewCycleStartedEvent보다 먼저 나가야 알림 순서가 유지된다
+            eventPublisher.publishEvent(new CycleCompletedEvent(userProfile.userId(), account.id(), account.nickname(),
+                    strategy.type(), strategy.ticker(), strategy.cycleSeedType()));
+
+            if (strategy.cycleSeedType() == StrategyCycleSeedType.NONE) {
+                // NONE → 전략 PAUSED (연속 없음)
+                strategyPort.pause(strategy.id());
+                log.info("[strategyId={}] 사이클 종료 (NONE) → PAUSED", strategy.id());
+                return;
+            }
+
+            // 시드는 전략 자신의 원장(마지막 CyclePosition.usdDeposit)만으로 정한다 — 원장 이상으로 키울 수 없으므로 부족 분기가 없다
+            BigDecimal maxSeed = calcLastPositionDeposit(strategy, currentCycle);
+            targetSeed = strategy.cycleSeedType() == StrategyCycleSeedType.MAX
+                    ? maxSeed
+                    : currentCycle.startAmount().min(maxSeed); // MAINTAIN: 손실 뒤엔 남은 돈으로, 수익 뒤엔 원래 시드로
+
+            // 1주도 못 사는 시드는 0회차 매수가 원장 상한에 막혀 교착 — 새 사이클 없이 PAUSED (가격 모르면 0 이하만 판정)
+            // 관리자 알림은 최소금액 미달과 같은 이벤트, 사용자에게는 자동 일시정지 알림
+            boolean belowOneShare = price != null ? targetSeed.compareTo(price) < 0 : targetSeed.signum() <= 0;
+            if (belowOneShare) {
+                strategyPort.pause(strategy.id());
+                log.warn("[strategyId={}] 원장 1주 미만({} < {}) — 새 사이클 없이 PAUSED", strategy.id(), targetSeed, price);
+                eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
+                        0, targetSeed, strategy.ticker(), null, 0, false, OrderDirection.BUY));
+                eventPublisher.publishEvent(new StrategyAutoPausedEvent(userProfile.userId(), account.id(), account.nickname(),
+                        strategy.type(), strategy.ticker(), targetSeed, price));
+                return;
+            }
+
             // 최소금액 가드 — 전략 타입별 정책은 전략 객체에 위임. 미달이어도 재등록 자체는 차단하지 않고
             // 정보성 알림만 발행한다(예전엔 여기서 재등록을 취소했으나, 그러면 새 사이클 없이 종료 사이클만 남는
             // "좀비 사이클" 상태가 되어 BatchContextFactory가 매 배치마다 오류 알림을 반복 발행했다) — cycleSeedType대로
@@ -86,10 +93,16 @@ class CycleRotationService {
                     .orElseThrow(() -> new NoSuchElementException("활성 전략 버전이 없습니다: " + strategy.id()));
             cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), targetSeed, price);
         } catch (RuntimeException e) {
-            // 재등록 실패 시에도 markEnded는 이미 커밋된 상태 — PAUSED 없이 던지면 전략은 ACTIVE인 채
-            // 후속 사이클 없는 좀비로 남는다. 원래 예외는 그대로 전파해 TradingBatchGuard가 기존대로 알림·격리한다
-            // (알림 이벤트 발행은 이 try 밖 — 사이클 생성 성공 뒤 리스너 예외로 건강한 전략이 PAUSED되지 않도록)
-            strategyPort.pause(strategy.id());
+            // 생성 전후 어느 지점이든 실패하면 markEnded는 이미 커밋된 상태 — PAUSED 없이 던지면 전략은 ACTIVE인 채
+            // 후속 사이클 없는 좀비로 남는다. PAUSED + 종료 사이클은 StrategyService.reopenCycleIfEnded가 재개 시 처리한다.
+            // 원래 예외는 그대로 전파해 TradingBatchGuard가 기존대로 알림·격리한다
+            // (생성 성공 뒤 알림(최소금액 미달·새 사이클 시작)은 이 try 밖 — 리스너 예외로 건강한 전략이 PAUSED되지 않도록)
+            // 1주 미만 분기 알림 리스너가 던지면 pause가 한 번 더 호출된다 — 상태 갱신이라 멱등
+            try {
+                strategyPort.pause(strategy.id());
+            } catch (RuntimeException pauseFailure) {
+                e.addSuppressed(pauseFailure); // PAUSE마저 실패해도 원래 원인을 잃지 않는다 — 좀비는 BatchContextFactory가 보고
+            }
             log.error("[strategyId={}] 사이클 재등록 실패 → PAUSED (좀비 사이클 방지)", strategy.id(), e);
             throw e;
         }

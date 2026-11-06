@@ -11,6 +11,7 @@ import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.trading.domain.creation.*;
 import com.kista.tradingcore.matching.domain.strategy.*;
+import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,6 +29,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -187,6 +190,23 @@ class CycleRotationServiceTest {
                 && ev.price().compareTo(new BigDecimal("60")) == 0
                 && ev.userId().equals(USER.userId())));
         verify(eventPublisher, never()).publishEvent(any(NewCycleStartedEvent.class));
+        // 1주 미만 분기에서도 사이클 완료 알림은 PAUSE 알림보다 먼저 나간다
+        InOrder order = inOrder(eventPublisher);
+        order.verify(eventPublisher).publishEvent(any(CycleCompletedEvent.class));
+        order.verify(eventPublisher).publishEvent(any(StrategyAutoPausedEvent.class));
+    }
+
+    @Test
+    @DisplayName("NONE — 사이클 완료 알림 후 새 사이클 없이 PAUSED한다(원장 조회 없음)")
+    void none_publishesCompletedAndPauses() {
+        Strategy strategy = strategy(StrategyCycleSeedType.NONE);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
+
+        verify(eventPublisher).publishEvent(any(CycleCompletedEvent.class));
+        verify(strategyPort).pause(strategy.id());
+        verifyNoInteractions(cyclePositionPort, cycleSnapshotCreator);
     }
 
     @Test
@@ -249,7 +269,7 @@ class CycleRotationServiceTest {
     void max_listenerFailsAfterCycleCreated_doesNotPause() {
         Strategy strategy = strategy(StrategyCycleSeedType.MAX);
         StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
-        doThrow(new RuntimeException("리스너 실패")).when(eventPublisher).publishEvent(any(Object.class));
+        lenient().doThrow(new RuntimeException("리스너 실패")).when(eventPublisher).publishEvent(any(NewCycleStartedEvent.class));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
                         () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
@@ -257,5 +277,49 @@ class CycleRotationServiceTest {
 
         verify(cycleSnapshotCreator).createCycleAndSnapshot(eq(strategy.id()), eq(STRATEGY_VERSION_ID), any(), eq(PRICE));
         verify(strategyPort, never()).pause(any());
+    }
+
+    @Test
+    @DisplayName("완료 이벤트 리스너가 던지면 전략 PAUSED 후 재throw — 사이클 생성 없음 (좀비 방지)")
+    void completedEventListenerFails_pausesAndRethrows() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        doThrow(new NoSuchElementException("프로필 없음")).when(eventPublisher).publishEvent(any(CycleCompletedEvent.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
+                .isInstanceOf(NoSuchElementException.class);
+
+        verify(strategyPort).pause(strategy.id());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("원장 조회가 던지면 전략 PAUSED 후 재throw")
+    void ledgerReadFails_pausesAndRethrows() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        when(cyclePositionPort.findLatestOneByStrategyId(strategy.id())).thenThrow(new IllegalStateException("DB 장애"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(strategyPort).pause(strategy.id());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("정상 rotation — CycleCompletedEvent가 NewCycleStartedEvent보다 먼저 발행된다")
+    void completedEventPublishedBeforeNewCycleStarted() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "1200");
+
+        service.rotate(strategy, current, ACCOUNT, USER, PRICE, null);
+
+        InOrder order = inOrder(eventPublisher);
+        order.verify(eventPublisher).publishEvent(any(CycleCompletedEvent.class));
+        order.verify(eventPublisher).publishEvent(any(NewCycleStartedEvent.class));
     }
 }

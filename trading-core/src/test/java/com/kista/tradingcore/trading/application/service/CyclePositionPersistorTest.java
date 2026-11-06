@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.Strategy; import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -44,7 +42,6 @@ class CyclePositionPersistorTest {
     @Mock StrategyInfiniteDetailPort strategyInfiniteDetailPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CycleRotationService cycleRotationService;
-    @Mock ApplicationEventPublisher eventPublisher;
     @Mock VrCycleRolloverService vrCycleRolloverService;
     @Mock TradingBatchRunPort batchRunPort;
 
@@ -92,7 +89,7 @@ class CyclePositionPersistorTest {
 
         persistor = new CyclePositionPersistor(
                 cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
-                strategyCyclePort, cycleRotationService, eventPublisher,
+                strategyCyclePort, cycleRotationService,
                 cycleOrderStrategies, vrCycleRolloverService, batchRunPort,
                 org.springframework.transaction.support.TransactionOperations.withoutTransaction());
     }
@@ -191,9 +188,6 @@ class CyclePositionPersistorTest {
         // INFINITE: markEnded + rotate 호출
         verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
         verify(cycleRotationService).rotate(strategy, cycle, ACCOUNT, USER, PRICE, null);
-        // 사이클 완료 이벤트 발행 검증
-        verify(eventPublisher).publishEvent(new CycleCompletedEvent(USER.userId(), ACCOUNT.id(), ACCOUNT.nickname(),
-                strategy.type(), strategy.ticker(), strategy.cycleSeedType()));
         // INFINITE가 아닌 VR이 아니므로 vrCycleRolloverService 미호출
         verifyNoInteractions(vrCycleRolloverService);
     }
@@ -243,7 +237,6 @@ class CyclePositionPersistorTest {
         verify(batchRunPort).markReported(TODAY, STRATEGY_ID);
         verify(strategyCyclePort).markEnded(CYCLE_ID, balance.usdDeposit(), TODAY);
         verify(cycleRotationService, never()).rotate(any(), any(), any(), any(), any(), any());
-        verifyNoInteractions(eventPublisher);
     }
 
     @Test

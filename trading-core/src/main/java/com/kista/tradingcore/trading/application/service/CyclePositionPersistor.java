@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import com.kista.shared.kernel.StrategyDefaults;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
@@ -10,7 +9,6 @@ import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -29,7 +27,6 @@ class CyclePositionPersistor {
     private final StrategyInfiniteDetailPort strategyInfiniteDetailPort;        // 전략 버전별 divisionCount 조회
     private final StrategyCyclePort strategyCyclePort;                          // 사이클 종료 기록
     private final CycleRotationService cycleRotationService;                    // 사이클 종료 후 연속 정책 실행
-    private final ApplicationEventPublisher eventPublisher;                     // 사이클 완료 이벤트 발행
     private final CycleOrderStrategies cycleOrderStrategies;                    // 전략 타입별 capability 조회
     private final VrCycleRolloverService vrCycleRolloverService;                // VR N주 롤오버
     private final TradingBatchRunPort batchRunPort;                             // 전략별 당일 리포트 완료 마커 (재개 시 중복 리포트 방지)
@@ -83,8 +80,6 @@ class CyclePositionPersistor {
                 return;
             }
             log.info("[strategyId={}] 사이클 종료 — 연속 정책 실행: {}", strategy.id(), strategy.cycleSeedType());
-            eventPublisher.publishEvent(new CycleCompletedEvent(ctx.userProfile().userId(), ctx.account().id(), ctx.account().nickname(),
-                    strategy.type(), strategy.ticker(), strategy.cycleSeedType()));
             cycleRotationService.rotate(strategy, currentCycle, ctx.account(), ctx.userProfile(), price, privacyBase);
         }
 
