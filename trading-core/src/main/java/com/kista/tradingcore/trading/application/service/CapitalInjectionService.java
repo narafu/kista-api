@@ -211,7 +211,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
 
         // 사이클 행 잠금 — 수동 체결 보정과 직렬화
         strategyCyclePort.lockForUpdate(first.id());
-        // ponytail: 마감 리포트의 markEnded는 사이클 락을 잡지 않아 재조회~커밋 사이 ms 창이 남음
+        // 마감 리포트의 markEnded는 마커와 한 트랜잭션이라 위 잠금과 FK 락으로 직렬화됨
         StrategyCycle cycle = strategyCyclePort.requireLatestByStrategyId(strategyId);
         if (cycle.endDate() != null || !cycle.id().equals(first.id())) {
             throw new IllegalStateException(noActiveMessage);
