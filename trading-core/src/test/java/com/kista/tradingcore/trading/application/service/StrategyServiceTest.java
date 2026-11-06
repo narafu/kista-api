@@ -1,5 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 import static com.kista.shared.support.FixedClockTestConfig.FIXED;
+
+import com.kista.tradingcore.trading.application.service.support.UnassignedCashCalculator;
 import com.kista.tradingcore.trading.domain.creation.VrRampInput;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.application.service.support.StrategyHistoryQueryService;
@@ -8,7 +10,7 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.trading.domain.model.*;
-import com.kista.tradingcore.matching.domain.model.*; import com.kista.tradingcore.trading.domain.model.*;
+import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyFieldSettings;
@@ -135,7 +137,7 @@ class StrategyServiceTest {
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
                 privacyTradePort, brokerPricePort,
-                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
+                new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, null), FIXED);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,

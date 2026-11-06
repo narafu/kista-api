@@ -16,7 +16,7 @@ public record StrategySeedPreviewResponse(
         BigDecimal minSeed,
         @Schema(description = "계산 불가 사유 (정상이면 null)", example = "NO_PRIVACY_BASE")
         String skipReason,
-        @Schema(description = "가용 예수금 = 증권사 매수가능금액 − 다른 전략 원장 합 (모의계좌·조회 실패면 null). 입력 예수금이 넘으면 경고만 한다")
+        @Schema(description = "가용 예수금(계좌 통화 — 주식 USD·코인 KRW/USDT) = 주문 가능 현금(증권사 매수가능금액·거래소 견적 통화 잔고) − 계좌 전략 원장 예수금 합 (모의계좌·조회 실패면 null). 입력 예수금이 넘으면 경고만 한다")
         BigDecimal availableCash
 ) {
     public static StrategySeedPreviewResponse from(StrategySeedPreview preview) {

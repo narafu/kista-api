@@ -47,7 +47,7 @@ public class StrategyHistoryQueryService {
     private final CycleOrderStrategies cycleStrategies;
     private final PrivacyTradePort privacyTradePort;
     private final BrokerPricePort brokerPricePort;
-    private final UnassignedUsdCalculator unassignedUsd; // 가용 예수금 경고용 계좌 미배정 USD
+    private final UnassignedCashCalculator unassignedCash; // 가용 예수금 경고용 계좌 미배정 현금(계좌 통화)
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 — register()의 minRequiredDeposit 계산과 동일 경로
@@ -74,7 +74,8 @@ public class StrategyHistoryQueryService {
                 : null;
 
         // 3단계: 기준가 결정 후 최소 시드 계산 — 실제 첫 주문(holdings=0)과 동일하게 전일종가 사용
-        BigDecimal price = strategy.requiresPrivacyBase()
+        // 코인 계좌(DCA)는 증권사 전일종가 경로가 없고 최소 시드도 없어 기준가 null
+        BigDecimal price = strategy.requiresPrivacyBase() || account.broker().getMarket().isCrypto()
                 ? null
                 : brokerPricePort.getPrevClose(ticker, account.toBrokerRef());
         BigDecimal basePrice = strategy.requiresPrivacyBase()
@@ -85,12 +86,12 @@ public class StrategyHistoryQueryService {
         return new StrategySeedPreview(ticker.name(), basePrice, minSeed, null, calcAvailableCash(account));
     }
 
-    // 가용 예수금 = 계좌 미배정 USD(UnassignedUsdCalculator) — 등록 차단이 아닌 폼 경고용
-    // 미적용 계좌(MOCK·코인)와 조회 실패는 미리보기를 막지 않고 null
+    // 가용 예수금 = 계좌 미배정 현금(UnassignedCashCalculator, 계좌 통화) — 등록 차단이 아닌 폼 경고용
+    // MOCK과 조회 실패는 미리보기를 막지 않고 null
     private BigDecimal calcAvailableCash(Account account) {
-        if (!UnassignedUsdCalculator.applies(account.broker())) return null;
+        if (!UnassignedCashCalculator.applies(account.broker())) return null;
         return BrokerCallGuard.tryGet("가용 예수금 조회: accountId=" + account.id(),
-                () -> unassignedUsd.available(account.id(), account.toBrokerRef())).orElse(null);
+                () -> unassignedCash.available(account.id(), account.toBrokerRef())).orElse(null);
     }
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션

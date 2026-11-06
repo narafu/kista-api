@@ -5,7 +5,10 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
+import com.kista.tradingcore.broker.application.service.CryptoExchanges;
+import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -15,20 +18,24 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class UnassignedUsdCalculatorTest {
+class UnassignedCashCalculatorTest {
 
     StrategyPort strategyPort = mock(StrategyPort.class);
     CyclePositionPort cyclePositionPort = mock(CyclePositionPort.class);
     MarginPort marginPort = mock(MarginPort.class);
-    UnassignedUsdCalculator calc = new UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort);
+    CryptoExchanges cryptoExchanges = mock(CryptoExchanges.class);
+    UnassignedCashCalculator calc = new UnassignedCashCalculator(strategyPort, cyclePositionPort, marginPort, cryptoExchanges);
 
     private static Strategy strategy(UUID accountId, StrategyType type) {
         return new Strategy(UUID.randomUUID(), accountId, type, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
@@ -54,9 +61,26 @@ class UnassignedUsdCalculatorTest {
     }
 
     @Test
-    void applies_only_to_real_us_stock_brokers() {
-        assertThat(UnassignedUsdCalculator.applies(Broker.KIS)).isTrue();
-        assertThat(UnassignedUsdCalculator.applies(Broker.MOCK)).isFalse();
-        assertThat(UnassignedUsdCalculator.applies(Broker.UPBIT)).isFalse();
+    void crypto_account_uses_exchange_quote_available_minus_ledgers() {
+        UUID accountId = UUID.randomUUID();
+        Strategy dca = new Strategy(UUID.randomUUID(), accountId, StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);
+        deposit(dca, "300000");
+        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(dca));
+        CryptoExchangePort upbit = mock(CryptoExchangePort.class);
+        when(cryptoExchanges.of(Broker.UPBIT)).thenReturn(upbit);
+        // 주문 가능 견적 통화 — 접수 주문 잠금분(quoteLocked)은 이미 빠져 있다
+        when(upbit.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal("1000000"), new BigDecimal("50000"), Map.of()));
+
+        var ref = TradingFixtures.upbitAccount(accountId, UUID.randomUUID()).toBrokerRef();
+        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("700000"); // 1,000,000 − 300,000
+        verify(marginPort, never()).getUsdBuyableAmount(any());
+    }
+
+    @Test
+    void applies_to_every_broker_except_mock() {
+        assertThat(UnassignedCashCalculator.applies(Broker.KIS)).isTrue();
+        assertThat(UnassignedCashCalculator.applies(Broker.UPBIT)).isTrue();
+        assertThat(UnassignedCashCalculator.applies(Broker.BINANCE)).isTrue();
+        assertThat(UnassignedCashCalculator.applies(Broker.MOCK)).isFalse();
     }
 }
