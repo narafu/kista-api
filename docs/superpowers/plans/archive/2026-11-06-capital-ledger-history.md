@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JPA/Hibernate, Flyway(`db/migration-trading`), JUnit 5 + Mockito, AssertJ.
 
-**Spec:** `docs/superpowers/specs/2026-11-06-capital-ledger-history-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-06-capital-ledger-history-design.md`
 
 ## Global Constraints
 
