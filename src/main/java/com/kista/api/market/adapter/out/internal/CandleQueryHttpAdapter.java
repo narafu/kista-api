@@ -5,6 +5,7 @@ import com.kista.api.market.domain.model.CandleUnavailableException;
 import com.kista.shared.contract.broker.DailyCandleResponse;
 import com.kista.shared.platform.internalapi.InternalApiErrorDetails;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpResponse;
@@ -14,9 +15,12 @@ import org.springframework.web.client.RestClient;
 import java.time.LocalDate;
 import java.util.List;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class CandleQueryHttpAdapter implements CandleQueryPort {
+
+    private static final String UNAVAILABLE_DETAIL = "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요."; // 503 사용자 노출 고정 문구
 
     private final RestClient internalApiRestClient;
 
@@ -30,6 +34,7 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
                         .build())
                 .retrieve()
                 .onStatus(status -> status.value() == 503, CandleQueryHttpAdapter::throwUnavailable)
+                .onStatus(status -> status.value() == 422, CandleQueryHttpAdapter::throwCredentialInvalid)
                 .body(new ParameterizedTypeReference<List<DailyCandleResponse>>() {});
     }
 
@@ -44,6 +49,7 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
                         .build())
                 .retrieve()
                 .onStatus(status -> status.value() == 503, CandleQueryHttpAdapter::throwUnavailable)
+                .onStatus(status -> status.value() == 422, CandleQueryHttpAdapter::throwCredentialInvalid)
                 .body(new ParameterizedTypeReference<List<DailyCandleResponse>>() {});
     }
 
@@ -51,6 +57,14 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
     private static void throwUnavailable(HttpRequest request,
                                          ClientHttpResponse response) {
         throw new CandleUnavailableException(InternalApiErrorDetails.detailOrDefault(response,
-                "증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요."));
+                UNAVAILABLE_DETAIL));
+    }
+
+    // trading-core 422(서버 시세 조회용 증권사 키 무효) — 공개 시세 API라 사용자가 고칠 수 없는 서버 장애이므로 503으로 복원한다.
+    // trading-core는 4xx를 보고하지 않아 키 만료를 놓치지 않도록 여기서 log.error로 남기고, detail("API 키가 유효하지 않습니다")은 사용자를 오도하므로 고정 문구를 쓴다
+    private static void throwCredentialInvalid(HttpRequest request,
+                                               ClientHttpResponse response) {
+        log.error("캔들 조회용 증권사 키가 유효하지 않습니다: {}", request.getURI().getPath());
+        throw new CandleUnavailableException(UNAVAILABLE_DETAIL);
     }
 }

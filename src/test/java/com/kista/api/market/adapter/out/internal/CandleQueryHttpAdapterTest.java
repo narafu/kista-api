@@ -85,4 +85,16 @@ class CandleQueryHttpAdapterTest {
                 .isInstanceOf(CandleUnavailableException.class)
                 .hasMessage("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
     }
+
+    @Test
+    void trading_core_422_키_무효는_사용자_키_문구_대신_CandleUnavailableException_고정_문구로_바꾼다() {
+        server.enqueue(new MockResponse.Builder()
+                .code(422).addHeader("Content-Type", "application/problem+json")
+                .body("{\"detail\":\"증권사 API 키가 유효하지 않습니다.\",\"status\":422,\"code\":\"BROKER_CREDENTIAL_INVALID\"}")
+                .build());
+
+        assertThatThrownBy(() -> adapter.dailyCandles("SOXL", java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 1, 2)))
+                .isInstanceOf(CandleUnavailableException.class)
+                .hasMessage("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    }
 }
