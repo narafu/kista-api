@@ -48,6 +48,7 @@ class StrategyService implements StrategyUseCase {
     private final CycleSnapshotCreator cycleSnapshotCreator;       // 재개 시 종료된 사이클 재오픈 전용
     private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;       // stats 캐시 무효화 이벤트 발행
+    private final CycleCapitalEventPort cycleCapitalEventPort;     // 투자금 추가·인출 이력 존재 확인(시드 수정 거절용)
     private final StrategyStateWriter stateWriter;                 // 일시중지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
 
     @Override
@@ -213,6 +214,10 @@ class StrategyService implements StrategyUseCase {
 
         if (latest.holdings().signum() != 0) {
             throw new IllegalArgumentException("보유 수량이 있는 사이클은 예수금을 수정할 수 없습니다.");
+        }
+        // 이력 합계(원금)와 어긋나므로 투자금 추가·인출 이력이 있으면 일반 시드 수정 불가
+        if (cycleCapitalEventPort.existsByCycleId(cycle.id())) {
+            throw new IllegalArgumentException("투자금 추가·인출 이력이 있는 사이클은 예수금을 수정할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
         }
 
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);

@@ -15,11 +15,13 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.InjectCapitalCommand;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -65,6 +67,7 @@ class CapitalInjectionServiceTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock TradingBatchRunPort batchRunPort;
     @Mock CycleOrderStrategies cycleOrderStrategies;
+    @Mock CycleCapitalEventPort cycleCapitalEventPort;
 
     CapitalInjectionService service;
 
@@ -87,7 +90,7 @@ class CapitalInjectionServiceTest {
 
     private CapitalInjectionService newService(Clock clock) {
         return new CapitalInjectionService(strategyPort, accountPort, strategyCyclePort, cyclePositionPort, orderPort, batchRunPort,
-                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock, eventPublisher);
+                new StrategyLedgerBudget(cyclePositionPort, orderPort, batchRunPort, cycleOrderStrategies), clock, eventPublisher, cycleCapitalEventPort);
     }
 
     private void stub(StrategyType type, BigDecimal holdings, BigDecimal avg, LocalDate endDate) {
@@ -122,6 +125,50 @@ class CapitalInjectionServiceTest {
         assertThat(p.avgPrice()).isEqualByComparingTo("20.0000");
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
         verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(userId));
+    }
+
+    private CycleCapitalEvent savedEvent() {
+        ArgumentCaptor<CycleCapitalEvent> c = ArgumentCaptor.forClass(CycleCapitalEvent.class);
+        verify(cycleCapitalEventPort).save(c.capture());
+        return c.getValue();
+    }
+
+    private void assertEvent(CycleCapitalEvent e, CycleCapitalEvent.Kind kind, String deposit, String holdings, String principal) {
+        assertThat(e.id()).isNull();
+        assertThat(e.strategyCycleId()).isEqualTo(cycleId);
+        assertThat(e.cyclePositionId()).isEqualTo(latestId);
+        assertThat(e.kind()).isEqualTo(kind);
+        assertThat(e.depositDelta()).isEqualByComparingTo(deposit);
+        assertThat(e.holdingsDelta()).isEqualByComparingTo(holdings);
+        assertThat(e.principalDelta()).isEqualByComparingTo(principal);
+        assertThat(e.occurredAt()).isEqualTo(Instant.now(FixedClockTestConfig.FIXED));
+    }
+
+    @Test
+    void inject_depositAndShares_recordsEvent() {
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("100.0000"), null);
+
+        service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("500.00"), 5, new BigDecimal("120.00")));
+
+        assertEvent(savedEvent(), CycleCapitalEvent.Kind.INJECT, "500", "5", "1100"); // 500 + 5×120
+    }
+
+    @Test
+    void inject_depositOnly_recordsZeroHoldingsDelta() {
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("100.0000"), null);
+
+        service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("300.00"), null, null));
+
+        assertEvent(savedEvent(), CycleCapitalEvent.Kind.INJECT, "300", "0", "300");
+    }
+
+    @Test
+    void withdraw_recordsNegativeDeltas() {
+        stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("100.0000"), null);
+
+        service.withdraw(strategyId, userId, new WithdrawCapitalCommand(new BigDecimal("300.00")));
+
+        assertEvent(savedEvent(), CycleCapitalEvent.Kind.WITHDRAW, "-300", "0", "-300");
     }
 
     @Test
@@ -409,6 +456,7 @@ class CapitalInjectionServiceTest {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("20.0000"), null);
         withdrawRejected("500.01", IllegalArgumentException.class,
                 "투자금 인출 금액이 인출 가능액 $500.00를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.");
+        verify(cycleCapitalEventPort, never()).save(any());
     }
 
     @Test

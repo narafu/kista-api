@@ -4,6 +4,7 @@ import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -11,6 +12,7 @@ import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
 import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.InjectCapitalCommand;
@@ -28,6 +30,7 @@ import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEve
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -65,6 +68,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     private final StrategyLedgerBudget ledgerBudget;
     private final Clock clock;
     private final ApplicationEventPublisher eventPublisher; // stats 캐시 무효화 이벤트 발행
+    private final CycleCapitalEventPort cycleCapitalEventPort; // 투자금 추가·인출 이력 기록
 
     @Override
     public void inject(UUID strategyId, UUID requesterId, InjectCapitalCommand cmd) {
@@ -107,6 +111,9 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         // 최신 행 in-place 갱신 — detail(리버스모드)은 같은 행에 붙어 있어 그대로 유지
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), cycle.startAmount().add(deposit).add(injectedCost));
+        // 이력 기록 — 원금 변화 = 예수금 추가분 + 주식 매입원가
+        cycleCapitalEventPort.save(new CycleCapitalEvent(null, cycle.id(), latest.id(), CycleCapitalEvent.Kind.INJECT,
+                deposit, sharesBd, deposit.add(injectedCost), Instant.now(clock)));
 
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
         log.info("[strategyId={}] 투자금 추가: deposit={}, shares={}, sharePrice={}, holdings={}, usdDeposit={}",
@@ -172,6 +179,9 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         // 최신 행 in-place 갱신 — append하면 리버스 판정·별점가·이력이 왜곡되고 detail은 같은 행에 유지된다
         cyclePositionPort.updateBalance(latest.id(), newBalance);
         strategyCyclePort.updateStartAmount(cycle.id(), newStartAmount);
+        // 이력 기록 — 인출은 예수금·원금만 음수
+        cycleCapitalEventPort.save(new CycleCapitalEvent(null, cycle.id(), latest.id(), CycleCapitalEvent.Kind.WITHDRAW,
+                amount.negate(), BigDecimal.ZERO, amount.negate(), Instant.now(clock)));
 
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
         log.info("[strategyId={}] 투자금 인출: amount={}, usdDeposit={}, startAmount={}",

@@ -82,6 +82,7 @@ class StrategyServiceTest {
     @Mock StrategyDcaDetailPort dcaDetailPort;                   // DCA 버전 설정 포트
     @Mock DcaExecutionPort dcaExecutionPort;                     // DCA 회차 이력 포트
     @Mock MarketCalendarPort marketCalendarPort;                 // DCA 다음 실행일 계산용 캘린더
+    @Mock CycleCapitalEventPort cycleCapitalEventPort;           // 투자금 추가·인출 이력 존재 확인
     @Mock OrderCancelService orderCancelService;                 // 일시중지·삭제 전 미체결 주문 정리
 
     private StrategyService strategyService;
@@ -151,6 +152,7 @@ class StrategyServiceTest {
                         strategyCyclePort, cyclePositionPort, strategyCycleVrPort, strategyVersionPort, vrStrategyDetailService, FIXED),
                 orderCancelService,
                 eventPublisher,
+                cycleCapitalEventPort,
                 new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
@@ -628,6 +630,27 @@ class StrategyServiceTest {
 
         verify(strategyCyclePort, never()).updateStartAmount(any(), any());
         verify(cyclePositionPort, never()).updateCycleStartSnapshot(any(), any());
+    }
+
+    @Test
+    @DisplayName("update() 투자금 추가·인출 이력이 있는 사이클은 시드 수정을 거절한다")
+    void update_newSeed_rejectedWhenCapitalEventsExist() {
+        CyclePosition latest = new CyclePosition(UUID.randomUUID(), CYCLE_ID,
+                new BigDecimal("1000"), new BigDecimal("110"), null, BigDecimal.ZERO, null, null);
+
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.save(any(Strategy.class))).thenReturn(ACTIVE_STRATEGY);
+        when(strategyCyclePort.requireLatestByStrategyId(STRATEGY_ID)).thenReturn(CYCLE);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(latest));
+        when(cycleCapitalEventPort.existsByCycleId(CYCLE.id())).thenReturn(true);
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("5000"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("투자금 추가·인출 이력이 있는 사이클은 예수금을 수정할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
+
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
     }
 
     @Test
