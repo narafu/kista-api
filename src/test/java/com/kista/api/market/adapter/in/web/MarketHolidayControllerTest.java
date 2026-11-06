@@ -93,13 +93,16 @@ class MarketHolidayControllerTest {
     @Test
     void session_returns_200_without_auth() throws Exception {
         when(marketCalendarQueryPort.currentSession())
-                .thenReturn(new com.kista.shared.contract.marketcalendar.MarketSessionResponse(MarketSession.DIRECT, true));
+                .thenReturn(new com.kista.shared.contract.marketcalendar.MarketSessionResponse(MarketSession.DIRECT, true,
+                        java.time.LocalDate.of(2026, 7, 20), true));
 
         // /api/market/session은 anyRequest().authenticated() 에 해당 — 인증 포함으로 테스트
         mockMvc.perform(get("/api/market/session")
                         .with(authentication(userTokenWithRole(USER_UUID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.session").exists())
+                .andExpect(jsonPath("$.tradeDateKst").value("2026-07-20"))
+                .andExpect(jsonPath("$.tradingDay").value(true))
                 .andExpect(jsonPath("$.isDst").exists());
     }
 }

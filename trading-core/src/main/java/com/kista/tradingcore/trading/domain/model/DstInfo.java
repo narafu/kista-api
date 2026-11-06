@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.domain.model;
 
 import com.kista.shared.kernel.MarketSession;
 import com.kista.shared.kernel.TimeZones;
+import com.kista.shared.platform.time.KstTradeDates;
 
 import java.time.*;
 
@@ -93,18 +94,14 @@ public record DstInfo(
                 atKst(date, marketOpenTime(isDst)));
     }
 
-    // 매매일 경계 기준 시각 — 마감 배치 cron 발화(TradingCloseScheduler 04:30 KST)와 동일 임계값.
-    // 04:30 이후면 당일 배치는 이미 계획 완료 → 다음 세션(익일)이 preview/수동 실행 대상
-    private static final LocalTime SCHEDULER_RUN_TIME = LocalTime.of(4, 30);
-
-    // 주어진 KST 시각 기준 거래일 — 재기동 재개 등 시각을 이미 들고 있는 호출부용
+    // 주어진 KST 시각 기준 거래일 — 재기동 재개 등 시각을 이미 들고 있는 호출부용 (계산은 KstTradeDates SSOT)
     public static LocalDate nextTradeDate(ZonedDateTime nowKst) {
-        return nextTradeDateAt(nowKst.toLocalDate(), nowKst.toLocalTime());
+        return KstTradeDates.nextTradeDate(nowKst);
     }
 
     // 시각 주입식 판단 — nextTradeDate 공용
     static LocalDate nextTradeDateAt(LocalDate today, LocalTime now) {
-        return now.isBefore(SCHEDULER_RUN_TIME) ? today : today.plusDays(1);
+        return KstTradeDates.nextTradeDateAt(today, now);
     }
 
     // 개장 배치 발화 시각 — TradingOpenScheduler cron(22:00 KST 월~금)과 동일. 이 시각에 대상 전략을 확정한다(DST 무관)

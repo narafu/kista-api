@@ -1,6 +1,7 @@
 package com.kista.tradingcore.marketcalendar.adapter.in.web;
 
 import com.kista.shared.contract.marketcalendar.MarketSessionResponse;
+import com.kista.shared.platform.time.KstTradeDates;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.marketcalendar.domain.model.MarketSessionSnapshot;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,7 +40,10 @@ public class MarketCalendarInternalController {
 
     @GetMapping("/session")
     public MarketSessionResponse session() {
-        MarketSessionSnapshot snapshot = MarketSessionSnapshot.at(ZonedDateTime.now(clock));
-        return new MarketSessionResponse(snapshot.session(), snapshot.isDst());
+        ZonedDateTime nowKst = ZonedDateTime.now(clock);
+        MarketSessionSnapshot snapshot = MarketSessionSnapshot.at(nowKst);
+        LocalDate tradeDateKst = KstTradeDates.nextTradeDate(nowKst); // KST 거래일
+        return new MarketSessionResponse(snapshot.session(), snapshot.isDst(),
+                tradeDateKst, marketCalendarPort.isMarketOpen(tradeDateKst));
     }
 }
