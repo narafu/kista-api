@@ -4,14 +4,18 @@ import com.kista.api.market.application.port.output.CandleQueryPort;
 import com.kista.api.market.domain.model.CandleUnavailableException;
 import com.kista.shared.contract.broker.DailyCandleResponse;
 import com.kista.shared.platform.internalapi.InternalApiErrorDetails;
+import com.kista.shared.platform.web.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -60,10 +64,16 @@ class CandleQueryHttpAdapter implements CandleQueryPort {
                 UNAVAILABLE_DETAIL));
     }
 
-    // trading-core 422(서버 시세 조회용 증권사 키 무효) — 공개 시세 API라 사용자가 고칠 수 없는 서버 장애이므로 503으로 복원한다.
-    // trading-core는 4xx를 보고하지 않아 키 만료를 놓치지 않도록 여기서 log.error로 남기고, detail("API 키가 유효하지 않습니다")은 사용자를 오도하므로 고정 문구를 쓴다
+    // trading-core 422 중 BROKER_CREDENTIAL_INVALID(서버 시세 조회용 증권사 키 무효)만 503으로 복원한다 — 공개 시세 API라 사용자가 고칠 수 없는 서버 장애다.
+    // trading-core는 4xx를 보고하지 않아 키 만료를 놓치지 않도록 log.error로 남기고, detail("API 키가 유효하지 않습니다")은 사용자를 오도하므로 고정 문구를 쓴다.
+    // 다른 코드의 422는 의미를 모르므로 기본 동작(HttpClientErrorException → root catch-all 보고)을 유지한다
     private static void throwCredentialInvalid(HttpRequest request,
-                                               ClientHttpResponse response) {
+                                               ClientHttpResponse response) throws IOException {
+        byte[] body = response.getBody().readAllBytes();
+        if (!ErrorCode.BROKER_CREDENTIAL_INVALID.name().equals(InternalApiErrorDetails.codeOrNull(body))) {
+            throw HttpClientErrorException.create(response.getStatusCode(), response.getStatusText(),
+                    response.getHeaders(), body, StandardCharsets.UTF_8);
+        }
         log.error("캔들 조회용 증권사 키가 유효하지 않습니다: {}", request.getURI().getPath());
         throw new CandleUnavailableException(UNAVAILABLE_DETAIL);
     }

@@ -28,4 +28,14 @@ public final class InternalApiErrorDetails {
         }
         return fallback;
     }
+
+    // ProblemDetail의 기계 판독 "code" 필드 — 같은 status에 여러 의미가 실려 올 때 분기용. 없거나 파싱 실패면 null
+    public static String codeOrNull(byte[] body) {
+        try {
+            JsonNode code = MAPPER.readTree(body).get("code");
+            return code != null && code.isString() ? code.asString() : null;
+        } catch (Exception _) {
+            return null; // 바디 파싱 실패 — 코드 없음
+        }
+    }
 }

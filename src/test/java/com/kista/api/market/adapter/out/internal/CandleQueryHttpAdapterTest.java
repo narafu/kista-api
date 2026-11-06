@@ -10,6 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
@@ -96,5 +97,17 @@ class CandleQueryHttpAdapterTest {
         assertThatThrownBy(() -> adapter.dailyCandles("SOXL", java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 1, 2)))
                 .isInstanceOf(CandleUnavailableException.class)
                 .hasMessage("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    @Test
+    void 키_무효가_아닌_422는_기본_HttpClientErrorException을_그대로_던진다() {
+        server.enqueue(new MockResponse.Builder()
+                .code(422).addHeader("Content-Type", "application/problem+json")
+                .body("{\"detail\":\"다른 오류입니다.\",\"status\":422,\"code\":\"OTHER\"}")
+                .build());
+
+        assertThatThrownBy(() -> adapter.latestDailyCandles("QQQ", 1))
+                .isInstanceOfSatisfying(HttpClientErrorException.UnprocessableContent.class,
+                        ex -> assertThat(ex.getResponseBodyAsString()).contains("다른 오류입니다.")); // 읽은 바디를 예외에 보존
     }
 }

@@ -41,4 +41,12 @@ class InternalApiErrorDetailsTest {
     private static ClientHttpResponse jsonResponse(String body) {
         return new MockClientHttpResponse(body.getBytes(StandardCharsets.UTF_8), 500);
     }
+
+    @Test
+    void code_필드는_문자열일_때만_반환하고_없거나_JSON이_아니면_null() {
+        assertThat(InternalApiErrorDetails.codeOrNull("{\"code\":\"BROKER_CREDENTIAL_INVALID\"}".getBytes(StandardCharsets.UTF_8)))
+                .isEqualTo("BROKER_CREDENTIAL_INVALID");
+        assertThat(InternalApiErrorDetails.codeOrNull("{\"detail\":\"x\"}".getBytes(StandardCharsets.UTF_8))).isNull();
+        assertThat(InternalApiErrorDetails.codeOrNull("not-a-json".getBytes(StandardCharsets.UTF_8))).isNull();
+    }
 }
