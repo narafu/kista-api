@@ -14,6 +14,8 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
@@ -49,15 +51,17 @@ class TradingStatsService implements TradingStatsUseCase {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
+    private final CycleCapitalEventPort cycleCapitalEventPort; // 투자금 추가·인출 이력 — 과거 원금·자산·장부가 실현손익 복원용
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     private final TtlResultCache statsResultCache; // summary/equity-curve 결과 캐시
 
     TradingStatsService(AccountPort accountPort, StrategyPort strategyPort, StrategyCyclePort strategyCyclePort,
-                        CyclePositionPort cyclePositionPort, Clock clock) {
+                        CyclePositionPort cyclePositionPort, CycleCapitalEventPort cycleCapitalEventPort, Clock clock) {
         this.accountPort = accountPort;
         this.strategyPort = strategyPort;
         this.strategyCyclePort = strategyCyclePort;
         this.cyclePositionPort = cyclePositionPort;
+        this.cycleCapitalEventPort = cycleCapitalEventPort;
         this.clock = clock;
         this.statsResultCache = new TtlResultCache(clock);
     }
@@ -73,7 +77,7 @@ class TradingStatsService implements TradingStatsUseCase {
     private record EquityCurveKey(UUID userId, StrategyType type, LocalDate from, LocalDate to) {}
 
     // 사이클 + 소속 전략 조인 뷰 — 원금 = 사이클 시작 금액(추가·인출 반영), 자산 = 예수금 + 보유 평가액(시드 점유 전략 공통)
-    private record CycleView(StrategyCycle cycle, Strategy strategy) {
+    private record CycleView(StrategyCycle cycle, Strategy strategy, List<CycleCapitalEvent> events) {
         boolean closed() {
             return cycle.endAmount() != null && cycle.endDate() != null;
         }
@@ -82,6 +86,17 @@ class TradingStatsService implements TradingStatsUseCase {
             return cycle.startAmount();
         }
 
+        // date(KST) 시점의 원금 — 그 뒤 추가·인출분을 현재 시작 금액에서 되돌린다
+        BigDecimal principalOn(LocalDate date) {
+            return cycle.startAmount().subtract(CapitalLedgerTimeline.principalDeltaAfter(events, date));
+        }
+
+        // 사이클이 열린 시점의 시작 금액 — 이후 추가·인출 전체를 되돌린다
+        BigDecimal startAmountAtOpen() {
+            return cycle.startAmount().subtract(CapitalLedgerTimeline.principalDeltaTotal(events));
+        }
+
+        // 구간 손익(종료 − 시작) — 승률·평균 수익률·성과 목록·체인 보정 기준
         BigDecimal realizedPnl() {
             return cycle.endAmount().subtract(principal());
         }
@@ -133,8 +148,13 @@ class TradingStatsService implements TradingStatsUseCase {
                 .collect(Collectors.groupingBy(v -> v.strategy().type(),
                         () -> new EnumMap<>(StrategyType.class), Collectors.toList()));
 
+        // 종료 사이클의 장부가 실현손익 계산용 첫·마지막 스냅샷 — 종료 사이클이 없으면 조회 생략
+        Set<UUID> closedIds = cycles.stream().filter(CycleView::closed).map(v -> v.cycle().id()).collect(Collectors.toSet());
+        Map<UUID, CyclePosition> firstPositions = closedIds.isEmpty() ? Map.of() : cyclePositionPort.findFirstByCycleIds(closedIds);
+        Map<UUID, CyclePosition> lastPositions = closedIds.isEmpty() ? Map.of() : cyclePositionPort.findLatestByCycleIds(closedIds);
+
         List<StrategyTypeStats> typeStats = byType.entrySet().stream()
-                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle))
+                .map(e -> toTypeStats(e.getKey(), e.getValue(), unrealizedByCycle, firstPositions, lastPositions))
                 .toList();
 
         BigDecimal totalRealized = sum(typeStats.stream().map(StrategyTypeStats::realizedPnl));
@@ -164,7 +184,10 @@ class TradingStatsService implements TradingStatsUseCase {
                 .toList();
         Set<UUID> cycleIds = cycles.stream().map(v -> v.cycle().id()).collect(Collectors.toSet());
         // userId 스코프는 loadCycles(userId, true)가 이미 보장 — DB 조회 자체를 cycleIds로 좁혀 불필요한 타입 전체 조회 방지
-        List<CyclePosition> positions = cyclePositionPort.findByCycleIdsAndRange(cycleIds, fromInstant, toInstant);
+        List<CyclePosition> raw = cyclePositionPort.findByCycleIdsAndRange(cycleIds, fromInstant, toInstant);
+        // 투자금 추가·인출로 덮어쓴 과거 스냅샷을 이력으로 복원
+        List<CyclePosition> positions = CapitalLedgerTimeline.restore(raw,
+                cycles.stream().flatMap(v -> v.events().stream()).toList());
         List<EquityPoint> points = buildPoints(cycles, positions, from, effectiveTo);
         return new EquityCurve(points);
     }
@@ -213,8 +236,11 @@ class TradingStatsService implements TradingStatsUseCase {
                 .collect(Collectors.toMap(Strategy::id, Function.identity()));
         if (strategies.isEmpty()) return List.of();
         List<StrategyCycle> cycles = strategyCyclePort.findByStrategyIds(strategies.keySet());
+        Map<UUID, List<CycleCapitalEvent>> eventsByCycle = cycleCapitalEventPort
+                .findByCycleIds(cycles.stream().map(StrategyCycle::id).toList()).stream()
+                .collect(Collectors.groupingBy(CycleCapitalEvent::strategyCycleId));
         return cycles.stream()
-                .map(c -> new CycleView(c, strategies.get(c.strategyId())))
+                .map(c -> new CycleView(c, strategies.get(c.strategyId()), eventsByCycle.getOrDefault(c.id(), List.of())))
                 .toList();
     }
 
@@ -235,13 +261,17 @@ class TradingStatsService implements TradingStatsUseCase {
     }
 
     private StrategyTypeStats toTypeStats(StrategyType type, List<CycleView> views,
-                                          Map<UUID, BigDecimal> unrealizedByCycle) {
+                                          Map<UUID, BigDecimal> unrealizedByCycle,
+                                          Map<UUID, CyclePosition> firstPositions,
+                                          Map<UUID, CyclePosition> lastPositions) {
         List<CycleView> closed = views.stream().filter(CycleView::closed).toList();
         List<CycleView> active = views.stream().filter(v -> !v.closed()).toList();
 
-        BigDecimal realizedPnl = sum(closed.stream().map(CycleView::realizedPnl));
-        BigDecimal unrealizedPnl = sum(active.stream()
-                .map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO)));
+        // 총 손익 = 종료 구간 손익 + 진행 중 미실현 — 실현(매도 확정분)만 장부가로 갈라내고 나머지는 미실현으로 둬 합을 보존한다
+        BigDecimal totalPnl = sum(closed.stream().map(CycleView::realizedPnl))
+                .add(sum(active.stream().map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO))));
+        BigDecimal realizedPnl = sum(closed.stream().map(v -> settledPnl(v, firstPositions, lastPositions)));
+        BigDecimal unrealizedPnl = totalPnl.subtract(realizedPnl).setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal winRate = null;
         BigDecimal avgReturnRate = null;
@@ -268,6 +298,15 @@ class TradingStatsService implements TradingStatsUseCase {
         }
         return new StrategyTypeStats(type, closed.size(), active.size(),
                 winRate, avgReturnRate, avgDurationDays, realizedPnl, unrealizedPnl);
+    }
+
+    // 종료 사이클의 실현손익 — 보유 0으로 끝났으면 종료 − 시작, 보유가 남았으면(VR 롤오버·재설정) 장부가 기준 매도 확정분
+    private static BigDecimal settledPnl(CycleView v, Map<UUID, CyclePosition> firstPositions,
+                                         Map<UUID, CyclePosition> lastPositions) {
+        CyclePosition first = firstPositions.get(v.cycle().id());
+        CyclePosition last = lastPositions.get(v.cycle().id());
+        if (first == null || last == null || last.holdings().signum() == 0) return v.realizedPnl();
+        return CapitalLedgerTimeline.bookRealized(first, last, v.events());
     }
 
     // 날짜(KST)별 사이클 최신 스냅샷 carry-forward 합산.
@@ -313,7 +352,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
                 if (!view.cycle().id().equals(chains.get(view.cycle().strategyId()).last().id())) continue; // 후속 사이클이 있으면 탈락
                 asset = asset.add(posEntry.getValue().totalAssetWithAvgPriceFallback());
-                principal = principal.add(view.principal());
+                principal = principal.add(view.principalOn(date));
                 ChainAdjustment adj = adjustments.get(view.cycle().strategyId());
                 if (adj != null) { // 앞선 종료 사이클의 손익은 유지하고 전략 밖으로 빠진 금액(surplus)만 자산·원금에 더한다
                     asset = asset.add(adj.surplus());
@@ -338,7 +377,7 @@ class TradingStatsService implements TradingStatsUseCase {
             CycleView prev = cycleById.get(cs[i].id());
             if (!prev.closed()) continue;
             realized = realized.add(prev.realizedPnl());
-            surplus = surplus.add(prev.cycle().endAmount().subtract(cs[i + 1].startAmount()).max(BigDecimal.ZERO));
+            surplus = surplus.add(prev.cycle().endAmount().subtract(cycleById.get(cs[i + 1].id()).startAmountAtOpen()).max(BigDecimal.ZERO));
         }
         return new ChainAdjustment(realized, surplus);
     }

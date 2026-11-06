@@ -12,6 +12,8 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
+import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
+import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import org.junit.jupiter.api.BeforeEach;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.junit.jupiter.api.Test;
@@ -48,11 +50,12 @@ class TradingStatsServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
+    @Mock CycleCapitalEventPort cycleCapitalEventPort;
     TradingStatsService statsService;
 
     @BeforeEach
     void setUp() {
-        statsService = new TradingStatsService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, FixedClockTestConfig.FIXED);
+        statsService = new TradingStatsService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, cycleCapitalEventPort, FixedClockTestConfig.FIXED);
     }
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -776,5 +779,146 @@ class TradingStatsServiceTest {
         statsService.getEquityCurve(USER_ID, null, LocalDate.parse("2026-06-01"), LocalDate.parse("2026-07-31"));
 
         verify(cyclePositionPort, times(2)).findByCycleIdsAndRange(any(), any(), any());
+    }
+
+    // ── 투자금 이력 소비 ─────────────────────────────────────────────────────
+
+    private static final Strategy VR_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.VR,
+            StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+
+    private void stubUserWith(Strategy strategy) {
+        when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
+        when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
+    }
+
+    private static CyclePosition position(UUID id, UUID cycleId, String deposit, String closing, String avg,
+                                          int holdings, String createdAt) {
+        return new CyclePosition(id, cycleId, new BigDecimal(deposit),
+                closing != null ? new BigDecimal(closing) : null, avg != null ? new BigDecimal(avg) : null,
+                BigDecimal.valueOf(holdings), Instant.parse(createdAt), null);
+    }
+
+    private static CycleCapitalEvent injectEvent(UUID cycleId, UUID positionId, String deposit, String occurredAt) {
+        return new CycleCapitalEvent(UUID.randomUUID(), cycleId, positionId, CycleCapitalEvent.Kind.INJECT,
+                new BigDecimal(deposit), BigDecimal.ZERO, new BigDecimal(deposit), Instant.parse(occurredAt));
+    }
+
+    private static StrategyCycle closedCycleOf(Strategy strategy, String start, String end) {
+        return new StrategyCycle(UUID.randomUUID(), strategy.id(), null, new BigDecimal(start), new BigDecimal(end),
+                LocalDate.parse("2026-01-01"), LocalDate.parse("2026-02-01"), Instant.parse("2026-01-01T00:00:00Z"), null);
+    }
+
+    @Test
+    void equityCurve_capitalInjection_keepsPastPrincipalAndAsset() {
+        stubUserWith(PRIVACY_STRATEGY);
+        StrategyCycle active = activeCycle(PRIVACY_STRATEGY_ID, "15000.00", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(active));
+        UUID p2 = UUID.randomUUID();
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                position(UUID.randomUUID(), active.id(), "10000", null, null, 0, "2026-06-01T03:00:00Z"),
+                position(p2, active.id(), "15000", null, null, 0, "2026-06-10T03:00:00Z")));
+        // 06-20 KST에 +5,000 추가 — P2는 현재값(15,000)이라 원본 10,000으로 되돌려야 한다
+        when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
+                injectEvent(active.id(), p2, "5000", "2026-06-20T03:00:00Z")));
+
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+
+        assertThat(points).extracting(EquityPoint::date)
+                .containsExactly(LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-10"), LocalDate.parse("2026-06-20"));
+        assertThat(points.get(0).totalAsset()).isEqualByComparingTo("10000");
+        assertThat(points.get(0).principal()).isEqualByComparingTo("10000");
+        assertThat(points.get(1).totalAsset()).isEqualByComparingTo("10000");
+        assertThat(points.get(1).principal()).isEqualByComparingTo("10000");
+        assertThat(points.get(2).totalAsset()).isEqualByComparingTo("15000");
+        assertThat(points.get(2).principal()).isEqualByComparingTo("15000");
+    }
+
+    @Test
+    void equityCurve_chainSurplus_usesStartAmountAtRotation() {
+        stubUserWithStrategy();
+        StrategyCycle c1 = closedCycle("10000.00", "12000.00", "2026-06-01", "2026-06-10");
+        StrategyCycle c2 = activeCycle("13000.00", "2026-06-10"); // 현재 13,000 = 회전 시점 11,000 + 이후 추가 2,000
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
+        UUID row = UUID.randomUUID();
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                position(UUID.randomUUID(), c1.id(), "11000", null, null, 0, "2026-06-05T03:00:00Z"),
+                position(row, c2.id(), "13000", null, null, 0, "2026-06-10T03:00:00Z")));
+        when(cycleCapitalEventPort.findByCycleIds(any())).thenReturn(List.of(
+                injectEvent(c2.id(), row, "2000", "2026-06-20T03:00:00Z")));
+
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+
+        // surplus = 12,000 - 11,000 = 1,000, realized = 2,000
+        assertThat(points).hasSize(3);
+        assertThat(points.get(1).totalAsset()).isEqualByComparingTo("12000");
+        assertThat(points.get(1).principal()).isEqualByComparingTo("10000");
+        assertThat(points.get(2).totalAsset()).isEqualByComparingTo("14000");
+        assertThat(points.get(2).principal()).isEqualByComparingTo("12000");
+    }
+
+    // 종료 사이클의 첫·마지막 스냅샷 스텁 (Set.of(id) 조회)
+    private void stubClosedSnapshots(StrategyCycle closed, CyclePosition first, CyclePosition last) {
+        when(cyclePositionPort.findFirstByCycleIds(Set.of(closed.id()))).thenReturn(Map.of(closed.id(), first));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(closed.id()))).thenReturn(Map.of(closed.id(), last));
+    }
+
+    @Test
+    void summary_vrRollover_splitsRealizedAndUnrealized() {
+        stubUserWith(VR_STRATEGY);
+        StrategyCycle c1 = closedCycleOf(VR_STRATEGY, "10000", "12200");
+        StrategyCycle c2 = activeCycle(VR_STRATEGY.id(), "12200", "2026-02-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
+        stubClosedSnapshots(c1,
+                position(UUID.randomUUID(), c1.id(), "5000", "100", "100", 50, "2026-01-01T03:00:00Z"),
+                position(UUID.randomUUID(), c1.id(), "6200", "100", "100", 40, "2026-02-01T03:00:00Z"));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(c2.id()))).thenReturn(Map.of(c2.id(),
+                position(UUID.randomUUID(), c2.id(), "6200", "160", "100", 40, "2026-02-02T03:00:00Z")));
+
+        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+
+        // 장부가 실현 = 10,200 - 10,000, 미실현 = 합 2,600 - 200
+        assertThat(vr.realizedPnl()).isEqualByComparingTo("200.00");
+        assertThat(vr.unrealizedPnl()).isEqualByComparingTo("2400.00");
+    }
+
+    @Test
+    void summary_vrReconfigureWithoutSell_realizedZero() {
+        stubUserWith(VR_STRATEGY);
+        StrategyCycle c1 = closedCycleOf(VR_STRATEGY, "10000", "10500");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1));
+        stubClosedSnapshots(c1,
+                position(UUID.randomUUID(), c1.id(), "5000", "100", "100", 50, "2026-01-01T03:00:00Z"),
+                position(UUID.randomUUID(), c1.id(), "5000", "110", "100", 50, "2026-02-01T03:00:00Z"));
+
+        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+
+        assertThat(vr.realizedPnl()).isEqualByComparingTo("0.00");
+        assertThat(vr.unrealizedPnl()).isEqualByComparingTo("500.00");
+    }
+
+    @Test
+    void summary_liquidatedWithInitialHoldings_realizedIsEndMinusStart() {
+        stubUserWith(PRIVACY_STRATEGY);
+        StrategyCycle c1 = closedCycleOf(PRIVACY_STRATEGY, "10000", "11000");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1));
+        stubClosedSnapshots(c1,
+                position(UUID.randomUUID(), c1.id(), "4000", "80", "60", 100, "2026-01-01T03:00:00Z"),
+                position(UUID.randomUUID(), c1.id(), "11000", null, null, 0, "2026-02-01T03:00:00Z"));
+
+        StrategyTypeStats privacy = statsService.getSummary(USER_ID).byType().getFirst();
+
+        assertThat(privacy.realizedPnl()).isEqualByComparingTo("1000.00");
+        assertThat(privacy.unrealizedPnl()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void cyclePerformances_unchangedForVrRollover() {
+        stubUserWith(VR_STRATEGY);
+        StrategyCycle c1 = closedCycleOf(VR_STRATEGY, "10000", "12200");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1));
+
+        CyclePerformance perf = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().getFirst();
+
+        assertThat(perf.pnl()).isEqualByComparingTo("2200");
     }
 }
