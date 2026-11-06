@@ -49,7 +49,7 @@ class DcaRuleDecisionTest {
 
     private DcaRuleDecision decide(DcaRule r, Market m, AccountBalance ledger, String sellable, String close, String current, String cash) {
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, m, List.of(bd(close)), ledger, bd(sellable), null, bd(current),
-                cash == null && !m.isCrypto() && r.direction() == OrderDirection.BUY ? DcaCycleOrderStrategy.UNLIMITED_CASH : bd(cash),
+                cash == null && !m.isCrypto() && r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : bd(cash),
                 m.isCrypto() ? UPBIT_LIKE : null));
     }
 
@@ -100,7 +100,7 @@ class DcaRuleDecisionTest {
     }
 
     @Test
-    void 판매가능수량_조회실패는_DATA_UNAVAILABLE() {
+    void 원장_조회실패는_DATA_UNAVAILABLE() {
         DcaRule r = stock(OrderDirection.SELL, amount("1000"), DcaShortfallPolicy.PARTIAL, List.of());
         assertThat(skipped(stockSell(r, "20", null)).reason()).isEqualTo(DcaSkipReason.DATA_UNAVAILABLE);
     }

@@ -40,8 +40,8 @@ public class TradingCycleController {
     private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
     private final TradingExecutionUseCase tradingExecution;      // 수동 실행 + 주문 취소
     private final VrReconfigureUseCase vrReconfigure;            // VR 전략 운영 중 재설정
-    private final InjectCapitalUseCase injectCapital;           // PRIVACY·INFINITE 진행 중 사이클 투자금 추가
-    private final WithdrawCapitalUseCase withdrawCapital;       // PRIVACY·INFINITE 진행 중 사이클 투자금 인출
+    private final InjectCapitalUseCase injectCapital;           // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 추가
+    private final WithdrawCapitalUseCase withdrawCapital;       // PRIVACY·INFINITE·DCA 진행 중 사이클 투자금 인출
     private final DcaConfigUseCase dcaConfig;                    // DCA 설정 수정
     private final DcaExecutionQuery dcaExecutionQuery;           // DCA 회차 이력 조회
     private final Clock clock;                                   // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
@@ -112,7 +112,7 @@ public class TradingCycleController {
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 
-    // 진행 중 PRIVACY·INFINITE 사이클 투자금 추가 — 사이클 유지, 포지션 스냅샷 append
+    // 진행 중 PRIVACY·INFINITE·DCA 사이클 투자금 추가 — 사이클 유지, 포지션 스냅샷 append
     @Operation(summary = "진행 중 사이클 투자금 추가")
     @PostMapping("/api/trading-cycles/{id}/capital-injection")
     public TradingCycleResponse injectCapital(
@@ -123,7 +123,7 @@ public class TradingCycleController {
         return TradingCycleResponse.from(tradingCycle.getById(id, userId));
     }
 
-    // 진행 중 PRIVACY·INFINITE 사이클 투자금 인출 — 장부 예수금·startAmount 차감(브로커 호출 없음)
+    // 진행 중 PRIVACY·INFINITE·DCA 사이클 투자금 인출 — 장부 예수금·startAmount 차감(브로커 호출 없음)
     @Operation(summary = "진행 중 사이클 투자금 인출")
     @PostMapping("/api/trading-cycles/{id}/capital-withdrawal")
     public TradingCycleResponse withdrawCapital(

@@ -16,7 +16,7 @@ public record StrategyDetail(
         VrSummary vr,           // VR 전략만 non-null, 비VR은 null (com.kista.tradingcore.trading.domain.model.VrSummary)
         DcaSummary dca,         // DCA 전략만 non-null
         boolean cycleInProgress, // 최신 사이클이 존재하고 종료(endDate)되지 않음 — 투자금 추가 NO_ACTIVE_CYCLE 판정과 동일 기준
-        BigDecimal ledgerUsdDeposit // 최신 cycle_position 장부 예수금 (USD, 포지션 없으면 null) — 투자금 인출 최대 기준
+        BigDecimal ledgerDeposit // 최신 cycle_position 장부 예수금 (계좌 통화 — 주식 USD·코인 견적 통화, 포지션 없으면 null) — 투자금 인출 최대 기준
 ) {
     public StrategyDetail {
         // 코인 DCA 원장은 소수 보유라 정수 필드에 싣지 않는다 — 소수 보유·평단은 dca.currentHoldings/avgPrice, 실잔고는 crypto-portfolio

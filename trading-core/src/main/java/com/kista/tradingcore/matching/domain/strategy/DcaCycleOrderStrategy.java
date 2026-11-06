@@ -29,13 +29,9 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
-    // 주식 BUY 가용 USD 상한을 걸지 않는 입력(MOCK·US 주식 외 계좌) — availableCash null은 조회 실패(DATA_UNAVAILABLE)라 구분용 값
-    public static final BigDecimal UNLIMITED_CASH = new BigDecimal("1000000000000");
-
     // 규칙 단위 판정 입력 — closes: 전일까지 종가(null=조회 실패), ledger: 원장(AVG_PRICE·보유비율 기준),
-    // sellableAfterReserved: SELL 상한 — 주식은 원장 − 기존 예약분 − 앞 규칙 계획분(브로커 잔고 미사용), 코인은 원장 − 앞 틱 매도분 ∧ 지갑 보유,
-    // currentPrice: 현재가(null=조회 실패), availableCash: BUY 가용 금액(null=조회 실패) — 크립토는 지갑 견적 통화,
-    // 주식은 계좌 미배정 USD(증권사 매수가능 − 다른 시드 전략 원장 − 미차감 기존 BUY), 상한 없음은 UNLIMITED_CASH,
+    // sellableAfterReserved: SELL 상한 — 원장 보유 − 기존 예약·취소 체결분(주식) / 같은 틱 앞 규칙 매도분(코인), null=원장 없음,
+    // currentPrice: 현재가(null=조회 실패), availableCash: BUY 상한 = 원장 예수금(계좌 통화) − 체결 전 BUY 약정, null=원장 없음,
     // tradingRules: 크립토 필수(거래소 수수료·최소 금액·수량 단위), 주식은 null
     public record DcaRuleInputs(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
                                 BigDecimal sellableAfterReserved, BigDecimal fearGreed, BigDecimal currentPrice,
@@ -52,7 +48,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     // 주식 DCA 배치 계획 — 판정할 규칙마다 decideRule, 같은 시점 발동 규칙은 각자 주문(상계 없음)
     // SELL 가용 = 수집 시점 상한(원장 − 기존 예약분) − 같은 배치 앞 규칙이 계획한 SELL — 규칙 합계가 원장을 넘지 않게
-    // BUY 가용 = 수집 시점 미배정 USD − 같은 배치 앞 규칙이 계획한 BUY(수량 × 캡가) — 규칙 합계가 가용을 넘지 않게
+    // BUY 가용 = 수집 시점 원장 예수금 잔여 − 같은 배치 앞 규칙이 계획한 BUY(수량 × 캡가) — 규칙 합계가 원장을 넘지 않게
     // 판정할 규칙이 없어도 빈 계획을 돌려준다(전략 차원 skip 아님). 코인은 CryptoDcaRoundExecutor가 decideRule을 직접 부른다
     @Override
     public Optional<OrderPlan> plan(PlanContext ctx) {
@@ -106,7 +102,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
         }
         if (sell && in.sellableAfterReserved() == null) {
-            return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "판매가능수량 조회 실패", basis);
+            return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
         }
         Optional<DcaDecision.Skipped> notMet = DcaConditions.check(rule, closes, in.ledger(), in.fearGreed(), basis);
         if (notMet.isPresent()) {
@@ -119,7 +115,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         BigDecimal quantity;
         BigDecimal notional = null;
         if (sell) {
-            // 가용 = min(원장 보유, 상한) — 주식은 상한이 이미 원장 기반, 코인은 지갑 보유 반영
+            // 가용 = min(원장 보유, 상한) — 상한은 원장에서 예약·앞 규칙 매도분을 뺀 값
             BigDecimal available = in.ledger().holdings().min(in.sellableAfterReserved()).setScale(scale, RoundingMode.FLOOR);
             if (available.signum() <= 0) {
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", basis);
@@ -134,13 +130,13 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             quantity = want.min(available);
         } else if (crypto) {
             if (in.availableCash() == null) {
-                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "주문 가능 잔고 조회 실패", basis);
+                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
             }
-            // 금액은 계좌 통화 소수 자릿수 — 수수료 포함 지출이 지갑을 넘지 않게 가용 금액을 역산
+            // 금액은 계좌 통화 소수 자릿수 — 수수료 포함 지출이 원장 예수금을 넘지 않게 가용 금액을 역산
             int amountScale = in.market().amountScale();
             BigDecimal affordable = in.tradingRules().affordableAmount(in.availableCash(), amountScale);
             BigDecimal want = rule.sizing().amount().setScale(amountScale, RoundingMode.FLOOR);
-            // 가용 0이면 PARTIAL도 잔고 부족 — 최소 금액 미달로 기록되면 원인(지갑 비어 있음)이 가려진다
+            // 가용 0이면 PARTIAL도 잔고 부족 — 최소 금액 미달로 기록되면 원인(원장 예수금 없음)이 가려진다
             if (want.compareTo(affordable) > 0 && (rule.shortfall() == DcaShortfallPolicy.REJECT || affordable.signum() <= 0)) {
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.INSUFFICIENT_BALANCE,
                         "필요 " + DcaConditions.plain(want) + " > 가용 " + DcaConditions.plain(affordable), basis);
@@ -149,7 +145,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             quantity = notional.divide(basis, scale, RoundingMode.FLOOR);
         } else {
             if (in.availableCash() == null) {
-                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "주문 가능 잔고 조회 실패", basis);
+                return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
             }
             // 주문가는 캡 지정가라 가용 수량 = floor(가용 / 캡가)
             BigDecimal want = rule.sizing().amount().divide(basis, 0, RoundingMode.FLOOR);
@@ -191,9 +187,6 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
 
     @Override
     public boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) { return false; } // 계획 시점 캡가 고정
-
-    @Override
-    public boolean occupiesSeed() { return false; } // 시드 없이 규칙 금액만 매매
 
     @Override
     public boolean fixesPricesAtPlan() { return true; } // 계획 시점 캡가 고정 — 현재가 기준 재캡 없음

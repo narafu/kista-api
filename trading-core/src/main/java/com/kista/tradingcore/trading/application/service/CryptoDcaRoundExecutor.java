@@ -8,8 +8,6 @@ import com.kista.shared.kernel.OrderStatus;
 import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
-import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -34,7 +32,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +40,8 @@ import java.util.Set;
 import java.util.UUID;
 
 // 코인 DCA 회차 실행 — 한 계좌의 이번 틱 대상 전략×규칙을 decideRule 판정·시장가 주문·이력 기록까지 처리
-// 원장 = 최신 cycle_position(체결 동기화가 갱신), 매도 가용 = min(원장 − 같은 틱 앞 규칙 매도분, 지갑 매도 가능 수량)
+// 원장 = 최신 cycle_position(체결 동기화가 갱신) — 매수 가용 = 원장 예수금 − 미체결 BUY − 같은 틱 앞 규칙 매수분,
+// 매도 가용 = 원장 보유 − 미체결 SELL − 같은 틱 앞 규칙 매도분 (거래소 잔고는 보지 않는다)
 // HTTP를 포함하므로 @Transactional 없음 — 상태 변경은 OrderPort·recorder의 개별 트랜잭션. 계좌 단위 예외는 호출부(Task 8)가 격리
 @Slf4j
 @Component
@@ -60,11 +58,10 @@ class CryptoDcaRoundExecutor {
     // 이번 틱 판정 단위 — 전략 컨텍스트 × 규칙
     private record Target(BatchContext ctx, DcaRule rule) {}
 
-    // 한 틱 안의 로컬 차감 지갑 — 같은 계좌 후속 규칙이 이미 쓴 원화·보유 수량을 보게 한다(매도 대금은 더하지 않음 — 보수적)
-    private static final class Wallet {
-        BigDecimal quote;                       // 견적 통화 가용
-        final Map<StrategyTicker, BigDecimal> held = new EnumMap<>(StrategyTicker.class); // 코인별 매도 가능 수량
-        final Map<UUID, BigDecimal> ledgerSold = new HashMap<>(); // 사이클별 같은 틱 앞 규칙 매도 수량 — 규칙 합계가 원장을 넘지 않게
+    // 원장 약정 — 사이클별 아직 원장에 반영되지 않은 매수 지출·매도 수량(미체결 주문 + 같은 틱 앞 규칙). 매도 대금은 체결 전까지 더하지 않는다(보수적)
+    private static final class Committed {
+        final Map<UUID, BigDecimal> spent = new HashMap<>(); // 사이클별 견적 통화 지출(수수료 포함)
+        final Map<UUID, BigDecimal> sold = new HashMap<>();  // 사이클별 매도 수량
     }
 
     private final CryptoFearGreedIndexPort fearGreedPort;
@@ -86,16 +83,12 @@ class CryptoDcaRoundExecutor {
         List<Optional<BigDecimal>> fearGreedMemo = new ArrayList<>(1); // 비어 있으면 미조회
         int i = 0;
         try {
-            BrokerAccountRef ref = targets.get(0).ctx().account().brokerRef();
-            CryptoBalance balance = exchange.getBalance(ref);
             // 원장 — 사이클별 최신 cycle_position 1회 배치 조회. 행이 없으면(초기 보유 없는 첫 체결 전) 0
             Map<UUID, CyclePosition> ledgers = cyclePositionPort.findLatestByCycleIds(
                     targets.stream().map(t -> t.ctx().currentCycle().id()).distinct().toList());
             Map<StrategyTicker, BigDecimal> prices = exchange.getCurrentPrices(
                     targets.stream().map(t -> t.ctx().strategy().ticker()).distinct().toList());
-            Wallet wallet = new Wallet();
-            wallet.quote = balance.quoteAvailable();
-            balance.holdings().forEach((t, h) -> wallet.held.put(t, h.available()));
+            Committed committed = openCommitments(targets.get(0).ctx().account().id());
             for (; i < targets.size(); i++) {
                 BatchContext ctx = targets.get(i).ctx();
                 DcaRule rule = targets.get(i).rule();
@@ -111,21 +104,21 @@ class CryptoDcaRoundExecutor {
                 UUID cycleId = ctx.currentCycle().id();
                 CyclePosition position = ledgers.get(cycleId);
                 AccountBalance ledger = position == null ? new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO) : position.toBalance();
-                // 매도 가용 — 원장에서 같은 틱 앞 규칙 매도분을 빼고 지갑 매도 가능 수량(로컬 차감)으로 상한
-                BigDecimal sellable = ledger.holdings().subtract(wallet.ledgerSold.getOrDefault(cycleId, BigDecimal.ZERO))
-                        .min(wallet.held.getOrDefault(ticker, BigDecimal.ZERO)).max(BigDecimal.ZERO);
+                // 원장 기준 가용 — 미체결·같은 틱 앞 규칙 약정을 뺀다
+                BigDecimal sellable = ledger.holdings().subtract(committed.sold.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
+                BigDecimal cash = ledger.usdDeposit().subtract(committed.spent.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
                 BigDecimal fearGreed = null;
                 if (rule.hasIndicator(DcaIndicator.FEAR_GREED)) {
                     if (fearGreedMemo.isEmpty()) fearGreedMemo.add(fearGreedPort.latest());
                     fearGreed = fearGreedMemo.get(0).orElse(null);
                 }
                 DcaRuleDecision decision = dcaStrategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(rule,
-                        ctx.account().brokerRef().broker().getMarket(), closes, ledger, sellable, fearGreed, price, wallet.quote, rules));
+                        ctx.account().brokerRef().broker().getMarket(), closes, ledger, sellable, fearGreed, price, cash, rules));
                 if (decision instanceof DcaRuleDecision.Skipped s) {
                     recorder.recordSkipped(ctx, today, key, rule.direction(), s.reason(), s.detail(), s.referencePrice());
                     continue;
                 }
-                RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, wallet, rules);
+                RuntimeException keyExpired = place(exchange, ctx, rule, today, (DcaRuleDecision.Planned) decision, committed, rules);
                 if (keyExpired != null) {
                     // 키 만료는 계좌 단위 문제 — 남은 규칙은 주문·HTTP 없이 일괄 미주문 기록
                     handleFailure(targets.subList(i + 1, targets.size()), keyExpired, nowKst, today);
@@ -177,10 +170,10 @@ class CryptoDcaRoundExecutor {
         return candles.stream().map(CryptoCandle::close).toList();
     }
 
-    // 판정된 계획 → 주문 저장·선점·전송. 지갑은 같은 틱 후속 규칙을 위한 로컬 차감 대상
+    // 판정된 계획 → 주문 저장·선점·전송. committed는 같은 틱 후속 규칙을 위한 원장 약정 누적
     // 반환: 키 만료로 확정 거절되면 그 예외(호출부가 남은 규칙을 일괄 처리), 그 외 null
     private RuntimeException place(CryptoExchangePort exchange, BatchContext ctx, DcaRule rule, LocalDate today,
-                                   DcaRuleDecision.Planned plan, Wallet wallet, CryptoTradingRules rules) {
+                                   DcaRuleDecision.Planned plan, Committed committed, CryptoTradingRules rules) {
         StrategyTicker ticker = ctx.strategy().ticker();
         boolean buy = rule.direction() == OrderDirection.BUY;
         BigDecimal price = plan.referencePrice();
@@ -209,12 +202,25 @@ class CryptoDcaRoundExecutor {
                 return failure == CryptoFailure.KEY_EXPIRED ? e : null;
             }
         }
-        if (buy) wallet.quote = wallet.quote.subtract(rules.quoteSpendFor(amount));
-        else {
-            wallet.held.merge(ticker, volume, BigDecimal::subtract);
-            wallet.ledgerSold.merge(ctx.currentCycle().id(), volume, BigDecimal::add);
-        }
+        UUID cycleId = ctx.currentCycle().id();
+        if (buy) committed.spent.merge(cycleId, rules.quoteSpendFor(amount), BigDecimal::add);
+        else committed.sold.merge(cycleId, volume, BigDecimal::add);
         return null;
+    }
+
+    // 동기화 후에도 남은 미체결 주문(PLANNED·SUBMITTING·PLACED, 날짜 무관)의 원장 약정 — 체결 전이라 원장에 아직 없다
+    // BUY 지출은 주문 금액(수량 × 기준가) 상한, 수수료는 체결 시 원장이 실제 값으로 반영
+    // ponytail: 견적 수수료(업비트 0.05%)는 미체결 약정에 넣지 않는다 — 미체결 BUY가 남은 틱에 원장이 수수료만큼 음수가 될 수 있음, 문제되면 거래 규칙을 넘겨 quoteSpendFor로 계산
+    private Committed openCommitments(UUID accountId) {
+        Committed committed = new Committed();
+        for (Order o : orderPort.findOpenByAccountId(accountId)) {
+            if (o.direction() == OrderDirection.BUY) {
+                if (o.price() != null) committed.spent.merge(o.strategyCycleId(), o.quantity().multiply(o.price()), BigDecimal::add);
+            } else {
+                committed.sold.merge(o.strategyCycleId(), o.quantity(), BigDecimal::add);
+            }
+        }
+        return committed;
     }
 
     // 오류 규칙 — KEY_EXPIRED·REJECTED는 남은 대상 전부 미주문 기록, TRANSIENT는 마지막 틱(50분~)에만 기록하고 아니면 다음 틱 재시도

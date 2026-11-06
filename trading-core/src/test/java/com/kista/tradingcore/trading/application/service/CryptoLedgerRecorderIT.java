@@ -107,15 +107,15 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
     void 같은_주문_두번_settle해도_원장은_1회_반영() {
         Order order = placedBuy();
 
-        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.001"), PRICE)).isTrue();
-        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.001"), PRICE)).isFalse();
+        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.001"), PRICE, new BigDecimal("100050"))).isTrue();
+        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.001"), PRICE, new BigDecimal("100050"))).isFalse();
 
         // 원장 행이 없던 사이클 — 0 원장에서 시작해 1행만 append
         assertThat(positionCount()).isEqualTo(1);
         assertThat(latest()).satisfies(p -> {
             assertThat(p.holdings()).isEqualByComparingTo("0.001");
             assertThat(p.avgPrice()).isEqualByComparingTo(PRICE);
-            assertThat(p.usdDeposit()).isEqualByComparingTo("0");
+            assertThat(p.usdDeposit()).isEqualByComparingTo("-100050"); // 수수료 포함 실지출만큼 한 번만 차감
             assertThat(p.closingPrice()).isEqualByComparingTo(PRICE);
         });
         assertThat(orderPort.findById(order.id())).get().satisfies(o -> {
@@ -130,14 +130,16 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
         // 0.0004 @ 1억 → 누적 0.001 @ 평균 1.06억 (증분 0.0006 × 1.1억)
         BigDecimal avgAll = new BigDecimal("106000000");
 
-        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.0004"), PRICE)).isTrue();
-        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.001"), avgAll)).isTrue();
+        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.0004"), PRICE, new BigDecimal("40000"))).isTrue();
+        assertThat(recorder.recordFill(ctx, order, new BigDecimal("0.001"), avgAll, new BigDecimal("106000"))).isTrue();
 
         assertThat(positionCount()).isEqualTo(2);
         CyclePosition latest = latest();
         assertThat(latest.holdings()).isEqualByComparingTo("0.001"); // 0.0004 + 0.0006, 이중 반영 없음
         // 평단 = (0.0004×1억 + 0.0006×1.1억) / 0.001 = 1.06억 — 누적 금액 기준 증분
         assertThat(latest.avgPrice()).isEqualByComparingTo(avgAll);
+        // 예수금 차감은 누적 견적 금액을 증분 비율(delta/volume)로 배분: 40000 + 106000 × 0.0006/0.001 = 103600 (체결가가 달라지면 누적 106000과 약간 어긋남)
+        assertThat(latest.usdDeposit()).isEqualByComparingTo("-103600");
     }
 
     @Test
@@ -146,7 +148,7 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
         BigDecimal netVolume = new BigDecimal("0.00015985"); // 수수료 차감 후 순수량
         BigDecimal fillAvg = new BigDecimal("65000");
 
-        assertThat(recorder.recordFill(ctx, order, netVolume, fillAvg)).isTrue();
+        assertThat(recorder.recordFill(ctx, order, netVolume, fillAvg, new BigDecimal("10.40"))).isTrue();
 
         // 평단은 체결 평균가 그대로 — 수수료 포함 실지출(10.40/순수량 ≈ 65061)로 부풀지 않는다
         assertThat(latest()).satisfies(p -> {
@@ -156,6 +158,23 @@ class CryptoLedgerRecorderIT extends DataJpaTestBase {
         assertThat(orderPort.findById(order.id())).get().satisfies(o -> {
             assertThat(o.filledQuantity()).isEqualByComparingTo("0.00015985");
             assertThat(o.filledPrice()).isEqualByComparingTo("65000");
+        });
+    }
+
+    @Test
+    void SELL_체결은_실수령만큼_예수금을_늘린다() {
+        // 먼저 BUY로 0.001 보유 + 예수금 -100050, 이어 SELL 0.001 @ 1.1억 실수령 109945(수수료 차감) → 예수금 +109945
+        recorder.recordFill(ctx, placedBuy(), new BigDecimal("0.001"), PRICE, new BigDecimal("100050"));
+        Order sell = orderPort.save(Order.cryptoMarket(ctx.account().id(), cycleId, LocalDate.now(), StrategyTicker.BTC,
+                OrderDirection.SELL, "DCA_22222222-2222-2222-2222-222222222222", OrderTiming.AT_CLOSE, new BigDecimal("0.001"), PRICE));
+        orderPort.markSubmitting(sell.id());
+        orderPort.markPlaced(sell.id(), "upbit-uuid-sell");
+
+        assertThat(recorder.recordFill(ctx, sell, new BigDecimal("0.001"), new BigDecimal("110000000"), new BigDecimal("109945"))).isTrue();
+
+        assertThat(latest()).satisfies(p -> {
+            assertThat(p.holdings()).isEqualByComparingTo("0");
+            assertThat(p.usdDeposit()).isEqualByComparingTo("9895"); // -100050 + 109945
         });
     }
 }

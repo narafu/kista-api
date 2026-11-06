@@ -723,6 +723,19 @@ class StrategyServiceTest {
     }
 
     @Test
+    @DisplayName("update() DCA에 newSeed를 주면 일반 수정으로 예수금을 바꿀 수 없다고 거절한다")
+    void update_dcaNewSeed_throws() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(new Strategy(
+                STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID, new UpdateStrategyCommand(null, new BigDecimal("3000"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("DCA 전략의 예수금은 일반 수정으로 변경할 수 없습니다. 투자금 추가·인출을 이용해야 합니다.");
+        verify(strategyCyclePort, never()).updateStartAmount(any(), any());
+    }
+
+    @Test
     @DisplayName("update() 호출 시 소유자가 아니면 SecurityException이 발생한다 (→ 403)")
     void update_by_non_owner_throws_security_exception() {
         UUID otherUserId = UUID.randomUUID();
@@ -1697,7 +1710,7 @@ class StrategyServiceTest {
         assertThat(single.currentRound()).isNull(); // 회차는 INFINITE 전용 — 보유 이력이 있어도 PRIVACY는 null
         assertThat(single.vr()).isNull();
         assertThat(single.cycleInProgress()).isTrue(); // 최신 사이클 endDate=null
-        assertThat(single.ledgerUsdDeposit()).isEqualByComparingTo("1500.00"); // 최신 포지션 장부 예수금
+        assertThat(single.ledgerDeposit()).isEqualByComparingTo("1500.00"); // 최신 포지션 장부 예수금
     }
 
     @Test
@@ -1728,7 +1741,7 @@ class StrategyServiceTest {
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
         assertThat(single.cycleInProgress()).isFalse();
-        assertThat(single.ledgerUsdDeposit()).isNull(); // 종료 사이클 + 포지션 stub 없음
+        assertThat(single.ledgerDeposit()).isNull(); // 종료 사이클 + 포지션 stub 없음
     }
 
     @Test
@@ -1761,7 +1774,7 @@ class StrategyServiceTest {
         assertThat(single.currentRound()).isNull();
         assertThat(single.currentHoldings()).isNull();
         assertThat(single.cycleInProgress()).isFalse(); // 사이클 없음
-        assertThat(single.ledgerUsdDeposit()).isNull(); // 포지션 없음
+        assertThat(single.ledgerDeposit()).isNull(); // 포지션 없음
     }
 
     @Test
@@ -2303,6 +2316,35 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                 && p.usdDeposit().signum() == 0 && p.avgPrice().compareTo(new BigDecimal("40")) == 0));
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("400")) == 0));
         verifyNoInteractions(marginPort, brokerPricePort);
+    }
+
+    @Test
+    @DisplayName("주식 DCA 초기 예수금은 시작 원장 예수금이 되고 start_amount에 보유 원가와 함께 합산된다")
+    void register_stockDca_storesInitialDeposit() {
+        stubDcaRegistration(StrategyTicker.UPRO);
+        stubUsCalendar();
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of());
+
+        strategyService.register(USER_ID, ACCOUNT_ID, dca().ticker(StrategyTicker.UPRO).holdings(new BigDecimal("10"))
+                .avgPrice(new BigDecimal("40")).deposit(new BigDecimal("1000.50")).dcaConfig(dcaConfig(OrderDirection.BUY)).build());
+
+        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(new BigDecimal("1000.50")) == 0
+                && p.holdings().compareTo(BigDecimal.TEN) == 0));
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(new BigDecimal("1400.50")) == 0)); // 예수금 + 40 × 10
+    }
+
+    @Test
+    @DisplayName("DCA 초기 예수금이 음수면 거절한다")
+    void register_dca_rejectsNegativeDeposit() {
+        stubDcaPolicyWithCrypto();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(tradingUserProfilePort.findByUserId(USER_ID)).thenReturn(Optional.of(activeUserProfile()));
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID, dca().ticker(StrategyTicker.UPRO)
+                .deposit(new BigDecimal("-1")).dcaConfig(dcaConfig(OrderDirection.BUY)).build()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("예수금은 0 이상이어야 합니다.");
+        verify(strategyPort, never()).save(any());
     }
 
     @Test

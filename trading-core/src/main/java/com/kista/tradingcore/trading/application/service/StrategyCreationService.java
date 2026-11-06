@@ -96,7 +96,8 @@ class StrategyCreationService {
         // 사용자 복제본이 없으면 배치가 이 전략을 돌릴 수 없다 — 등록 단계에서 거부
         tradingUserProfilePort.findByUserId(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-        BigDecimal initialUsdDeposit = dca ? BigDecimal.ZERO : cmd.initialUsdDeposit(); // DCA는 예수금 시드 없음
+        // DCA 원장 예수금 — 계좌 통화(주식 USD·코인 견적 통화), 생략은 0
+        BigDecimal initialUsdDeposit = dca ? dcaDeposit(cmd.initialUsdDeposit(), account.broker().getMarket()) : cmd.initialUsdDeposit();
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
@@ -177,6 +178,17 @@ class StrategyCreationService {
     }
 
     // 같은 계좌 내 종목 중복 방지 — 종목별 합산 잔고 ↔ 전략 일대일 보장 (DCA도 예외 없음 — 매수·매도는 한 전략의 규칙으로)
+    // DCA 시작 원장 예수금 검증 — 0 이상, 계좌 통화 금액 자릿수 이하(KRW 정수·USD/USDT 소수 2자리)
+    private static BigDecimal dcaDeposit(BigDecimal deposit, Market market) {
+        if (deposit == null) return BigDecimal.ZERO;
+        if (deposit.signum() < 0) throw new IllegalArgumentException("예수금은 0 이상이어야 합니다.");
+        if (deposit.stripTrailingZeros().scale() > market.amountScale()) {
+            throw new IllegalArgumentException(market.amountScale() == 0 ? "예수금은 정수로 입력해야 합니다."
+                    : "예수금은 소수 %d자리까지 입력할 수 있습니다.".formatted(market.amountScale()));
+        }
+        return deposit;
+    }
+
     private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {
         if (!strategyPort.findByAccountIdAndTicker(accountId, ticker).isEmpty()) {
             throw new DuplicateStrategyTickerException(); // 409 — 전 전략 유형 공통

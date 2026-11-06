@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Currency;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.shared.kernel.OrderStatus;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
@@ -95,6 +96,14 @@ class CryptoOrderSynchronizer {
         }
     }
 
+    // 원장 예수금 증감액 — 총 체결 수량 × 평균가에 견적 통화로 낸 수수료를 BUY는 더하고 SELL은 뺀다
+    // 수수료가 받은 코인·BNB 등 다른 자산이면 견적 통화 지출이 아니라 제외(코인 수수료는 순수량으로 원장 보유에 반영)
+    private static BigDecimal quoteAmount(Order order, CryptoOrderResult r, BigDecimal volume, Currency currency) {
+        BigDecimal gross = volume.multiply(r.avgPrice());
+        BigDecimal quoteFee = r.paidFee() != null && currency.name().equals(r.feeAsset()) ? r.paidFee() : BigDecimal.ZERO;
+        return order.direction() == OrderDirection.BUY ? gross.add(quoteFee) : gross.subtract(quoteFee);
+    }
+
     // 주문 leg "DCA_" + ruleKey → ruleKey
     private static String ruleKeyOf(Order order) {
         return order.orderLeg().substring("DCA_".length());
@@ -110,9 +119,9 @@ class CryptoOrderSynchronizer {
                 log.warn("체결 수량은 있으나 평균가 없음 — 건너뜀 orderId={}", order.id());
                 return;
             }
-            if (!ledgerRecorder.recordFill(ctx, order, r.netExecutedVolume(), r.avgPrice())) return; // 이미 반영된 체결 — 알림 중복 방지
-            // 체결 금액은 계좌 통화 자릿수로 반올림
             Currency currency = ctx.account().brokerRef().broker().getCurrency();
+            if (!ledgerRecorder.recordFill(ctx, order, r.netExecutedVolume(), r.avgPrice(), quoteAmount(order, r, volume, currency))) return; // 이미 반영된 체결 — 알림 중복 방지
+            // 체결 금액은 계좌 통화 자릿수로 반올림
             eventPublisher.publishEvent(new CryptoOrderFilledEvent(ctx.account().userId(), ctx.account().id(), ctx.strategy().id(),
                     ctx.account().nickname(), order.ticker(), order.direction(), volume, r.avgPrice(),
                     currency.round(volume.multiply(r.avgPrice())), currency));

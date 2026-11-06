@@ -477,7 +477,7 @@ class TradingCycleControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"amount\": 500.00}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ledgerUsdDeposit").value(1000.00));
+                .andExpect(jsonPath("$.ledgerDeposit").value(1000.00));
         verify(withdrawCapital).withdraw(eq(CYCLE_ID), eq(USER_ID), eq(new WithdrawCapitalCommand(new BigDecimal("500.00"))));
     }
 

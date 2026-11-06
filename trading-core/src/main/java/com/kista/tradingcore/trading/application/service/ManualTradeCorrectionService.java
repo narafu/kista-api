@@ -80,7 +80,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         AccountBalance balance = latest.toBalance();
         CycleOrderStrategy cycleStrategy = cycleOrderStrategies.of(strategy.type());
         boolean endsCycleOnLiquidation = cycleStrategy.endsCycleOnLiquidation();
-        boolean occupiesSeed = cycleStrategy.occupiesSeed(); // 시드 비점유 전략(DCA)은 보정 후에도 usd_deposit 0
+        boolean occupiesSeed = cycleStrategy.occupiesSeed(); // 시드 비점유 전략은 보정 후에도 usd_deposit 0
         Strategy updatedStrategy = strategy;
         boolean cycleEnded = false;
         List<Order> manualOrders = new ArrayList<>();

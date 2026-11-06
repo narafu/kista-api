@@ -14,8 +14,8 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-// 계좌 미배정 USD = 증권사 USD 매수가능금액 − 시드를 점유하는 전략(occupiesSeed)들의 최신 원장(usd_deposit) 합
-// DCA처럼 시드가 없는 전략은 원장이 자기 몫이 아니므로 제외 — 전략 등록 폼 경고와 주식 DCA BUY 가용 판정의 공용 계산
+// 계좌 미배정 USD = 증권사 USD 매수가능금액 − 시드를 점유하는 전략(occupiesSeed — DCA 포함)들의 최신 원장(usd_deposit) 합
+// 전략 등록 폼 가용 예수금 경고용 계산
 @Component
 @RequiredArgsConstructor
 public class UnassignedUsdCalculator {

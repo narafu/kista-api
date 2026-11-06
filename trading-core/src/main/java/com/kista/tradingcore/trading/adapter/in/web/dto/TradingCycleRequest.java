@@ -19,7 +19,7 @@ public record TradingCycleRequest(
         @NotNull StrategyType type,
         @Schema(description = "거래 종목 (null이면 런타임 기본값, PRIVACY=SOXL/VR=TQQQ 외 명시값은 400)", example = "TQQQ")
         StrategyTicker ticker,
-        @Schema(description = "초기 입금액 (PRIVACY: 배수 자동 산출 기준, VR: 예수금=초기 pool)", example = "2000.00")
+        @Schema(description = "초기 입금액 (PRIVACY: 배수 자동 산출 기준, VR: 예수금=초기 pool, DCA: 시작 원장 예수금 — 계좌 통화, 0 이상, 생략=0)", example = "2000.00")
         BigDecimal initialUsdDeposit,
         @Schema(description = "연속 사이클 정책 (null이면 NONE)", example = "NONE")
         StrategyCycleSeedType cycleSeedType,

@@ -30,6 +30,7 @@ import com.kista.tradingcore.trading.application.service.support.TradingBatchGua
 import com.kista.tradingcore.trading.application.service.support.TradingOrderPlanner;
 import com.kista.tradingcore.trading.application.service.support.TradingParallelRunner;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
+import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -64,7 +65,8 @@ class TradingCandidatePlannerDcaTest {
 
     OrderPort orderPort = mock(OrderPort.class);
     TradingOrderPlanner orderPlanner = mock(TradingOrderPlanner.class);
-    // DCA는 원장을 쓰지 않으므로(occupiesSeed=false) 실제 원장 상한을 연결해도 거절되지 않는다 — 원장 0, 포지션 없음
+    // DCA도 시드 점유 전략 — 실제 원장 상한을 연결하고 원장 예수금은 positionPort로 stub한다
+    CyclePositionPort positionPort = mock(CyclePositionPort.class);
     StrategyLedgerBudget ledgerBudget;
     ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     DcaExecutionRecorder recorder = mock(DcaExecutionRecorder.class);
@@ -74,7 +76,7 @@ class TradingCandidatePlannerDcaTest {
 
     @BeforeEach
     void setUp() {
-        ledgerBudget = new StrategyLedgerBudget(mock(CyclePositionPort.class), orderPort, mock(TradingBatchRunPort.class), STRATEGIES);
+        ledgerBudget = new StrategyLedgerBudget(positionPort, orderPort, mock(TradingBatchRunPort.class), STRATEGIES);
         planner = new TradingCandidatePlanner(orderPort, null, orderPlanner, null, STRATEGIES, ledgerBudget, null,
                 publisher, new TradingBatchGuard(publisher), new AccountBudgetLock(), mock(DcaPlanInputCollector.class), recorder,
                 new TradingParallelRunner(0));
@@ -118,7 +120,7 @@ class TradingCandidatePlannerDcaTest {
         List<DcaCycleOrderStrategy.DcaRuleInputs> due = java.util.Arrays.stream(rules)
                 .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(REFERENCE), LEDGER,
                         r.direction() == OrderDirection.SELL ? BigDecimal.TEN : null, null, PREMARKET,
-                        r.direction() == OrderDirection.BUY ? DcaCycleOrderStrategy.UNLIMITED_CASH : null, null))
+                        r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null, null))
                 .toList();
         when(collector.collect(eq(ctx), eq(DAY), any(), eq(List.of()), eq(PREMARKET), eq(LEDGER)))
                 .thenReturn(new DcaCollected(new CycleOrderStrategy.PlanContext.DcaPlanInputs(due), recoveries));
@@ -170,8 +172,25 @@ class TradingCandidatePlannerDcaTest {
         assertThat(candidates).allSatisfy(c -> assertThat(c.creatableOrders()).isEmpty());
     }
 
+    private void stubLedgerDeposit(String deposit) {
+        when(positionPort.findLatestOne(ctx.currentCycle().id())).thenReturn(Optional.of(CyclePosition.tradeSnapshot(
+                ctx.currentCycle().id(), new AccountBalance(0, null, new BigDecimal(deposit)), null)));
+    }
+
     @Test
-    void dca_buy_is_saved_without_ledger_then_recorded_ordered_with_reference_price() throws Exception {
+    void dca_buy_over_ledger_is_rejected_and_not_saved() throws Exception {
+        stubLedgerDeposit("100"); // 3주 × 91.48 = 274.44 > 원장 100
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
+
+        TradingCandidatePlanner.SaveAllocationResult result = planner.saveAllocatedOrders(List.of(candidate()), DAY);
+
+        assertThat(result.savedContexts()).doesNotContain(ctx);
+        verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    @Test
+    void dca_buy_within_ledger_is_saved_then_recorded_ordered_with_reference_price() throws Exception {
+        stubLedgerDeposit("1000");
         Order saved = new Order(UUID.randomUUID(), ctx.account().id(), ctx.currentCycle().id(), DAY, StrategyTicker.UPRO,
                 OrderType.MOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, "DCA_" + KEY, BigDecimal.valueOf(3), new BigDecimal("91.48"),
                 OrderStatus.PLANNED, null, null, null);

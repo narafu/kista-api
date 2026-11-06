@@ -12,7 +12,6 @@ import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.application.port.output.CryptoExchangePort;
 import com.kista.tradingcore.broker.domain.model.BrokerCredentialException;
-import com.kista.tradingcore.broker.domain.model.CryptoBalance;
 import com.kista.tradingcore.broker.domain.model.CryptoCandle;
 import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.shared.kernel.DcaShortfallPolicy;
@@ -113,11 +112,12 @@ class CryptoDcaRoundExecutorTest {
         return new CryptoOrderResult("uuid-1", identifier, CryptoOrderResult.State.WAIT, BigDecimal.ZERO, BigDecimal.ZERO, null, BigDecimal.ZERO, "KRW");
     }
 
-    // 지갑 잔고 — 원장도 같은 보유(평단 1)로 맞춘다. 원장이 다른 케이스는 이후 ledger()로 덮는다
-    void balance(String krw, String btcAvailable) {
-        when(exchange.getBalance(any())).thenReturn(new CryptoBalance(new BigDecimal(krw), BigDecimal.ZERO,
-                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(new BigDecimal(btcAvailable), BigDecimal.ZERO, new BigDecimal("1")))));
-        ledger(btcAvailable, "1");
+    String ledgerDeposit = "0"; // 원장 예수금 — balance()가 지정, ledger()가 이어서 사용
+
+    // 원장 보유·예수금 — 거래소 잔고는 조회하지 않으므로 원장만 맞춘다(평단 1). 보유가 다른 케이스는 이후 ledger()로 덮는다
+    void balance(String deposit, String holdings) {
+        ledgerDeposit = deposit;
+        ledger(holdings, "1");
     }
 
     // 모든 사이클의 최신 cycle_position(원장) stub
@@ -126,7 +126,7 @@ class CryptoDcaRoundExecutorTest {
             Map<UUID, CyclePosition> m = new java.util.HashMap<>();
             for (UUID id : i.<java.util.Collection<UUID>>getArgument(0)) {
                 m.put(id, CyclePosition.tradeSnapshot(id, new AccountBalance(new BigDecimal(holdings),
-                        avgPrice == null ? null : new BigDecimal(avgPrice), BigDecimal.ZERO), null));
+                        avgPrice == null ? null : new BigDecimal(avgPrice), new BigDecimal(ledgerDeposit)), null));
             }
             return m;
         }).when(cyclePositionPort).findLatestByCycleIds(any()); // doAnswer — 재stub 시 이전 answer가 null 인자로 호출되지 않게
@@ -190,17 +190,28 @@ class CryptoDcaRoundExecutorTest {
     }
 
     @Test
-    void secondStrategyUsesLocallyDeductedBalance() {
+    void sameCycleSecondRuleUsesLocallyDeductedDeposit() {
+        balance("40000", "0");
+        // 같은 사이클의 두 규칙 — 앞 규칙 지출(30000 + 수수료)이 원장에 반영되기 전이라도 뒤 규칙 가용에서 빠진다
+        run(NOW, ctx(StrategyTicker.BTC), TradingFixtures.dcaConfig(
+                TradingFixtures.cryptoDcaRule(KEY, OrderDirection.BUY, "30000", 13),
+                TradingFixtures.cryptoDcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, "30000", 13)));
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("30000")), anyString());
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("9980")), anyString());
+    }
+
+    @Test
+    void ledgersAreIndependentPerCycle() {
         balance("40000", "0");
         BatchContext btc = ctx(StrategyTicker.BTC);
         BatchContext eth = ctx(StrategyTicker.ETH);
-        // 순서 보장을 위해 LinkedHashMap 대신 두 번째 인자로 순차 전달
         Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
         m.put(btc, config(OrderDirection.BUY, "30000", 13));
         m.put(eth, config(OrderDirection.BUY, "30000", 13));
         run(NOW, m);
+        // 전략마다 자기 사이클 원장 예수금(40000)을 쓴다 — 서로의 지출이 빠지지 않는다
         verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("30000")), anyString());
-        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.ETH), eq(new BigDecimal("9980")), anyString());
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.ETH), eq(new BigDecimal("30000")), anyString());
     }
 
     @Test
@@ -307,30 +318,19 @@ class CryptoDcaRoundExecutorTest {
     }
 
     @Test
-    void transientPlacementStillDeductsForNextStrategy() {
+    void transientPlacementStillDeductsForNextRuleOfSameCycle() {
         balance("40000", "0");
-        when(exchange.buyMarketByAmount(any(), eq(StrategyTicker.BTC), any(), anyString())).thenThrow(new StubBrokerApiException("timeout"));
-        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
-        m.put(ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "30000", 13));
-        m.put(ctx(StrategyTicker.ETH), config(OrderDirection.BUY, "30000", 13));
-        run(NOW, m);
-        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.ETH), eq(new BigDecimal("9980")), anyString());
-    }
-
-    @Test
-    void sellDeductsHoldingsForNextSellOfSameTicker() {
-        balance("0", "0.0006");
-        Map<BatchContext, DcaStrategyConfig> m = new java.util.LinkedHashMap<>();
-        m.put(ctx(StrategyTicker.BTC), config(OrderDirection.SELL, "10000", 13));
-        m.put(ctx(StrategyTicker.BTC), config(OrderDirection.SELL, "10000", 13));
-        run(NOW, m);
-        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.00033333")), anyString());
-        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.00026667")), anyString());
+        when(exchange.buyMarketByAmount(any(), eq(StrategyTicker.BTC), any(), anyString()))
+                .thenThrow(new StubBrokerApiException("timeout")).thenAnswer(i -> placed(i.getArgument(3)));
+        run(NOW, ctx(StrategyTicker.BTC), TradingFixtures.dcaConfig(
+                TradingFixtures.cryptoDcaRule(KEY, OrderDirection.BUY, "30000", 13),
+                TradingFixtures.cryptoDcaRule("22222222-2222-2222-2222-222222222222", OrderDirection.BUY, "30000", 13)));
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("9980")), anyString());
     }
 
     @Test
     void keyExpiredSkipsAllTargets() {
-        when(exchange.getBalance(any())).thenThrow(new BrokerCredentialException());
+        when(exchange.getCurrentPrices(any())).thenThrow(new BrokerCredentialException());
         BatchContext btc = ctx(StrategyTicker.BTC);
         BatchContext eth = ctx(StrategyTicker.ETH);
         run(NOW, Map.of(btc, config(OrderDirection.BUY, "10000", 13), eth, config(OrderDirection.BUY, "10000", 13)));
@@ -340,14 +340,14 @@ class CryptoDcaRoundExecutorTest {
 
     @Test
     void transientBeforeMinute50Retries() {
-        when(exchange.getBalance(any())).thenThrow(new RuntimeException("timeout"));
+        when(exchange.getCurrentPrices(any())).thenThrow(new RuntimeException("timeout"));
         run(NOW, ctx(StrategyTicker.BTC), config(OrderDirection.BUY, "10000", 13));
         verifyNoInteractions(recorder);
     }
 
     @Test
     void transientAtMinute50IsSkipped() {
-        when(exchange.getBalance(any())).thenThrow(new RuntimeException("timeout"));
+        when(exchange.getCurrentPrices(any())).thenThrow(new RuntimeException("timeout"));
         BatchContext c = ctx(StrategyTicker.BTC);
         run(TODAY.atTime(13, 50), c, config(OrderDirection.BUY, "10000", 13));
         verify(recorder).recordSkipped(eq(c), eq(TODAY), eq(KEY), any(), eq(DcaSkipReason.EXCHANGE_API_ERROR), anyString(), isNull());
@@ -434,9 +434,9 @@ class CryptoDcaRoundExecutorTest {
     }
 
     @Test
-    void 매도_가용량은_지갑이_아니라_원장_보유로_제한() {
+    void 매도_가용량은_원장_보유로_제한() {
         balance("0", "1");
-        ledger("0.0002", "1"); // 지갑 1 BTC, 원장 0.0002
+        ledger("0.0002", "1"); // 원장 0.0002
         BatchContext c = ctx(StrategyTicker.BTC);
         run(NOW, c, config(OrderDirection.SELL, "10000", 13));
         verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.0002")), anyString());
@@ -444,7 +444,7 @@ class CryptoDcaRoundExecutorTest {
 
     @Test
     void 같은틱_매도규칙_합계는_원장_보유를_넘지_않는다() {
-        // 지갑은 넉넉하지만 원장 0.0005 — 앞 규칙 계획분 0.00033333을 원장 쪽에서도 빼야 둘째는 0.00016667(5,000원 이상)
+        // 원장 0.0005 — 앞 규칙 계획분 0.00033333을 원장 쪽에서도 빼야 둘째는 0.00016667(5,000원 이상)
         balance("0", "1");
         ledger("0.0005", "1");
         String key2 = "22222222-2222-2222-2222-222222222222";
@@ -467,9 +467,7 @@ class CryptoDcaRoundExecutorTest {
 
     @Test
     void 시나리오3_09시_매수체결후_10시_AVG_PRICE_매도는_갱신된_평단으로_판정() {
-        // 지갑 평단 200(전일 종가 100 기준 미충족)과 달리 09시 체결로 갱신된 원장 평단 90 → 종가 100 ≥ 평단 90 충족
-        when(exchange.getBalance(any())).thenReturn(new CryptoBalance(BigDecimal.ZERO, BigDecimal.ZERO,
-                Map.of(StrategyTicker.BTC, new CryptoBalance.Holding(BigDecimal.ONE, BigDecimal.ZERO, new BigDecimal("200")))));
+        // 09시 체결로 갱신된 원장 평단 90 → 종가 100 ≥ 평단 90 충족
         ledger("1", "90");
         BatchContext c = ctx(StrategyTicker.BTC);
         DcaCondition aboveAvg = new DcaCondition(DcaIndicator.AVG_PRICE, DcaOperator.GTE, null, BigDecimal.ZERO);
@@ -506,5 +504,33 @@ class CryptoDcaRoundExecutorTest {
         run(NOW, c, cfg);
         verify(exchange, org.mockito.Mockito.times(1)).buyMarketByAmount(any(), any(), any(), anyString());
         verify(exchange, never()).sellMarketByVolume(any(), any(), any(), anyString());
+    }
+
+    // 체결 전 미체결 주문 — 원장에 아직 반영되지 않은 약정
+    Order openOrder(BatchContext c, OrderDirection dir, String qty, BigDecimal price) {
+        return new Order(UUID.randomUUID(), c.account().id(), c.currentCycle().id(), TODAY, StrategyTicker.BTC,
+                OrderType.MARKET, OrderTiming.AT_CLOSE, dir, "DCA_22222222-2222-2222-2222-222222222222", new BigDecimal(qty), price,
+                OrderStatus.PLACED, "ex-1", null, null);
+    }
+
+    @Test
+    void 매수_가용은_원장_예수금에서_미체결_BUY_약정을_뺀다() {
+        balance("50000", "0");
+        BatchContext c = ctx(StrategyTicker.BTC);
+        // 미체결 BUY 0.0001 × 3천만 = 3,000원 약정 → 가용 47,000원에서 수수료 몫을 뺀 46,976
+        when(orderPort.findOpenByAccountId(account.id())).thenReturn(List.of(openOrder(c, OrderDirection.BUY, "0.0001", BTC_PRICE)));
+        run(NOW, c, config(OrderDirection.BUY, "100000", 13));
+        verify(exchange).buyMarketByAmount(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("46976")), anyString());
+        verify(exchange, never()).getBalance(any()); // 거래소 잔고는 보지 않는다
+    }
+
+    @Test
+    void 매도_가용은_원장_보유에서_미체결_SELL_수량을_뺀다() {
+        ledger("0.0005", "1");
+        BatchContext c = ctx(StrategyTicker.BTC);
+        when(orderPort.findOpenByAccountId(account.id())).thenReturn(List.of(openOrder(c, OrderDirection.SELL, "0.0003", BTC_PRICE)));
+        run(NOW, c, config(OrderDirection.SELL, "10000", 13));
+        verify(exchange).sellMarketByVolume(any(), eq(StrategyTicker.BTC), eq(new BigDecimal("0.0002")), anyString());
+        verify(exchange, never()).getBalance(any());
     }
 }

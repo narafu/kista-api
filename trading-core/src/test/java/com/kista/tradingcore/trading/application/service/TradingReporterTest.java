@@ -314,7 +314,7 @@ class TradingReporterTest {
     }
 
     @Test
-    void DCA_원장은_자기주문_체결로_갱신되고_usd_deposit은_0() {
+    void DCA_원장은_자기주문_체결로_갱신되고_usd_deposit도_차감된다() {
         // 같은 계좌·티커의 외부 체결("S-9")이 조회에 섞여 들어와도 자기 주문 BUY 3주만 원장에 반영
         Strategy dcaStrategy = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.DCA,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
@@ -327,12 +327,12 @@ class TradingReporterTest {
 
         reporter.recordAndNotify(TODAY, dcaCtx, BALANCE, CLOSE, orders, null);
 
-        // 10주@20 + 3주@20 → 13주@20, DCA는 시드를 점유하지 않아 usd_deposit 0
+        // 10주@20 + 3주@20 → 13주@20, DCA도 시드를 점유해 예수금 1000에서 매수 60이 빠진다
         ArgumentCaptor<AccountBalance> balanceCaptor = ArgumentCaptor.forClass(AccountBalance.class);
         verify(cyclePositionPersistor).saveCyclePosition(eq(TODAY), balanceCaptor.capture(), eq(dcaCtx), eq(CLOSE), isNull());
         assertThat(balanceCaptor.getValue().wholeShares()).isEqualTo(13);
         assertThat(balanceCaptor.getValue().avgPrice()).isEqualByComparingTo("20.00");
-        assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo("0");
+        assertThat(balanceCaptor.getValue().usdDeposit()).isEqualByComparingTo("940.00");
         // 리포트 이벤트는 자기 주문 BUY 3주 1건뿐
         ArgumentCaptor<TradingReportReadyEvent> eventCaptor = ArgumentCaptor.forClass(TradingReportReadyEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());

@@ -44,7 +44,7 @@ class DcaCycleOrderStrategyTest {
         return strategy.decideRule(new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, closes, ledger,
                 sellable == null ? null : BigDecimal.valueOf(sellable), fearGreed,
                 currentPrice == null ? null : new BigDecimal(currentPrice),
-                r.direction() == OrderDirection.BUY ? DcaCycleOrderStrategy.UNLIMITED_CASH : null, null));
+                r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null, null));
     }
 
     // 주식 BUY 가용 USD를 직접 지정 — 전일 종가 100 단일 봉, 캡가 = PriceCapPolicy.capFor(100)
@@ -339,6 +339,6 @@ class DcaCycleOrderStrategyTest {
     void policy_flags() {
         assertThat(strategy.endsCycleOnLiquidation()).isFalse();
         assertThat(strategy.needsCapCheck(null, null)).isFalse();
-        assertThat(strategy.occupiesSeed()).isFalse();
+        assertThat(strategy.occupiesSeed()).isTrue(); // 원장 예수금으로 운용
     }
 }

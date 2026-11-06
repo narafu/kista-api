@@ -44,17 +44,17 @@ class UnassignedUsdCalculatorTest {
     }
 
     @Test
-    void subtracts_only_seed_occupying_strategies() {
+    void subtracts_every_seed_occupying_strategy_including_dca() {
         UUID accountId = UUID.randomUUID();
         Strategy inf = strategy(accountId, StrategyType.INFINITE);
         Strategy dca = strategy(accountId, StrategyType.DCA);
         deposit(inf, "1200");
-        deposit(dca, "999"); // DCA 원장은 자기 몫이 아니므로 제외
+        deposit(dca, "999"); // DCA도 원장 예수금이 자기 몫이라 함께 뺀다
         when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(inf, dca));
         when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("5000"));
 
         var ref = TradingFixtures.tradingAccount(accountId, UUID.randomUUID()).brokerRef();
-        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("3800");
+        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("2801"); // 5000 − 1200 − 999
     }
 
     @Test

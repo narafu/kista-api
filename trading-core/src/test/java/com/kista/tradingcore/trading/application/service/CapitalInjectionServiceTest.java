@@ -9,7 +9,10 @@ import com.kista.shared.support.FixedClockTestConfig;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.account.domain.model.Account;
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
@@ -74,6 +77,12 @@ class CapitalInjectionServiceTest {
     @BeforeEach
     void setUp() {
         service = newService(FixedClockTestConfig.FIXED);
+        stubAccount(TradingFixtures.kisAccount(accountId, userId)); // 기본: 주식(USD) 계좌
+    }
+
+    // 소유권 검증 default 메서드 자체를 stub — 반환 계좌의 통화·시장이 금액 자릿수·리포트 창 검사를 정한다
+    private void stubAccount(Account account) {
+        org.mockito.Mockito.lenient().when(accountPort.requireOwnedAccount(accountId, userId)).thenReturn(account);
     }
 
     private CapitalInjectionService newService(Clock clock) {
@@ -229,14 +238,80 @@ class CapitalInjectionServiceTest {
     }
 
     @Test
-    void rejects_vrAndDca() {
-        for (StrategyType type : List.of(StrategyType.VR, StrategyType.DCA)) {
-            when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(
-                    new Strategy(strategyId, accountId, type, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE));
-            assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
-                    .isInstanceOf(IllegalArgumentException.class).hasMessage("투자금 추가는 PRIVACY·INFINITE 전략만 지원합니다.");
-        }
+    void rejects_vr() {
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(
+                new Strategy(strategyId, accountId, StrategyType.VR, StrategyStatus.ACTIVE, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE));
+        assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(BigDecimal.ONE, null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("투자금 추가는 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
         verify(cyclePositionPort, never()).save(any());
+    }
+
+    @Test
+    void dca_depositOnly_addsDepositAndStartAmount() {
+        stub(StrategyType.DCA, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+
+        service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("300.00"), null, null));
+
+        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("800.00");
+        verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00"));
+    }
+
+    @Test
+    void dca_rejects_shares() {
+        stub(StrategyType.DCA, BigDecimal.TEN, new BigDecimal("20.0000"), null);
+
+        assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(null, 5, new BigDecimal("30.00"))))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("DCA 전략은 예수금만 추가할 수 있습니다.");
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
+    }
+
+    @Test
+    void dca_crypto_inject_skipsReportWindow() {
+        // 코인 계좌는 마감 리포트가 없다 — 당일 주문 조회(리포트 창 판정) 자체를 하지 않는다
+        stubAccount(TradingFixtures.upbitAccount(accountId, userId));
+        stub(StrategyType.DCA, BigDecimal.ZERO, null, null);
+
+        service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("100000"), null, null));
+
+        assertThat(updatedBalance().usdDeposit()).isEqualByComparingTo("100500.00");
+        verify(orderPort, never()).findByStrategyId(any(), any(), any());
+    }
+
+    @Test
+    void dca_crypto_withdraw_overAvailable_usesCurrencyFormat() {
+        stubAccount(TradingFixtures.upbitAccount(accountId, userId));
+        stub(StrategyType.DCA, BigDecimal.ZERO, null, null);
+
+        // 가용 = 장부 예수금 500 → 501 요청은 "500원" 표기로 거절
+        withdrawRejected("501", IllegalArgumentException.class,
+                "투자금 인출 금액이 인출 가능액 %s를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다."
+                        .formatted(Currency.KRW.format(new BigDecimal("500"))));
+        verify(orderPort, never()).findByStrategyId(any(), any(), any()); // 리포트 창 검사 생략
+    }
+
+    @Test
+    void dca_crypto_withdraw_subtractsOpenOrdersOfCycleOnly_noCancelledHold() {
+        stubAccount(TradingFixtures.upbitAccount(accountId, userId));
+        stub(StrategyType.DCA, BigDecimal.ZERO, null, null);
+        // 날짜 무관 미체결 BUY 200(같은 사이클) + 다른 사이클 BUY 300(무시) → 가용 500 − 200 = 300
+        Order sameCycle = order(TODAY.minusDays(1), OrderDirection.BUY, "100", "2");
+        Order otherCycle = new Order(null, accountId, UUID.randomUUID(), TODAY, StrategyTicker.SOXL, OrderType.LOC, OrderTiming.AT_CLOSE,
+                OrderDirection.BUY, new BigDecimal("3"), new BigDecimal("100"), OrderStatus.PLACED, null, null, null);
+        when(orderPort.findOpenByAccountId(accountId)).thenReturn(List.of(sameCycle, otherCycle));
+
+        withdrawRejected("301", IllegalArgumentException.class,
+                "투자금 인출 금액이 인출 가능액 %s를 초과합니다. 장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다."
+                        .formatted(Currency.KRW.format(new BigDecimal("300"))));
+        verify(orderPort, never()).findCancelledByCycleAndDate(any(), any()); // 코인은 취소분 보류 체결 없음
+    }
+
+    @Test
+    void dca_crypto_rejects_amountBeyondCurrencyScale() {
+        stubAccount(TradingFixtures.upbitAccount(accountId, userId));
+        stub(StrategyType.DCA, BigDecimal.ZERO, null, null);
+
+        assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("100.5"), null, null)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessage("금액은 정수로 입력해야 합니다.");
     }
 
     @Test
@@ -309,7 +384,7 @@ class CapitalInjectionServiceTest {
     @Test
     void withdraw_rejects_vr() {
         stub(StrategyType.VR, BigDecimal.TEN, new BigDecimal("20.0000"), null);
-        withdrawRejected("100", IllegalArgumentException.class, "투자금 인출은 PRIVACY·INFINITE 전략만 지원합니다.");
+        withdrawRejected("100", IllegalArgumentException.class, "투자금 인출은 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
     }
 
     @Test

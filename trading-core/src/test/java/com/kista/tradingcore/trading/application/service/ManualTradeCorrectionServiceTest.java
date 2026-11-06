@@ -282,7 +282,7 @@ class ManualTradeCorrectionServiceTest {
 
     @Test
     void DCA_보정은_원장에_반영되고_사이클은_유지() {
-        // DCA는 영구 사이클·시드 비점유 — 청산해도 사이클 유지, usd_deposit은 0
+        // DCA는 영구 사이클 — 청산해도 사이클 유지, 원장 예수금은 기존 6665.31에 매도 대금 2 × 267.37이 더해진다
         Strategy dca = new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.UPRO, StrategyCycleSeedType.NONE);
         stubSelection(dca);
@@ -291,11 +291,11 @@ class ManualTradeCorrectionServiceTest {
 
         assertThat(result.finalHoldings()).isZero();
         assertThat(result.cycleEnded()).isFalse();
-        assertThat(result.finalUsdDeposit()).isZero();
+        assertThat(result.finalUsdDeposit()).isEqualByComparingTo("7200.05");
         verify(strategyCyclePort, never()).markEnded(any(), any(), any());
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());
-        assertThat(captor.getValue().usdDeposit()).isZero();
+        assertThat(captor.getValue().usdDeposit()).isEqualByComparingTo("7200.05");
         verify(orderPort).saveAll(any());
     }
 
@@ -312,7 +312,7 @@ class ManualTradeCorrectionServiceTest {
 
         // 기존 보유 2 + 0.00123456
         assertThat(result.finalHoldings()).isEqualByComparingTo("2.00123456");
-        assertThat(result.finalUsdDeposit()).isZero();
+        assertThat(result.finalUsdDeposit()).isEqualByComparingTo("-116790.69"); // 기존 예수금 6665.31 − 0.00123456 × 1억
         verify(orderPort).saveAll(any());
     }
 

@@ -1,6 +1,8 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
@@ -51,6 +53,9 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     // 잠금 후 재조회한 진행 중 사이클과 그 최신 포지션
     private record LockedCycle(StrategyCycle cycle, CyclePosition latest) {}
 
+    // 소유권 검증된 전략과 계좌 통화(원장 예수금 단위 — 주식 USD, 코인 견적 통화)·코인 여부
+    private record OwnedStrategy(Strategy strategy, Currency currency, boolean crypto) {}
+
     private final StrategyPort strategyPort;
     private final AccountPort accountPort;
     private final StrategyCyclePort strategyCyclePort;
@@ -63,7 +68,8 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
 
     @Override
     public void inject(UUID strategyId, UUID requesterId, InjectCapitalCommand cmd) {
-        Strategy strategy = ownedStrategy(strategyId, requesterId);
+        OwnedStrategy owned = ownedStrategy(strategyId, requesterId);
+        Strategy strategy = owned.strategy();
 
         BigDecimal deposit = cmd.depositAmount() != null ? cmd.depositAmount() : BigDecimal.ZERO;
         int shares = cmd.shares() != null ? cmd.shares() : 0;
@@ -77,8 +83,12 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
                 || (cmd.sharePrice() != null && cmd.sharePrice().signum() <= 0)) {
             throw new IllegalArgumentException("추가 금액과 수량은 0보다 커야 합니다.");
         }
-        requireSupportedType(strategy, "투자금 추가는 PRIVACY·INFINITE 전략만 지원합니다.");
-        LockedCycle locked = lockActiveCycle(strategy, NO_ACTIVE_CYCLE, REPORT_WINDOW);
+        requireSupportedType(strategy, "투자금 추가는 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
+        if (strategy.isDca() && cmd.shares() != null) {
+            throw new IllegalArgumentException("DCA 전략은 예수금만 추가할 수 있습니다.");
+        }
+        requireAmountScale(deposit, owned.currency());
+        LockedCycle locked = lockActiveCycle(owned, NO_ACTIVE_CYCLE, REPORT_WINDOW);
         StrategyCycle cycle = locked.cycle();
         CyclePosition latest = locked.latest();
 
@@ -105,35 +115,51 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
 
     @Override
     public void withdraw(UUID strategyId, UUID requesterId, WithdrawCapitalCommand cmd) {
-        Strategy strategy = ownedStrategy(strategyId, requesterId);
+        OwnedStrategy owned = ownedStrategy(strategyId, requesterId);
+        Strategy strategy = owned.strategy();
         BigDecimal amount = cmd.amount();
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("투자금 인출 금액은 0보다 커야 합니다.");
         }
-        requireSupportedType(strategy, "투자금 인출은 PRIVACY·INFINITE 전략만 지원합니다.");
-        LockedCycle locked = lockActiveCycle(strategy, NO_ACTIVE_CYCLE_WITHDRAW, REPORT_WINDOW_WITHDRAW);
+        requireSupportedType(strategy, "투자금 인출은 PRIVACY·INFINITE·DCA 전략만 지원합니다.");
+        requireAmountScale(amount, owned.currency());
+        LockedCycle locked = lockActiveCycle(owned, NO_ACTIVE_CYCLE_WITHDRAW, REPORT_WINDOW_WITHDRAW);
         StrategyCycle cycle = locked.cycle();
         CyclePosition latest = locked.latest();
 
         // 인출 가능액 = 장부 예수금 − 체결 전 BUY 약정 − 장중 취소 BUY의 보류 체결분. 오늘 마감 전 주문과 22:00 개장 배치가 미리 저장한 다음 거래일 주문이
         // 장부 예수금으로 체결되므로 두 날짜를 모두 빼야 체결 후 usdDeposit이 음수가 되지 않는다(StrategyLedgerBudget.remaining과 같은 약정 정의)
-        LocalDate today = LocalDate.now(clock);
-        LocalDate nextTradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
-        List<LocalDate> dates = Stream.of(today, nextTradeDate).distinct().toList();
-        List<Order> committedOrders = dates.stream()
-                .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
-                .toList();
-        // 장중 일부 체결 후 취소된 BUY의 체결분은 마감 리포트 전까지 장부에 없다 — 취소 직후 기록된 체결분을 빼고, 체결 조회가 실패해 기록이 없는(null) 건은 주문 금액 전체를 상한으로 뺀다.
-        // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다(unreportedCancelledBuys).
-        List<Order> cancelledOrders = dates.stream()
-                .flatMap(date -> ledgerBudget.unreportedCancelledBuys(cycle, date).stream())
-                .toList();
+        List<Order> committedOrders;
+        List<Order> cancelledOrders;
+        if (owned.crypto()) {
+            // 코인은 체결 즉시 원장에 반영되고(CryptoLedgerRecorder) 마감 리포트가 없다 — 날짜 무관 미체결 주문만 약정, 취소분 보류 체결은 없다
+            // ponytail: 코인 실행기는 사이클 잠금 없이 원장을 읽어 주문한다 — 그 사이 인출이 커밋되면 체결 후 원장이 음수가 될 수 있다(다음 틱부터 매수 skip), 문제되면 접수 직전 잠금 재확인
+            committedOrders = orderPort.findOpenByAccountId(strategy.accountId()).stream()
+                    .filter(o -> cycle.id().equals(o.strategyCycleId()))
+                    .toList();
+            cancelledOrders = List.of();
+        } else {
+            LocalDate today = LocalDate.now(clock);
+            LocalDate nextTradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
+            List<LocalDate> dates = Stream.of(today, nextTradeDate).distinct().toList();
+            committedOrders = dates.stream()
+                    .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
+                    .toList();
+            // 장중 일부 체결 후 취소된 BUY의 체결분은 마감 리포트 전까지 장부에 없다 — 취소 직후 기록된 체결분을 빼고, 체결 조회가 실패해 기록이 없는(null) 건은 주문 금액 전체를 상한으로 뺀다.
+            // 리포트가 끝난 날짜는 체결분이 이미 장부에 반영돼 이중 차감이므로 제외한다(unreportedCancelledBuys).
+            cancelledOrders = dates.stream()
+                    .flatMap(date -> ledgerBudget.unreportedCancelledBuys(cycle, date).stream())
+                    .toList();
+        }
         BigDecimal available = ledgerBudget.remaining(cycle, Optional.of(latest), committedOrders, cancelledOrders);
         if (amount.compareTo(available) > 0) {
-            // 금액 표기는 kista-ui fmtUsd와 같은 #,##0.00 (JVM 로케일 무관), 음수 가용액은 0으로 표시, 표시액을 그대로 요청해도 통과하도록 내림
-            throw new IllegalArgumentException(("투자금 인출 금액이 인출 가능액 $%s를 초과합니다. "
+            // 금액 표기: USD는 kista-ui fmtUsd와 같은 $#,##0.00, 그 외는 Currency.format(15,000원·10.50 USDT). 음수 가용액은 0, 표시액을 그대로 요청해도 통과하도록 내림
+            BigDecimal shown = available.max(BigDecimal.ZERO).setScale(owned.currency().amountScale(), RoundingMode.DOWN);
+            String shownText = owned.currency() == Currency.USD
+                    ? "$" + String.format(Locale.US, "%,.2f", shown) : owned.currency().format(shown);
+            throw new IllegalArgumentException(("투자금 인출 금액이 인출 가능액 %s를 초과합니다. "
                     + "장부 예수금에서 체결 전 매수 주문 금액과 장중 취소 전에 체결된 매수 금액을 뺀 만큼 인출할 수 있습니다.")
-                    .formatted(String.format(Locale.US, "%,.2f", available.max(BigDecimal.ZERO).setScale(2, RoundingMode.DOWN))));
+                    .formatted(shownText));
         }
         BigDecimal newStartAmount = cycle.startAmount().subtract(amount);
         if (newStartAmount.signum() <= 0) {
@@ -153,20 +179,29 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     }
 
     // 전략 조회 + 소유권 검증
-    private Strategy ownedStrategy(UUID strategyId, UUID requesterId) {
+    private OwnedStrategy ownedStrategy(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        return strategy;
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        return new OwnedStrategy(strategy, account.broker().getCurrency(), account.broker().getMarket().isCrypto());
     }
 
     private void requireSupportedType(Strategy strategy, String message) {
-        if (!strategy.isPrivacy() && !strategy.isInfinite()) {
+        if (!strategy.isPrivacy() && !strategy.isInfinite() && !strategy.isDca()) {
             throw new IllegalArgumentException(message);
         }
     }
 
+    // 금액 자릿수 — 계좌 통화 소수 자릿수 이하(KRW 정수·USD/USDT 소수 2자리)
+    private static void requireAmountScale(BigDecimal amount, Currency currency) {
+        if (amount.stripTrailingZeros().scale() > currency.amountScale()) {
+            throw new IllegalArgumentException(currency.amountScale() == 0 ? "금액은 정수로 입력해야 합니다."
+                    : "금액은 소수 %d자리까지 입력할 수 있습니다.".formatted(currency.amountScale()));
+        }
+    }
+
     // 최신 사이클 종료 검사 → 행 잠금 → 재조회(잠금 대기 중 종료·startAmount 변경분 반영) → 최신 포지션 조회
-    private LockedCycle lockActiveCycle(Strategy strategy, String noActiveMessage, String reportWindowMessage) {
+    private LockedCycle lockActiveCycle(OwnedStrategy owned, String noActiveMessage, String reportWindowMessage) {
+        Strategy strategy = owned.strategy();
         UUID strategyId = strategy.id();
         // ponytail: StrategyStatus가 ACTIVE/PAUSED 두 값뿐이라 상태 검사는 생략 — 값이 늘면 여기서 거른다
         StrategyCycle first = strategyCyclePort.requireLatestByStrategyId(strategyId);
@@ -181,7 +216,8 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         if (cycle.endDate() != null || !cycle.id().equals(first.id())) {
             throw new IllegalStateException(noActiveMessage);
         }
-        requireOutsideReportWindow(strategy, reportWindowMessage);
+        // 코인 계좌는 마감 리포트가 없다 — 체결 기록(CryptoLedgerRecorder)이 같은 사이클 잠금으로 직렬화된다
+        if (!owned.crypto()) requireOutsideReportWindow(strategy, reportWindowMessage);
         CyclePosition latest = cyclePositionPort.findLatestOne(cycle.id())
                 .orElseThrow(() -> new NoSuchElementException("최신 포지션 이력이 없습니다: cycleId=" + cycle.id()));
         return new LockedCycle(cycle, latest);

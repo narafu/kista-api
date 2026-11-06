@@ -73,7 +73,7 @@ class TradingReporter {
                 .map(ExecutionFillMapper::toFill)
                 .toList();
         AccountBalance applied = balance.applyExecutions(fills);
-        // 시드를 점유하지 않는 전략(DCA)은 usd_deposit 0 — calcFreeCash가 점유 시드로 합산하지 않게 한다
+        // 시드를 점유하지 않는 전략은 usd_deposit 0 — 계좌 미배정 USD 계산이 점유 시드로 합산하지 않게 한다
         AccountBalance postBalance = cycleStrategies.of(strategy.type()).occupiesSeed()
                 ? applied : applied.withUsdDeposit(BigDecimal.ZERO);
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED) — 포지션 저장(rotation 포함)보다 먼저:
