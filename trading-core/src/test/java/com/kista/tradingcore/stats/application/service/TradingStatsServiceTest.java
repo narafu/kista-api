@@ -882,6 +882,27 @@ class TradingStatsServiceTest {
     }
 
     @Test
+    void summary_vrRollover_roundsRealizedToTwoDecimalsAndKeepsTotal() {
+        stubUserWith(VR_STRATEGY);
+        StrategyCycle c1 = closedCycleOf(VR_STRATEGY, "10000", "12200");
+        StrategyCycle c2 = activeCycle(VR_STRATEGY.id(), "12200", "2026-02-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(c1, c2));
+        // 마지막 평단이 소수 4자리라 장부가 실현 = 10204.936 - 10000 = 204.936
+        stubClosedSnapshots(c1,
+                position(UUID.randomUUID(), c1.id(), "5000", "100", "100", 50, "2026-01-01T03:00:00Z"),
+                position(UUID.randomUUID(), c1.id(), "6200", "100", "100.1234", 40, "2026-02-01T03:00:00Z"));
+        when(cyclePositionPort.findLatestByCycleIds(Set.of(c2.id()))).thenReturn(Map.of(c2.id(),
+                position(UUID.randomUUID(), c2.id(), "6200", "160", "100", 40, "2026-02-02T03:00:00Z")));
+
+        StrategyTypeStats vr = statsService.getSummary(USER_ID).byType().getFirst();
+
+        assertThat(vr.realizedPnl().scale()).isEqualTo(2);
+        assertThat(vr.realizedPnl()).isEqualTo(new BigDecimal("204.94"));
+        // 합(2,600)은 반올림 전후 모두 보존
+        assertThat(vr.realizedPnl().add(vr.unrealizedPnl())).isEqualByComparingTo("2600");
+    }
+
+    @Test
     void summary_vrReconfigureWithoutSell_realizedZero() {
         stubUserWith(VR_STRATEGY);
         StrategyCycle c1 = closedCycleOf(VR_STRATEGY, "10000", "10500");
