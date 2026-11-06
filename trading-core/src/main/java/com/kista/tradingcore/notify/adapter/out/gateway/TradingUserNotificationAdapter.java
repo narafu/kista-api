@@ -72,6 +72,15 @@ class TradingUserNotificationAdapter implements TradingUserNotificationPort {
     }
 
     @Override
+    public void notifyCycleRotationFailed(TradingUserProfile profile, String accountNickname, StrategyType strategyType,
+                                          StrategyTicker ticker) {
+        String text = """
+                ⏸️ <b>전략 자동 일시정지</b> — %s%n                [%s] %s 사이클은 정상 종료됐지만 다음 사이클을 여는 중 오류가 나 전략을 일시정지했습니다.%n                재개하면 새 사이클 시작을 다시 시도합니다(남은 원장이 1주 가격보다 작으면 재개되지 않습니다).""".formatted(
+                TelegramHttpClient.escapeHtml(accountNickname), strategyType.name(), ticker.name());
+        notify(profile, "전략 자동 일시정지", text);
+    }
+
+    @Override
     public void notifyInsufficientBalance(TradingUserProfile profile, String accountNickname, StrategyType strategyType, StrategyTicker ticker,
                                           int failedCount, boolean partiallyPlaced, OrderDirection direction) {
         String account = TelegramHttpClient.escapeHtml(accountNickname);

@@ -12,6 +12,7 @@ import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.trading.domain.creation.*;
 import com.kista.tradingcore.matching.domain.strategy.*;
 import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
+import com.kista.tradingcore.trading.application.event.CycleRotationFailedEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
@@ -262,6 +263,60 @@ class CycleRotationServiceTest {
                 .isSameAs(boom);
 
         verify(strategyPort).pause(strategy.id());
+        // 사용자에게 정지 사실을 알린다
+        verify(eventPublisher).publishEvent(argThat((Object e) -> e instanceof CycleRotationFailedEvent ev
+                && ev.userId().equals(USER.userId()) && ev.accountId().equals(ACCOUNT.id())
+                && ev.ticker() == StrategyTicker.SOXL));
+    }
+
+    @Test
+    @DisplayName("재등록 실패 알림 리스너가 던져도 원래 예외가 전파되고 알림 실패는 suppressed로 남는다")
+    void rotationFailedNotifyFails_keepsOriginalException() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        RuntimeException boom = new RuntimeException("사이클 생성 실패");
+        when(cycleSnapshotCreator.createCycleAndSnapshot(any(), any(), any(), any())).thenThrow(boom);
+        RuntimeException notifyFailure = new RuntimeException("알림 실패");
+        lenient().doThrow(notifyFailure).when(eventPublisher).publishEvent(any(CycleRotationFailedEvent.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
+                .isSameAs(boom).hasSuppressedException(notifyFailure);
+
+        verify(strategyPort).pause(strategy.id());
+    }
+
+    @Test
+    @DisplayName("PAUSE마저 실패하면 원래 예외에 suppressed로 남기고 재등록 실패 알림은 보내지 않는다")
+    void pauseFails_keepsOriginalExceptionAndSkipsNotify() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        RuntimeException boom = new RuntimeException("사이클 생성 실패");
+        when(cycleSnapshotCreator.createCycleAndSnapshot(any(), any(), any(), any())).thenThrow(boom);
+        RuntimeException pauseFailure = new RuntimeException("DB 장애");
+        doThrow(pauseFailure).when(strategyPort).pause(strategy.id());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, PRICE, null))
+                .isSameAs(boom).hasSuppressedException(pauseFailure);
+
+        verify(eventPublisher, never()).publishEvent(any(CycleRotationFailedEvent.class));
+    }
+
+    @Test
+    @DisplayName("1주 미만으로 PAUSE한 뒤 알림 리스너가 던지면 재정지·재등록 실패 알림 없이 전파만 한다")
+    void belowOneShare_listenerFails_doesNotRepauseOrNotifyRotationFailure() {
+        Strategy strategy = strategy(StrategyCycleSeedType.MAX);
+        StrategyCycle current = currentCycle(strategy.id(), new BigDecimal("1000.00"));
+        stubLedger(strategy, current, "50");
+        lenient().doThrow(new RuntimeException("리스너 실패")).when(eventPublisher).publishEvent(any(StrategyAutoPausedEvent.class));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> service.rotate(strategy, current, ACCOUNT, USER, new BigDecimal("60"), null))
+                .hasMessage("리스너 실패");
+
+        verify(strategyPort, times(1)).pause(strategy.id());
+        verify(eventPublisher, never()).publishEvent(any(CycleRotationFailedEvent.class));
     }
 
     @Test
@@ -292,6 +347,7 @@ class CycleRotationServiceTest {
 
         verify(strategyPort).pause(strategy.id());
         verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
+        verify(eventPublisher).publishEvent(any(CycleRotationFailedEvent.class));
     }
 
     @Test

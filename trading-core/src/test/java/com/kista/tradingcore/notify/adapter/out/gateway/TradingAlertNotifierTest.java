@@ -135,6 +135,17 @@ class TradingAlertNotifierTest {
     }
 
     @Test
+    void onCycleRotationFailed_notifies_user_only() {
+        when(userProfilePort.findByUserId(userId)).thenReturn(Optional.of(profile));
+
+        notifier().onCycleRotationFailed(new com.kista.tradingcore.trading.application.event.CycleRotationFailedEvent(
+                userId, accountId, "메인", StrategyType.INFINITE, StrategyTicker.SOXL));
+
+        verify(userNotificationPort).notifyCycleRotationFailed(profile, "메인", StrategyType.INFINITE, StrategyTicker.SOXL);
+        verifyNoInteractions(notifyPort);
+    }
+
+    @Test
     void onMarketClosed_callsNotifyPort() {
         notifier().onMarketClosed(new MarketClosedEvent());
 

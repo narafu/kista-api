@@ -570,7 +570,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 원인 범위: rotate에는 외부 HTTP가 없고, 생성 블록은 이미 실패 시 PAUSE했다. ACTIVE 좀비는 그 try 밖 실패에서만 생겼다 — persistor가 rotate 직전에 트랜잭션 밖에서 발행한 `CycleCompletedEvent`의 인라인 리스너(`requireProfile` 예외 시 rotate 미호출), `calcLastPositionDeposit` 읽기, NONE·1주 미만 분기의 pause.
 - 기각: (a) 배치 시작 시 재시도는 price·privacyBase가 필요하고 진입점이 늘어 과하다. (b) 마커 트랜잭션 통합은 rotate 실패 시 청산 스냅샷(매도 후 원장)까지 롤백해 다음 배치가 매도 전 원장으로 매매한다. (c) 관리자 알림은 `BatchContextFactory`에 이미 있다.
 - 해소: `CycleCompletedEvent` 발행을 rotate의 try 맨 앞으로 옮기고 try를 메서드 전체로 넓혔다. 어느 단계든 실패하면 PAUSE 후 rethrow하고, PAUSED + 종료 사이클은 `reopenCycleIfEnded`가 처리한다. 고정: `CycleRotationServiceTest`(리스너·원장 조회 실패 시 PAUSE, 완료→새 사이클 알림 순서), `CyclePositionPersistorDbTest..._cq38`(원장·마커 보존).
-- 남은 한계(수용): PAUSE 사실을 사용자에게 알리지 않는다(관리자는 `TradingBatchGuard`로 받는다). 리스너 외 실패면 완료 알림은 이미 나간 뒤다.
+- 후속(2026-11-06): PAUSE 뒤 `CycleRotationFailedEvent`로 사용자에게 정지·재개 안내를 보낸다(관리자는 `TradingBatchGuard`). NONE·1주 미만 정책으로 이미 PAUSE한 뒤의 실패는 재정지·안내 없이 전파한다. PAUSE·안내 실패는 원래 예외의 suppressed로 남긴다.
+- 남은 한계(수용): 리스너 외 실패면 완료 알림은 이미 나간 뒤다.
 - 상태: done(2026-11-06).
 
 ## 유지 목록 (재제안 금지, 이유 기록)

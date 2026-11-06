@@ -86,6 +86,18 @@ class TradingUserNotificationAdapterTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void notifyCycleRotationFailed_sends_pause_and_resume_guide() {
+        adapter.notifyCycleRotationFailed(LINKED_PROFILE, "메인", StrategyType.INFINITE, StrategyTicker.SOXL);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(restClient.post().uri(anyString())).body(captor.capture());
+        String text = ((Map<String, String>) captor.getValue()).get("text");
+        assertThat(text).contains("전략 자동 일시정지").contains("메인").contains("SOXL")
+                .contains("오류").contains("재개하면 새 사이클 시작을 다시 시도");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void notifyInsufficientBalance_brokerRejection_bodyContainsFailedCountAndPartialNote() {
         adapter.notifyInsufficientBalance(LINKED_PROFILE, "내계좌", StrategyType.INFINITE, StrategyTicker.SOXL, 2, true, OrderDirection.BUY);
 

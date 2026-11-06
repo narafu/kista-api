@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
+import com.kista.tradingcore.trading.application.event.CycleRotationFailedEvent;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.application.event.InsufficientBalanceEvent;
 import com.kista.tradingcore.trading.application.event.StrategyAutoPausedEvent;
@@ -47,6 +48,7 @@ class CycleRotationService {
 
         BigDecimal minRequired;
         BigDecimal targetSeed; // try 밖(생성 성공 뒤 알림)에서도 쓴다
+        boolean pausedByPolicy = false; // NONE·1주 미만으로 이미 PAUSE한 뒤의 실패(알림 리스너 등)는 재등록 실패가 아니다
         try {
             // 완료 이벤트는 맨 앞 — NewCycleStartedEvent보다 먼저 나가야 알림 순서가 유지된다
             eventPublisher.publishEvent(new CycleCompletedEvent(userProfile.userId(), account.id(), account.nickname(),
@@ -55,6 +57,7 @@ class CycleRotationService {
             if (strategy.cycleSeedType() == StrategyCycleSeedType.NONE) {
                 // NONE → 전략 PAUSED (연속 없음)
                 strategyPort.pause(strategy.id());
+                pausedByPolicy = true;
                 log.info("[strategyId={}] 사이클 종료 (NONE) → PAUSED", strategy.id());
                 return;
             }
@@ -70,6 +73,7 @@ class CycleRotationService {
             boolean belowOneShare = price != null ? targetSeed.compareTo(price) < 0 : targetSeed.signum() <= 0;
             if (belowOneShare) {
                 strategyPort.pause(strategy.id());
+                pausedByPolicy = true;
                 log.warn("[strategyId={}] 원장 1주 미만({} < {}) — 새 사이클 없이 PAUSED", strategy.id(), targetSeed, price);
                 eventPublisher.publishEvent(new InsufficientBalanceEvent(null, account.id(), account.nickname(),
                         0, targetSeed, strategy.ticker(), null, 0, false, OrderDirection.BUY));
@@ -93,17 +97,26 @@ class CycleRotationService {
                     .orElseThrow(() -> new NoSuchElementException("활성 전략 버전이 없습니다: " + strategy.id()));
             cycleSnapshotCreator.createCycleAndSnapshot(strategy.id(), activeVersion.id(), targetSeed, price);
         } catch (RuntimeException e) {
+            // 정책으로 이미 PAUSE된 뒤의 실패(1주 미만 알림 리스너 등)는 그대로 전파만 한다 — 재정지·재등록 실패 알림 불필요
+            if (pausedByPolicy) throw e;
             // 생성 전후 어느 지점이든 실패하면 markEnded는 이미 커밋된 상태 — PAUSED 없이 던지면 전략은 ACTIVE인 채
             // 후속 사이클 없는 좀비로 남는다. PAUSED + 종료 사이클은 StrategyService.reopenCycleIfEnded가 재개 시 처리한다.
-            // 원래 예외는 그대로 전파해 TradingBatchGuard가 기존대로 알림·격리한다
+            // 원래 예외는 그대로 전파해 TradingBatchGuard가 기존대로 관리자 알림·격리한다
             // (생성 성공 뒤 알림(최소금액 미달·새 사이클 시작)은 이 try 밖 — 리스너 예외로 건강한 전략이 PAUSED되지 않도록)
-            // 1주 미만 분기 알림 리스너가 던지면 pause가 한 번 더 호출된다 — 상태 갱신이라 멱등
+            log.error("[strategyId={}] 사이클 재등록 실패 → PAUSED 시도 (좀비 사이클 방지)", strategy.id(), e);
             try {
                 strategyPort.pause(strategy.id());
             } catch (RuntimeException pauseFailure) {
                 e.addSuppressed(pauseFailure); // PAUSE마저 실패해도 원래 원인을 잃지 않는다 — 좀비는 BatchContextFactory가 보고
+                throw e;
             }
-            log.error("[strategyId={}] 사이클 재등록 실패 → PAUSED (좀비 사이클 방지)", strategy.id(), e);
+            // 사용자에게 정지 사실과 재개 방법을 알린다 — 알림 실패가 원래 원인을 가리지 않게 suppressed로만 남긴다
+            try {
+                eventPublisher.publishEvent(new CycleRotationFailedEvent(userProfile.userId(), account.id(), account.nickname(),
+                        strategy.type(), strategy.ticker()));
+            } catch (RuntimeException notifyFailure) {
+                e.addSuppressed(notifyFailure);
+            }
             throw e;
         }
         log.info("[strategyId={}] 사이클 재등록 완료: {} → targetSeed={}", strategy.id(), strategy.cycleSeedType(), targetSeed);
