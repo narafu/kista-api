@@ -20,6 +20,7 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
   - 보정이 생략된 날은 `canSkipOrderComputation`의 correctionComplete(보정 3건 전부 존재)가 성립하지 않아 같은 날 재실행 시 재계산한다 — 같은 leg는 `excludeExisting`이 걸러 중복은 없다
   - 접수 직전 재캡(`capIfNeeded`)의 원장 가드: 재캡이 BUY 총액을 늘리지 않으면(PRIVACY 가격 치환 등) 이미 승인된 범위 안이라 그대로 반영한다. 늘리면 `capIfNeeded`가 아무것도 반영하지 않고 true를 반환하고, `TradingOrderExecutor.applyCap`이 `StrategyLedgerBudget.remaining(cycle, date)`(같은 날 저장된 PLANNED·SUBMITTING·PLACED BUY 차감 후 한도)를 예산으로 다시 호출한다 — capper가 자기 스코프 원본 PLANNED BUY를 되돌려 더하고, 예산 초과분은 `fitBuysToBudget`으로 축소하며 축소로도 못 담으면 재캡을 생략하고 기존 PLANNED를 유지한다. 증권사 live 잔고 조회는 없다. 이 구간(원장 조회→재캡 커밋)은 계좌별 JVM 락(`AccountBudgetLock`)으로 직렬화하고 접수는 락 밖에서 병렬 유지한다. 같은 락이 배치 `TradingCandidatePlanner`의 계좌별 태스크와 수동 실행 `ManualTradingService`의 판정~PLANNED 커밋도 감싼다 — 수동 실행은 세션 가드·배치 락 없이 마감(04:30)·개장(22:00) 배치와 겹칠 수 있어, 락이 없으면 같은 사이클의 판정과 재캡이 같은 한도를 이중으로 쓴다. 백테스트는 VR 사다리·bootstrap이 전략 잔고(pool) 이내로만 생성돼 한도 초과 자체가 없어 축소 훅을 타지 않는다
 - 재산정 결과가 모두 비어있으면 BUY 주문 전체 제외 (log.warn)
+- 재캡 멱등성: 전체 취소·재저장(`applyBatchCap`) 직전에 같은 사이클·거래일의 활성 주문(PLANNED 취소 대상 제외, SUBMITTING·PLACED)과 같은 슬롯은 `TradingOrderSlots.excludeExisting`으로 걸러 이미 접수된 leg(예: 평단가 매수①)를 다시 만들지 않는다
 - INFINITE BUY는 항상 AT_CLOSE라 `capIfNeeded(StrategyType.INFINITE, atOpen=true, ...)`은 실질 no-op — 전략별 분기 대칭성 유지 목적으로만 존재
 
 #### PRIVACY 전략 (StrategyType.PRIVACY)

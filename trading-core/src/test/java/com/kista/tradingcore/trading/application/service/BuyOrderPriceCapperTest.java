@@ -88,6 +88,12 @@ class BuyOrderPriceCapperTest {
                 OrderTiming.AT_CLOSE, OrderDirection.BUY, BigDecimal.valueOf(quantity), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
     }
 
+    private Order leg(String orderLeg, OrderStatus status) {
+        return new Order(UUID.randomUUID(), null, STRATEGY_CYCLE_ID, TODAY, StrategyTicker.SOXL, OrderType.LOC,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY, orderLeg, BigDecimal.valueOf(9), new BigDecimal("60.00"),
+                status, null, null, null);
+    }
+
     private Order sell(String price, int quantity) {
         return new Order(null, null, null, TODAY, StrategyTicker.SOXL, OrderType.LOC,
                 OrderTiming.AT_CLOSE, OrderDirection.SELL, BigDecimal.valueOf(quantity), new BigDecimal(price), OrderStatus.PLANNED, null, null, null);
@@ -221,6 +227,24 @@ class BuyOrderPriceCapperTest {
         verify(strategyCyclePort).lockForUpdate(STRATEGY_CYCLE_ID);
         verify(orderPort, never()).cancelPlanned(any());
         verify(orderPlanner, never()).savePlannedOrders(any(), any(), any());
+    }
+
+    @Test
+    void capIfNeeded_avgLegAlreadyPlaced_doesNotResaveAvgLeg() {
+        // AVG는 이미 PLACED, REF·보정만 PLANNED — 재캡이 AVG leg를 다시 만들어도 중복 저장하면 안 된다
+        Order placedAvg = leg("INFINITE_EARLY_AVG_BUY", OrderStatus.PLACED);
+        Order plannedRef = leg("INFINITE_EARLY_REF_BUY", OrderStatus.PLANNED);
+        when(orderPort.findPlannedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(plannedRef));
+        when(orderPort.findPlannedOrPlacedByCycleAndDate(STRATEGY_CYCLE_ID, TODAY)).thenReturn(List.of(placedAvg, plannedRef));
+        PlannedOrder cappedAvg = buy("52.50", 9).withLeg("INFINITE_EARLY_AVG_BUY").toPlanned();
+        PlannedOrder cappedRef = buy("52.50", 9).withLeg("INFINITE_EARLY_REF_BUY").toPlanned();
+        when(infiniteType.capBuyOrders(any(), any(), any(), any(), any(), any())).thenReturn(List.of(cappedAvg, cappedRef));
+
+        capper.capIfNeeded(StrategyType.INFINITE, false, TODAY, ACCOUNT, STRATEGY_CYCLE_ID,
+                new BigDecimal("50.00"), POSITION, null, StrategyTicker.SOXL, new BigDecimal("100000"));
+
+        verify(orderPlanner).savePlannedOrders(ordersCaptor.capture(), eq(ACCOUNT), eq(STRATEGY_CYCLE_ID));
+        assertThat(ordersCaptor.getValue()).containsExactly(cappedRef);
     }
 
     @Test

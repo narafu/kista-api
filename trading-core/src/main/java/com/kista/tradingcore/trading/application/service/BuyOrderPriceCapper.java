@@ -21,7 +21,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static com.kista.shared.kernel.OrderDirection.BUY;
 import com.kista.shared.kernel.StrategyTicker;
@@ -140,6 +142,12 @@ class BuyOrderPriceCapper {
             log.warn("[{}] 보정 후 BUY 주문 없음 — 매수 제외", account.nickname());
             return;
         }
+        // 이미 PLACED/SUBMITTING인 leg(예: 접수 도중 인터럽트 후 재개 시 PLACED된 평단가 매수①)는 재생성분에서 제외 — 이중 매수 방지
+        Set<UUID> cancelledIds = buyOrders.stream().map(Order::id).collect(Collectors.toSet());
+        List<Order> alreadyActive = orderPort.findPlannedOrPlacedByCycleAndDate(strategyCycleId, plannedBuyOrders.getFirst().tradeDate()).stream()
+                .filter(o -> !cancelledIds.contains(o.id())).toList();
+        corrected = TradingOrderSlots.excludeExisting(corrected, alreadyActive);
+        if (corrected.isEmpty()) return;
         orderPlanner.savePlannedOrders(corrected, account, strategyCycleId);
         log.info("[{}] BUY 가격 보정 완료(전체) — 보정 주문: {}", account.nickname(), describePlannedOrders(corrected));
     }
