@@ -533,7 +533,13 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
   - `CyclePositionPersistor`에서 마커 커밋 뒤 `markEnded`·`rotate`가 예외를 던지는 경우
   - 재캡 입력이 부분 PLANNED(AVG PLACED)인 경우
 - 수정 방향: CQ-29~32를 고치면서 해당 테스트를 함께 넣는다. 반올림 경계는 단독으로 먼저 고정할 수 있다.
-- 상태: open(2026-11-04).
+- 상태: done(2026-11-06) — 테스트만 추가(프로덕션 변경 없음).
+  - 반올림 경계: `InfinitePositionTest.priceOffsetRate_roundingBoundary_20div`(9.70/9.75/9.76/10.00/11.00, 9.75가 `HALF_UP`→`HALF_EVEN` 변이를 잡음 확인).
+  - 30·40분할: `InfinitePositionTest.priceOffsetRate_zeroBoundary_movesWithDivisionCount`·`isFinalRound_boundary_30_40div`·`quantities_30div`·`quantities_40div`, `ReverseModePositionTest.sellQuantity_dividesByHalfDivisionCount`. `InfinitePosition.isFinalRound` 주석의 "⟺ currentRound > 19"는 20분할 전용 표현(실제 경계는 div−1) — 주석만 어긋남, 다음 InfinitePosition 수정 때 고친다.
+  - 리버스 BUY cap 초과: `BuyOrderPriceCapperTest.reverseQuotaBuy_exceedingCap_passesThroughUncapped_cq30` — CQ-30 보류 동작을 characterization으로 고정, 의도 확정 시 뒤집는다.
+  - PRIVACY 기준표 날짜 ≠ 거래일: `PrivacyTradeBaseJpaRepositoryDbTest`(실 DB, T−2·T만 있으면 T−1 조회 empty). `(release_date, ticker)` UNIQUE 제약 있음(trading V1).
+  - 마커 커밋 뒤 `markEnded` 예외: CQ-29의 `CyclePositionPersistorDbTest.saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails`. `rotate` 예외: `saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38`(현재 동작 고정, CQ-38).
+  - 재캡 부분 PLANNED: CQ-31의 `BuyOrderPriceCapperTest.capIfNeeded_avgLegAlreadyPlaced_doesNotResaveAvgLeg`.
 
 ### CQ-35 투자금 추가·인출 이력이 남지 않아 과거 원금선이 소급 변경됨
 - 주제: 통계 정확도. 유형: 누락(기존 동작). 위험: 중간(마이그레이션 필요).
@@ -555,6 +561,13 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: 소프트 삭제된 전략의 사이클·스냅샷이 실현손익·승률·곡선에서 빠진다. 사용자는 "보고 싶어서 남길 것"과 "치우려고 지운 것"을 구분하고 싶어 한다.
 - 수정 방향(사용자 추천안 동의): `StrategyStatus.ARCHIVED`(보관)를 신설한다. 보관하면 매매를 멈추고 목록에서 숨기되 통계는 유지하고, 삭제는 지금처럼 통계에서도 뺀다. 스케쥴러·상태 판정의 `!= PAUSED` 형태를 전수 점검한다(보관 전략이 매매되면 안 된다). kista-ui에 보관 버튼·보관함 목록·삭제 확인 문구를 추가한다.
 - 상태: open(2026-11-04, 새 세션 brainstorming 대상).
+
+### CQ-38 마커 커밋 뒤 `rotate` 실패 시 ACTIVE 전략이 영구 skip됨
+- 주제: 배치 복구. 유형: 버그(CQ-29 계열). 위험: 중간(발생 시 매매 정지, 자동 복구 없음).
+- 위치: `CyclePositionPersistor.saveCyclePosition`(position·`markEnded`·`markReported` 커밋 뒤 `CycleCompletedEvent` 발행 → `cycleRotationService.rotate`), `StrategyService.resume`(`isActive()`면 거부, `reopenCycleIfEnded`는 재개 경로에서만 호출).
+- 근거: `rotate`가 예외를 던지면 사이클 종료·리포트 마커는 이미 커밋돼 재개가 건너뛴다. 전략은 ACTIVE인데 최신 사이클이 종료된 상태라 매 배치 좀비 사이클로 skip된다. 사용자가 정지→재개해야 `reopenCycleIfEnded`로 풀린다. 완료 이벤트도 이미 발행돼 사용자에게는 정상 순환처럼 보인다. 고정: `CyclePositionPersistorDbTest.saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38`.
+- 수정 방향(미정): (a) 배치 시작 시 "ACTIVE + 최신 사이클 종료 + 후속 사이클 없음"을 감지해 rotation을 재시도한다. (b) rotate를 마커 트랜잭션 안으로 넣는다(외부 호출 없음을 확인해야 함). (c) 최소한 관리자 알림. 운영 발생 이력부터 조회한다.
+- 상태: open(2026-11-06).
 
 ## 유지 목록 (재제안 금지, 이유 기록)
 

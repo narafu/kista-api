@@ -6,6 +6,8 @@ import com.kista.shared.kernel.StrategyTicker;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 
@@ -166,5 +168,76 @@ class InfinitePositionTest {
         assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("100.00"), new BigDecimal("100"), 1, new BigDecimal("120.00"))).isZero();
         assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("100.00"), new BigDecimal("60"), 1, new BigDecimal("72.00"))).isEqualTo(1);
         assertThat(InfinitePosition.earlyBuyQuantity2(new BigDecimal("1000.00"), new BigDecimal("50"), 10, new BigDecimal("60.00"))).isEqualTo(8);
+    }
+
+    // 평단 1 고정, totalAssets=holdings+deposit — 분할수별 회차 경계 검증용 헬퍼
+    private static InfinitePosition posAtAvg1(int holdings, int deposit, int divisionCount) {
+        return new InfinitePosition(new AccountBalance(holdings, BigDecimal.ONE, new BigDecimal(deposit)),
+                StrategyTicker.SOXL, BigDecimal.ONE, divisionCount);
+    }
+
+    @ParameterizedTest(name = "20분할 holdings={0} → currentRound={2}, priceOffsetRate={3}, early={4}")
+    @CsvSource({
+            "970, 1030, 9.70, 0.01, true",    // 0.006 → 0.01
+            "975, 1025, 9.75, 0.01, true",    // 정확히 0.005 — HALF_UP이면 0.01 (HALF_EVEN이면 0.00)
+            "976, 1024, 9.76, 0.00, false",   // 0.0048 → 0.00 후반
+            "1000, 1000, 10.00, 0.00, false", // 정확히 0
+            "1100, 900, 11.00, -0.02, false"  // 음수
+    })
+    @DisplayName("priceOffsetRate 반올림 경계: 20분할 SOXL(0.20) 9.70/9.75/9.76/10.00/11.00회차")
+    void priceOffsetRate_roundingBoundary_20div(int holdings, int deposit, String round, String rate, boolean early) {
+        InfinitePosition pos = posAtAvg1(holdings, deposit, 20);
+
+        assertThat(pos.currentRound()).isEqualTo(Double.parseDouble(round));
+        assertThat(pos.priceOffsetRate()).isEqualByComparingTo(rate);
+        assertThat(pos.isEarlyStage()).isEqualTo(early);
+    }
+
+    @ParameterizedTest(name = "{0}분할 holdings={1} → currentRound={3}, rate={4}, early={5}")
+    @CsvSource({
+            "30, 1400, 1600, 14.00, 0.01, true",   // 0.0133 → 0.01 (15회차 직전 전반)
+            "30, 1500, 1500, 15.00, 0.00, false",  // 15회차 경계 후반
+            "40, 1900, 2100, 19.00, 0.01, true",   // 0.01 (20회차 직전 전반)
+            "40, 2000, 2000, 20.00, 0.00, false"   // 20회차 경계 후반
+    })
+    @DisplayName("priceOffsetRate 0 경계가 분할수/2 회차로 이동한다 (30분할 15, 40분할 20)")
+    void priceOffsetRate_zeroBoundary_movesWithDivisionCount(int div, int holdings, int deposit, String round,
+                                                            String rate, boolean early) {
+        InfinitePosition pos = posAtAvg1(holdings, deposit, div);
+
+        assertThat(pos.unitAmount()).isEqualByComparingTo("100.00"); // totalAssets=100×div
+        assertThat(pos.currentRound()).isEqualTo(Double.parseDouble(round));
+        assertThat(pos.priceOffsetRate()).isEqualByComparingTo(rate);
+        assertThat(pos.isEarlyStage()).isEqualTo(early);
+    }
+
+    @ParameterizedTest(name = "{0}분할 holdings={1} deposit={2} → isFinalRound={3}")
+    @CsvSource({
+            "30, 2900, 100, false", // 29.00회차, unit(100) == deposit(100)
+            "30, 2910, 90, true",   // 29.10회차, unit(100) > deposit(90)
+            "40, 3900, 100, false", // 39.00회차
+            "40, 3910, 90, true"    // 39.10회차
+    })
+    @DisplayName("isFinalRound: unitAmount > usdDeposit 경계가 분할수-1 회차 부근에 있다 (30분할 29, 40분할 39)")
+    void isFinalRound_boundary_30_40div(int div, int holdings, int deposit, boolean expected) {
+        assertThat(posAtAvg1(holdings, deposit, div).isFinalRound()).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("30분할 수량: 전반(14회차) 평단 매수 50주·기준가 매수 49주, 후반(15회차) 100주")
+    void quantities_30div() {
+        InfinitePosition early = posAtAvg1(1400, 1600, 30); // unit=100, 평단 1, 기준가 1.01
+        int byAvg = early.calcEarlyBuyQuantityByAvgPrice();
+
+        assertThat(byAvg).isEqualTo(50);                                       // floor(50/1)
+        assertThat(early.calcEarlyBuyQuantityByRefPrice(byAvg)).isEqualTo(49); // floor(50/1.01)
+        assertThat(posAtAvg1(1500, 1500, 30).calcLateBuyQuantity()).isEqualTo(100); // floor(100/1.00)
+    }
+
+    @Test
+    @DisplayName("40분할 수량: 전반(19회차) 평단 매수 50주, 후반(20회차) 100주")
+    void quantities_40div() {
+        assertThat(posAtAvg1(1900, 2100, 40).calcEarlyBuyQuantityByAvgPrice()).isEqualTo(50);
+        assertThat(posAtAvg1(2000, 2000, 40).calcLateBuyQuantity()).isEqualTo(100);
     }
 }

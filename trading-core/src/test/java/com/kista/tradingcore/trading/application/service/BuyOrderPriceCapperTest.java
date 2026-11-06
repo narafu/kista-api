@@ -20,7 +20,12 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
+import com.kista.tradingcore.matching.domain.model.ReverseModePosition;
+import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
+import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
+import com.kista.tradingcore.matching.domain.strategy.ReverseInfiniteStrategy;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -179,6 +184,36 @@ class BuyOrderPriceCapperTest {
                 StrategyType.VR, TODAY);
 
         assertThat(prepared).containsExactly(cappedBuy, sell);
+        verifyNoInteractions(orderPort, orderPlanner);
+    }
+
+    @Test
+    @DisplayName("현재 동작 고정 — CQ-30 보류, 의도 확정 시 뒤집을 것: 리버스 쿼터매수 BUY는 cap(현재가×1.05) 초과여도 가격·수량 그대로 통과한다")
+    void reverseQuotaBuy_exceedingCap_passesThroughUncapped_cq30() {
+        // 실제 InfiniteCycleOrderStrategy + 실제 ReverseInfiniteStrategy 산출 주문 사용 (mock 아님)
+        InfiniteCycleOrderStrategy realInfinite = new InfiniteCycleOrderStrategy(null, null);
+        ReverseModePosition reverse = new ReverseModePosition(
+                100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
+                StrategyTicker.SOXL, 20, new BigDecimal("100.00"), false);
+        PlannedOrder reverseBuy = new ReverseInfiniteStrategy().buildOrders(reverse, TODAY).stream()
+                .filter(o -> "REVERSE_INFINITE_LOC_BUY".equals(o.orderLeg())).findFirst().orElseThrow();
+        BigDecimal currentPrice = new BigDecimal("50.00"); // cap=52.50 < 매수가 99.99
+        assertThat(reverseBuy.price()).isGreaterThan(PriceCapPolicy.capFor(currentPrice));
+
+        // 리버스 경로는 position=null → needsCapCheck=false (TradingOrderExecutor.capWithBudget이 capIfNeeded를 호출하지 않음)
+        assertThat(realInfinite.needsCapCheck(null, null)).isFalse();
+
+        // 배정 전 prepareForAllocation도 원본을 그대로 돌려준다
+        CycleOrderStrategies real = new CycleOrderStrategies(List.of(realInfinite));
+        BuyOrderPriceCapper realCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, real, strategyCyclePort);
+        List<PlannedOrder> orders = List.of(reverseBuy);
+
+        List<PlannedOrder> prepared = realCapper.prepareForAllocation(
+                orders, currentPrice, null, null, StrategyTicker.SOXL, StrategyType.INFINITE, TODAY);
+
+        assertThat(prepared).isEqualTo(orders);
+        assertThat(prepared.getFirst().price()).isEqualByComparingTo(reverseBuy.price());
+        assertThat(prepared.getFirst().quantity()).isEqualTo(reverseBuy.quantity());
         verifyNoInteractions(orderPort, orderPlanner);
     }
 

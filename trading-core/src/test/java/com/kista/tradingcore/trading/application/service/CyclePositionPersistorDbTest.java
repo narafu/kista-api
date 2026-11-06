@@ -14,7 +14,9 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyType;
 import org.junit.jupiter.api.AfterEach;
+import com.kista.tradingcore.trading.application.event.CycleCompletedEvent;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -40,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 // 포지션·상세·리포트 마커 원자성 — markReported(JdbcTemplate)가 JPA 트랜잭션에 합류해 함께 롤백되는지 실 DB로 검증.
 // 테스트 트랜잭션을 끄고(NOT_SUPPORTED) persistor의 TransactionOperations가 유일한 경계가 되게 한다. 커밋된 행은 계좌 삭제(FK CASCADE)로 정리.
@@ -53,7 +56,8 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
     @ComponentScan(basePackages = "com.kista.tradingcore.trading.adapter.out.persistence", useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = {
                     ".*\\.CyclePositionPersistenceAdapter", ".*\\.CyclePositionInfiniteDetailPersistenceAdapter",
-                    ".*\\.TradingBatchRunPersistenceAdapter", ".*\\.StrategyPersistenceAdapter"}))
+                    ".*\\.TradingBatchRunPersistenceAdapter", ".*\\.StrategyPersistenceAdapter",
+                    ".*\\.StrategyCyclePersistenceAdapter"}))
     static class AdaptersConfig {
     }
 
@@ -64,6 +68,7 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
     @Autowired CyclePositionPort cyclePositionPort;
     @Autowired CyclePositionInfiniteDetailPort detailPort;
     @Autowired TradingBatchRunPort batchRunPort;
+    @Autowired StrategyCyclePort strategyCyclePort;
 
     private UUID accountId;
     private UUID strategyId;
@@ -135,14 +140,41 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
         assertThat(count("trading_batch_report WHERE strategy_id = ?", strategyId)).isZero();
     }
 
+    @Test
+    @DisplayName("현재 동작 고정 — CQ-38, 복구 경로 생기면 갱신: 마커 커밋 뒤 rotate가 던지면 예외가 전파되고 포지션·종료·마커는 이미 커밋돼 남으며 CycleCompletedEvent도 발행된 상태다")
+    void saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38() {
+        jdbcTemplate.update("INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at) VALUES (?, ?, ?, ?, now() - interval '1 hour')",
+                UUID.randomUUID(), cycleId, new BigDecimal("500.00"), new BigDecimal("5"));
+        CycleRotationService rotation = mock(CycleRotationService.class);
+        doAnswer(inv -> { throw new IllegalStateException("rotate 주입된 실패"); })
+                .when(rotation).rotate(any(), any(), any(), any(), any(), any());
+        ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
+
+        assertThatThrownBy(() -> persistor(batchRunPort, strategyCyclePort, rotation, publisher).saveCyclePosition(TODAY,
+                new AccountBalance(0, null, new BigDecimal("1050.00")), ctx(), new BigDecimal("50.00"), null))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("rotate");
+
+        // 커밋된 상태: 청산 스냅샷(사전 1 + 신규 1), 사이클 종료일·종료금액, 리포트 마커
+        assertThat(count("cycle_position WHERE strategy_cycle_id = ?", cycleId)).isEqualTo(2);
+        assertThat(count("strategy_cycle WHERE id = ? AND end_date IS NOT NULL AND end_amount IS NOT NULL", cycleId)).isEqualTo(1);
+        assertThat(count("trading_batch_report WHERE strategy_id = ?", strategyId)).isEqualTo(1);
+        // 이벤트는 rotate 이전에 이미 발행됐다
+        verify(publisher).publishEvent(any(CycleCompletedEvent.class));
+    }
+
     private CyclePositionPersistor persistor(TradingBatchRunPort batchRun) {
         return persistor(batchRun, mock(StrategyCyclePort.class));
     }
 
     private CyclePositionPersistor persistor(TradingBatchRunPort batchRun, StrategyCyclePort cycles) {
+        return persistor(batchRun, cycles, mock(CycleRotationService.class), mock(ApplicationEventPublisher.class));
+    }
+
+    private CyclePositionPersistor persistor(TradingBatchRunPort batchRun, StrategyCyclePort cycles,
+                                             CycleRotationService rotation, ApplicationEventPublisher publisher) {
         CycleOrderStrategies strategies = new CycleOrderStrategies(java.util.List.of(new InfiniteCycleOrderStrategy(null, null)));
         return new CyclePositionPersistor(cyclePositionPort, detailPort, mock(StrategyInfiniteDetailPort.class),
-                cycles, mock(CycleRotationService.class), mock(ApplicationEventPublisher.class),
+                cycles, rotation, publisher,
                 strategies, mock(VrCycleRolloverService.class), batchRun, new TransactionTemplate(txManager));
     }
 

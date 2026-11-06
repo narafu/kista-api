@@ -4,6 +4,8 @@ import com.kista.tradingcore.matching.domain.model.ReverseModePosition;
 import com.kista.shared.kernel.StrategyTicker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 
@@ -42,5 +44,23 @@ class ReverseModePositionTest {
                 StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
 
         assertThat(position.isQuotaBuyExhausted()).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}분할 holdings={1} → 매도 수량 {2}")
+    @CsvSource({
+            "20, 100, 10",
+            "30, 100, 6",   // divisor 15 → 100/15
+            "40, 100, 5",   // divisor 20
+            "30, 14, 0",    // holdings < divisor
+            "30, 15, 1"
+    })
+    @DisplayName("리버스 MOC/LOC 매도 수량은 holdings/(divisionCount/2) 정수 나눗셈이다")
+    void sellQuantity_dividesByHalfDivisionCount(int div, int holdings, int expected) {
+        ReverseModePosition position = new ReverseModePosition(
+                holdings, new BigDecimal("10.00"), new BigDecimal("1000.00"),
+                StrategyTicker.SOXL, div, new BigDecimal("20.00"), false);
+
+        assertThat(position.calcMocSellQuantity()).isEqualTo(expected);
+        assertThat(position.calcLocSellQuantity()).isEqualTo(expected);
     }
 }
