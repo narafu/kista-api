@@ -626,6 +626,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `BootstrapPosition`·`BacktestEngine` 평단 필수 규칙 | `BootstrapPosition.java:35`, `BacktestEngine.java:420` | 2곳. |
 | "사용자를 찾을 수 없습니다" 복제 | `BatchContextFactory.java:71`, `CryptoDcaRunner.java:122` | 2곳. |
 | `String accountNo` 원시값 | 어댑터 9개 외 | 포트·어댑터 경계의 wire 값이다. 애그리게이트 내부는 `BrokerAccountRef`가 이미 묶는다. |
+| 원장↔증권사 보유 수량 자동 대사 없음 | `TradingReporter` 마감 리포트 | 사용자가 전략과 별개로 같은 계좌에서 직접 매매할 수 있어 차이가 정상이다(사용자 결정 2026-11-07, CQ-39). 감지는 미리보기 `accountHoldingsCheck` 경고로 충분하다. |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
