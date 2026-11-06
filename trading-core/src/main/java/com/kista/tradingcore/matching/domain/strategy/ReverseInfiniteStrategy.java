@@ -19,6 +19,11 @@ import static com.kista.shared.kernel.OrderType.MOC;
 @Slf4j
 public class ReverseInfiniteStrategy {
 
+    // 리버스 LOC 매도 leg (별지점)
+    public static final String LOC_SELL_LEG = "REVERSE_INFINITE_LOC_SELL";
+    // 리버스 LOC 쿼터매수 leg (별지점 − 0.01, 가격 캡 재산정 대상)
+    public static final String LOC_BUY_LEG = "REVERSE_INFINITE_LOC_BUY";
+
     // 소진 직후 첫날: MOC 매도만 생성 (별지점 계산 없이 즉시 청산 시작)
     public List<PlannedOrder> buildFirstDayOrders(ReverseModePosition position, LocalDate tradeDate) {
         int mocSellQuantity = position.calcMocSellQuantity();
@@ -44,7 +49,7 @@ public class ReverseInfiniteStrategy {
         int locSellQuantity = position.calcLocSellQuantity();
         if (locSellQuantity >= 1 && position.starPointPrice() != null) {
             orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, SELL, locSellQuantity,
-                    position.starPointPrice(), "REVERSE_INFINITE_LOC_SELL"));
+                    position.starPointPrice(), LOC_SELL_LEG));
             log.info("[리버스모드] LOC 매도 {}주 @ 별지점={}", locSellQuantity, position.starPointPrice());
         }
 
@@ -53,7 +58,7 @@ public class ReverseInfiniteStrategy {
         if (locBuyQuantity >= 1 && position.starPointPrice() != null) {
             BigDecimal buyPrice = position.starPointPrice().subtract(InfinitePosition.TICK_SIZE);
             orders.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, locBuyQuantity,
-                    buyPrice, "REVERSE_INFINITE_LOC_BUY"));
+                    buyPrice, LOC_BUY_LEG));
             log.info("[리버스모드] LOC 쿼터매수 {}주 @ {}", locBuyQuantity, buyPrice);
         }
 

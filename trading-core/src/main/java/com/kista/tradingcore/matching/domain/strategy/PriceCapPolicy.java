@@ -9,7 +9,10 @@ import java.util.List;
 
 import static java.math.RoundingMode.HALF_UP;
 
-// 매수 가격 캡 공통 정책 — INFINITE/PRIVACY(BuyOrderPriceCapper)·VR(VrStrategy) 매수 사다리 공용
+// 매수 가격 캡 공통 정책 — INFINITE(리버스 쿼터매수 포함)/PRIVACY(BuyOrderPriceCapper)·VR(VrStrategy) 매수 사다리 공용
+// 도입 이유: LOC 지정가가 실제 종가와 크게 벌어지면(경험상 15~20%, 증권사마다 다름) 증권사가 주문 실수로 보고 거부한다
+// 5%인 이유: 접수(장 마감 30분 전) 시점 현재가 기준이라 남은 30분 추가 하락에 10~15% 여유를 둔다
+// 대가: 마감 30분 내 5% 넘게 반등하면 원래 매수가보다 싸도 미체결 — 캡이 걸리는 날은 이미 급락한 날이라 추가 하락 쪽을 막는다
 public final class PriceCapPolicy {
 
     // 캡 배수: currentPrice × (1+RATE) 초과 매수가는 캡으로 대체

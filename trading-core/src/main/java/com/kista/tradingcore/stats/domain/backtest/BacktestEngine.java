@@ -14,7 +14,6 @@ import com.kista.tradingcore.matching.domain.model.StrategyVrDetail;
 import com.kista.tradingcore.matching.domain.model.VrPosition;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
 import com.kista.tradingcore.matching.domain.strategy.VrStrategy;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
@@ -44,8 +43,6 @@ public class BacktestEngine {
 
     // 캡 재산정(사다리 재생성) 전용 — VrStrategy는 무상태라 인스턴스 공유 가능
     private static final VrStrategy VR_STRATEGY = new VrStrategy();
-    // 캡 재산정(수량 재계산 + 보정 주문) 전용 — InfiniteStrategy도 무상태
-    private static final InfiniteStrategy INFINITE_STRATEGY = new InfiniteStrategy();
     // 리버스모드 별지점 산출에 쓰는 최근 종가 개수 — 운영 CycleOrderComputer.STAR_POINT_WINDOW와 동일
     private static final int STAR_POINT_WINDOW = 5;
 
@@ -278,7 +275,7 @@ public class BacktestEngine {
 
         Optional<CycleOrderStrategy.OrderPlan> plan = strategies.of(StrategyType.INFINITE).plan(ctx);
         List<PlannedOrder> orders = plan.map(CycleOrderStrategy.OrderPlan::orders).orElse(List.of());
-        // 리버스모드면 position이 null — 운영 BuyOrderPriceCapper와 동일하게 캡 재산정 대상에서 제외된다
+        // 리버스모드 쿼터매수도 운영과 같은 capBuyOrders 규칙으로 캡 재산정된다
         return applyInfiniteBuyCap(orders, refClose,
                 plan.map(CycleOrderStrategy.OrderPlan::position).orElse(null), candle.date());
     }
@@ -292,7 +289,8 @@ public class BacktestEngine {
 
         BigDecimal cap = PriceCapPolicy.capFor(refClose);
         if (buys.stream().noneMatch(o -> o.price().compareTo(cap) > 0)) return orders;
-        return PriceCapPolicy.replaceBuysPreservingOrder(orders, INFINITE_STRATEGY.buildCappedBuyOrders(position, tradeDate, buys, cap));
+        return PriceCapPolicy.replaceBuysPreservingOrder(orders,
+                strategies.of(StrategyType.INFINITE).capBuyOrders(buys, cap, position, null, position.ticker(), tradeDate));
     }
 
     // --- PRIVACY 경로 ---

@@ -302,6 +302,6 @@ class TradingPreviewService {
                 .mapToInt(PlannedOrder::quantity)
                 .sum());
 
-        return new NextOrdersPreview(today, plan.position(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null, null);
+        return new NextOrdersPreview(today, plan.displayPosition(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null, null);
     }
 }

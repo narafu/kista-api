@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -73,8 +74,8 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                 && (earlyComplete || earlyMergedComplete || lateComplete);
         boolean atCloseComplete = !hasAtCloseTiming
                 || correctionComplete
-                || (hasSlot(concreteSlots, OrderTiming.AT_CLOSE, OrderDirection.BUY, "REVERSE_INFINITE_LOC_BUY")
-                        && hasSlot(concreteSlots, OrderTiming.AT_CLOSE, OrderDirection.SELL, "REVERSE_INFINITE_LOC_SELL"));
+                || (hasSlot(concreteSlots, OrderTiming.AT_CLOSE, OrderDirection.BUY, ReverseInfiniteStrategy.LOC_BUY_LEG)
+                        && hasSlot(concreteSlots, OrderTiming.AT_CLOSE, OrderDirection.SELL, ReverseInfiniteStrategy.LOC_SELL_LEG));
 
         return atOpenComplete && atCloseComplete;
     }
@@ -137,8 +138,9 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
 
         log.info("[{}] 전략 계산(리버스모드): isFirstDay={}, holdings={}, starPointPrice={}, orders={}",
                 ctx.label(), position.isFirstDay(), position.holdings(), position.starPointPrice(), orders.size());
-        // 리버스모드에서 InfinitePosition은 null (OrderPlan.position()은 일반모드 전용)
-        return Optional.of(new OrderPlan(null, null, orders));
+        // 리버스모드 position은 가격 캡 재산정(쿼터 예산 = 원장 예수금/4) 전용 — reverseMode=true라 미리보기 화면에는 내보내지 않는다
+        InfinitePosition capPosition = new InfinitePosition(ctx.balance(), ctx.ticker(), inputs.prevClosePrice(), position.divisionCount());
+        return Optional.of(new OrderPlan(capPosition, null, orders, List.of(), Map.of(), true));
     }
 
     @Override
@@ -153,7 +155,18 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
                                             InfinitePosition position, VrPosition vrPosition,
                                             StrategyTicker ticker, LocalDate tradeDate) {
         if (position == null) return buyOrders;
+        // 리버스 쿼터매수 — 가격만 캡, 수량은 쿼터 예산 ÷ 캡 가격으로 재산정(일반모드 캡과 같은 예산 보존 방식)
+        // 일반모드 사다리 재구성(buildCappedBuyOrders)으로 넘기면 리버스 BUY가 일반모드 주문으로 바뀌므로 먼저 분기한다
+        if (buyOrders.stream().anyMatch(o -> ReverseInfiniteStrategy.LOC_BUY_LEG.equals(o.orderLeg()))) {
+            return buyOrders.stream().map(o -> capReverseQuotaBuy(o, cap, position.usdDeposit())).toList();
+        }
         return infiniteStrategy.buildCappedBuyOrders(position, tradeDate, buyOrders, cap);
+    }
+
+    private static PlannedOrder capReverseQuotaBuy(PlannedOrder order, BigDecimal cap, BigDecimal usdDeposit) {
+        if (order.price().compareTo(cap) <= 0) return order;
+        // 같은 원장이면 캡 가격이 원래 매수가보다 낮아 수량은 원래 이상이 된다 — 쿼터 예산 상한은 그대로
+        return order.withPrice(cap).withQuantity(ReverseModePosition.quotaBuyQuantity(usdDeposit, cap));
     }
 
     @Override

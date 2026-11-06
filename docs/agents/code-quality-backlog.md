@@ -492,7 +492,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `InfiniteCycleOrderStrategy.java:141`(`OrderPlan(null, …)`), `:155`, `:165-167`, `BuyOrderPriceCapper.java:54`.
 - 근거: 리버스모드는 position이 null이라 `needsCapCheck`가 false이고 `capBuyOrders`가 원본을 돌려준다. 예: 별지점 30.00, 현재가 27.00이면 cap 28.35인데 29.99 LOC가 그대로 접수된다. `workflow-capper.md`에 리버스 제외 기술이 없다. Toss CLS 범위 초과 취소 여부는 미확인.
 - 수정 방향: 리버스 BUY도 cap 대상에 넣거나, 제외가 의도라면 `workflow-capper.md`에 이유를 기록한다.
-- 상태: 보류(2026-11-06). 코드상 우회는 확정이나 의도된 제외라는 근거도 없다. 운영 `trading.orders` 3,134건(2026-06-17~11-06)에 `REVERSE_INFINITE_LOC_BUY`는 0건(리버스 주문은 MOC 매도 1건뿐)이라 발생·거절 이력이 없다. 가격만 cap하면 쿼터매수 수량 공식이 바뀌므로 실증 전에는 손대지 않는다. 처음 발생하면 접수 status를 확인해 재검토한다. `workflow-capper.md`에 제외 사실을 기록했다.
+- 상태: done(2026-11-06) — 사용자 확인: cap 이유는 LOC 지정가·종가 괴리 15~20%에서의 증권사 주문 실수 거부이고, 리버스 쿼터매수(별지점 = 5거래일 평균)는 급락 구간에서 오히려 괴리가 크다. 일반모드와 같은 예산 보존 방식으로 가격 cap + 수량 = 쿼터 예산 ÷ cap(`InfiniteCycleOrderStrategy.capBuyOrders`, `ReverseModePosition.quotaBuyQuantity`). 리버스 plan이 cap용 position을 싣고 `OrderPlan.reverseMode`로 미리보기 표시만 가린다. 백테스트도 운영 `capBuyOrders`를 호출하도록 맞췄다. 회귀: `BuyOrderPriceCapperTest.reverseQuotaBuy_exceedingCap_capsPriceAndRecomputesQuantity`(변이 확인 완료).
 
 ### CQ-31 재캡이 이미 PLACED된 평단가 매수①을 재생성
 - 주제: 주문 안전·멱등성. 유형: 버그(재실행 전제). 위험: 낮음~중간.
@@ -536,7 +536,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 상태: done(2026-11-06) — 테스트만 추가(프로덕션 변경 없음).
   - 반올림 경계: `InfinitePositionTest.priceOffsetRate_roundingBoundary_20div`(9.70/9.75/9.76/10.00/11.00, 9.75가 `HALF_UP`→`HALF_EVEN` 변이를 잡음 확인).
   - 30·40분할: `InfinitePositionTest.priceOffsetRate_zeroBoundary_movesWithDivisionCount`·`isFinalRound_boundary_30_40div`·`quantities_30div`·`quantities_40div`, `ReverseModePositionTest.sellQuantity_dividesByHalfDivisionCount`. `InfinitePosition.isFinalRound` 주석의 "⟺ currentRound > 19"는 20분할 전용 표현(실제 경계는 div−1) — 주석만 어긋남, 다음 InfinitePosition 수정 때 고친다.
-  - 리버스 BUY cap 초과: `BuyOrderPriceCapperTest.reverseQuotaBuy_exceedingCap_passesThroughUncapped_cq30` — CQ-30 보류 동작을 characterization으로 고정, 의도 확정 시 뒤집는다.
+  - 리버스 BUY cap 초과: CQ-30에서 cap 적용으로 바꾸며 `BuyOrderPriceCapperTest.reverseQuotaBuy_exceedingCap_capsPriceAndRecomputesQuantity`·`reverseQuotaBuy_withinCap_unchanged`로 대체.
   - PRIVACY 기준표 날짜 ≠ 거래일: `PrivacyTradeBaseJpaRepositoryDbTest`(실 DB, T−2·T만 있으면 T−1 조회 empty). `(release_date, ticker)` UNIQUE 제약 있음(trading V1).
   - 마커 커밋 뒤 `markEnded` 예외: CQ-29의 `CyclePositionPersistorDbTest.saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails`. `rotate` 예외: `saveCyclePosition_keepsCommittedEndAndMarker_whenRotateThrowsAfterCommit_cq38`(현재 동작 고정, CQ-38).
   - 재캡 부분 PLANNED: CQ-31의 `BuyOrderPriceCapperTest.capIfNeeded_avgLegAlreadyPlaced_doesNotResaveAvgLeg`.

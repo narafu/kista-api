@@ -63,4 +63,19 @@ class ReverseModePositionTest {
         assertThat(position.calcMocSellQuantity()).isEqualTo(expected);
         assertThat(position.calcLocSellQuantity()).isEqualTo(expected);
     }
+
+    @Test
+    @DisplayName("쿼터매수 수량 헬퍼는 쿼터 예산(원장/4) ÷ 매수가 내림이고 별지점 경로와 같은 값을 낸다")
+    void quotaBuyQuantity_sharedByStarPointAndCap() {
+        ReverseModePosition position = new ReverseModePosition(
+                100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
+                StrategyTicker.SOXL, 20, new BigDecimal("100.00"), false);
+
+        // 별지점 경로: 250 / 99.99 = 2
+        assertThat(position.calcLocBuyQuantity())
+                .isEqualTo(ReverseModePosition.quotaBuyQuantity(new BigDecimal("1000.00"), new BigDecimal("99.99")))
+                .isEqualTo(2);
+        // 캡 경로: 250 / 52.50 = 4
+        assertThat(ReverseModePosition.quotaBuyQuantity(new BigDecimal("1000.00"), new BigDecimal("52.50"))).isEqualTo(4);
+    }
 }

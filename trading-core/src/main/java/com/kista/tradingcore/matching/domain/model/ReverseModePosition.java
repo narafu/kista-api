@@ -39,6 +39,15 @@ public record ReverseModePosition(
 
     // 쿼터매수 금액 — usdDeposit / SELL_QUARTER_DIVISOR(4)
     public BigDecimal calcLocBuyAmount() {
+        return quotaBuyAmount(usdDeposit);
+    }
+
+    // static 헬퍼: 쿼터매수 수량 = 쿼터 예산 ÷ 매수가(FLOOR) — 별지점 매수가와 가격 캡(InfiniteCycleOrderStrategy.capBuyOrders) 재산정 공용
+    public static int quotaBuyQuantity(BigDecimal usdDeposit, BigDecimal buyPrice) {
+        return quotaBuyAmount(usdDeposit).divide(buyPrice, 0, FLOOR).intValue();
+    }
+
+    private static BigDecimal quotaBuyAmount(BigDecimal usdDeposit) {
         return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), 2, HALF_UP);
     }
 
@@ -48,7 +57,7 @@ public record ReverseModePosition(
         if (starPointPrice == null || starPointPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
         BigDecimal buyPrice = starPointPrice.subtract(InfinitePosition.TICK_SIZE);
         if (buyPrice.compareTo(BigDecimal.ZERO) <= 0) return 0;
-        return calcLocBuyAmount().divide(buyPrice, 0, FLOOR).intValue();
+        return quotaBuyQuantity(usdDeposit, buyPrice);
     }
 
     // 예산 소진 판정: 별지점은 계산됐지만(데이터 존재) 쿼터매수 예산으로 1주도 못 사는 경우

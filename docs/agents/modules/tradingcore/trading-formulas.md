@@ -39,6 +39,7 @@ BUY 가격이 cap(currentPrice × 1.05, PriceCapPolicy)을 넘으면 cap 기준�
 starPointPrice = 현재 사이클에서 INFINITE 상세(cycle_position_infinite)가 있는 최신 cycle_position 5건(STAR_POINT_WINDOW — 마감 리포트·등록 개장 행. 수동 체결 보정 행은 체결가가 종가 자리에 들어가므로 제외. 로테이션 개장 행은 detail이 없어 제외되나 새 사이클은 보유 0에서 시작해 리버스 진입 전에 창이 리포트 행으로 채워져 영향 없음)의 closingPrice 평균  (scale=2, HALF_UP — null·0 이하 종가 제외, 남는 값이 없으면 null)
 LOC 매도 가격 = starPointPrice, 쿼터매수 LOC 가격 = starPointPrice − 0.01(TICK_SIZE)
 ```
+- 쿼터매수는 접수 전 가격 캡 대상이다: 주문가 = min(starPointPrice − 0.01, 현재가 × 1.05), 수량 = floor(round2(usdDeposit/4) ÷ 주문가) — 상세 `workflow-capper.md`
 - 리버스모드 첫날은 별지점 없이 MOC 매도만 낸다 — 별지점은 2일차부터 계산(`CycleOrderComputer.computeStarPointPrice`)
 - 백테스트(`BacktestEngine.STAR_POINT_WINDOW`)도 같은 5개 윈도우 — 두 값은 함께 바꾼다
 - 최신 N건 조회는 Pageable이 건수를 정하는 파생 쿼리로 한다. `findTopN…` 같은 숫자 없는 `Top`/`First`는 PartTree가 1건으로 고정해 별지점이 종가 1개로 계산된 적이 있다(`RepositoryLimitingQueryTest`가 재발 차단)

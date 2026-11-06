@@ -75,7 +75,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
                 case DcaRuleDecision.Skipped s -> skips.add(s);
             }
         }
-        return Optional.of(new OrderPlan(null, null, List.copyOf(orders), List.copyOf(skips), Map.copyOf(referencePrices)));
+        return Optional.of(new OrderPlan(null, null, List.copyOf(orders), List.copyOf(skips), Map.copyOf(referencePrices), false));
     }
 
     private static DcaRuleInputs withLimits(DcaRuleInputs in, BigDecimal sellable, BigDecimal availableCash) {

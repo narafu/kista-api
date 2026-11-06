@@ -20,9 +20,8 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
-import com.kista.tradingcore.matching.domain.model.ReverseModePosition;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.tradingcore.matching.domain.strategy.PriceCapPolicy;
+import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.matching.domain.strategy.ReverseInfiniteStrategy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -187,34 +186,63 @@ class BuyOrderPriceCapperTest {
         verifyNoInteractions(orderPort, orderPlanner);
     }
 
+    // 리버스 쿼터매수 실제 plan — 보유 100주·원장 1000(쿼터 예산 250)·별지점 100 → LOC BUY 99.99 × 2주
+    private static CycleOrderStrategy.OrderPlan reversePlan(InfiniteCycleOrderStrategy strategy) {
+        AccountBalance balance = new AccountBalance(new BigDecimal("100"), new BigDecimal("10.00"), new BigDecimal("1000.00"));
+        CycleOrderStrategy.PlanContext.InfiniteInputs inputs = new CycleOrderStrategy.PlanContext.InfiniteInputs(
+                20, new BigDecimal("50.00"), new BigDecimal("100.00"), true, false);
+        CycleOrderStrategy.PlanContext ctx = new CycleOrderStrategy.PlanContext(
+                balance, StrategyTicker.SOXL, TODAY, "test", inputs, null, null, null);
+        return strategy.plan(ctx).orElseThrow();
+    }
+
     @Test
-    @DisplayName("현재 동작 고정 — CQ-30 보류, 의도 확정 시 뒤집을 것: 리버스 쿼터매수 BUY는 cap(현재가×1.05) 초과여도 가격·수량 그대로 통과한다")
-    void reverseQuotaBuy_exceedingCap_passesThroughUncapped_cq30() {
+    @DisplayName("CQ-30: 리버스 쿼터매수 BUY가 cap(현재가×1.05) 초과면 가격은 cap, 수량은 쿼터 예산 ÷ cap으로 재산정한다")
+    void reverseQuotaBuy_exceedingCap_capsPriceAndRecomputesQuantity() {
         // 실제 InfiniteCycleOrderStrategy + 실제 ReverseInfiniteStrategy 산출 주문 사용 (mock 아님)
-        InfiniteCycleOrderStrategy realInfinite = new InfiniteCycleOrderStrategy(null, null);
-        ReverseModePosition reverse = new ReverseModePosition(
-                100, new BigDecimal("10.00"), new BigDecimal("1000.00"),
-                StrategyTicker.SOXL, 20, new BigDecimal("100.00"), false);
-        PlannedOrder reverseBuy = new ReverseInfiniteStrategy().buildOrders(reverse, TODAY).stream()
-                .filter(o -> "REVERSE_INFINITE_LOC_BUY".equals(o.orderLeg())).findFirst().orElseThrow();
-        BigDecimal currentPrice = new BigDecimal("50.00"); // cap=52.50 < 매수가 99.99
-        assertThat(reverseBuy.price()).isGreaterThan(PriceCapPolicy.capFor(currentPrice));
+        InfiniteCycleOrderStrategy realInfinite = new InfiniteCycleOrderStrategy(new InfiniteStrategy(), new ReverseInfiniteStrategy());
+        CycleOrderStrategy.OrderPlan plan = reversePlan(realInfinite);
+        PlannedOrder reverseBuy = plan.orders().stream()
+                .filter(o -> ReverseInfiniteStrategy.LOC_BUY_LEG.equals(o.orderLeg())).findFirst().orElseThrow();
+        assertThat(reverseBuy.price()).isEqualByComparingTo("99.99");
+        assertThat(reverseBuy.quantity()).isEqualTo(2);
 
-        // 리버스 경로는 position=null → needsCapCheck=false (TradingOrderExecutor.capWithBudget이 capIfNeeded를 호출하지 않음)
-        assertThat(realInfinite.needsCapCheck(null, null)).isFalse();
+        // 리버스 plan도 캡 재산정용 position을 싣는다 → 접수 직전 재캡(capIfNeeded) 대상, 미리보기 표시용 position은 null
+        assertThat(realInfinite.needsCapCheck(plan.position(), null)).isTrue();
+        assertThat(plan.reverseMode()).isTrue();
+        assertThat(plan.displayPosition()).isNull();
 
-        // 배정 전 prepareForAllocation도 원본을 그대로 돌려준다
         CycleOrderStrategies real = new CycleOrderStrategies(List.of(realInfinite));
         BuyOrderPriceCapper realCapper = new BuyOrderPriceCapper(orderPort, orderPlanner, real, strategyCyclePort);
-        List<PlannedOrder> orders = List.of(reverseBuy);
 
+        // 현재가 50 → cap 52.50, 수량 = floor(250 / 52.50) = 4
         List<PlannedOrder> prepared = realCapper.prepareForAllocation(
-                orders, currentPrice, null, null, StrategyTicker.SOXL, StrategyType.INFINITE, TODAY);
+                plan.orders(), new BigDecimal("50.00"), plan.position(), null, StrategyTicker.SOXL, StrategyType.INFINITE, TODAY);
 
-        assertThat(prepared).isEqualTo(orders);
-        assertThat(prepared.getFirst().price()).isEqualByComparingTo(reverseBuy.price());
-        assertThat(prepared.getFirst().quantity()).isEqualTo(reverseBuy.quantity());
+        PlannedOrder cappedBuy = prepared.stream()
+                .filter(o -> ReverseInfiniteStrategy.LOC_BUY_LEG.equals(o.orderLeg())).findFirst().orElseThrow();
+        assertThat(cappedBuy.price()).isEqualByComparingTo("52.50");
+        assertThat(cappedBuy.quantity()).isEqualTo(4);
+        // LOC 매도(별지점)는 그대로
+        PlannedOrder sell = prepared.stream()
+                .filter(o -> ReverseInfiniteStrategy.LOC_SELL_LEG.equals(o.orderLeg())).findFirst().orElseThrow();
+        assertThat(sell.price()).isEqualByComparingTo("100.00");
         verifyNoInteractions(orderPort, orderPlanner);
+    }
+
+    @Test
+    @DisplayName("CQ-30: 리버스 쿼터매수 BUY가 cap 이하면 가격·수량을 그대로 둔다")
+    void reverseQuotaBuy_withinCap_unchanged() {
+        InfiniteCycleOrderStrategy realInfinite = new InfiniteCycleOrderStrategy(new InfiniteStrategy(), new ReverseInfiniteStrategy());
+        CycleOrderStrategy.OrderPlan plan = reversePlan(realInfinite);
+        BuyOrderPriceCapper realCapper = new BuyOrderPriceCapper(orderPort, orderPlanner,
+                new CycleOrderStrategies(List.of(realInfinite)), strategyCyclePort);
+
+        // 현재가 100 → cap 105.00 ≥ 매수가 99.99
+        List<PlannedOrder> prepared = realCapper.prepareForAllocation(
+                plan.orders(), new BigDecimal("100.00"), plan.position(), null, StrategyTicker.SOXL, StrategyType.INFINITE, TODAY);
+
+        assertThat(prepared).isEqualTo(plan.orders());
     }
 
     // ─── capIfNeeded — INFINITE/VR(전체 취소·재저장) ────────────────────────

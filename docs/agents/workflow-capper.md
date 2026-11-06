@@ -11,7 +11,9 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 - 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded(StrategyType.INFINITE, ...)`) — 재산정·보정 로직 자체는 `InfiniteCycleOrderStrategy.capBuyOrders()`가 `InfiniteStrategy.buildCappedBuyOrders()`에 위임 (아래 `computeEarlyBuys`/`computeLateBuys`/`CORRECTION_ORDER_COUNT`는 InfiniteStrategy 내부 심볼)
 - 전반(buyOrders 2건): `computeEarlyBuys` — cappedAvg/cappedRef 기준 buy①② 재산정, 동가 시 병합
 - 후반(buyOrders 1건): `computeLateBuys` — cappedPrice 기준 단일 LOC 수량 재산정
-- **리버스모드 쿼터매수 BUY는 cap 대상이 아니다**: position이 null이라 `needsCapCheck`가 false이고 `capBuyOrders`도 원본을 돌려준다. 의도된 제외인지는 미확정(CQ-30) — 운영에서 `REVERSE_INFINITE_LOC_BUY`는 2026-11-06까지 0건이라 브로커 거절 여부도 미확인. 처음 발생하면 접수 status부터 확인한다
+- **cap을 두는 이유**: LOC 지정가가 실제 종가와 크게 벌어지면(경험상 15~20%, 증권사마다 다름) 증권사가 주문 실수로 보고 거부한다. 5%는 접수(장 마감 30분 전) 현재가 기준이라 남은 30분 추가 하락에 10~15% 여유를 둔 값이다. 대가는 마감 30분 내 5% 넘게 반등하면 원래 매수가보다 싸도 미체결이라는 점 — cap이 걸리는 날은 이미 급락한 날이라 추가 하락 쪽을 막는다(`PriceCapPolicy` 주석)
+- **리버스모드 쿼터매수 BUY**(`ReverseInfiniteStrategy.LOC_BUY_LEG`, CQ-30): 가격만 cap으로 낮추고 수량은 쿼터 예산(원장 예수금/4) ÷ cap으로 재산정한다(`ReverseModePosition.quotaBuyQuantity` — 별지점 경로와 공용). 일반모드 cap과 같은 예산 보존 방식이다. 리버스 plan도 cap용 `InfinitePosition`을 싣고 `OrderPlan.reverseMode=true`라, `capBuyOrders`가 일반모드 사다리 재구성보다 먼저 분기하고 미리보기는 `displayPosition()`(null)으로 회차·기준가를 내보내지 않는다. 별지점이 5거래일 종가 평균이라 급락 구간(리버스 진입 구간)에서 종가와 벌어지기 쉽다
+  - 예산 소진 판정(`isQuotaBuyExhausted` → 동일 수량 MOC 매도 전환)은 계획 시점에 cap 전 가격(별지점 − 0.01)으로 정해진다 — cap 후 가격이면 1주를 살 수 있는 날도 MOC 매도로 간다(현행 유지)
 - **보정 주문 (전후반 공통)**: cap 경로 전용이 아니라 `InfiniteStrategy.buildOrders`가 일반모드 BUY(base) 바로 뒤에 상시 붙이고(isFinalRound·리버스 제외), cap 재산정 시 base와 함께 다시 계산한다. `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
   - 가격 = `K / (누적수량 + 1)` (FLOOR, scale=2) — `buildOrders`에서도 `trimCorrectionsToBudget`을 적용한다 — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip
