@@ -11,6 +11,7 @@ INFINITE/PRIVACY/VR 세 전략 모두 대상이며, 단일 진입점 `BuyOrderPr
 - 트리거: PLANNED BUY 주문가 중 하나라도 `currentPrice × 1.05`(`PriceCapPolicy`) 초과 시 가격 캡 후 수량 재산정 (`capIfNeeded(StrategyType.INFINITE, ...)`) — 재산정·보정 로직 자체는 `InfiniteCycleOrderStrategy.capBuyOrders()`가 `InfiniteStrategy.buildCappedBuyOrders()`에 위임 (아래 `computeEarlyBuys`/`computeLateBuys`/`CORRECTION_ORDER_COUNT`는 InfiniteStrategy 내부 심볼)
 - 전반(buyOrders 2건): `computeEarlyBuys` — cappedAvg/cappedRef 기준 buy①② 재산정, 동가 시 병합
 - 후반(buyOrders 1건): `computeLateBuys` — cappedPrice 기준 단일 LOC 수량 재산정
+- **리버스모드 쿼터매수 BUY는 cap 대상이 아니다**: position이 null이라 `needsCapCheck`가 false이고 `capBuyOrders`도 원본을 돌려준다. 의도된 제외인지는 미확정(CQ-30) — 운영에서 `REVERSE_INFINITE_LOC_BUY`는 2026-11-06까지 0건이라 브로커 거절 여부도 미확인. 처음 발생하면 접수 status부터 확인한다
 - **보정 주문 (전후반 공통)**: cap 경로 전용이 아니라 `InfiniteStrategy.buildOrders`가 일반모드 BUY(base) 바로 뒤에 상시 붙이고(isFinalRound·리버스 제외), cap 재산정 시 base와 함께 다시 계산한다. `CORRECTION_ORDER_COUNT`(=3)회 LOC 1주 추가
   - 가격 = `K / (누적수량 + 1)` (FLOOR, scale=2) — `buildOrders`에서도 `trimCorrectionsToBudget`을 적용한다 — 매 회 직전까지 추가된 주문 수량 합산 기준
   - 누적수량이 0이면 해당 회차 skip

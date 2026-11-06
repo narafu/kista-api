@@ -492,7 +492,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `InfiniteCycleOrderStrategy.java:141`(`OrderPlan(null, …)`), `:155`, `:165-167`, `BuyOrderPriceCapper.java:54`.
 - 근거: 리버스모드는 position이 null이라 `needsCapCheck`가 false이고 `capBuyOrders`가 원본을 돌려준다. 예: 별지점 30.00, 현재가 27.00이면 cap 28.35인데 29.99 LOC가 그대로 접수된다. `workflow-capper.md`에 리버스 제외 기술이 없다. Toss CLS 범위 초과 취소 여부는 미확인.
 - 수정 방향: 리버스 BUY도 cap 대상에 넣거나, 제외가 의도라면 `workflow-capper.md`에 이유를 기록한다.
-- 상태: open(2026-11-04, 미확인).
+- 상태: 보류(2026-11-06). 코드상 우회는 확정이나 의도된 제외라는 근거도 없다. 운영 `trading.orders` 3,134건(2026-06-17~11-06)에 `REVERSE_INFINITE_LOC_BUY`는 0건(리버스 주문은 MOC 매도 1건뿐)이라 발생·거절 이력이 없다. 가격만 cap하면 쿼터매수 수량 공식이 바뀌므로 실증 전에는 손대지 않는다. 처음 발생하면 접수 status를 확인해 재검토한다. `workflow-capper.md`에 제외 사실을 기록했다.
 
 ### CQ-31 재캡이 이미 PLACED된 평단가 매수①을 재생성
 - 주제: 주문 안전·멱등성. 유형: 버그(재실행 전제). 위험: 낮음~중간.
