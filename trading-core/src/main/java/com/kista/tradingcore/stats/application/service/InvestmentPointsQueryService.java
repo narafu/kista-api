@@ -5,8 +5,6 @@ import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.KstDays;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
-import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -24,9 +22,6 @@ import java.time.Instant;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.math.BigDecimal;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -39,8 +34,6 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
     private final StrategyPort strategyPort;
     private final StrategyCyclePort strategyCyclePort;
     private final CyclePositionPort cyclePositionPort;
-    private final OrderPort orderPort;
-    private final CycleOrderStrategies cycleOrderStrategies; // 시드 비점유 전략(DCA)의 순투입액을 외부 흐름으로 넘길지 판정
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     private final InvestmentIndexCalculator investmentIndexCalculator = new InvestmentIndexCalculator();
 
@@ -78,18 +71,8 @@ class InvestmentPointsQueryService implements InvestmentPointsQuery {
                 ? cyclePositionPort.findByStrategyAndRange(strategyId, Instant.EPOCH, toInstant)
                 : cyclePositionPort.findByUserAndRange(userId, Instant.EPOCH, toInstant);
 
-        // 시드 비점유 전략(DCA) 사이클은 일자별 누적 순투입액을 외부 현금흐름으로 넘긴다 (일괄 조회)
-        Map<UUID, Strategy> strategyById = strategies.stream().collect(Collectors.toMap(Strategy::id, s -> s));
-        Set<UUID> seedlessCycleIds = cycles.stream()
-                .filter(c -> !cycleOrderStrategies.of(strategyById.get(c.strategyId()).type()).occupiesSeed())
-                .map(StrategyCycle::id)
-                .collect(Collectors.toSet());
-        Map<UUID, NavigableMap<LocalDate, BigDecimal>> netInvested = seedlessCycleIds.isEmpty()
-                ? Map.of() : orderPort.findFilledFlowsByCycleIds(seedlessCycleIds).entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().netInvested()));
-
         List<InvestmentPoint> investmentPoints = investmentIndexCalculator.calculate(
-                cycles, positions, effectiveFrom, effectiveTo, netInvested);
+                cycles, positions, effectiveFrom, effectiveTo);
 
         return new InvestmentPointsResult(investmentPoints, effectiveFrom, effectiveTo, selectedStrategy);
     }

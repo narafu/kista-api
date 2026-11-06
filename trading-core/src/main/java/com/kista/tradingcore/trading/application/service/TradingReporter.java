@@ -16,7 +16,6 @@ import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -46,7 +45,6 @@ class TradingReporter {
     private final OrderPort orderPort;                              // 주문 체결 상태 갱신
     private final CyclePositionPersistor cyclePositionPersistor;   // 포지션 스냅샷 저장 위임
     private final ApplicationEventPublisher eventPublisher;        // 리포트/SSE 알림 이벤트 발행
-    private final CycleOrderStrategies cycleStrategies;            // 전략별 시드 점유 여부(occupiesSeed) 조회
 
     void recordAndNotify(LocalDate today, BatchContext ctx, AccountBalance balance,
                          BigDecimal closingPrice, List<Order> mainOrders, PrivacyTradeBase privacyBase) {
@@ -72,10 +70,7 @@ class TradingReporter {
         List<AccountBalance.Fill> fills = executions.stream()
                 .map(ExecutionFillMapper::toFill)
                 .toList();
-        AccountBalance applied = balance.applyExecutions(fills);
-        // 시드를 점유하지 않는 전략은 usd_deposit 0 — 계좌 미배정 USD 계산이 점유 시드로 합산하지 않게 한다
-        AccountBalance postBalance = cycleStrategies.of(strategy.type()).occupiesSeed()
-                ? applied : applied.withUsdDeposit(BigDecimal.ZERO);
+        AccountBalance postBalance = balance.applyExecutions(fills);
         // 접수된 주문별 체결 현황 기록 (FILLED / PARTIALLY_FILLED) — 포지션 저장(rotation 포함)보다 먼저:
         // rotation 실패가 예외로 끝나도 주문이 PLACED로 남지 않게 한다 (리포트 마커가 이미 찍혀 재개로도 복구되지 않음)
         markFilledOrders(mainOrders, cancelledOrders, executions);

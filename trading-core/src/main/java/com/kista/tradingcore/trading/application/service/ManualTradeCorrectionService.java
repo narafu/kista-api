@@ -33,7 +33,6 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -80,7 +79,6 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
         AccountBalance balance = latest.toBalance();
         CycleOrderStrategy cycleStrategy = cycleOrderStrategies.of(strategy.type());
         boolean endsCycleOnLiquidation = cycleStrategy.endsCycleOnLiquidation();
-        boolean occupiesSeed = cycleStrategy.occupiesSeed(); // 시드 비점유 전략은 보정 후에도 usd_deposit 0
         Strategy updatedStrategy = strategy;
         boolean cycleEnded = false;
         List<Order> manualOrders = new ArrayList<>();
@@ -93,7 +91,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
             validateQuantity(fill, account.broker().getMarket());
             validateSellQuantity(fill, balance);
             manualOrders.add(toManualOrder(fill, account, currentCycle, strategy));
-            balance = applyFillAndSnapshot(fill, balance, currentCycle, occupiesSeed);
+            balance = applyFillAndSnapshot(fill, balance, currentCycle);
 
             // 청산이 발생하면 즉시 사이클 종료 + 안전하게 PAUSED 고정 — VR처럼 청산에도 사이클을 유지하는 전략은 제외
             // (VR 사이클을 닫으면 재개가 재오픈하지 않아 좀비 사이클로 영구 정지된다)
@@ -204,11 +202,10 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
 
     // 체결 반영 후 잔고 재계산 + cycle_position 스냅샷 append
     private AccountBalance applyFillAndSnapshot(ManualTradeCorrectionCommand.Fill fill, AccountBalance balance,
-                                                StrategyCycle currentCycle, boolean occupiesSeed) {
+                                                StrategyCycle currentCycle) {
         // 소수 수량을 쓰므로 브로커 Execution(int) 대신 원장 Fill을 직접 만든다
-        AccountBalance applied = balance.applyExecutions(List.of(ExecutionFillMapper.of(
+        AccountBalance updated = balance.applyExecutions(List.of(ExecutionFillMapper.of(
                 fill.direction(), fill.quantity(), fill.price().multiply(fill.quantity()))));
-        AccountBalance updated = occupiesSeed ? applied : applied.withUsdDeposit(BigDecimal.ZERO);
         cyclePositionPort.save(CyclePosition.tradeSnapshot(currentCycle.id(), updated, fill.price()));
         return updated;
     }

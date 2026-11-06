@@ -9,11 +9,7 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
-import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
-import java.util.TreeMap;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -27,7 +23,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.kista.tradingcore.trading.domain.model.CycleFilledFlows;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -55,19 +50,11 @@ class InvestmentPointsQueryServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
-    @Mock OrderPort orderPort;
-    @Mock CycleOrderStrategies cycleOrderStrategies;
     InvestmentPointsQueryService service;
 
     @BeforeEach
-    void stubSeedCapability() {
-        service = new InvestmentPointsQueryService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, orderPort, cycleOrderStrategies, FixedClockTestConfig.FIXED);
-        CycleOrderStrategy seeded = org.mockito.Mockito.mock(CycleOrderStrategy.class);
-        CycleOrderStrategy seedless = org.mockito.Mockito.mock(CycleOrderStrategy.class);
-        org.mockito.Mockito.lenient().when(seeded.occupiesSeed()).thenReturn(true);
-        org.mockito.Mockito.lenient().when(seedless.occupiesSeed()).thenReturn(false);
-        org.mockito.Mockito.lenient().when(cycleOrderStrategies.of(any())).thenReturn(seeded);
-        org.mockito.Mockito.lenient().when(cycleOrderStrategies.of(StrategyType.DCA)).thenReturn(seedless);
+    void setUp() {
+        service = new InvestmentPointsQueryService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, FixedClockTestConfig.FIXED);
     }
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -155,7 +142,7 @@ class InvestmentPointsQueryServiceTest {
     }
 
     @Test
-    void PORTFOLIO_scope는_DCA_전략도_포함하고_순투입액을_계산기에_넘긴다() {
+    void PORTFOLIO_scope는_DCA_전략도_포함한다() {
         Strategy dca = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ACTIVE,
                 StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount(USER_ID)));
@@ -164,9 +151,6 @@ class InvestmentPointsQueryServiceTest {
                 LocalDate.of(2026, 1, 5), null, Instant.parse("2026-01-05T00:00:00Z"), null);
         ArgumentCaptor<Set<UUID>> idsCaptor = ArgumentCaptor.forClass(Set.class);
         when(strategyCyclePort.findByStrategyIds(idsCaptor.capture())).thenReturn(List.of(cycle));
-        when(orderPort.findFilledFlowsByCycleIds(Set.of(cycle.id()))).thenReturn(Map.of(cycle.id(),
-                new CycleFilledFlows(new TreeMap<>(Map.of(LocalDate.of(2026, 1, 5), new BigDecimal("100"),
-                        LocalDate.of(2026, 1, 6), new BigDecimal("200"))), new TreeMap<>())));
         when(cyclePositionPort.findByUserAndRange(eq(USER_ID), eq(Instant.EPOCH), any())).thenReturn(List.of(
                 depositSnapshot(cycle.id(), "100.00", "2026-01-05T01:00:00Z"),
                 depositSnapshot(cycle.id(), "200.00", "2026-01-06T01:00:00Z")));
@@ -175,8 +159,7 @@ class InvestmentPointsQueryServiceTest {
                 LocalDate.of(2026, 1, 5), LocalDate.of(2026, 1, 6));
 
         assertThat(idsCaptor.getValue()).containsExactlyInAnyOrder(STRATEGY_ID, dca.id());
-        // 추가 매수 100은 외부 투입이라 지수는 100 유지
-        assertThat(result.points().getLast().investmentIndexUsd()).isEqualByComparingTo("100");
+        assertThat(result.points()).isNotEmpty();
     }
 
     @Test

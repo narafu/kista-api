@@ -17,7 +17,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyPort; impor
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
-import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.trading.domain.creation.DcaCreationResolver;
@@ -136,7 +135,7 @@ class StrategyServiceTest {
         StrategyHistoryQueryService historyQueryService = new StrategyHistoryQueryService(
                 accountPort, strategyPort, cyclePositionPort, orderPort, historyStrategies,
                 privacyTradePort, brokerPricePort,
-                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort, historyStrategies), FIXED);
+                new com.kista.tradingcore.trading.application.service.support.UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort), FIXED);
         strategyService = new StrategyService(
                 strategyPort,
                 strategyVersionPort,

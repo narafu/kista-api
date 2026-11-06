@@ -339,6 +339,5 @@ class DcaCycleOrderStrategyTest {
     void policy_flags() {
         assertThat(strategy.endsCycleOnLiquidation()).isFalse();
         assertThat(strategy.needsCapCheck(null, null)).isFalse();
-        assertThat(strategy.occupiesSeed()).isTrue(); // 원장 예수금으로 운용
     }
 }

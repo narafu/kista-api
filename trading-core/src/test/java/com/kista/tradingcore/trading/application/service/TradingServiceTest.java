@@ -24,7 +24,6 @@ import com.kista.tradingcore.broker.domain.model.OrderResult;
 import com.kista.tradingcore.broker.domain.model.PriceSnapshot;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.shared.kernel.OrderType;
-import com.kista.shared.kernel.DcaFrequency;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.Strategy; import com.kista.tradingcore.trading.domain.model.*;
@@ -35,7 +34,6 @@ import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalend
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
-import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.application.port.output.SellableQuantityPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCycleVrPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPort;
@@ -192,7 +190,7 @@ class TradingServiceTest {
                 org.springframework.transaction.support.TransactionOperations.withoutTransaction());
         TradingReporter reporter = new TradingReporter(
                 kisExecutionPort, brokerOrderPort, orderPort,
-                positionPersistor, eventPublisher, cycleStrategies);
+                positionPersistor, eventPublisher);
         lenient().when(sellableQuantityPort.getSellableQuantity(any(), any()))
                 .thenReturn(new SellableQuantity("SOXL", 100));
         lenient().when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(BigDecimal.ZERO);

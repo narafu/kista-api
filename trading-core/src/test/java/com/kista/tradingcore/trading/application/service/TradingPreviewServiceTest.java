@@ -86,6 +86,12 @@ class TradingPreviewServiceTest {
         // 브로커 조회는 경고 전용 포트(MarginPort·SellableQuantityPort)뿐이다 — 매매 판정에는 쓰지 않는다
         service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, FIXED);
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
+        // 원장 상한은 모든 전략에 적용된다 — 기본은 넉넉한 잔여로 주문을 그대로 통과시킨다 (개별 테스트가 재스텁)
+        lenient().when(ledgerBudget.remaining(any(), any(), any(), any())).thenReturn(new BigDecimal("1000000"));
+        lenient().when(ledgerBudget.fit(any(), any(), any())).thenAnswer(inv -> {
+            List<PlannedOrder> orders = inv.getArgument(1);
+            return new StrategyLedgerBudget.LedgerFit(orders, BigDecimal.ZERO, false, false);
+        });
         lenient().when(strategyPort.findByIdOrThrow(STRATEGY.id())).thenReturn(STRATEGY);
         lenient().when(accountPort.requireOwnedAccount(ACCOUNT.id(), ACCOUNT.userId())).thenReturn(ACCOUNT);
         lenient().when(strategyCyclePort.findLatestByStrategyId(STRATEGY.id())).thenReturn(Optional.of(STRATEGY_CYCLE));
@@ -360,7 +366,6 @@ class TradingPreviewServiceTest {
                 OrderDirection.BUY, 8, new BigDecimal("38.04"));
         when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
-        when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(true);
         // 배치 조회한 사이클 최신 포지션과 이미 로드한 당일 주문(없음)이 그대로 원장 계산에 넘어가야 한다
         CyclePosition latest = mock(CyclePosition.class);
         when(cyclePositionPort.findLatestByCycleIds(any())).thenReturn(Map.of(STRATEGY_CYCLE.id(), latest));
@@ -378,18 +383,6 @@ class TradingPreviewServiceTest {
         verify(orderPort, never()).findPlannedOrPlacedByCycleAndDate(any(), any());
     }
 
-    @Test
-    void dcaHasNoLedgerCheck() {
-        PlannedOrder buy = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LOC,
-                OrderDirection.BUY, 1, new BigDecimal("10.00"));
-        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
-                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
-        when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(false);
-
-        assertThat(service.preview(STRATEGY.id(), ACCOUNT.userId()).ledgerCheck()).isNull();
-        verify(ledgerBudget, never()).fit(any(), any(), any());
-    }
-
     // 이미 저장된 BUY 슬롯은 신규 필요액에서 제외해 원장 잔여(이미 차감됨)와 이중 계산하지 않는다
     @Test
     void alreadyPlacedBuyIsNotCountedAgain() {
@@ -399,7 +392,6 @@ class TradingPreviewServiceTest {
         when(orderPort.findPlannedOrPlacedByCycleIdsAndDate(any(), any())).thenReturn(Map.of(STRATEGY_CYCLE.id(), List.of(existing)));
         when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
                 .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(buy)), null));
-        lenient().when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(true);
 
         assertThat(service.preview(STRATEGY.id(), ACCOUNT.userId()).ledgerCheck()).isNull();
         verify(ledgerBudget, never()).fit(any(), any(), any());
@@ -605,7 +597,6 @@ class TradingPreviewServiceTest {
     void accountCashCheck_usesLedgerFitResult_trimmedAndRejected() {
         PlannedOrder original = buyOrder(StrategyTicker.SOXL, 8, "38.04");
         stubPlan(STRATEGY, STRATEGY_CYCLE, original);
-        when(ledgerBudget.applies(StrategyType.INFINITE)).thenReturn(true);
         when(ledgerBudget.remaining(eq(STRATEGY_CYCLE), any(), any(), any())).thenReturn(new BigDecimal("100.00"));
         when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(new BigDecimal("50.00"));
         when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("1000.00"));

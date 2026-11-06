@@ -82,10 +82,6 @@ public interface CycleOrderStrategy {
     // false면 호출부가 DB 조회·트랜잭션을 열지 않고 즉시 스킵한다(스케쥴러 매 틱 빈 트랜잭션 방지)
     default boolean needsCapCheck(InfinitePosition position, VrPosition vrPosition) { return true; }
 
-    // 시드(usd_deposit)를 점유하는지 (현재 전 전략 true) — false면 리포트가 cycle_position.usd_deposit을 0으로 기록하고
-    // 계좌 미배정 USD·원장 상한·통계 시드 기준에서 빠진다
-    default boolean occupiesSeed() { return true; }
-
     // 계획 시점 지정가를 고정하는지 (DCA만 true) — true면 호출부가 예산 배정 전 현재가 기준 재캡(prepareForAllocation)을 건너뛴다
     default boolean fixesPricesAtPlan() { return false; }
 

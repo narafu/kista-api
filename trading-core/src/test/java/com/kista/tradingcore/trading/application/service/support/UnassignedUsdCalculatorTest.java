@@ -6,9 +6,6 @@ import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
-import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
@@ -31,8 +28,7 @@ class UnassignedUsdCalculatorTest {
     StrategyPort strategyPort = mock(StrategyPort.class);
     CyclePositionPort cyclePositionPort = mock(CyclePositionPort.class);
     MarginPort marginPort = mock(MarginPort.class);
-    UnassignedUsdCalculator calc = new UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort,
-            new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(null, null), new DcaCycleOrderStrategy())));
+    UnassignedUsdCalculator calc = new UnassignedUsdCalculator(strategyPort, cyclePositionPort, marginPort);
 
     private static Strategy strategy(UUID accountId, StrategyType type) {
         return new Strategy(UUID.randomUUID(), accountId, type, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);

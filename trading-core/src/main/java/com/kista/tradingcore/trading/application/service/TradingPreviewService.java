@@ -278,11 +278,11 @@ class TradingPreviewService {
         CycleOrderStrategy.OrderPlan plan = planResult.plan();
 
         // 배치(TradingCandidatePlanner)와 같은 판정 — 이미 저장된 슬롯을 뺀 신규 주문만 원장 잔여에 대조한다
-        // DCA(원장 상한 제외)·신규 BUY 없음이면 경고 없음(null)
+        // 신규 BUY 없음이면 경고 없음(null)
         List<PlannedOrder> freshOrders = TradingOrderSlots.excludeExisting(plan.orders(), todayOrders);
         LedgerCheckPreview ledgerCheck = null;
-        List<PlannedOrder> buyCandidates = freshOrders; // 원장 fit 후 신규 주문 — 원장 상한 제외(DCA)면 freshOrders 그대로
-        if (ledgerBudget.applies(strategy.type()) && freshOrders.stream().anyMatch(o -> o.direction() == OrderDirection.BUY)) {
+        List<PlannedOrder> buyCandidates = freshOrders; // 원장 fit 후 신규 주문 — 신규 BUY가 없으면 freshOrders 그대로
+        if (freshOrders.stream().anyMatch(o -> o.direction() == OrderDirection.BUY)) {
             BigDecimal remainingLedger = ledgerBudget.remaining(currentCycle, Optional.ofNullable(latestPosition), todayOrders,
                     ledgerBudget.unreportedCancelledBuys(currentCycle, today));
             StrategyLedgerBudget.LedgerFit fit = ledgerBudget.fit(strategy.type(), freshOrders, remainingLedger);

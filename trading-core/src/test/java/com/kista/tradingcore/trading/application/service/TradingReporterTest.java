@@ -22,11 +22,6 @@ import com.kista.tradingcore.broker.domain.model.CancelInstruction;
 import com.kista.tradingcore.broker.domain.model.CancelOutcome;
 import com.kista.tradingcore.broker.application.port.output.BrokerOrderCorrectionPort;
 import com.kista.tradingcore.broker.application.port.output.ExecutionPort;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
-import com.kista.tradingcore.matching.domain.strategy.InfiniteCycleOrderStrategy;
-import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
-import com.kista.tradingcore.matching.domain.strategy.ReverseInfiniteStrategy;
 import com.kista.tradingcore.support.TradingFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,9 +54,6 @@ class TradingReporterTest {
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock CyclePositionPersistor cyclePositionPersistor;
     @Mock BrokerOrderCorrectionPort brokerOrderPort;
-    // 실제 INFINITE·DCA 커널 — occupiesSeed()만 읽는다
-    CycleOrderStrategies cycleStrategies = new CycleOrderStrategies(List.of(
-            new InfiniteCycleOrderStrategy(new InfiniteStrategy(), new ReverseInfiniteStrategy()), new DcaCycleOrderStrategy()));
     TradingReporter reporter;
 
     static final LocalDate TODAY = LocalDate.of(2026, 7, 9);
@@ -99,7 +91,7 @@ class TradingReporterTest {
     void setUp() {
         lenient().when(brokerOrderPort.cancel(any(), any())).thenReturn(CancelOutcome.CANCELLED); // 기본: 취소 접수
         reporter = new TradingReporter(executionPort, brokerOrderPort, orderPort,
-                cyclePositionPersistor, eventPublisher, cycleStrategies);
+                cyclePositionPersistor, eventPublisher);
         // TRADING_ALERT 기본 활성 — USER/TOSS_USER 모두 notificationPrefs 비어있어 isNotificationEnabled()가 true 반환
     }
 

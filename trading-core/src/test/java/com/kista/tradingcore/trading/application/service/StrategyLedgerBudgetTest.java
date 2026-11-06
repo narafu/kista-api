@@ -104,7 +104,6 @@ class StrategyLedgerBudgetTest {
     void dcaAppliesLedger() {
         // DCA도 시드 점유 전략 — 원장 예수금 안이면 통과, 넘으면 BUY 거절
         List<PlannedOrder> orders = List.of(buy(1, "100.00", "DCA_X"));
-        assertThat(budget.applies(StrategyType.DCA)).isTrue();
         assertThat(budget.fit(StrategyType.DCA, orders, new BigDecimal("100.00")).rejected()).isFalse();
         StrategyLedgerBudget.LedgerFit over = budget.fit(StrategyType.DCA, orders, BigDecimal.ZERO);
         assertThat(over.rejected()).isTrue();

@@ -234,37 +234,6 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     }
 
     @Test
-    void findFilledFlowsByCycleIds_cumulatesBuyAndSellSeparatelyPerTradeDate() {
-        LocalDate d1 = LocalDate.of(2026, 7, 1);
-        LocalDate d2 = d1.plusDays(1);
-        LocalDate d3 = d1.plusDays(2);
-        insertOrderForAccount(accountId, cycleId, d1, "SOXL", "BUY", "FILLED", 5, new BigDecimal("10.00"));            // 매수 +50
-        insertOrderForAccount(accountId, cycleId, d1, "SOXL", "BUY", "PARTIALLY_FILLED", 2, new BigDecimal("15.00")); // 매수 +30
-        insertOrderForAccount(accountId, cycleId, d2, "SOXL", "SELL", "FILLED", 2, new BigDecimal("20.00"));           // 매도 +40
-        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "CANCELLED", 1, new BigDecimal("10.00"));        // 매수 +10 (취소 전 부분 체결)
-        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "SELL", "FILLED", 3, new BigDecimal("10.00"));          // 매도 +30
-        insertOrderForAccount(accountId, cycleId, d3, "SOXL", "BUY", "PLANNED", null, null);                          // 제외 (미체결)
-        insertOrderForAccount(accountId, otherCycleId, d1, "SOXL", "SELL", "FILLED", 10, new BigDecimal("30.00"));     // 다른 사이클
-
-        var flows = adapter.findFilledFlowsByCycleIds(java.util.List.of(cycleId)).get(cycleId);
-
-        // 체결이 있는 거래일마다 두 맵 모두 누적값을 갖는다 (해당 쪽 체결이 없는 날은 직전 누적 유지)
-        assertThat(flows.buys()).containsOnlyKeys(d1, d2, d3);
-        assertThat(flows.buys().get(d1)).isEqualByComparingTo("80.00");
-        assertThat(flows.buys().get(d2)).isEqualByComparingTo("80.00");
-        assertThat(flows.buys().get(d3)).isEqualByComparingTo("90.00");
-        assertThat(flows.sells()).containsOnlyKeys(d1, d2, d3);
-        assertThat(flows.sells().get(d1)).isEqualByComparingTo("0");
-        assertThat(flows.sells().get(d2)).isEqualByComparingTo("40.00");
-        assertThat(flows.sells().get(d3)).isEqualByComparingTo("70.00");
-        // 순투입 = 누적 매수 − 누적 매도: 80 / 40 / 20
-        var net = flows.netInvested();
-        assertThat(net.get(d1)).isEqualByComparingTo("80.00");
-        assertThat(net.get(d2)).isEqualByComparingTo("40.00");
-        assertThat(net.get(d3)).isEqualByComparingTo("20.00");
-    }
-
-    @Test
     void sumPlannedOrPlacedSellQuantityByAccountAndDateAndTicker_sumsOnlyMatchingReservations() {
         LocalDate databaseTradeDate = LocalDate.of(2026, 7, 14);
         LocalDate domainTradeDate = databaseTradeDate; // DB와 도메인이 같은 KST 일자

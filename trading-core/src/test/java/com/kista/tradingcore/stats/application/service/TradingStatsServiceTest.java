@@ -5,7 +5,6 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.shared.kernel.Broker;
 import com.kista.tradingcore.stats.domain.model.*;
-import com.kista.tradingcore.trading.domain.model.CycleFilledFlows;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -13,17 +12,11 @@ import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
-import com.kista.tradingcore.trading.application.port.output.OrderPort;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import org.junit.jupiter.api.BeforeEach;
-import java.util.TreeMap;
-import java.util.NavigableMap;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import java.util.Collection;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -55,20 +48,11 @@ class TradingStatsServiceTest {
     @Mock StrategyPort strategyPort;
     @Mock StrategyCyclePort strategyCyclePort;
     @Mock CyclePositionPort cyclePositionPort;
-    @Mock OrderPort orderPort;
-    @Mock CycleOrderStrategies cycleOrderStrategies;
     TradingStatsService statsService;
 
-    // 시드 점유 전략(기본)과 비점유 전략(DCA) 능력 stub — 전략 타입별 occupiesSeed 분기 검증용
     @BeforeEach
-    void stubSeedCapability() {
-        statsService = new TradingStatsService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, orderPort, cycleOrderStrategies, FixedClockTestConfig.FIXED);
-        CycleOrderStrategy seeded = org.mockito.Mockito.mock(CycleOrderStrategy.class);
-        CycleOrderStrategy seedless = org.mockito.Mockito.mock(CycleOrderStrategy.class);
-        lenient().when(seeded.occupiesSeed()).thenReturn(true);
-        lenient().when(seedless.occupiesSeed()).thenReturn(false);
-        lenient().when(cycleOrderStrategies.of(any())).thenReturn(seeded);
-        lenient().when(cycleOrderStrategies.of(StrategyType.DCA)).thenReturn(seedless);
+    void setUp() {
+        statsService = new TradingStatsService(accountPort, strategyPort, strategyCyclePort, cyclePositionPort, FixedClockTestConfig.FIXED);
     }
 
     private static final UUID USER_ID = UUID.randomUUID();
@@ -611,19 +595,13 @@ class TradingStatsServiceTest {
     private static final Strategy DCA_STRATEGY = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA,
             StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
 
-    // buys/sells = 일자별 누적 BUY·SELL 체결금액
-    private void stubDcaOnly(StrategyCycle cycle, NavigableMap<LocalDate, BigDecimal> buys, NavigableMap<LocalDate, BigDecimal> sells) {
+    private void stubDcaOnly(StrategyCycle cycle) {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(testAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(DCA_STRATEGY)));
         when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(cycle));
-        when(orderPort.findFilledFlowsByCycleIds(any())).thenReturn(Map.of(cycle.id(), new CycleFilledFlows(buys, sells)));
     }
 
-    private static NavigableMap<LocalDate, BigDecimal> cum(String day, String amount) {
-        return new TreeMap<>(Map.of(LocalDate.parse(day), new BigDecimal(amount)));
-    }
-
-    // 자산 = 보유 수량 × 종가 (usdDeposit 0 — DCA는 시드를 점유하지 않는다)
+    // 자산 = 보유 수량 × 종가 (usdDeposit 0)
     private static CyclePosition holdingSnapshot(UUID cycleId, String closing, String createdAt) {
         return holdingSnapshot(cycleId, closing, BigDecimal.ONE, createdAt);
     }
@@ -635,108 +613,16 @@ class TradingStatsServiceTest {
 
     @Test
     void 요약은_DCA_전략_사이클도_포함한다() {
-        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "0", "2026-06-01");
-        stubDcaOnly(cycle, cum("2026-06-01", "100"), new TreeMap<>());
+        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "100", "2026-06-01");
+        stubDcaOnly(cycle);
         when(cyclePositionPort.findLatestByCycleIds(Set.of(cycle.id())))
                 .thenReturn(Map.of(cycle.id(), holdingSnapshot(cycle.id(), "130.00", "2026-06-01T01:00:00Z")));
 
         StatsSummary summary = statsService.getSummary(USER_ID);
 
         assertThat(summary.byType()).extracting(StrategyTypeStats::type).containsExactly(StrategyType.DCA);
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("100.00"); // 시드 0 + 누적 매수 100
+        assertThat(summary.activePrincipal()).isEqualByComparingTo("100.00"); // 시드 = 시작 원금
         assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("30.00"); // 평가 130 - 원금 100
-    }
-
-    @Test
-    void DCA_원금은_누적매수원가이며_매도로_줄지_않는다() {
-        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "0", "2026-06-01");
-        // 1일차 BUY 100, 2일차 BUY 100, 3일차 SELL 50 → 누적 매수 100, 200, 200 / 누적 매도 0, 0, 50
-        stubDcaOnly(cycle,
-                new TreeMap<>(Map.of(LocalDate.parse("2026-06-01"), new BigDecimal("100"),
-                        LocalDate.parse("2026-06-02"), new BigDecimal("200"),
-                        LocalDate.parse("2026-06-03"), new BigDecimal("200"))),
-                cum("2026-06-03", "50"));
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                holdingSnapshot(cycle.id(), "100.00", "2026-06-01T01:00:00Z"),
-                holdingSnapshot(cycle.id(), "200.00", "2026-06-02T01:00:00Z"),
-                holdingSnapshot(cycle.id(), "150.00", "2026-06-03T01:00:00Z")));
-
-        EquityCurve curve = statsService.getEquityCurve(USER_ID, null,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).extracting(EquityPoint::principal)
-                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
-                .containsExactly(new BigDecimal("100"), new BigDecimal("200"), new BigDecimal("200"));
-        // 3일차 자산 = 보유 평가 150 + 인출 매도대금 50 = 200 → 손익 0 (기존 순투입 정의와 같은 총손익)
-        assertThat(curve.points()).extracting(EquityPoint::totalAsset)
-                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
-                .containsExactly(new BigDecimal("100"), new BigDecimal("200"), new BigDecimal("200"));
-    }
-
-    @Test
-    void DCA_초기보유_원가가_시작원금() {
-        // 초기 보유 5주 × 평단 100 = 시작 원가 500, 이후 BUY 100 → 원금 600
-        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "500.00", "2026-06-01");
-        stubDcaOnly(cycle, cum("2026-06-01", "100"), new TreeMap<>());
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                holdingSnapshot(cycle.id(), "600.00", "2026-06-01T01:00:00Z"),
-                holdingSnapshot(cycle.id(), "600.00", "2026-06-02T01:00:00Z"))); // 2일차는 체결 없음 → 누적 carry
-
-        EquityCurve curve = statsService.getEquityCurve(USER_ID, null,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-
-        assertThat(curve.points()).extracting(EquityPoint::principal)
-                .usingComparatorForType(BigDecimal::compareTo, BigDecimal.class)
-                .containsExactly(new BigDecimal("600"), new BigDecimal("600"));
-    }
-
-    @Test
-    void DCA_일부_익절_뒤에도_원금_100_자산_300_수익률_200퍼센트() {
-        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "0", "2026-06-01");
-        // 6/1 $100 매수(평가 100) → 6/3 평가 $300에서 $200 매도, 남은 평가 $100
-        stubDcaOnly(cycle,
-                new TreeMap<>(Map.of(LocalDate.parse("2026-06-01"), new BigDecimal("100"),
-                        LocalDate.parse("2026-06-03"), new BigDecimal("100"))),
-                cum("2026-06-03", "200"));
-        CyclePosition latest = holdingSnapshot(cycle.id(), "100.00", "2026-06-03T01:00:00Z");
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
-                holdingSnapshot(cycle.id(), "100.00", "2026-06-01T01:00:00Z"), latest));
-        when(cyclePositionPort.findLatestByCycleIds(any())).thenReturn(Map.of(cycle.id(), latest));
-
-        EquityCurve curve = statsService.getEquityCurve(USER_ID, null,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30"));
-        EquityPoint last = curve.points().get(1);
-        assertThat(last.principal()).isEqualByComparingTo("100");
-        assertThat(last.totalAsset()).isEqualByComparingTo("300");
-
-        CyclePerformance perf = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().get(0);
-        assertThat(perf.startAmount()).isEqualByComparingTo("100");
-        assertThat(perf.endAmount()).isEqualByComparingTo("300");
-        assertThat(perf.pnl()).isEqualByComparingTo("200");
-        assertThat(perf.returnRate()).isEqualByComparingTo("2.0000");
-
-        StatsSummary summary = statsService.getSummary(USER_ID);
-        assertThat(summary.activePrincipal()).isEqualByComparingTo("100.00"); // 매도로 줄지 않는다
-        assertThat(summary.totalUnrealizedPnl()).isEqualByComparingTo("200.00");
-    }
-
-    @Test
-    void DCA_전량_매도_뒤_보유_0이어도_원금_유지_자산은_누적매도대금() {
-        StrategyCycle cycle = activeCycle(DCA_STRATEGY.id(), "0", "2026-06-01");
-        stubDcaOnly(cycle, cum("2026-06-01", "100"), cum("2026-06-03", "300"));
-        CyclePosition latest = holdingSnapshot(cycle.id(), "0.00", BigDecimal.ZERO, "2026-06-03T01:00:00Z");
-        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(latest));
-        when(cyclePositionPort.findLatestByCycleIds(any())).thenReturn(Map.of(cycle.id(), latest));
-
-        EquityPoint point = statsService.getEquityCurve(USER_ID, null,
-                LocalDate.parse("2026-06-01"), LocalDate.parse("2026-06-30")).points().get(0);
-        assertThat(point.principal()).isEqualByComparingTo("100");
-        assertThat(point.totalAsset()).isEqualByComparingTo("300");
-
-        CyclePerformance perf = statsService.getCyclePerformances(USER_ID, null, null, null, null, 0, 10).items().get(0);
-        assertThat(perf.endAmount()).isEqualByComparingTo("300");
-        assertThat(perf.returnRate()).isEqualByComparingTo("2.0000");
-        assertThat(statsService.getSummary(USER_ID).activePrincipal()).isEqualByComparingTo("100.00");
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.kista.shared.kernel.Broker;
 import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
-import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
@@ -14,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-// 계좌 미배정 USD = 증권사 USD 매수가능금액 − 시드를 점유하는 전략(occupiesSeed — DCA 포함)들의 최신 원장(usd_deposit) 합
+// 계좌 미배정 USD = 증권사 USD 매수가능금액 − 계좌 전략들의 최신 원장(usd_deposit) 합
 // 전략 등록 폼 가용 예수금 경고용 계산
 @Component
 @RequiredArgsConstructor
@@ -23,7 +22,6 @@ public class UnassignedUsdCalculator {
     private final StrategyPort strategyPort;
     private final CyclePositionPort cyclePositionPort;
     private final MarginPort marginPort;
-    private final CycleOrderStrategies cycleStrategies;
 
     // MOCK은 마진이 고정값이라 무의미, 코인 계좌는 USD 매수가능금액 개념이 없다
     public static boolean applies(Broker broker) {
@@ -33,7 +31,6 @@ public class UnassignedUsdCalculator {
     // 조회 실패는 예외로 전파, 증권사가 금액을 주지 않으면 null — 호출부가 정책(경고 생략/skip)을 정한다
     public BigDecimal available(UUID accountId, BrokerAccountRef ref) {
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
-                .filter(s -> cycleStrategies.of(s.type()).occupiesSeed())
                 .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id()).map(CyclePosition::usdDeposit).orElse(BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal buyable = marginPort.getUsdBuyableAmount(ref);

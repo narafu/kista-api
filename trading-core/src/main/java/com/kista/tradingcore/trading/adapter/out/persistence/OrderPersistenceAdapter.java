@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
 import com.kista.shared.kernel.OrderStatus;
-import com.kista.tradingcore.trading.domain.model.CycleFilledFlows;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
@@ -21,7 +20,6 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -249,21 +247,6 @@ public class OrderPersistenceAdapter implements OrderPort {
         // BUY 체결금액 합계(취소 전 부분 체결 포함) — 결과 없으면 ZERO (COALESCE 보장)
         BigDecimal result = repository.sumFilledBuyAmountByCycleId(strategyCycleId);
         return result != null ? result : BigDecimal.ZERO;
-    }
-
-    @Override
-    public Map<UUID, CycleFilledFlows> findFilledFlowsByCycleIds(Collection<UUID> strategyCycleIds) {
-        if (strategyCycleIds.isEmpty()) return Map.of();
-        Map<UUID, CycleFilledFlows> result = new java.util.HashMap<>();
-        Map<UUID, BigDecimal> runningBuy = new java.util.HashMap<>(); // 사이클별 누적 (거래일 오름차순 행을 순회)
-        Map<UUID, BigDecimal> runningSell = new java.util.HashMap<>();
-        for (var row : repository.findDailyFilledFlowsByCycleIds(strategyCycleIds)) {
-            UUID cycleId = row.getCycleId();
-            var flows = result.computeIfAbsent(cycleId, _ -> new CycleFilledFlows(new TreeMap<>(), new TreeMap<>()));
-            flows.buys().put(row.getTradeDate(), runningBuy.merge(cycleId, row.getBuy(), BigDecimal::add));
-            flows.sells().put(row.getTradeDate(), runningSell.merge(cycleId, row.getSell(), BigDecimal::add));
-        }
-        return result;
     }
 
     @Override
