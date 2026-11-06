@@ -119,10 +119,30 @@ class CyclePositionPersistorDbTest extends DataJpaTestBase {
         assertThat(count("trading_batch_report WHERE strategy_id = ?", strategyId)).isEqualTo(1);
     }
 
+    @Test
+    void saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails() {
+        // 직전 보유 이력 + 이번 청산(holdings=0) — markEnded가 마커와 같은 트랜잭션이므로 실패 시 포지션·마커도 롤백돼야 한다
+        jdbcTemplate.update("INSERT INTO cycle_position (id, strategy_cycle_id, usd_deposit, holdings, created_at) VALUES (?, ?, ?, ?, now() - interval '1 hour')",
+                UUID.randomUUID(), cycleId, new BigDecimal("500.00"), new BigDecimal("5"));
+        StrategyCyclePort failingCycles = mock(StrategyCyclePort.class);
+        doAnswer(inv -> { throw new IllegalStateException("주입된 실패"); }).when(failingCycles).markEnded(any(), any(), any());
+
+        assertThatThrownBy(() -> persistor(batchRunPort, failingCycles).saveCyclePosition(TODAY,
+                new AccountBalance(0, null, new BigDecimal("1050.00")), ctx(), new BigDecimal("50.00"), null))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(count("cycle_position WHERE strategy_cycle_id = ?", cycleId)).isEqualTo(1); // 사전 삽입 행만 남음
+        assertThat(count("trading_batch_report WHERE strategy_id = ?", strategyId)).isZero();
+    }
+
     private CyclePositionPersistor persistor(TradingBatchRunPort batchRun) {
+        return persistor(batchRun, mock(StrategyCyclePort.class));
+    }
+
+    private CyclePositionPersistor persistor(TradingBatchRunPort batchRun, StrategyCyclePort cycles) {
         CycleOrderStrategies strategies = new CycleOrderStrategies(java.util.List.of(new InfiniteCycleOrderStrategy(null, null)));
         return new CyclePositionPersistor(cyclePositionPort, detailPort, mock(StrategyInfiniteDetailPort.class),
-                mock(StrategyCyclePort.class), mock(CycleRotationService.class), mock(ApplicationEventPublisher.class),
+                cycles, mock(CycleRotationService.class), mock(ApplicationEventPublisher.class),
                 strategies, mock(VrCycleRolloverService.class), batchRun, new TransactionTemplate(txManager));
     }
 

@@ -479,12 +479,13 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 수정 방향: 재주문 허용 창을 마감 배치 접수 전까지로 좁히거나, 리포트가 당일 PLACED를 리포트 시점에 다시 조회한다. 설계는 brainstorming부터 한다.
 - 상태: 해소(2026-11-04) — 재검증 결과 기술한 경로는 재현되지 않았다(자정 이후 DstInfo.calculate의 marketOpen이 당일 22:30이라 IMMEDIATE가 닫혀 있고, 04:30 이후 재주문은 nextTradeDate 검사로 다음 거래일 주문이 된다). 대신 자정~장마감 IMMEDIATE 차단·AT_OPEN 허용 판정 오류와 원본 거래일 미검사를 찾았고, 운영 사용 0건이라 관리자 재주문 기능 자체를 제거했다.
 
-### CQ-29 마커 커밋 뒤 `markEnded`·`rotate` 실패 시 사이클이 영구히 닫히지 않음
+### CQ-29 마커 커밋 뒤 `markEnded` 실패 시 사이클이 영구히 닫히지 않음
 - 주제: 사이클 수명. 유형: 버그(기존 동작). 위험: 중간.
 - 위치: `CyclePositionPersistor.java:57-63`(포지션·상세·리포트 마커 한 트랜잭션) 대 `:71-85`(트랜잭션 밖 `markEnded`·`rotate`).
+- 범위: `markEnded` 앞 실패만 해당(`markEnded` 성공 후 `rotate` 실패는 `BatchContextFactory` 좀비 판정이 받음).
 - 근거: 커밋 뒤 DB 오류나 SIGKILL이 나면 재개는 마커를 보고 건너뛰고, 다음 날 최신 holdings=0이라 `prevHadHoldings=false`가 되어 종료·회전이 다시 일어나지 않는다. NONE seed INFINITE면 PAUSED되지 않고 0회차 매수를 이어 간다.
-- 수정 방향: 종료·회전을 마커와 같은 트랜잭션에 넣거나, 재개가 "청산됐는데 열린 사이클"을 감지해 종료를 재시도한다.
-- 상태: open(2026-11-04, 미확인).
+- 수정 방향: `markEnded`를 마커와 같은 트랜잭션에 넣는다(`rotate`는 알림·이벤트 포함이라 트랜잭션 밖 유지).
+- 상태: done(2026-11-06) — `CyclePositionPersistor`가 `markEnded`를 마커 트랜잭션 안에서 실행, `CyclePositionPersistorDbTest.saveCyclePosition_rollsBackPositionAndMarker_whenMarkEndedFails`가 잠금.
 
 ### CQ-30 INFINITE 리버스모드 쿼터매수 BUY에 cap 미적용
 - 주제: 주문 안전. 유형: 누락(기존 동작). 위험: 중간(매매 공식 인접 — 높음 규칙 적용).
@@ -498,7 +499,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `BuyOrderPriceCapper.java:72,149-155`(PLANNED BUY만 조회), `InfiniteStrategy.java:92-97`.
 - 근거: AVG는 PLACED이고 REF·보정만 PLANNED인 상태에서 재조회 가격 하락으로 cap이 걸리면 `computeEarlyBuys`가 buy1=null로 보고 `INFINITE_EARLY_AVG_BUY`를 새로 저장한다. `savePlannedOrders`는 중복 슬롯을 거르지 않고 orders에 UNIQUE 제약도 없다.
 - 수정 방향: 재캡 입력에 PLACED leg를 반영하거나, 같은 사이클·거래일·leg 중복 저장을 막는다.
-- 상태: open(2026-11-04, 미확인).
+- 상태: done(2026-11-06) — 코드상 중복 경로 확정, 트리거는 접수 도중 인터럽트/크래시 후 재개. `applyBatchCap`이 재저장 직전 `findPlannedOrPlacedByCycleAndDate`(취소 대상 제외)로 `TradingOrderSlots.excludeExisting`을 적용. 회귀: `BuyOrderPriceCapperTest.capIfNeeded_avgLegAlreadyPlaced_doesNotResaveAvgLeg`(변이 확인 완료).
 
 ### CQ-32 PRIVACY 실거래 기준표 조회에 거래일 정확 일치 가드 없음
 - 주제: 날짜 기준. 유형: 비일관성(기존 동작). 위험: 낮음.
