@@ -2289,6 +2289,24 @@ class TradingServiceTest {
     }
 
     @Test
+    void executeBatch_archivedWithPlacedOrder_isReportedAsNonActiveWithoutStatusWriteOrRotation() throws InterruptedException {
+        // 보관 직전 접수분 체결 — 정지 전략과 같은 리포트 경로(원장 기록만), 상태 쓰기·롤오버·신규 사이클 없음
+        LocalDate today = LocalDate.now(FIXED);
+        Strategy archived = PAUSED.withStatus(StrategyStatus.ARCHIVED);
+        Order placed = pausedOrder(OrderStatus.PLACED, "ORD-A", "BUY_LOC");
+        stubPausedReport(placed);
+
+        service.executeBatch(List.of(new BatchContext(archived, PAUSED_CYCLE, ACCOUNT, USER)), PAST_DST);
+
+        verify(cycleHistoryPort).save(argThat(p -> p.strategyCycleId().equals(PAUSED_CYCLE.id())));
+        verify(batchRunPort).markReported(today, PAUSED_ID);
+        verify(cyclePort, never()).save(any()); // StrategyPort mock(CycleRotationService 전용) — 상태 쓰기 없음
+        verify(cyclePort, never()).updateStatusUnlessArchived(any(), any());
+        verify(cycleSnapshotCreator, never()).createCycleAndSnapshot(any(), any(), any(), any());
+        verify(vrRolloverService, never()).rollIfDue(any(), any(), any(), any());
+    }
+
+    @Test
     void executeBatch_pausedWithAlreadyFilledPlacedOrder_isPassedAsMainOrder() throws InterruptedException {
         LocalDate today = LocalDate.now(FIXED);
         Order placed = pausedOrder(OrderStatus.PLACED, "ORD-P", "BUY_LOC");

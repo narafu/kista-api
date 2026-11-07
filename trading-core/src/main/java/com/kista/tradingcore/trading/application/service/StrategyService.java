@@ -72,7 +72,7 @@ class StrategyService implements StrategyUseCase {
         // 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(삭제된 전략의 주문이 증권사에 남지 않도록) — 전략은 PAUSED로 남는다
         // 자격증명 오류(키 만료·철회)는 재시도로 풀리지 않아 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다
         orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
-        stateWriter.pause(strategyId);
+        stateWriter.pause(strategyId); // 보관 전략은 갱신 0건이어도 삭제는 진행한다
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         if (cancelled.retryableFailedCount() > 0) {
             throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 전략을 삭제할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
@@ -95,7 +95,9 @@ class StrategyService implements StrategyUseCase {
         // 먼저 PAUSED로 기록해 이후 배치가 새 주문을 만들지 않게 하고, 배치가 정지 뒤 체결을 기록하지 않으므로 오늘 미체결 주문을 정리한다
         // 취소 실패분은 관리자 알림 후 PLACED로 남는다
         orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
-        stateWriter.pause(strategyId);
+        if (!stateWriter.pause(strategyId)) { // 읽은 뒤 보관이 커밋된 경합
+            throw new IllegalStateException("보관된 전략은 변경할 수 없습니다.");
+        }
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
         log.info("[strategyId={}] 전략 일시중지: cancelledOrders={}, failedOrders={}",
                 strategyId, cancelled.cancelledCount(), cancelled.failedCount());
@@ -153,7 +155,9 @@ class StrategyService implements StrategyUseCase {
             throw new IllegalStateException("이미 활성화된 전략입니다.");
         }
         reopenCycleIfEnded(strategy, requesterId);
-        strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
+        if (!strategyPort.updateStatusUnlessArchived(strategyId, StrategyStatus.ACTIVE)) { // 읽은 뒤 보관이 커밋된 경합 — 스냅샷 save로 덮어쓰지 않는다
+            throw new IllegalStateException("보관된 전략은 변경할 수 없습니다.");
+        }
         log.info("[strategyId={}] 전략 재개", strategyId);
     }
 

@@ -89,12 +89,12 @@ public class TradingCloseScheduler {
         });
     }
 
-    // 마감 배치 대상 = ACTIVE + 정지됐지만 당일 접수 주문이 있는 전략(체결 리포트 전용) — 중복은 ACTIVE 우선
+    // 마감 배치 대상 = ACTIVE + 정지·보관됐지만 당일 접수 주문이 있는 전략(체결 리포트 전용) — 중복은 ACTIVE 우선
     private List<Strategy> closeBatchStrategies() {
         List<Strategy> active = strategyPort.findAllActive();
         Set<UUID> activeIds = active.stream().map(Strategy::id).collect(Collectors.toSet());
         return Stream.concat(active.stream(),
-                        strategyPort.findPausedWithReportableOrders(LocalDate.now(clock)).stream()
+                        strategyPort.findNotActiveWithReportableOrders(LocalDate.now(clock)).stream()
                                 .filter(s -> !activeIds.contains(s.id())))
                 .toList();
     }

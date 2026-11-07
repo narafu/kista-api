@@ -22,19 +22,17 @@ class StrategyStateWriter {
     private final CyclePositionPort cyclePositionPort;
 
     @Transactional
-    public void pause(UUID strategyId) {
-        // 트랜잭션 안에서 다시 읽어 상태만 바꾼다 — 호출자가 앞서 읽은 스냅샷으로 덮어쓰지 않도록
-        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        // 보관 전략은 PAUSED로 되돌리지 않는다(삭제 경로 등)
-        if (!strategy.isPaused() && !strategy.isArchived()) {
-            strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
-        }
+    public boolean pause(UUID strategyId) {
+        // 상태만 조건부 갱신 — 스냅샷 덮어쓰기·보관 되돌림 방지(삭제 경로 등은 false여도 무시). 보관돼 갱신 안 됐으면 false
+        return strategyPort.updateStatusUnlessArchived(strategyId, StrategyStatus.PAUSED);
     }
 
     @Transactional
     public void archive(UUID strategyId) {
-        // 재조회 후 상태만 바꾼다 — pause와 같은 이유로 스냅샷 덮어쓰기 방지
-        strategyPort.save(strategyPort.findByIdOrThrow(strategyId).withStatus(StrategyStatus.ARCHIVED));
+        // PAUSED일 때만 조건부로 확정 — 마지막 점검 뒤 재개된 전략을 ARCHIVED로 덮어쓰지 않는다
+        if (!strategyPort.archiveIfPaused(strategyId)) {
+            throw new IllegalStateException("전략 상태가 바뀌어 보관하지 못했습니다. 다시 시도하시기 바랍니다.");
+        }
     }
 
     @Transactional

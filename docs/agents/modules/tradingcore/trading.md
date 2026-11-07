@@ -62,6 +62,8 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - 보관은 ACTIVE·PAUSED → ARCHIVED 한 방향이다(해제 API·메서드 없음). `StrategyService.archive`(NOT_SUPPORTED — 증권사 취소 HTTP 포함)가 보유 0·당일 접수 주문 마감 반영·미체결 취소 성공을 확인한 뒤 `StrategyStateWriter.archive`로 저장한다. 실패 시 PAUSED로 남는다
 - 보관 전략 변경 거부: `Strategy.requireNotArchived()`를 pause·resume·update·VR 재설정(`VrReconfigureService`)·DCA 설정(`DcaConfigService`)·투자금 추가·인출(`CapitalInjectionService`)·수동 체결 보정(`ManualTradeCorrectionService`)·상태 API(`StrategyStatusInternalController`, ARCHIVED 요청과 보관 전략 ACTIVE 요청 400)에서 호출한다. 삭제는 보관 전략도 허용한다(소프트 삭제, 통계에서 빠짐)
 - 목록·미리보기 제외는 호출부 필터(`!isArchived()`, `includeArchived`)로 한다. `StrategyPort.findByAccountIds`·`findByAccountId`는 보관 포함 그대로 둔다 — 통계(`TradingStatsService`)가 공유하므로 포트에 필터를 넣으면 보관 전략 성과가 사라진다. 계좌당 종목 중복 검사만 보관을 제외한다(`StrategyCreationService`)
+- 상태 쓰기 경합: 보관은 되돌릴 수 없으므로 오래된 스냅샷 `save(withStatus(...))`로 PAUSED/ACTIVE를 쓰지 않고 `StrategyPort.updateStatusUnlessArchived`(조건부 UPDATE, 0건이면 false)를 쓴다 — `resume`·`pause`(0건이면 "보관된 전략은 변경할 수 없습니다.")·`StrategyStateWriter.pause`·`StrategyPort.pause` default. 보관 확정은 `StrategyPort.archiveIfPaused`(PAUSED일 때만, 0건이면 "전략 상태가 바뀌어 보관하지 못했습니다." — 재개와의 경합). 삭제는 `pause` 결과를 무시해 보관 전략도 삭제된다. 어댑터의 두 조건부 갱신은 `@Transactional` 필수(스케쥴러 경로엔 바깥 트랜잭션이 없다). 예외: `CycleCloser`(수동 보정 — `requireNotArchived`가 먼저 거부)
+- 마감 리포트 백스톱: `findNotActiveWithReportableOrders`가 PAUSED뿐 아니라 ARCHIVED도 잡아 보관 직전 접수분 체결을 원장에 남긴다. 리포트 경로는 `!isActive()`로 정지와 같이 취급돼 사이클 종료만 기록하고 rotation·알림·VR 롤오버·상태 쓰기는 없다
 - 신규 상태를 추가하면 `status != PAUSED`가 아니라 `isActive()`로 판정한다 — 배치·정산·리포트 판정이 ARCHIVED를 매매 대상으로 잘못 잡지 않게 한다
 
 ### 전략 원장 상한 (상세 규칙 SSOT → workflow-ledger-price.md)

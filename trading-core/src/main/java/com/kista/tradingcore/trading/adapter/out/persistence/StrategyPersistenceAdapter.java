@@ -6,6 +6,7 @@ import com.kista.tradingcore.trading.domain.model.StrategySummary;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyTicker;
 
@@ -48,8 +50,8 @@ class StrategyPersistenceAdapter implements StrategyPort {
     }
 
     @Override
-    public List<Strategy> findPausedWithReportableOrders(LocalDate tradeDate) {
-        return jpaRepository.findPausedWithReportableOrders(tradeDate, Order.UNKNOWN_LEG).stream()
+    public List<Strategy> findNotActiveWithReportableOrders(LocalDate tradeDate) {
+        return jpaRepository.findNotActiveWithReportableOrders(tradeDate, Order.UNKNOWN_LEG).stream()
                 .map(this::toDomain)
                 .toList();
     }
@@ -57,6 +59,18 @@ class StrategyPersistenceAdapter implements StrategyPort {
     @Override
     public Strategy save(Strategy strategy) {
         return toDomain(jpaRepository.save(toEntity(strategy)));
+    }
+
+    @Override
+    @Transactional // @Modifying JPQL은 자체 트랜잭션이 없고 스케쥴러 경로엔 바깥 트랜잭션도 없다
+    public boolean updateStatusUnlessArchived(UUID id, StrategyStatus status) {
+        return jpaRepository.updateStatusUnlessArchived(id, status, Instant.now(clock)) > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean archiveIfPaused(UUID id) {
+        return jpaRepository.archiveIfPaused(id, Instant.now(clock)) > 0;
     }
 
     @Override

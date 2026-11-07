@@ -16,6 +16,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
@@ -218,31 +220,31 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         return strategyId;
     }
 
-    private List<UUID> pausedIds() {
+    private List<UUID> notActiveIds() {
         entityManager.flush();
         entityManager.clear();
-        return strategyAdapter.findPausedWithReportableOrders(TRADE_DATE).stream().map(Strategy::id).toList();
+        return strategyAdapter.findNotActiveWithReportableOrders(TRADE_DATE).stream().map(Strategy::id).toList();
     }
 
     @Test
-    void findPausedWithReportableOrders_includesPausedWithTodaysSubmittedOrder() {
+    void findNotActiveWithReportableOrders_includesPausedWithTodaysSubmittedOrder() {
         UUID paused = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-1", "BUY_LOC");
 
-        assertThat(pausedIds()).containsExactly(paused);
+        assertThat(notActiveIds()).containsExactly(paused);
     }
 
     @Test
-    void findPausedWithReportableOrders_excludesActiveOtherDateUnknownLegAndNoExternalId() {
+    void findNotActiveWithReportableOrders_excludesActiveOtherDateUnknownLegAndNoExternalId() {
         seedStrategyWithOrder("ACTIVE", TRADE_DATE, "ORD-1", "BUY_LOC");
         seedStrategyWithOrder("PAUSED", TRADE_DATE.minusDays(1), "ORD-2", "BUY_LOC");
         seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-3", Order.UNKNOWN_LEG);
         seedStrategyWithOrder("PAUSED", TRADE_DATE, null, "BUY_LOC");
 
-        assertThat(pausedIds()).isEmpty();
+        assertThat(notActiveIds()).isEmpty();
     }
 
     @Test
-    void findPausedWithReportableOrders_excludesSoftDeletedStrategyAccountAndCycle() {
+    void findNotActiveWithReportableOrders_excludesSoftDeletedStrategyAccountAndCycle() {
         UUID deletedStrategy = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-1", "BUY_LOC");
         jdbcTemplate.update("UPDATE strategy SET deleted_at = now() WHERE id = ?", deletedStrategy);
         UUID deletedAccount = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-2", "BUY_LOC");
@@ -250,14 +252,65 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         UUID deletedCycle = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-3", "BUY_LOC");
         jdbcTemplate.update("UPDATE strategy_cycle SET deleted_at = now() WHERE strategy_id = ?", deletedCycle);
 
-        assertThat(pausedIds()).isEmpty();
+        assertThat(notActiveIds()).isEmpty();
     }
 
     @Test
-    void findPausedWithReportableOrders_excludesEndedCycle() {
+    void findNotActiveWithReportableOrders_excludesEndedCycle() {
         UUID ended = seedStrategyWithOrder("PAUSED", TRADE_DATE, "ORD-1", "BUY_LOC");
         jdbcTemplate.update("UPDATE strategy_cycle SET end_date = ? WHERE strategy_id = ?", TRADE_DATE, ended);
 
-        assertThat(pausedIds()).isEmpty();
+        assertThat(notActiveIds()).isEmpty();
+    }
+
+    @Test
+    void updateStatusUnlessArchived_keepsArchivedAndUpdatesOthers() {
+        Strategy archived = strategyAdapter.save(new Strategy(null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ARCHIVED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+        Strategy paused = strategyAdapter.save(new Strategy(null, accountId, StrategyType.INFINITE,
+                StrategyStatus.PAUSED, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
+        entityManager.flush();
+
+        assertThat(strategyAdapter.updateStatusUnlessArchived(archived.id(), StrategyStatus.ACTIVE)).isFalse();
+        assertThat(strategyAdapter.updateStatusUnlessArchived(paused.id(), StrategyStatus.ACTIVE)).isTrue();
+        entityManager.clear();
+
+        assertThat(strategyAdapter.findByIdOrThrow(archived.id()).status()).isEqualTo(StrategyStatus.ARCHIVED);
+        assertThat(strategyAdapter.findByIdOrThrow(paused.id()).status()).isEqualTo(StrategyStatus.ACTIVE);
+    }
+
+    @Test
+    void findNotActiveWithReportableOrders_includesArchivedWithTodaysSubmittedOrder() {
+        UUID archived = seedStrategyWithOrder("ARCHIVED", TRADE_DATE, "ORD-1", "BUY_LOC");
+
+        assertThat(notActiveIds()).containsExactly(archived);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 스케쥴러 경로처럼 바깥 트랜잭션 없이 호출 — 어댑터가 자기 트랜잭션을 열어야 한다
+    void conditionalStatusWrites_workWithoutOuterTransaction() {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, 'INFINITE', 'SOXL', 'ACTIVE', 'NONE', now(), now())",
+                id, accountId);
+        try {
+            assertThat(strategyAdapter.updateStatusUnlessArchived(id, StrategyStatus.PAUSED)).isTrue();
+            assertThat(strategyAdapter.archiveIfPaused(id)).isTrue();
+            assertThat(jdbcTemplate.queryForObject("SELECT status FROM strategy WHERE id = ?", String.class, id)).isEqualTo("ARCHIVED");
+        } finally {
+            jdbcTemplate.update("DELETE FROM strategy WHERE id = ?", id);
+            jdbcTemplate.update("DELETE FROM accounts WHERE id = ?", accountId);
+        }
+    }
+
+    @Test
+    void archiveIfPaused_skipsWhenNotPaused() {
+        Strategy active = saveActiveStrategy(accountId, StrategyTicker.UPRO);
+        entityManager.flush();
+
+        assertThat(strategyAdapter.archiveIfPaused(active.id())).isFalse();
+        entityManager.clear();
+
+        assertThat(strategyAdapter.findByIdOrThrow(active.id()).status()).isEqualTo(StrategyStatus.ACTIVE);
     }
 }

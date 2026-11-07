@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 
 interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
@@ -50,19 +51,29 @@ interface StrategyJpaRepository extends JpaRepository<StrategyEntity, UUID> {
             """, nativeQuery = true)
     List<StrategyEntity> findAllActiveStrategies();
 
-    // 정지 전략 중 진행 중 사이클(end_date null)에 당일 접수 주문(상태 무관)이 있는 전략 — 마감 배치가 체결을 원장에 반영하는 리포트 전용
+    // 정지·보관 전략 중 진행 중 사이클(end_date null)에 당일 접수 주문(상태 무관)이 있는 전략 — 마감 배치가 체결을 원장에 반영하는 리포트 전용
     @Query(value = """
             SELECT s.* FROM strategy s
             JOIN accounts a ON s.account_id = a.id
             JOIN user_notify_profile p ON p.user_id = a.user_id
-            WHERE p.is_active AND s.status = 'PAUSED'
+            WHERE p.is_active AND s.status IN ('PAUSED', 'ARCHIVED')
               AND s.deleted_at IS NULL AND a.deleted_at IS NULL
               AND EXISTS (SELECT 1 FROM orders o JOIN strategy_cycle sc ON o.strategy_cycle_id = sc.id
                           WHERE sc.strategy_id = s.id AND sc.deleted_at IS NULL AND sc.end_date IS NULL
                             AND o.trade_date = :tradeDate AND o.external_order_id IS NOT NULL
                             AND o.order_leg <> :unknownLeg)
             """, nativeQuery = true)
-    List<StrategyEntity> findPausedWithReportableOrders(@Param("tradeDate") LocalDate tradeDate, @Param("unknownLeg") String unknownLeg);
+    List<StrategyEntity> findNotActiveWithReportableOrders(@Param("tradeDate") LocalDate tradeDate, @Param("unknownLeg") String unknownLeg);
+
+    // 보관(ARCHIVED)은 한 방향 — 오래된 스냅샷 저장이 보관을 덮어쓰지 않도록 조건부 갱신(벌크 UPDATE는 감사 필드를 안 채우므로 updatedAt 직접 설정)
+    @Modifying
+    @Query("UPDATE StrategyEntity s SET s.status = :status, s.updatedAt = :now WHERE s.id = :id AND s.status <> com.kista.shared.kernel.StrategyStatus.ARCHIVED")
+    int updateStatusUnlessArchived(@Param("id") UUID id, @Param("status") StrategyStatus status, @Param("now") Instant now);
+
+    // 보관 확정 — PAUSED일 때만 ARCHIVED로(마지막 확인 뒤 재개된 전략을 덮어쓰지 않는다)
+    @Modifying
+    @Query("UPDATE StrategyEntity s SET s.status = com.kista.shared.kernel.StrategyStatus.ARCHIVED, s.updatedAt = :now WHERE s.id = :id AND s.status = com.kista.shared.kernel.StrategyStatus.PAUSED")
+    int archiveIfPaused(@Param("id") UUID id, @Param("now") Instant now);
 
     @Modifying
     @Query("UPDATE StrategyEntity s SET s.deletedAt = :now WHERE s.id = :id")

@@ -26,10 +26,16 @@ public interface StrategyPort {
     // 사용자 ACTIVE + 전략 ACTIVE 전체 조회 (스케쥴러용)
     List<Strategy> findAllActive();
 
-    // PAUSED 전략 중 tradeDate에 접수된 주문(외부번호 보유·수동 보정 제외)이 있는 전략 — 마감 리포트 전용
-    List<Strategy> findPausedWithReportableOrders(LocalDate tradeDate);
+    // PAUSED·ARCHIVED 전략 중 tradeDate에 접수된 주문(외부번호 보유·수동 보정 제외)이 있는 전략 — 마감 리포트 전용(보관 직전 접수분 체결이 원장에 남게)
+    List<Strategy> findNotActiveWithReportableOrders(LocalDate tradeDate);
 
     Strategy save(Strategy strategy);
+
+    // PAUSED → ARCHIVED 조건부 확정 — 그 사이 재개 등으로 PAUSED가 아니면 false(덮어쓰지 않는다)
+    boolean archiveIfPaused(UUID id);
+
+    // 상태만 조건부 갱신 — 보관(ARCHIVED) 행은 건드리지 않는다. 오래된 스냅샷 save가 보관을 덮어쓰는 경합 방지. 갱신됐으면 true
+    boolean updateStatusUnlessArchived(UUID id, StrategyStatus status);
     void delete(UUID id);
     void deleteByAccountId(UUID accountId); // 계좌 삭제 시 전략 일괄 소프트 삭제
     void deleteByUserId(UUID userId);       // 사용자 탈퇴 시 전략 일괄 소프트 삭제
@@ -48,7 +54,6 @@ public interface StrategyPort {
 
     // 시스템 자동 일시중지(사이클 재등록 실패 등) — 사용자 승인 흐름을 거치지 않는 강제 전이
     default void pause(UUID strategyId) {
-        Strategy strategy = findByIdOrThrow(strategyId);
-        if (!strategy.isArchived()) save(strategy.withStatus(StrategyStatus.PAUSED)); // 보관 전략은 되돌리지 않는다
+        updateStatusUnlessArchived(strategyId, StrategyStatus.PAUSED); // 보관 전략은 되돌리지 않는다
     }
 }

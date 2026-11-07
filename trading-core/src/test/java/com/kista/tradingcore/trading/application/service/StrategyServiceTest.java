@@ -122,6 +122,8 @@ class StrategyServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(strategyPort.archiveIfPaused(any())).thenReturn(true); // 보관 확정 기본 성공
+        lenient().when(strategyPort.updateStatusUnlessArchived(any(), any())).thenReturn(true); // 조건부 상태 갱신 기본 성공(보관 경합 테스트에서 재스텁)
         DcaSummaryAssembler dcaSummaryAssembler = new DcaSummaryAssembler(marketCalendarPort);
         StrategyDetailAssembler detailAssembler = new StrategyDetailAssembler(
                 strategyVersionPort, strategyInfiniteDetailPort, vrStrategyDetailService, strategyCyclePort,
@@ -323,7 +325,7 @@ class StrategyServiceTest {
 
         strategyService.pause(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED);
     }
 
     @Test
@@ -354,7 +356,7 @@ class StrategyServiceTest {
 
         // PAUSED를 먼저 기록해 이후 배치가 새 주문을 만들지 않게 한 뒤 취소한다
         var inOrder = inOrder(strategyPort, orderCancelService);
-        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        inOrder.verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED);
         inOrder.verify(orderCancelService).cancelOpenOrders(STRATEGY_ID, account);
     }
 
@@ -380,7 +382,7 @@ class StrategyServiceTest {
         strategyService.delete(STRATEGY_ID, USER_ID);
 
         var inOrder = inOrder(orderCancelService, cyclePositionPort, strategyCyclePort, strategyPort);
-        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        inOrder.verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED);
         inOrder.verify(orderCancelService).cancelOpenOrders(STRATEGY_ID, account);
         inOrder.verify(cyclePositionPort).deleteByStrategyId(STRATEGY_ID);
         inOrder.verify(strategyCyclePort).deleteByStrategyId(STRATEGY_ID);
@@ -412,7 +414,7 @@ class StrategyServiceTest {
         assertThatThrownBy(() -> strategyService.delete(STRATEGY_ID, USER_ID))
                 .isInstanceOf(IllegalStateException.class);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED);
         verify(strategyPort, never()).delete(any());
         verify(strategyCyclePort, never()).deleteByStrategyId(any());
         verify(cyclePositionPort, never()).deleteByStrategyId(any());
@@ -420,9 +422,9 @@ class StrategyServiceTest {
 
     @Test
     void pause_keeps_archived_status() {
-        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ARCHIVED_STRATEGY);
+        when(strategyPort.updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED)).thenReturn(false);
 
-        new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort).pause(STRATEGY_ID);
+        assertThat(new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort).pause(STRATEGY_ID)).isFalse();
 
         verify(strategyPort, never()).save(any());
     }
@@ -525,9 +527,20 @@ class StrategyServiceTest {
 
         // pause 기록 → 미체결 정리 → archive 기록 순서
         var inOrder = inOrder(strategyPort, orderCancelService);
-        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        inOrder.verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED);
         inOrder.verify(orderCancelService).cancelOpenOrders(eq(STRATEGY_ID), any());
-        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        inOrder.verify(strategyPort).archiveIfPaused(STRATEGY_ID);
+    }
+
+    @Test
+    void archive_rejects_when_status_changed_concurrently() {
+        // 최종 기록 직전 재개 등으로 PAUSED가 아니면 조건부 갱신 0건 — ARCHIVED로 덮어쓰지 않고 거부
+        stubArchivable(ACTIVE_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(positionWithHoldings(0)));
+        when(strategyPort.archiveIfPaused(STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class).hasMessage("전략 상태가 바뀌어 보관하지 못했습니다. 다시 시도하시기 바랍니다.");
     }
 
     @Test
@@ -549,7 +562,7 @@ class StrategyServiceTest {
 
         strategyService.archive(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        verify(strategyPort).archiveIfPaused(STRATEGY_ID);
     }
 
     @Test
@@ -598,7 +611,7 @@ class StrategyServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
 
-        verify(strategyPort, never()).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        verify(strategyPort, never()).archiveIfPaused(any());
     }
 
     @Test
@@ -611,7 +624,7 @@ class StrategyServiceTest {
 
         strategyService.archive(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        verify(strategyPort).archiveIfPaused(STRATEGY_ID);
     }
 
     @Test
@@ -624,7 +637,7 @@ class StrategyServiceTest {
 
         strategyService.archive(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        verify(strategyPort).archiveIfPaused(STRATEGY_ID);
     }
 
     @Test
@@ -648,7 +661,7 @@ class StrategyServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("증권사 주문 취소에 실패한 주문이 있어 보관할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
 
-        verify(strategyPort, never()).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        verify(strategyPort, never()).archiveIfPaused(any());
     }
 
     @Test
@@ -658,12 +671,13 @@ class StrategyServiceTest {
 
         strategyService.archive(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+        verify(strategyPort).archiveIfPaused(STRATEGY_ID);
     }
 
     @Test
     void delete_archived_strategy_soft_deletes() {
         stubArchivable(ARCHIVED_STRATEGY);
+        when(strategyPort.updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED)).thenReturn(false); // 보관 행은 갱신 0건 — 삭제는 그래도 진행
 
         strategyService.delete(STRATEGY_ID, USER_ID);
 
@@ -681,7 +695,30 @@ class StrategyServiceTest {
 
         strategyService.resume(STRATEGY_ID, USER_ID);
 
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+        verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE);
+    }
+
+    @Test
+    void resume_rejects_when_archived_concurrently() {
+        // 읽은 뒤 보관이 커밋된 경합 — 조건부 갱신이 0건이면 거부(ARCHIVED 덮어쓰기 방지)
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class).hasMessage(ARCHIVED_MESSAGE);
+    }
+
+    @Test
+    void pause_rejects_when_archived_concurrently() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.PAUSED)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class).hasMessage(ARCHIVED_MESSAGE);
+
+        verify(orderCancelService, never()).cancelOpenOrders(any(), any());
     }
 
     @Test
@@ -711,7 +748,7 @@ class StrategyServiceTest {
         assertThat(cycleCaptor.getValue().startAmount()).isEqualByComparingTo("874.50");
         verify(cyclePositionPort).save(argThat(p ->
                 p.usdDeposit().compareTo(new BigDecimal("874.50")) == 0 && p.holdings().signum() == 0));
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+        verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE);
         verify(eventPublisher).publishEvent(new com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent(USER_ID)); // 새 사이클 생성 → stats 캐시 무효화
     }
 
@@ -783,7 +820,7 @@ class StrategyServiceTest {
         strategyService.resume(STRATEGY_ID, USER_ID);
 
         verify(strategyCyclePort).save(any(StrategyCycle.class));
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+        verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE);
     }
 
     @Test
@@ -797,7 +834,7 @@ class StrategyServiceTest {
 
         verify(strategyCyclePort, never()).save(any());
         verify(cyclePositionPort, never()).save(any());
-        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ACTIVE));
+        verify(strategyPort).updateStatusUnlessArchived(STRATEGY_ID, StrategyStatus.ACTIVE);
     }
 
     @Test

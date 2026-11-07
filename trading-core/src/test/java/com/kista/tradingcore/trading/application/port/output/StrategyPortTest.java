@@ -31,22 +31,13 @@ class StrategyPortTest {
     }
 
     @Test
-    void pause_default_does_not_save_archived() {
-        Strategy archived = strategy(StrategyStatus.ARCHIVED);
-        doReturn(archived).when(strategyPort).findByIdOrThrow(archived.id()); // 실제 default 호출 방지
+    void pause_default_delegates_to_conditional_update() {
+        UUID id = UUID.randomUUID();
+        doReturn(true).when(strategyPort).updateStatusUnlessArchived(id, StrategyStatus.PAUSED); // 실제 default 호출 방지
 
-        strategyPort.pause(archived.id());
+        strategyPort.pause(id);
 
+        verify(strategyPort).updateStatusUnlessArchived(id, StrategyStatus.PAUSED);
         verify(strategyPort, never()).save(any());
-    }
-
-    @Test
-    void pause_default_saves_active_as_paused() {
-        Strategy active = strategy(StrategyStatus.ACTIVE);
-        doReturn(active).when(strategyPort).findByIdOrThrow(active.id());
-
-        strategyPort.pause(active.id());
-
-        verify(strategyPort).save(active.withStatus(StrategyStatus.PAUSED));
     }
 }

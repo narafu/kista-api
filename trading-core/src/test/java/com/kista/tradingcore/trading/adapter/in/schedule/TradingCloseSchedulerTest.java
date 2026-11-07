@@ -125,7 +125,7 @@ class TradingCloseSchedulerTest {
                 StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
         Strategy pausedDuplicate = active.withStatus(StrategyStatus.PAUSED); // 두 쿼리 사이 정지된 같은 전략
         when(strategyPort.findAllActive()).thenReturn(List.of(active));
-        when(strategyPort.findPausedWithReportableOrders(LocalDate.now(FixedClockTestConfig.FIXED)))
+        when(strategyPort.findNotActiveWithReportableOrders(LocalDate.now(FixedClockTestConfig.FIXED)))
                 .thenReturn(List.of(pausedDuplicate, pausedOnly));
         when(contextFactory.buildAll(List.of(active, pausedOnly))).thenReturn(List.of());
 
