@@ -654,4 +654,4 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 근거: DCA는 Upbit(KRW)·Binance(USDT) 코인 계좌에서도 돈다. KRW 시장에 소수 2자리를 쓰는 셈이다. 같은 모듈의 `DcaCycleOrderStrategy`는 이미 `Currency`/`Market` 기반 자릿수를 쓴다.
 - 수정 방향: 계좌 시장의 `amountScale()`로 바꾼다. KRW에서는 값이 바뀌므로 경계 테스트를 먼저 넣는다. 원장 `numeric(20,2)` 저장값과의 관계(원장은 통화 무관 2자리)를 함께 정한다.
 - 출처: CQ-20 작업 중 제외 site(2026-11-07).
-- 상태: open.
+- 상태: done(1566604d4). 조건 목표가·가격·금액 표시는 계좌 `Market.amountScale()`(KRW 정수), RSI·공포탐욕지수 표시는 2자리 유지, start_amount는 `AccountBalance.LEDGER_SCALE`(값 불변).
