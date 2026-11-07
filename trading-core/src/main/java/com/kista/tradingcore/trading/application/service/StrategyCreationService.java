@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.Market;
 
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
 import com.kista.tradingcore.account.domain.model.Account;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
@@ -104,7 +105,7 @@ class StrategyCreationService {
         // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
         BigDecimal marketPrice = bootstrap && !dca ? fetchMarketPrice(account, resolvedTicker) : null;
         BigDecimal initialStockValue = !bootstrap ? BigDecimal.ZERO
-                : (dca ? cmd.initialAvgPrice() : marketPrice).multiply(initialHoldings).setScale(2, RoundingMode.HALF_UP);
+                : (dca ? cmd.initialAvgPrice() : marketPrice).multiply(initialHoldings).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
 
         // VR 전략 파라미터 해석·검증 — V값은 시장가×보유수량 기준 (비VR은 null)
         VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialUsdDeposit, initialStockValue) : null;

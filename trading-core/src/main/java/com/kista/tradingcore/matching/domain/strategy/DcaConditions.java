@@ -2,6 +2,7 @@ package com.kista.tradingcore.matching.domain.strategy;
 
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.shared.kernel.Market;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.DcaDecision;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
@@ -17,6 +18,8 @@ import java.util.Optional;
 // DCA 조건 판정 커널 — 주식(DcaCycleOrderStrategy)·코인 경로 공용 순수 계산
 public final class DcaConditions {
 
+    private static final int INDICATOR_SCALE = 2; // 지표값(RSI·공포탐욕지수) 표시 자릿수 — 금액 아님
+
     private DcaConditions() {}
 
     // 조건 1개 평가 결과 — passed=false면 detail이 skip 사유
@@ -26,14 +29,14 @@ public final class DcaConditions {
     private record Holding(BigDecimal quantity, BigDecimal avgPrice) {}
 
     // 전부 통과면 empty. 전일 종가 없음 → 지표 계산 불가 → 미충족 순. AVG_PRICE는 원장(ledger) 평단 기준, referencePrice는 skip 기록용
-    public static Optional<DcaDecision.Skipped> check(DcaRule rule, List<BigDecimal> closes, AccountBalance ledger,
+    public static Optional<DcaDecision.Skipped> check(DcaRule rule, Market market, List<BigDecimal> closes, AccountBalance ledger,
                                                       BigDecimal fearGreed, BigDecimal referencePrice) {
         var holding = ledger == null ? null : new Holding(ledger.holdings(), ledger.avgPrice());
-        return check(rule.conditions(), closes, holding, fearGreed, referencePrice);
+        return check(rule.conditions(), closes, holding, fearGreed, referencePrice, market.amountScale());
     }
 
     private static Optional<DcaDecision.Skipped> check(List<DcaCondition> conditions, List<BigDecimal> closes, Holding holding,
-                                                       BigDecimal fearGreed, BigDecimal referencePrice) {
+                                                       BigDecimal fearGreed, BigDecimal referencePrice, int amountScale) {
         BigDecimal prevClose = closes == null || closes.isEmpty() ? null : closes.getLast();
         if (prevClose == null || prevClose.signum() <= 0) {
             return Optional.of(new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, "전일 종가 조회 실패", null));
@@ -41,7 +44,7 @@ public final class DcaConditions {
         // 모든 조건 지표값을 먼저 계산 — 하나라도 계산 불가면 다른 조건과 무관하게 DATA_UNAVAILABLE
         List<Evaluation> evaluations = new ArrayList<>();
         for (DcaCondition cond : conditions) {
-            Optional<Evaluation> e = evaluate(cond, closes, prevClose, holding, fearGreed);
+            Optional<Evaluation> e = evaluate(cond, closes, prevClose, holding, fearGreed, amountScale);
             if (e.isEmpty()) return Optional.of(new DcaDecision.Skipped(DcaSkipReason.DATA_UNAVAILABLE, dataFailure(cond), referencePrice));
             evaluations.add(e.get());
         }
@@ -51,28 +54,28 @@ public final class DcaConditions {
 
     // 조건 1개 평가 — 지표 계산 불가면 empty
     private static Optional<Evaluation> evaluate(DcaCondition cond, List<BigDecimal> closes, BigDecimal prevClose,
-                                                 Holding holding, BigDecimal fearGreed) {
-        String close = "전일 종가 " + money(prevClose);
+                                                 Holding holding, BigDecimal fearGreed, int amountScale) {
+        String close = "전일 종가 " + money(prevClose, amountScale);
         return switch (cond.indicator()) {
             case SMA -> DcaIndicators.sma(closes, cond.smaPeriod())
-                    .map(v -> compare(cond.operator(), prevClose, v, close, "SMA(" + cond.smaPeriod() + ") " + money(v)));
+                    .map(v -> compare(cond.operator(), prevClose, v, close, "SMA(" + cond.smaPeriod() + ") " + money(v, amountScale)));
             case RSI -> DcaIndicators.rsiWilder(closes, DcaIndicators.RSI_PERIOD)
-                    .map(v -> compare(cond.operator(), v, cond.threshold(), "RSI(" + DcaIndicators.RSI_PERIOD + ") " + money(v), plain(cond.threshold())));
-            case AVG_PRICE -> evaluateAvgPrice(cond, prevClose, holding, close);
+                    .map(v -> compare(cond.operator(), v, cond.threshold(), "RSI(" + DcaIndicators.RSI_PERIOD + ") " + indicator(v), plain(cond.threshold())));
+            case AVG_PRICE -> evaluateAvgPrice(cond, prevClose, holding, close, amountScale);
             case FEAR_GREED -> Optional.ofNullable(fearGreed)
-                    .map(v -> compare(cond.operator(), v, cond.threshold(), "공포탐욕지수 " + money(v), plain(cond.threshold())));
+                    .map(v -> compare(cond.operator(), v, cond.threshold(), "공포탐욕지수 " + indicator(v), plain(cond.threshold())));
         };
     }
 
     // 보유 0은 통과 처리 — BUY는 첫 매수 허용, SELL은 뒤 단계 NO_HOLDINGS로 보고 (spec 5.2)
-    private static Optional<Evaluation> evaluateAvgPrice(DcaCondition cond, BigDecimal prevClose, Holding holding, String close) {
+    private static Optional<Evaluation> evaluateAvgPrice(DcaCondition cond, BigDecimal prevClose, Holding holding, String close, int amountScale) {
         if (holding == null) return Optional.empty();
         if (holding.quantity().signum() <= 0) return Optional.of(new Evaluation(true, null));
         if (holding.avgPrice() == null || holding.avgPrice().signum() <= 0) return Optional.empty();
         BigDecimal n = cond.threshold();
-        BigDecimal target = holding.avgPrice().multiply(BigDecimal.ONE.add(n.movePointLeft(2))).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal target = holding.avgPrice().multiply(BigDecimal.ONE.add(n.movePointLeft(2))).setScale(amountScale, RoundingMode.HALF_UP);
         String sign = n.signum() < 0 ? "−" : "+";
-        String rhs = "평단 " + money(holding.avgPrice()) + " × (1 " + sign + " " + plain(n.abs()) + "%) = " + money(target);
+        String rhs = "평단 " + money(holding.avgPrice(), amountScale) + " × (1 " + sign + " " + plain(n.abs()) + "%) = " + money(target, amountScale);
         return Optional.of(compare(cond.operator(), prevClose, target, close, rhs));
     }
 
@@ -100,7 +103,11 @@ public final class DcaConditions {
         };
     }
 
-    static String money(BigDecimal v) { return v.setScale(2, RoundingMode.HALF_UP).toPlainString(); }
+    // 가격·금액 표시 — 시장 견적 통화 자릿수
+    static String money(BigDecimal v, int scale) { return v.setScale(scale, RoundingMode.HALF_UP).toPlainString(); }
+
+    // 지표값 표시 — 금액이 아니므로 통화 자릿수와 무관
+    static String indicator(BigDecimal v) { return v.setScale(INDICATOR_SCALE, RoundingMode.HALF_UP).toPlainString(); }
 
     static String plain(BigDecimal v) { return v.stripTrailingZeros().toPlainString(); }
 }

@@ -104,7 +104,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
         if (sell && in.sellableAfterReserved() == null) {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.DATA_UNAVAILABLE, "원장 조회 실패", basis);
         }
-        Optional<DcaDecision.Skipped> notMet = DcaConditions.check(rule, closes, in.ledger(), in.fearGreed(), basis);
+        Optional<DcaDecision.Skipped> notMet = DcaConditions.check(rule, in.market(), closes, in.ledger(), in.fearGreed(), basis);
         if (notMet.isPresent()) {
             DcaDecision.Skipped s = notMet.get();
             return new DcaRuleDecision.Skipped(key, s.reason(), s.detail(), s.referencePrice());
@@ -153,7 +153,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             if (want.compareTo(affordable) > 0 && (rule.shortfall() == DcaShortfallPolicy.REJECT || affordable.signum() == 0)) {
                 // PARTIAL이어도 1주조차 못 사면 INSUFFICIENT_BALANCE — 회차 금액 부족(BELOW_ONE_SHARE)과 구분
                 return new DcaRuleDecision.Skipped(key, DcaSkipReason.INSUFFICIENT_BALANCE,
-                        "필요 " + DcaConditions.money(want.multiply(limit)) + " > 가용 " + DcaConditions.money(in.availableCash()), basis);
+                        "필요 " + DcaConditions.money(want.multiply(limit), in.market().amountScale()) + " > 가용 " + DcaConditions.money(in.availableCash(), in.market().amountScale()), basis);
             }
             quantity = want.min(affordable);
         }
@@ -167,7 +167,7 @@ public class DcaCycleOrderStrategy implements CycleOrderStrategy {
             }
         } else if (quantity.signum() == 0) {
             return new DcaRuleDecision.Skipped(key, DcaSkipReason.BELOW_ONE_SHARE,
-                    "회차 금액 < 기준가 " + DcaConditions.money(basis), basis);
+                    "회차 금액 < 기준가 " + DcaConditions.money(basis, in.market().amountScale()), basis);
         }
         return new DcaRuleDecision.Planned(key, rule.direction(), quantity, notional, basis, limit);
     }

@@ -2448,6 +2448,23 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     }
 
     @Test
+    @DisplayName("크립토 DCA 초기 투입 원가는 보유×평단을 소수 2자리 HALF_UP으로 반올림한다")
+    void 크립토_DCA_초기원가_2자리_반올림() {
+        stubDcaRegistration(StrategyTicker.BTC);
+        stubDcaPolicyWithCrypto();
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.BTC)).thenReturn(List.of());
+
+        strategyService.register(USER_ID, ACCOUNT_ID,
+                dcaCommand(StrategyTicker.BTC, cryptoDcaConfig(), new BigDecimal("0.30736563"), new BigDecimal("2264.05")));
+
+        // 2264.05 × 0.30736563 = 695.8911...(원문 그대로 반올림)
+        verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(
+                new BigDecimal("2264.05").multiply(new BigDecimal("0.30736563")).setScale(2, java.math.RoundingMode.HALF_UP)) == 0
+                && c.startAmount().scale() == 2));
+    }
+
+    @Test
     @DisplayName("주식 DCA 소수 초기보유는 400")
     void 주식_소수_초기보유는_400() {
         when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
