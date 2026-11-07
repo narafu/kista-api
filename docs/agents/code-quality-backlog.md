@@ -511,14 +511,14 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 ### CQ-33 통계·원장 경계의 낮은 우선순위 정합성 묶음
 - 주제: 통계 정확도. 유형: 정의·경계(기존 동작). 위험: 낮음.
 - 위치·근거:
-  - VR 롤오버 지연 구멍: `VrCycleRolloverService.java:145`가 `markEnded(evaluationDate)`로 닫으므로, 재시도로 today > evaluationDate면 그 사이 날짜에는 옛 사이클이 endDate 규칙으로 빠지고 새 사이클 스냅샷은 아직 없어 전략이 곡선에서 빠진다(`TradingStatsService.buildPoints`). (해소 2026-11-07)
+  - VR 롤오버 지연 구멍: `VrCycleRolloverService.java:145`가 `markEnded(evaluationDate)`로 닫으므로, 재시도로 today > evaluationDate면 그 사이 날짜에는 옛 사이클이 endDate 규칙으로 빠지고 새 사이클 스냅샷은 아직 없어 전략이 곡선에서 빠진다(`TradingStatsService.buildPoints`). (해소 2026-11-07: 938206ff3)
   - VR 종료금액 시점 혼합: due일 종가에 오늘 매매 후 holdings를 곱한다(`VrCycleRolloverService.java:119-126`). 지연 시 그 사이 체결이 옛 사이클 평가에 섞인다. (문서화로 종결 2026-11-07: ponytail 주석)
-  - 본전 사이클이 패배로 집계: 승률은 `realizedPnl().signum() > 0`만 승으로 센다(`TradingStatsService.toTypeStats`). (해소 2026-11-07)
+  - 본전 사이클이 패배로 집계: 승률은 `realizedPnl().signum() > 0`만 승으로 센다(`TradingStatsService.toTypeStats`). (해소 2026-11-07: 938206ff3)
   - 수동 체결 보정이 과거 trade_date로 SELL을 넣으면 DCA `withdrawnOn`(trade_date 기준)과 스냅샷(createdAt 기준)이 어긋나 그 사이 곡선 자산이 매도대금만큼 부푼다(`CycleView` `ponytail:` 주석). (종결 2026-11-07: withdrawnOn 삭제(131b749b0)로 근거 소멸. 남은 한계 — 보정분은 곡선에 보정 실행일로 반영)
   - 곡선 체인 보정의 surplus가 후속 사이클의 현재 startAmount를 쓴다(`TradingStatsService.chainAdjustment`). 회전 뒤 투자금 추가·인출이나 시드 수정이 있으면 자산선과 원금선이 같은 양만큼 함께 움직인다. 손익선은 맞다. (해소 2026-11-06: 개시 시점 시작금액 `startAmountAtOpen` 사용, 083ce5faa)
   - 종료 처리가 안 된 선행 사이클(CQ-29 상황)은 체인 보정에서 빠지고 후속 사이클 제외 규칙으로만 사라져 손익이 끊긴다. CQ-29를 고치면 해소된다.
-  - `TtlResultCache.getOrCompute`에 세대(버전) 검사가 없다. 무효화 직전에 계산을 시작한 스레드가 무효화 뒤 옛 결과를 다시 넣으면 5분 TTL 동안 유지된다. TradingReportReady 무효화도 같다. (해소 2026-11-07)
-  - 전략 등록(`StrategyService.register`), 계좌 삭제 캐스케이드(`AccountCascadeListener`), 크립토 원장 스냅샷(`CryptoLedgerRecorder`)은 `StrategyCapitalChangedEvent`를 발행하지 않아 최대 5분 동안 옛 값이 보인다. (해소 2026-11-07)
+  - `TtlResultCache.getOrCompute`에 세대(버전) 검사가 없다. 무효화 직전에 계산을 시작한 스레드가 무효화 뒤 옛 결과를 다시 넣으면 5분 TTL 동안 유지된다. TradingReportReady 무효화도 같다. (해소 2026-11-07: 938206ff3)
+  - 전략 등록(`StrategyService.register`), 계좌 삭제 캐스케이드(`AccountCascadeListener`), 크립토 원장 스냅샷(`CryptoLedgerRecorder`)은 `StrategyCapitalChangedEvent`를 발행하지 않아 최대 5분 동안 옛 값이 보인다. (해소 2026-11-07: 938206ff3)
   - PRIVACY 보유 초과분은 BUY 감액으로만 흡수되고 매도로 따라잡지 않는다(`PrivacyStrategy.java:207-227`). 테스트로 고정된 동작이지만 문서화되지 않았다. (문서화로 종결 2026-11-07: privacy.md)
 - 수정 방향: 항목별로 정의를 정한 뒤 처리한다. PRIVACY 초과분은 의도 확인 후 `modules/tradingcore/privacy.md`에 기록한다.
 - 상태: open(2026-11-04) → CQ-29 의존 항목만 남음(2026-11-07).
