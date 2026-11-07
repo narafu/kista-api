@@ -86,7 +86,7 @@ class VrRampInputTest {
 
     @Test
     void registerCommand_nullRamp_normalizedToNone() {
-        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, null, null, 0, null, null,
+        RegisterStrategyCommand cmd = new RegisterStrategyCommand(StrategyType.VR, null, null, null, null, null, null,
                 null, null, null, null, null, null, null);
         assertThat(cmd.vrRamp()).isEqualTo(VrRampInput.NONE);
     }

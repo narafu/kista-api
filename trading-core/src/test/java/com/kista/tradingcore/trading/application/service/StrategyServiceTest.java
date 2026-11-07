@@ -278,7 +278,7 @@ class StrategyServiceTest {
         return defaultTradingSettings(type).ticker().defaultValue();
     }
 
-    private RegisterStrategyCommand commandFor(StrategyType type, StrategyTicker ticker, int divisionCount,
+    private RegisterStrategyCommand commandFor(StrategyType type, StrategyTicker ticker, Integer divisionCount,
                                                 Integer intervalWeeks, BigDecimal bandWidth, Integer recurringAmount) {
         // 중간부터 시작 입력(initialHoldings/initialAvgPrice) 없음 — holdings=0에서 시작하는 기존 시나리오 전용 헬퍼
         return register(type).ticker(ticker).divisionCount(divisionCount).intervalWeeks(intervalWeeks).bandWidth(bandWidth).recurringAmount(recurringAmount).build();
@@ -826,7 +826,7 @@ class StrategyServiceTest {
         stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
 
         StrategyDetail registered = strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(StrategyType.INFINITE, null, 0, null, null, null));
+                commandFor(StrategyType.INFINITE, null, null, null, null, null));
 
         verify(accountPort, times(1)).requireOwnedAccount(ACCOUNT_ID, USER_ID);
         when(strategyPort.findByIdOrThrow(registered.strategy().id())).thenReturn(registered.strategy());
@@ -843,7 +843,7 @@ class StrategyServiceTest {
         when(strategyCreationPolicyPort.find(StrategyType.INFINITE)).thenReturn(Optional.of(customized));
 
         StrategyDetail result = strategyService.register(USER_ID, ACCOUNT_ID,
-                commandFor(StrategyType.INFINITE, null, 0, null, null, null));
+                commandFor(StrategyType.INFINITE, null, null, null, null, null));
 
         assertThat(result.strategy().ticker()).isEqualTo(StrategyTicker.TQQQ);
         assertThat(result.divisionCount()).isEqualTo(30);
@@ -929,6 +929,63 @@ class StrategyServiceTest {
         verify(strategyVrDetailPort).save(argThat(detail -> detail.intervalWeeks() == 2
                 && detail.bandWidth().compareTo(new BigDecimal("15")) == 0
                 && detail.recurringAmount() == 0));
+    }
+
+    @Test
+    @DisplayName("INFINITE register()는 생략한 divisionCount에 정책 기본값을 저장한다")
+    void register_infinite_omittedDivisionCount_storesPolicyDefault() {
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+
+        strategyService.register(USER_ID, ACCOUNT_ID, infinite().deposit("1000").build());
+
+        verify(strategyInfiniteDetailPort).save(argThat(detail -> detail.divisionCount() == StrategyDefaults.DEFAULT_DIVISION_COUNT));
+    }
+
+    @Test
+    @DisplayName("INFINITE register()는 divisionCount=0 명시 입력을 허용 목록 밖으로 거부한다")
+    void register_infinite_explicitZeroDivisionCount_rejected() {
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                infinite().deposit("1000").divisionCount(0).build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("허용되지 않는 값");
+    }
+
+    @Test
+    @DisplayName("INFINITE register()는 initialUsdDeposit null이면 0으로 저장한다")
+    void register_infinite_nullDeposit_persistsZero() {
+        stubSuccessfulRegistration(StrategyType.INFINITE, StrategyTicker.SOXL);
+
+        strategyService.register(USER_ID, ACCOUNT_ID, infinite().build());
+
+        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
+    }
+
+    @Test
+    @DisplayName("PRIVACY register()는 initialUsdDeposit null이면 0으로 저장한다")
+    void register_privacy_nullDeposit_persistsZero() {
+        stubSuccessfulRegistration(StrategyType.PRIVACY, StrategyTicker.SOXL);
+
+        strategyService.register(USER_ID, ACCOUNT_ID, register(StrategyType.PRIVACY).build());
+
+        verify(cyclePositionPort).save(argThat(p -> p.usdDeposit().compareTo(BigDecimal.ZERO) == 0));
+    }
+
+    @Test
+    @DisplayName("VR register()는 recurringAmount 생략 시 기본 방향이 입금이면 입력을 요구한다")
+    void register_vr_omittedRecurringAmount_depositDefaultMode_rejected() {
+        StrategyCreationSettings hold = defaultTradingSettings(StrategyType.VR);
+        when(strategyCreationPolicyPort.find(StrategyType.VR)).thenReturn(Optional.of(new StrategyCreationSettings(
+                true, hold.ticker(), null,
+                new StrategyFieldSettings<>(true, List.of(RecurringMode.values()), RecurringMode.DEPOSIT),
+                hold.bandWidth(), hold.intervalWeeks())));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+
+        assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
+                vr().deposit("1000").intervalWeeks(2).bandWidth("15.00").build()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("정기 입출금액을 입력해야 합니다.");
     }
 
     @Test

@@ -96,8 +96,9 @@ class StrategyCreationService {
         // 사용자 복제본이 없으면 배치가 이 전략을 돌릴 수 없다 — 등록 단계에서 거부
         tradingUserProfilePort.findByUserId(userId)
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다: " + userId));
-        // DCA 원장 예수금 — 계좌 통화(주식 USD·코인 견적 통화), 생략은 0
-        BigDecimal initialUsdDeposit = dca ? dcaDeposit(cmd.initialUsdDeposit(), account.broker().getMarket()) : cmd.initialUsdDeposit();
+        // 예수금 — 생략(null)은 0으로 여기서 한 번만 정규화, DCA는 계좌 통화(주식 USD·코인 견적 통화) 자릿수 검증 포함
+        BigDecimal initialUsdDeposit = dca ? dcaDeposit(cmd.initialUsdDeposit(), account.broker().getMarket())
+                : cmd.initialUsdDeposit() != null ? cmd.initialUsdDeposit() : BigDecimal.ZERO;
 
         // 중간부터 시작 시 시장가(전일종가) 1회 조회 — holdings=0이면 조회 자체를 건너뛰어 기존 동작 보존
         // DCA는 시장가를 조회하지 않고 초기 투입 원가(보유 × 평단)를 start_amount로 둔다 — 코인은 BrokerPricePort 경로가 없다
@@ -106,16 +107,15 @@ class StrategyCreationService {
                 : (dca ? cmd.initialAvgPrice() : marketPrice).multiply(initialHoldings).setScale(2, RoundingMode.HALF_UP);
 
         // VR 전략 파라미터 해석·검증 — V값은 시장가×보유수량 기준 (비VR은 null)
-        VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialStockValue) : null;
+        VrRegistration vr = cmd.type() == StrategyType.VR ? VrRegistration.resolve(cmd, resolved, initialUsdDeposit, initialStockValue) : null;
 
         // 연속 사이클 정책을 지원하지 않는 전략(VR·DCA)은 NONE으로 강제하고 나머지는 요청 값을 따른다.
         StrategyCycleSeedType seedType = !cmd.type().capability().supportsCycleSeed()
                 ? StrategyCycleSeedType.NONE  // capability.supportsCycleSeed=false는 NONE 강제
                 : (cmd.cycleSeedType() != null ? cmd.cycleSeedType() : StrategyCycleSeedType.NONE);
 
-        // 시작금액 산출 — 예수금 null은 0으로 취급
-        BigDecimal depositOrZero = initialUsdDeposit != null ? initialUsdDeposit : BigDecimal.ZERO;
-        BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), depositOrZero, initialHoldings, initialStockValue);
+        // 시작금액 산출
+        BigDecimal startAmount = startAmountCalculator.calculate(cmd.type(), initialUsdDeposit, initialHoldings, initialStockValue);
 
         // INFINITE 최소 시드 검증 — 폼이 먼저 막지만 API 직접 호출도 0회차 교착 시드를 만들지 못하게 서버에서도 막는다
         if (cmd.type() == StrategyType.INFINITE) {

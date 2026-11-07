@@ -27,19 +27,19 @@ class VrRegistrationTest {
     @Test
     void resolve_explicitVrValueOverridesEvaluated() {
         var cmd = cmd(BigDecimal.ZERO, 0, new BigDecimal("5000"), VrRampInput.NONE);
-        assertThat(VrRegistration.resolve(cmd, resolved(4, 0), EVALUATED).vrValue()).isEqualByComparingTo("5000");
+        assertThat(VrRegistration.resolve(cmd, resolved(4, 0), BigDecimal.ZERO, EVALUATED).vrValue()).isEqualByComparingTo("5000");
     }
 
     @Test
     void resolve_zeroVrValueFallsBackToEvaluated() {
         var cmd = cmd(BigDecimal.ZERO, 0, BigDecimal.ZERO, VrRampInput.NONE);
-        assertThat(VrRegistration.resolve(cmd, resolved(4, 0), EVALUATED).vrValue()).isEqualByComparingTo("3000");
+        assertThat(VrRegistration.resolve(cmd, resolved(4, 0), BigDecimal.ZERO, EVALUATED).vrValue()).isEqualByComparingTo("3000");
     }
 
     @Test
     void resolve_negativeVrValue_throws() {
         var cmd = cmd(BigDecimal.ZERO, 0, new BigDecimal("-1"), VrRampInput.NONE);
-        assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(4, 0), EVALUATED))
+        assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(4, 0), BigDecimal.ZERO, EVALUATED))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("VR 전략의 초기 V값은 0 이상이어야 합니다.");
     }
@@ -47,7 +47,7 @@ class VrRegistrationTest {
     @Test
     void resolve_withdrawalUsesEvaluatedNotOverride() {
         var cmd = cmd(BigDecimal.ZERO, -100, new BigDecimal("1000000"), VrRampInput.NONE);
-        assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(4, -100), BigDecimal.ZERO))
+        assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(4, -100), BigDecimal.ZERO, BigDecimal.ZERO))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("인출식 VR 전략의 초기 자산은 10000.00 이상이어야 합니다.");
     }
@@ -57,7 +57,7 @@ class VrRegistrationTest {
         // 램프 무효(gradient 음수)와 intervalWeeks=0 동시 — intervalWeeks 문구가 먼저
         var badRamp = new VrRampInput(-1, null, null, null, null, null, null, null);
         var cmd = cmd(BigDecimal.ZERO, 0, null, badRamp);
-        assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(0, 0), EVALUATED))
+        assertThatThrownBy(() -> VrRegistration.resolve(cmd, resolved(0, 0), BigDecimal.ZERO, EVALUATED))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
     }

@@ -5,7 +5,6 @@ import com.kista.tradingcore.account.adapter.in.web.dto.AccountResponse;
 import com.kista.tradingcore.account.adapter.in.web.dto.CredentialsRequest;
 import com.kista.tradingcore.account.adapter.in.web.dto.TestConnectionRequest;
 import com.kista.tradingcore.account.application.usecase.AccountUseCase;
-import com.kista.shared.kernel.Broker;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -117,8 +116,7 @@ public class AccountController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void testConnection(
             @RequestBody TestConnectionRequest request) {
-        // broker null이면 KIS 기본값 적용 — 실패 시 BrokerCredentialException → GlobalExceptionHandler → 422
-        accountUseCase.test(request.broker() != null ? request.broker() : Broker.KIS,
-                request.appKey(), request.appSecret());
+        // broker 기본값은 서비스가 결정 — 실패 시 BrokerCredentialException → GlobalExceptionHandler → 422
+        accountUseCase.test(request.broker(), request.appKey(), request.appSecret());
     }
 }

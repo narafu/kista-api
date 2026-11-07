@@ -188,6 +188,17 @@ class AccountServiceTest {
     }
 
     @Test
+    @DisplayName("연결 테스트: broker 미지정이면 KIS 라우터로 위임")
+    void test_nullBroker_defaultsToKis() {
+        when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);
+        when(connectionTesters.of(Broker.KIS)).thenReturn(connectionTester);
+
+        accountService.test(null, "ak", "sk");
+
+        verify(connectionTester).verifyCredentials("ak", "sk");
+    }
+
+    @Test
     @DisplayName("계좌 등록 성공")
     void register_success() {
         when(brokerEnabledPort.enabled(Broker.KIS)).thenReturn(true);

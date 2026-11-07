@@ -43,7 +43,7 @@ public final class StrategyCommands {
         private StrategyTicker ticker;                 // 종목 (null=전략 기본값)
         private BigDecimal initialUsdDeposit;          // 초기 예수금
         private StrategyCycleSeedType cycleSeedType;   // 사이클 시드 타입
-        private int divisionCount;                     // 분할 수 (0=미입력)
+        private Integer divisionCount;                 // 분할 수 (null=미입력)
         private BigDecimal initialHoldings;            // 중간 시작 보유 수량
         private BigDecimal initialAvgPrice;            // 중간 시작 평단가
         private Integer intervalWeeks;                 // VR 리밸런싱 주기
@@ -62,7 +62,7 @@ public final class StrategyCommands {
         public Register deposit(BigDecimal v) { initialUsdDeposit = v; return this; }
         public Register deposit(String v) { return deposit(new BigDecimal(v)); }
         public Register cycleSeedType(StrategyCycleSeedType v) { cycleSeedType = v; return this; }
-        public Register divisionCount(int v) { divisionCount = v; return this; }
+        public Register divisionCount(Integer v) { divisionCount = v; return this; }
         public Register holdings(BigDecimal v) { initialHoldings = v; return this; }
         public Register avgPrice(BigDecimal v) { initialAvgPrice = v; return this; }
         public Register intervalWeeks(Integer v) { intervalWeeks = v; return this; }

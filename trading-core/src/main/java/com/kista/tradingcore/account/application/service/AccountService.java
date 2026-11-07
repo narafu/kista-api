@@ -43,7 +43,7 @@ class AccountService implements AccountUseCase {
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // Toss accountSeq 조회 HTTP 호출 포함 — 트랜잭션 없이 실행 (단건 저장은 JPA auto-commit)
     public Account register(UUID userId, RegisterAccountCommand cmd) {
         // broker 미지정 시 KIS 기본값 적용 후 신규 등록 정책을 확인한다.
-        Broker broker = cmd.broker() != null ? cmd.broker() : Broker.KIS;
+        Broker broker = brokerOrDefault(cmd.broker());
         requireBrokerEnabled(broker);
 
         // MOCK은 서버가 합성 자격증명 생성, 키 전용 브로커(계좌번호 없음)는 키만, 그 외 브로커는 계좌번호 필수
@@ -170,9 +170,15 @@ class AccountService implements AccountUseCase {
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 API 호출 — 트랜잭션 불필요
-    public void test(Broker broker, String appKey, String appSecret) {
+    public void test(Broker requestedBroker, String appKey, String appSecret) {
+        Broker broker = brokerOrDefault(requestedBroker); // 미지정 시 KIS — 등록(register)과 같은 기본값
         requireBrokerEnabled(broker);
         connectionTesters.of(broker).verifyCredentials(appKey, appSecret);
+    }
+
+    // broker 미지정 기본값(KIS) — 등록·연결 테스트 공용
+    private static Broker brokerOrDefault(Broker broker) {
+        return broker != null ? broker : Broker.KIS;
     }
 
     private void requireBrokerEnabled(Broker broker) {

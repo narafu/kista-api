@@ -14,7 +14,7 @@ public record RegisterStrategyCommand(
         StrategyTicker ticker,                      // null이면 전략 기본값
         BigDecimal initialUsdDeposit,                // null 허용 (선택 입력), VR에서는 예수금(초기 pool)으로 재사용
         StrategyCycleSeedType cycleSeedType,        // null이면 NONE으로 처리
-        int divisionCount,                           // 분할 수 (20/30/40), 0은 미입력 sentinel로 런타임 기본값 적용
+        Integer divisionCount,                       // 분할 수 (20/30/40), null이면 런타임 기본값 적용 (INFINITE 전용)
         // 중간부터 시작 — 기존 보유 수량·평단가 (세 전략 공통, null/0이면 빈 포지션에서 시작)
         BigDecimal initialHoldings,                   // 등록 시점 기존 보유 수량 (주식 정수, 코인 소수 8자리까지)
         BigDecimal initialAvgPrice,                   // 등록 시점 기존 평단가 (initialHoldings>0이면 필수)

@@ -62,10 +62,10 @@ public record TradingCycleRequest(
 ) {
     public RegisterStrategyCommand toRegisterCommand() {
         return new RegisterStrategyCommand(type, ticker, initialUsdDeposit, cycleSeedType,
-                divisionCount != null ? divisionCount : 0,
+                divisionCount,
                 initialHoldings, initialAvgPrice,
                 intervalWeeks, bandWidth,
-                recurringAmount != null ? recurringAmount : 0,
+                recurringAmount,
                 new VrRampInput(initialGradient, gGraceWeeks, gStepWeeks, gMax,
                         initialPoolLimitRate, pGraceWeeks, pStepWeeks, poolLimitFloor),
                 scheduledStartDate, initialVrValue,

@@ -73,10 +73,10 @@ class TradingPolicySettingsTest {
     void fieldRequiresAllowedDefaultAndSingleValueWhenFixed() {
         assertThatThrownBy(() -> new StrategyFieldSettings<>(true, List.of(10, 20), 30))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("default");
+                .hasMessageContaining("기본값은 허용 값");
         assertThatThrownBy(() -> new StrategyFieldSettings<>(false, List.of(10, 20), 10))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-customizable");
+                .hasMessageContaining("허용 값이 정확히 하나");
     }
 
     @Test
@@ -86,7 +86,7 @@ class TradingPolicySettingsTest {
         assertThat(field.resolve(null)).isEqualTo("SOXL");
         assertThatThrownBy(() -> field.resolve("TQQQ"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("non-customizable");
+                .hasMessageContaining("기본값만 허용");
     }
 
     @Test

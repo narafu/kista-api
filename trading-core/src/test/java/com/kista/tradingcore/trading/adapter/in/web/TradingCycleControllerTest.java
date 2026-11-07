@@ -371,7 +371,7 @@ class TradingCycleControllerTest {
     }
 
     @Test
-    void register_omittedDivisionCount_passesRuntimeDefaultSentinel() throws Exception {
+    void register_omittedDivisionCount_passesNullToResolver() throws Exception {
         Strategy strategy = new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE,
                 StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
         StrategyDetail detail = new StrategyDetail(strategy, BigDecimal.ZERO, LocalDate.now(), 30, false, 0.0, 0, null, null, true, null);
@@ -387,7 +387,7 @@ class TradingCycleControllerTest {
                 .andExpect(jsonPath("$.divisionCount").value(30));
 
         verify(tradingCycle).register(eq(USER_ID), eq(ACCOUNT_ID),
-                argThat((RegisterStrategyCommand command) -> command.divisionCount() == 0));
+                argThat((RegisterStrategyCommand command) -> command.divisionCount() == null));
     }
 
     @Test

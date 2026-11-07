@@ -66,14 +66,13 @@ class StrategyCreationPersister {
 
         // strategy_cycles → cycle_positions → 전략 타입별 cycle_detail 순 저장
         // startAmount 산출 규칙은 호출부(StrategyCreationService) 소유
-        BigDecimal normalizedInitialUsdDeposit = d.initialUsdDeposit() != null ? d.initialUsdDeposit() : BigDecimal.ZERO;
         StrategyCycle cycle = strategyCyclePort.save(StrategyCycle.start(saved.id(), version.id(), d.startAmount(), d.scheduledStart()));
 
         // DCA는 marketPrice 없음(closingPrice null) — 시작 원장 = 초기 보유·평단, 예수금 0
         CyclePosition initialPosition = d.initialHoldings().signum() > 0
                 ? cyclePositionPort.save(CyclePosition.bootstrapSnapshot(
-                        cycle.id(), normalizedInitialUsdDeposit, d.initialHoldings(), d.initialAvgPrice(), d.marketPrice()))
-                : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), normalizedInitialUsdDeposit));
+                        cycle.id(), d.initialUsdDeposit(), d.initialHoldings(), d.initialAvgPrice(), d.marketPrice()))
+                : cyclePositionPort.save(CyclePosition.initialSnapshot(cycle.id(), d.initialUsdDeposit()));
 
         switch (saved.type()) {
             case INFINITE -> cyclePositionInfiniteDetailPort.save(new CyclePositionInfiniteDetail(initialPosition.id(), false));

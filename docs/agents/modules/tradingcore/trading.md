@@ -68,7 +68,7 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 정책 값은 `trading.trading_runtime_settings`(`TradingPolicyService`가 소유)에 있고, root admin `GET|PUT /api/admin/settings`가 내부 API로 조회·교체한다(엔드포인트 규칙 → `modules/api/admin.md` "런타임 설정 API 규칙").
 - `brokers.<broker>.enabled=false`이면 해당 증권사의 신규 계좌 등록과 연결 테스트를 외부 API 호출 전에 400으로 차단. 기존 계좌의 조회·수정·매매는 영향받지 않음
 - `StrategyService.register()`(정책 조회는 `StrategyCreationService`가 `StrategyCreationPolicyPort`로)는 신규 전략에만 `strategies.<type>` 생성 정책을 적용: `enabled=false`면 400으로 차단하고, ticker·INFINITE divisionCount·VR recurringMode/bandWidth/intervalWeeks의 생략 기본값과 허용/고정값을 검증. 기존 전략 수정·실행에는 소급 적용하지 않음
-- `RegisterStrategyCommand.divisionCount=0`은 INFINITE 신규 등록의 미입력 sentinel이며 런타임 기본값으로 치환. VR `recurringMode`는 `recurringAmount` 부호(DEPOSIT/HOLD/WITHDRAW)로만 검증하고 금액 크기는 기존 VR 자산 규칙에 맡김. `recurringMode.customizable=false` 설정은 기본값과 유일한 허용값이 모두 `HOLD`여야 함
+- `RegisterStrategyCommand.divisionCount=null`은 INFINITE 신규 등록의 미입력이며 `InfiniteCreationResolver`가 런타임 기본값으로 치환한다(명시적 0은 허용값이 아니라 400). VR `recurringAmount` 생략도 null로 넘어가 `VrCreationResolver`가 정책 기본 `recurringMode`로 정한다(HOLD면 0, 그 외는 400). VR `recurringMode`는 `recurringAmount` 부호(DEPOSIT/HOLD/WITHDRAW)로만 검증하고 금액 크기는 기존 VR 자산 규칙에 맡김. `recurringMode.customizable=false` 설정은 기본값과 유일한 허용값이 모두 `HOLD`여야 함
 
 ### DCA 실행 → dca.md (필수 Read)
 

@@ -12,14 +12,15 @@ import com.kista.shared.kernel.StrategyType;
 class TradingCycleRequestTest {
 
     @Test
-    void omittedDivisionCountMapsToCommandSentinel() {
+    void omittedDivisionCountAndRecurringAmountStayNull() {
         TradingCycleRequest request = new TradingCycleRequest(
                 StrategyType.INFINITE, null, null, null, null,
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null);
 
-        assertThat(request.toRegisterCommand().divisionCount()).isZero();
+        assertThat(request.toRegisterCommand().divisionCount()).isNull();
+        assertThat(request.toRegisterCommand().recurringAmount()).isNull();
     }
 
     @Test

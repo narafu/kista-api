@@ -14,10 +14,10 @@ public record StrategyFieldSettings<T>(
         allowedValues = List.copyOf(Objects.requireNonNull(allowedValues, "allowedValues"));
         Objects.requireNonNull(defaultValue, "defaultValue");
         if (allowedValues.isEmpty() || allowedValues.stream().noneMatch(v -> valuesEqual(v, defaultValue))) {
-            throw new IllegalArgumentException("default value must be included in allowed values");
+            throw new IllegalArgumentException("기본값은 허용 값 목록에 포함되어야 합니다.");
         }
         if (!customizable && allowedValues.size() != 1) {
-            throw new IllegalArgumentException("non-customizable field must have exactly one allowed value");
+            throw new IllegalArgumentException("변경할 수 없는 필드는 허용 값이 정확히 하나여야 합니다.");
         }
     }
 
@@ -26,10 +26,10 @@ public record StrategyFieldSettings<T>(
             return defaultValue;
         }
         if (!customizable && !valuesEqual(defaultValue, requestedValue)) {
-            throw new IllegalArgumentException("non-customizable field only accepts its default value");
+            throw new IllegalArgumentException("변경할 수 없는 필드는 기본값만 허용합니다.");
         }
         if (allowedValues.stream().noneMatch(v -> valuesEqual(v, requestedValue))) {
-            throw new IllegalArgumentException("value is not allowed: " + requestedValue);
+            throw new IllegalArgumentException("허용되지 않는 값(" + requestedValue + ")입니다.");
         }
         return requestedValue;
     }
