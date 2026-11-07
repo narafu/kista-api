@@ -185,6 +185,16 @@ class CapitalInjectionServiceTest {
     }
 
     @Test
+    void sharesOnly_avgRoundsDirectlyToScale2() {
+        stub(StrategyType.PRIVACY, BigDecimal.valueOf(199), new BigDecimal("45.12"), null);
+
+        service.inject(strategyId, userId, new InjectCapitalCommand(null, 1, new BigDecimal("46.11")));
+
+        // (199×45.12 + 46.11) / 200 = 45.12495 → 4자리 선반올림 45.1250 경유 금지
+        assertThat(updatedBalance().avgPrice()).isEqualTo(new BigDecimal("45.12"));
+    }
+
+    @Test
     void sharesFromZeroHoldings_avgEqualsSharePrice() {
         stub(StrategyType.PRIVACY, BigDecimal.ZERO, null, null);
 
@@ -204,7 +214,7 @@ class CapitalInjectionServiceTest {
         AccountBalance p = updatedBalance();
         assertThat(p.usdDeposit()).isEqualByComparingTo("600.00");
         assertThat(p.holdings()).isEqualByComparingTo("15");
-        assertThat(p.avgPrice()).isEqualByComparingTo("26.6667"); // (200 + 200) / 15
+        assertThat(p.avgPrice()).isEqualByComparingTo("26.67"); // (200 + 200) / 15 = 26.666… → scale 2 HALF_UP
         verify(strategyCyclePort).updateStartAmount(cycleId, new BigDecimal("1300.00")); // 1000 + 100 + 5×40
     }
 

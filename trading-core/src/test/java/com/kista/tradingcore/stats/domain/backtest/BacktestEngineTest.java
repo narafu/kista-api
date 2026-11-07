@@ -512,14 +512,14 @@ class BacktestEngineTest {
                 "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03",
                 "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
 
-        // 4일차: 캡 보정 매수 2주가 종가 85에 체결 → 6주·평단 91.6667·예수금 450 → 매입금 550 ÷ 250.00 = 2.2회차 (≥ 2.0) → 후반
+        // 4일차: 캡 보정 매수 2주가 종가 85에 체결 → 6주·평단 91.67(550÷6 scale 2)·예수금 450 → 매입금 550 ÷ 250.00 = 2.2회차 (≥ 2.0) → 후반
         Recorded late = recorder.on("2024-01-04");
         assertThat(late.position(4).currentRound()).isEqualTo(2.2);
         assertThat(late.position(4).isEarlyStage()).isFalse();
         assertThat(late.legs()).containsExactly("INFINITE_LATE_REF_BUY", "INFINITE_CORRECTION_01", "INFINITE_CORRECTION_02", "INFINITE_CORRECTION_03", "INFINITE_LOC_SELL", "INFINITE_LIMIT_SELL");
-        // 후반 매수 = 단위금액 250.00 ÷ 기준가 89.83 내림 = 2주 (기준가 = 평단 91.6667 × (1 − 0.02), offset = 0.15×(1−2×2.2/4) = −0.015 → −0.02)
+        // 후반 매수 = 단위금액 250.00 ÷ 기준가 89.84 내림 = 2주 (기준가 = 평단 91.67 × (1 − 0.02) = 89.8366, offset = 0.15×(1−2×2.2/4) = −0.015 → −0.02)
         assertThat(late.orders().getFirst().quantity()).isEqualTo(2);
-        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("89.83");
+        assertThat(late.orders().getFirst().price()).isEqualByComparingTo("89.84");
 
         // 5일차 종가 80에 캡(85×1.05=89.25) 보정 매수 3주 체결 → 예수금 450 − 240 = 210 + 9주×80 = 930
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("930");

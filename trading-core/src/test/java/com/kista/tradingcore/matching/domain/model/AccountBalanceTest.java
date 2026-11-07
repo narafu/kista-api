@@ -55,6 +55,18 @@ class AccountBalanceTest {
     }
 
     @Test
+    @DisplayName("평단가 경계 — 원값 45.12495는 scale 2 HALF_UP으로 바로 45.12 (4자리 선반올림 45.1250 경유 금지)")
+    void avgPrice_roundsDirectlyToScale2() {
+        // (199×45.12 + 1×46.11) / 200 = 9024.99 / 200 = 45.12495
+        AccountBalance balance = new AccountBalance(199, new BigDecimal("45.12"), new BigDecimal("1000"));
+        AccountBalance result = balance.applyExecutions(List.of(buy(1, "46.11")));
+        assertThat(result.avgPrice()).isEqualTo(new BigDecimal("45.12"));
+        // 정상 케이스: (10×20 + 10×30) / 20 = 25 → 25.00
+        assertThat(new AccountBalance(10, new BigDecimal("20.00"), new BigDecimal("1000"))
+                .applyExecutions(List.of(buy(10, "30.00"))).avgPrice()).isEqualTo(new BigDecimal("25.00"));
+    }
+
+    @Test
     @DisplayName("빈 체결 목록 — 잔고 그대로 반환")
     void emptyExecutions_returnsUnchanged() {
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("5000"));
@@ -69,9 +81,9 @@ class AccountBalanceTest {
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("10000"));
         AccountBalance result = balance.applyExecutions(List.of(buy(50, "30.00")));
 
-        // (100*25 + 50*30) / 150 = 4000 / 150 = 26.6667
+        // (100*25 + 50*30) / 150 = 4000 / 150 = 26.666… → 26.67 (scale 2 HALF_UP)
         assertThat(result.holdings()).isEqualByComparingTo("150");
-        assertThat(result.avgPrice()).isEqualByComparingTo("26.6667");
+        assertThat(result.avgPrice()).isEqualByComparingTo("26.67");
     }
 
     @Test
@@ -100,12 +112,12 @@ class AccountBalanceTest {
     void sellThenBuySameDay_correctAvg() {
         // holdings=100 @ $25, 매도 50 + 매수 30 @ $30
         // 매도 후: 50주 @ $25 (cost=$1250)
-        // 매수 후: (1250 + 30*30) / 80 = (1250+900)/80 = 26.875
+        // 매수 후: (1250 + 30*30) / 80 = (1250+900)/80 = 26.875 → 26.88 (scale 2 HALF_UP)
         AccountBalance balance = new AccountBalance(100, new BigDecimal("25.00"), new BigDecimal("5000"));
         AccountBalance result = balance.applyExecutions(List.of(sell(50, "30.00"), buy(30, "30.00")));
 
         assertThat(result.holdings()).isEqualByComparingTo("80");
-        assertThat(result.avgPrice()).isEqualByComparingTo("26.8750");
+        assertThat(result.avgPrice()).isEqualByComparingTo("26.88");
     }
 
     @Test
@@ -131,8 +143,8 @@ class AccountBalanceTest {
         AccountBalance result = new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO)
                 .applyExecutions(List.of(fillWithAmount(OrderDirection.BUY, "0.00123", "100000")));
         assertThat(result.holdings()).isEqualByComparingTo("0.00123");
-        // 체결금액 100000 / 0.00123 = 81300813.0081
-        assertThat(result.avgPrice()).isEqualByComparingTo("81300813.0081");
+        // 체결금액 100000 / 0.00123 = 81300813.00813… → 81300813.01 (scale 2 HALF_UP)
+        assertThat(result.avgPrice()).isEqualByComparingTo("81300813.01");
     }
 
     @Test

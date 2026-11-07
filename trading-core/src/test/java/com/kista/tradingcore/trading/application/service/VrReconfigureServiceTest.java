@@ -200,9 +200,9 @@ class VrReconfigureServiceTest {
         CapturedCall captured = captureReconfigureCall();
         // newHoldings = 기존 10 + 5 = 15
         assertThat(captured.postBalance().wholeShares()).isEqualTo(15);
-        // 가중평균: (50.00×10 + 60.00×5) / 15 = 800.00/15 = 53.3333 (scale4 HALF_UP)
+        // 가중평균: (50.00×10 + 60.00×5) / 15 = 800.00/15 = 53.33 (scale 2 HALF_UP)
         BigDecimal expectedAvgPrice = new BigDecimal("500.00").add(new BigDecimal("300.00"))
-                .divide(BigDecimal.valueOf(15), 4, java.math.RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(15), 2, java.math.RoundingMode.HALF_UP);
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(expectedAvgPrice);
         // V += 5 × 120.00 = 600.00 → 1000.00 + 600.00 = 1600.00
         assertThat(captured.newValue()).isEqualByComparingTo("1600.00");
@@ -306,6 +306,20 @@ class VrReconfigureServiceTest {
     }
 
     @Test
+    @DisplayName("수량 주입 평단가 경계: 원값 45.12495 → scale 2 HALF_UP 45.12 (4자리 선반올림 경유 금지)")
+    void reconfigure_injectShares_avgPriceRoundsDirectlyToScale2() {
+        latestPosition = new CyclePosition(UUID.randomUUID(), cycleId,
+                new BigDecimal("500.00"), new BigDecimal("95.00"), new BigDecimal("45.12"), BigDecimal.valueOf(199), null, null);
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = reconfigureVr().injectShares(1, "46.11").build();
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        // (199×45.12 + 46.11) / 200 = 45.12495
+        assertThat(captureReconfigureCall().postBalance().avgPrice()).isEqualTo(new BigDecimal("45.12"));
+    }
+
+    @Test
     @DisplayName("인출 후 주입: 잔여 수량 기준으로 평단가 가중평균 재계산")
     void reconfigure_withdrawThenInject_recomputesAvgPriceFromRemainingShares() {
         stubHappyPathChain();
@@ -319,7 +333,7 @@ class VrReconfigureServiceTest {
         assertThat(captured.postBalance().wholeShares()).isEqualTo(9);
         // 가중평균: (50.00×6 + 60.00×3) / 9 = (300.00+180.00)/9 = 480.00/9
         BigDecimal expectedAvgPrice = new BigDecimal("300.00").add(new BigDecimal("180.00"))
-                .divide(BigDecimal.valueOf(9), 4, java.math.RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(9), 2, java.math.RoundingMode.HALF_UP);
         assertThat(captured.postBalance().avgPrice()).isEqualByComparingTo(expectedAvgPrice);
     }
 

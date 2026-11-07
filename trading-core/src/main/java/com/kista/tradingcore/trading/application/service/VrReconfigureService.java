@@ -171,7 +171,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
             BigDecimal injectedCost = cmd.injectSharePrice().multiply(BigDecimal.valueOf(injectShares));
             newAvgPrice = newHoldings == 0
                     ? null
-                    : existingCost.add(injectedCost).divide(BigDecimal.valueOf(newHoldings), 4, RoundingMode.HALF_UP);
+                    : existingCost.add(injectedCost).divide(BigDecimal.valueOf(newHoldings), AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
         } else {
             newAvgPrice = newHoldings == 0 ? null : latestPosition.avgPrice();
         }

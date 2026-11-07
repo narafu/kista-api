@@ -104,7 +104,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
         if (shares > 0) {
             injectedCost = cmd.sharePrice().multiply(sharesBd);
             BigDecimal existingCost = old.avgPrice() != null ? old.avgPrice().multiply(old.holdings()) : BigDecimal.ZERO;
-            newAvg = existingCost.add(injectedCost).divide(newHoldings, 4, RoundingMode.HALF_UP);
+            newAvg = existingCost.add(injectedCost).divide(newHoldings, AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
         }
         AccountBalance newBalance = new AccountBalance(newHoldings, newAvg, old.usdDeposit().add(deposit));
 

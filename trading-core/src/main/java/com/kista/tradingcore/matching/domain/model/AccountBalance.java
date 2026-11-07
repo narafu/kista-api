@@ -81,7 +81,7 @@ public record AccountBalance(
                 ? BigDecimal.ZERO
                 : avgPrice.multiply(holdingsAfterSell);
         BigDecimal newAvgPrice = newHoldings.signum() > 0
-                ? costAfterSell.add(buyAmount).divide(newHoldings, 4, HALF_UP)
+                ? costAfterSell.add(buyAmount).divide(newHoldings, LEDGER_SCALE, HALF_UP)
                 : null;
         BigDecimal newUsdDeposit = usdDeposit.subtract(buyAmount).add(sellAmount);
         return new AccountBalance(newHoldings, newAvgPrice, newUsdDeposit);
