@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit 5, Mockito, AssertJ
 
-**Spec:** `docs/superpowers/specs/2026-11-07-cq33-stats-ledger-consistency-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-07-cq33-stats-ledger-consistency-design.md`
 
 ## Global Constraints
 - 주석은 `//` 인라인만 쓰고 Javadoc은 금지한다. 신규 코드에는 주석을 함께 단다.
