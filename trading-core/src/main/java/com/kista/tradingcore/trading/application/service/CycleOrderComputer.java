@@ -95,9 +95,7 @@ class CycleOrderComputer {
             // poolLimit(달러)은 개장 포지션의 예수금 × 고정 poolLimitRate 스냅샷
             CyclePosition openingPosition = cyclePositionPort.findFirstOne(currentCycle.id())
                     .orElseThrow(() -> new IllegalStateException("VR 시작 포지션이 없습니다."));
-            BigDecimal poolLimit = openingPosition.usdDeposit()
-                    .multiply(cycleVr.poolLimitRate())
-                    .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
+            BigDecimal poolLimit = StrategyVrDetail.poolLimitOf(openingPosition.usdDeposit(), cycleVr.poolLimitRate());
             // referencePrice: bootstrap·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
             BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(

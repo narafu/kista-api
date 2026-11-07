@@ -1,5 +1,7 @@
 package com.kista.tradingcore.matching.domain.model;
 
+import com.kista.shared.kernel.Currency;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.UUID;
@@ -34,6 +36,11 @@ public record StrategyVrDetail(
         }
         long gSteps = (weeks - gGraceWeeks) / gStepWeeks + 1;
         return (int) Math.min(initialGradient + (long) G_STEP * gSteps, gMax);
+    }
+
+    // 사이클 매수 상한(달러) = 개장 예수금 × poolLimitRate (USD 센트 HALF_UP)
+    public static BigDecimal poolLimitOf(BigDecimal openingPool, BigDecimal poolLimitRate) {
+        return openingPool.multiply(poolLimitRate).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }
 
     // poolLimitRateAt: 경과 주수(weeks) 기준 poolLimitRate 값 — 유예 주수 이후 pStepWeeks마다 POOL_LIMIT_STEP씩 하강, poolLimitFloor에서 하한

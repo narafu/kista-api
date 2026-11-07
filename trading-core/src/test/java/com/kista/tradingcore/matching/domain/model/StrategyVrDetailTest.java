@@ -135,4 +135,11 @@ class StrategyVrDetailTest {
         assertThat(detail.gradientAt(0)).isEqualTo(10);
         assertThat(detail.gradientAt(10_000)).isEqualTo(10);
     }
+
+    @Test
+    @DisplayName("poolLimitOf: 개장 예수금 × 비율을 센트 HALF_UP으로 반올림")
+    void poolLimitOf_센트_반올림() {
+        assertThat(StrategyVrDetail.poolLimitOf(new BigDecimal("1000.55"), new BigDecimal("0.75")))
+                .isEqualByComparingTo("750.41");
+    }
 }

@@ -197,7 +197,7 @@ public class BacktestEngine {
         // 새 사이클 시작일 = 평가 기준일(항상 실제 거래일) — 실행일을 쓰면 휴장 due일마다 N주 스케줄이 누적해서 밀린다
         state.cycleStartDate = evaluationCandle.date();
         // 새 사이클의 poolLimit — 자본 조정까지 반영한 개장 예수금 × 램프 재계산 비율
-        state.poolLimit = poolLimitOf(state.balance.usdDeposit(), detail.poolLimitRateAt(weeks));
+        state.poolLimit = StrategyVrDetail.poolLimitOf(state.balance.usdDeposit(), detail.poolLimitRateAt(weeks));
         state.poolUsed = BigDecimal.ZERO;
         state.startNextCycle(state.cycleStartDate);
         state.holdReason = null;
@@ -393,11 +393,6 @@ public class BacktestEngine {
         return candle.close().multiply(BigDecimal.valueOf(holdings));
     }
 
-    // 사이클 매수 상한 = 개장 예수금 × poolLimitRate (scale=2 HALF_UP)
-    private static BigDecimal poolLimitOf(BigDecimal openPool, BigDecimal poolLimitRate) {
-        return openPool.multiply(poolLimitRate).setScale(Currency.USD.amountScale(), HALF_UP);
-    }
-
     // 전략 공통 루프 상태 — 잔고·원금·집계 카운터. 전략별 상태는 서브클래스가 얹는다
     private static class DayState {
         AccountBalance balance;   // 현재 잔고
@@ -500,7 +495,7 @@ public class BacktestEngine {
             this.value = initialVrValue(command, firstCandle.close());
             this.firstCycleStartDate = firstCandle.date();
             this.cycleStartDate = firstCandle.date();
-            this.poolLimit = poolLimitOf(command.seedOrZero(), detail.poolLimitRateAt(0));
+            this.poolLimit = StrategyVrDetail.poolLimitOf(command.seedOrZero(), detail.poolLimitRateAt(0));
         }
 
         // 공통 체결 반영에 이번 사이클 매수 사용액 누계를 덧붙인다
