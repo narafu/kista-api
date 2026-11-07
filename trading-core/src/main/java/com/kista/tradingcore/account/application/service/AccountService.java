@@ -150,7 +150,7 @@ class AccountService implements AccountUseCase {
         if (openOrderCancelPort.cancelOpenOrders(account) > 0) {
             throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 계좌를 삭제할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
         }
-        deletionWriter.delete(accountId);
+        deletionWriter.delete(accountId, account.userId());
         log.info("[accountId={}] 계좌 삭제: requesterId={}", accountId, requesterId);
     }
 

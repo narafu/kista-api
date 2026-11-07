@@ -14,6 +14,7 @@ import com.kista.tradingcore.matching.domain.model.*;
 import com.kista.shared.kernel.RecurringMode;
 import com.kista.shared.kernel.StrategyCreationSettings;
 import com.kista.shared.kernel.StrategyFieldSettings;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.StrategyCreationPolicyPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort; import com.kista.tradingcore.trading.application.port.output.*;
 import com.kista.tradingcore.broker.application.port.output.BrokerPricePort;
@@ -1131,6 +1132,7 @@ class StrategyServiceTest {
                 commandFor(StrategyType.INFINITE, null, null, null, null, null));
 
         verify(accountPort, times(1)).requireOwnedAccount(ACCOUNT_ID, USER_ID);
+        verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(USER_ID)); // stats 캐시 무효화
         when(strategyPort.findByIdOrThrow(registered.strategy().id())).thenReturn(registered.strategy());
         assertThat(strategyService.getById(registered.strategy().id(), USER_ID)).isEqualTo(registered);
     }

@@ -141,6 +141,7 @@ class VrCycleRolloverService {
         }
 
         // 사이클 종료 — 종료금액=마감 후 예수금+보유분 종가 평가액, 종료일자=evaluationDate(due일 기준 실제 거래일 — 배치 실행일 아님)
+        // ponytail: 평가일 종가 × 실행일 매매 후 잔고 — 롤오버가 지연되면 그 사이 체결이 옛 사이클 평가에 섞인다. 정확히 하려면 평가일 이후 체결을 역산해 평가일 잔고를 재구성
         BigDecimal endAmount = postBalance.usdDeposit().add(evaluation)
                 .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         strategyCyclePort.markEnded(cycle.id(), endAmount, evaluationDate);

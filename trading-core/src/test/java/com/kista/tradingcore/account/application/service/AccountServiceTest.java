@@ -299,7 +299,7 @@ class AccountServiceTest {
 
         verify(accountPort).delete(accountId);
         verify(accountTokenEvictionPort).evict(List.of(accountId));
-        verify(eventPublisher).publishEvent(new AccountDeletedEvent(accountId));
+        verify(eventPublisher).publishEvent(new AccountDeletedEvent(accountId, userId));
     }
 
     @Test

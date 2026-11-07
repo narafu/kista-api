@@ -125,6 +125,26 @@ class TradingStatsServiceTest {
     }
 
     @Test
+    void winRate_excludesBreakEvenCycles() {
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
+                closedCycle("1000.00", "1010.00", "2026-01-01", "2026-01-31"),
+                closedCycle("1000.00", "990.00", "2026-02-01", "2026-02-11"),
+                closedCycle("1000.00", "1000.00", "2026-03-01", "2026-03-11")));
+
+        assertThat(statsService.getSummary(USER_ID).byType().getFirst().winRate()).isEqualByComparingTo("0.5000");
+    }
+
+    @Test
+    void winRate_nullWhenAllBreakEven() {
+        stubUserWithStrategy();
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(
+                closedCycle("1000.00", "1000.00", "2026-01-01", "2026-01-31")));
+
+        assertThat(statsService.getSummary(USER_ID).byType().getFirst().winRate()).isNull();
+    }
+
+    @Test
     void 진행_중_사이클은_최신_스냅샷으로_미실현손익을_계산한다() {
         stubUserWithStrategy();
         StrategyCycle active = new StrategyCycle(UUID.randomUUID(), STRATEGY_ID, null,
@@ -447,6 +467,43 @@ class TradingStatsServiceTest {
         assertThat(curve.points().get(1).totalAsset()).isEqualByComparingTo("1200.00"); // 06-02: 새 700 + surplus 500
         assertThat(curve.points().get(1).principal()).isEqualByComparingTo("1000.00");
         assertThat(curve.points().get(2).totalAsset()).isEqualByComparingTo("1220.00");
+    }
+
+    @Test
+    void delayedRollover_carriesOldCycleUntilSuccessorSnapshot() {
+        stubUserWithStrategy();
+        // 지연 롤오버: A는 06-01에 종료, B(후속)의 첫 스냅샷은 06-03 — 06-02는 A를 이어 쓴다
+        StrategyCycle a = cycleOf("1000", "1100", "2026-05-01", "2026-06-01");
+        StrategyCycle b = cycleOf("1100", null, "2026-06-01", null);
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(a, b));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                depositSnapshot(a.id(), "1100", "2026-05-31T01:00:00Z"),
+                depositSnapshot(UUID.randomUUID(), "1", "2026-06-02T01:00:00Z"), // 06-02 점을 만들기 위한 미지 사이클
+                depositSnapshot(b.id(), "1100", "2026-06-03T01:00:00Z")));
+
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+
+        assertThat(points).hasSize(3);
+        assertThat(points.get(1).totalAsset()).isEqualByComparingTo("1100.00");
+        assertThat(points.get(1).principal()).isEqualByComparingTo("1000.00");
+        // 교체일 연속: B 자산 1100 + surplus 0, 원금 1100 - realized 100 + surplus 0
+        assertThat(points.get(2).totalAsset()).isEqualByComparingTo("1100.00");
+        assertThat(points.get(2).principal()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void endedCycleWithoutSuccessor_dropsAfterEndDate() {
+        stubUserWithStrategy();
+        StrategyCycle a = cycleOf("1000", "1100", "2026-05-01", "2026-06-01");
+        when(strategyCyclePort.findByStrategyIds(any())).thenReturn(List.of(a));
+        when(cyclePositionPort.findByCycleIdsAndRange(any(), any(), any())).thenReturn(List.of(
+                depositSnapshot(a.id(), "1100", "2026-05-31T01:00:00Z"),
+                depositSnapshot(UUID.randomUUID(), "1", "2026-06-02T01:00:00Z"))); // 다른 전략 스냅샷으로 06-02 점 생성
+
+        List<EquityPoint> points = statsService.getEquityCurve(USER_ID, null, null, LocalDate.parse("2026-06-30")).points();
+
+        assertThat(points.getLast().totalAsset()).isEqualByComparingTo("0.00");
+        assertThat(points.getLast().principal()).isEqualByComparingTo("0.00");
     }
 
     // 체인 곡선 검증 — cycles를 생성 순서로 두고 각 사이클 스냅샷 1개씩(deposit)을 날짜별로 준 뒤 마지막 점을 돌려준다

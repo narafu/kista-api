@@ -1,10 +1,12 @@
 package com.kista.tradingcore.trading.adapter.in.event;
 
 import com.kista.tradingcore.account.application.event.AccountDeletedEvent;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class AccountCascadeListener {
     private final CyclePositionPort cyclePositionPort;
     private final StrategyCyclePort strategyCyclePort;
     private final StrategyPort strategyPort;
+    private final ApplicationEventPublisher eventPublisher; // stats 캐시 무효화 이벤트 발행
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -30,5 +33,9 @@ public class AccountCascadeListener {
         cyclePositionPort.deleteByAccountId(event.accountId());
         strategyCyclePort.deleteByAccountId(event.accountId());
         strategyPort.deleteByAccountId(event.accountId());
+        // 삭제된 계좌의 전략이 stats 캐시에 남지 않도록 무효화
+        if (event.userId() != null) {
+            eventPublisher.publishEvent(new StrategyCapitalChangedEvent(event.userId()));
+        } // else: 배포 전 EPR 잔여 이벤트 — userId 없음, 5분 TTL로 수렴
     }
 }

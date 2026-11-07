@@ -18,6 +18,7 @@ import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.support.StubBrokerApiException;
 import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -197,6 +198,7 @@ class CryptoOrderSynchronizerTest {
         verifyFill(o, new BigDecimal("0.0001"), new BigDecimal("150000000"), "15000");
         ArgumentCaptor<CryptoOrderFilledEvent> cap = ArgumentCaptor.forClass(CryptoOrderFilledEvent.class);
         verify(publisher).publishEvent(cap.capture());
+        verify(publisher).publishEvent(new StrategyCapitalChangedEvent(ctx.account().userId())); // stats 캐시 무효화
         assertThat(cap.getValue().amount()).isEqualByComparingTo("15000");
         assertThat(cap.getValue().currency()).isEqualTo(Currency.KRW);
         assertThat(cap.getValue().strategyId()).isEqualTo(ctx.strategy().id());

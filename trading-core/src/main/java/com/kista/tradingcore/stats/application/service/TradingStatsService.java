@@ -278,9 +278,13 @@ class TradingStatsService implements TradingStatsUseCase {
         BigDecimal avgReturnRate = null;
         BigDecimal avgDurationDays = null;
         if (!closed.isEmpty()) {
+            // 승률 = 수익 / (수익 + 손실) — 본전(손익 0) 사이클은 분자·분모에서 뺀다. 전부 본전이면 null
             long wins = closed.stream().filter(v -> v.realizedPnl().signum() > 0).count();
-            winRate = BigDecimal.valueOf(wins)
-                    .divide(BigDecimal.valueOf(closed.size()), 4, RoundingMode.HALF_UP);
+            long losses = closed.stream().filter(v -> v.realizedPnl().signum() < 0).count();
+            if (wins + losses > 0) {
+                winRate = BigDecimal.valueOf(wins)
+                        .divide(BigDecimal.valueOf(wins + losses), 4, RoundingMode.HALF_UP);
+            }
             // 원금이 0 이하인 사이클(VR 적립식 등)은 수익률 계산에서 제외한다.
             List<CycleView> returnable = closed.stream()
                     .filter(v -> v.principal().signum() > 0)
@@ -312,12 +316,20 @@ class TradingStatsService implements TradingStatsUseCase {
 
     // 날짜(KST)별 사이클 최신 스냅샷 carry-forward 합산.
     // 사이클 종료일 이후, 또는 같은 전략의 후속 사이클 스냅샷이 생긴 날부터는 해당 사이클을 자산·원금에서 제외한다.
+    // 롤오버·회전으로 후속 사이클이 있는 종료 사이클은 후속 스냅샷이 나타날 때까지 마지막 값을 이어 쓴다(지연 롤오버 공백 방지).
     // 단 교체된 앞선 사이클의 손익이 사라지지 않도록 체인 보정(ChainAdjustment)을 최신 사이클에 더한다.
     // 체인은 latest에 들어온 같은 전략 사이클(positions는 전체 범위 조회라 과거 스냅샷이 모두 있다)이고, 사이클 메타는 cycleById(전체 사이클)에서 읽는다.
     private List<EquityPoint> buildPoints(List<CycleView> cycles, List<CyclePosition> positions,
                                           LocalDate from, LocalDate to) {
         Map<UUID, CycleView> cycleById = cycles.stream()
                 .collect(Collectors.toMap(v -> v.cycle().id(), Function.identity()));
+
+        // 후속 사이클이 있는 사이클 id — 전략별로 가장 나중 사이클을 뺀 나머지
+        Set<UUID> hasSuccessor = new HashSet<>();
+        cycles.stream().collect(Collectors.groupingBy(v -> v.cycle().strategyId())).values().forEach(group -> {
+            List<StrategyCycle> sorted = group.stream().map(CycleView::cycle).sorted(NEWER_CYCLE).toList();
+            sorted.subList(0, sorted.size() - 1).forEach(c -> hasSuccessor.add(c.id()));
+        });
 
         // positions는 created_at 오름차순 — 날짜별로 사이클당 마지막 스냅샷이 남는다
         TreeMap<LocalDate, Map<UUID, CyclePosition>> byDate = new TreeMap<>();
@@ -350,7 +362,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 CycleView view = cycleById.get(posEntry.getKey());
                 if (view == null) continue;
                 LocalDate endDate = view.cycle().endDate();
-                if (endDate != null && date.isAfter(endDate)) continue; // 종료 사이클 탈락
+                if (endDate != null && date.isAfter(endDate) && !hasSuccessor.contains(view.cycle().id())) continue; // 후속 없는 종료 사이클 탈락
                 if (!view.cycle().id().equals(chains.get(view.cycle().strategyId()).last().id())) continue; // 후속 사이클이 있으면 탈락
                 asset = asset.add(posEntry.getValue().totalAssetWithAvgPriceFallback());
                 principal = principal.add(view.principalOn(date));

@@ -22,10 +22,10 @@ class AccountDeletionWriter {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public void delete(UUID accountId) {
+    public void delete(UUID accountId, UUID userId) {
         accountTokenEvictionPort.evict(List.of(accountId));
         accountPort.delete(accountId);
         // 커밋 후 발행 — trading 리스너가 전략·사이클·포지션을 독립적으로 정리(EPR 재시도 보장)
-        eventPublisher.publishEvent(new AccountDeletedEvent(accountId));
+        eventPublisher.publishEvent(new AccountDeletedEvent(accountId, userId));
     }
 }

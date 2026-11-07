@@ -9,6 +9,7 @@ import com.kista.tradingcore.broker.domain.model.CryptoOrderResult;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.tradingcore.trading.application.event.CryptoOrderFilledEvent;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.domain.model.BatchContext;
 import com.kista.tradingcore.trading.domain.model.Order;
@@ -121,6 +122,7 @@ class CryptoOrderSynchronizer {
             }
             Currency currency = ctx.account().brokerRef().broker().getCurrency();
             if (!ledgerRecorder.recordFill(ctx, order, r.netExecutedVolume(), r.avgPrice(), quoteAmount(order, r, volume, currency))) return; // 이미 반영된 체결 — 알림 중복 방지
+            eventPublisher.publishEvent(new StrategyCapitalChangedEvent(ctx.account().userId())); // 원장 변경 — stats 캐시 무효화
             // 체결 금액은 계좌 통화 자릿수로 반올림
             eventPublisher.publishEvent(new CryptoOrderFilledEvent(ctx.account().userId(), ctx.account().id(), ctx.strategy().id(),
                     ctx.account().nickname(), order.ticker(), order.direction(), volume, r.avgPrice(),

@@ -10,7 +10,7 @@ public record StrategyTypeStats(
         StrategyType type,
         int closedCycleCount,
         int activeCycleCount,
-        BigDecimal winRate,         // 수익 사이클 비율 0~1 (scale 4)
+        BigDecimal winRate,         // 수익 사이클 비율 0~1 (본전 제외, scale 4)
         BigDecimal avgReturnRate,   // 평균 수익률 (scale 4)
         BigDecimal avgDurationDays, // 평균 소요일 (scale 1)
         BigDecimal realizedPnl,     // 누적 실현손익 USD

@@ -60,7 +60,9 @@ class StrategyService implements StrategyUseCase {
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public StrategyDetail register(UUID userId, UUID accountId, RegisterStrategyCommand cmd) {
-        return creationService.register(userId, accountId, cmd);
+        StrategyDetail detail = creationService.register(userId, accountId, cmd);
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(userId)); // 신규 전략 등록 — stats 캐시 무효화
+        return detail;
     }
 
     @Override

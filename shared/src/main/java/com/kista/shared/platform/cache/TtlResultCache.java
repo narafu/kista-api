@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -20,6 +21,7 @@ public class TtlResultCache {
     private final Clock clock; // TTL 만료 판정용 시계 — 테스트에서 고정 Clock 주입 (TossRedisTokenStore 패턴)
     private final ConcurrentMap<Object, Entry> cache = new ConcurrentHashMap<>();
     private final ReentrantLock[] stripes = createStripes(); // 키 해시로 매핑하는 고정 크기 락 배열 — 무한 증가·제거 레이스 없음
+    private final AtomicLong generation = new AtomicLong(); // 무효화 세대 — 계산 도중 무효화됐으면 그 결과는 캐시하지 않는다
 
     public TtlResultCache(Clock clock) {
         this.clock = clock;
@@ -63,12 +65,19 @@ public class TtlResultCache {
             if (doubleChecked != null) {
                 return doubleChecked;
             }
+            long gen = generation.get();
             V fresh = loader.get();
             if (fresh == null) {
                 return null; // null 결과는 캐시하지 않음 — 일시 실패가 TTL 동안 고착되는 것 방지
             }
             cleanupIfNeeded();
-            cache.put(key, new Entry(fresh, clock.instant().plus(ttl)));
+            Entry entry = new Entry(fresh, clock.instant().plus(ttl));
+            cache.put(key, entry);
+            // 계산 시작 뒤 무효화가 있었으면(put 직전 포함 — invalidateIf는 락 없음) 방금 넣은 항목을 되돌린다
+            // ponytail: 인스턴스 전역 세대 — 무효화 순간 진행 중이던 다른 키 결과도 한 번 캐시 생략, 무효화가 잦아지면 키별 세대로
+            if (generation.get() != gen) {
+                cache.remove(key, entry);
+            }
             return fresh;
         } finally {
             lock.unlock();
@@ -77,6 +86,7 @@ public class TtlResultCache {
 
     // 조건에 맞는 키만 즉시 제거 — 사용자 단위 무효화(체결 직후 stale 방지)용. 전체 clear는 제공하지 않는다
     public void invalidateIf(Predicate<Object> keyFilter) {
+        generation.incrementAndGet(); // removeIf 전에 세대를 올려 진행 중 계산 결과의 put을 막는다
         cache.keySet().removeIf(keyFilter);
     }
 

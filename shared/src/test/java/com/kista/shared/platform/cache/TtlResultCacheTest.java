@@ -179,4 +179,18 @@ class TtlResultCacheTest {
 
         assertThat(callCount.get()).isEqualTo(1); // 동시 miss는 키별 락으로 1회만 계산됨
     }
+
+    @Test
+    void invalidationDuringLoad_returnsValueButDoesNotCache() {
+        AtomicInteger calls = new AtomicInteger();
+        String first = cache.getOrCompute("k", Duration.ofMinutes(5), () -> {
+            calls.incrementAndGet();
+            cache.invalidateIf(_ -> true); // 계산 중 무효화
+            return "old";
+        });
+        assertThat(first).isEqualTo("old");
+        String second = cache.getOrCompute("k", Duration.ofMinutes(5), () -> { calls.incrementAndGet(); return "new"; });
+        assertThat(second).isEqualTo("new");
+        assertThat(calls).hasValue(2);
+    }
 }
