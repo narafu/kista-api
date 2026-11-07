@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
@@ -147,7 +148,7 @@ public class InfiniteCycleOrderStrategy implements CycleOrderStrategy {
     public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyPlan privacyPlan, int divisionCount) {
         if (price == null) return null;
         BigDecimal multiplier = BigDecimal.valueOf(divisionCount * MIN_DEPOSIT_FACTOR);
-        return price.multiply(multiplier).setScale(2, HALF_UP);
+        return price.multiply(multiplier).setScale(Currency.USD.amountScale(), HALF_UP);
     }
 
     @Override

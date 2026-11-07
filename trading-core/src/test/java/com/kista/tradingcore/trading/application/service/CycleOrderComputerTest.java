@@ -333,4 +333,30 @@ class CycleOrderComputerTest {
 
         verify(vrStrategy).buildOrders(any(VrPosition.class), eq(StrategyTicker.SOXL), eq(prevClosePrice), any(LocalDate.class));
     }
+
+    @Test
+    @DisplayName("INFINITE 리버스모드 2일차 — 별지점은 최근 종가 평균을 USD 센트로 HALF_UP 반올림한다")
+    void compute_infiniteReverse_starPointRoundedToCents() {
+        UUID cycleId = INFINITE_CYCLE.id();
+        when(cyclePositionInfiniteDetailPort.findLatestByCycleId(cycleId, 2)).thenReturn(List.of(
+                new CyclePositionInfiniteDetail(UUID.randomUUID(), true),
+                new CyclePositionInfiniteDetail(UUID.randomUUID(), true)));
+        // 종가 (10.00 + 10.00 + 10.01) ÷ 3 = 10.00333 → 10.00
+        when(cyclePositionPort.findLatestWithInfiniteDetailByCycleId(cycleId, 5)).thenReturn(List.of(
+                new CyclePosition(UUID.randomUUID(), cycleId, BigDecimal.ONE, new BigDecimal("10.00"), null, BigDecimal.ZERO, null, null),
+                new CyclePosition(UUID.randomUUID(), cycleId, BigDecimal.ONE, new BigDecimal("10.00"), null, BigDecimal.ZERO, null, null),
+                new CyclePosition(UUID.randomUUID(), cycleId, BigDecimal.ONE, new BigDecimal("10.01"), null, BigDecimal.ZERO, null, null)));
+        ReverseInfiniteStrategy reverseStrategy = mock(ReverseInfiniteStrategy.class);
+        CycleOrderComputer reverseComputer = new CycleOrderComputer(
+                new CycleOrderStrategies(List.of(new InfiniteCycleOrderStrategy(infiniteStrategy, reverseStrategy))),
+                cyclePositionPort, cyclePositionInfiniteDetailPort, strategyInfiniteDetailPort,
+                strategyCycleVrPort, strategyVrDetailPort, orderPort);
+
+        reverseComputer.compute(BALANCE, INFINITE_STRATEGY, new BigDecimal("20.00"),
+                LocalDate.now(), INFINITE_CYCLE, null, "테스트", CURRENT_PRICE);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ReverseModePosition.class);
+        verify(reverseStrategy).buildOrders(captor.capture(), any(LocalDate.class));
+        assertThat(captor.getValue().starPointPrice()).isEqualTo(new BigDecimal("10.00"));
+    }
 }

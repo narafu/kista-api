@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.kis;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
 import com.kista.shared.kernel.StrategyTicker;
@@ -40,7 +41,7 @@ final class KisResponseParser {
     // KIS 가격 파라미터 포맷 SSOT — 시장가(매도 MOO/MOC)만 "0", 그 외(매수 MOO/MOC는 LOO/LOC 캡 지정가)는 2자리 지정가
     static String formatPrice(OrderType type, OrderDirection direction, BigDecimal price) {
         boolean marketSell = direction == OrderDirection.SELL && (type == OrderType.MOC || type == OrderType.MOO);
-        return marketSell ? "0" : price.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        return marketSell ? "0" : price.setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP).toPlainString();
     }
 
     // last(현재가) 우선, 비어있으면 base(전일종가) fallback — 장 마감 시 last가 빈 ETF 대응

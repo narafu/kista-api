@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
@@ -44,6 +45,6 @@ class StrategyStartAmountCalculator {
             throw new IllegalArgumentException("보유 자산이 PRIVACY 기준 매매표 대비 너무 적어 중간부터 시작할 수 없습니다.");
         }
         // CEILING — 매매 시 startAmount ÷ currentCycleStart를 FLOOR로 되돌리므로 반올림 내림이면 배수가 0.01 낮아진다
-        return multiple.multiply(base.currentCycleStart()).setScale(2, RoundingMode.CEILING);
+        return multiple.multiply(base.currentCycleStart()).setScale(Currency.USD.amountScale(), RoundingMode.CEILING);
     }
 }

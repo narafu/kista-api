@@ -1,5 +1,6 @@
 package com.kista.tradingcore.privacy.adapter.out.persistence;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.privacy.domain.model.*;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.StrategyTicker;
@@ -116,7 +117,7 @@ class PrivacyTradePersistenceAdapter implements PrivacyTradePort {
     private static boolean sameMoney(BigDecimal a, BigDecimal b) {
         if (a == null && b == null) return true;
         if (a == null || b == null) return false;
-        return a.setScale(2, RoundingMode.HALF_UP).compareTo(b.setScale(2, RoundingMode.HALF_UP)) == 0;
+        return a.setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP).compareTo(b.setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP)) == 0;
     }
 
     @Override

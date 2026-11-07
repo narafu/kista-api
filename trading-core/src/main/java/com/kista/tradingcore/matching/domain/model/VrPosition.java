@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.model;
 
+import com.kista.shared.kernel.Currency;
 import java.math.BigDecimal;
 
 import static java.math.RoundingMode.HALF_UP;
@@ -13,7 +14,6 @@ public record VrPosition(
         BigDecimal poolUsed,     // 이미 사용한 pool 누적 금액 (USD) — V=0,pool>0 bootstrap 잔여예산 계산에도 사용
         int recurringAmount      // 주기당 입출금액 (양수=적립, 0=거치, 음수=인출)
 ) {
-    private static final int MONEY_SCALE = 2; // 금액·가격 반올림 자리수
 
     public VrPosition {
         value = value != null ? value : BigDecimal.ZERO;
@@ -38,13 +38,13 @@ public record VrPosition(
     // 매수 사다리 하단 기준선 = V × (1 − bandWidth/100)
     public BigDecimal lowerBand() {
         BigDecimal rate = bandWidth.divide(BigDecimal.valueOf(100), 10, HALF_UP);
-        return value.multiply(BigDecimal.ONE.subtract(rate)).setScale(MONEY_SCALE, HALF_UP);
+        return value.multiply(BigDecimal.ONE.subtract(rate)).setScale(Currency.USD.amountScale(), HALF_UP);
     }
 
     // 매도 사다리 상단 기준선 = V × (1 + bandWidth/100)
     public BigDecimal upperBand() {
         BigDecimal rate = bandWidth.divide(BigDecimal.valueOf(100), 10, HALF_UP);
-        return value.multiply(BigDecimal.ONE.add(rate)).setScale(MONEY_SCALE, HALF_UP);
+        return value.multiply(BigDecimal.ONE.add(rate)).setScale(Currency.USD.amountScale(), HALF_UP);
     }
 
     // --- 사다리 단가 계산 ---
@@ -53,13 +53,13 @@ public record VrPosition(
     // 주의: divisor < 1 여부는 호출측에서 확인 후 skip 처리 (holdings=0, m=1 → divisor=0)
     public BigDecimal buyPrice(int m) {
         int divisor = holdings() + m - 1;
-        return lowerBand().divide(BigDecimal.valueOf(divisor), MONEY_SCALE, HALF_UP);
+        return lowerBand().divide(BigDecimal.valueOf(divisor), Currency.USD.amountScale(), HALF_UP);
     }
 
     // s번째 매도 단가 = upperBand ÷ (holdings − s + 1), scale=2 HALF_UP
     public BigDecimal sellPrice(int s) {
         int divisor = holdings() - s + 1;
-        return upperBand().divide(BigDecimal.valueOf(divisor), MONEY_SCALE, HALF_UP);
+        return upperBand().divide(BigDecimal.valueOf(divisor), Currency.USD.amountScale(), HALF_UP);
     }
 
     // --- V값 갱신 (실력공식) ---
@@ -83,6 +83,6 @@ public record VrPosition(
         BigDecimal denom = BigDecimal.valueOf(2).multiply(sqrtG);
         BigDecimal adjustPart = evaluationDiff.divide(denom, 10, HALF_UP);
 
-        return value.add(poolPart).add(recurringPart).add(adjustPart).setScale(MONEY_SCALE, HALF_UP);
+        return value.add(poolPart).add(recurringPart).add(adjustPart).setScale(Currency.USD.amountScale(), HALF_UP);
     }
 }

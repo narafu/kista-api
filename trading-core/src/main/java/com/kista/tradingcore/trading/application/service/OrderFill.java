@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.broker.domain.model.Execution;
 
 import java.math.BigDecimal;
@@ -20,12 +21,12 @@ record OrderFill(BigDecimal quantity, BigDecimal avgPrice) {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> of(e.getValue())));
     }
 
-    // 수량 Σ(체결수량), 가중평균가 Σ(체결금액) ÷ Σ(체결수량) — scale 2, HALF_UP (수량 0이면 평균가 0)
+    // 수량 Σ(체결수량), 가중평균가 Σ(체결금액) ÷ Σ(체결수량) — USD 금액 자릿수 HALF_UP (Execution 수량이 int라 주식 전용, 수량 0이면 평균가 0)
     static OrderFill of(List<Execution> matched) {
         int quantity = matched.stream().mapToInt(Execution::quantity).sum();
         BigDecimal avg = quantity <= 0 ? BigDecimal.ZERO
                 : matched.stream().map(Execution::amountUsd).reduce(BigDecimal.ZERO, BigDecimal::add)
-                        .divide(BigDecimal.valueOf(quantity), 2, RoundingMode.HALF_UP);
+                        .divide(BigDecimal.valueOf(quantity), Currency.USD.amountScale(), RoundingMode.HALF_UP);
         return new OrderFill(BigDecimal.valueOf(quantity), avg);
     }
 }

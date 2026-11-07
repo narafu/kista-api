@@ -74,4 +74,21 @@ class CycleOrderStrategyCapabilityTest {
             assertThat(strategy.availableDivisionCounts()).isEqualTo(capability.divisionCounts());
         }
     }
+
+    @Test
+    void infinite_minRequiredDeposit_roundsToUsdCents() {
+        // 10.0049 × (20 × 2.0) = 400.196 → 400.20
+        var infinite = new InfiniteCycleOrderStrategy(null, null);
+        assertThat(infinite.minRequiredDeposit(new BigDecimal("10.0049"), null, 20))
+                .isEqualTo(new BigDecimal("400.20"));
+    }
+
+    @Test
+    void privacy_minRequiredDeposit_roundsToUsdCents() {
+        // 1001.01 ÷ 2 = 500.505 → 500.51 (HALF_UP)
+        var privacy = new PrivacyCycleOrderStrategy(null);
+        var plan = new com.kista.tradingcore.matching.domain.model.PrivacyPlan(
+                0, new BigDecimal("1001.01"), java.util.List.of());
+        assertThat(privacy.minRequiredDeposit(null, plan, 0)).isEqualTo(new BigDecimal("500.51"));
+    }
 }

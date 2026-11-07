@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.domain.creation.VrRampParams;
 import com.kista.tradingcore.trading.domain.creation.VrRampValidator;
@@ -189,7 +190,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
         }
         return currentCycleVr.value()
                 .add(BigDecimal.valueOf(netShares).multiply(currentPrice))
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }
 
 }

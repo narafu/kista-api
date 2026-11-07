@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.tradingcore.matching.domain.model.PrivacyPlan;
 import com.kista.tradingcore.matching.domain.model.InfinitePosition;
@@ -44,7 +45,7 @@ public class PrivacyCycleOrderStrategy implements CycleOrderStrategy {
     public BigDecimal minRequiredDeposit(BigDecimal price, PrivacyPlan privacyPlan, int divisionCount) {
         if (privacyPlan == null) return null;
         // currentCycleStart 0.5배 적용
-        return privacyPlan.currentCycleStart().divide(BigDecimal.valueOf(2), 2, HALF_UP);
+        return privacyPlan.currentCycleStart().divide(BigDecimal.valueOf(2), Currency.USD.amountScale(), HALF_UP);
     }
 
     @Override

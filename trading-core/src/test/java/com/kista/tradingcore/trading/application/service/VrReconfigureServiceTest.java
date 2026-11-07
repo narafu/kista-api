@@ -454,4 +454,17 @@ class VrReconfigureServiceTest {
 
         verify(cycleSnapshotCreator, never()).reconfigureVrCycle(any(CycleSnapshotCreator.VrReconfiguration.class));
     }
+
+    @Test
+    @DisplayName("수량 주입 V 증분은 USD 센트(소수 2자리) HALF_UP으로 반올림된다")
+    void reconfigure_injectShares_valueRoundedToCents() {
+        // V = 1000.00 + 5 × 120.005 = 1600.025 → 1600.03
+        currentPrice = new BigDecimal("120.005");
+        stubHappyPathChain();
+        ReconfigureVrCommand cmd = reconfigureVr().injectShares(5, "60.00").build();
+
+        service.reconfigure(strategyId, requesterId, cmd);
+
+        assertThat(captureReconfigureCall().newValue()).isEqualTo(new BigDecimal("1600.03"));
+    }
 }

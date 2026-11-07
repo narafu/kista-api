@@ -1,6 +1,7 @@
 package com.kista.tradingcore.matching.domain.model;
 
 
+import com.kista.shared.kernel.Currency;
 import java.math.BigDecimal;
 
 import static java.math.RoundingMode.FLOOR;
@@ -48,7 +49,7 @@ public record ReverseModePosition(
     }
 
     private static BigDecimal quotaBuyAmount(BigDecimal usdDeposit) {
-        return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), 2, HALF_UP);
+        return usdDeposit.divide(BigDecimal.valueOf(InfinitePosition.SELL_QUARTER_DIVISOR), Currency.USD.amountScale(), HALF_UP);
     }
 
     // 쿼터매수 수량 — 별지점 아래에서 매수: 별지점 - TICK_SIZE($0.01)
@@ -72,7 +73,7 @@ public record ReverseModePosition(
     public static boolean shouldExit(BigDecimal avgPrice, BigDecimal closingPrice, BigDecimal targetProfitRate) {
         if (closingPrice == null || avgPrice == null) return false;
         BigDecimal threshold = avgPrice.multiply(BigDecimal.ONE.subtract(targetProfitRate))
-                .setScale(2, HALF_UP);
+                .setScale(Currency.USD.amountScale(), HALF_UP);
         return closingPrice.compareTo(threshold) >= 0;
     }
 }

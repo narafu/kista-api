@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.shared.kernel.Quantities;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
@@ -27,12 +28,12 @@ public record CyclePositionHistoryEntry(
     // 평가금액 = closingPrice × holdings (closingPrice 없으면 0)
     public BigDecimal marketValueUsd() {
         return closingPrice != null
-                ? closingPrice.multiply(holdings).setScale(2, RoundingMode.HALF_UP)
+                ? closingPrice.multiply(holdings).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
     }
 
     // 총 자산 = 평가금액 + 예수금
     public BigDecimal totalAssetUsd() {
-        return marketValueUsd().add(usdDeposit).setScale(2, RoundingMode.HALF_UP);
+        return marketValueUsd().add(usdDeposit).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
     }
 }

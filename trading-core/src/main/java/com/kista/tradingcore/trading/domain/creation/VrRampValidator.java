@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.domain.creation;
 
+import com.kista.shared.kernel.Currency;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -79,7 +80,7 @@ public final class VrRampValidator {
             BigDecimal required = BigDecimal.valueOf(Math.abs((long) recurringAmount))
                     .multiply(BigDecimal.valueOf(100))
                     .multiply(BigDecimal.valueOf(4))
-                    .divide(BigDecimal.valueOf(intervalWeeks), 2, RoundingMode.HALF_UP);
+                    .divide(BigDecimal.valueOf(intervalWeeks), Currency.USD.amountScale(), RoundingMode.HALF_UP);
             if (requiredCheckAssets.compareTo(required) < 0) {
                 throw new IllegalArgumentException("인출식 VR 전략의 초기 자산은 %s 이상이어야 합니다.".formatted(required));
             }

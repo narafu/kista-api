@@ -66,6 +66,6 @@ public record CyclePosition(
         BigDecimal unitPrice = closingPrice != null ? closingPrice
                 : avgPrice != null ? avgPrice : BigDecimal.ZERO;
         return usdDeposit.add(unitPrice.multiply(holdings))
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
     }
 }

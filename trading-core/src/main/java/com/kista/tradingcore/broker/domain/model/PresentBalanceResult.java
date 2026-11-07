@@ -1,4 +1,5 @@
 package com.kista.tradingcore.broker.domain.model;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.StrategyTicker;
 
 import java.math.BigDecimal;
@@ -45,10 +46,10 @@ public record PresentBalanceResult(
         List<Item> items = holdings.stream()
                 .map(h -> {
                     BigDecimal evalAmountUsd = h.currentPrice().multiply(BigDecimal.valueOf(h.holdings()))
-                            .setScale(2, RoundingMode.HALF_UP);
+                            .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
                     BigDecimal profitLossUsd = h.currentPrice().subtract(h.avgPrice())
                             .multiply(BigDecimal.valueOf(h.holdings()))
-                            .setScale(2, RoundingMode.HALF_UP);
+                            .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
                     BigDecimal profitRate = h.avgPrice().compareTo(BigDecimal.ZERO) > 0
                             ? h.currentPrice().subtract(h.avgPrice())
                               .divide(h.avgPrice(), 4, RoundingMode.HALF_UP)
@@ -91,9 +92,9 @@ public record PresentBalanceResult(
                 : BigDecimal.ZERO;
 
         BigDecimal krwAsUsd = hasRate
-                ? krwDeposit.divide(rate, 2, RoundingMode.HALF_UP)
+                ? krwDeposit.divide(rate, Currency.USD.amountScale(), RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
-        BigDecimal totalUsdDeposit = usdDeposit.add(krwAsUsd).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalUsdDeposit = usdDeposit.add(krwAsUsd).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         return new PresentBalanceResult(items, totalAssetKrw, totalEvalProfitKrw, totalReturnRate, totalUsdDeposit, rate);
     }
 }

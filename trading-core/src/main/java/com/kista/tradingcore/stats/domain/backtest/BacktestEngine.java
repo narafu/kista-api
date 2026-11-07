@@ -1,5 +1,6 @@
 package com.kista.tradingcore.stats.domain.backtest;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
 import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
@@ -383,7 +384,7 @@ public class BacktestEngine {
     public static BigDecimal initialStockValue(BacktestCommand command, BigDecimal day0Close) {
         int holdings = command.initialHoldings() != null ? command.initialHoldings() : 0;
         return holdings > 0
-                ? day0Close.multiply(BigDecimal.valueOf(holdings)).setScale(2, HALF_UP)
+                ? day0Close.multiply(BigDecimal.valueOf(holdings)).setScale(Currency.USD.amountScale(), HALF_UP)
                 : BigDecimal.ZERO;
     }
 
@@ -394,7 +395,7 @@ public class BacktestEngine {
 
     // 사이클 매수 상한 = 개장 예수금 × poolLimitRate (scale=2 HALF_UP)
     private static BigDecimal poolLimitOf(BigDecimal openPool, BigDecimal poolLimitRate) {
-        return openPool.multiply(poolLimitRate).setScale(2, HALF_UP);
+        return openPool.multiply(poolLimitRate).setScale(Currency.USD.amountScale(), HALF_UP);
     }
 
     // 전략 공통 루프 상태 — 잔고·원금·집계 카운터. 전략별 상태는 서브클래스가 얹는다
@@ -565,7 +566,7 @@ public class BacktestEngine {
         BigDecimal starPointPrice() {
             if (!reverseMode || isFirstReverseDay || recentCloses.isEmpty()) return null;
             BigDecimal sum = recentCloses.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            return sum.divide(BigDecimal.valueOf(recentCloses.size()), 2, HALF_UP);
+            return sum.divide(BigDecimal.valueOf(recentCloses.size()), Currency.USD.amountScale(), HALF_UP);
         }
 
         // 새 사이클 시작 — 리버스모드·별지점 윈도우 리셋 (자산 처리는 restartCycle의 시드 정책 몫)

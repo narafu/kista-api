@@ -1,5 +1,6 @@
 package com.kista.tradingcore.broker.adapter.out.meritz;
 
+import com.kista.shared.kernel.Currency;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.OrderDirection;
@@ -206,6 +207,6 @@ class MeritzOrderApi {
     // 가격 지정 주문의 단가 누락은 송신 전 차단 — "0"으로 보내면 사실상 무가격 주문이 된다
     private static String formatPrice(BigDecimal price) {
         if (price == null) throw new IllegalArgumentException("Meritz 지정가 계열 주문 단가가 없습니다");
-        return price.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        return price.setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP).toPlainString();
     }
 }

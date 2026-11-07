@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
@@ -101,6 +102,6 @@ class CycleSnapshotCreator {
     private static BigDecimal totalAssets(AccountBalance balance, BigDecimal closingPrice) {
         return balance.usdDeposit()
                 .add(closingPrice.multiply(balance.holdings()))
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }
 }

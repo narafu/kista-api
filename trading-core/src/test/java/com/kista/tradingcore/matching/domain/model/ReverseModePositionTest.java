@@ -78,4 +78,23 @@ class ReverseModePositionTest {
         // 캡 경로: 250 / 52.50 = 4
         assertThat(ReverseModePosition.quotaBuyQuantity(new BigDecimal("1000.00"), new BigDecimal("52.50"))).isEqualTo(4);
     }
+
+    @Test
+    @DisplayName("쿼터매수 금액은 예수금÷4를 USD 센트(소수 2자리)로 HALF_UP 반올림한다")
+    void calcLocBuyAmount_roundsToCents() {
+        // 100.01 ÷ 4 = 25.0025 → 25.00
+        ReverseModePosition position = new ReverseModePosition(
+                10, new BigDecimal("10.00"), new BigDecimal("100.01"),
+                StrategyTicker.SOXL, 20, new BigDecimal("20.00"), false);
+
+        assertThat(position.calcLocBuyAmount()).isEqualTo(new BigDecimal("25.00"));
+    }
+
+    @Test
+    @DisplayName("리버스 종료 임계값은 평단×(1−목표수익률)을 USD 센트로 반올림해 비교한다")
+    void shouldExit_thresholdRoundedToCents() {
+        // 목표수익률 0 → 임계값 = 100.003 → 100.00 (HALF_UP), 종가 100.001 ≥ 100.00 이므로 종료
+        assertThat(ReverseModePosition.shouldExit(
+                new BigDecimal("100.003"), new BigDecimal("100.001"), BigDecimal.ZERO)).isTrue();
+    }
 }

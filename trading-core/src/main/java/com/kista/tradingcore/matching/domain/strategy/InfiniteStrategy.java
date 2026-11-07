@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.OrderType;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
@@ -132,7 +133,7 @@ public class InfiniteStrategy {
             return;
         }
 
-        BigDecimal adjustedOrderPrice = unitAmount.divide(BigDecimal.valueOf(totalQuantity + 1), 2, RoundingMode.FLOOR);
+        BigDecimal adjustedOrderPrice = unitAmount.divide(BigDecimal.valueOf(totalQuantity + 1), Currency.USD.amountScale(), RoundingMode.FLOOR);
 
         newBuys.add(PlannedOrder.of(tradeDate, position.ticker(), LOC, BUY, 1, adjustedOrderPrice,
                 PlannedOrder.leg("INFINITE_CORRECTION", correctionIndex)));

@@ -1037,4 +1037,38 @@ class BacktestEngineTest {
         // 매도대금 950이 그대로 남는다
         assertThat(output.points().getLast().totalAsset()).isEqualByComparingTo("950");
     }
+
+    @Test
+    @DisplayName("리버스모드 별지점은 최근 종가 평균을 USD 센트로 HALF_UP 반올림한다")
+    void 리버스_별지점은_센트로_반올림된다() {
+        RecordingInfinite recorder = new RecordingInfinite();
+        BacktestEngine infiniteEngine = new BacktestEngine(new CycleOrderStrategies(List.of(recorder)));
+
+        // 종가(64·60.01) 평균 = 62.005 → 62.01
+        infiniteEngine.run(List.of(
+                flat("2024-01-01", 64), flat("2024-01-02", 60.01)
+        ), infiniteCommandWithPosition("2024-01-01", "105", 4, 11, "76.7172"));
+
+        assertThat(recorder.on("2024-01-02").inputs().starPointPrice()).isEqualTo(new BigDecimal("62.01"));
+    }
+
+    @Test
+    @DisplayName("VR 사이클 매수 상한(poolLimit)은 시작 예수금×poolLimitRate를 USD 센트로 반올림한다")
+    void VR_poolLimit은_센트로_반올림된다() {
+        List<BigDecimal> poolLimits = new java.util.ArrayList<>();
+        VrCycleOrderStrategy capturing = new VrCycleOrderStrategy(new VrStrategy()) {
+            @Override
+            public Optional<OrderPlan> plan(PlanContext ctx) {
+                poolLimits.add(ctx.vr().poolLimit());
+                return super.plan(ctx);
+            }
+        };
+        BacktestEngine vrEngine = new BacktestEngine(new CycleOrderStrategies(List.of(capturing)));
+
+        // seed 1000.55 × 거치식 poolLimitRate 0.75 = 750.4125 → 750.41
+        vrEngine.run(List.of(candle("2024-01-02", 800, 910, 790, 900)), vrCommand("1000.55", "1000", 4, 0));
+
+        assertThat(poolLimits).isNotEmpty();
+        assertThat(poolLimits.getFirst()).isEqualTo(new BigDecimal("750.41"));
+    }
 }

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.shared.kernel.StrategyDefaults;
 import com.kista.tradingcore.trading.domain.model.*;
@@ -96,7 +97,7 @@ class CycleOrderComputer {
                     .orElseThrow(() -> new IllegalStateException("VR 시작 포지션이 없습니다."));
             BigDecimal poolLimit = openingPosition.usdDeposit()
                     .multiply(cycleVr.poolLimitRate())
-                    .setScale(2, RoundingMode.HALF_UP);
+                    .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
             // referencePrice: bootstrap·일반 사다리 캡 판정 공용 기준가 — currentPrice 없으면(preview·수동실행) 전일종가로 대체
             BigDecimal vrReferencePrice = currentPrice != null ? currentPrice : prevClosePrice;
             vrInputs = new CycleOrderStrategy.PlanContext.VrInputs(
@@ -120,7 +121,7 @@ class CycleOrderComputer {
                 .toList();
         if (closingPrices.isEmpty()) return null;
         BigDecimal sum = closingPrices.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        return sum.divide(BigDecimal.valueOf(closingPrices.size()), 2, RoundingMode.HALF_UP);
+        return sum.divide(BigDecimal.valueOf(closingPrices.size()), Currency.USD.amountScale(), RoundingMode.HALF_UP);
     }
 
     private Integer resolveDivisionCount(Strategy strategy, StrategyCycle currentCycle) {

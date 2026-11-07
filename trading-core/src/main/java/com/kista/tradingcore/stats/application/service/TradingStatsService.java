@@ -17,6 +17,7 @@ import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.CycleCapitalEventPort;
 import com.kista.tradingcore.trading.domain.model.CycleCapitalEvent;
 import com.kista.shared.kernel.Currency;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import com.kista.tradingcore.trading.application.event.TradingReportReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -271,7 +272,7 @@ class TradingStatsService implements TradingStatsUseCase {
         BigDecimal totalPnl = sum(closed.stream().map(CycleView::realizedPnl))
                 .add(sum(active.stream().map(v -> unrealizedByCycle.getOrDefault(v.cycle().id(), BigDecimal.ZERO))));
         BigDecimal realizedPnl = sum(closed.stream().map(v -> settledPnl(v, firstPositions, lastPositions)));
-        BigDecimal unrealizedPnl = totalPnl.subtract(realizedPnl).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal unrealizedPnl = totalPnl.subtract(realizedPnl).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
 
         BigDecimal winRate = null;
         BigDecimal avgReturnRate = null;
@@ -360,8 +361,8 @@ class TradingStatsService implements TradingStatsUseCase {
                 }
             }
             points.add(new EquityPoint(date,
-                    asset.setScale(2, RoundingMode.HALF_UP),
-                    principal.setScale(2, RoundingMode.HALF_UP)));
+                    asset.setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP),
+                    principal.setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP)));
         }
         return points;
     }
@@ -401,6 +402,6 @@ class TradingStatsService implements TradingStatsUseCase {
     }
 
     private static BigDecimal sum(java.util.stream.Stream<BigDecimal> stream) {
-        return stream.reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+        return stream.reduce(BigDecimal.ZERO, BigDecimal::add).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
     }
 }

@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.application.event.NewCycleStartedEvent;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
@@ -103,7 +104,7 @@ class VrCycleRolloverService {
         // 적립/인출 반영 pool — recurringAmount(양수=적립·음수=인출)를 실측 예수금에 실제로 더해 다음 사이클의 실 현금으로 승계
         int recurringAmount = detail.recurringAmount();
         BigDecimal adjustedPool = postBalance.usdDeposit()
-                .add(BigDecimal.valueOf(recurringAmount)).setScale(2, RoundingMode.HALF_UP);
+                .add(BigDecimal.valueOf(recurringAmount)).setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         if (adjustedPool.compareTo(BigDecimal.ZERO) < 0) {
             log.warn("[strategyId={}] VR 롤오버 보류 — 인출 반영 후 예수금 음수 (pool={}, recurringAmount={})",
                     strategy.id(), postBalance.usdDeposit(), recurringAmount);
@@ -141,7 +142,7 @@ class VrCycleRolloverService {
 
         // 사이클 종료 — 종료금액=마감 후 예수금+보유분 종가 평가액, 종료일자=evaluationDate(due일 기준 실제 거래일 — 배치 실행일 아님)
         BigDecimal endAmount = postBalance.usdDeposit().add(evaluation)
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         strategyCyclePort.markEnded(cycle.id(), endAmount, evaluationDate);
         log.info("[strategyId={}] VR 사이클 종료 완료: cycleId={}", strategy.id(), cycle.id());
 

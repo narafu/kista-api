@@ -1,5 +1,6 @@
 package com.kista.tradingcore.matching.domain.strategy;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
 
@@ -23,7 +24,7 @@ public final class PriceCapPolicy {
 
     // currentPrice 기준 캡 가격 계산
     public static BigDecimal capFor(BigDecimal currentPrice) {
-        return currentPrice.multiply(CAP_MULTIPLIER).setScale(2, HALF_UP);
+        return currentPrice.multiply(CAP_MULTIPLIER).setScale(Currency.USD.amountScale(), HALF_UP);
     }
 
     // price가 cap 초과면 cap으로 교체

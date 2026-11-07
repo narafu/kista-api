@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
+import com.kista.shared.kernel.Currency;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
@@ -72,7 +73,7 @@ class VrStrategyDetailService {
             throw new IllegalStateException("VR 시작 포지션이 없습니다.");
         }
         BigDecimal poolLimit = openingPool.multiply(cycleVr.poolLimitRate())
-                .setScale(2, RoundingMode.HALF_UP);
+                .setScale(Currency.USD.amountScale(), RoundingMode.HALF_UP);
         return new VrSummary(
                 cycleVr.value(), vrDetail.bandWidth(), vrDetail.intervalWeeks(),
                 vrDetail.recurringAmount(), poolLimit, currentPool, cycleVr.poolLimitRate(), cycleVr.gradient(),
