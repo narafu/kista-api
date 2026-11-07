@@ -10,6 +10,8 @@
 - deprecated API는 새로 쓰지 않는다 — Spring 7/Jackson 3 대체를 쓴다(`HttpStatus.UNPROCESSABLE_CONTENT`, `JsonNode.asString()`, `org.jspecify.annotations.Nullable` — 중첩 타입은 `Outer.@Nullable Inner`)
 - 오류 보고 caller 등 클래스 식별 문자열은 `X.class.getSimpleName()` — 리터럴 하드코딩 금지. `getClass()`는 프록시 이름이 나오므로 쓰지 않는다
 - persistence 매퍼(`toEntity`/`toDomain`)는 필드 복사만 한다 — 기본값은 도메인 생성 시점에서 정하고 어댑터에 `!= null ? x : 기본값` 폴백을 두지 않는다. 예외는 DB 컬럼 자체가 nullable인 레거시 값(예: `user_settings.strategy_suggestions`)뿐
+- web DTO의 `toCommand()`도 기본값을 정하지 않는다 — 생략 필드는 null 그대로 넘기고 도메인 resolver·팩토리·서비스 한 곳이 정한다(예: INFINITE `divisionCount`는 `InfiniteCreationResolver`가 정책 기본값으로, `broker`는 `AccountService`가 KIS로). `0` 같은 sentinel로 생략을 표현하지 않는다
+- USD 금액(가격·원장 금액) 반올림 자릿수는 `Currency.USD.amountScale()`을 쓴다 — 리터럴 `2`·모듈별 private `MONEY_SCALE` 금지. 원장(`cycle_position` 금액·평단, 통화 무관 `numeric(20,2)`)을 다루며 코인 DCA 계좌도 지나는 경로는 `AccountBalance.LEDGER_SCALE`, 주문 금액처럼 시장 통화가 결정하는 값은 `Market`/`Currency`의 `amountScale()`을 쓴다. 비율·퍼센트 자릿수는 별개다
 
 ### 신규 파일 배치
 신규 코드는 해당 서브프로젝트 루트의 애그리게이트 모듈(`com.kista.api.<module>`·`com.kista.tradingcore.<module>`, 공용은 `com.kista.shared.<module>`) 안에 `domain/model` + `application/{usecase,port/output,service}` + `adapter/{in,out}` 구조로 추가한다. 모듈별 NamedInterface 공개 범위·internal 패키지는 `docs/agents/modules/<루트>/<ID>.md`가 SSOT.

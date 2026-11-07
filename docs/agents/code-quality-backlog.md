@@ -359,7 +359,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 기본값을 한 곳에서만 지정하고, 0과 20의 불일치 여지를 제거한다.
 - 위험: 높음(공식). 전략 등록 결과가 바뀔 수 있고, INFINITE 분할 수는 공식 입력이다. 비공식 필드(broker 기본값 등)만 먼저 분리해 진행할 수 있다.
 - 가드(`constraints.md` "persistence 기본값" 확장 문장 초안): "web DTO의 `toCommand()`도 기본값을 정하지 않는다. null을 그대로 넘기고 도메인 resolver·팩토리가 정한다."
-- 상태: open.
+- 상태: done(e6b1470f1). DTO 기본값 제거·`divisionCount` Integer(null=생략, 명시 0은 400)·VR `recurringAmount` 생략은 정책 기본 recurringMode(운영 DEPOSIT → 400)·`initialUsdDeposit` 정규화 `StrategyCreationService` 1곳·broker 기본값 `AccountService.brokerOrDefault`. 조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)`는 유지 목록. 가드: `constraints.md` "persistence 기본값"의 web DTO 문장 + `StrategyServiceTest.register_infinite_explicitZeroDivisionCount_rejected` 등.
 
 ### CQ-20 USD 금액 scale 리터럴 2 산재와 `MONEY_SCALE` 이중 정의
 - 주제: 금액·수량 스케일. 유형: 중복.
@@ -411,7 +411,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 스케일 의미 명시.
 - 위험: 높음. 공식 코드가 대부분이다. 값은 같으므로 치환만 하고, 공식 테스트 통과를 확인한다. 비공식 경로(어댑터·통계·표시)부터 분리해 진행할 수 있다.
 - 가드: 상수 도입 후 `constraints.md`에 "USD 금액 반올림은 `<상수>`를 쓴다" 한 줄.
-- 상태: open.
+- 상태: done(5afbb0e38). 새 상수 대신 기존 SSOT `Currency.USD.amountScale()` 재사용, 원장 경로(코인 DCA 포함)는 `AccountBalance.LEDGER_SCALE`. 변이 확인으로 미커버 공식 site 8곳에 고정 테스트 추가. DCA 크립토 경로는 CQ-40. 가드: `constraints.md` "persistence 기본값" 절의 USD 금액 반올림 문장.
 
 ### CQ-21 백테스트 러너 선택의 타입 switch
 - 주제: 전략 타입별 분기. 유형: OOP.
@@ -435,7 +435,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 원장 평단 표시 일관성.
 - 위험: 높음. 평단은 INFINITE·VR 주문가 계산의 입력이다.
 - 가드: `trading-formulas.md` 명시 + 경계값 단위 테스트.
-- 상태: open(전용 작업, 공식 묶음).
+- 상태: done(2532f2f3d). 범위에 `CapitalInjectionService:107`(주식 추가 평단, 4자리) 추가. 경계값 실례는 45.12495(4자리 45.1250 → 저장 45.13, 직접 45.12) — 45.12449는 두 경로 모두 45.12라 차이가 없다. 백테스트는 평단을 메모리에 누적해 infinite 골든 117행이 +0.03~0.04 바뀌었다(체결·사이클 수 불변). 가드: `trading-formulas.md` averagePrice 2자리 명시 + `AccountBalanceTest.avgPrice_roundsDirectlyToScale2`·`CapitalInjectionServiceTest`·`VrReconfigureServiceTest` 경계 테스트.
 
 ### CQ-23 재주문·배치 원장 예산이 장중 부분체결 후 취소된 BUY 체결분을 모름
 - 주제: 원장 예산 정확도. 유형: 누락.
@@ -627,6 +627,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | "사용자를 찾을 수 없습니다" 복제 | `BatchContextFactory.java:71`, `CryptoDcaRunner.java:122` | 2곳. |
 | `String accountNo` 원시값 | 어댑터 9개 외 | 포트·어댑터 경계의 wire 값이다. 애그리게이트 내부는 `BrokerAccountRef`가 이미 묶는다. |
 | 원장↔증권사 보유 수량 자동 대사 없음 | `TradingReporter` 마감 리포트 | 사용자가 전략과 별개로 같은 계좌에서 직접 매매할 수 있어 차이가 정상이다(사용자 결정 2026-11-07, CQ-39). 감지는 미리보기 `accountHoldingsCheck` 경고로 충분하다. |
+| 조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)` 폴백 | `CyclePositionPersistor`, `CycleRotationService`, `StrategyDetailAssembler`, `CycleOrderComputer`, `InfiniteCycleOrderStrategy` | null 기본값이 아니라 버전 상세 행 누락 방어다. 예외로 바꾸면 매매가 멈춘다(CQ-12, 2026-11-07). |
+| 시드 미리보기 `divisionCount` `@RequestParam(defaultValue = "20")` | `TradingCycleController` 시드 미리보기 | 등록 resolver로 흐르지 않는 미리보기 전용 쿼리 파라미터다(CQ-12). |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
@@ -645,3 +647,11 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 실보유 대조(2026-11-06, 사용자가 메리츠 앱에서 확인): SOXL 606주로 원장 606과 일치한다. 수동 반영 2건은 실재하는 주식을 반영한 것이다.
 - 운영 정리(2026-11-06): 10-31 예수금 +4,090.34는 의도한 투자금 추가다(사용자 확인). 1878526 행은 `filled_quantity` 43, `filled_price` 100.62로 채웠다. 상태는 CANCELLED로 유지했다(취소 후 체결 기록 관례와 같다).
 - 상태: closed(2026-11-06) — 코드 결함 없음. 원인은 1878526 애프터장 체결 누락(f0ae5ee5f에서 수정)과 이를 메운 수동 원장 변경 2건이다.
+
+### CQ-40 DCA 코인 경로의 금액 자릿수 리터럴 2
+- 주제: 금액·수량 스케일. 유형: 비일관성(기존 버그 의심). 위험: 중간(DCA 공식).
+- 위치: `trading/application/service/StrategyCreationService.java` DCA 초기 투입 원가 `setScale(2, HALF_UP)`, `matching/domain/strategy/DcaConditions.java` 평단 기준 목표가 `setScale(2, HALF_UP)`(~73)·`money()` 표시(~103).
+- 근거: DCA는 Upbit(KRW)·Binance(USDT) 코인 계좌에서도 돈다. KRW 시장에 소수 2자리를 쓰는 셈이다. 같은 모듈의 `DcaCycleOrderStrategy`는 이미 `Currency`/`Market` 기반 자릿수를 쓴다.
+- 수정 방향: 계좌 시장의 `amountScale()`로 바꾼다. KRW에서는 값이 바뀌므로 경계 테스트를 먼저 넣는다. 원장 `numeric(20,2)` 저장값과의 관계(원장은 통화 무관 2자리)를 함께 정한다.
+- 출처: CQ-20 작업 중 제외 site(2026-11-07).
+- 상태: open.

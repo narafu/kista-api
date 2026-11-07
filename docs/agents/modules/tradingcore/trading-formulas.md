@@ -4,7 +4,7 @@
 
 ### 매매 공식 (변경 금지 — 단위 테스트로 검증)
 ```
-averagePrice (holdings==0이면 prevClosePrice 전일종가)
+averagePrice (holdings==0이면 prevClosePrice 전일종가 — 평단가 갱신은 scale=2 HALF_UP 단일 반올림 `AccountBalance.LEDGER_SCALE`, 4자리 중간값 금지: DB `numeric(20,2)` 재반올림과 이중 반올림이 생긴다)
 purchaseAmount = averagePrice × holdings
 totalAssets = usdDeposit + purchaseAmount
 unitAmount = totalAssets ÷ divisionCount  (scale=2, HALF_UP — 분모는 리터럴 20이 아닌 divisionCount; 허용값 20/30/40 — RuntimeSettings 기본값·capability 메타 availableDivisionCounts() 동기화됨, 기본값은 20)
