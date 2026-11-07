@@ -13,7 +13,6 @@ import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.matching.domain.model.*;
-import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
@@ -85,7 +84,7 @@ class TradingService {
     private void runCloseBatch(List<BatchContext> allContexts, DstInfo dst) throws InterruptedException {
         // 정지 전략은 체결 리포트 전용 — 계획·접수 없이 활성 리포트 뒤에 따로 처리한다
         Map<Boolean, List<BatchContext>> split = allContexts.stream()
-                .collect(Collectors.partitioningBy(ctx -> ctx.strategy().status() == StrategyStatus.PAUSED));
+                .collect(Collectors.partitioningBy(ctx -> !ctx.strategy().isActive()));
         List<BatchContext> paused = split.get(true);
         List<BatchContext> contexts = split.get(false);
         LocalDate today = LocalDate.now(clock);
@@ -237,7 +236,7 @@ class TradingService {
             // 정지 전략은 주문이 있을 때만(롤오버 판정 제외 — 주문 없는 정지 VR에 0체결 스냅샷 방지)
             List<BatchContext> targets = filterScheduledStart(contexts, today).stream()
                     .filter(ctx -> !batchRunPort.isReported(today, ctx.strategy().id()))
-                    .filter(ctx -> ctx.strategy().status() != StrategyStatus.PAUSED
+                    .filter(ctx -> ctx.strategy().isActive()
                             && cycleOrderStrategies.of(ctx.strategy().type()).requiresRolloverCheck()
                             || CloseReportScope.awaitsCloseReport(ctx.strategy(), orderPort.findByStrategyId(ctx.strategy().id(), today, today)))
                     .toList();

@@ -155,6 +155,18 @@ class VrReconfigureServiceTest {
                 r.postBalance(), r.closingPrice(), r.newValue(), r.weeks());
     }
 
+    @Test
+    void reconfigure_rejects_archived_strategy() {
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(new Strategy(strategyId, accountId, StrategyType.VR,
+                StrategyStatus.ARCHIVED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE));
+        when(accountPort.requireOwnedAccount(accountId, requesterId)).thenReturn(account);
+
+        assertThatThrownBy(() -> service.reconfigure(strategyId, requesterId, reconfigureVr().bandWidth("20.00").build()))
+                .isInstanceOf(IllegalStateException.class).hasMessage("보관된 전략은 변경할 수 없습니다.");
+
+        verify(orderCancelService, never()).cancelByCycle(any(), any());
+    }
+
     // --- 1) 순수 파라미터 수정 (투자금 추가 없음) ---
 
     @Test

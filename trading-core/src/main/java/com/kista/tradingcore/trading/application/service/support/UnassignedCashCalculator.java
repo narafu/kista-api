@@ -33,6 +33,7 @@ public class UnassignedCashCalculator {
     // 조회 실패는 예외로 전파, 증권사가 금액을 주지 않으면 null — 호출부가 정책(경고 생략/skip)을 정한다
     public BigDecimal available(UUID accountId, BrokerAccountRef ref) {
         BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
+                .filter(s -> !s.isArchived()) // 보관 전략의 잔여 예수금은 시드를 점유하지 않는다
                 .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id()).map(CyclePosition::usdDeposit).orElse(BigDecimal.ZERO))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal buyable = ref.broker().isCryptoExchange()

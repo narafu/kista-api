@@ -397,6 +397,18 @@ class ManualTradeCorrectionServiceTest {
         return new ManualTradeCorrectionCommand(USER_ID, ACCOUNT_ID, STRATEGY_ID, List.of(fills));
     }
 
+    @Test
+    void correctManualFills_rejects_archived_strategy() {
+        when(accountPort.findByIdOrThrow(ACCOUNT_ID)).thenReturn(account());
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.PRIVACY,
+                StrategyStatus.ARCHIVED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+
+        assertThatThrownBy(() -> service.correctManualFills(command(sell(1, "X-1"))))
+                .isInstanceOf(IllegalStateException.class).hasMessage("보관된 전략은 변경할 수 없습니다.");
+
+        verify(strategyCyclePort, never()).lockForUpdate(any());
+    }
+
     // ===== 마감 리포트 창 가드 — FIXED(12:00 KST)는 postClose 이후 =====
     private static final String WINDOW_MSG = "오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.";
 

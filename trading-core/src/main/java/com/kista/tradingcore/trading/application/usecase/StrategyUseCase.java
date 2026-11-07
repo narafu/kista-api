@@ -19,7 +19,7 @@ public interface StrategyUseCase {
     List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId);
     StrategyDetail getById(UUID strategyId, UUID requesterId);
     // 로그인 사용자의 전 계좌 전략 목록 (계좌 무관 집계) — 모바일 전략 탭용
-    List<StrategyDetail> listByUserId(UUID userId);
+    List<StrategyDetail> listByUserId(UUID userId, boolean includeArchived);
 
     // 전략 등록/수정 폼용 최소시드·기준가 미리보기 (등록 시점 minRequiredDeposit 계산과 동일 경로)
     StrategySeedPreview strategySeedPreview(UUID accountId, UUID requesterId,
@@ -44,4 +44,7 @@ public interface StrategyUseCase {
     // --- 일시중지 / 재개 ---
     void pause(UUID strategyId, UUID requesterId);
     void resume(UUID strategyId, UUID requesterId);
+
+    // --- 보관 (PAUSED/ACTIVE → ARCHIVED, 한 방향) ---
+    void archive(UUID strategyId, UUID requesterId);
 }

@@ -64,6 +64,7 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
                 accountPort, strategyPort, command.accountId(), command.strategyId(), command.userId());
         Account account = sel.account();
         Strategy strategy = sel.strategy();
+        strategy.requireNotArchived(); // 보관 전략은 체결 보정 불가
         StrategyCycle currentCycle = strategyCyclePort.requireLatestByStrategyId(strategy.id());
         // 사이클 행 잠금 — 동시에 들어온 같은 보정(원 요청 + 재시도)이 중복 검사를 함께 통과하지 않도록 직렬화
         strategyCyclePort.lockForUpdate(currentCycle.id());

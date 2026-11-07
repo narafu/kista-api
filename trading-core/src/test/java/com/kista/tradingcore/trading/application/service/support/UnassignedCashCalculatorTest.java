@@ -61,6 +61,21 @@ class UnassignedCashCalculatorTest {
     }
 
     @Test
+    void available_ignores_archived_deposit() {
+        UUID accountId = UUID.randomUUID();
+        Strategy inf = strategy(accountId, StrategyType.INFINITE);
+        Strategy archived = new Strategy(UUID.randomUUID(), accountId, StrategyType.INFINITE, StrategyStatus.ARCHIVED,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        deposit(inf, "1200");
+        deposit(archived, "999"); // 보관 전략의 잔여 예수금은 시드를 점유하지 않는다
+        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(inf, archived));
+        when(marginPort.getUsdBuyableAmount(any())).thenReturn(new BigDecimal("5000"));
+
+        var ref = TradingFixtures.tradingAccount(accountId, UUID.randomUUID()).brokerRef();
+        assertThat(calc.available(accountId, ref)).isEqualByComparingTo("3800"); // 5000 − 1200
+    }
+
+    @Test
     void crypto_account_uses_exchange_quote_available_minus_ledgers() {
         UUID accountId = UUID.randomUUID();
         Strategy dca = new Strategy(UUID.randomUUID(), accountId, StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.BTC, StrategyCycleSeedType.NONE);

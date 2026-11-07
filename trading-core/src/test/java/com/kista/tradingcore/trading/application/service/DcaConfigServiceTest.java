@@ -86,6 +86,17 @@ class DcaConfigServiceTest {
     }
 
     @Test
+    void updateConfig_rejects_archived_strategy() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(new Strategy(STRATEGY_ID, ACCOUNT_ID, StrategyType.DCA,
+                StrategyStatus.ARCHIVED, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
+
+        assertThatThrownBy(() -> service.updateConfig(STRATEGY_ID, USER_ID, config(KEY, OrderDirection.BUY, "500")))
+                .isInstanceOf(IllegalStateException.class).hasMessage("보관된 전략은 변경할 수 없습니다.");
+
+        verify(dcaDetailPort, never()).save(any(), any());
+    }
+
+    @Test
     void ruleKey_보존_수정은_같은_키를_유지한다() {
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy(StrategyType.DCA));
         when(dcaDetailPort.findActiveByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(config(KEY, OrderDirection.BUY, "300")));

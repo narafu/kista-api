@@ -1,7 +1,6 @@
 package com.kista.tradingcore.trading.application.service;
 
 import com.kista.shared.kernel.StrategyDefaults;
-import com.kista.shared.kernel.StrategyStatus;
 import com.kista.tradingcore.privacy.domain.model.PrivacyTradeBase;
 import com.kista.tradingcore.trading.domain.model.*;
 import com.kista.tradingcore.matching.domain.model.*;
@@ -70,7 +69,7 @@ class CyclePositionPersistor {
         });
         log.info("[strategyId={}] 사이클 포지션 저장 완료 (isReverseMode={})", strategy.id(), newReverseMode);
 
-        boolean paused = strategy.status() == StrategyStatus.PAUSED;
+        boolean paused = !strategy.isActive();
 
         if (cycleEnds) {
             // 정지 전략은 사이클 종료만 기록한다 — 재개 시 StrategyService.reopenCycleIfEnded가 endAmount로 새 사이클을 연다.

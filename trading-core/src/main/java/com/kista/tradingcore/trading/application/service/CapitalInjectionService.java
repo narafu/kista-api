@@ -213,7 +213,7 @@ class CapitalInjectionService implements InjectCapitalUseCase, WithdrawCapitalUs
     private LockedCycle lockActiveCycle(OwnedStrategy owned, String noActiveMessage, String reportWindowMessage) {
         Strategy strategy = owned.strategy();
         UUID strategyId = strategy.id();
-        // ponytail: StrategyStatus가 ACTIVE/PAUSED 두 값뿐이라 상태 검사는 생략 — 값이 늘면 여기서 거른다
+        strategy.requireNotArchived(); // 보관 전략은 투자금 추가·인출 불가
         StrategyCycle first = strategyCyclePort.requireLatestByStrategyId(strategyId);
         if (first.endDate() != null) {
             throw new IllegalStateException(noActiveMessage);

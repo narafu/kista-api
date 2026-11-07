@@ -75,7 +75,7 @@ public class AdminAccountController {
         switch (body.status()) {
             case ACTIVE -> adminStrategy.resumeStrategy(adminId, accountId, strategyId);
             case PAUSED -> adminStrategy.pauseStrategy(adminId, accountId, strategyId);
-            default -> throw new IllegalArgumentException("허용되지 않는 status: " + body.status());
+            default -> throw new IllegalArgumentException("허용되지 않는 상태입니다.");
         }
     }
 

@@ -100,7 +100,8 @@ class TradingPreviewService {
         // 휴장 거래일이면 계획 계산·브로커 호출 없이 전 전략을 MARKET_CLOSED로 skip — today 기준 1회만 판정
         boolean marketClosed = !marketCalendarPort.isMarketOpen(today);
         // 코인 전략(전부 DCA)은 미리보기 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
-        List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
+        List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of()
+                : strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(); // 보관 전략은 미리보기 제외
 
         // 전략 목록의 현재 사이클을 1회 배치 조회 (전략마다 개별 조회하던 것을 축소)
         List<UUID> strategyIds = strategies.stream().map(Strategy::id).toList();

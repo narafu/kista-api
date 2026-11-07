@@ -58,6 +58,12 @@ com.kista.tradingcore.trading/   ← Spring Modulith 모듈(CLOSED) — 주문/�
 - 계좌당 종목(ticker) 중복 등록 불가 — `StrategyPort.findByAccountIdAndTicker` (계좌당 여러 전략, 종목별 1개 — DCA 포함 전 전략 공통, 중복이면 409 "같은 계좌에 이미 해당 종목 전략이 있습니다.". 한 종목의 매수·매도는 DCA 한 전략의 규칙으로 표현)
 - `cycleSeedType`: 사이클 종료 후 자동 재등록 정책 (기본 `NONE`); **VR은 NONE 강제** — 롤오버가 사이클 교체 담당
 
+### 전략 보관 (ARCHIVED)
+- 보관은 ACTIVE·PAUSED → ARCHIVED 한 방향이다(해제 API·메서드 없음). `StrategyService.archive`(NOT_SUPPORTED — 증권사 취소 HTTP 포함)가 보유 0·당일 접수 주문 마감 반영·미체결 취소 성공을 확인한 뒤 `StrategyStateWriter.archive`로 저장한다. 실패 시 PAUSED로 남는다
+- 보관 전략 변경 거부: `Strategy.requireNotArchived()`를 pause·resume·update·VR 재설정(`VrReconfigureService`)·DCA 설정(`DcaConfigService`)·투자금 추가·인출(`CapitalInjectionService`)·수동 체결 보정(`ManualTradeCorrectionService`)·상태 API(`StrategyStatusInternalController`, ARCHIVED 요청과 보관 전략 ACTIVE 요청 400)에서 호출한다. 삭제는 보관 전략도 허용한다(소프트 삭제, 통계에서 빠짐)
+- 목록·미리보기 제외는 호출부 필터(`!isArchived()`, `includeArchived`)로 한다. `StrategyPort.findByAccountIds`·`findByAccountId`는 보관 포함 그대로 둔다 — 통계(`TradingStatsService`)가 공유하므로 포트에 필터를 넣으면 보관 전략 성과가 사라진다. 계좌당 종목 중복 검사만 보관을 제외한다(`StrategyCreationService`)
+- 신규 상태를 추가하면 `status != PAUSED`가 아니라 `isActive()`로 판정한다 — 배치·정산·리포트 판정이 ARCHIVED를 매매 대상으로 잘못 잡지 않게 한다
+
 ### 전략 원장 상한 (상세 규칙 SSOT → workflow-ledger-price.md)
 - 원장 상한 판정·compute skip·실패 격리 등 실행 규칙 전체는 `docs/agents/workflow-ledger-price.md` "스케쥴러 실행 흐름"이 SSOT — 매매·스케쥴러·주문 로직 작업 시 workflow.md 인덱스 참고
 - `orders.order_leg`는 스케쥴러 내부 leg 식별자 — 신규 전략 주문은 non-blank concrete leg 필수(`UNKNOWN` 잔존 시 배치는 `TradingCandidatePlanner.validateConcreteOrderLegs`가 원장 판정·슬롯 필터 전에 전략 타입과 함께 `IllegalStateException`으로 거절하고, 공용 저장 지점 `TradingOrderPlanner.savePlannedOrders`도 수동 실행·재캡 포함 모든 저장을 거절 — 앞단 검사를 지우면 결함이 원장 부족 알림·슬롯 중복 제외로 가려지므로 둘 다 유지), 과거 행·수동 체결 행은 `UNKNOWN` 유지, 브로커 API payload에 미포함

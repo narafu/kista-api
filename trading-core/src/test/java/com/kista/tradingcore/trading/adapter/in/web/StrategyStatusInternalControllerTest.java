@@ -98,6 +98,36 @@ class StrategyStatusInternalControllerTest {
     }
 
     @Test
+    void ARCHIVED_요청은_400이고_유스케이스를_호출하지_않는다() throws Exception {
+        given(accountPort.findByIdOrThrow(ACCOUNT_ID)).willReturn(account(ACCOUNT_ID));
+        given(strategyPort.findByIdOrThrow(STRATEGY_ID)).willReturn(strategy(STRATEGY_ID, ACCOUNT_ID));
+
+        mockMvc.perform(patch("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/status",
+                        ACCOUNT_ID, STRATEGY_ID)
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .param("status", "ARCHIVED"))
+                .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verifyNoInteractions(strategyUseCase);
+    }
+
+    @Test
+    void ARCHIVED_전략에_ACTIVE_요청은_서비스_예외가_전파돼_400() throws Exception {
+        Account account = account(ACCOUNT_ID);
+        given(accountPort.findByIdOrThrow(ACCOUNT_ID)).willReturn(account);
+        given(strategyPort.findByIdOrThrow(STRATEGY_ID))
+                .willReturn(strategy(STRATEGY_ID, ACCOUNT_ID, StrategyStatus.ARCHIVED));
+        org.mockito.Mockito.doThrow(new IllegalStateException("보관된 전략은 변경할 수 없습니다."))
+                .when(strategyUseCase).resume(STRATEGY_ID, account.userId());
+
+        mockMvc.perform(patch("/api/internal/trading/accounts/{accountId}/strategies/{strategyId}/status",
+                        ACCOUNT_ID, STRATEGY_ID)
+                        .header("X-Internal-Token", VALID_TOKEN)
+                        .param("status", "ACTIVE"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void 이미_같은_상태면_아무것도_하지_않는다() throws Exception {
         given(accountPort.findByIdOrThrow(ACCOUNT_ID)).willReturn(account(ACCOUNT_ID));
         given(strategyPort.findByIdOrThrow(STRATEGY_ID)).willReturn(strategy(STRATEGY_ID, ACCOUNT_ID));

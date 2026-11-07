@@ -25,9 +25,16 @@ class StrategyStateWriter {
     public void pause(UUID strategyId) {
         // 트랜잭션 안에서 다시 읽어 상태만 바꾼다 — 호출자가 앞서 읽은 스냅샷으로 덮어쓰지 않도록
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
-        if (!strategy.isPaused()) {
+        // 보관 전략은 PAUSED로 되돌리지 않는다(삭제 경로 등)
+        if (!strategy.isPaused() && !strategy.isArchived()) {
             strategyPort.save(strategy.withStatus(StrategyStatus.PAUSED));
         }
+    }
+
+    @Transactional
+    public void archive(UUID strategyId) {
+        // 재조회 후 상태만 바꾼다 — pause와 같은 이유로 스냅샷 덮어쓰기 방지
+        strategyPort.save(strategyPort.findByIdOrThrow(strategyId).withStatus(StrategyStatus.ARCHIVED));
     }
 
     @Transactional

@@ -43,7 +43,7 @@ class StrategyEntity extends BaseAuditEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private StrategyStatus status; // 실행 상태 (ACTIVE, PAUSED)
+    private StrategyStatus status; // 실행 상태 (ACTIVE, PAUSED, ARCHIVED)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cycle_seed_type", nullable = false, length = 20)

@@ -19,13 +19,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
@@ -49,7 +52,10 @@ class StrategyService implements StrategyUseCase {
     private final OrderCancelService orderCancelService;           // 일시중지·삭제 전 미체결 주문 정리
     private final ApplicationEventPublisher eventPublisher;       // stats 캐시 무효화 이벤트 발행
     private final CycleCapitalEventPort cycleCapitalEventPort;     // 투자금 추가·인출 이력 존재 확인(시드 수정 거절용)
-    private final StrategyStateWriter stateWriter;                 // 일시중지·삭제 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
+    private final StrategyStateWriter stateWriter;                 // 일시중지·삭제·보관 DB 쓰기 (취소 HTTP를 트랜잭션 밖에 두기 위해 분리)
+    private final OrderPort orderPort;                             // 보관 전 당일 접수 주문 확인
+    private final TradingBatchRunPort batchRunPort;                // 보관 전 당일 마감 리포트 반영 여부
+    private final Clock clock;                                     // 당일(KST) 기준
 
     @Override
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -81,7 +87,8 @@ class StrategyService implements StrategyUseCase {
     public void pause(UUID strategyId, UUID requesterId) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
-        // 중복 상태 guard — 이미 일시중지된 전략은 다시 일시중지 불가 (소유권 검증 이후 수행)
+        strategy.requireNotArchived(); // 보관 전략은 일시중지도 불가 (소유권 검증 이후 수행)
+        // 중복 상태 guard — 이미 일시중지된 전략은 다시 일시중지 불가
         if (strategy.isPaused()) {
             throw new IllegalStateException("이미 일시중지된 전략입니다.");
         }
@@ -95,8 +102,52 @@ class StrategyService implements StrategyUseCase {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED) // 증권사 주문 취소 HTTP 포함 — DB 쓰기는 StrategyStateWriter 짧은 트랜잭션
+    public void archive(UUID strategyId, UUID requesterId) {
+        Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
+        Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        if (strategy.isArchived()) {
+            throw new IllegalStateException("이미 보관된 전략입니다.");
+        }
+        // 보유 수량이 남은 전략은 보관 불가 — 보관 후엔 원장이 갱신되지 않으므로 포지션이 비어 있어야 한다(포지션 없음은 통과)
+        boolean holdsShares = cyclePositionPort.findLatestOneByStrategyId(strategyId)
+                .map(position -> position.holdings().signum() != 0)
+                .orElse(false);
+        if (holdsShares) {
+            throw new IllegalStateException("보유 수량을 모두 매도한 뒤 보관할 수 있습니다.");
+        }
+        requireTodayOrdersReported(strategyId, account);
+        // PAUSED로 먼저 기록해 이후 배치가 새 주문을 만들지 않게 한 뒤 미체결 주문을 정리한다 — 취소 실패 시 PAUSED로 남는다
+        orderCancelService.requireNoCryptoInFlight(strategyId, account);
+        stateWriter.pause(strategyId);
+        CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
+        if (cancelled.retryableFailedCount() > 0) {
+            throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 보관할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
+        }
+        // 첫 점검과 PAUSED 기록 사이에 접수된 주문 재점검 — 마감 반영 전이면 PAUSED로 남기고 거부
+        requireTodayOrdersReported(strategyId, account);
+        stateWriter.archive(strategyId);
+        log.info("[strategyId={}] 전략 보관: cancelledOrders={}", strategyId, cancelled.cancelledCount());
+    }
+
+    // 접수 주문이 마감 리포트에 반영되기 전에 보관하면 체결이 원장에 남지 않는다 — OrderCancelService와 같이 오늘·다음 거래일(개장 배치 tradeDate) 둘 다 본다
+    // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니라 제외. 코인은 리포트 마커가 없어(ManualTradeCorrectionService와 동일) 건너뛰고 체결 확인 중 주문은 requireNoCryptoInFlight가 막는다
+    private void requireTodayOrdersReported(UUID strategyId, Account account) {
+        if (account.broker().getMarket().isCrypto()) return;
+        ZonedDateTime now = ZonedDateTime.now(clock);
+        for (LocalDate date : Stream.of(now.toLocalDate(), DstInfo.nextTradeDate(now)).distinct().toList()) {
+            boolean hasPlaced = orderPort.findByStrategyId(strategyId, date, date).stream()
+                    .anyMatch(o -> o.externalOrderId() != null && !Order.UNKNOWN_LEG.equals(o.orderLeg()));
+            if (hasPlaced && !batchRunPort.isReported(date, strategyId)) {
+                throw new IllegalStateException("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
+            }
+        }
+    }
+
+    @Override
     public void resume(UUID strategyId, UUID requesterId) {
         Strategy strategy = requireOwnedStrategy(strategyId, requesterId);
+        strategy.requireNotArchived(); // 보관은 한 방향 — 재개 불가
         // 중복 상태 guard — 이미 활성화된 전략은 재활성화 불가 (소유권 검증 이후 수행)
         if (strategy.isActive()) {
             throw new IllegalStateException("이미 활성화된 전략입니다.");
@@ -146,7 +197,7 @@ class StrategyService implements StrategyUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StrategyDetail> listByUserId(UUID userId) {
+    public List<StrategyDetail> listByUserId(UUID userId, boolean includeArchived) {
         List<Account> accounts = accountPort.findByUserId(userId);
         List<UUID> accountIds = accounts.stream().map(Account::id).toList();
         Map<UUID, Market> marketByAccountId = accounts.stream()
@@ -154,6 +205,7 @@ class StrategyService implements StrategyUseCase {
         Map<UUID, List<Strategy>> strategiesByAccount = strategyPort.findByAccountIds(accountIds);
         List<Strategy> strategies = accountIds.stream()
                 .flatMap(id -> strategiesByAccount.getOrDefault(id, List.of()).stream())
+                .filter(s -> includeArchived || !s.isArchived()) // 보관 전략은 요청 시에만 포함
                 .toList();
         return detailAssembler.toDetails(strategies, marketByAccountId);
     }
@@ -162,7 +214,7 @@ class StrategyService implements StrategyUseCase {
     @Transactional(readOnly = true)
     public List<StrategyDetail> listByAccountId(UUID accountId, UUID requesterId) {
         Account account = accountPort.requireOwnedAccount(accountId, requesterId);
-        return detailAssembler.toDetails(strategyPort.findByAccountId(accountId), Map.of(accountId, account.broker().getMarket()));
+        return detailAssembler.toDetails(strategyPort.findByAccountId(accountId).stream().filter(s -> !s.isArchived()).toList(), Map.of(accountId, account.broker().getMarket()));
     }
 
     @Override
@@ -177,6 +229,7 @@ class StrategyService implements StrategyUseCase {
     public StrategyDetail update(UUID strategyId, UUID requesterId, UpdateStrategyCommand cmd) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        strategy.requireNotArchived();
         if (strategy.isVr() && cmd.newSeed() != null) {
             throw new IllegalArgumentException("VR 전략의 시작 예수금은 일반 수정으로 변경할 수 없습니다. VR 재설정을 이용해야 합니다.");
         }

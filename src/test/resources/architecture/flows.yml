@@ -888,16 +888,16 @@ flows:
     trigger: 사용자가 전략 화면에서 일시정지·재개·삭제를 누르거나, 관리자가 계좌 화면에서 전략 상태를 바꾼다
     summary: >-
       전략의 상태(ACTIVE·PAUSED)만 바꾸면 배치가 그 전략을 다루거나 건너뛴다. 재개할 때 사이클이 이미 끝나 있으면 새 사이클을 열고,
-      삭제하면 전략·사이클·포지션을 삭제 처리한다. 일시정지·삭제 모두 오늘 미체결 주문을 먼저 정리한다(PLANNED 삭제, PLACED 증권사 취소).
+      보관하면 ARCHIVED로 바꿔 매매를 멈추고 목록에서 숨기되 통계는 유지한다(되돌릴 수 없음). 삭제하면 전략·사이클·포지션을 삭제 처리한다. 일시정지·보관·삭제 모두 오늘 미체결 주문을 먼저 정리한다(PLANNED 삭제, PLACED 증권사 취소).
     steps:
       - id: request
         lane: ui
         to: [trading]
         title: 사용자 요청
         desc: >-
-          전략 카드·상세의 버튼(useManageStrategyMutations)이 kista-trading으로 바로 PATCH /api/trading-cycles/{id}/pause, PATCH .../resume, DELETE /api/trading-cycles/{id}를 보낸다.
+          전략 카드·상세의 버튼(useManageStrategyMutations)이 kista-trading으로 바로 PATCH /api/trading-cycles/{id}/pause, PATCH .../resume, PATCH .../archive, DELETE /api/trading-cycles/{id}를 보낸다.
           삭제는 "진행 중인 사이클이 종료됩니다" 확인 대화상자를 거친다. 성공하면 주문·통계·거래 화면 캐시를 새로 고친다.
-        code: [TradingCycleController#pause, TradingCycleController#resume, TradingCycleController#delete]
+        code: [TradingCycleController#pause, TradingCycleController#resume, TradingCycleController#archive, TradingCycleController#delete]
         fail: 실패하면 "일시정지에 실패했습니다"·"재개에 실패했습니다"·"삭제에 실패했습니다" 토스트(서버 detail이 있으면 그 문구).
 
       - id: pause
@@ -932,18 +932,29 @@ flows:
         desc: >-
           소유권을 확인한 뒤 일시정지와 같은 규칙으로 PAUSED 기록·미체결 주문 정리를 먼저 하고, 일시 장애로 증권사 취소에 실패한 주문이 있으면 삭제하지 않는다(전략은 PAUSED로 남는다).
           자격증명 오류(키 만료·철회)로 실패한 주문은 재시도해도 풀리지 않으므로 삭제를 막지 않는다 — 그 주문은 PLACED로 남고 관리자에게 알린다.
-          정리가 끝나면 포지션 기록 → 사이클 → 전략 순으로 한 트랜잭션에서 삭제 처리(소프트 삭제)한다. 삭제된 전략은 목록·배치·통계에서 빠지고 주문 이력(orders)은 보존한다.
+          정리가 끝나면 포지션 기록 → 사이클 → 전략 순으로 한 트랜잭션에서 삭제 처리(소프트 삭제)한다. 삭제된 전략은 목록·배치·통계에서 빠지고(통계에서도 빠짐 — 남기려면 보관) 주문 이력(orders)은 보존한다.
         code: [StrategyService#delete, OrderCancelService#cancelOpenOrders, StrategyStateWriter#delete]
         state: "orders PLANNED 삭제·PLACED → CANCELLED · cycle_position·strategy_cycle·strategy → 삭제됨"
         fail: 증권사 취소에 실패한 주문이 있으면 400(삭제 안 됨·PAUSED 유지, 관리자 알림). 내 전략이 아니면 403, 없으면 404.
+
+      - id: archive
+        lane: trading
+        to: [broker, db]
+        title: 보관
+        desc: >-
+          소유권을 확인한 뒤 이미 보관된 전략이면 거부한다. 보유 수량이 남았거나, 당일 접수 주문이 마감 리포트에 아직 반영되지 않았으면 거부한다(반영 전에 보관하면 체결이 원장에 남지 않는다).
+          일시정지와 같은 방식으로 PAUSED를 먼저 기록해 새 주문을 막고 미체결 주문을 정리한 뒤, 증권사 취소에 실패한 주문이 있으면 보관하지 않는다(PAUSED로 남는다). 정리가 끝나면 ARCHIVED로 바꾼다. 보관은 되돌릴 수 없고, 사이클·통계는 그대로 남는다.
+        code: [TradingCycleController#archive, StrategyService#archive, OrderCancelService#cancelOpenOrders, StrategyStateWriter#archive]
+        state: "orders PLANNED 삭제·PLACED → CANCELLED · strategy → PAUSED → ARCHIVED"
+        fail: 이미 보관된 전략이면 400, 보유 수량이 남았거나 당일 접수 주문이 마감 반영 전이면 400, 증권사 취소에 실패한 주문이 있으면 400(보관 안 됨·PAUSED 유지). 내 전략이 아니면 403, 없으면 404.
 
       - id: admin-request
         lane: ui
         to: [api]
         title: 관리자 상태 변경 요청
-        desc: 관리자 계좌 화면이 PATCH /api/admin/accounts/{accountId}/strategies/{strategyId}/status에 ACTIVE(재개) 또는 PAUSED(일시중지)를 보낸다. 이 경로는 kista-api가 받는다. 삭제는 관리자 화면에 없다.
+        desc: 관리자 계좌 화면이 PATCH /api/admin/accounts/{accountId}/strategies/{strategyId}/status에 ACTIVE(재개) 또는 PAUSED(일시중지)를 보낸다. 이 경로는 kista-api가 받는다. 삭제·보관은 관리자 화면에 없다.
         code: [AdminAccountController#updateStrategyStatus]
-        fail: ACTIVE·PAUSED 외 값이면 400.
+        fail: ACTIVE·PAUSED 외 값(ARCHIVED 포함)이면 400.
 
       - id: admin-forward
         lane: api
@@ -961,8 +972,9 @@ flows:
         title: 관리자 상태 적용
         desc: >-
           trading은 전략이 그 계좌 소속인지 확인하고, 이미 같은 상태면 아무것도 하지 않는다. 다른 상태면 사용자의 일시정지·재개와 같은 서비스(소유자 ID로 호출)를 쓰므로
-          관리자 재개도 종료된 사이클을 다시 열어 준다.
+          관리자 재개도 종료된 사이클을 다시 열어 준다. 보관 전략은 상태를 바꾸지 않고, ARCHIVED 요청과 보관 전략에 대한 ACTIVE 요청은 거부한다.
         code: [StrategyStatusInternalController#updateStatus, StrategyService#pause, StrategyService#resume]
+        fail: ARCHIVED 요청이거나 보관 전략에 ACTIVE 요청이면 400, 상태는 그대로다.
         state: "strategy → PAUSED / ACTIVE"
 
   manual-run:
@@ -1681,10 +1693,11 @@ lifecycles:
   strategy:
     title: 전략
     enum: StrategyStatus
-    summary: 등록하면 ACTIVE로 매일 배치 대상이 된다. 사용자·관리자가 멈추거나, 사이클이 끝났는데 다음 사이클을 열 수 없으면 시스템이 PAUSED로 바꾼다.
+    summary: 등록하면 ACTIVE로 매일 배치 대상이 된다. 사용자·관리자가 멈추거나, 사이클이 끝났는데 다음 사이클을 열 수 없으면 시스템이 PAUSED로 바꾼다. 사용자가 보관하면 ARCHIVED가 되며, 되돌릴 수 없다.
     states:
       - {id: ACTIVE, label: 운영중, desc: 매일 배치 대상}
       - {id: PAUSED, label: 일시중지, desc: 배치 제외}
+      - {id: ARCHIVED, label: 보관됨, desc: "매매 제외·목록 숨김, 통계 유지 (한 방향)"}
     transitions:
       - {to: ACTIVE, title: 전략 등록, code: [StrategyCreationService#register], flow: strategy-register/save}
       - {from: ACTIVE, to: PAUSED, title: 사용자 일시정지, code: [StrategyService#pause], flow: pause-stop/pause}
@@ -1700,7 +1713,10 @@ lifecycles:
         flow: close-batch/rotate
       - {from: ACTIVE, to: PAUSED, title: 수동 체결 보정으로 보유 0, code: [ManualTradeCorrectionService#correctManualFills, CycleCloser#closeIfExhausted], tag: 관리자, flow: admin-orders/close-cycle}
       - {from: PAUSED, to: ACTIVE, title: 재개, desc: 사이클이 끝나 있으면 새 사이클을 다시 연다., code: [StrategyService#resume, AdminStrategyService#resumeStrategy], flow: pause-stop/resume}
-      - {from: ACTIVE, title: 전략 삭제·회원 탈퇴, desc: 상태와 무관한 소프트 삭제(사이클 이력 포함)., code: [StrategyService#delete, TradingUserCascadeListener#onUserDeleted], flow: withdraw/trading-cleanup}
+      - {from: ACTIVE, to: ARCHIVED, title: 사용자 보관, desc: "보유 0·당일 접수 주문 마감 반영·미체결 취소 성공일 때만. 보관 후 되돌릴 수 없다.", code: [StrategyService#archive], flow: pause-stop/archive}
+      - {from: PAUSED, to: ARCHIVED, title: 사용자 보관, desc: "보유 0·당일 접수 주문 마감 반영·미체결 취소 성공일 때만. 보관 후 되돌릴 수 없다.", code: [StrategyService#archive], flow: pause-stop/archive}
+      - {from: ACTIVE, title: 전략 삭제·회원 탈퇴, desc: "상태와 무관한 소프트 삭제(사이클 이력 포함). 통계에서도 빠짐 — 남기려면 보관.", code: [StrategyService#delete, TradingUserCascadeListener#onUserDeleted], flow: withdraw/trading-cleanup}
+      - {from: ARCHIVED, title: 보관 전략 삭제, desc: "보관된 전략도 같은 소프트 삭제 규칙을 따른다. 통계에서도 빠짐.", code: [StrategyService#delete], flow: pause-stop/delete}
 
   order:
     title: 주문

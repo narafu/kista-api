@@ -34,6 +34,7 @@ class DcaConfigService implements DcaConfigUseCase {
     public void updateConfig(UUID strategyId, UUID requesterId, DcaStrategyConfig requested) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        strategy.requireNotArchived();
         if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
         requested.requireCompatible(account.broker().getMarket()); // 수정도 등록과 같은 시장 규칙 — executionHour 수정 가능
         DcaStrategyConfig current = dcaDetailPort.findActiveByStrategyId(strategyId)

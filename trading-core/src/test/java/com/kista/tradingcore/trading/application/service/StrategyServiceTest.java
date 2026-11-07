@@ -21,6 +21,8 @@ import com.kista.tradingcore.broker.application.port.output.MarginPort;
 import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.OrderTiming;
 import com.kista.tradingcore.trading.domain.creation.DcaCreationResolver;
 import com.kista.tradingcore.trading.domain.creation.InfiniteCreationResolver;
 import com.kista.tradingcore.trading.domain.creation.PrivacyCreationResolver;
@@ -83,6 +85,7 @@ class StrategyServiceTest {
     @Mock DcaExecutionPort dcaExecutionPort;                     // DCA 회차 이력 포트
     @Mock MarketCalendarPort marketCalendarPort;                 // DCA 다음 실행일 계산용 캘린더
     @Mock CycleCapitalEventPort cycleCapitalEventPort;           // 투자금 추가·인출 이력 존재 확인
+    @Mock TradingBatchRunPort batchRunPort;                      // 보관 전 당일 마감 반영 여부
     @Mock OrderCancelService orderCancelService;                 // 일시중지·삭제 전 미체결 주문 정리
 
     private StrategyService strategyService;
@@ -101,6 +104,12 @@ class StrategyServiceTest {
     // PAUSED 상태 전략 픽스처
     private static final Strategy PAUSED_STRATEGY = new Strategy(
             STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.PAUSED,
+            StrategyTicker.SOXL, StrategyCycleSeedType.NONE
+    );
+
+    // ARCHIVED 상태 전략 픽스처
+    private static final Strategy ARCHIVED_STRATEGY = new Strategy(
+            STRATEGY_ID, ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ARCHIVED,
             StrategyTicker.SOXL, StrategyCycleSeedType.NONE
     );
 
@@ -153,7 +162,8 @@ class StrategyServiceTest {
                 orderCancelService,
                 eventPublisher,
                 cycleCapitalEventPort,
-                new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort));
+                new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort),
+                orderPort, batchRunPort, FIXED);
         lenient().when(orderCancelService.cancelOpenOrders(any(), any())).thenReturn(new CancelResult(0, 0));
         for (StrategyType type : StrategyType.values()) {
             lenient().when(strategyCreationPolicyPort.find(type)).thenReturn(Optional.of(defaultTradingSettings(type)));
@@ -406,6 +416,261 @@ class StrategyServiceTest {
         verify(strategyPort, never()).delete(any());
         verify(strategyCyclePort, never()).deleteByStrategyId(any());
         verify(cyclePositionPort, never()).deleteByStrategyId(any());
+    }
+
+    @Test
+    void pause_keeps_archived_status() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ARCHIVED_STRATEGY);
+
+        new StrategyStateWriter(strategyPort, strategyCyclePort, cyclePositionPort).pause(STRATEGY_ID);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    private static final String ARCHIVED_MESSAGE = "보관된 전략은 변경할 수 없습니다.";
+
+    @Test
+    void pause_rejects_archived_strategy() {
+        stubArchivable(ARCHIVED_STRATEGY);
+
+        assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class).hasMessage(ARCHIVED_MESSAGE);
+
+        verify(orderCancelService, never()).cancelOpenOrders(any(), any());
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    void resume_rejects_archived_strategy() {
+        stubArchivable(ARCHIVED_STRATEGY);
+
+        assertThatThrownBy(() -> strategyService.resume(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class).hasMessage(ARCHIVED_MESSAGE);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    void update_rejects_archived_strategy() {
+        stubArchivable(ARCHIVED_STRATEGY);
+
+        assertThatThrownBy(() -> strategyService.update(STRATEGY_ID, USER_ID,
+                new UpdateStrategyCommand(null, new BigDecimal("3000"))))
+                .isInstanceOf(IllegalStateException.class).hasMessage(ARCHIVED_MESSAGE);
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    // --- 목록 보관 전략 제외 ---
+
+    private void stubListing(Strategy active, Strategy archived) {
+        Account account = ownerAccount();
+        lenient().when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(account));
+        lenient().when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        lenient().when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(active, archived)));
+        lenient().when(strategyPort.findByAccountId(ACCOUNT_ID)).thenReturn(List.of(active, archived));
+        lenient().when(strategyCyclePort.findLatestByStrategyIds(any())).thenReturn(Map.of());
+    }
+
+    private static Strategy archivedWithNewId() {
+        return new Strategy(UUID.randomUUID(), ACCOUNT_ID, StrategyType.INFINITE, StrategyStatus.ARCHIVED,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+    }
+
+    @Test
+    void listByUserId_excludes_archived_by_default() {
+        stubListing(ACTIVE_STRATEGY, archivedWithNewId());
+
+        assertThat(strategyService.listByUserId(USER_ID, false)).extracting(d -> d.strategy().id())
+                .containsExactly(STRATEGY_ID);
+    }
+
+    @Test
+    void listByUserId_includes_archived_when_requested() {
+        stubListing(ACTIVE_STRATEGY, archivedWithNewId());
+
+        assertThat(strategyService.listByUserId(USER_ID, true)).hasSize(2);
+    }
+
+    @Test
+    void listByAccountId_excludes_archived() {
+        stubListing(ACTIVE_STRATEGY, archivedWithNewId());
+
+        assertThat(strategyService.listByAccountId(ACCOUNT_ID, USER_ID)).extracting(d -> d.strategy().id())
+                .containsExactly(STRATEGY_ID);
+    }
+
+    private void stubArchivable(Strategy strategy) {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(strategy);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+    }
+
+    private static CyclePosition positionWithHoldings(int holdings) {
+        return new CyclePosition(UUID.randomUUID(), CYCLE_ID, new BigDecimal("500"), new BigDecimal("110"),
+                new BigDecimal("100"), BigDecimal.valueOf(holdings), null, null);
+    }
+
+    private static Order todayOrder(String externalOrderId, String leg) {
+        return new Order(UUID.randomUUID(), ACCOUNT_ID, CYCLE_ID, LocalDate.now(FIXED), StrategyTicker.SOXL,
+                OrderType.LOC, OrderTiming.AT_CLOSE, OrderDirection.BUY, leg, BigDecimal.ONE, BigDecimal.TEN,
+                OrderStatus.PLACED, externalOrderId, null, null);
+    }
+
+    @Test
+    void archive_saves_strategy_as_archived() {
+        stubArchivable(ACTIVE_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(positionWithHoldings(0)));
+
+        strategyService.archive(STRATEGY_ID, USER_ID);
+
+        // pause 기록 → 미체결 정리 → archive 기록 순서
+        var inOrder = inOrder(strategyPort, orderCancelService);
+        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.PAUSED));
+        inOrder.verify(orderCancelService).cancelOpenOrders(eq(STRATEGY_ID), any());
+        inOrder.verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void archive_rejects_when_holdings_nonzero() {
+        stubArchivable(ACTIVE_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(positionWithHoldings(3)));
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("보유 수량을 모두 매도한 뒤 보관할 수 있습니다.");
+
+        verify(orderCancelService, never()).cancelOpenOrders(any(), any());
+    }
+
+    @Test
+    void archive_allows_when_no_position() {
+        stubArchivable(ACTIVE_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+
+        strategyService.archive(STRATEGY_ID, USER_ID);
+
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void archive_rejects_when_today_orders_not_reported() {
+        stubArchivable(PAUSED_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        when(orderPort.findByStrategyId(STRATEGY_ID, LocalDate.now(FIXED), LocalDate.now(FIXED)))
+                .thenReturn(List.of(todayOrder("ODNO1", "LOC_BUY")));
+        when(batchRunPort.isReported(LocalDate.now(FIXED), STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    void archive_rejects_when_next_trade_date_orders_not_reported() {
+        LocalDate nextDate = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate(java.time.ZonedDateTime.now(FIXED));
+        stubArchivable(PAUSED_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        lenient().when(orderPort.findByStrategyId(STRATEGY_ID, LocalDate.now(FIXED), LocalDate.now(FIXED))).thenReturn(List.of()); // 오늘 날짜 주문 없음
+        when(orderPort.findByStrategyId(STRATEGY_ID, nextDate, nextDate)).thenReturn(List.of(todayOrder("ODNO1", "LOC_BUY")));
+        when(batchRunPort.isReported(nextDate, STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
+
+        verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    void archive_recheck_after_cancel_catches_order_placed_in_between() {
+        LocalDate nextDate = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate(java.time.ZonedDateTime.now(FIXED));
+        stubArchivable(PAUSED_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        // 첫 점검(보관 전)엔 없고 취소 뒤 재점검에서 접수 주문이 보인다
+        lenient().when(orderPort.findByStrategyId(STRATEGY_ID, LocalDate.now(FIXED), LocalDate.now(FIXED))).thenReturn(List.of()); // 오늘 날짜 주문 없음
+        when(orderPort.findByStrategyId(STRATEGY_ID, nextDate, nextDate))
+                .thenReturn(List.of()).thenReturn(List.of(todayOrder("ODNO1", "LOC_BUY")));
+        when(batchRunPort.isReported(nextDate, STRATEGY_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("오늘 접수된 주문이 마감 반영된 뒤 보관할 수 있습니다.");
+
+        verify(strategyPort, never()).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void archive_skips_report_check_for_crypto_account() {
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(PAUSED_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(TradingFixtures.upbitAccount(ACCOUNT_ID, USER_ID));
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        lenient().when(orderPort.findByStrategyId(any(), any(), any())).thenReturn(List.of(todayOrder("UUID1", "DCA")));
+        lenient().when(batchRunPort.isReported(any(), any())).thenReturn(false); // 코인은 리포트 마커가 없다
+
+        strategyService.archive(STRATEGY_ID, USER_ID);
+
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void archive_allows_when_today_orders_already_reported() {
+        stubArchivable(PAUSED_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        when(orderPort.findByStrategyId(STRATEGY_ID, LocalDate.now(FIXED), LocalDate.now(FIXED)))
+                .thenReturn(List.of(todayOrder("ODNO1", "LOC_BUY")));
+        when(batchRunPort.isReported(LocalDate.now(FIXED), STRATEGY_ID)).thenReturn(true);
+
+        strategyService.archive(STRATEGY_ID, USER_ID);
+
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void archive_rejects_already_archived() {
+        stubArchivable(ARCHIVED_STRATEGY);
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("이미 보관된 전략입니다.");
+    }
+
+    @Test
+    void archive_aborts_when_cancel_fails() {
+        Account account = ownerAccount();
+        when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+        when(orderCancelService.cancelOpenOrders(STRATEGY_ID, account)).thenReturn(new CancelResult(0, 1));
+
+        assertThatThrownBy(() -> strategyService.archive(STRATEGY_ID, USER_ID))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("증권사 주문 취소에 실패한 주문이 있어 보관할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
+
+        verify(strategyPort, never()).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void archive_from_paused_succeeds() {
+        stubArchivable(PAUSED_STRATEGY);
+        when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
+
+        strategyService.archive(STRATEGY_ID, USER_ID);
+
+        verify(strategyPort).save(argThat(s -> s.status() == StrategyStatus.ARCHIVED));
+    }
+
+    @Test
+    void delete_archived_strategy_soft_deletes() {
+        stubArchivable(ARCHIVED_STRATEGY);
+
+        strategyService.delete(STRATEGY_ID, USER_ID);
+
+        // ARCHIVED는 PAUSED로 되돌려 저장하지 않고 취소·소프트 삭제만 진행한다
+        verify(strategyPort, never()).save(any());
+        verify(orderCancelService).cancelOpenOrders(eq(STRATEGY_ID), any());
+        verify(strategyPort).delete(STRATEGY_ID);
     }
 
     @Test
@@ -795,7 +1060,7 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyAId, strategyBId)))
                 .thenReturn(Map.of(strategyAId, CYCLE, strategyBId, CYCLE));
 
-        List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> result = strategyService.listByUserId(USER_ID, false);
 
         assertThat(result).extracting(d -> d.strategy().id())
                 .containsExactlyInAnyOrder(strategyAId, strategyBId);
@@ -1621,7 +1886,7 @@ class StrategyServiceTest {
                         new BigDecimal("500.00"), new BigDecimal("700"), new BigDecimal("0.50"), 10,
                         10, 52, 26, 20, new BigDecimal("0.50"), 52, 26, new BigDecimal("0.50")));
 
-        List<StrategyDetail> result = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> result = strategyService.listByUserId(USER_ID, false);
 
         assertThat(result).hasSize(1);
         StrategyDetail detail = result.getFirst();
@@ -1654,7 +1919,7 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyIds(List.of(vrStrategyId))).thenReturn(Map.of(vrStrategyId, vrCycle));
         // cyclePositionPort.findFirstByCycleIds는 stub하지 않음 — 빈 Map 기본값으로 개장 포지션 누락을 재현
 
-        assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
+        assertThatThrownBy(() -> strategyService.listByUserId(USER_ID, false))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
@@ -1697,7 +1962,7 @@ class StrategyServiceTest {
         when(strategyInfiniteDetailPort.findByStrategyVersionIds(List.of(versionId))).thenReturn(Map.of(versionId, infiniteDetail));
         when(cyclePositionInfiniteDetailPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, reverseDetail));
 
-        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID, false);
 
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
@@ -1747,7 +2012,7 @@ class StrategyServiceTest {
         when(strategyVrDetailPort.findByStrategyVersionIds(List.of(versionId))).thenReturn(Map.of(versionId, vrDetail));
         when(strategyCycleVrPort.findByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, cycleVr));
 
-        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID, false);
 
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
@@ -1783,7 +2048,7 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, cycle));
         when(cyclePositionPort.findLatestByCycleIds(List.of(cycleId))).thenReturn(Map.of(cycleId, position));
 
-        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID, false);
 
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
@@ -1817,7 +2082,7 @@ class StrategyServiceTest {
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
         when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, endedCycle));
 
-        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID, false);
 
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
@@ -1845,7 +2110,7 @@ class StrategyServiceTest {
         when(accountPort.findByUserId(USER_ID)).thenReturn(List.of(ownerAccount()));
         when(strategyPort.findByAccountIds(List.of(ACCOUNT_ID))).thenReturn(Map.of(ACCOUNT_ID, List.of(strategy)));
 
-        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID);
+        List<StrategyDetail> batch = strategyService.listByUserId(USER_ID, false);
 
         assertThat(batch).hasSize(1);
         assertThat(batch.getFirst()).isEqualTo(single);
@@ -1882,7 +2147,7 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyId))).thenReturn(Map.of(strategyId, cycle));
         // cyclePositionPort.findFirstByCycleIds도 stub하지 않음 — 빈 Map 기본값
 
-        assertThatThrownBy(() -> strategyService.listByUserId(USER_ID))
+        assertThatThrownBy(() -> strategyService.listByUserId(USER_ID, false))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("VR 시작 포지션이 없습니다");
     }
@@ -1909,7 +2174,7 @@ class StrategyServiceTest {
         when(strategyCyclePort.findLatestByStrategyIds(List.of(strategyAId, strategyBId)))
                 .thenReturn(Map.of(strategyAId, cycleA, strategyBId, cycleB));
 
-        strategyService.listByUserId(USER_ID);
+        strategyService.listByUserId(USER_ID, false);
 
         verify(strategyPort, never()).findByAccountId(any());
         verify(strategyCyclePort, never()).findLatestByStrategyId(any());
@@ -2490,6 +2755,25 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
                 BigDecimal.valueOf(Integer.MAX_VALUE).add(BigDecimal.ONE), new BigDecimal("40"))))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("허용 범위");
         verify(strategyPort, never()).save(any());
+    }
+
+    @Test
+    void validateUniqueTicker_ignores_archived() {
+        when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Optional.of(new StrategyCreationSettings(true,
+                new StrategyFieldSettings<>(true, List.of(StrategyTicker.UPRO, StrategyTicker.QLD), StrategyTicker.UPRO),
+                null, null, null, null)));
+        when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
+        when(strategyPort.findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO)).thenReturn(List.of(new Strategy(
+                UUID.randomUUID(), ACCOUNT_ID, StrategyType.DCA, StrategyStatus.ARCHIVED, StrategyTicker.UPRO, StrategyCycleSeedType.NONE)));
+
+        // 보관 전략만 있으면 중복이 아니다 — 409가 아닌 다른 경로(이후 단계)로 진행해야 한다
+        try {
+            strategyService.register(USER_ID, ACCOUNT_ID, dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.SELL)));
+        } catch (RuntimeException e) {
+            assertThat(e).isNotInstanceOf(DuplicateStrategyTickerException.class);
+        }
+        // 중복 검사가 실제로 실행됐는지 — 그 전에 다른 예외로 끝나 통과하는 것을 막는다
+        verify(strategyPort).findByAccountIdAndTicker(ACCOUNT_ID, StrategyTicker.UPRO);
     }
 
     @Test

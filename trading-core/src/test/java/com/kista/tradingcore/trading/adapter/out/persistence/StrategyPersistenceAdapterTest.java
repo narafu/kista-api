@@ -64,6 +64,17 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
     }
 
     @Test
+    void findByAccountIds_includes_archived() {
+        // 통계 경로(findByAccountId(s))는 보관 전략을 포함해야 한다 — 목록 제외는 서비스 계층 필터 몫
+        Strategy archived = strategyAdapter.save(new Strategy(null, accountId, StrategyType.INFINITE,
+                StrategyStatus.ARCHIVED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+
+        assertThat(strategyAdapter.findByAccountIds(List.of(accountId)).get(accountId))
+                .extracting(Strategy::id).containsExactly(archived.id());
+        assertThat(strategyAdapter.findByAccountId(accountId)).extracting(Strategy::id).containsExactly(archived.id());
+    }
+
+    @Test
     void findAllActive_usesNotifyProfileActiveFlag_notUsersTable() {
         // 활성 프로필 → 포함 (trading 스키마엔 users 테이블이 없어 users 비의존은 스키마가 보장한다)
         Strategy included = saveActiveStrategy(insertAccountOfUser(Boolean.TRUE), StrategyTicker.SOXL);

@@ -62,6 +62,7 @@ class VrReconfigureService implements VrReconfigureUseCase {
     public void reconfigure(UUID strategyId, UUID requesterId, ReconfigureVrCommand cmd) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         Account account = accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
+        strategy.requireNotArchived();
         if (!strategy.isVr()) {
             throw new IllegalArgumentException("VR 전략만 재설정할 수 있습니다.");
         }

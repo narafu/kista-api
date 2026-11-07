@@ -191,7 +191,8 @@ class StrategyCreationService {
     }
 
     private void validateUniqueTicker(UUID accountId, StrategyTicker ticker) {
-        if (!strategyPort.findByAccountIdAndTicker(accountId, ticker).isEmpty()) {
+        // 보관 전략은 같은 종목 재등록을 막지 않는다
+        if (strategyPort.findByAccountIdAndTicker(accountId, ticker).stream().anyMatch(s -> !s.isArchived())) {
             throw new DuplicateStrategyTickerException(); // 409 — 전 전략 유형 공통
         }
     }

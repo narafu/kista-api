@@ -49,8 +49,9 @@ public class TradingCycleController {
     // 로그인 사용자의 전 계좌 전략 목록 — 모바일 전략 탭용
     @Operation(summary = "내 전체 거래 사이클 목록")
     @GetMapping("/api/trading-cycles")
-    public List<TradingCycleResponse> listMine(@AuthenticationPrincipal UUID userId) {
-        return tradingCycle.listByUserId(userId).stream()
+    public List<TradingCycleResponse> listMine(@AuthenticationPrincipal UUID userId,
+                                                @RequestParam(defaultValue = "false") boolean includeArchived) {
+        return tradingCycle.listByUserId(userId, includeArchived).stream()
                 .map(TradingCycleResponse::from)
                 .toList();
     }
@@ -163,6 +164,16 @@ public class TradingCycleController {
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId) {
         tradingCycle.pause(id, userId);
+    }
+
+    // 거래 사이클 보관 (→ ARCHIVED, 해제 없음)
+    @Operation(summary = "전략 보관", description = "보유 수량이 없고 당일 접수 주문이 마감 반영된 전략만 보관한다. 미체결 주문을 정리한 뒤 ARCHIVED로 바꾸며 되돌릴 수 없다.")
+    @PatchMapping("/api/trading-cycles/{id}/archive")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void archive(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UUID userId) {
+        tradingCycle.archive(id, userId);
     }
 
     // 거래 사이클 재개 (PAUSED → ACTIVE)

@@ -321,6 +321,19 @@ class TradingPreviewServiceTest {
     }
 
     @Test
+    void previewBatch_skips_archived() {
+        Strategy archived = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ARCHIVED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        PlannedOrder sellOrder = PlannedOrder.of(LocalDate.now(FIXED), StrategyTicker.SOXL, OrderType.LIMIT,
+                OrderDirection.SELL, 3, new BigDecimal("25.00"));
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, archived));
+        when(planBuilder.build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any()))
+                .thenReturn(new StrategyOrderPlanBuilder.PlanResult(new CycleOrderStrategy.OrderPlan(null, null, List.of(sellOrder)), null));
+
+        assertThat(service.previewBatch(ACCOUNT.id(), ACCOUNT.userId())).containsOnlyKeys(STRATEGY.id());
+    }
+
+    @Test
     void previewBatch_omitsStrategy_whenNoCycleHistory() {
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY));
         when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id()))).thenReturn(Map.of());

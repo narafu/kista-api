@@ -159,6 +159,15 @@ class TradingCycleControllerTest {
     }
 
     @Test
+    void archive_returns_204() throws Exception {
+        mockMvc.perform(patch("/api/trading-cycles/{id}/archive", CYCLE_ID)
+                        .with(csrf()).with(authentication(userToken(USER_ID))))
+                .andExpect(status().isNoContent());
+
+        verify(tradingCycle).archive(CYCLE_ID, USER_ID);
+    }
+
+    @Test
     void cancelExecute_success_returnsCancelResult() throws Exception {
         when(tradingExecution.cancelByCycle(any(), any()))
                 .thenReturn(new CancelResult(2, 1));
@@ -257,12 +266,24 @@ class TradingCycleControllerTest {
                         com.kista.shared.kernel.StrategyTicker.SOXL,
                         com.kista.shared.kernel.StrategyCycleSeedType.NONE),
                 new java.math.BigDecimal("1000"), LocalDate.now(), 20, false, null, 0, null, null, true, null);
-        when(tradingCycle.listByUserId(USER_ID)).thenReturn(List.of(detail));
+        when(tradingCycle.listByUserId(USER_ID, false)).thenReturn(List.of(detail));
 
         mockMvc.perform(get("/api/trading-cycles").with(authentication(userToken(USER_ID))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(CYCLE_ID.toString()))
                 .andExpect(jsonPath("$[0].status").value("ACTIVE"));
+    }
+
+    @Test
+    void listMine_passes_includeArchived() throws Exception {
+        when(tradingCycle.listByUserId(any(), anyBoolean())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/trading-cycles").with(authentication(userToken(USER_ID)))).andExpect(status().isOk());
+        mockMvc.perform(get("/api/trading-cycles?includeArchived=true").with(authentication(userToken(USER_ID))))
+                .andExpect(status().isOk());
+
+        verify(tradingCycle).listByUserId(USER_ID, false);
+        verify(tradingCycle).listByUserId(USER_ID, true);
     }
 
     @Test

@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service;
 
-import com.kista.shared.kernel.StrategyStatus;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 
@@ -13,7 +12,7 @@ final class CloseReportScope {
 
     // 수동 보정 행(UNKNOWN_LEG)은 전략 주문이 아니므로 제외
     static boolean awaitsCloseReport(Strategy strategy, List<Order> todayOrders) {
-        boolean paused = strategy.status() == StrategyStatus.PAUSED;
+        boolean paused = !strategy.isActive();
         return todayOrders.stream()
                 .filter(o -> !Order.UNKNOWN_LEG.equals(o.orderLeg()))
                 .anyMatch(o -> !paused || o.externalOrderId() != null);

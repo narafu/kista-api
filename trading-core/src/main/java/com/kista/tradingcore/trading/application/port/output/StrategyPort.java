@@ -48,6 +48,7 @@ public interface StrategyPort {
 
     // 시스템 자동 일시중지(사이클 재등록 실패 등) — 사용자 승인 흐름을 거치지 않는 강제 전이
     default void pause(UUID strategyId) {
-        save(findByIdOrThrow(strategyId).withStatus(StrategyStatus.PAUSED));
+        Strategy strategy = findByIdOrThrow(strategyId);
+        if (!strategy.isArchived()) save(strategy.withStatus(StrategyStatus.PAUSED)); // 보관 전략은 되돌리지 않는다
     }
 }

@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum StrategyStatus {
     ACTIVE("운영중"),  // 매매 스케쥴링 실행 중
-    PAUSED("일시중지"); // 매매 중지 (스케쥴링 제외)
+    PAUSED("일시중지"), // 매매 중지 (스케쥴링 제외)
+    ARCHIVED("보관됨"); // 보관 — 종료 상태(한 방향, 해제 없음)
 
     private final String label; // 한국어 표시 이름
 }

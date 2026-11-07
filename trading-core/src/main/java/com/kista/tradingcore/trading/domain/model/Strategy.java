@@ -66,4 +66,13 @@ public record Strategy(
     public boolean isPaused() {
         return status == StrategyStatus.PAUSED;
     }
+
+    public boolean isArchived() {
+        return status == StrategyStatus.ARCHIVED;
+    }
+
+    // 보관된 전략은 변경 불가 — 수정 경로 진입 시 호출
+    public void requireNotArchived() {
+        if (isArchived()) throw new IllegalStateException("보관된 전략은 변경할 수 없습니다.");
+    }
 }

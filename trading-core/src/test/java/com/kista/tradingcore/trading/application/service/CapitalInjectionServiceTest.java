@@ -145,6 +145,18 @@ class CapitalInjectionServiceTest {
     }
 
     @Test
+    void inject_rejects_archived_strategy() {
+        when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(
+                new Strategy(strategyId, accountId, StrategyType.PRIVACY, StrategyStatus.ARCHIVED, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
+
+        assertThatThrownBy(() -> service.inject(strategyId, userId, new InjectCapitalCommand(new BigDecimal("500.00"), null, null)))
+                .isInstanceOf(IllegalStateException.class).hasMessage("보관된 전략은 변경할 수 없습니다.");
+
+        verify(strategyCyclePort, never()).lockForUpdate(any());
+        verify(cyclePositionPort, never()).updateBalance(any(), any());
+    }
+
+    @Test
     void inject_depositAndShares_recordsEvent() {
         stub(StrategyType.PRIVACY, BigDecimal.TEN, new BigDecimal("100.0000"), null);
 
