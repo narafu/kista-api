@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 25, Spring Boot 4, JUnit 5 + Mockito + AssertJ, `@WebMvcTest`, `DataJpaTestBase`.
 
-**Spec:** `docs/superpowers/specs/2026-11-07-strategy-archive-design.md`
+**Spec:** `docs/superpowers/specs/archive/2026-11-07-strategy-archive-design.md`
 
 ## Global Constraints
 
