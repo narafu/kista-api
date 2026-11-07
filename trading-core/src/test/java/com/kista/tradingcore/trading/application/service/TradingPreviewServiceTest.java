@@ -66,6 +66,7 @@ class TradingPreviewServiceTest {
     @Mock TradingPriceFetcher priceFetcher;
     @Mock MarginPort marginPort;
     @Mock SellableQuantityPort sellableQuantityPort;
+    @Mock com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort marketCalendarPort;
 
     TradingPreviewService service;
 
@@ -84,7 +85,8 @@ class TradingPreviewServiceTest {
     @BeforeEach
     void setUp() {
         // 브로커 조회는 경고 전용 포트(MarginPort·SellableQuantityPort)뿐이다 — 매매 판정에는 쓰지 않는다
-        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, FIXED);
+        service = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, planBuilder, ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, marketCalendarPort, FIXED);
+        lenient().when(marketCalendarPort.isMarketOpen(any())).thenReturn(true); // 기본은 개장일
         lenient().when(priceFetcher.fetchPrevCloses(any(), any())).thenReturn(Map.of());
         // 원장 상한은 모든 전략에 적용된다 — 기본은 넉넉한 잔여로 주문을 그대로 통과시킨다 (개별 테스트가 재스텁)
         lenient().when(ledgerBudget.remaining(any(), any(), any(), any())).thenReturn(new BigDecimal("1000000"));
@@ -208,6 +210,68 @@ class TradingPreviewServiceTest {
         assertThat(result.skipReason()).isEqualTo(NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED);
         assertThat(result.orders()).isEmpty();
         verify(planBuilder, never()).build(any(), any(), any(), any(), anyString(), any());
+    }
+
+    // 휴장 거래일 — 계산 skip보다 먼저 MARKET_CLOSED, 브로커·plan 호출 없음, 판정은 1회
+    @Test
+    void preview_returnsMarketClosed_withoutPlanOrBrokerCalls_whenMarketClosed() {
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isEqualTo(SkipReason.MARKET_CLOSED);
+        assertThat(result.orders()).isEmpty();
+        verify(planBuilder, never()).build(any(), any(), any(), any(), anyString(), any());
+        verifyNoInteractions(priceFetcher);
+        verify(marketCalendarPort, times(1)).isMarketOpen(any());
+    }
+
+    // 개장일 — 기존 동작 유지(plan 계산 진행, skip 없음)
+    @Test
+    void preview_computesPlan_whenMarketOpen() {
+        stubPlan(STRATEGY, STRATEGY_CYCLE);
+
+        NextOrdersPreview result = service.preview(STRATEGY.id(), ACCOUNT.userId());
+
+        assertThat(result.skipReason()).isNull();
+        verify(planBuilder).build(eq(STRATEGY), eq(TRADING_ACCOUNT), eq(STRATEGY_CYCLE), any(), anyString(), any());
+    }
+
+    // 다전략 배치에서도 휴장 판정은 1회, 저장된 SELL이 있어도 브로커 경고 조회는 없다
+    @Test
+    void previewBatch_marketClosed_checksCalendarOnce_andSkipsBrokerWarnings_evenWithStoredSell() {
+        Strategy sibling = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE);
+        StrategyCycle siblingCycle = new StrategyCycle(UUID.randomUUID(), sibling.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(7), null, null, null);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, sibling));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id(), sibling.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE, sibling.id(), siblingCycle));
+        Order storedSell = Order.fromPlanned(sellOrder(StrategyTicker.SOXL, 3, "40.00"), null, null);
+        when(orderPort.findPlannedOrPlacedByCycleIdsAndDate(any(), any())).thenReturn(Map.of(STRATEGY_CYCLE.id(), List.of(storedSell)));
+        when(orderPort.sumPlannedBuyByAccountAndDate(any(), any())).thenReturn(new BigDecimal("100"));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result.values()).extracting(NextOrdersPreview::skipReason).containsOnly(SkipReason.MARKET_CLOSED);
+        assertThat(result.values()).allSatisfy(p -> {
+            assertThat(p.accountHoldingsCheck()).isNull();
+            assertThat(p.accountCashCheck()).isNull();
+        });
+        verify(marketCalendarPort, times(1)).isMarketOpen(any());
+        verifyNoInteractions(sellableQuantityPort, marginPort);
+    }
+
+    // 종료된 사이클은 휴장이어도 CYCLE_ENDED 유지
+    @Test
+    void preview_cycleEnded_takesPrecedenceOverMarketClosed() {
+        StrategyCycle ended = new StrategyCycle(STRATEGY_CYCLE.id(), STRATEGY.id(), STRATEGY_CYCLE.strategyVersionId(),
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(7), LocalDate.now(FIXED).minusDays(1), null, null);
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id()))).thenReturn(Map.of(STRATEGY.id(), ended));
+        when(marketCalendarPort.isMarketOpen(any())).thenReturn(false);
+
+        assertThat(service.preview(STRATEGY.id(), ACCOUNT.userId()).skipReason()).isEqualTo(SkipReason.CYCLE_ENDED);
     }
 
     @Test
@@ -453,7 +517,7 @@ class TradingPreviewServiceTest {
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
                 new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
         TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,
-                ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, FIXED);
+                ledgerBudget, priceFetcher, marginPort, sellableQuantityPort, marketCalendarPort, FIXED);
 
         NextOrdersPreview result = wired.preview(STOCK_DCA.id(), ACCOUNT.userId());
 

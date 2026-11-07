@@ -23,6 +23,7 @@ import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.account.application.port.output.AccountPort;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyCyclePort;
@@ -61,6 +62,7 @@ class TradingPreviewService {
     private final TradingPriceFetcher priceFetcher; // 배치 미리보기 전일종가 일괄 조회(getPrevCloses) + 단건 fallback
     private final MarginPort marginPort; // 계좌 실제 주문가능 USD 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
     private final SellableQuantityPort sellableQuantityPort; // 종목 실제 판매 가능 수량 조회 — 경고 전용, 매매 판정에는 쓰지 않는다
+    private final MarketCalendarPort marketCalendarPort; // 휴장 거래일 판정 — 미리보기 today 기준 1회
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
 
     // execute()와 동일한 잔고 출처(CyclePosition) 및 전략 분기로 미리보기
@@ -95,6 +97,8 @@ class TradingPreviewService {
         Account ownedAccount = accountPort.requireOwnedAccount(accountId, requesterId);
         TradingAccount account = TradingAccount.from(ownedAccount);
         LocalDate today = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
+        // 휴장 거래일이면 계획 계산·브로커 호출 없이 전 전략을 MARKET_CLOSED로 skip — today 기준 1회만 판정
+        boolean marketClosed = !marketCalendarPort.isMarketOpen(today);
         // 코인 전략(전부 DCA)은 미리보기 대상이 아니다 — 결과 맵에서 빠진다. 주식 DCA는 포함
         List<Strategy> strategies = account.brokerRef().broker().isCryptoExchange() ? List.of() : strategyPort.findByAccountId(accountId);
 
@@ -118,7 +122,7 @@ class TradingPreviewService {
 
         // 계좌 내 종목별 전일종가를 1회 일괄 조회(multprice) — 전략마다 개별 KIS 왕복을 생략
         List<StrategyTicker> tickers = strategies.stream()
-                .filter(s -> cyclesByStrategyId.containsKey(s.id()))
+                .filter(s -> cyclesByStrategyId.containsKey(s.id()) && !marketClosed)
                 .map(Strategy::ticker)
                 .distinct()
                 .toList();
@@ -143,6 +147,12 @@ class TradingPreviewService {
                 // skip 결과를 캐시에 명시적으로 채워둔다 — 비워두면 아래 최종 루프가 캐시 미스로 오인해 재계산한다
                 planResultsByStrategyId.put(strategy.id(),
                         new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.SCHEDULED_START_NOT_REACHED));
+                continue;
+            }
+            if (marketClosed) {
+                // 종료·시작예정일 미도래 판정 뒤, 계산 skip(NO_PRIVACY_BASE 등)보다 앞에서 걸러 plan 계산 자체를 생략한다
+                planResultsByStrategyId.put(strategy.id(),
+                        new StrategyOrderPlanBuilder.PlanResult(null, NextOrdersPreview.SkipReason.MARKET_CLOSED));
                 continue;
             }
             try {
@@ -179,6 +189,8 @@ class TradingPreviewService {
             previews.put(strategy.id(), buildPreview(strategy, account, cycle, today,
                     todayOrdersByStrategyId.get(strategy.id()), latestPositions.get(cycle.id()), planResult, totalAccountPlannedBuy, freshBuyByStrategyId, freshSellByStrategyId, freshCorrectionByStrategyId));
         }
+        // 휴장 skip은 필요 주문이 없으므로 브로커 경고 조회·첨부를 생략한다
+        if (marketClosed) return previews;
         attachAccountCashCheck(previews, account, totalAccountPlannedBuy, freshBuyByStrategyId, freshCorrectionByStrategyId);
         return attachAccountHoldingsCheck(previews, strategies, account, today, freshSellByStrategyId);
     }

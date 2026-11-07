@@ -28,7 +28,7 @@ public record NextOrdersResponse(
         PositionSnapshot position,                    // PRIVACY/skip 시 null
         @Schema(description = "생성 예정 주문 목록")
         List<OrderItem> orders,
-        @Schema(description = "주문 생성 skip 사유 (정상이면 null)", example = "NO_PRIVACY_BASE")
+        @Schema(description = "주문 생성 skip 사유 (정상이면 null, MARKET_CLOSED=다음 거래일 휴장)", example = "NO_PRIVACY_BASE")
         NextOrdersPreview.SkipReason skipReason,      // 정상이면 null
         @Schema(description = "오늘 이미 등록된 PLANNED·PLACED 주문 목록")
         List<TodayOrderItem> todayOrders,             // 오늘 이미 등록된 PLANNED·PLACED 주문
