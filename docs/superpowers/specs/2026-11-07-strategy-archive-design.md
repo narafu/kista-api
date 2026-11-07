@@ -83,7 +83,7 @@ ACTIVE·PAUSED 어느 상태에서든 보관할 수 있다.
 
 ### 목록·조회에서 제외
 
-`StrategyPort`에 목록용 조회(보관 제외)를 따로 둔다. **`findByAccountId(s)`는 그대로 두고** 다음 호출부만 목록용으로 바꾼다:
+목록용 조회는 포트 메서드를 새로 만들지 않고 호출부에서 `!isArchived()`로 거른다(plan에서 확정). **`findByAccountId(s)`는 그대로 두고** 다음 호출부만 거른다:
 - `StrategyService.listByUserId:154`, `listByAccountId:165` (사용자 목록)
 - `TradingPreviewService.java:103` (`previewBatch`)
 - `UnassignedCashCalculator:35` (미배정 현금 — 보관 전략은 현금을 점유하지 않음)
