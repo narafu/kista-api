@@ -128,7 +128,7 @@ class StrategyCreationService {
                 accountId, cmd.type(), seedType, resolved, vr != null ? vr.ramp() : null, initialUsdDeposit, initialHoldings,
                 cmd.initialAvgPrice(), marketPrice, startAmount, vr != null ? vr.vrValue() : null, scheduledStart, dcaConfig));
 
-        log.info("전략 등록: accountId={}, strategyId={}, type={}", accountId, strategy.id(), strategy.type());
+        log.info("[strategyId={}] [accountId={}] 전략 등록: type={}", strategy.id(), accountId, strategy.type());
         return detailAssembler.toDetail(strategy, account.broker().getMarket());
     }
 

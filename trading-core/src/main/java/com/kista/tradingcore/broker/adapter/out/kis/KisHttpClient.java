@@ -139,7 +139,7 @@ class KisHttpClient {
                 return call.apply(buildHeaders(token, account.appKey(), account.secretKey(), trId));
             } catch (HttpStatusCodeException e) {
                 if (e.getStatusCode().value() == 401) {
-                    log.warn("KIS 401 — 토큰 무효화 후 재시도: accountId={}", account.id());
+                    log.warn("[accountId={}] KIS 401 — 토큰 무효화 후 재시도", account.id());
                     String recoveredToken;
                     try {
                         recoveredToken = kisAuthApi.recoverToken(
@@ -159,8 +159,8 @@ class KisHttpClient {
                     }
                 }
                 if (retryOnRateLimit && isRateLimited(e) && attempt < MAX_RATE_LIMIT_RETRIES) {
-                    log.warn("KIS EGW00201 — 초당 거래건수 초과, 백오프 후 재시도 {}/{}: accountId={}",
-                            attempt + 1, MAX_RATE_LIMIT_RETRIES, account.id());
+                    log.warn("[accountId={}] KIS EGW00201 — 초당 거래건수 초과, 백오프 후 재시도 {}/{}",
+                            account.id(), attempt + 1, MAX_RATE_LIMIT_RETRIES);
                     if (!sleepRateLimitBackoff(attempt)) {
                         // 대기 중 인터럽트(배포·강제종료) — 백오프 없이 즉시 재시도하면 재발 위험만 커지므로 포기
                         throw KisApiException.rejected("KIS API 오류(재시도 대기 중 인터럽트): "

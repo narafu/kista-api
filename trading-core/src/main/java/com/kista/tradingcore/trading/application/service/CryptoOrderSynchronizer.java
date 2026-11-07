@@ -47,14 +47,14 @@ class CryptoOrderSynchronizer {
             BatchContext ctx = byCycle.get(order.strategyCycleId());
             DcaStrategyConfig config = ctx == null ? null : configsByStrategyId.get(ctx.strategy().id());
             if (config == null) {
-                log.warn("코인 주문 동기화 건너뜀 — 매칭되는 전략 없음 orderId={}", order.id());
+                log.warn("[orderId={}] 코인 주문 동기화 건너뜀 — 매칭되는 전략 없음", order.id());
                 continue;
             }
             try {
                 syncOne(exchange, ctx, config, order, nowKst);
             } catch (RuntimeException e) {
                 // 조회 실패는 TRANSIENT 취급 — 상태를 그대로 두고 다음 틱에 재시도
-                log.warn("코인 주문 동기화 실패 orderId={}", order.id(), e);
+                log.warn("[orderId={}] 코인 주문 동기화 실패", order.id(), e);
             }
         }
     }
@@ -116,7 +116,7 @@ class CryptoOrderSynchronizer {
         BigDecimal volume = r.executedVolume() == null ? BigDecimal.ZERO : r.executedVolume();
         if (volume.signum() > 0) {
             if (r.avgPrice() == null) {
-                log.warn("체결 수량은 있으나 평균가 없음 — 건너뜀 orderId={}", order.id());
+                log.warn("[orderId={}] 체결 수량은 있으나 평균가 없음 — 건너뜀", order.id());
                 return;
             }
             Currency currency = ctx.account().brokerRef().broker().getCurrency();

@@ -225,7 +225,7 @@ class KisTradingApi {
                 break;
             }
             if (page >= MAX_PAGES) {
-                log.warn("KIS {} 연속조회 {}페이지 상한 도달 — 누적 {}건만 반환: accountId={}", label, MAX_PAGES, all.size(), account.id());
+                log.warn("[accountId={}] KIS {} 연속조회 {}페이지 상한 도달 — 누적 {}건만 반환", account.id(), label, MAX_PAGES, all.size());
                 break;
             }
             trCont = "N"; // 연속조회 다음 페이지
@@ -233,7 +233,7 @@ class KisTradingApi {
             nk200 = body == null || body.ctxAreaNk200() == null ? "" : body.ctxAreaNk200();
             // 키가 그대로면 같은 페이지를 다시 받아 중복 집계된다 — 이상 응답으로 보고 중단
             if (fk200.equals(pageFk) && nk200.equals(pageNk)) {
-                log.warn("KIS {} 연속조회 키 미변경 — {}페이지에서 중단, 누적 {}건 반환: accountId={}", label, page, all.size(), account.id());
+                log.warn("[accountId={}] KIS {} 연속조회 키 미변경 — {}페이지에서 중단, 누적 {}건 반환", account.id(), label, page, all.size());
                 break;
             }
         }

@@ -44,7 +44,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
 
     private TokenCoordinator.IssuedToken issueAccountToken(
             UUID accountId, String clientId, String clientSecret) {
-        log.info("Toss 토큰 신규 발급: accountId={}", accountId);
+        log.info("[accountId={}] Toss 토큰 신규 발급", accountId);
         TokenResponse response = issueOAuthToken(clientId, clientSecret);
         return new TokenCoordinator.IssuedToken(response.accessToken(), response.expiresIn());
     }
@@ -141,7 +141,7 @@ class TossAuthApi implements BrokerConnectionTestPort {
             }
             return String.valueOf(accounts.getFirst().accountSeq());
         } catch (RestClientException e) {
-            log.warn("Toss 계좌 조회 실패: {}", e.getMessage(), e);
+            log.warn("Toss 계좌 조회 실패: {}", e.getMessage());
             throw new BrokerCredentialException();
         }
     }

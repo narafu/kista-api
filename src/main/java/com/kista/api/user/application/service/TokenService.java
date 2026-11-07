@@ -70,7 +70,7 @@ class TokenService implements TokenUseCase {
 
         if (rt.expiresAt().isBefore(now)) {
             refreshTokenPort.deleteByTokenHash(hash);
-            log.warn("[RT] refresh 거부: 만료된 토큰 (userId={})", rt.userId());
+            log.warn("[userId={}] [RT] refresh 거부: 만료된 토큰", rt.userId());
             throw new InvalidRefreshTokenException("만료된 refresh token");
         }
 
@@ -140,7 +140,7 @@ class TokenService implements TokenUseCase {
 
     // grace 초과 — 해당 사용자 전체 세션 폐기 후 거부 예외 반환 (throw 용)
     private InvalidRefreshTokenException revokeAllSessionsAndReject(UUID userId, String warnContext) {
-        log.warn("[RT] {} (userId={})", warnContext, userId);
+        log.warn("[userId={}] [RT] {}", userId, warnContext);
         refreshTokenPort.deleteAllByUserId(userId);
         return new InvalidRefreshTokenException("유효하지 않은 refresh token");
     }

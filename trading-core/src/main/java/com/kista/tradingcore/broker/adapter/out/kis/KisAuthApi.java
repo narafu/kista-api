@@ -76,7 +76,7 @@ class KisAuthApi implements BrokerConnectionTestPort {
     }
 
     private TokenCoordinator.IssuedToken issueAccountToken(UUID accountId, String appKey, String appSecret) {
-        log.info("KIS 토큰 신규 발급: accountId={}", accountId);
+        log.info("[accountId={}] KIS 토큰 신규 발급", accountId);
         try {
             TokenResponse response = issueOAuthToken(appKey, appSecret);
             OffsetDateTime expiresAt = parseExpiry(response.accessTokenExpired());

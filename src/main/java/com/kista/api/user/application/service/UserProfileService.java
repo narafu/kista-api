@@ -31,7 +31,7 @@ class UserProfileService implements UserProfileUseCase {
         User saved = userPort.save(user.withTelegram(botToken, chatId, botUsername)
                 .withNotificationChannel(user.notificationChannel().withTelegram()));
         userNotifyProfilePublisher.publishStatusChanged(saved);
-        log.info("텔레그램 설정 업데이트: userId={}, botUsername={}", userId, botUsername);
+        log.info("[userId={}] 텔레그램 설정 업데이트: botUsername={}", userId, botUsername);
     }
 
     @Override
@@ -41,7 +41,7 @@ class UserProfileService implements UserProfileUseCase {
         User saved = userPort.save(user.withTelegram(null, null, null)
                 .withNotificationChannel(user.notificationChannel().withoutTelegram()));
         userNotifyProfilePublisher.publishStatusChanged(saved);
-        log.info("텔레그램 설정 해제: userId={}", userId);
+        log.info("[userId={}] 텔레그램 설정 해제", userId);
     }
 
     @Override
@@ -50,13 +50,13 @@ class UserProfileService implements UserProfileUseCase {
         User saved = userPort.save(user.withNotificationChannel(channel));
         // kista-trading 매매 알림도 채널을 따르므로 복제본에 전달
         userNotifyProfilePublisher.publishStatusChanged(saved);
-        log.info("알림 채널 변경: userId={}, channel={}", userId, channel);
+        log.info("[userId={}] 알림 채널 변경: channel={}", userId, channel);
     }
 
     @Override
     public void updateNickname(UUID userId, String nickname) {
         User user = userPort.findByIdOrThrow(userId);
         userPort.save(user.withNickname(nickname.strip()));
-        log.info("닉네임 변경: userId={}", userId);
+        log.info("[userId={}] 닉네임 변경", userId);
     }
 }

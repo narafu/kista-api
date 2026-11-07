@@ -87,7 +87,7 @@ class FinanceGroupService implements FinanceGroupUseCase {
             financeGroupPort.addMember(invitation.groupId(), userId, FinanceGroup.MemberRole.MEMBER);
         }
         FinanceGroupInvitation updated = financeGroupPort.updateInvitationStatus(invitation.id(), status, userId);
-        log.info("그룹 초대 응답: code={}, userId={}, status={}", code, userId, status);
+        log.info("[userId={}] 그룹 초대 응답: code={}, status={}", userId, code, status);
         return updated;
     }
 

@@ -84,14 +84,14 @@ class OrderSubmissionReconciler {
             result = brokerOrderCorrectionPort.place(OrderSubmitter.instructionOf(latest), account.brokerRef());
         } catch (Exception e) {
             if (!BrokerApiException.isRejection(e)) {
-                log.warn("[{}] SUBMITTING 대사 재요청 결과 불명 (orderId={}): {}", account.nickname(), order.id(), e.getMessage());
+                log.warn("[orderId={}] [{}] SUBMITTING 대사 재요청 결과 불명: {}", order.id(), account.nickname(), e.getMessage());
                 return false;
             }
-            log.warn("[{}] SUBMITTING 대사 재요청 확정 거절 — FAILED (orderId={}): {}", account.nickname(), order.id(), e.getMessage());
+            log.warn("[orderId={}] [{}] SUBMITTING 대사 재요청 확정 거절 — FAILED: {}", order.id(), account.nickname(), e.getMessage());
             return markResolved(() -> orderPort.markFailed(order.id()));
         }
-        log.info("[{}] SUBMITTING 대사 — 원 주문번호 회수로 PLACED (orderId={}, externalOrderId={})",
-                account.nickname(), order.id(), result.externalOrderId());
+        log.info("[orderId={}] [{}] SUBMITTING 대사 — 원 주문번호 회수로 PLACED (externalOrderId={})",
+                order.id(), account.nickname(), result.externalOrderId());
         return markResolved(() -> orderPort.markPlaced(order.id(), result.externalOrderId()));
     }
 

@@ -175,7 +175,7 @@ class TradingOrderExecutor {
             }
         } catch (Exception e) {
             // 관리자 이벤트는 이미 억제됐으므로 여기서 실패하면 아무도 모른다 — 관리자에게 알린다
-            log.error("[{}] 잔고 부족 알림 처리 실패: {}", account.nickname(), e.getMessage());
+            log.error("[{}] 잔고 부족 알림 처리 실패", account.nickname(), e);
             eventPublisher.publishEvent(new TradingErrorEvent(null, "[잔고 부족 알림 실패] %s %s %s — %s"
                     .formatted(account.nickname(), strategy.ticker(), strategy.type(), e.getMessage())));
         }

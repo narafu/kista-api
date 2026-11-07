@@ -119,9 +119,7 @@ class BacktestService implements BacktestUseCase {
         if (command.vrBandWidth() == null || command.vrBandWidth().signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭은 0보다 커야 합니다.");
         }
-        if (command.vrIntervalWeeks() == null || command.vrIntervalWeeks() <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1 이상이어야 합니다.");
-        }
+        VrRampValidator.requireIntervalWeeks(command.vrIntervalWeeks());
         if (command.vrInitialValue() != null && command.vrInitialValue().signum() < 0) {
             throw new IllegalArgumentException("VR 백테스트의 초기 V값은 0 이상이어야 합니다.");
         }

@@ -49,7 +49,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         FinanceTransaction transaction = new FinanceTransaction(null, ownerGroupId, command.categoryId(), userId,
                 command.transactionDate(), command.amount(), command.memo(), null);
         FinanceTransaction saved = transactionPort.save(transaction);
-        log.info("거래내역 등록: userId={}, transactionId={}", userId, saved.id());
+        log.info("[userId={}] 거래내역 등록: transactionId={}", userId, saved.id());
         return saved;
     }
 
@@ -82,7 +82,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         // 마감월 거래는 삭제도 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, existing.transactionDate());
         transactionPort.softDelete(transactionId);
-        log.info("거래내역 삭제: transactionId={}, userId={}", transactionId, userId);
+        log.info("[userId={}] 거래내역 삭제: transactionId={}", userId, transactionId);
     }
 
     // 개인 소유 거래를 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
@@ -112,7 +112,7 @@ class FinanceTransactionService implements FinanceTransactionUseCase {
         return GroupShareSupport.unshare(existing, userId, currentGroupId)
                 .map(personal -> {
                     FinanceTransaction saved = transactionPort.save(personal);
-                    log.info("거래내역 그룹 공유 해제: transactionId={}, userId={}", transactionId, userId);
+                    log.info("[userId={}] 거래내역 그룹 공유 해제: transactionId={}", userId, transactionId);
                     return saved;
                 })
                 .orElse(existing);

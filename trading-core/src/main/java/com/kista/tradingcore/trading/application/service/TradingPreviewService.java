@@ -160,7 +160,7 @@ class TradingPreviewService {
                         planBuilder.build(strategy, account, cycle, today, "batch:" + strategy.id(), prevCloseCache));
             } catch (RuntimeException e) {
                 // 아래 최종 루프가 캐시 누락을 감지해 동일 계산을 재시도하며, 그때 실패하면 그대로 전파된다
-                log.warn("배치 미리보기 사전 계산 실패, 재시도 예정: strategyId={}, error={}",
+                log.warn("[strategyId={}] 배치 미리보기 사전 계산 실패, 재시도 예정: error={}",
                         strategy.id(), e.getMessage());
             }
         }
@@ -181,7 +181,7 @@ class TradingPreviewService {
                 try {
                     planResult = planBuilder.build(strategy, account, cycle, today, "preview:" + strategy.id(), prevCloseCache);
                 } catch (RuntimeException e) {
-                    log.warn("배치 미리보기 재시도도 실패 — 이 전략만 생략: strategyId={}, error={}", strategy.id(), e.getMessage());
+                    log.warn("[strategyId={}] 배치 미리보기 재시도도 실패 — 이 전략만 생략: error={}", strategy.id(), e.getMessage());
                     failures.put(strategy.id(), e);
                     continue;
                 }

@@ -73,7 +73,7 @@ class StrategyService implements StrategyUseCase {
         }
         stateWriter.delete(strategyId);
         eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId)); // 삭제된 전략의 사이클이 통계에서 빠지므로 캐시 무효화
-        log.info("전략 삭제: strategyId={}, requesterId={}, cancelledOrders={}", strategyId, requesterId, cancelled.cancelledCount());
+        log.info("[strategyId={}] 전략 삭제: requesterId={}, cancelledOrders={}", strategyId, requesterId, cancelled.cancelledCount());
     }
 
     @Override
@@ -90,7 +90,7 @@ class StrategyService implements StrategyUseCase {
         orderCancelService.requireNoCryptoInFlight(strategyId, account); // 코인 체결 확인 중이면 PAUSED 기록 전에 거부
         stateWriter.pause(strategyId);
         CancelResult cancelled = orderCancelService.cancelOpenOrders(strategyId, account);
-        log.info("전략 일시중지: strategyId={}, cancelledOrders={}, failedOrders={}",
+        log.info("[strategyId={}] 전략 일시중지: cancelledOrders={}, failedOrders={}",
                 strategyId, cancelled.cancelledCount(), cancelled.failedCount());
     }
 
@@ -103,7 +103,7 @@ class StrategyService implements StrategyUseCase {
         }
         reopenCycleIfEnded(strategy, requesterId);
         strategyPort.save(strategy.withStatus(StrategyStatus.ACTIVE));
-        log.info("전략 재개: strategyId={}", strategyId);
+        log.info("[strategyId={}] 전략 재개", strategyId);
     }
 
     // 전략 조회 + 소유권 검증 — delete/pause/resume/getById/update 공용
@@ -199,7 +199,7 @@ class StrategyService implements StrategyUseCase {
             eventPublisher.publishEvent(new StrategyCapitalChangedEvent(requesterId));
         }
 
-        log.info("전략 수정: strategyId={}, cycleSeedType={}", strategyId, seedType);
+        log.info("[strategyId={}] 전략 수정: cycleSeedType={}", strategyId, seedType);
         return detailAssembler.toDetail(saved, account.broker().getMarket());
     }
 
@@ -222,7 +222,7 @@ class StrategyService implements StrategyUseCase {
 
         strategyCyclePort.updateStartAmount(cycle.id(), newSeed);
         cyclePositionPort.updateCycleStartSnapshot(strategyId, newSeed);
-        log.info("시드 수정: strategyId={}, newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
+        log.info("[strategyId={}] 시드 수정: newSeed={}, holdings={}", strategyId, newSeed, latest.holdings());
     }
 
     // ── 조회 전용 (stats에서 이관 — 전략 소유 read) ─────────────────────────────

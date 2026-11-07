@@ -43,7 +43,7 @@ class AccountTokenEvictionAdapter implements AccountTokenEvictionPort {
             try {
                 tossTokenStore.invalidate(TossDistributedTokenCoordinator.accountScope(accountId));
             } catch (RuntimeException e) {
-                log.warn("Toss 토큰 캐시 무효화 실패 — TTL 만료까지 옛 토큰이 남을 수 있음: accountId={}", accountId, e);
+                log.warn("[accountId={}] Toss 토큰 캐시 무효화 실패 — TTL 만료까지 옛 토큰이 남을 수 있음", accountId, e);
             }
         }
     }

@@ -46,7 +46,7 @@ class UserTradingDataEraseService implements UserTradingDataEraseUseCase {
             try {
                 failed = openOrderCancelPort.cancelOpenOrders(account);
             } catch (RuntimeException e) {
-                log.error("탈퇴 사용자 미체결 취소 실패 userId={}, accountId={}", userId, account.id(), e);
+                log.error("[accountId={}] [userId={}] 탈퇴 사용자 미체결 취소 실패", account.id(), userId, e);
                 failed = -1;
             }
             if (failed != 0) {

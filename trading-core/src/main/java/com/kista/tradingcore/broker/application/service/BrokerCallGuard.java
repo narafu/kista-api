@@ -29,7 +29,7 @@ public final class BrokerCallGuard {
                 log.warn("[{}] 증권사 API 조회에 실패했습니다: {}", label, e.getMessage());
                 throw (RuntimeException) e;
             }
-            log.warn("[{}] 증권사 API 조회에 실패했습니다: {}", label, e.getMessage(), e);
+            log.warn("[{}] 증권사 API 조회에 실패했습니다: {}", label, e.getMessage());
             throw new IllegalStateException("증권사 API 조회에 실패했습니다. 잠시 후 다시 시도할 수 있습니다.", e);
         }
     }

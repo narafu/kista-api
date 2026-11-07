@@ -29,7 +29,7 @@ class RedisPushNotificationPublisher {
             RedisStreams.add(redisTemplate, RedisStreamConfig.PUSH_NOTIFICATION_STREAM, payload,
                     RedisStreamConfig.PUSH_NOTIFICATION_MAXLEN);
         } catch (Exception e) {
-            log.error("[userId={}] 푸시 위임 XADD 실패 — 유실: {} ({})", event.userId(), event.title(), e.getMessage());
+            log.error("[userId={}] 푸시 위임 XADD 실패 — 유실: {}", event.userId(), event.title(), e);
         }
     }
 }

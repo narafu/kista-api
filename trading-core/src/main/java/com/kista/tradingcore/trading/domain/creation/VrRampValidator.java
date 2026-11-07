@@ -12,6 +12,13 @@ public final class VrRampValidator {
     private VrRampValidator() {
     }
 
+    // 리밸런싱 주기 1 이상 검증 (null 불가) — 등록·백테스트·램프 검증이 공용
+    public static void requireIntervalWeeks(Integer intervalWeeks) {
+        if (intervalWeeks == null || intervalWeeks <= 0) {
+            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
+        }
+    }
+
     // gradient/poolLimitRate 램프 8필드 + intervalWeeks/bandWidth 검증
     public static void validateRampParams(int intervalWeeks, BigDecimal bandWidth, VrRampParams ramp) {
         int initialGradient = ramp.initialGradient();
@@ -22,9 +29,7 @@ public final class VrRampValidator {
         int pGraceWeeks = ramp.pGraceWeeks();
         int pStepWeeks = ramp.pStepWeeks();
         BigDecimal poolLimitFloor = ramp.poolLimitFloor();
-        if (intervalWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
-        }
+        requireIntervalWeeks(intervalWeeks);
         if (bandWidth == null || bandWidth.signum() <= 0) {
             throw new IllegalArgumentException("VR 전략의 밴드 폭은 0보다 커야 합니다.");
         }

@@ -49,7 +49,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         FinanceCategory category = new FinanceCategory(null, ownerGroupId, command.parentId(), userId,
                 command.type(), command.name(), command.sortOrder(), null);
         FinanceCategory saved = categoryPort.save(category);
-        log.info("카테고리 등록: userId={}, categoryId={}", userId, saved.id());
+        log.info("[userId={}] 카테고리 등록: categoryId={}", userId, saved.id());
         return saved;
     }
 
@@ -98,7 +98,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         return GroupShareSupport.unshare(existing, userId, currentGroupId)
                 .map(personal -> {
                     categoryPort.unshareWithChildren(categoryId);
-                    log.info("카테고리 그룹 공유 해제(하위 포함): categoryId={}, userId={}", categoryId, userId);
+                    log.info("[userId={}] 카테고리 그룹 공유 해제(하위 포함): categoryId={}", userId, categoryId);
                     return categoryPort.findByIdOrThrow(categoryId);
                 })
                 .orElse(existing);
@@ -112,7 +112,7 @@ class FinanceCategoryService implements FinanceCategoryUseCase {
         }
         FinanceAccessSupport.verifyAccessible(existing, userId, financeGroupPort);
         categoryPort.softDeleteWithChildren(categoryId);
-        log.info("카테고리 삭제: categoryId={}, userId={}", categoryId, userId);
+        log.info("[userId={}] 카테고리 삭제: categoryId={}", userId, categoryId);
     }
 
     @Override

@@ -38,7 +38,7 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
         updatedPrefs.put(type, enabled);
         UserSettings updated = current.withNotificationPrefs(updatedPrefs);
         userSettingsPort.save(updated);
-        log.info("알림 설정 변경: userId={}, type={}, enabled={}", userId, type, enabled);
+        log.info("[userId={}] 알림 설정 변경: type={}, enabled={}", userId, type, enabled);
         userNotifyProfilePublisher.publishSettingsChanged(updated);
     }
 
@@ -54,6 +54,6 @@ class UserSettingsService implements GetUserSettingsQuery, UserSettingsUseCase {
     public void updateStrategySuggestions(UUID userId, List<String> suggestions) {
         UserSettings current = getByUserId(userId);
         userSettingsPort.save(current.withStrategySuggestions(suggestions));
-        log.info("운영전략 추천 목록 변경: userId={}, count={}", userId, suggestions.size());
+        log.info("[userId={}] 운영전략 추천 목록 변경: count={}", userId, suggestions.size());
     }
 }

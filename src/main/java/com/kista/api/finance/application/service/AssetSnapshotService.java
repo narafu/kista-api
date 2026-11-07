@@ -49,7 +49,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         AssetSnapshot snapshot = new AssetSnapshot(null, ownerGroupId, command.categoryId(), command.accountId(), userId,
                 command.entryDate(), command.assetClass(), command.market(), command.strategy(), command.memo(), command.amount(), null);
         AssetSnapshot saved = assetSnapshotPort.save(snapshot);
-        log.info("자산 스냅샷 등록: userId={}, snapshotId={}", userId, saved.id());
+        log.info("[userId={}] 자산 스냅샷 등록: snapshotId={}", userId, saved.id());
         return saved;
     }
 
@@ -83,7 +83,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         // 마감월 기록은 삭제도 차단
         monthlyClosingGuard.verifyMonthOpen(currentGroupId, userId, existing.entryDate());
         assetSnapshotPort.softDelete(snapshotId);
-        log.info("자산 스냅샷 삭제: snapshotId={}, userId={}", snapshotId, userId);
+        log.info("[userId={}] 자산 스냅샷 삭제: snapshotId={}", userId, snapshotId);
     }
 
     // 개인 소유 자산 기록을 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
@@ -113,7 +113,7 @@ class AssetSnapshotService implements AssetSnapshotUseCase {
         return GroupShareSupport.unshare(existing, userId, currentGroupId)
                 .map(personal -> {
                     AssetSnapshot saved = assetSnapshotPort.save(personal);
-                    log.info("자산 기록 그룹 공유 해제: snapshotId={}, userId={}", snapshotId, userId);
+                    log.info("[userId={}] 자산 기록 그룹 공유 해제: snapshotId={}", userId, snapshotId);
                     return saved;
                 })
                 .orElse(existing);

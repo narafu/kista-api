@@ -57,7 +57,7 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
                 command.applyStartDate(), command.applyEndDate(), command.amount(), null);
         // 기간 중첩 시 어댑터가 finance_budgets_no_overlap EXCLUDE 위반을 OverlappingPeriodException으로 변환한다.
         FinanceBudget saved = budgetPort.save(budget);
-        log.info("예산 등록: userId={}, budgetId={}", userId, saved.id());
+        log.info("[userId={}] 예산 등록: budgetId={}", userId, saved.id());
         return saved;
     }
 
@@ -140,7 +140,7 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
                 budgetPort::findByIdOrThrow, budgetId, userId, financeGroupPort);
         // 파생 설정이므로 하드 삭제 (소프트 삭제 컬럼 없음)
         budgetPort.delete(budgetId);
-        log.info("예산 삭제: budgetId={}, userId={}", budgetId, userId);
+        log.info("[userId={}] 예산 삭제: budgetId={}", userId, budgetId);
     }
 
     // 개인 소유 예산을 소유자가 자신의 현재 그룹으로 전환한다. 본인 것만 전환 가능(그룹 멤버 전체 아님).
@@ -166,7 +166,7 @@ class FinanceBudgetService implements FinanceBudgetUseCase {
         return GroupShareSupport.unshare(existing, userId, currentGroupId)
                 .map(personal -> {
                     FinanceBudget saved = budgetPort.save(personal);
-                    log.info("예산 그룹 공유 해제: budgetId={}, userId={}", budgetId, userId);
+                    log.info("[userId={}] 예산 그룹 공유 해제: budgetId={}", userId, budgetId);
                     return saved;
                 })
                 .orElse(existing);

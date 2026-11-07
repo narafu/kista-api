@@ -118,8 +118,8 @@ class MeritzOrderApi {
         OrderResponse res = send(path, account, body);
         String code = res.warnCode();
         if ("1".equals(code) || "3".equals(code)) {
-            log.warn("Meritz POST {} 경고 자동 확인 후 재전송: warn_cls_code={}, warn_msg={}, accountId={}",
-                    path, code, res.warnMsg(), account.id());
+            log.warn("[accountId={}] Meritz POST {} 경고 자동 확인 후 재전송: warn_cls_code={}, warn_msg={}",
+                    account.id(), path, code, res.warnMsg());
             Map<String, String> confirmed = new LinkedHashMap<>(body);
             confirmed.put("warn_cnfr_yn", "Y");
             res = send(path, account, confirmed);

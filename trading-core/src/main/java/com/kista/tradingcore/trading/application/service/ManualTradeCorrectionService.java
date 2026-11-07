@@ -114,8 +114,8 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
 
         // trading 쪽 독립 감사 기록 — admin 프록시(AdminTradeCorrectionService.auditLogPort)와 별개로,
         // 내부 엔드포인트를 직접 호출한 경우에도 trading 로그에는 반드시 남긴다
-        log.info("수동 체결 보정 처리: userId={}, accountId={}, strategyId={}, fillCount={}, holdings={}, cycleEnded={}",
-                command.userId(), account.id(), strategy.id(), command.fills().size(), balance.holdings(), cycleEnded);
+        log.info("[strategyId={}] [accountId={}] [userId={}] 수동 체결 보정 처리: fillCount={}, holdings={}, cycleEnded={}",
+                strategy.id(), account.id(), command.userId(), command.fills().size(), balance.holdings(), cycleEnded);
 
         return buildResult(account, strategy, command, balance, updatedStrategy, cycleEnded);
     }

@@ -93,7 +93,7 @@ class AccountService implements AccountUseCase {
                 verified.apiKeyExpiresAt()
         );
         Account saved = accountPort.save(account);
-        log.info("계좌 등록: userId={}, accountId={}, broker={}", userId, saved.id(), broker);
+        log.info("[accountId={}] [userId={}] 계좌 등록: broker={}", saved.id(), userId, broker);
         return saved;
     }
 
@@ -138,7 +138,7 @@ class AccountService implements AccountUseCase {
             throw new Account.DuplicateAccountException(cmd.appKey());
         }
         accountTokenEvictionPort.evict(List.of(accountId)); // 옛 키로 발급된 KIS·Toss 토큰 캐시 제거
-        log.info("계좌 키 교체: accountId={}, broker={}", accountId, account.broker());
+        log.info("[accountId={}] 계좌 키 교체: broker={}", accountId, account.broker());
         return saved;
     }
 
@@ -151,7 +151,7 @@ class AccountService implements AccountUseCase {
             throw new IllegalStateException("증권사 주문 취소에 실패한 주문이 있어 계좌를 삭제할 수 없습니다. 잠시 후 다시 시도하시기 바랍니다.");
         }
         deletionWriter.delete(accountId);
-        log.info("계좌 삭제: accountId={}, requesterId={}", accountId, requesterId);
+        log.info("[accountId={}] 계좌 삭제: requesterId={}", accountId, requesterId);
     }
 
     @Override

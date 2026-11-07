@@ -116,7 +116,7 @@ class UserService implements UserUseCase {
             User newUser = new User(userId, kakaoId, nickname, email, status, role,
                     null, null, null, null, null, User.DEFAULT_CHANNEL);
             User saved = userPort.save(newUser);
-            log.info("신규 사용자 등록: kakaoId={}, userId={}", kakaoId, userId);
+            log.info("[userId={}] 신규 사용자 등록: kakaoId={}", userId, kakaoId);
             // 트랜잭션 커밋 성공 후에만 알림 발송 (race condition 시 롤백된 트랜잭션은 알림 미발송)
             eventPublisher.publishEvent(new NewUserRegisteredEvent(saved.id()));
             userNotifyProfilePublisher.publishStatusChanged(saved);
@@ -129,7 +129,7 @@ class UserService implements UserUseCase {
         // PENDING·REJECTED → ACTIVE, 이미 ACTIVE면 409 (중복 승인 차단)
         User updated = userPort.findByIdOrThrow(userId).approve();
         userPort.save(updated);
-        log.info("사용자 승인: userId={}", userId);
+        log.info("[userId={}] 사용자 승인", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
         eventPublisher.publishEvent(new UserApprovedEvent(updated.id()));
         userNotifyProfilePublisher.publishStatusChanged(updated);
@@ -143,7 +143,7 @@ class UserService implements UserUseCase {
         // REJECTED 전환 + 사유 세팅 + 24h 카운트다운 시작 (lastReappliedAt = now)
         User updated = user.withRejection(normalizedReason, Instant.now(clock));
         userPort.save(updated);
-        log.info("사용자 거절: userId={}", userId);
+        log.info("[userId={}] 사용자 거절", userId);
         // 커밋 성공 후 알림 + SSE — 롤백 시 알림 미발송
         eventPublisher.publishEvent(new UserRejectedEvent(updated.id()));
         userNotifyProfilePublisher.publishStatusChanged(updated);
@@ -172,7 +172,7 @@ class UserService implements UserUseCase {
         UserStatus status = approvalRequired ? UserStatus.PENDING : UserStatus.ACTIVE;
         User updated = user.withStatus(status, now);
         userPort.save(updated);
-        log.info("사용자 재신청: userId={}", userId);
+        log.info("[userId={}] 사용자 재신청", userId);
         // 결과 상태에 맞춰 관리자 승인 요청 또는 사용자 승인 알림과 SSE를 한 번만 발행한다.
         if (approvalRequired) {
             eventPublisher.publishEvent(new UserReappliedEvent(updated.id()));
@@ -202,6 +202,6 @@ class UserService implements UserUseCase {
     public void deleteMe(UUID userId) {
         userPort.findByIdOrThrow(userId); // 존재 확인
         userCascadeDeleter.deleteCascade(userId);
-        log.info("사용자 탈퇴: userId={}", userId);
+        log.info("[userId={}] 사용자 탈퇴", userId);
     }
 }

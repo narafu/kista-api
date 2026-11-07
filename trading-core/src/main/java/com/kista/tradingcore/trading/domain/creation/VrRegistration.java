@@ -37,9 +37,7 @@ public record VrRegistration(BigDecimal vrValue, VrRampParams ramp) {
                                  BigDecimal bandWidth, Integer recurringAmount,
                                  BigDecimal vrValue, BigDecimal evaluatedStockValue,
                                  VrRampParams ramp) {
-        if (intervalWeeks == null || intervalWeeks <= 0) {
-            throw new IllegalArgumentException("VR 전략의 리밸런싱 주기는 1주 이상이어야 합니다.");
-        }
+        VrRampValidator.requireIntervalWeeks(intervalWeeks);
         BigDecimal initialUsdDeposit = normalizeMoney(cmd.initialUsdDeposit());
         int normalizedRecurringAmount = recurringAmount != null ? recurringAmount : 0;
         BigDecimal initialAssets = vrValue.add(initialUsdDeposit);

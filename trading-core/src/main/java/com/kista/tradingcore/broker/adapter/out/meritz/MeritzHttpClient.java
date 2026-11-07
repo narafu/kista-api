@@ -89,7 +89,7 @@ class MeritzHttpClient {
             rows.addAll(rowList(res, rowType));
             if (!res.hasNextPage()) return rows;
             if (page >= MAX_PAGES) {
-                log.warn("Meritz GET {} 연속조회 {}페이지 상한 도달 — 누적 {}건만 반환: accountId={}", path, MAX_PAGES, rows.size(), account.id());
+                log.warn("[accountId={}] Meritz GET {} 연속조회 {}페이지 상한 도달 — 누적 {}건만 반환", account.id(), path, MAX_PAGES, rows.size());
                 return rows;
             }
             pageParams.set("tr_cont", "1");
@@ -124,15 +124,15 @@ class MeritzHttpClient {
             if (MeritzResponse.TOKEN_INVALID_CODES.contains(code)) {
                 // 토큰 거절은 게이트웨이 단계라 미접수 확정 — POST도 1회 재전송 안전
                 if (tokenRetried) throw MeritzApiException.rejected(code, "Meritz " + action + " 토큰 재발급 후에도 거절: rsp_cd=" + code);
-                log.warn("Meritz {} 토큰 무효({}) — 재발급 후 재시도: accountId={}", action, code, account.id());
+                log.warn("[accountId={}] Meritz {} 토큰 무효({}) — 재발급 후 재시도", account.id(), action, code);
                 token = recoverToken(account, token);
                 tokenRetried = true;
                 continue;
             }
             if (MeritzResponse.RATE_LIMITED.equals(code)) {
                 if (!idempotent || rateLimitRetries >= MAX_RATE_LIMIT_RETRIES) throw new BrokerRateLimitException();
-                log.warn("Meritz {} 초당 한도(EGW00200) — 백오프 후 재시도 {}/{}: accountId={}",
-                        action, rateLimitRetries + 1, MAX_RATE_LIMIT_RETRIES, account.id());
+                log.warn("[accountId={}] Meritz {} 초당 한도(EGW00200) — 백오프 후 재시도 {}/{}",
+                        account.id(), action, rateLimitRetries + 1, MAX_RATE_LIMIT_RETRIES);
                 sleepBackoff(rateLimitRetries++, action);
                 continue;
             }

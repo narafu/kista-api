@@ -168,7 +168,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 운영 로그를 `[strategyId=` grep 한 번으로 추적할 수 있다.
 - 위험: 낮음. 로그 문자열만 바뀐다. 운영 대시보드·알림이 로그 문자열을 파싱하는지는 착수 시 `docker-infra.md`에서 확인한다.
 - 가드(`constraints.md` 주석 규칙 옆에 추가할 문장 초안): "로그 문맥은 `[strategyId={}]`·`[accountId={}]`·`[orderId={}]`·`[userId={}]` 접두사로 시작한다. 본문 중간 `key=`로 쓰지 않는다."
-- 상태: open.
+- 상태: done(cc6db1e64). trading-core·api의 userId/accountId/orderId/strategyId 본문 `key=` 로그를 접두사로 통일(`[{}]`는 orderId 등 명확한 경우만 앞에 접두사 추가). 알림·예외 문구 속 `orderId=`와 FinanceAccountService(금융 accountId라 trading accountId와 혼동)는 유지.
 
 ### CQ-08 `CyclePosition.toBalance()`가 있는데 인라인 생성
 - 주제: 매핑. 유형: 보일러플레이트.
@@ -213,7 +213,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 검증 규칙 SSOT 확보.
 - 위험: 낮음. 백테스트 쪽은 필드명(`vrIntervalWeeks`)이 달라 호출 형태를 맞춰야 한다.
 - 가드: 없음.
-- 상태: open.
+- 상태: done(cc6db1e64). `VrRampValidator.requireIntervalWeeks`로 3곳 통합. ReorderService·ReorderCommand는 코드에 이미 없어 해당 없음.
 
 ### CQ-13 같은 의미 오류의 예외 타입 분기
 - 주제: 입력 검증·예외. 유형: 비일관성.
@@ -332,7 +332,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 예상 효과: 장애 분석 시 스택 유무를 예측할 수 있다.
 - 위험: 낮음.
 - 가드(`constraints.md` 주석 규칙 옆 문장 초안): "`log.error`는 예외 객체를 마지막 인자로 넘긴다. `log.warn`은 `e.getMessage()`만 남기고 스택이 필요하면 error로 올린다."
-- 상태: open. 착수 시 `CryptoMarketIndicatorService` 5곳(warn+스택)은 메시지만으로, `getMessage()`만 남기는 error는 예외 객체 전달로 바꾼다.
+- 상태: done(cc6db1e64). error 6곳을 예외 객체 전달로, warn+스택 3곳(TossAuthApi·BrokerCallGuard·CryptoDcaRoundExecutor)을 메시지만으로. 스택 필요 가능성이 있는 warn 4곳(AccountTokenEvictionAdapter·KisPriceApi·MeritzPriceApi·CryptoOrderSynchronizer)은 유지. CryptoMarketIndicatorService는 이미 로그 없음.
 
 ### CQ-12 같은 필드 기본값을 여러 층에서 지정
 - 주제: null·기본값. 유형: 중복·비일관성.

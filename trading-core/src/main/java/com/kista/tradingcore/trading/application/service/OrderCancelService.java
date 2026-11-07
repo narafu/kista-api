@@ -108,7 +108,7 @@ class OrderCancelService {
         int credentialFailedCount = 0; // 자격증명 오류 실패 — 재시도로 풀리지 않아 삭제를 막지 않는다
         List<String> failures = new ArrayList<>(); // 취소 실패 건 요약 — 커밋 후 알림 1건으로 통지
         for (Order stuck : stuckOrders) {
-            log.warn("접수 결과 미확정 주문 — 취소 판정 보류: orderId={}", stuck.id());
+            log.warn("[orderId={}] 접수 결과 미확정 주문 — 취소 판정 보류", stuck.id());
             failures.add("orderId=" + stuck.id() + ": 접수 결과 미확정(SUBMITTING)");
             failedCount++;
         }
@@ -121,12 +121,12 @@ class OrderCancelService {
                     case CANCELLED -> true;
                     case ALREADY_FILLED -> {
                         // 취소 직전 체결 확정 — 취소할 잔량이 없어 실패가 아니다. 상태는 마감 리포트가 FILLED로 기록하므로 PLACED로 둔다
-                        log.info("주문이 이미 체결됨 — 취소 생략: orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                        log.info("[orderId={}] 주문이 이미 체결됨 — 취소 생략: externalOrderId={}", order.id(), order.externalOrderId());
                         yield false;
                     }
                     case ALREADY_CANCELED -> {
                         // 동일 사이클에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
-                        log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", order.id(), order.externalOrderId());
+                        log.info("[orderId={}] 주문이 이미 취소됨 — externalOrderId={}", order.id(), order.externalOrderId());
                         yield true;
                     }
                 };
@@ -136,7 +136,7 @@ class OrderCancelService {
                     cancelledCount++;
                 }
             } catch (Exception e) {
-                log.warn("주문 취소 실패 — orderId={}, externalOrderId={}: {}",
+                log.warn("[orderId={}] 주문 취소 실패 — externalOrderId={}: {}",
                         order.id(), order.externalOrderId(), e.getMessage());
                 failures.add("orderId=" + order.id() + ", externalOrderId=" + order.externalOrderId()
                         + ": " + e.getMessage());
@@ -176,7 +176,7 @@ class OrderCancelService {
                 return;
             } catch (OrderStateConflictException e) {
                 // 읽은 뒤 배치가 접수(PLACED)했거나 정리됨 — 최신 상태로 다시 판정해 PLACED면 증권사 취소로 이어간다
-                log.info("PLANNED 취소 경합 — 최신 상태로 재판정: orderId={}", orderId);
+                log.info("[orderId={}] PLANNED 취소 경합 — 최신 상태로 재판정", orderId);
                 order = orderPort.findById(orderId)
                         .orElseThrow(() -> new OrderCancelException("취소 가능한 상태가 아닙니다."));
             }
@@ -192,7 +192,7 @@ class OrderCancelService {
 
         // PLACED 상태: 증권사 취소 후 DB 상태 변경
         if (order.status() != OrderStatus.PLACED) {
-            log.info("취소 불가 상태 주문 취소 요청: orderId={}, status={}", orderId, order.status());
+            log.info("[orderId={}] 취소 불가 상태 주문 취소 요청: status={}", orderId, order.status());
             throw new OrderCancelException("취소 가능한 상태가 아닙니다.");
         }
 
@@ -206,7 +206,7 @@ class OrderCancelService {
         };
         if (alreadyCanceled) {
             // 동일 주문에 대한 중복 취소 요청(경쟁 상태)의 예상된 결과 — 이미 취소된 상태이므로 성공으로 흡수
-            log.info("주문이 이미 취소됨 — orderId={}, externalOrderId={}", orderId, order.externalOrderId());
+            log.info("[orderId={}] 주문이 이미 취소됨 — externalOrderId={}", orderId, order.externalOrderId());
         }
         stateWriter.markCancelled(orderId);
         fillRecorder.record(List.of(order), account.toBrokerRef()); // 취소 직후 체결량 기록

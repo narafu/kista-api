@@ -38,7 +38,7 @@ public class TradeSseEmitterRegistry {
         try {
             emitter.send(SseEmitter.event().name("ping").data("connected"));
         } catch (IOException _) {
-            log.warn("Trade SSE initial ping failed userId={}", userId);
+            log.warn("[userId={}] Trade SSE initial ping failed", userId);
         }
         return emitter;
     }

@@ -77,7 +77,7 @@ class UserNotifyProfilePersistenceAdapter implements TradingUserProfilePort {
         // 커밋 역순으로 도착하면 나중 커밋이 버려질 수 있다(발생 드묾 — 다음 변경이 바로잡는다).
         // occurredAt 없는 구버전 발행분은 비교 기준이 없어 그대로 적용한다
         if (change.occurredAt() != null && existing.isPresent() && existing.get().getUpdatedAt().isAfter(change.occurredAt())) {
-            log.info("옛 프로필 스냅샷 무시 — userId={}, occurredAt={}, 복제본 updatedAt={}",
+            log.info("[userId={}] 옛 프로필 스냅샷 무시 — occurredAt={}, 복제본 updatedAt={}",
                     change.userId(), change.occurredAt(), existing.get().getUpdatedAt());
             return;
         }

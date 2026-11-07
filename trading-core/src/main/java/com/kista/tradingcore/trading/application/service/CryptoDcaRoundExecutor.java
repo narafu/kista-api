@@ -195,7 +195,7 @@ class CryptoDcaRoundExecutor {
             CryptoFailure failure = CryptoFailure.classify(e);
             if (failure == CryptoFailure.TRANSIENT) {
                 // 접수 결과 불명 — SUBMITTING 유지(동기화기가 clientOrderId로 복구), 이중 지출 방지 위해 차감은 성공과 동일
-                log.warn("코인 DCA 주문 결과 불명 orderId={}", order.id(), e);
+                log.warn("[orderId={}] 코인 DCA 주문 결과 불명: {}", order.id(), e.getMessage());
             } else {
                 recorder.recordSkipped(ctx, today, key, rule.direction(), failure.reason(), failureDetail(failure), price);
                 orderPort.markFailed(order.id());
@@ -227,7 +227,7 @@ class CryptoDcaRoundExecutor {
     private void handleFailure(List<Target> remaining, RuntimeException e, LocalDateTime now, LocalDate today) {
         CryptoFailure failure = CryptoFailure.classify(e);
         if (failure == CryptoFailure.TRANSIENT && now.getMinute() < LAST_TICK_MINUTE) {
-            log.warn("코인 DCA 조회 일시 실패 — 다음 틱 재시도", e);
+            log.warn("코인 DCA 조회 일시 실패 — 다음 틱 재시도: {}", e.getMessage());
             return;
         }
         for (Target t : remaining) {
