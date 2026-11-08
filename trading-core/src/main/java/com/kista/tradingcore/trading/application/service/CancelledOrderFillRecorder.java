@@ -52,7 +52,8 @@ class CancelledOrderFillRecorder {
                 BigDecimal avg = fill == null || fill.quantity().signum() == 0 ? null : fill.avgPrice();
                 stateWriter.recordCancelledFill(order.id(), quantity, avg);
             } catch (RuntimeException e) {
-                log.warn("[orderId={}] 취소 체결 기록 실패: {}", order.id(), e.getMessage());
+                // DB 쓰기 실패는 원장 누락으로 이어지므로 스택까지 남긴다(증권사 조회 실패는 위에서 warn)
+                log.error("[orderId={}] 취소 체결 기록 실패", order.id(), e);
             }
         }
     }
