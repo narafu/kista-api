@@ -415,6 +415,13 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 deleted ? Timestamp.from(Instant.now()) : null);
     }
 
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
+    private int tickerSeq;
+
+    private String nextTicker() {
+        return com.kista.shared.kernel.StrategyTicker.values()[tickerSeq++ % com.kista.shared.kernel.StrategyTicker.values().length].name();
+    }
+
     // strategy → strategy_version → strategy_cycle 체인 삽입, cycleId 반환
     private UUID insertCycleChain(UUID accId, boolean deletedStrategy, boolean deletedCycle) {
         UUID strategyId = UUID.randomUUID();
@@ -423,7 +430,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         jdbcTemplate.update(
                 "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at, deleted_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, now(), now(), ?)",
-                strategyId, accId, "INFINITE", "SOXL", "ACTIVE", "NONE",
+                strategyId, accId, "INFINITE", nextTicker(), "ACTIVE", "NONE",
                 deletedStrategy ? Timestamp.from(Instant.now()) : null);
         jdbcTemplate.update(
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",

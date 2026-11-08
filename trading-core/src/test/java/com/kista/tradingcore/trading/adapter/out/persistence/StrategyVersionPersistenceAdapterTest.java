@@ -44,12 +44,19 @@ class StrategyVersionPersistenceAdapterTest extends DataJpaTestBase {
                 strategyId, accountId, "VR", "TQQQ", "ACTIVE", "NONE");
     }
 
-    // 배치 조회 테스트 전용 — 계좌 내 추가 전략 삽입 (DB 레벨 계좌당 종목 유니크 제약 없음)
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
+    private int tickerSeq;
+
+    private String nextTicker() {
+        return com.kista.shared.kernel.StrategyTicker.values()[tickerSeq++ % com.kista.shared.kernel.StrategyTicker.values().length].name();
+    }
+
+    // 배치 조회 테스트 전용 — 계좌 내 추가 전략 삽입 (종목은 활성 유니크 인덱스 때문에 매번 다르게)
     private UUID insertStrategy() {
         UUID newStrategyId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
-                newStrategyId, accountId, "VR", "TQQQ", "ACTIVE", "NONE");
+                newStrategyId, accountId, "VR", nextTicker(), "ACTIVE", "NONE");
         return newStrategyId;
     }
 

@@ -53,10 +53,17 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
     }
 
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
+    private int tickerSeq;
+
+    private String nextTicker() {
+        return StrategyTicker.values()[tickerSeq++ % StrategyTicker.values().length].name();
+    }
+
     private StrategyCycle createCycle() {
         Strategy strategy = strategyAdapter.save(new Strategy(
                 null, accountId, StrategyType.VR,
-                StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE
+                StrategyStatus.ACTIVE, StrategyTicker.valueOf(nextTicker()), StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));

@@ -41,13 +41,20 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
     }
 
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
+    private int tickerSeq;
+
+    private String nextTicker() {
+        return com.kista.shared.kernel.StrategyTicker.values()[tickerSeq++ % com.kista.shared.kernel.StrategyTicker.values().length].name();
+    }
+
     // strategy → strategy_version 체인 삽입, strategyId 반환 (버전은 1개만 필요)
     private UUID insertStrategy() {
         UUID strategyId = UUID.randomUUID();
         UUID versionId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
-                strategyId, accountId, "INFINITE", "SOXL", "ACTIVE", "NONE");
+                strategyId, accountId, "INFINITE", nextTicker(), "ACTIVE", "NONE");
         jdbcTemplate.update(
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
