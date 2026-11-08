@@ -84,7 +84,7 @@ class DcaExecutionRecorder {
         // 조건 미충족은 실패가 아닌 정상 대기라 알림하지 않는다 — 이력(dca_execution)은 남는다
         if (reason == DcaSkipReason.CONDITION_NOT_MET) return;
         Integer ruleNumber = dcaDetailPort.findActiveByStrategyId(strategy.id()).map(c -> c.ruleNumber(ruleKey)).orElse(null);
-        eventPublisher.publishEvent(new DcaRoundSkippedEvent(account.userId(), strategy.id(), account.nickname(),
-                strategy.ticker(), ruleKey, ruleNumber, direction, tradeDate, reason, detail));
+        eventPublisher.publishEvent(new DcaRoundSkippedEvent(account.userId(), account.nickname(),
+                strategy.ticker(), ruleNumber, direction, tradeDate, reason, detail));
     }
 }

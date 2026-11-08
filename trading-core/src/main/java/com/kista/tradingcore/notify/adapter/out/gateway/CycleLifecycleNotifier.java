@@ -11,6 +11,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 // 사이클 종료/신규 시작 알림을 채널(Telegram/FCM) 라우팅과 분리 — 발행처가 트랜잭션 안이든 밖이든 fallbackExecution으로 항상 실행되게 함
 // root의 동명 클래스를 이관 — User/UserNotificationPort 대신 TradingUserProfile/TradingUserNotificationPort 사용
+// 배치 정상 종료(CycleRotationService.rotate()가 CycleCompletedEvent 발행) — CyclePositionPersistor가 포지션 저장 후 트랜잭션 밖에서 호출하므로 fallbackExecution=true
+// CycleEndedNotifier(관리자 수동 체결 보정)와 한 종료 흐름에서 동시 발행되지 않는다
 @Component
 @RequiredArgsConstructor
 class CycleLifecycleNotifier {

@@ -109,12 +109,11 @@ class DcaExecutionRecorderTest {
     }
 
     @Test
-    void skip_event_carries_rule_key_direction_and_number() {
+    void skip_event_carries_direction_and_number() {
         when(port.insertIfAbsent(any())).thenReturn(true);
         recorder.recordSkipped(ctx, DAY, KEY, OrderDirection.SELL, DcaSkipReason.NO_HOLDINGS, "가용 보유 수량 0", null);
         org.mockito.ArgumentCaptor<DcaRoundSkippedEvent> captor = org.mockito.ArgumentCaptor.forClass(DcaRoundSkippedEvent.class);
         verify(publisher).publishEvent(captor.capture());
-        assertThat(captor.getValue().ruleKey()).isEqualTo(KEY);
         assertThat(captor.getValue().direction()).isEqualTo(OrderDirection.SELL);
         assertThat(captor.getValue().ruleNumber()).isEqualTo(2); // 입력 순서 두 번째 규칙
         verify(port).insertIfAbsent(argThat(e -> KEY.equals(e.ruleKey()) && e.tradeDate().equals(DAY) && e.direction() == OrderDirection.SELL));

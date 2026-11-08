@@ -11,6 +11,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 // 관리자 수동 체결 보정으로 사이클이 종료됨을 트랜잭션 커밋 후 사용자에게 알림 (SSE/FCM/텔레그램 호출을 트랜잭션 밖으로 격리)
 // root의 동명 클래스를 이관 — User/UserNotificationPort 대신 TradingUserProfile/TradingUserNotificationPort 사용
+// 관리자 수동 체결 보정(ManualTradeCorrectionService @Transactional 안에서 CycleEndedEvent 발행) — AFTER_COMMIT
+// CycleLifecycleNotifier(배치 정상 종료)와 한 종료 흐름에서 동시 발행되지 않는다
 @Component
 @RequiredArgsConstructor
 public class CycleEndedNotifier {
