@@ -691,4 +691,4 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 상태 전이 가드. 유형: 누락 가드.
 - 위치: `VrReconfigureService.reconfigure`(보관·VR 여부만 검사), `CycleSnapshotCreator.reconfigureVrCycle`(옛 사이클 `markEnded(today)`, 새 사이클 startDate=오늘), `StrategyCreationPersister:69`(첫 사이클 startDate=시작예정일).
 - 근거: 미래 시작예정일 VR을 시작 전에 재설정하면 옛 사이클은 endDate < startDate, 새 사이클은 더 이른 startDate로 남는다. 운영 조회(2026-11-08) 역전 쌍 0건·`end_date < start_date` 0건. stats 정렬은 CQ-43에서 생성순으로 맞춰 영향이 없고, `InvestmentIndexCalculator.addEntryFlow`가 시작 안 된 사이클의 스냅샷으로 진입 흐름을 만드는 한계는 남는다.
-- 상태: open — 시작 전 재설정을 막을지(400) 허용할지 사용자 결정 대기.
+- 상태: done(86c04774e) — 거부 대신 허용을 택했다. 시작 전(배치와 같은 `StrategyCycle.hasStartedBy(nextTradeDate)` 기준) 재설정은 새 사이클 없이 첫 사이클을 제자리에서 갱신한다(버전 교체·startAmount·포지션 `updateBalance`·사이클 VR 상세, startDate 유지, 새 사이클 알림 없음). 같이 발견한 날짜 불일치도 고쳤다: 시작 후 재설정은 옛 사이클 종료일이 `nextTradeDate`(04:30 이후 내일)라 새 사이클 시작일(오늘)과 하루 겹쳤는데, 이제 둘 다 오늘(KST)이다. 운영 VR 사이클 전환 쌍은 0건(2026-11-08)이라 백필은 없다. 램프 주수 음수는 0으로 보정한다. `addEntryFlow` 한계는 원인인 '대체된 시작 전 사이클'이 더 생기지 않고 기존 데이터도 0건이라 사실상 해소됐다(계산기 코드는 그대로).
