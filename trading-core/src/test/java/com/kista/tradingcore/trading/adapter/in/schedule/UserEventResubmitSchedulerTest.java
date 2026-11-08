@@ -3,6 +3,7 @@ package com.kista.tradingcore.trading.adapter.in.schedule;
 import com.kista.tradingcore.trading.application.port.output.TradingErrorReportPort;
 import com.kista.shared.kernel.AppErrorRaisedEvent;
 import com.kista.shared.kernel.UserDeletedEvent;
+import com.kista.tradingcore.account.application.event.AccountDeletedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,20 +38,26 @@ class UserEventResubmitSchedulerTest {
     }
 
     @Test
-    void 사용자_동기화_이벤트만_재발행_대상이다() {
-        assertThat(scheduler.isUserSyncEventAndAlertOnFirstFailure(publication(new AppErrorRaisedEvent("t", "m", "s", Map.of()), 1))).isFalse();
+    void 사용자_동기화_계좌_cascade_이벤트가_아니면_재발행_대상이_아니다() {
+        assertThat(scheduler.isCascadeOrSyncEventAndAlertOnFirstFailure(publication(new AppErrorRaisedEvent("t", "m", "s", Map.of()), 1))).isFalse();
         verify(errorReportPort, never()).reportError(any());
     }
 
     @Test
     void 첫_실패_발견_회차에만_관리자에게_알린다() {
-        assertThat(scheduler.isUserSyncEventAndAlertOnFirstFailure(publication(new UserDeletedEvent(UUID.randomUUID()), 1))).isTrue();
+        assertThat(scheduler.isCascadeOrSyncEventAndAlertOnFirstFailure(publication(new UserDeletedEvent(UUID.randomUUID()), 1))).isTrue();
         verify(errorReportPort).reportError(any());
     }
 
     @Test
     void 재시도_회차에는_알리지_않고_재발행만_한다() {
-        assertThat(scheduler.isUserSyncEventAndAlertOnFirstFailure(publication(new UserDeletedEvent(UUID.randomUUID()), 2))).isTrue();
+        assertThat(scheduler.isCascadeOrSyncEventAndAlertOnFirstFailure(publication(new UserDeletedEvent(UUID.randomUUID()), 2))).isTrue();
         verify(errorReportPort, never()).reportError(any());
+    }
+
+    @Test
+    void 계좌_삭제_cascade_이벤트도_재발행_대상이며_첫_실패에_알린다() {
+        assertThat(scheduler.isCascadeOrSyncEventAndAlertOnFirstFailure(publication(new AccountDeletedEvent(UUID.randomUUID(), UUID.randomUUID()), 1))).isTrue();
+        verify(errorReportPort).reportError(any());
     }
 }

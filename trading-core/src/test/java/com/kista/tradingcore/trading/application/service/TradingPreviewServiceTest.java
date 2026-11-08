@@ -669,6 +669,26 @@ class TradingPreviewServiceTest {
         assertThat(result.get(STRATEGY.id()).accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("424.32");
         assertThat(result.get(sibling.id()).accountCashCheck()).isEqualTo(result.get(STRATEGY.id()).accountCashCheck());
     }
+    // 정지 전략 카드는 유지하되 그 가상 BUY는 계좌 경고의 필요 현금에 합산하지 않는다
+    @Test
+    void accountCashCheck_excludesPausedStrategyBuy_butKeepsItsCard() {
+        Strategy paused = new Strategy(UUID.randomUUID(), ACCOUNT.id(), StrategyType.INFINITE,
+                StrategyStatus.PAUSED, StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        StrategyCycle pausedCycle = new StrategyCycle(UUID.randomUUID(), paused.id(), UUID.randomUUID(),
+                new BigDecimal("1000.00"), null, LocalDate.now(FIXED).minusDays(7), null, null, null);
+        when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(List.of(STRATEGY, paused));
+        when(strategyCyclePort.findLatestByStrategyIds(List.of(STRATEGY.id(), paused.id())))
+                .thenReturn(Map.of(STRATEGY.id(), STRATEGY_CYCLE, paused.id(), pausedCycle));
+        stubPlan(STRATEGY, STRATEGY_CYCLE, buyOrder(StrategyTicker.SOXL, 8, "38.04")); // 304.32
+        stubPlan(paused, pausedCycle, buyOrder(StrategyTicker.TQQQ, 2, "10.00"));      // 20.00 — 합산 제외
+        when(marginPort.getUsdBuyableAmount(TRADING_ACCOUNT.brokerRef())).thenReturn(new BigDecimal("1000.00"));
+
+        Map<UUID, NextOrdersPreview> result = service.previewBatch(ACCOUNT.id(), ACCOUNT.userId());
+
+        assertThat(result).containsKeys(STRATEGY.id(), paused.id());
+        assertThat(result.get(paused.id()).accountCashCheck().requiredBuyUsd()).isEqualByComparingTo("304.32");
+    }
+
     // 원장 fit 후 금액만 필요 BUY로 센다 — 축소면 축소 후 금액, 거절이면 신규 BUY 0
     @Test
     void accountCashCheck_usesLedgerFitResult_trimmedAndRejected() {

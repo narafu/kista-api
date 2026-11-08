@@ -16,6 +16,7 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderStatus;
+import com.kista.shared.kernel.StrategyStatus;
 import com.kista.tradingcore.matching.domain.strategy.InfiniteStrategy;
 import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.DcaManualExecutionUnsupportedException;
@@ -169,9 +170,9 @@ class TradingPreviewService {
         }
 
         Map<UUID, NextOrdersPreview> previews = new LinkedHashMap<>();
-        Map<UUID, BigDecimal> freshBuyByStrategyId = new HashMap<>(); // 전략별 원장 반영 후 신규 BUY 금액 — skip 전략은 없음(0)
-        Map<UUID, Integer> freshSellByStrategyId = new HashMap<>(); // 전략별 신규(미저장) SELL 수량 — skip 전략은 없음(0)
-        Map<UUID, BigDecimal> freshCorrectionByStrategyId = new HashMap<>(); // 전략별 신규 BUY 중 INFINITE 보정 주문 금액 — 없으면 없음(0)
+        Map<UUID, BigDecimal> freshBuyByStrategyId = new HashMap<>(); // 전략별 원장 반영 후 신규 BUY 금액 — skip 전략은 없음(0), ACTIVE 전략만 담는다(PAUSED는 경고 합산 제외)
+        Map<UUID, Integer> freshSellByStrategyId = new HashMap<>(); // 전략별 신규(미저장) SELL 수량 — skip 전략은 없음(0), ACTIVE 전략만 담는다(PAUSED는 경고 합산 제외)
+        Map<UUID, BigDecimal> freshCorrectionByStrategyId = new HashMap<>(); // 전략별 신규 BUY 중 INFINITE 보정 주문 금액 — 없으면 없음(0), ACTIVE 전략만 담는다(PAUSED는 경고 합산 제외)
         for (Strategy strategy : strategies) {
             StrategyCycle cycle = cyclesByStrategyId.get(strategy.id());
             if (cycle == null) continue;
@@ -292,18 +293,21 @@ class TradingPreviewService {
             ledgerCheck = new LedgerCheckPreview(remainingLedger, fit.requiredBuyUsd(), !fit.rejected(), fit.trimmed());
             buyCandidates = fit.orders(); // 거절이면 BUY 없음, 축소면 축소 후 금액
         }
-        freshBuyByStrategyId.put(strategy.id(), buyCandidates.stream()
-                .filter(o -> o.direction() == OrderDirection.BUY)
-                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
-        freshCorrectionByStrategyId.put(strategy.id(), buyCandidates.stream()
-                .filter(o -> o.direction() == OrderDirection.BUY && InfiniteStrategy.isCorrectionLeg(o.orderLeg()))
-                .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
-        freshSellByStrategyId.put(strategy.id(), freshOrders.stream()
-                .filter(o -> o.direction() == OrderDirection.SELL)
-                .mapToInt(PlannedOrder::quantity)
-                .sum());
+        // 계좌 경고 합산은 ACTIVE 전략만 — 정지 전략 카드는 보이되 그 가상 주문은 실행되지 않으므로 필요 현금·수량에 넣지 않는다
+        if (strategy.status() == StrategyStatus.ACTIVE) {
+            freshBuyByStrategyId.put(strategy.id(), buyCandidates.stream()
+                    .filter(o -> o.direction() == OrderDirection.BUY)
+                    .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+            freshCorrectionByStrategyId.put(strategy.id(), buyCandidates.stream()
+                    .filter(o -> o.direction() == OrderDirection.BUY && InfiniteStrategy.isCorrectionLeg(o.orderLeg()))
+                    .map(o -> o.price().multiply(BigDecimal.valueOf(o.quantity())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+            freshSellByStrategyId.put(strategy.id(), freshOrders.stream()
+                    .filter(o -> o.direction() == OrderDirection.SELL)
+                    .mapToInt(PlannedOrder::quantity)
+                    .sum());
+        }
 
         return new NextOrdersPreview(today, plan.displayPosition(), plan.orders(), null, todayOrders, otherStrategiesPlannedBuyUsd, ledgerCheck, null, null);
     }

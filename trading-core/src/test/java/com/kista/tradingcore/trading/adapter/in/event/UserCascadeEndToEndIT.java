@@ -132,7 +132,7 @@ class UserCascadeEndToEndIT {
         assertThat(cascadePublicationStatus()).isEqualTo("FAILED");
         assertThat(cascadePublicationAttempts()).isEqualTo(1);
 
-        ReflectionTestUtils.invokeMethod(context.getBean("userEventResubmitScheduler"), "resubmitFailedUserEvents");
+        ReflectionTestUtils.invokeMethod(context.getBean("userEventResubmitScheduler"), "resubmitFailedCascadeAndSyncEvents");
 
         verify(errorReportPort, atLeastOnce()).reportError(any());
         assertThat(jdbcTemplate.queryForObject("SELECT deleted_at IS NOT NULL FROM accounts WHERE id = ?", Boolean.class, accountId)).isTrue();
