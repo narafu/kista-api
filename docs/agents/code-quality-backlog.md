@@ -643,6 +643,7 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | stats 평가액 계산 2종 | `TradingStatsService`(종가 없으면 평단 대체) vs `InvestmentIndexCalculator`(종가 없으면 제외) | 곡선·요약은 연속성이, 투자지수(TWR)는 실평가가 필요해 용도가 다르다(stats 감사 2026-11-08). |
 | stats 서비스 `to` null → today 인라인 | `AccountStatisticsService`·`TradingStatsService`·`InvestmentPointsQueryService` 등 | CQ-04에서 null 기본값을 호출부에 남기기로 했다(CQ-17 Clock 주입과 충돌 방지). |
 | stats 어댑터 빈 응답 → 빈 결과 | `BinanceMarketDataAdapter` 롱숏, `FrankfurterFxRateAdapter`, `UpbitMarketDataAdapter.getKrwPrices` | 소비처가 모두 `tryGet`이고 다음 단계(`LongShortRatio.of` 등)가 빈 값을 실패로 바꾼다. 미결제약정만 가드가 없어 CQ-43에서 고쳤다. |
+| 엔티티 저장 패턴 두 갈래(`findOrCreate` vs `new`+`setId`) | `StrategyCyclePersistenceAdapter:120`, `CyclePositionPersistenceAdapter:234`, `CycleCapitalEventPersistenceAdapter:38` vs `findOrCreate` 6곳 | 현재 호출처가 모두 id=null 신규 저장이라 merge 덮어쓰기가 일어나지 않는다. update 경로가 생기면 재검토한다(trading 감사 2026-11-08). |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
@@ -692,3 +693,163 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 위치: `VrReconfigureService.reconfigure`(보관·VR 여부만 검사), `CycleSnapshotCreator.reconfigureVrCycle`(옛 사이클 `markEnded(today)`, 새 사이클 startDate=오늘), `StrategyCreationPersister:69`(첫 사이클 startDate=시작예정일).
 - 근거: 미래 시작예정일 VR을 시작 전에 재설정하면 옛 사이클은 endDate < startDate, 새 사이클은 더 이른 startDate로 남는다. 운영 조회(2026-11-08) 역전 쌍 0건·`end_date < start_date` 0건. stats 정렬은 CQ-43에서 생성순으로 맞춰 영향이 없고, `InvestmentIndexCalculator.addEntryFlow`가 시작 안 된 사이클의 스냅샷으로 진입 흐름을 만드는 한계는 남는다.
 - 상태: done(86c04774e) — 거부 대신 허용을 택했다. 시작 전(배치와 같은 `StrategyCycle.hasStartedBy(nextTradeDate)` 기준) 재설정은 새 사이클 없이 첫 사이클을 제자리에서 갱신한다(버전 교체·startAmount·포지션 `updateBalance`·사이클 VR 상세, startDate 유지, 새 사이클 알림 없음). 같이 발견한 날짜 불일치도 고쳤다: 시작 후 재설정은 옛 사이클 종료일이 `nextTradeDate`(04:30 이후 내일)라 새 사이클 시작일(오늘)과 하루 겹쳤는데, 이제 둘 다 오늘(KST)이다. 운영 VR 사이클 전환 쌍은 0건(2026-11-08)이라 백필은 없다. 램프 주수 음수는 0으로 보정한다. `addEntryFlow` 한계는 원인인 '대체된 시작 전 사이클'이 더 생기지 않고 기존 데이터도 0건이라 사실상 해소됐다(계산기 코드는 그대로).
+
+## 2026-11-08 tradingcore.trading 깊이 감사 (CQ-45~)
+
+- 감사 시점 HEAD `4cf3e9e8c`. 대상은 `trading-core/.../tradingcore/trading` main 280파일(약 16,000줄)이다. 저비용 서브에이전트 4개가 배치·주문 흐름, 전략 설정·도메인, inbound 어댑터, outbound·영속성으로 나눠 탐색했다. 판정은 메인 세션이 했다. ✔는 메인 세션이 직접 재확인한 위치다.
+- 운영 조회(2026-11-08, 읽기 전용): 비보관 전략 8건, 같은 계좌·종목 중복 0건, 열린 사이클이 없는 ACTIVE VR 전략 0건.
+- 제외한 항목:
+  - 파라미터 8~10개 메서드(`BuyOrderPriceCapper.capIfNeeded` 등): 10-arg는 c12a04aa7(2026-10-25)부터 있었다. 2026-10-31 리뷰의 "긴 파라미터는 동일 타입 인접 2쌍 이상인 7곳만" 판단보다 앞서므로 재제안이다.
+  - divisionCount 조회 폴백: 유지 목록 "조회 경로 `.orElse(DEFAULT_DIVISION_COUNT)` 폴백"과 같다.
+  - 엔티티 저장 패턴 두 갈래(`findOrCreate` vs `new`+`setId`): 현재 호출처가 모두 id=null 신규 저장이라 영향이 없다. 유지 목록에 올린다.
+  - "활성 최신 버전" 정렬 기준 3종(`version_no` vs `created_at`): 활성 버전이 1개라는 불변식이 깨진 사례가 없다(미확인). 재검토 트리거는 불변식 위반 발견이다.
+
+### CQ-45 VR 롤오버가 사이클 종료와 새 사이클 생성을 두 트랜잭션으로 나눈다
+- 주제: 상태 전이. 유형: 버그 의심. 위험: 중간(VR 경로, 공식 수치는 불변).
+- 위치: `VrCycleRolloverService.java:147`(`markEnded`) ✔, `:157`(`cycleSnapshotCreator.createVrCycleAndSnapshot`) ✔. 상위 `CyclePositionPersistor.java:87`·`TradingExecutionFacade`에 `@Transactional`이 없다 ✔.
+- 근거: 새 사이클 생성이 실패하면 ACTIVE VR 전략에 종료된 사이클만 남는다. `StrategyService.reopenCycleIfEnded`(`:175-178`) ✔는 "VR은 rollover/재설정이 원자적으로 대체 사이클을 만든다"는 전제로 VR을 제외해서 재개로도 풀리지 않는다. 그런데 그 전제가 롤오버에서는 성립하지 않는다. 같은 작업인 `CycleSnapshotCreator.reconfigureVrCycle`(`:76`)은 한 트랜잭션이다. CQ-29(INFINITE·PRIVACY의 `markEnded`)와 같은 유형이다.
+- 수정안: `CycleSnapshotCreator`에 `markEnded`까지 포함한 `@Transactional` 롤오버 메서드를 두고 `rollIfDue`가 그것을 호출한다.
+- 가드: DB 테스트로 "새 사이클 생성 실패 시 `markEnded`도 롤백"을 잠근다(`CyclePositionPersistorDbTest` CQ-29 패턴).
+- 상태: open.
+
+### CQ-46 같은 계좌·종목 중복 등록이 check-then-act라 경합에 뚫린다
+- 주제: 상태 가드. 유형: 누락 가드. 위험: 중간(마이그레이션).
+- 위치: `StrategyCreationService.java:96,193-197` ✔(`validateUniqueTicker`, `register`는 `NOT_SUPPORTED`), `StrategyCreationPersister.java:44` ✔. `trading.strategy`에는 `idx_strategy_account_id`만 있고 유니크 제약이 없다(`V1__init.sql:523`) ✔.
+- 근거: 더블클릭이나 재시도로 두 요청이 동시에 검증을 통과하면 같은 종목 전략이 두 개 생긴다. 운영 중복은 0건이다.
+- 수정안: trading 마이그레이션에 `UNIQUE (account_id, ticker) WHERE deleted_at IS NULL AND status <> 'ARCHIVED'` 부분 인덱스를 추가하고, `DataIntegrityViolationException`을 `DuplicateStrategyTickerException`(409)으로 변환한다.
+- 가드: 인덱스 자체와 저장 경합 IT.
+- 상태: open.
+
+### CQ-47 개장 후 바로주문의 AT_OPEN 접수 시세 조회가 raw 호출이다
+- 주제: 브로커 실패 처리. 유형: 비일관·조용한 실패. 위험: 낮음.
+- 위치: `ManualTradingService.java:145-148`(`fetchStartPriceOrNull`, `tryGet`) ✔ vs `:160` raw `priceFetcher.fetchPrices(...).get(...)` ✔.
+- 근거: `:160`은 PLANNED 저장 뒤에 실행된다. 시세 조회가 실패하면 사용자는 503을 받는데 주문은 PLANNED로 남는다. 같은 서비스의 다른 조회는 실패 시 캡 미적용(null)으로 진행한다.
+- 수정안: `fetchStartPriceOrNull`을 재사용한다(null이면 캡 없이 원본 접수 — 기존 계약).
+- 가드: 시세 조회 실패 시 접수가 진행되는지 확인하는 단위 테스트.
+- 상태: open.
+
+### CQ-48 오래된 스냅샷 `strategyPort.save`가 상태를 덮어쓴다
+- 주제: 상태 전이. 유형: 비일관. 위험: 낮음~중간.
+- 위치: `support/CycleCloser.java:23`(`save(strategy.withStatus(PAUSED))`) ✔, `StrategyService.java:253`(`update`의 `save`) ✔. 조건부 갱신은 `StrategyPort.java:38,56`(`updateStatusUnlessArchived`·`pause`) ✔에 있다.
+- 근거: `StrategyPort`가 "오래된 스냅샷 save가 보관을 덮어쓰는 경합" 때문에 조건부 갱신을 만들었는데 두 곳이 남았다. 동시에 보관하면 ARCHIVED가 PAUSED나 ACTIVE로 되돌아갈 수 있다(재현 미확인).
+- 수정안: `CycleCloser`는 `strategyPort.pause(id)`를 호출하고 `withStatus(PAUSED)`를 반환한다. `update`는 `cycleSeedType`만 쓰는 조건부 메서드를 추가한다.
+- 가드: 어댑터 테스트로 ARCHIVED 행이 되돌아가지 않음을 잠근다.
+- 상태: open.
+
+### CQ-49 계좌 삭제 cascade 실패의 재시도 경로가 재기동뿐이다
+- 주제: 이벤트. 유형: 비일관. 위험: 낮음.
+- 위치: `adapter/in/event/AccountCascadeListener.java:31` ✔, `adapter/in/schedule/UserEventResubmitScheduler.java:46-48` ✔(필터는 `UserDeletedEvent`·`UserNotifyProfileChangedEvent`만 통과).
+- 근거: 사용자 탈퇴 cascade는 첫 실패 시 알림과 10분 재발행이 있다. 계좌 삭제 cascade는 kista-trading 재기동 재발행에만 기대므로 그 사이 삭제 계좌의 전략·사이클이 남는다. 리스너가 멱등인지는 미확인이다.
+- 수정안: 필터에 `AccountDeletedEvent`를 추가하고 메서드·주석 이름을 "cascade·사용자 동기화 이벤트"로 넓힌다. 리스너 멱등은 먼저 확인한다.
+- 가드: `UserEventResubmitSchedulerTest`에 `AccountDeletedEvent` 케이스를 추가한다.
+- 상태: open.
+
+### CQ-50 "증권사에 접수된 전략 주문" 술어 4곳 반복
+- 주제: 중복. 유형: 중복. 위험: 낮음.
+- 위치: `StrategyService.java:148` ✔, `TradingService.java:199-200` ✔, `StrategyLedgerBudget.java:59` ✔, `DcaPlanInputCollector.java:185-186` ✔.
+- 근거: `externalOrderId != null && !UNKNOWN_LEG.equals(orderLeg)`가 4곳에 있고, 수동 보정 행 판정이 바뀌면 함께 바뀐다(CLAUDE.md 추출 기준 충족).
+- 수정안: `Order.isBrokerSubmitted()`(이름은 착수 시 정함)를 추가하고 4곳을 교체한다.
+- 가드: 없음(도메인 메서드 단위 테스트만).
+- 상태: open.
+
+### CQ-51 DCA 주문 leg 접두사 `"DCA_"` 4곳
+- 주제: 중복. 유형: 비일관. 위험: 낮음.
+- 위치: 생성 `matching/domain/model/DcaRule.java:90` ✔, 역변환·판별 `CryptoOrderSynchronizer.java:110` ✔(리터럴), `TradingCandidatePlanner.java:278,285,288` ✔·`TradingOrderExecutor.java:151,159,161` ✔(각자 private 상수).
+- 수정안: `DcaRule`에 `isDcaLeg(leg)`·`ruleKeyOf(leg)` 정적 메서드를 두고 3곳을 교체한다.
+- 가드: 없음.
+- 상태: open.
+
+### CQ-52 배치 락 이름·보유시간 리터럴 7곳
+- 주제: 중복. 유형: SSOT 우회. 위험: 낮음.
+- 위치: `TradingOpenScheduler.java:34,39,47` ✔, `TradingCloseScheduler.java:54,71,79,84` ✔. SSOT는 `TradingBatchJob.java:5-6` ✔(`lockName()`, 주석상 체크포인트 키와 같은 값).
+- 근거: 락 이름과 체크포인트 키가 다르면 재개 판정이 어긋난다.
+- 수정안: `TradingBatchJob.OPEN.lockName()`과 클래스 상수 `LOCK_TTL`로 바꾼다.
+- 가드: 없음.
+- 상태: open.
+
+### CQ-53 포지션 포트·쿼리의 죽은 메서드와 커서 쿼리 soft-delete 필터 누락
+- 주제: 불필요한 코드·영속성 일관성. 유형: 죽은 코드·비일관. 위험: 낮음.
+- 위치:
+  - 죽은 코드: `CyclePositionPort.java:49`(3-인자 `findByAccountId`)·`:52`(`findByStrategyIdAndDateRange`), 어댑터 `CyclePositionPersistenceAdapter.java:99-109`, `CyclePositionJpaRepository.java:75`(`findByAccountIdAndDateRange`)·`:81`(`findAllByOrderByCreatedAtDesc(Pageable)`). main·루트 test에서 호출처 0건이다(어댑터 테스트 제외) ✔. JPA `findByStrategyIdAndDateRange`는 어댑터 `:132`가 쓰므로 유지한다.
+  - 필터 누락: `CyclePositionJpaRepository.java` `findByAccountIdWithCursor`에 `a.deleted_at IS NULL`이 없다 ✔. 같은 JOIN을 쓰는 `findRecentByUserId`·`findByUserIdAndRange`에는 있다 ✔. 호출 전 계좌 소유 검증이 삭제 계좌를 막으므로 실제 영향은 없다.
+- 수정안: 죽은 메서드 4개와 해당 어댑터 테스트를 지우고 필터를 추가한다.
+- 가드: 없음.
+- 상태: open.
+
+### CQ-54 `nextVersionNo`가 soft delete 순서에 의존한다
+- 주제: 영속성. 유형: 잠재 함정. 위험: 낮음.
+- 위치: `StrategyVersionJpaRepository.java:32`(JPQL MAX — `@SQLRestriction`이 삭제 버전을 뺀다), 호출부 주석 `DcaConfigService.java:46` ✔·`CycleSnapshotCreator.java:114-118` ✔.
+- 근거: 호출 순서가 바뀌면 삭제된 버전 번호를 재사용해 `uq_strategy_version_strategy_version_no`(V1:544)와 충돌한다. 현재 순서는 안전하다.
+- 수정안: 삭제 행을 포함하는 native `MAX(version_no)`로 바꾸고 호출부의 순서 주석을 지운다.
+- 가드: 어댑터 테스트 "삭제된 버전이 있어도 다음 번호는 최대+1".
+- 상태: open.
+
+### CQ-55 거래일 후보 쌍·마감 리포트 창 판정의 중복
+- 주제: 중복. 유형: 중복. 위험: 낮음.
+- 위치:
+  - `Stream.of(today, nextTradeDate).distinct()`: `StrategyService.java:146`, `CapitalInjectionService.java:148`, `OrderCancelService.java:83`(3곳, 서브에이전트 보고).
+  - 리포트 창 거절: `CapitalInjectionService.java:230-239`·`ManualTradeCorrectionService.java:127-136`(본문 동일, 주석이 서로 참조). `TradingService.java:229-232`는 모양이 다르다.
+- 수정안: 후보 쌍은 `DstInfo`(또는 거래일 헬퍼)에 하나로 둔다. 리포트 창은 `CloseReportScope`에 위임 메서드를 둔다.
+- 가드: 없음.
+- 상태: open(착수 시 줄 재확인).
+
+### CQ-56 trading 잔손질 묶음 (동작 불변)
+- 주제: 일관성·불필요한 코드. 유형: 보일러플레이트·죽은 코드·stale 주석.
+- 위치(서브에이전트 보고, 착수 시 재확인):
+  - `OrderPersistenceAdapter`: `OPEN_STATUSES` 상수(`:33-34`)를 `:166`이 쓰지 않음. `findPlannedOrPlaced*`가 SUBMITTING도 포함하는데 이름·`OrderJpaRepository` 주석은 PLANNED/PLACED. `toDomainList`(`:279`)가 있는데 `:160,166,171` 인라인. 다른 어댑터와 달리 이유 없이 public(`:30`).
+  - `StrategyCyclePersistenceAdapter.java:52-77`: load-set-save 3벌과 stale 주석 "markFilled와 동일".
+  - `CancelledOrderFillRecorder.java:36-41`: `tryGet` 바깥 try/catch가 도달 불가.
+  - `OrderSubmissionReconciler.java:44-49`: 수기 생성자(`@RequiredArgsConstructor`로 대체 가능).
+  - `TradingCandidatePlanner.java:136,213`: `PriceSnapshot` 현재가 null 분기(옆 줄은 `prevCloseOrNull` 사용).
+  - `support/TradingBalanceLoader.java:32-33`: `loadBalanceOrThrow`가 항상 `skipReason=null`인 래퍼를 반환하고 주석은 ISE(실제는 NSEE).
+  - `Order` 금액 `price × quantity` 5곳(`StrategyLedgerBudget:50,67`, `CryptoDcaRoundExecutor:218`, `TradingPreviewService:216,273`), `new AccountBalance(ZERO, null, ZERO)` 2곳.
+  - `TradingBatchRunPersistenceAdapter.java:33,36`: SQL `now()`(다른 어댑터는 `Instant.now(clock)`).
+  - `TradingCycleController.java:264-269`: `getStrategyOrders`만 컨트롤러에서 기간 기본값을 정한다(같은 컨트롤러의 다른 조회는 서비스가 정함). DCA 회차 이력은 서비스(`DcaExecutionQueryService:42-43`, 상한 100)가, history는 컨트롤러(상한 200)가 size를 자른다.
+  - `TradingSchedulerInternalController` `/open`·`/close`에 `@Operation` 없음(같은 패키지 내부 컨트롤러는 모두 있음).
+  - stale 주석: `TradingExecutionUseCase.executeManually`("INFINITE 전용", 실제는 DCA만 거부), `StrategyCreationRequest`(변환 주체).
+  - 문서: 스트림 컨슈머 복구 `@Scheduled`가 `adapter/in/redis`에 있다(`UserEventStreamConsumer:63`, root 2곳 동형, `RedisStreamSubscriber` 설계). `constraints.md`에 예외를 한 줄 추가한다.
+- 가드: 없음.
+- 상태: open.
+
+### CQ-57 정책 설정 JSON 섹션 누락 시 NPE
+- 주제: 누락 가드. 위험: 낮음.
+- 위치: `adapter/out/persistence/policy/TradingPolicySettingsPersistenceAdapter.java:62-68`(`(ObjectNode) root.get(section)`), catch `:53`은 Jackson·IAE만 잡는다. 예외 문구가 영어다.
+- 수정안: 섹션이 없으면 기본 섹션을 채우고 문구를 한국어로 바꾼다.
+- 가드: 섹션 없는 JSON 단위 테스트.
+- 상태: open.
+
+### CQ-58 등록 예수금 부호·자릿수 검증이 DCA에만 있다
+- 주제: 입력 검증. 유형: 비일관·누락 가드. 위험: 낮음~중간.
+- 위치: `StrategyCreationService.java:101-102` ✔(DCA만 `dcaDeposit` 검증 `:182-192` ✔, 나머지 타입은 null→0만), `TradingCycleRequest.java:21-22`(검증 어노테이션 없음), `CapitalInjectionService.requireAmountScale`(`:195`, 같은 검사 다른 문구), `StrategyService.updateSeed`(`signum<=0`만).
+- 근거: INFINITE·PRIVACY·VR 등록에 음수나 소수 3자리 예수금이 들어갈 수 있다. INFINITE는 `validateInfiniteMinSeed`가 fail-open(유지 목록)이라 시세 조회 실패 시 통과한다.
+- 수정안: `requireAmountScale`을 공용 검증 하나로 올려 등록 전 타입·시드 수정·투자금 추가가 같이 쓴다.
+- 가드: 타입별 음수·자릿수 등록 거부 테스트.
+- 상태: open.
+
+### CQ-59 `markCancelled`·`markFilled`가 잠금·상태 검사 없이 덮어쓴다 (정책 판단 필요)
+- 주제: 상태 전이. 위험: 중간.
+- 위치: `OrderPersistenceAdapter.java:253-256,269-276` ✔(`mutate`), 대조 `markFailed` `:258-265` ✔(`lockOrConflict`+`requireStatus`).
+- 근거: 접수 계열은 행 잠금과 상태 검사를 하는데 취소·체결 기록은 last-write-wins다. 증권사 상태를 진실로 보는 의도일 수 있다. 실제 경합 경로는 미확인이다.
+- 결정 필요: 의도라면 주석으로 고정한다. 아니면 최소한 FAILED→FILLED 같은 되살림만 막는다.
+- 상태: open.
+
+### CQ-60 수동 마감 트리거가 창 밖이면 202 뒤에 조용히 거부된다 (정책 판단 필요)
+- 위치: `TradingCloseScheduler.java:63-70` ✔, `TradingSchedulerInternalController.java:44-53` ✔(무조건 202 + 가상 스레드), root `TradingSchedulerCommandHttpAdapter.java:28-30`·`AdminTradingSchedulerController.java:28-30`.
+- 근거: 관리자 알림은 가지만 호출 응답으로는 거부를 알 수 없다. 개장 `runNow`에는 창 판정이 없다.
+- 결정 필요: 창 판정을 동기 구간으로 올려 409를 반환할지(root 어댑터·admin UI 영향), 현행 유지+주석일지.
+- 상태: open.
+
+### CQ-61 코인 부분체결 후 취소 주문이 FILLED가 된다 (정책 판단 필요)
+- 위치: `CryptoLedgerRecorder.java:60`(`markFilled(…, FILLED)`), `CryptoOrderSynchronizer.java:115,130`. 주식은 CANCELLED를 유지하고 체결량만 기록한다(`CancelledOrderFillRecorder`, `OrderCancelStateWriter`).
+- 결정 필요: 코인 시장가 BUY 수량 추정 때문에 의도된 것인지. 의도면 주석, 아니면 CANCELLED 유지로 맞춘다.
+- 상태: open.
+
+### CQ-62 미리보기 계좌 현금·보유 경고가 정지 전략 주문까지 합산한다 (정책 판단 필요)
+- 위치: `TradingPreviewService.java:106`(`!isArchived()`만 거름), `:202-` `attachAccountCashCheck`·`attachAccountHoldingsCheck`.
+- 결정 필요: 경고 합산을 `isActive()` 전략으로 좁힐지(카드 표시는 유지).
+- 상태: open.
+
+### CQ-63 시드 수정·인출 뒤 INFINITE 최소 시드를 다시 확인하지 않는다 (정책 판단 필요)
+- 위치: `StrategyService.updateSeed`, `CapitalInjectionService.java:169`(`signum() > 0`만). `minRequiredDeposit` 호출은 등록(`StrategyCreationService:160`)과 `CycleRotationService:92`뿐이다.
+- 결정 필요: 수정·인출 경로에도 0회차 교착 시드 검사를 둘지. 허용이면 유지 목록에 근거를 남긴다(fail-open 전환 제안 아님).
+- 상태: open.
