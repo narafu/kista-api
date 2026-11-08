@@ -639,6 +639,10 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | 응답 DTO enum 표현 혼재(String vs enum) | `TradingCycleResponse`·`ExecuteOrdersResponse` vs `DcaResponse`, `NextOrdersResponse`는 파일 안에서 `OrderItem`(enum)과 `TodayOrderItem`(String)이 섞임 | JSON 결과가 같고 통일하면 OpenAPI 스키마(api-types)만 흔들린다. 유지. |
 | `UserEventRepublisher` 동일 본문 메서드 2개 | `trading/adapter/in/redis/UserEventRepublisher.java` | 2곳이라 추출 기준(3곳) 미달. 유지. |
 | `CycleCompletedEvent`/`CycleEndedEvent` 필드 동일 | `trading/application/event/` | 발행 흐름(배치 정상 종료 vs 수동 체결 보정)과 리스너 phase가 달라 병합하지 않는다. 한 흐름에서 동시 발행 없음(발행처 `CycleRotationService:54`, `ManualTradeCorrectionService:111`). |
+| stats 2곳 중복(기록만) | `PlainDecimalSerializer`(shared contract·stats dto), `Instant.parse(cursor)`(`DashboardController`·`TradingCycleController`), `CryptoMarketIndicators.Premium`/`DailyIndicator` 동형, `EquityPoint`/`BacktestPoint`, `BacktestEngine` initialHoldings null 폴백, `InvestmentIndexCalculator` `laterPosition` 병합 | 2곳(추출 기준 미달). `BacktestPoint`는 프론트 차트 재사용이 주석에 명시돼 있다(stats 감사 2026-11-08). |
+| stats 평가액 계산 2종 | `TradingStatsService`(종가 없으면 평단 대체) vs `InvestmentIndexCalculator`(종가 없으면 제외) | 곡선·요약은 연속성이, 투자지수(TWR)는 실평가가 필요해 용도가 다르다(stats 감사 2026-11-08). |
+| stats 서비스 `to` null → today 인라인 | `AccountStatisticsService`·`TradingStatsService`·`InvestmentPointsQueryService` 등 | CQ-04에서 null 기본값을 호출부에 남기기로 했다(CQ-17 Clock 주입과 충돌 방지). |
+| stats 어댑터 빈 응답 → 빈 결과 | `BinanceMarketDataAdapter` 롱숏, `FrankfurterFxRateAdapter`, `UpbitMarketDataAdapter.getKrwPrices` | 소비처가 모두 `tryGet`이고 다음 단계(`LongShortRatio.of` 등)가 빈 값을 실패로 바꾼다. 미결제약정만 가드가 없어 CQ-43에서 고쳤다. |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.
@@ -677,3 +681,14 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 - 주제: 불필요한 코드. 유형: 죽은 코드.
 - 위치: trading-core `trading`·`stats`의 미사용 import 21개(대부분 `Strategy`가 `shared.kernel`로 옮겨진 뒤 남은 import), `TradingPreviewService.buildPreview`의 `account`·`TradingCandidatePlanner.allocateAndSave`의 `firstContext` 파라미터.
 - 상태: done(7f4d9be11). 가드는 두지 않는다(유지 목록 "미사용 import 빌드 가드").
+
+### CQ-43 stats 모듈 비일관·불필요 코드 (2026-11-08 감사)
+- 주제: 일관성·불필요한 코드. 유형: 비일관·죽은 코드.
+- 위치: `AlpacaCandleAdapter`(빈 응답 문구에 symbol 노출·미사용 `Bar.v`), `DashboardController`(size `Math.min`만), `InvestmentIndexCalculator.compareCycles`(startDate 우선 — 포트 조회·곡선은 createdAt), `CryptoMarketIndicators.OpenInterest`(빈 이력 가드 없음), `CoinMarketCapAdapter`(quotes null 미검사·NPE catch), `CryptoMarketIndicatorService` 별칭 변수, `PortfolioService` 필드명, `BacktestEngine` 같은 패키지 import 외.
+- 상태: done(1b1eb7cd1). 회귀: `InvestmentIndexCalculatorTest.시작예정일_전_재설정된_사이클도_생성순으로_체인을_잡는다`·`CryptoMarketIndicatorServiceTest.미결제약정_이력이_비면_미결제약정만_null`(변이 확인 완료).
+
+### CQ-44 시작예정일 전 VR 재설정이 startDate 역전 사이클을 만든다 (의심, 정책 판단 필요)
+- 주제: 상태 전이 가드. 유형: 누락 가드.
+- 위치: `VrReconfigureService.reconfigure`(보관·VR 여부만 검사), `CycleSnapshotCreator.reconfigureVrCycle`(옛 사이클 `markEnded(today)`, 새 사이클 startDate=오늘), `StrategyCreationPersister:69`(첫 사이클 startDate=시작예정일).
+- 근거: 미래 시작예정일 VR을 시작 전에 재설정하면 옛 사이클은 endDate < startDate, 새 사이클은 더 이른 startDate로 남는다. 운영 조회(2026-11-08) 역전 쌍 0건·`end_date < start_date` 0건. stats 정렬은 CQ-43에서 생성순으로 맞춰 영향이 없고, `InvestmentIndexCalculator.addEntryFlow`가 시작 안 된 사이클의 스냅샷으로 진입 흐름을 만드는 한계는 남는다.
+- 상태: open — 시작 전 재설정을 막을지(400) 허용할지 사용자 결정 대기.
