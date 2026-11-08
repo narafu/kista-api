@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
+import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionPage;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -33,15 +34,15 @@ class DcaExecutionQueryService implements DcaExecutionQuery {
 
     @Override
     @Transactional(readOnly = true)
-    public DcaExecutionPage list(UUID strategyId, UUID requesterId, int page, int size) {
+    public DcaExecutionPage list(UUID strategyId, UUID requesterId, DcaExecutionFilter filter, int page, int size) {
         Strategy strategy = strategyPort.findByIdOrThrow(strategyId);
         accountPort.requireOwnedAccount(strategy.accountId(), requesterId);
         if (!strategy.isDca()) throw new IllegalArgumentException("DCA 전략이 아닙니다.");
 
         int safePage = Math.max(page, 0);
         int safeSize = Math.clamp(size, 1, 100);
-        List<DcaExecution> executions = dcaExecutionPort.findPage(strategyId, safePage, safeSize);
-        long total = dcaExecutionPort.count(strategyId);
+        List<DcaExecution> executions = dcaExecutionPort.findPage(strategyId, filter, safePage, safeSize);
+        long total = dcaExecutionPort.count(strategyId, filter);
 
         // ORDERED 회차의 주문을 1회 조회로 합친다
         List<UUID> orderIds = executions.stream().map(DcaExecution::orderId).filter(Objects::nonNull).toList();

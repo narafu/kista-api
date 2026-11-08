@@ -3,10 +3,13 @@ package com.kista.tradingcore.trading.adapter.out.persistence;
 import com.kista.shared.kernel.DcaSkipReason;
 import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
+import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.id.uuid.UuidVersion7Strategy;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,14 +61,26 @@ class DcaExecutionPersistenceAdapter implements DcaExecutionPort {
     }
 
     @Override
-    public List<DcaExecution> findPage(UUID strategyId, int page, int size) {
-        return jpaRepository.findByStrategyIdOrderByTradeDateDescIdDesc(strategyId, PageRequest.of(page, size))
+    public List<DcaExecution> findPage(UUID strategyId, DcaExecutionFilter filter, int page, int size) {
+        // 같은 거래일 다중 규칙 행의 페이지 경계 안정화 — id(UUIDv7) 2차 정렬
+        Sort sort = Sort.by(Sort.Order.desc("tradeDate"), Sort.Order.desc("id"));
+        return jpaRepository.findAll(spec(strategyId, filter), PageRequest.of(page, size, sort))
                 .stream().map(this::toDomain).toList();
     }
 
     @Override
-    public long count(UUID strategyId) {
-        return jpaRepository.countByStrategyId(strategyId);
+    public long count(UUID strategyId, DcaExecutionFilter filter) {
+        return jpaRepository.count(spec(strategyId, filter));
+    }
+
+    // 필터 AND 결합 — null 조건은 건너뛴다
+    private static Specification<DcaExecutionEntity> spec(UUID strategyId, DcaExecutionFilter f) {
+        Specification<DcaExecutionEntity> spec = (root, q, cb) -> cb.equal(root.get("strategyId"), strategyId);
+        if (f.from() != null) spec = spec.and((root, q, cb) -> cb.greaterThanOrEqualTo(root.get("tradeDate"), f.from()));
+        if (f.to() != null) spec = spec.and((root, q, cb) -> cb.lessThanOrEqualTo(root.get("tradeDate"), f.to()));
+        if (f.direction() != null) spec = spec.and((root, q, cb) -> cb.equal(root.get("direction"), f.direction()));
+        if (f.ruleKey() != null) spec = spec.and((root, q, cb) -> cb.equal(root.get("ruleKey"), f.ruleKey()));
+        return spec;
     }
 
     private DcaExecution toDomain(DcaExecutionEntity e) {

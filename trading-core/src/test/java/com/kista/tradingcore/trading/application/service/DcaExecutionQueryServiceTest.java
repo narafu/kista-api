@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
 import com.kista.tradingcore.trading.application.port.output.OrderPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
+import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 import com.kista.tradingcore.trading.domain.model.DcaExecutionPage;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
@@ -45,14 +46,14 @@ class DcaExecutionQueryServiceTest {
         DcaExecution ordered = DcaExecution.ordered(strategyId, "buy-key", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 9, 30), orderId, BigDecimal.valueOf(3), null);
         DcaExecution skipped = DcaExecution.skipped(strategyId, "sell-key", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 8, 31), DcaSkipReason.CONDITION_NOT_MET, "x", null);
         DcaExecution removed = DcaExecution.skipped(strategyId, "removed-key", com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 8, 30), DcaSkipReason.CONDITION_NOT_MET, "x", null);
-        when(executionPort.findPage(strategyId, 0, 20)).thenReturn(List.of(ordered, skipped, removed));
-        when(executionPort.count(strategyId)).thenReturn(3L);
+        when(executionPort.findPage(strategyId, DcaExecutionFilter.NONE, 0, 20)).thenReturn(List.of(ordered, skipped, removed));
+        when(executionPort.count(strategyId, DcaExecutionFilter.NONE)).thenReturn(3L);
         when(calendar.usSessionDateOf(any())).thenAnswer(inv -> inv.<LocalDate>getArgument(0).minusDays(1));
         Order order = new Order(orderId, dca.accountId(), UUID.randomUUID(), LocalDate.of(2026, 9, 30), StrategyTicker.UPRO,
                 OrderType.MOO, OrderTiming.AT_OPEN, OrderDirection.BUY, BigDecimal.valueOf(3), null, OrderStatus.FILLED, "E1", BigDecimal.valueOf(3), new BigDecimal("80"));
         when(orderPort.findAllByIds(List.of(orderId))).thenReturn(List.of(order));
 
-        DcaExecutionPage page = service.list(strategyId, UUID.randomUUID(), 0, 20);
+        DcaExecutionPage page = service.list(strategyId, UUID.randomUUID(), DcaExecutionFilter.NONE, 0, 20);
 
         assertThat(page.totalElements()).isEqualTo(3);
         assertThat(page.content().get(0).order()).isEqualTo(order);
@@ -67,10 +68,10 @@ class DcaExecutionQueryServiceTest {
         UUID strategyId = UUID.randomUUID();
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(new Strategy(strategyId, UUID.randomUUID(),
                 StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
-        when(executionPort.findPage(strategyId, 0, 100)).thenReturn(List.of());
+        when(executionPort.findPage(strategyId, DcaExecutionFilter.NONE, 0, 100)).thenReturn(List.of());
 
-        assertThat(service.list(strategyId, UUID.randomUUID(), -1, 999).size()).isEqualTo(100);
-        verify(executionPort).findPage(strategyId, 0, 100);
+        assertThat(service.list(strategyId, UUID.randomUUID(), DcaExecutionFilter.NONE, -1, 999).size()).isEqualTo(100);
+        verify(executionPort).findPage(strategyId, DcaExecutionFilter.NONE, 0, 100);
     }
 
     @Test
@@ -79,7 +80,7 @@ class DcaExecutionQueryServiceTest {
         when(strategyPort.findByIdOrThrow(strategyId)).thenReturn(new Strategy(strategyId, UUID.randomUUID(),
                 StrategyType.INFINITE, StrategyStatus.ACTIVE, StrategyTicker.SOXL, StrategyCycleSeedType.NONE));
 
-        assertThatThrownBy(() -> service.list(strategyId, UUID.randomUUID(), 0, 20))
+        assertThatThrownBy(() -> service.list(strategyId, UUID.randomUUID(), DcaExecutionFilter.NONE, 0, 20))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -92,7 +93,7 @@ class DcaExecutionQueryServiceTest {
                 StrategyType.DCA, StrategyStatus.ACTIVE, StrategyTicker.UPRO, StrategyCycleSeedType.NONE));
         when(accountPort.requireOwnedAccount(accountId, requester)).thenThrow(new SecurityException("소유권 불일치"));
 
-        assertThatThrownBy(() -> service.list(strategyId, requester, 0, 20)).isInstanceOf(SecurityException.class);
-        verify(executionPort, never()).findPage(any(), anyInt(), anyInt());
+        assertThatThrownBy(() -> service.list(strategyId, requester, DcaExecutionFilter.NONE, 0, 20)).isInstanceOf(SecurityException.class);
+        verify(executionPort, never()).findPage(any(), any(), anyInt(), anyInt());
     }
 }

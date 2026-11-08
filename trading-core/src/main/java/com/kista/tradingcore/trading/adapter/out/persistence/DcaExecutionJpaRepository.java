@@ -1,7 +1,7 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,14 +13,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UUID> {
+interface DcaExecutionJpaRepository extends JpaRepository<DcaExecutionEntity, UUID>, JpaSpecificationExecutor<DcaExecutionEntity> {
 
     Optional<DcaExecutionEntity> findByStrategyIdAndRuleKeyAndTradeDate(UUID strategyId, String ruleKey, LocalDate tradeDate);
-
-    // 같은 거래일 다중 규칙 행의 페이지 경계 안정화 — id(UUIDv7) 2차 정렬
-    List<DcaExecutionEntity> findByStrategyIdOrderByTradeDateDescIdDesc(UUID strategyId, Pageable pageable);
-
-    long countByStrategyId(UUID strategyId);
 
     // 전략×규칙별 최신 1건
     @Query(value = """

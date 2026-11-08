@@ -14,6 +14,7 @@ import com.kista.tradingcore.matching.domain.model.DcaStrategyConfig;
 import com.kista.shared.kernel.DcaIndicator;
 import com.kista.shared.kernel.DcaOperator;
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
+import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -128,7 +129,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null))).isTrue();
         assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null))).isFalse();
         assertThat(executions.find(strategyId, K1, day)).get().extracting(DcaExecution::skipReason).isEqualTo(DcaSkipReason.NO_HOLDINGS);
-        assertThat(executions.count(strategyId)).isEqualTo(1);
+        assertThat(executions.count(strategyId, DcaExecutionFilter.NONE)).isEqualTo(1);
     }
 
     @Test
@@ -136,7 +137,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         LocalDate day = LocalDate.of(2026, 10, 14);
         assertThat(executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null))).isTrue();
         assertThat(executions.insertIfAbsent(DcaExecution.ordered(strategyId, K2, com.kista.shared.kernel.OrderDirection.BUY, day, null, BigDecimal.ONE, new BigDecimal("10.00")))).isTrue();
-        assertThat(executions.count(strategyId)).isEqualTo(2);
+        assertThat(executions.count(strategyId, DcaExecutionFilter.NONE)).isEqualTo(2);
         assertThat(executions.find(strategyId, K2, day)).get().extracting(DcaExecution::ruleKey).isEqualTo(K2);
         assertThat(executions.find(strategyId, K2, LocalDate.of(2026, 10, 15))).isEmpty();
     }
@@ -148,9 +149,27 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, OrderDirection.BUY, day, DcaSkipReason.NO_HOLDINGS, null, null));
         assertThat(executions.find(strategyId, K1, day)).get().extracting(DcaExecution::direction).isEqualTo(OrderDirection.SELL);
         // 같은 거래일 두 행 — 크기 1 페이지 두 장이 겹치지 않고 둘 다 덮는다(id 2차 정렬)
-        var first = executions.findPage(strategyId, 0, 1);
-        var second = executions.findPage(strategyId, 1, 1);
+        var first = executions.findPage(strategyId, DcaExecutionFilter.NONE, 0, 1);
+        var second = executions.findPage(strategyId, DcaExecutionFilter.NONE, 1, 1);
         assertThat(List.of(first.getFirst().ruleKey(), second.getFirst().ruleKey())).containsExactlyInAnyOrder(K1, K2);
+    }
+
+    @Test
+    void filters_combine_with_and_and_total_follows_filter() {
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, OrderDirection.BUY, LocalDate.of(2026, 10, 1), DcaSkipReason.NO_HOLDINGS, null, null));
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, OrderDirection.BUY, LocalDate.of(2026, 10, 2), DcaSkipReason.NO_HOLDINGS, null, null));
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, OrderDirection.SELL, LocalDate.of(2026, 10, 2), DcaSkipReason.NO_HOLDINGS, null, null));
+        executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, OrderDirection.SELL, LocalDate.of(2026, 10, 3), DcaSkipReason.NO_HOLDINGS, null, null));
+        // 경계 포함: 10/2~10/3 + SELL → 2건
+        var f = new DcaExecutionFilter(LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 3), OrderDirection.SELL, null);
+        assertThat(executions.findPage(strategyId, f, 0, 10)).extracting(DcaExecution::tradeDate)
+                .containsExactly(LocalDate.of(2026, 10, 3), LocalDate.of(2026, 10, 2));
+        assertThat(executions.count(strategyId, f)).isEqualTo(2);
+        // ruleKey 단건 + 페이지 크기 1 → 총 2건, 한 장 1건
+        var byRule = new DcaExecutionFilter(null, null, null, K1);
+        assertThat(executions.findPage(strategyId, byRule, 0, 1)).hasSize(1);
+        assertThat(executions.count(strategyId, byRule)).isEqualTo(2);
+        assertThat(executions.count(strategyId, DcaExecutionFilter.NONE)).isEqualTo(4);
     }
 
     @Test
@@ -158,7 +177,7 @@ class DcaPersistenceAdapterDbTest extends DataJpaTestBase {
         executions.insertIfAbsent(DcaExecution.skipped(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 10, 1), DcaSkipReason.NO_HOLDINGS, null, null));
         executions.insertIfAbsent(DcaExecution.ordered(strategyId, K1, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 10, 2), null, BigDecimal.valueOf(3), new BigDecimal("87.12")));
         executions.insertIfAbsent(DcaExecution.skipped(strategyId, K2, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 9, 30), DcaSkipReason.NO_HOLDINGS, null, null));
-        assertThat(executions.findPage(strategyId, 0, 10)).extracting(DcaExecution::tradeDate)
+        assertThat(executions.findPage(strategyId, DcaExecutionFilter.NONE, 0, 10)).extracting(DcaExecution::tradeDate)
                 .containsExactly(LocalDate.of(2026, 10, 2), LocalDate.of(2026, 10, 1), LocalDate.of(2026, 9, 30));
         var latest = executions.findLatestByStrategyIds(List.of(strategyId)).get(strategyId);
         assertThat(latest.get(K1).tradeDate()).isEqualTo(LocalDate.of(2026, 10, 2));

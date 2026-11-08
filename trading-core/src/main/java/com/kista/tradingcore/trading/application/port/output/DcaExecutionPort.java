@@ -1,6 +1,7 @@
 package com.kista.tradingcore.trading.application.port.output;
 
 import com.kista.tradingcore.trading.domain.model.DcaExecution;
+import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
 
 import com.kista.shared.kernel.DcaSkipReason;
 
@@ -25,9 +26,9 @@ public interface DcaExecutionPort {
     // 전략×규칙별 최신 회차 1건 (배치 조회) — strategyId → ruleKey → 최신 회차
     Map<UUID, Map<String, DcaExecution>> findLatestByStrategyIds(Collection<UUID> strategyIds);
 
-    // 회차 이력 페이지 (trade_date DESC)
-    List<DcaExecution> findPage(UUID strategyId, int page, int size);
+    // 회차 이력 페이지 (trade_date DESC) — 필터 AND 적용
+    List<DcaExecution> findPage(UUID strategyId, DcaExecutionFilter filter, int page, int size);
 
-    // 회차 이력 총 건수
-    long count(UUID strategyId);
+    // 필터 적용 회차 이력 총 건수
+    long count(UUID strategyId, DcaExecutionFilter filter);
 }

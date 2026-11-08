@@ -3,6 +3,8 @@ package com.kista.tradingcore.trading.adapter.in.web;
 import com.kista.tradingcore.trading.adapter.in.web.dto.*;
 import com.kista.tradingcore.trading.application.usecase.DcaConfigUseCase;
 import com.kista.tradingcore.trading.application.usecase.DcaExecutionQuery;
+import com.kista.tradingcore.trading.domain.model.DcaExecutionFilter;
+import com.kista.shared.kernel.OrderDirection;
 import com.kista.tradingcore.trading.application.usecase.InjectCapitalUseCase;
 import com.kista.tradingcore.trading.application.usecase.WithdrawCapitalUseCase;
 import com.kista.tradingcore.trading.application.usecase.StrategyUseCase;
@@ -273,8 +275,13 @@ public class TradingCycleController {
     public DcaExecutionPageResponse listDcaExecutions(
             @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) OrderDirection direction,
+            @RequestParam(required = false) String ruleKey,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return DcaExecutionPageResponse.from(dcaExecutionQuery.list(id, userId, page, size));
+        DcaExecutionFilter filter = new DcaExecutionFilter(from, to, direction, ruleKey);
+        return DcaExecutionPageResponse.from(dcaExecutionQuery.list(id, userId, filter, page, size));
     }
 }
