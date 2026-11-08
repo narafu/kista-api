@@ -146,26 +146,20 @@ class CryptoMarketIndicatorService implements CryptoMarketIndicatorUseCase {
             BigDecimal spot = BrokerCallGuard.tryGet("바이낸스 현재가 " + t, () -> binance.getSpotPrice(t)).orElse(null);
             KimchiPremium kimchi = null;
             if (upbitOk && krwPrices != null && closes != null && spot != null) {
-                final BigDecimal tetherPrice = usdtPrice;
-                final List<DatedValue> usdtC = usdtCandles;
-                final BigDecimal fxNow = fxCurrent;
-                final Map<LocalDate, BigDecimal> fxMap = fxByDate;
-                kimchi = BrokerCallGuard.tryGet("김프 " + t, () -> kimchi(t, spot, closes, krwPrices.get(t), tetherPrice, usdtC, fxNow, fxMap)).orElse(null);
+                kimchi = BrokerCallGuard.tryGet("김프 " + t, () -> kimchi(t, spot, closes, krwPrices.get(t), usdtPrice, usdtCandles, fxCurrent, fxByDate)).orElse(null);
             }
             Premium coinbasePremium = null;
             if (cbUsdtPrice != null && closes != null && spot != null) {
-                final BigDecimal usdtUsd = cbUsdtPrice;
-                final List<DatedValue> usdtUsdCloses = cbUsdtCloses;
                 coinbasePremium = BrokerCallGuard.tryGet("코인베이스 프리미엄 " + t, () -> new Premium(
-                        CryptoPremiums.premiumPercent(coinbase.getUsdPrice(t.name()), spot.multiply(usdtUsd)),
-                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyClosesSince(t.name(), today.minusDays(MAX_DAYS)), usdtUsdCloses, closes, today))).orElse(null);
+                        CryptoPremiums.premiumPercent(coinbase.getUsdPrice(t.name()), spot.multiply(cbUsdtPrice)),
+                        CryptoPremiums.coinbasePremiumHistory(coinbase.getUsdDailyClosesSince(t.name(), today.minusDays(MAX_DAYS)), cbUsdtCloses, closes, today))).orElse(null);
             }
             FundingRate funding = BrokerCallGuard.tryGet("펀딩비 " + t, () -> {
                 FundingRateQuote q = binance.getFundingRate(t);
                 return new FundingRate(q.rate(), q.nextFundingTime(),
                         CryptoPremiums.fundingDailyAverage(binance.getFundingHistory(t, fundingFrom)));
             }).orElse(null);
-            OpenInterest oi = BrokerCallGuard.tryGet("OI " + t, () -> new OpenInterest(binance.getOpenInterestHistory(t))).orElse(null);
+            OpenInterest oi = BrokerCallGuard.tryGet("OI " + t, () -> OpenInterest.of(binance.getOpenInterestHistory(t))).orElse(null);
             Valuation valuation = closes == null ? null
                     : BrokerCallGuard.tryGet("밸류에이션 " + t, () -> Valuation.of(CryptoValuations.history(closes, today, MAX_DAYS))).orElse(null);
             LongShortRatio longShort = BrokerCallGuard.tryGet("롱숏 비율 " + t, () -> LongShortRatio.of(binance.getLongShortAccountRatioHistory(t))).orElse(null);

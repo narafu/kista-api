@@ -51,7 +51,13 @@ public record CryptoMarketIndicators(
 
     public record FundingRate(BigDecimal current, Instant nextFundingTime, List<DatedValue> history) {}
 
-    public record OpenInterest(List<DatedValue> history) {}
+    public record OpenInterest(List<DatedValue> history) {
+        // 빈 이력은 실패로 본다 — non-null 섹션이 빈 history면 isEmpty 판정이 어긋난다
+        public static OpenInterest of(List<DatedValue> history) {
+            if (history.isEmpty()) throw new NoSuchElementException("미결제약정 이력이 없습니다.");
+            return new OpenInterest(history);
+        }
+    }
 
     // 장기 밸류에이션 — current는 직전 완성 일봉 기준(history 마지막 점)
     public record Valuation(DatedValuation current, List<DatedValuation> history) {

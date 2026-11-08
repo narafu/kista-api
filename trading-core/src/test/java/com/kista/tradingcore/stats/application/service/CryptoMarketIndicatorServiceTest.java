@@ -382,6 +382,18 @@ class CryptoMarketIndicatorServiceTest {
     }
 
     @Test
+    void 미결제약정_이력이_비면_미결제약정만_null() {
+        when(binance.getOpenInterestHistory(any())).thenReturn(List.of());
+
+        CryptoMarketIndicators r = service.get(200);
+
+        r.tickers().forEach(t -> {
+            assertThat(t.openInterest()).isNull();
+            assertThat(t.valuation()).isNotNull();
+        });
+    }
+
+    @Test
     void 새_섹션만_살아있어도_빈_결과가_아니다() {
         stubAllFail();
         reset(binance);

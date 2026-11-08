@@ -1,6 +1,7 @@
 package com.kista.tradingcore.stats.application.service;
 
 import com.kista.tradingcore.broker.application.service.BrokerCallGuard;
+import com.kista.shared.kernel.Currency;
 import com.kista.shared.kernel.KstDays;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.account.domain.model.Account;
@@ -76,7 +77,7 @@ class AccountStatisticsService implements AccountStatisticsUseCase {
                             qty,
                             price,
                             amount,
-                            "USD"
+                            Currency.USD.name()
                     );
                 })
                 .toList();

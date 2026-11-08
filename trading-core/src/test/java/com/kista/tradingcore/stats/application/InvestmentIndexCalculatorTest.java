@@ -427,6 +427,26 @@ class InvestmentIndexCalculatorTest {
                         org.assertj.core.groups.Tuple.tuple(FEBRUARY_2, new BigDecimal("105.0000000000")));
     }
 
+    @Test
+    void 시작예정일_전_재설정된_사이클도_생성순으로_체인을_잡는다() {
+        UUID strategyId = UUID.randomUUID();
+        // 먼저 생성된 사이클의 startDate(2/5)가 나중 생성 사이클(2/1)보다 늦다 — startDate 정렬이면 체인이 뒤집힌다
+        StrategyCycle previous = new StrategyCycle(UUID.randomUUID(), strategyId, null, new BigDecimal("100"),
+                new BigDecimal("100"), LocalDate.of(2026, 2, 5), JANUARY_31,
+                at(JANUARY_1, LocalTime.MIDNIGHT), null);
+        StrategyCycle next = new StrategyCycle(UUID.randomUUID(), strategyId, null, new BigDecimal("100"), null,
+                FEBRUARY_1, null, at(JANUARY_31, LocalTime.NOON), null);
+
+        List<InvestmentPoint> result = calculator.calculate(
+                List.of(previous, next),
+                List.of(position(next, FEBRUARY_1, "100"), position(next, FEBRUARY_28, "110")),
+                JANUARY_1, FEBRUARY_28);
+
+        // 2/5 이후에도 재설정된 이전 사이클(종료)이 아닌 나중 생성 사이클이 계속 평가된다
+        assertThat(result.getFirst().baseDate()).isEqualTo(FEBRUARY_1);
+        assertThat(result.getLast().investmentIndexUsd()).isEqualTo(new BigDecimal("110.0000000000"));
+    }
+
     private static InvestmentPoint pointOn(List<InvestmentPoint> points, LocalDate date) {
         return points.stream().filter(point -> point.baseDate().equals(date)).findFirst().orElseThrow();
     }

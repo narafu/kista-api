@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "통계", description = "계좌별 손익·체결·잔고·증거금·현재가 조회 (KIS/Toss 증권사 자동 분기)")
+@Tag(name = "통계", description = "코인 계좌(업비트·바이낸스 등 거래소 계좌) 포트폴리오 조회")
 @RestController
 @RequiredArgsConstructor
 public class CryptoPortfolioController {

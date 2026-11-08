@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PortfolioServiceTest {
 
-    @Mock CyclePositionPort cycleHistoryPort;
+    @Mock CyclePositionPort cyclePositionPort;
     @Mock OrderPort orderPort;
 
     @InjectMocks PortfolioService sut;
@@ -36,7 +36,7 @@ class PortfolioServiceTest {
     @DisplayName("getCurrent: 가장 최근 이력 1건 반환")
     void getCurrent_returns_latest_entry() {
         CyclePositionHistoryEntry entry = entry(new BigDecimal("26.00"));
-        when(cycleHistoryPort.findRecentByUser(USER_ID, 1)).thenReturn(List.of(entry));
+        when(cyclePositionPort.findRecentByUser(USER_ID, 1)).thenReturn(List.of(entry));
 
         assertThat(sut.getCurrent(USER_ID)).isEqualTo(entry);
     }
@@ -44,7 +44,7 @@ class PortfolioServiceTest {
     @Test
     @DisplayName("getCurrent: 이력 없으면 NoSuchElementException")
     void getCurrent_throws_when_no_history() {
-        when(cycleHistoryPort.findRecentByUser(USER_ID, 1)).thenReturn(List.of());
+        when(cyclePositionPort.findRecentByUser(USER_ID, 1)).thenReturn(List.of());
 
         assertThatThrownBy(() -> sut.getCurrent(USER_ID))
                 .isInstanceOf(NoSuchElementException.class)

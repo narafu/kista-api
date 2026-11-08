@@ -67,7 +67,7 @@ class AlpacaCandleAdapterTest {
         assertThatThrownBy(() -> adapter.fetchDailyCandles(
                 "TQQQ", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("TQQQ");
+                .hasMessageContaining("일봉 데이터가 없습니다");
     }
 
     @Test

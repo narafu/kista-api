@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.stats.application.port.output.HistoricalCandlePort;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -16,22 +15,20 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
-// HistoricalCandlePort(shared.kernel)는 원래 root com.kista.api.benchmark.adapter.out.alpaca.AlpacaIndexPriceAdapter가
-// IndexPriceFeedPort와 함께 구현했으나, root는 trading-core 정의 인터페이스를 구현할 수 없는 컴파일
-// 경계(root→trading-core 단방향)라 own-type HTTP 브릿지가 필요해 보였다. 하지만 이 포트는 외부 API(Alpaca)
-// 호출일 뿐 root 소유 상태가 아니므로, root를 거치는 브릿지보다 trading-core가 직접 Alpaca를 호출하는 쪽이
-// 더 단순하다(BacktestEngine의 유일 소비처도 trading-core 내부). marketcalendar의 동명 AlpacaProperties는
-// internal이라 재사용 불가(ModulithArchitectureTest 위반, 실측 확인) — 이 패키지 소유 AlpacaConfig/
-// AlpacaProperties를 별도로 둔다(같은 API 키를 공유하는 "alpaca:" yml 블록은 그대로 재사용)
+// 별도 AlpacaConfig/AlpacaProperties를 쓰는 이유 — marketcalendar의 동명 AlpacaProperties는 internal이라 재사용 불가(Modulith 경계)
 @Slf4j
 @Component
-@RequiredArgsConstructor
 class AlpacaCandleAdapter implements HistoricalCandlePort {
-
 
     private final RestClient tradingStatsAlpacaRestClient;
     private final AlpacaProperties alpacaProperties;
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
+
+    AlpacaCandleAdapter(RestClient tradingStatsAlpacaRestClient, AlpacaProperties alpacaProperties, Clock clock) {
+        this.tradingStatsAlpacaRestClient = tradingStatsAlpacaRestClient;
+        this.alpacaProperties = alpacaProperties;
+        this.clock = clock;
+    }
 
     // root의 구 AlpacaIndexPriceAdapter.fetchDailyCandles와 동일 로직(수정주가 sip 피드, to 클램프) — 그대로 이관
     @Override
@@ -60,8 +57,8 @@ class AlpacaCandleAdapter implements HistoricalCandlePort {
                 .body(BarsResponse.class);
         List<Bar> bars = response != null ? response.bars() : null;
         if (bars == null || bars.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "과거 일봉 응답이 비어있음: symbol=%s, from=%s, to=%s".formatted(symbol, from, clampedTo));
+            log.warn("{} 과거 일봉 응답이 비어 있습니다 ({} ~ {})", symbol, from, clampedTo);
+            throw new IllegalArgumentException("해당 기간의 과거 일봉 데이터가 없습니다.");
         }
         if (response.nextPageToken() != null) {
             log.warn("{} 과거 일봉 조회에 next_page_token 발생 — 페이지네이션 미구현이라 데이터 누락 가능", symbol);
@@ -74,9 +71,8 @@ class AlpacaCandleAdapter implements HistoricalCandlePort {
                 .toList();
     }
 
-    record Bar(@JsonProperty("t") String t, @JsonProperty("o") BigDecimal o, @JsonProperty("h") BigDecimal h,
-               @JsonProperty("l") BigDecimal l, @JsonProperty("c") BigDecimal c, @JsonProperty("v") Long v) {}
+    record Bar(String t, BigDecimal o, BigDecimal h, BigDecimal l, BigDecimal c) {}
 
-    record BarsResponse(@JsonProperty("bars") List<Bar> bars,
+    record BarsResponse(List<Bar> bars,
                         @JsonProperty("next_page_token") String nextPageToken) {}
 }

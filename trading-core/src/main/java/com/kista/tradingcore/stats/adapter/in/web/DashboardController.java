@@ -42,7 +42,7 @@ public class DashboardController {
             @RequestParam(defaultValue = "50") int size) {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
-                accountStatistics.getByAccount(accountId, userId, from, to, cursorInstant, Math.min(size, 200)));
+                accountStatistics.getByAccount(accountId, userId, from, to, cursorInstant, Math.clamp(size, 1, 200)));
     }
 
     // 유저 스코프 일별 거래내역 (대시보드 위젯용 — 계좌별 개별 조회 대신 1회 배치 조회)

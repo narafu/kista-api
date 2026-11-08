@@ -40,6 +40,9 @@ class CoinMarketCapAdapter implements CryptoMarketMetricsPort {
     public List<DatedValue> btcDominanceDaily(int count) {
         HistoricalData data = official("/v1/global-metrics/quotes/historical?interval=daily&count=" + count,
                 Historical.class, Historical::data, Historical::status);
+        if (data.quotes() == null) {
+            throw new IllegalStateException("CoinMarketCap 도미넌스 이력 응답이 비어있습니다");
+        }
         TreeMap<LocalDate, BigDecimal> byDate = new TreeMap<>(); // 날짜 중복 시 마지막 점이 이김
         for (Quote q : data.quotes()) {
             byDate.put(Instant.parse(q.timestamp()).atZone(ZoneOffset.UTC).toLocalDate(), q.btcDominance());
@@ -65,10 +68,13 @@ class CoinMarketCapAdapter implements CryptoMarketMetricsPort {
         TreeMap<LocalDate, BigDecimal> byDate = new TreeMap<>();
         // points는 시간순 — 같은 날짜는 뒤 점이 덮어써 마지막 점이 남는다. 값이 문자열로 온다
         for (ChartPoint p : res.data().points()) {
+            if (p.timestamp() == null || p.altcoinIndex() == null) {
+                throw new IllegalStateException("CoinMarketCap 알트 시즌 차트 점 형식이 올바르지 않습니다");
+            }
             try {
                 byDate.put(Instant.ofEpochSecond(Long.parseLong(p.timestamp())).atZone(ZoneOffset.UTC).toLocalDate(),
                         new BigDecimal(p.altcoinIndex()));
-            } catch (NumberFormatException | NullPointerException e) {
+            } catch (NumberFormatException e) {
                 throw new IllegalStateException("CoinMarketCap 알트 시즌 차트 점 형식이 올바르지 않습니다", e);
             }
         }

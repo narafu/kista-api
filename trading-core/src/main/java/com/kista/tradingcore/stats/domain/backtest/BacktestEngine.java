@@ -1,8 +1,6 @@
 package com.kista.tradingcore.stats.domain.backtest;
 
 import com.kista.shared.kernel.Currency;
-import com.kista.tradingcore.stats.domain.backtest.BacktestCommand;
-import com.kista.tradingcore.stats.domain.backtest.BacktestPoint;
 import com.kista.tradingcore.stats.domain.model.DailyCandle;
 import com.kista.tradingcore.broker.domain.model.Execution;
 import com.kista.tradingcore.matching.domain.model.PlannedOrder;

@@ -37,6 +37,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyType;
 
@@ -413,7 +414,7 @@ class TradingStatsService implements TradingStatsUseCase {
                 durationDays, v.closed());
     }
 
-    private static BigDecimal sum(java.util.stream.Stream<BigDecimal> stream) {
+    private static BigDecimal sum(Stream<BigDecimal> stream) {
         return stream.reduce(BigDecimal.ZERO, BigDecimal::add).setScale(AccountBalance.LEDGER_SCALE, RoundingMode.HALF_UP);
     }
 }

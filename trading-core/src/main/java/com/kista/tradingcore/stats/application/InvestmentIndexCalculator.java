@@ -7,6 +7,7 @@ import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,17 +32,24 @@ public final class InvestmentIndexCalculator {
             return List.of();
         }
 
-        Map<LocalDate, BigDecimal> flows = buildExternalFlows(cycles, positions);
+        Map<UUID, StrategyCycle> cycleById = cycles.stream()
+                .collect(Collectors.toMap(StrategyCycle::id, Function.identity()));
+        // 전략별 사이클을 생성순으로 한 번만 정렬해 흐름·평가 계산이 공유한다
+        Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
+                .collect(Collectors.groupingBy(StrategyCycle::strategyId));
+        cyclesByStrategy.replaceAll((strategyId, strategyCycles) -> strategyCycles.stream()
+                .sorted(InvestmentIndexCalculator::compareCycles)
+                .toList());
+
+        Map<LocalDate, BigDecimal> flows = buildExternalFlows(cyclesByStrategy, cycleById, positions);
         // 일별 USD 평가액과 외부 현금흐름을 분리한 뒤 시간가중수익률을 계산한다.
-        List<DailyValuation> valuations = buildDailyValuations(cycles, positions, from, to, flows);
+        List<DailyValuation> valuations = buildDailyValuations(cycleById, cyclesByStrategy, positions, from, to, flows);
         return compoundDailyReturns(valuations, flows);
     }
 
     private List<DailyValuation> buildDailyValuations(
-            List<StrategyCycle> cycles, List<CyclePosition> positions,
-            LocalDate from, LocalDate to, Map<LocalDate, BigDecimal> flows) {
-        Map<UUID, StrategyCycle> cycleById = cycles.stream()
-                .collect(Collectors.toMap(StrategyCycle::id, Function.identity()));
+            Map<UUID, StrategyCycle> cycleById, Map<UUID, List<StrategyCycle>> cyclesByStrategy,
+            List<CyclePosition> positions, LocalDate from, LocalDate to, Map<LocalDate, BigDecimal> flows) {
         NavigableMap<LocalDate, Map<UUID, CyclePosition>> positionsByDate = new TreeMap<>();
 
         // 입력 순서와 무관하게 같은 KST 일자의 사이클별 마지막 스냅샷만 남긴다.
@@ -59,11 +67,6 @@ public final class InvestmentIndexCalculator {
 
         Map<UUID, CyclePosition> latestByCycle = new HashMap<>();
         positionsByDate.headMap(from, false).values().forEach(latestByCycle::putAll);
-        Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
-                .collect(Collectors.groupingBy(StrategyCycle::strategyId));
-        cyclesByStrategy.replaceAll((strategyId, strategyCycles) -> strategyCycles.stream()
-                .sorted(InvestmentIndexCalculator::compareCycles)
-                .toList());
 
         List<DailyValuation> valuations = new ArrayList<>();
         boolean hasPreviousValuation = false;
@@ -107,18 +110,14 @@ public final class InvestmentIndexCalculator {
     }
 
     private Map<LocalDate, BigDecimal> buildExternalFlows(
-            List<StrategyCycle> cycles, List<CyclePosition> positions) {
+            Map<UUID, List<StrategyCycle>> cyclesByStrategy, Map<UUID, StrategyCycle> cycleById,
+            List<CyclePosition> positions) {
         Map<LocalDate, BigDecimal> flows = new HashMap<>();
-        Map<UUID, List<StrategyCycle>> cyclesByStrategy = cycles.stream()
-                .collect(Collectors.groupingBy(StrategyCycle::strategyId));
         Map<UUID, NavigableMap<LocalDate, BigDecimal>> valuesByCycle =
-                buildCompleteValuesByCycle(cycles, positions);
+                buildCompleteValuesByCycle(cycleById, positions);
 
         // 전략 최초 진입, 내부 사이클 교체, 최종 종료를 하나의 연속된 외부흐름으로 기록한다.
-        for (List<StrategyCycle> strategyCycles : cyclesByStrategy.values()) {
-            List<StrategyCycle> ordered = strategyCycles.stream()
-                    .sorted(InvestmentIndexCalculator::compareCycles)
-                    .toList();
+        for (List<StrategyCycle> ordered : cyclesByStrategy.values()) {
             addEntryFlow(flows, ordered.getFirst(), valuesByCycle.get(ordered.getFirst().id()));
 
             for (int index = 1; index < ordered.size(); index++) {
@@ -163,9 +162,7 @@ public final class InvestmentIndexCalculator {
     }
 
     private Map<UUID, NavigableMap<LocalDate, BigDecimal>> buildCompleteValuesByCycle(
-            List<StrategyCycle> cycles, List<CyclePosition> positions) {
-        Map<UUID, StrategyCycle> cycleById = cycles.stream()
-                .collect(Collectors.toMap(StrategyCycle::id, Function.identity()));
+            Map<UUID, StrategyCycle> cycleById, List<CyclePosition> positions) {
         Map<UUID, NavigableMap<LocalDate, CyclePosition>> dailyPositionsByCycle = new HashMap<>();
 
         // 같은 날의 마지막 스냅샷이 완전한 경우에만 전략 흐름의 전체 평가값 후보로 사용한다.
@@ -241,7 +238,7 @@ public final class InvestmentIndexCalculator {
         for (int index = 0; index < ordered.size(); index++) {
             StrategyCycle cycle = ordered.get(index);
             if (date.isBefore(cycle.startDate())) {
-                break;
+                continue; // 생성순이라 뒤 사이클의 startDate가 더 이를 수 있다(시작예정일 전 재설정)
             }
             candidate = cycle;
             candidateIndex = index;
@@ -284,11 +281,8 @@ public final class InvestmentIndexCalculator {
     }
 
     private static int compareCycles(StrategyCycle first, StrategyCycle second) {
-        int byStartDate = first.startDate().compareTo(second.startDate());
-        if (byStartDate != 0) {
-            return byStartDate;
-        }
-        Comparator<java.time.Instant> instantComparator = Comparator.nullsFirst(Comparator.naturalOrder());
+        // 사이클 순서는 포트 조회·곡선과 같은 생성순 — 시작예정일 전 재설정 시 startDate 역전
+        Comparator<Instant> instantComparator = Comparator.nullsFirst(Comparator.naturalOrder());
         int byCreatedAt = instantComparator.compare(first.createdAt(), second.createdAt());
         if (byCreatedAt != 0) {
             return byCreatedAt;

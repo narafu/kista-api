@@ -28,9 +28,9 @@ public record BacktestResponse(
         List<Point> points = result.points().stream()
                 .map(p -> new Point(p.date(), p.totalAsset(), p.principal()))
                 .toList();
-        Summary summary = new Summary(result.summary().finalAsset(), result.summary().totalInvested(),
-                result.summary().totalReturnRate(), result.summary().cagr(), result.summary().mdd(),
-                result.summary().tradeCount(), result.summary().cycleCount());
+        var s = result.summary();
+        Summary summary = new Summary(s.finalAsset(), s.totalInvested(), s.totalReturnRate(), s.cagr(), s.mdd(),
+                s.tradeCount(), s.cycleCount());
         return new BacktestResponse(points, summary, result.cycleStartDates(), result.warnings());
     }
 }
