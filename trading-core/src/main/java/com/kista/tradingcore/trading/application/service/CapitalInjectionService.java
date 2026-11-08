@@ -38,7 +38,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 // 진행 중 사이클 투자금 추가·인출 — 같은 사이클 잠금 로직을 공유한다. 인출은 장부만 차감하고 반영은 다음 주문 계산부터다(INFINITE unitAmount·PRIVACY multiple 감소, 넘친 보유분은 adjustBuyQuantities가 매수를 줄여 흡수하며 강제 매도는 없음).
 // 추가 — 사이클은 유지하고 최신 포지션 행을 in-place 갱신(append하면 리버스 판정·별점가·이력이 왜곡), startAmount에 추가분을 가산한다 (브로커 호출·주문 취소 없음)
@@ -139,9 +138,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
                     .toList();
             cancelledOrders = List.of();
         } else {
-            LocalDate today = LocalDate.now(clock);
-            LocalDate nextTradeDate = DstInfo.nextTradeDate(ZonedDateTime.now(clock));
-            List<LocalDate> dates = Stream.of(today, nextTradeDate).distinct().toList();
+            List<LocalDate> dates = DstInfo.tradeDateCandidates(ZonedDateTime.now(clock));
             committedOrders = dates.stream()
                     .flatMap(date -> orderPort.findPlannedOrPlacedByCycleAndDate(cycle.id(), date).stream())
                     .toList();
@@ -226,14 +223,7 @@ class CapitalInjectionService implements InjectCapitalUseCase {
     // 그 사이 커밋된 in-place 변경(예수금)은 덮어써지고 startAmount 변경만 남는다. postClose 이전 변경은 리포트가 재조회하므로 안전하다.
     // 리포트가 실패해 마커가 안 찍히면 그날은 계속 거절된다(다음 날 해제). 리포트 대상이 아닌 전략(주문 없음, 정지 전략의 미접수 주문)은 제외(CloseReportScope)
     private void requireOutsideReportWindow(Strategy strategy, String message) {
-        if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(Instant.now(clock)).isPositive()) {
-            return;
-        }
-        LocalDate today = LocalDate.now(clock);
-        if (batchRunPort.isReported(today, strategy.id())) {
-            return;
-        }
-        if (CloseReportScope.awaitsCloseReport(strategy, orderPort.findByStrategyId(strategy.id(), today, today))) {
+        if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort)) {
             throw new IllegalStateException(message);
         }
     }

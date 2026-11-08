@@ -247,6 +247,15 @@ class DstInfoTest {
                 .isEqualTo(LocalDate.of(2026, 7, 19));
     }
 
+    // tradeDateCandidates() — 오늘과 다음 거래일 후보(같은 날이면 1건)
+    @Test
+    void 거래일_후보는_경계_전후로_1건_또는_2건() {
+        assertThat(DstInfo.tradeDateCandidates(ZonedDateTime.of(2026, 7, 18, 4, 29, 0, 0, KST)))
+                .containsExactly(LocalDate.of(2026, 7, 18));
+        assertThat(DstInfo.tradeDateCandidates(ZonedDateTime.of(2026, 7, 18, 4, 30, 0, 0, KST)))
+                .containsExactly(LocalDate.of(2026, 7, 18), LocalDate.of(2026, 7, 19));
+    }
+
     // openBatchMissedAt() — 오늘 시작 전략을 개장 배치 발화(22:00 KST 월~금) 이후 등록했는지
     @ParameterizedTest
     @CsvSource({

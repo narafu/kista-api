@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 // 비-트랜잭션 서비스 — 브로커 취소 HTTP는 트랜잭션 밖에서 실행, DB 상태변경만 OrderCancelStateWriter의 짧은 트랜잭션으로 위임
 @Slf4j
@@ -80,7 +79,7 @@ class OrderCancelService {
 
         // 오늘(KST)과 다음 거래일(수동 실행 tradeDate) 둘 다 — 04:00~장마감 리포트 사이 마감 배치가 접수한 오늘 주문도 포함
         ZonedDateTime now = ZonedDateTime.now(clock);
-        List<LocalDate> tradeDates = Stream.of(now.toLocalDate(), DstInfo.nextTradeDate(now)).distinct().toList();
+        List<LocalDate> tradeDates = DstInfo.tradeDateCandidates(now);
 
         // PLANNED 주문 먼저 삭제 — 증권사 미접수이므로 DB만 처리
         int cancelledCount = 0;

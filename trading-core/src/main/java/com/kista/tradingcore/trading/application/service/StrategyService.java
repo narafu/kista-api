@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
@@ -144,7 +143,7 @@ class StrategyService implements StrategyUseCase {
     private void requireTodayOrdersReported(UUID strategyId, Account account) {
         if (account.broker().getMarket().isCrypto()) return;
         ZonedDateTime now = ZonedDateTime.now(clock);
-        for (LocalDate date : Stream.of(now.toLocalDate(), DstInfo.nextTradeDate(now)).distinct().toList()) {
+        for (LocalDate date : DstInfo.tradeDateCandidates(now)) {
             boolean hasPlaced = orderPort.findByStrategyId(strategyId, date, date).stream()
                     .anyMatch(Order::isBrokerSubmitted);
             if (hasPlaced && !batchRunPort.isReported(date, strategyId)) {

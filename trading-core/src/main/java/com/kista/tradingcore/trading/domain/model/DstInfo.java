@@ -5,6 +5,8 @@ import com.kista.shared.kernel.TimeZones;
 import com.kista.shared.platform.time.KstTradeDates;
 
 import java.time.*;
+import java.util.List;
+import java.util.stream.Stream;
 
 public record DstInfo(
         boolean isDst,      // 미국 뉴욕 기준 일광절약시간(DST) 적용 여부
@@ -97,6 +99,11 @@ public record DstInfo(
     // 주어진 KST 시각 기준 거래일 — 재기동 재개 등 시각을 이미 들고 있는 호출부용 (계산은 KstTradeDates SSOT)
     public static LocalDate nextTradeDate(ZonedDateTime nowKst) {
         return KstTradeDates.nextTradeDate(nowKst);
+    }
+
+    // 오늘(KST)과 다음 거래일 후보 — 같은 날이면 1건. 04:00~마감 리포트 사이 접수된 오늘 주문과 개장 배치가 미리 저장한 다음 거래일 주문을 함께 볼 때 쓴다
+    public static List<LocalDate> tradeDateCandidates(ZonedDateTime nowKst) {
+        return Stream.of(nowKst.toLocalDate(), nextTradeDate(nowKst)).distinct().toList();
     }
 
     // 시각 주입식 판단 — nextTradeDate 공용

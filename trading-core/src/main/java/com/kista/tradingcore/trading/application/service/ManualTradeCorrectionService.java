@@ -11,7 +11,6 @@ import com.kista.shared.kernel.Quantities;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionCommand;
 import com.kista.tradingcore.trading.domain.model.ManualTradeCorrectionResult;
-import com.kista.tradingcore.trading.domain.model.DstInfo;
 import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.shared.kernel.OrderTiming;
 import com.kista.shared.kernel.OrderDirection;
@@ -34,10 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.time.Instant;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -127,11 +124,8 @@ class ManualTradeCorrectionService implements ManualTradeCorrectionUseCase {
     private void rejectDuringReportWindow(Account account, Strategy strategy) {
         // 코인 계좌는 마감 리포트가 없어 제외 (rejectUnidentifiedFillsBeforeReport와 같은 이유)
         if (account.broker().getMarket().isCrypto()) return;
-        if (DstInfo.calculate(ZonedDateTime.now(clock)).waitUntilPostClose(Instant.now(clock)).isPositive()) return;
-        LocalDate today = LocalDate.now(clock);
-        if (batchRunPort.isReported(today, strategy.id())) return;
-        // 리포트 대상 판정은 마감 배치와 같은 기준(CloseReportScope)
-        if (CloseReportScope.awaitsCloseReport(strategy, orderPort.findByStrategyId(strategy.id(), today, today))) {
+        // 창 판정과 리포트 대상 판정은 마감 배치와 같은 기준(CloseReportScope)
+        if (CloseReportScope.inReportWindow(strategy, clock, batchRunPort, orderPort)) {
             throw new IllegalStateException("오늘 마감 리포트가 끝나기 전에는 수동 체결 보정을 할 수 없습니다.");
         }
     }
