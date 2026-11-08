@@ -85,6 +85,7 @@ tasks.named<Test>("test") {
     useJUnitPlatform {
         excludeTags("integration")
     }
+    maxHeapSize = "2g" // 루트 test와 동일 — 슬라이스 ApplicationContext 캐시가 늘어 CI 기본 힙에서 OOM 발생
     systemProperty("user.timezone", "Asia/Seoul")
 }
 
