@@ -92,6 +92,28 @@ class UnassignedCashCalculatorTest {
     }
 
     @Test
+    void seedHolders_excludes_archived_and_zero_fills_missing_ledger() {
+        UUID accountId = UUID.randomUUID();
+        Strategy active = strategy(accountId, StrategyType.INFINITE);
+        Strategy paused = new Strategy(UUID.randomUUID(), accountId, StrategyType.INFINITE, StrategyStatus.PAUSED,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        Strategy archived = new Strategy(UUID.randomUUID(), accountId, StrategyType.INFINITE, StrategyStatus.ARCHIVED,
+                StrategyTicker.TQQQ, StrategyCycleSeedType.NONE);
+        when(cyclePositionPort.findLatestOneByStrategyId(active.id())).thenReturn(Optional.of(
+                new CyclePosition(UUID.randomUUID(), UUID.randomUUID(), new BigDecimal("100"), null, null, new BigDecimal("2"), null, null)));
+        when(cyclePositionPort.findLatestOneByStrategyId(paused.id())).thenReturn(Optional.empty()); // 원장 없음
+        when(strategyPort.findByAccountId(accountId)).thenReturn(List.of(active, paused, archived));
+
+        var holders = calc.seedHolders(accountId);
+        assertThat(holders).hasSize(2);
+        assertThat(UnassignedCashCalculator.reserved(holders)).isEqualByComparingTo("100");
+        var noLedger = holders.get(1);
+        assertThat(noLedger.deposit()).isEqualByComparingTo("0");
+        assertThat(noLedger.holdings()).isEqualByComparingTo("0");
+        assertThat(holders.get(0).holdings()).isEqualByComparingTo("2");
+    }
+
+    @Test
     void applies_to_every_broker_except_mock() {
         assertThat(UnassignedCashCalculator.applies(Broker.KIS)).isTrue();
         assertThat(UnassignedCashCalculator.applies(Broker.UPBIT)).isTrue();

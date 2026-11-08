@@ -38,6 +38,7 @@ landscape:
       - {id: daily-trading, title: 매일 자동 매매, when: "개장 22:00 · 마감 04:30", flow: close-batch}
       - {id: result, title: 결과 확인, flow: result}
       - {id: dca-history, title: DCA 회차 이력 조회, when: "GET /api/trading-cycles/{id}/dca-executions", flow: result}
+      - {id: account-ledger-totals, title: 계좌 원장 합산 조회, when: "GET /api/accounts/{accountId}/ledger-totals", flow: result}
       - {id: pause-stop, title: 일시정지·재개·삭제, flow: pause-stop}
       - {id: withdraw, title: 탈퇴, flow: withdraw}
   - group: 사용자 기능

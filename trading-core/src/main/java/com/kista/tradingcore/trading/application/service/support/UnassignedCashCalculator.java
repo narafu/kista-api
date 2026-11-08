@@ -7,10 +7,13 @@ import com.kista.tradingcore.broker.domain.model.BrokerAccountRef;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import com.kista.tradingcore.trading.application.port.output.StrategyPort;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
+import com.kista.tradingcore.trading.domain.model.Strategy;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 // 계좌 미배정 현금(계좌 통화) = 주문 가능 현금 − 계좌 전략들의 최신 원장(usd_deposit) 합 — 전략 등록 폼 가용 예수금 경고용
@@ -30,15 +33,41 @@ public class UnassignedCashCalculator {
         return broker != Broker.MOCK;
     }
 
-    // 조회 실패는 예외로 전파, 증권사가 금액을 주지 않으면 null — 호출부가 정책(경고 생략/skip)을 정한다
-    public BigDecimal available(UUID accountId, BrokerAccountRef ref) {
-        BigDecimal reserved = strategyPort.findByAccountId(accountId).stream()
+    // 시드 점유 전략(ARCHIVED 제외)과 각 전략의 최신 원장 — 원장 합산·미배정 계산이 한 번 읽은 목록을 공유한다
+    public record SeedHolder(Strategy strategy, @Nullable CyclePosition latest) {
+        // 최신 원장이 없으면 예수금 0
+        public BigDecimal deposit() {
+            return latest == null ? BigDecimal.ZERO : latest.usdDeposit();
+        }
+
+        // 최신 원장이 없으면 보유 0
+        public BigDecimal holdings() {
+            return latest == null ? BigDecimal.ZERO : latest.holdings();
+        }
+    }
+
+    public List<SeedHolder> seedHolders(UUID accountId) {
+        return strategyPort.findByAccountId(accountId).stream()
                 .filter(s -> !s.isArchived()) // 보관 전략의 잔여 예수금은 시드를 점유하지 않는다
-                .map(s -> cyclePositionPort.findLatestOneByStrategyId(s.id()).map(CyclePosition::usdDeposit).orElse(BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(s -> new SeedHolder(s, cyclePositionPort.findLatestOneByStrategyId(s.id()).orElse(null)))
+                .toList();
+    }
+
+    // 시드 점유 전략들의 원장 예수금 합
+    public static BigDecimal reserved(List<SeedHolder> holders) {
+        return holders.stream().map(SeedHolder::deposit).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // 주문 가능 현금 − reserved. 증권사가 금액을 주지 않으면 null
+    public @Nullable BigDecimal available(BrokerAccountRef ref, BigDecimal reserved) {
         BigDecimal buyable = ref.broker().isCryptoExchange()
                 ? cryptoExchanges.of(ref.broker()).getBalance(ref).quoteAvailable()
                 : marginPort.getUsdBuyableAmount(ref);
         return buyable == null ? null : buyable.subtract(reserved);
+    }
+
+    // 조회 실패는 예외로 전파, 증권사가 금액을 주지 않으면 null — 호출부가 정책(경고 생략/skip)을 정한다
+    public BigDecimal available(UUID accountId, BrokerAccountRef ref) {
+        return available(ref, reserved(seedHolders(accountId)));
     }
 }
