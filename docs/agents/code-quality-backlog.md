@@ -639,7 +639,6 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | 응답 DTO enum 표현 혼재(String vs enum) | `TradingCycleResponse`·`ExecuteOrdersResponse` vs `DcaResponse`·`NextOrdersResponse` | JSON 결과가 같고 통일하면 OpenAPI 스키마(api-types)만 흔들린다. 유지. |
 | `UserEventRepublisher` 동일 본문 메서드 2개 | `trading/adapter/in/redis/UserEventRepublisher.java` | 2곳이라 추출 기준(3곳) 미달. 유지. |
 | `CycleCompletedEvent`/`CycleEndedEvent` 필드 동일 | `trading/application/event/` | 발행 흐름(배치 정상 종료 vs 수동 체결 보정)과 리스너 phase가 달라 병합하지 않는다. 한 흐름에서 동시 발행 없음(발행처 `CycleRotationService:54`, `ManualTradeCorrectionService:111`). |
-| `AccountCascadeListener` userId null 가드 | `trading/adapter/in/event/AccountCascadeListener.java` | 배포 전 EPR 잔여 이벤트 대비. 운영 `event_publication`에서 userId null 행이 없음을 읽기 전용으로 확인하기 전에는 유지하고, 확인 후 가드와 `AccountCascadeListenerTest:61`을 같이 정리한다. |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.

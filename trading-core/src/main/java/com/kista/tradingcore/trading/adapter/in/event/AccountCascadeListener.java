@@ -34,8 +34,6 @@ public class AccountCascadeListener {
         strategyCyclePort.deleteByAccountId(event.accountId());
         strategyPort.deleteByAccountId(event.accountId());
         // 삭제된 계좌의 전략이 stats 캐시에 남지 않도록 무효화
-        if (event.userId() != null) {
-            eventPublisher.publishEvent(new StrategyCapitalChangedEvent(event.userId()));
-        } // else: 배포 전 EPR 잔여 이벤트 — userId 없음, 5분 TTL로 수렴
+        eventPublisher.publishEvent(new StrategyCapitalChangedEvent(event.userId()));
     }
 }

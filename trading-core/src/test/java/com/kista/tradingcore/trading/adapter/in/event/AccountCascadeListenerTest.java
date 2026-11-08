@@ -15,9 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,18 +49,5 @@ class AccountCascadeListenerTest {
         listener.onAccountDeleted(new AccountDeletedEvent(UUID.randomUUID(), userId));
 
         verify(eventPublisher).publishEvent(new StrategyCapitalChangedEvent(userId));
-    }
-
-    @Test
-    @DisplayName("userId 없는 배포 전 이벤트는 삭제만 하고 캐시 이벤트를 내지 않는다")
-    void onAccountDeleted_nullUserId_skipsCapitalEvent() {
-        UUID accountId = UUID.randomUUID();
-
-        listener.onAccountDeleted(new AccountDeletedEvent(accountId, null));
-
-        verify(cyclePositionPort).deleteByAccountId(accountId);
-        verify(strategyCyclePort).deleteByAccountId(accountId);
-        verify(strategyPort).deleteByAccountId(accountId);
-        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 }
