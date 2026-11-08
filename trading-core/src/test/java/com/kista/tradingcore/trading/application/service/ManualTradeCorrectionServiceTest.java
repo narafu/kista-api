@@ -52,6 +52,7 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent;
 
 @ExtendWith(MockitoExtension.class)
 class ManualTradeCorrectionServiceTest {
@@ -108,7 +109,7 @@ class ManualTradeCorrectionServiceTest {
         verify(strategyPort).pause(STRATEGY_ID);
         // 청산 발생 → 사이클 종료 이벤트 발행
         verify(eventPublisher).publishEvent(any(CycleEndedEvent.class));
-        verify(eventPublisher).publishEvent(any(com.kista.tradingcore.trading.application.event.StrategyCapitalChangedEvent.class)); // stats 캐시 무효화
+        verify(eventPublisher).publishEvent(any(StrategyCapitalChangedEvent.class)); // stats 캐시 무효화
 
         ArgumentCaptor<CyclePosition> captor = ArgumentCaptor.forClass(CyclePosition.class);
         verify(cyclePositionPort).save(captor.capture());

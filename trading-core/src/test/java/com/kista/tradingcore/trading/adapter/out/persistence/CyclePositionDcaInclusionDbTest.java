@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.shared.support.DataJpaTestBase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -61,12 +62,8 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
         return accountId;
     }
 
-    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
-    private int tickerSeq;
-
-    private String nextTicker() {
-        return com.kista.shared.kernel.StrategyTicker.values()[tickerSeq++ % com.kista.shared.kernel.StrategyTicker.values().length].name();
-    }
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다
+    private final TradingFixtures.TickerSequence tickers = new TradingFixtures.TickerSequence();
 
     // strategy → version → cycle → position 체인을 만들고 position id를 반환
     private UUID insertPosition(UUID accountId, String type) {
@@ -75,7 +72,7 @@ class CyclePositionDcaInclusionDbTest extends DataJpaTestBase {
         UUID cycleId = UUID.randomUUID();
         UUID positionId = UUID.randomUUID();
         jdbc.update("INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
-                strategyId, accountId, type, nextTicker(), "ACTIVE", "NONE");
+                strategyId, accountId, type, tickers.next().name(), "ACTIVE", "NONE");
         jdbc.update("INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
         jdbc.update("INSERT INTO strategy_cycle (id, strategy_id, strategy_version_id, start_amount, start_date, created_at) VALUES (?, ?, ?, ?, ?, now())",

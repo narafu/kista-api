@@ -57,6 +57,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import java.util.Arrays;
 
 // DCA 후보의 저장 후 ORDERED 이력 기록 — 원장 상한과 무관하게 저장
 class TradingCandidatePlannerDcaTest {
@@ -115,9 +116,9 @@ class TradingCandidatePlannerDcaTest {
     }
 
     private void stubCollected(Map<String, Order> recoveries, DcaRule... rules) {
-        when(balanceLoader.loadBalanceOrThrow(ctx.strategy())).thenReturn(new TradingBalanceLoader.BalanceLoad(LEDGER, null));
+        when(balanceLoader.loadBalanceOrThrow(ctx.strategy())).thenReturn(LEDGER);
         when(orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), DAY)).thenReturn(List.of());
-        List<DcaCycleOrderStrategy.DcaRuleInputs> due = java.util.Arrays.stream(rules)
+        List<DcaCycleOrderStrategy.DcaRuleInputs> due = Arrays.stream(rules)
                 .map(r -> new DcaCycleOrderStrategy.DcaRuleInputs(r, Market.US_STOCK, List.of(REFERENCE), LEDGER,
                         r.direction() == OrderDirection.SELL ? BigDecimal.TEN : null, null, PREMARKET,
                         r.direction() == OrderDirection.BUY ? new BigDecimal("999999999999") : null, null))

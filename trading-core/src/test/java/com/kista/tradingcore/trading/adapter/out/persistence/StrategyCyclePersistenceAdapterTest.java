@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.shared.support.DataJpaTestBase;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import java.util.Objects;
 
 // findByStrategyIds — 통계용 여러 전략 사이클 배치 조회 검증 (raw JDBC로 created_at·deleted_at 직접 통제)
 @Import({StrategyCyclePersistenceAdapter.class})
@@ -41,12 +43,8 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
     }
 
-    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
-    private int tickerSeq;
-
-    private String nextTicker() {
-        return com.kista.shared.kernel.StrategyTicker.values()[tickerSeq++ % com.kista.shared.kernel.StrategyTicker.values().length].name();
-    }
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다
+    private final TradingFixtures.TickerSequence tickers = new TradingFixtures.TickerSequence();
 
     // strategy → strategy_version 체인 삽입, strategyId 반환 (버전은 1개만 필요)
     private UUID insertStrategy() {
@@ -54,7 +52,7 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
         UUID versionId = UUID.randomUUID();
         jdbcTemplate.update(
                 "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, now(), now())",
-                strategyId, accountId, "INFINITE", nextTicker(), "ACTIVE", "NONE");
+                strategyId, accountId, "INFINITE", tickers.next().name(), "ACTIVE", "NONE");
         jdbcTemplate.update(
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
                 versionId, strategyId, 1);
@@ -93,7 +91,7 @@ class StrategyCyclePersistenceAdapterTest extends DataJpaTestBase {
 
         assertThat(result).extracting(StrategyCycle::id)
                 .containsExactly(cycleA1, cycleB1, cycleA2);
-        assertThat(result).extracting(StrategyCycle::deletedAt).allMatch(java.util.Objects::isNull);
+        assertThat(result).extracting(StrategyCycle::deletedAt).allMatch(Objects::isNull);
     }
 
     @Test

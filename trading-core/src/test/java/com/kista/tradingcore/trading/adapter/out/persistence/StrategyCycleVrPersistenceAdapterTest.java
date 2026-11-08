@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategyCycle;
 import com.kista.tradingcore.trading.domain.model.StrategyCycleVrDetail;
@@ -24,6 +25,7 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
+import java.util.List;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -53,17 +55,13 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
                 accountId, userId, "테스트계좌", "KIS", "74420614", "01", "key", "secret");
     }
 
-    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
-    private int tickerSeq;
-
-    private String nextTicker() {
-        return StrategyTicker.values()[tickerSeq++ % StrategyTicker.values().length].name();
-    }
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다
+    private final TradingFixtures.TickerSequence tickers = new TradingFixtures.TickerSequence();
 
     private StrategyCycle createCycle() {
         Strategy strategy = strategyAdapter.save(new Strategy(
                 null, accountId, StrategyType.VR,
-                StrategyStatus.ACTIVE, StrategyTicker.valueOf(nextTicker()), StrategyCycleSeedType.NONE
+                StrategyStatus.ACTIVE, tickers.next(), StrategyCycleSeedType.NONE
         ));
         StrategyVersion version = strategyVersionAdapter.save(
                 new StrategyVersion(null, strategy.id(), 1, null, null));
@@ -130,7 +128,7 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
         cycleVrAdapter.save(new StrategyCycleVrDetail(cycleA.id(), new BigDecimal("5000.00"), 10, new BigDecimal("0.75")));
         cycleVrAdapter.save(new StrategyCycleVrDetail(cycleB.id(), new BigDecimal("6000.00"), 20, new BigDecimal("0.50")));
 
-        var result = cycleVrAdapter.findByCycleIds(java.util.List.of(cycleA.id(), cycleB.id(), UUID.randomUUID()));
+        var result = cycleVrAdapter.findByCycleIds(List.of(cycleA.id(), cycleB.id(), UUID.randomUUID()));
 
         assertThat(result).hasSize(2);
         assertThat(result.get(cycleA.id()).value()).isEqualByComparingTo("5000.00");
@@ -139,7 +137,7 @@ class StrategyCycleVrPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void findByCycleIds_emptyCollection_returnsEmptyMap() {
-        assertThat(cycleVrAdapter.findByCycleIds(java.util.List.of())).isEmpty();
+        assertThat(cycleVrAdapter.findByCycleIds(List.of())).isEmpty();
     }
 
     @Test

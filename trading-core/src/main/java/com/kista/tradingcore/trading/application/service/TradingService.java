@@ -206,7 +206,7 @@ class TradingService {
         for (BatchContext ctx : targets) {
             batchGuard.runSafely("리포트 재개 준비", ctx, () -> placedStates.add(new CyclePlacedState(
                     new TradingCandidatePlanner.CycleState(ctx,
-                            balanceLoader.loadBalanceOrThrow(ctx.strategy()).balance(),
+                            balanceLoader.loadBalanceOrThrow(ctx.strategy()),
                             null, null, null,
                             ctx.strategy().requiresPrivacyBase() ? priceCtx.privacyBase() : null),
                     // PLACED만 보면 체결 기록(markFilledOrders) 후 포지션 저장 전에 중단된 전략의 주문이 빠져

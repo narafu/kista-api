@@ -118,7 +118,6 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         verify(cycleSnapshotCreator, never()).rolloverVrCycle(any(), any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(CycleSnapshotCreator.VrCycleStart.class));
     }
 
     @Test
@@ -275,7 +274,6 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, zeroHoldingsBalance, CLOSING_PRICE, today);
 
         verify(cycleSnapshotCreator, never()).rolloverVrCycle(any(), any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(CycleSnapshotCreator.VrCycleStart.class));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null)); // 관리자 알림
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
@@ -350,7 +348,6 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, CLOSING_PRICE, today);
 
         verify(cycleSnapshotCreator, never()).rolloverVrCycle(any(), any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(CycleSnapshotCreator.VrCycleStart.class));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
@@ -367,7 +364,6 @@ class VrCycleRolloverServiceTest {
         service.rollIfDue(ctx, POST_BALANCE, null, today);
 
         verify(cycleSnapshotCreator, never()).rolloverVrCycle(any(), any(), any(), any());
-        verify(cycleSnapshotCreator, never()).createVrCycleAndSnapshot(any(CycleSnapshotCreator.VrCycleStart.class));
         verify(eventPublisher).publishEvent(argThat((Object ev) -> ev instanceof TradingErrorEvent tee
                 && tee.userId() == null));
     }

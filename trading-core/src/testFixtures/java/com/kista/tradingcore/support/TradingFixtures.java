@@ -7,6 +7,7 @@ import com.kista.shared.kernel.DcaShortfallPolicy;
 import com.kista.shared.kernel.DcaSizingType;
 import com.kista.shared.kernel.OrderDirection;
 import com.kista.shared.kernel.OrderType;
+import com.kista.shared.kernel.StrategyTicker;
 import com.kista.tradingcore.matching.domain.model.DcaCondition;
 import com.kista.tradingcore.matching.domain.model.DcaRule;
 import com.kista.tradingcore.matching.domain.model.DcaSizing;
@@ -15,6 +16,7 @@ import com.kista.tradingcore.trading.domain.model.TradingAccount;
 import com.kista.tradingcore.trading.domain.model.TradingUserProfile;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,6 +25,20 @@ import java.util.UUID;
 public final class TradingFixtures {
 
     private TradingFixtures() {}
+
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목이 필요한 영속 테스트용 — 테스트 인스턴스마다 new로 0부터, 이미 쓴 종목은 제외
+    public static final class TickerSequence {
+        private final List<StrategyTicker> candidates;
+        private int seq;
+
+        public TickerSequence(StrategyTicker... excluded) {
+            candidates = Arrays.stream(StrategyTicker.values()).filter(t -> !List.of(excluded).contains(t)).toList();
+        }
+
+        public StrategyTicker next() {
+            return candidates.get(seq++ % candidates.size());
+        }
+    }
 
     // trading 테스트용 TradingUserProfile — 잔고검증 ON, 알림 전부 기본값(미설정=활성)
     public static TradingUserProfile tradingUserProfile(UUID userId) {

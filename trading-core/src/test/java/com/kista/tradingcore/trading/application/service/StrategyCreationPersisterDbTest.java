@@ -30,6 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import com.kista.shared.kernel.OrderDirection;
+import com.kista.shared.kernel.OrderType;
+import com.kista.tradingcore.support.TradingFixtures;
 
 // 전략 등록 저장 5단계 원자성 — 마지막 단계 실패 시 앞선 strategy·version·cycle·position이 남지 않는지 실 DB로 검증.
 // 테스트 트랜잭션을 끄고(NOT_SUPPORTED) persister의 @Transactional이 유일한 경계가 되게 한다 — 테스트 트랜잭션 안에서 실패시키면
@@ -93,8 +96,8 @@ class StrategyCreationPersisterDbTest extends DataJpaTestBase {
 
     @Test
     void persist_dca_savesDcaRuleRowAndZeroPosition() {
-        var config = com.kista.tradingcore.support.TradingFixtures.dcaConfig(com.kista.tradingcore.support.TradingFixtures.stockDcaRule(
-                "11111111-1111-1111-1111-111111111111", com.kista.shared.kernel.OrderDirection.BUY, "300", com.kista.shared.kernel.OrderType.MOC));
+        var config = TradingFixtures.dcaConfig(TradingFixtures.stockDcaRule(
+                "11111111-1111-1111-1111-111111111111", OrderDirection.BUY, "300", OrderType.MOC));
 
         persister.persist(new StrategyCreationPersister.Draft(accountId, StrategyType.DCA, StrategyCycleSeedType.NONE,
                 new ResolvedCreation(StrategyTicker.UPRO, 20, null, null, null), null,

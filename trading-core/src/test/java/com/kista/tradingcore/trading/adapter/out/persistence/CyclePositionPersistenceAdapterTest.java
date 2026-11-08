@@ -1,5 +1,6 @@
 package com.kista.tradingcore.trading.adapter.out.persistence;
 
+import com.kista.tradingcore.support.TradingFixtures;
 import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.CyclePositionHistoryEntry;
 import com.kista.tradingcore.trading.domain.model.CyclePositionInfiniteDetail;
@@ -33,6 +34,9 @@ import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyTicker;
 import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import java.util.ArrayList;
+import java.util.Set;
 
 @Import({
         StrategyPersistenceAdapter.class,
@@ -117,7 +121,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 null, cycle.id(), new BigDecimal("900.00"), new BigDecimal("30.00"), BigDecimal.TEN, BigDecimal.valueOf(5), null, null));
         entityManager.flush();
 
-        cyclePositionAdapter.updateBalance(saved.id(), new com.kista.tradingcore.matching.domain.model.AccountBalance(
+        cyclePositionAdapter.updateBalance(saved.id(), new AccountBalance(
                 BigDecimal.valueOf(8), new BigDecimal("12.5000"), new BigDecimal("1200.00")));
         entityManager.flush();
         entityManager.clear();
@@ -157,12 +161,12 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         assertThat(fractional.id()).isNotNull();
         // 이력 entry(계좌 커서 경로): holdings 정규화(5.00000000이 아니라 5) + 전략 ticker·type 채움
         assertThat(cyclePositionAdapter.findByAccountIdWithCursor(accountId,
-                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60), 10))
+                Instant.EPOCH, Instant.now().plusSeconds(60), 10))
                 .isNotEmpty()
                 .extracting(CyclePositionHistoryEntry::holdings)
                 .contains(new BigDecimal("5"));
         assertThat(cyclePositionAdapter.findByAccountIdWithCursor(accountId,
-                java.time.Instant.EPOCH, java.time.Instant.now().plusSeconds(60), 10))
+                Instant.EPOCH, Instant.now().plusSeconds(60), 10))
                 .allSatisfy(e -> {
                     assertThat(e.ticker()).isEqualTo(StrategyTicker.SOXL);
                     assertThat(e.strategyType()).isEqualTo(StrategyType.INFINITE);
@@ -286,7 +290,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     void findLatestByCycleId_returnsUpToLimitNewestFirstExcludingDeleted() {
         Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(10, ChronoUnit.HOURS);
         UUID cycleId = insertCycleChain(accountId, false, false);
-        List<UUID> ids = new java.util.ArrayList<>();
+        List<UUID> ids = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
             ids.add(insertPosition(cycleId, new BigDecimal(i + 1), base.plus(i, ChronoUnit.HOURS), false));
         }
@@ -301,7 +305,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     void findLatestWithInfiniteDetailByCycleId_excludesPositionsWithoutDetail() {
         Instant base = Instant.now().truncatedTo(ChronoUnit.MILLIS).minus(10, ChronoUnit.HOURS);
         UUID cycleId = insertCycleChain(accountId, false, false);
-        List<UUID> detailed = new java.util.ArrayList<>();
+        List<UUID> detailed = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             UUID id = insertPosition(cycleId, new BigDecimal(i + 1), base.plus(i, ChronoUnit.HOURS), false);
             cyclePositionInfiniteDetailAdapter.save(new CyclePositionInfiniteDetail(id, false));
@@ -411,12 +415,8 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
                 deleted ? Timestamp.from(Instant.now()) : null);
     }
 
-    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다 — 테스트 인스턴스마다 0부터
-    private int tickerSeq;
-
-    private String nextTicker() {
-        return com.kista.shared.kernel.StrategyTicker.values()[tickerSeq++ % com.kista.shared.kernel.StrategyTicker.values().length].name();
-    }
+    // 계좌당 활성 종목 유니크 인덱스 때문에 전략마다 다른 종목을 쓴다
+    private final TradingFixtures.TickerSequence tickers = new TradingFixtures.TickerSequence();
 
     // strategy → strategy_version → strategy_cycle 체인 삽입, cycleId 반환
     private UUID insertCycleChain(UUID accId, boolean deletedStrategy, boolean deletedCycle) {
@@ -426,7 +426,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         jdbcTemplate.update(
                 "INSERT INTO strategy (id, account_id, type, ticker, status, cycle_seed_type, created_at, updated_at, deleted_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, now(), now(), ?)",
-                strategyId, accId, "INFINITE", nextTicker(), "ACTIVE", "NONE",
+                strategyId, accId, "INFINITE", tickers.next().name(), "ACTIVE", "NONE",
                 deletedStrategy ? Timestamp.from(Instant.now()) : null);
         jdbcTemplate.update(
                 "INSERT INTO strategy_version (id, strategy_id, version_no, created_at) VALUES (?, ?, ?, now())",
@@ -519,7 +519,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
     @Test
     void findByCycleIdsAndRange_returnsEmpty_whenCycleIdsIsEmpty() {
         List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
-                java.util.Set.of(), Instant.EPOCH, Instant.now());
+                Set.of(), Instant.EPOCH, Instant.now());
 
         assertThat(result).isEmpty();
     }
@@ -534,7 +534,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         insertPosition(excludedCycleId, new BigDecimal("999.00"), base, false);
 
         List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
-                java.util.Set.of(includedCycleId), base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
+                Set.of(includedCycleId), base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
 
         assertThat(result).extracting(CyclePosition::usdDeposit)
                 .containsExactly(new BigDecimal("111.00"));
@@ -553,7 +553,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         insertPosition(deletedCycleId, new BigDecimal("3.00"), base, false);
 
         List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
-                java.util.Set.of(activeCycleId, deletedCycleId),
+                Set.of(activeCycleId, deletedCycleId),
                 base.minus(1, ChronoUnit.HOURS), base.plus(1, ChronoUnit.HOURS));
 
         assertThat(result).extracting(CyclePosition::usdDeposit)
@@ -576,7 +576,7 @@ class CyclePositionPersistenceAdapterTest extends DataJpaTestBase {
         insertPosition(cycleId, new BigDecimal("40.00"), to, false); // 상한 경계는 제외 (< to)
 
         List<CyclePosition> result = cyclePositionAdapter.findByCycleIdsAndRange(
-                java.util.Set.of(cycleId), from, to);
+                Set.of(cycleId), from, to);
 
         assertThat(result).extracting(CyclePosition::usdDeposit)
                 .containsExactly(new BigDecimal("10.00"), new BigDecimal("20.00"), new BigDecimal("30.00"));

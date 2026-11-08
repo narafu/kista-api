@@ -103,7 +103,7 @@ class CryptoDcaRoundExecutor {
                 List<BigDecimal> closes = closes(exchange, ticker, candleMemo, nowKst);
                 UUID cycleId = ctx.currentCycle().id();
                 CyclePosition position = ledgers.get(cycleId);
-                AccountBalance ledger = position == null ? new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO) : position.toBalance();
+                AccountBalance ledger = position == null ? AccountBalance.empty() : position.toBalance();
                 // 원장 기준 가용 — 미체결·같은 틱 앞 규칙 약정을 뺀다
                 BigDecimal sellable = ledger.holdings().subtract(committed.sold.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
                 BigDecimal cash = ledger.usdDeposit().subtract(committed.spent.getOrDefault(cycleId, BigDecimal.ZERO)).max(BigDecimal.ZERO);
@@ -215,7 +215,7 @@ class CryptoDcaRoundExecutor {
         Committed committed = new Committed();
         for (Order o : orderPort.findOpenByAccountId(accountId)) {
             if (o.direction() == OrderDirection.BUY) {
-                if (o.price() != null) committed.spent.merge(o.strategyCycleId(), o.quantity().multiply(o.price()), BigDecimal::add);
+                if (o.price() != null) committed.spent.merge(o.strategyCycleId(), o.amount(), BigDecimal::add);
             } else {
                 committed.sold.merge(o.strategyCycleId(), o.quantity(), BigDecimal::add);
             }

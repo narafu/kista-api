@@ -17,6 +17,7 @@ import java.time.ZonedDateTime;
 import static com.kista.shared.kernel.MarketSession.BLOCKED;
 import static com.kista.shared.kernel.MarketSession.DIRECT;
 import static org.assertj.core.api.Assertions.assertThat;
+import java.time.LocalDateTime;
 
 @DisplayName("DstInfo 검증")
 class DstInfoTest {
@@ -269,7 +270,7 @@ class DstInfoTest {
             "2026-10-11T23:00, 2026-10-11, false"  // 일요일 — 개장 배치 없음
     })
     void openBatchMissedAt(String nowKst, LocalDate scheduledStart, boolean expected) {
-        ZonedDateTime now = java.time.LocalDateTime.parse(nowKst).atZone(ZoneId.of("Asia/Seoul"));
+        ZonedDateTime now = LocalDateTime.parse(nowKst).atZone(ZoneId.of("Asia/Seoul"));
         assertThat(DstInfo.openBatchMissedAt(scheduledStart, now)).isEqualTo(expected);
     }
 }

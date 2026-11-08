@@ -2,6 +2,7 @@ package com.kista.tradingcore.trading.adapter.in.web;
 
 import com.kista.tradingcore.trading.adapter.in.schedule.TradingCloseScheduler;
 import com.kista.tradingcore.trading.adapter.in.schedule.TradingOpenScheduler;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,12 +42,14 @@ public class TradingSchedulerInternalController {
         });
     }
 
+    @Operation(summary = "개장 스케쥴러 수동 실행", description = "admin 수동 트리거 — 202 후 백그라운드 실행. X-Internal-Token 필수.")
     @PostMapping("/open")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerOpen() {
         triggerAsync("개장 스케쥴러", openScheduler::runNow);
     }
 
+    @Operation(summary = "마감 스케쥴러 수동 실행", description = "admin 수동 트리거 — 202 후 백그라운드 실행. X-Internal-Token 필수.")
     @PostMapping("/close")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public void triggerClose() {

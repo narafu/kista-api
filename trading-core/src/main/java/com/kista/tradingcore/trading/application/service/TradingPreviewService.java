@@ -214,7 +214,7 @@ class TradingPreviewService {
         for (NextOrdersPreview preview : previews.values()) {
             correction = correction.add(preview.todayOrders().stream()
                     .filter(o -> o.status() == OrderStatus.PLANNED && o.direction() == OrderDirection.BUY && InfiniteStrategy.isCorrectionLeg(o.orderLeg()))
-                    .map(o -> o.price().multiply(o.quantity()))
+                    .map(Order::amount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
         }
         BigDecimal correctionBuyUsd = correction;
@@ -271,7 +271,7 @@ class TradingPreviewService {
                                             Map<UUID, Integer> freshSellByStrategyId, Map<UUID, BigDecimal> freshCorrectionByStrategyId) {
         BigDecimal thisStrategyPlannedBuy = todayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
-                .map(o -> o.price().multiply(o.quantity()))
+                .map(Order::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal otherStrategiesPlannedBuyUsd = totalAccountPlannedBuy.subtract(thisStrategyPlannedBuy);
 

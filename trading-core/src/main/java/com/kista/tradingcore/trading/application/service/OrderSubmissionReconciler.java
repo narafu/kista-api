@@ -11,6 +11,7 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.OrderStateConflictException;
 import com.kista.tradingcore.trading.domain.model.SubmittingOrder;
 import com.kista.tradingcore.trading.domain.model.TradingAccount;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 // Toss만 선점 후 2~9분 창에서 같은 멱등키(clientOrderId)로 재요청해 원 결과를 회수한다 — KIS·창 밖은 관리자 알림 후 런북 정정
 @Component
 @Slf4j
+@RequiredArgsConstructor
 class OrderSubmissionReconciler {
 
     static final Duration IN_FLIGHT_GRACE = Duration.ofMinutes(2); // 이보다 젊으면 다른 스레드가 접수 중일 수 있다
@@ -40,14 +42,6 @@ class OrderSubmissionReconciler {
     private final Clock clock; // 현재 시각 기준 — 테스트에서 Clock.fixed 주입
     // 이미 알린 잔류 주문 — 접수 경로를 탈 때마다 같은 알림이 반복되지 않게 (ponytail: 프로세스 메모리라 재기동 시 1회 재알림, 잔류는 희귀해 무한 증가 없음)
     private final Set<UUID> alerted = ConcurrentHashMap.newKeySet();
-
-    OrderSubmissionReconciler(OrderPort orderPort, BrokerOrderCorrectionPort brokerOrderCorrectionPort,
-                              ApplicationEventPublisher eventPublisher, Clock clock) {
-        this.orderPort = orderPort;
-        this.brokerOrderCorrectionPort = brokerOrderCorrectionPort;
-        this.eventPublisher = eventPublisher;
-        this.clock = clock;
-    }
 
     void reconcile(UUID strategyCycleId, LocalDate tradeDate, TradingAccount account) {
         List<SubmittingOrder> leftovers = orderPort.findSubmittingByCycleAndDate(strategyCycleId, tradeDate);

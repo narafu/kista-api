@@ -7,6 +7,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +20,7 @@ import java.util.UUID;
 class TradingBatchRunPersistenceAdapter implements TradingBatchRunPort {
 
     private final JdbcTemplate jdbcTemplate;
+    private final Clock clock; // 현재 시각 기준 — 테스트에서 고정 Clock 주입
 
     @Override
     public Optional<TradingBatchPhase> findPhase(TradingBatchJob job, LocalDate tradeDate) {
@@ -30,11 +34,11 @@ class TradingBatchRunPersistenceAdapter implements TradingBatchRunPort {
     public void recordPhase(TradingBatchJob job, LocalDate tradeDate, TradingBatchPhase phase) {
         jdbcTemplate.update("""
                 INSERT INTO trading_batch_run (job_name, trade_date, phase, updated_at)
-                VALUES (?, ?, ?, now())
+                VALUES (?, ?, ?, ?)
                 ON CONFLICT (job_name, trade_date) DO UPDATE
                    SET phase = EXCLUDED.phase,
-                       updated_at = now()
-                """, job.lockName(), tradeDate, phase.name());
+                       updated_at = EXCLUDED.updated_at
+                """, job.lockName(), tradeDate, phase.name(), Timestamp.from(Instant.now(clock))); // 갱신 시각은 Clock 기준
     }
 
     @Override

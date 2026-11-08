@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor(access = AccessLevel.PACKAGE) // OrderJpaRepository가 package-private
-public class OrderPersistenceAdapter implements OrderPort {
+class OrderPersistenceAdapter implements OrderPort {
 
     // 열린 주문 — 슬롯 점유·재계산 skip·수동 실행 이중 실행 판정 (SUBMITTING은 접수 결과 미확정이라 점유로 본다)
     private static final List<OrderStatus> OPEN_STATUSES =
@@ -164,13 +164,13 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findOpenByAccountId(UUID accountId) {
-        return repository.findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(
-                accountId, List.of(OrderStatus.PLANNED, OrderStatus.SUBMITTING, OrderStatus.PLACED)).stream().map(this::toDomain).toList();
+        return toDomainList(repository.findByAccountIdAndStatusInOrderByTradeDateAscCreatedAtAsc(
+                accountId, OPEN_STATUSES));
     }
 
     @Override
     public List<Order> findAllByIds(Collection<UUID> ids) {
-        return repository.findAllById(ids).stream().map(this::toDomain).toList();
+        return toDomainList(repository.findAllById(ids));
     }
 
     @Override
@@ -183,7 +183,7 @@ public class OrderPersistenceAdapter implements OrderPort {
 
     @Override
     public List<Order> findPlannedOrPlacedByCycleAndDate(UUID strategyCycleId, LocalDate tradeDate) {
-        // 스케쥴러 재계산 skip 판정 — PLANNED 또는 PLACED 중 하나라도 있으면 skip
+        // 스케쥴러 재계산 skip 판정 — 열린 주문(PLANNED·SUBMITTING·PLACED)이 하나라도 있으면 skip
         return toDomainList(repository.findByStrategyCycleIdAndTradeDateAndStatusIn(
                 strategyCycleId, tradeDate,
                 OPEN_STATUSES));

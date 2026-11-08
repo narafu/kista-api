@@ -51,6 +51,7 @@ import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.tradingcore.support.StubBrokerApiException;
 
 @ExtendWith(MockitoExtension.class)
 class ManualTradingServiceTest {
@@ -209,7 +210,7 @@ class ManualTradingServiceTest {
     void ledgerQueryBrokerTypedFailure_propagatesAsIs() {
         when(infiniteStrategy.buildOrders(any(InfinitePosition.class), any(LocalDate.class)))
                 .thenReturn(List.of(planned(OrderDirection.BUY, 1, "20.00", "INFINITE_BUY_01")));
-        RuntimeException brokerFailure = new com.kista.tradingcore.support.StubBrokerApiException("Toss", "Toss API 오류");
+        RuntimeException brokerFailure = new StubBrokerApiException("Toss", "Toss API 오류");
         when(cyclePositionPort.findLatestOne(CYCLE.id())).thenThrow(brokerFailure);
 
         assertThatThrownBy(() -> service.execute(STRATEGY.id(), REQUESTER_ID)).isSameAs(brokerFailure);

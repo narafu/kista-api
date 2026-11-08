@@ -24,6 +24,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.sql.Timestamp;
+import java.time.Instant;
 
 // sumFilledBuyAmountByCycleId SQL 필터(direction/status/cycle) 실효성 검증 — 실 DB 왕복 테스트
 @Import(OrderPersistenceAdapter.class)
@@ -210,7 +212,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
                 "INSERT INTO accounts (id, user_id, nickname, broker, account_no, broker_account_code, app_key, secret_key, created_at, updated_at, deleted_at) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, now(), now(), ?)",
                 accId, ownerUserId, "테스트계좌-" + accId, "KIS", accountNo, "01", "key", "secret",
-                deleted ? java.sql.Timestamp.from(java.time.Instant.now()) : null);
+                deleted ? Timestamp.from(Instant.now()) : null);
     }
 
     @Test
@@ -484,7 +486,7 @@ class OrderPersistenceAdapterDbTest extends DataJpaTestBase {
     @Test
     void fractionalCryptoQuantityIsStored() {
         Order fractional = new Order(null, accountId, cycleId, LocalDate.now(), StrategyTicker.SOXL, OrderType.LIMIT,
-                com.kista.shared.kernel.OrderTiming.AT_CLOSE, OrderDirection.BUY,
+                OrderTiming.AT_CLOSE, OrderDirection.BUY,
                 new BigDecimal("0.00012345"), new BigDecimal("22.00"), OrderStatus.PLANNED, null, null, null);
         adapter.saveAll(List.of(fractional));
 

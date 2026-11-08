@@ -64,6 +64,14 @@ import com.kista.shared.kernel.StrategyCycleSeedType;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import com.kista.shared.kernel.StrategyDefaults;
+import com.kista.shared.kernel.DcaSkipReason;
+import com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort;
+import com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase;
+import com.kista.tradingcore.trading.domain.model.DstInfo;
+import com.kista.tradingcore.trading.domain.model.OrderCancelException;
+import java.math.RoundingMode;
+import java.time.ZonedDateTime;
+import java.util.NoSuchElementException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("StrategyService 단위 테스트")
@@ -85,7 +93,7 @@ class StrategyServiceTest {
     @Mock StrategyCreationPolicyPort strategyCreationPolicyPort; // 신규 전략 생성 설정 조회
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock OrderPort orderPort;                                   // 전략별 주문 내역 조회
-    @Mock com.kista.tradingcore.privacy.application.port.output.PrivacyTradePort privacyTradePort; // 시드 미리보기 PRIVACY 기준표
+    @Mock PrivacyTradePort privacyTradePort; // 시드 미리보기 PRIVACY 기준표
     @Mock StrategyDcaDetailPort dcaDetailPort;                   // DCA 버전 설정 포트
     @Mock DcaExecutionPort dcaExecutionPort;                     // DCA 회차 이력 포트
     @Mock MarketCalendarPort marketCalendarPort;                 // DCA 다음 실행일 계산용 캘린더
@@ -345,11 +353,11 @@ class StrategyServiceTest {
         Account account = ownerAccount();
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(ACTIVE_STRATEGY);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(account);
-        doThrow(new com.kista.tradingcore.trading.domain.model.OrderCancelException("체결 확인 중인 코인 주문이 있어 잠시 후 다시 시도해 주세요."))
+        doThrow(new OrderCancelException("체결 확인 중인 코인 주문이 있어 잠시 후 다시 시도해 주세요."))
                 .when(orderCancelService).requireNoCryptoInFlight(STRATEGY_ID, account);
 
         assertThatThrownBy(() -> strategyService.pause(STRATEGY_ID, USER_ID))
-                .isInstanceOf(com.kista.tradingcore.trading.domain.model.OrderCancelException.class);
+                .isInstanceOf(OrderCancelException.class);
 
         verify(strategyPort, never()).save(any());
         verify(orderCancelService, never()).cancelOpenOrders(any(), any());
@@ -593,7 +601,7 @@ class StrategyServiceTest {
 
     @Test
     void archive_rejects_when_next_trade_date_orders_not_reported() {
-        LocalDate nextDate = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate(java.time.ZonedDateTime.now(FIXED));
+        LocalDate nextDate = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         stubArchivable(PAUSED_STRATEGY);
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
         lenient().when(orderPort.findByStrategyId(STRATEGY_ID, LocalDate.now(FIXED), LocalDate.now(FIXED))).thenReturn(List.of()); // 오늘 날짜 주문 없음
@@ -609,7 +617,7 @@ class StrategyServiceTest {
 
     @Test
     void archive_recheck_after_cancel_catches_order_placed_in_between() {
-        LocalDate nextDate = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate(java.time.ZonedDateTime.now(FIXED));
+        LocalDate nextDate = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED));
         stubArchivable(PAUSED_STRATEGY);
         when(cyclePositionPort.findLatestOneByStrategyId(STRATEGY_ID)).thenReturn(Optional.empty());
         // 첫 점검(보관 전)엔 없고 취소 뒤 재점검에서 접수 주문이 보인다
@@ -2325,7 +2333,7 @@ class StrategyServiceTest {
         when(brokerPricePort.getPrevClose(ticker, account.toBrokerRef())).thenReturn(new BigDecimal("100.00"));
         // FIDA 원가 자산 = 1,000.03 + (−0.03) = 1,000.00, 사용자 원가 자산 = 200 + 20×95.05 = 2,101 → 2.10배
         // 2.10 × 1,000.03 = 2,100.063 → CEILING 2,100.07 (HALF_UP 2,100.06이면 매매 시 FLOOR 역산이 2.09배)
-        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(new com.kista.tradingcore.privacy.domain.model.PrivacyCurrentBase(
+        when(privacyTradePort.findSeedPreviewBase()).thenReturn(Optional.of(new PrivacyCurrentBase(
                 StrategyTicker.SOXL, new BigDecimal("1000.03"), null, new BigDecimal("-0.03"), new BigDecimal("95.05"))));
         when(strategyPort.save(any())).thenReturn(saved);
         when(strategyCyclePort.save(any())).thenReturn(savedCycle);
@@ -2885,7 +2893,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         // 2264.05 × 0.30736563 = 695.8911...(원문 그대로 반올림)
         verify(strategyCyclePort).save(argThat(c -> c.startAmount().compareTo(
-                new BigDecimal("2264.05").multiply(new BigDecimal("0.30736563")).setScale(2, java.math.RoundingMode.HALF_UP)) == 0
+                new BigDecimal("2264.05").multiply(new BigDecimal("0.30736563")).setScale(2, RoundingMode.HALF_UP)) == 0
                 && c.startAmount().scale() == 2));
     }
 
@@ -2997,8 +3005,8 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
     @DisplayName("DCA 전략 조회는 활성 설정·최근 회차·다음 실행일을 싣는다")
     void getById_dca_includesSummary() {
         Strategy dca = dcaStrategy(STRATEGY_ID, StrategyTicker.UPRO);
-        DcaExecution last = DcaExecution.skipped(STRATEGY_ID, DCA_KEY, com.kista.shared.kernel.OrderDirection.BUY, LocalDate.of(2026, 9, 30),
-                com.kista.shared.kernel.DcaSkipReason.CONDITION_NOT_MET, "상세", null);
+        DcaExecution last = DcaExecution.skipped(STRATEGY_ID, DCA_KEY, OrderDirection.BUY, LocalDate.of(2026, 9, 30),
+                DcaSkipReason.CONDITION_NOT_MET, "상세", null);
         when(strategyPort.findByIdOrThrow(STRATEGY_ID)).thenReturn(dca);
         when(accountPort.requireOwnedAccount(ACCOUNT_ID, USER_ID)).thenReturn(ownerAccount());
         when(strategyCyclePort.findLatestByStrategyId(STRATEGY_ID)).thenReturn(Optional.of(CYCLE));
@@ -3050,7 +3058,7 @@ lenient().when(strategyCreationPolicyPort.find(StrategyType.DCA)).thenReturn(Opt
 
         assertThatThrownBy(() -> strategyService.register(USER_ID, ACCOUNT_ID,
                 dcaCommand(StrategyTicker.UPRO, dcaConfig(OrderDirection.BUY))))
-                .isInstanceOf(java.util.NoSuchElementException.class);
+                .isInstanceOf(NoSuchElementException.class);
         verify(strategyPort, never()).save(any());
     }
 }

@@ -52,6 +52,19 @@ import static org.mockito.Mockito.*;
 import com.kista.shared.kernel.StrategyType;
 import com.kista.shared.kernel.StrategyStatus;
 import com.kista.shared.kernel.StrategyCycleSeedType;
+import com.kista.tradingcore.broker.application.port.output.CandlePort;
+import com.kista.tradingcore.broker.domain.model.BrokerCandle;
+import com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort;
+import com.kista.tradingcore.matching.domain.model.AccountBalance;
+import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
+import com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy;
+import com.kista.tradingcore.trading.application.port.output.DcaExecutionPort;
+import com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort;
+import com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort;
+import com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort;
+import com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader;
+import com.kista.tradingcore.trading.domain.model.DstInfo;
+import java.util.HashMap;
 
 @ExtendWith(MockitoExtension.class)
 class TradingPreviewServiceTest {
@@ -66,7 +79,7 @@ class TradingPreviewServiceTest {
     @Mock TradingPriceFetcher priceFetcher;
     @Mock MarginPort marginPort;
     @Mock SellableQuantityPort sellableQuantityPort;
-    @Mock com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort marketCalendarPort;
+    @Mock MarketCalendarPort marketCalendarPort;
 
     TradingPreviewService service;
 
@@ -371,7 +384,7 @@ class TradingPreviewServiceTest {
         List<Strategy> strategies = List.of(s1, s2);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
-        Map<UUID, StrategyCycle> cyclesById = new java.util.HashMap<>();
+        Map<UUID, StrategyCycle> cyclesById = new HashMap<>();
         for (Strategy s : strategies) {
             // startDate는 과거로 고정 — LocalDate.now(FIXED)면 KST 00:00~04:30 사이 실행 시 DstInfo.nextTradeDate(ZonedDateTime.now(FIXED))가
             // 오늘 날짜를 반환해 SCHEDULED_START_NOT_REACHED skip과 경합하는 flaky 테스트가 됨 (58번째 줄 주석 참고)
@@ -412,7 +425,7 @@ class TradingPreviewServiceTest {
         List<Strategy> strategies = List.of(s1, s2, s3);
         when(strategyPort.findByAccountId(ACCOUNT.id())).thenReturn(strategies);
 
-        Map<UUID, StrategyCycle> cycles = new java.util.HashMap<>();
+        Map<UUID, StrategyCycle> cycles = new HashMap<>();
         for (Strategy s : strategies) {
             // startDate는 과거로 고정 — 위 previewBatch_callsSumPlannedBuyByAccountAndDateOnce...와 동일한 이유
             StrategyCycle cycle = new StrategyCycle(UUID.randomUUID(), s.id(), UUID.randomUUID(),
@@ -505,28 +518,28 @@ class TradingPreviewServiceTest {
         // 실제 planBuilder → CycleOrderComputer → DcaPlanInputCollector → DCA 커널 경로. 수집기는 이력 기록 의존이 없고,
         // 판정 완료 여부 조회(find)만 읽는다 — insertIfAbsent(기록)는 한 번도 호출되지 않아야 한다
         stubDcaAccount();
-        LocalDate usSession = com.kista.tradingcore.trading.domain.model.DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)).minusDays(1);
-        var calendar = mock(com.kista.tradingcore.marketcalendar.application.port.output.MarketCalendarPort.class);
+        LocalDate usSession = DstInfo.nextTradeDate(ZonedDateTime.now(FIXED)).minusDays(1);
+        var calendar = mock(MarketCalendarPort.class);
         when(calendar.usSessionDateOf(any())).thenReturn(usSession);
         when(calendar.isUsSessionOpen(any())).thenReturn(true);
-        var candlePort = mock(com.kista.tradingcore.broker.application.port.output.CandlePort.class);
+        var candlePort = mock(CandlePort.class);
         when(candlePort.getDailyCandlesBefore(eq("UPRO"), eq(usSession), anyInt())).thenReturn(List.of(
-                new com.kista.tradingcore.broker.domain.model.BrokerCandle(usSession.minusDays(1), null, null, null, new BigDecimal("87.12"), 0)));
-        var dcaDetailPort = mock(com.kista.tradingcore.trading.application.port.output.StrategyDcaDetailPort.class);
+                new BrokerCandle(usSession.minusDays(1), null, null, null, new BigDecimal("87.12"), 0)));
+        var dcaDetailPort = mock(StrategyDcaDetailPort.class);
         when(dcaDetailPort.findActiveByStrategyId(STOCK_DCA.id())).thenReturn(Optional.of(TradingFixtures.dcaConfig(
                 TradingFixtures.stockDcaRule(DCA_KEY, OrderDirection.BUY, "300", OrderType.MOC))));
-        var executionPort = mock(com.kista.tradingcore.trading.application.port.output.DcaExecutionPort.class);
+        var executionPort = mock(DcaExecutionPort.class);
         var dcaLedgerBudget = mock(StrategyLedgerBudget.class);
         when(dcaLedgerBudget.remaining(any(), any())).thenReturn(new BigDecimal("100000"));
         DcaPlanInputCollector collector = new DcaPlanInputCollector(calendar, candlePort,
-                mock(com.kista.tradingcore.trading.application.port.output.FearGreedIndexPort.class), orderPort, dcaDetailPort, executionPort,
+                mock(FearGreedIndexPort.class), orderPort, dcaDetailPort, executionPort,
                 dcaLedgerBudget,
-                mock(com.kista.tradingcore.trading.application.port.output.TradingBatchRunPort.class));
-        var strategies = new com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies(
-                List.of(new com.kista.tradingcore.matching.domain.strategy.DcaCycleOrderStrategy()));
-        var balanceLoader = mock(com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader.class);
-        when(balanceLoader.tryLoadBalance(STOCK_DCA)).thenReturn(new com.kista.tradingcore.trading.application.service.support.TradingBalanceLoader.BalanceLoad(
-                new com.kista.tradingcore.matching.domain.model.AccountBalance(0, null, BigDecimal.ZERO), null));
+                mock(TradingBatchRunPort.class));
+        var strategies = new CycleOrderStrategies(
+                List.of(new DcaCycleOrderStrategy()));
+        var balanceLoader = mock(TradingBalanceLoader.class);
+        when(balanceLoader.tryLoadBalance(STOCK_DCA)).thenReturn(new TradingBalanceLoader.BalanceLoad(
+                new AccountBalance(0, null, BigDecimal.ZERO), null));
         StrategyOrderPlanBuilder realBuilder = new StrategyOrderPlanBuilder(balanceLoader, null, null,
                 new CycleOrderComputer(strategies, null, null, null, null, null, orderPort), strategies, null, orderPort, collector);
         TradingPreviewService wired = new TradingPreviewService(accountPort, strategyPort, strategyCyclePort, orderPort, cyclePositionPort, realBuilder,

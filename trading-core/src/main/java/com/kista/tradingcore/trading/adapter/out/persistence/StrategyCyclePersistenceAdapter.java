@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Component
@@ -51,29 +52,29 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
 
     @Override
     public void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate) {
-        // 사이클 종료 기록: load-set-save 패턴 (OrderPersistenceAdapter.markFilled와 동일)
-        StrategyCycleEntity e = jpaRepository.findById(cycleId)
-                .orElseThrow(() -> new IllegalStateException("사이클을 찾을 수 없습니다."));
-        e.setEndAmount(endAmount);
-        e.setEndDate(endDate);
-        jpaRepository.save(e);
+        // 사이클 종료 기록
+        mutate(cycleId, e -> {
+            e.setEndAmount(endAmount);
+            e.setEndDate(endDate);
+        });
     }
 
     @Override
     public void updateStrategyVersion(UUID cycleId, UUID strategyVersionId) {
-        // load-set-save 패턴 (updateStartAmount와 동일)
-        StrategyCycleEntity e = jpaRepository.findById(cycleId)
-                .orElseThrow(() -> new IllegalStateException("사이클을 찾을 수 없습니다."));
-        e.setStrategyVersionId(strategyVersionId);
-        jpaRepository.save(e);
+        mutate(cycleId, e -> e.setStrategyVersionId(strategyVersionId));
     }
 
     @Override
     public void updateStartAmount(UUID cycleId, BigDecimal startAmount) {
-        // 시드 수정: load-set-save 패턴 (markEnded와 동일)
+        // 시드 수정
+        mutate(cycleId, e -> e.setStartAmount(startAmount));
+    }
+
+    // 사이클 엔티티 조회 → 변경 → 명시적 save (dirty checking 대신 명시적 저장 유지)
+    private void mutate(UUID cycleId, Consumer<StrategyCycleEntity> change) {
         StrategyCycleEntity e = jpaRepository.findById(cycleId)
                 .orElseThrow(() -> new IllegalStateException("사이클을 찾을 수 없습니다."));
-        e.setStartAmount(startAmount);
+        change.accept(e);
         jpaRepository.save(e);
     }
 

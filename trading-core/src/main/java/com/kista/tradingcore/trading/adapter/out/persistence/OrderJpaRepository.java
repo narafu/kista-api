@@ -32,11 +32,11 @@ interface OrderJpaRepository extends JpaRepository<OrderEntity, UUID> {
             @Param("strategyCycleId") UUID strategyCycleId, @Param("tradeDate") LocalDate tradeDate,
             @Param("status") OrderStatus status);
 
-    // PLANNED 또는 PLACED 조회 (스케쥴러 재계산 skip 판정)
+    // 상태 목록 조회 — 호출자는 열린 주문(PLANNED·SUBMITTING·PLACED)을 넘긴다 (스케쥴러 재계산 skip 판정)
     List<OrderEntity> findByStrategyCycleIdAndTradeDateAndStatusIn(
             UUID strategyCycleId, LocalDate tradeDate, List<OrderStatus> statuses);
 
-    // 여러 사이클의 PLANNED 또는 PLACED 배치 조회 (미리보기 N+1 방지)
+    // 여러 사이클의 열린 주문 배치 조회 (미리보기 N+1 방지)
     List<OrderEntity> findByStrategyCycleIdInAndTradeDateAndStatusIn(
             Collection<UUID> strategyCycleIds, LocalDate tradeDate, List<OrderStatus> statuses);
 

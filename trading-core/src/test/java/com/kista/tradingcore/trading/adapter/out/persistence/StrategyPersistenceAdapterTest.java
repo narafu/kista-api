@@ -166,7 +166,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
         strategyInfiniteDetailAdapter.save(new StrategyInfiniteDetail(versionB.id(), 30));
 
         var result = strategyInfiniteDetailAdapter.findByStrategyVersionIds(
-                java.util.List.of(versionA.id(), versionB.id(), UUID.randomUUID()));
+                List.of(versionA.id(), versionB.id(), UUID.randomUUID()));
 
         assertThat(result).hasSize(2);
         assertThat(result.get(versionA.id()).divisionCount()).isEqualTo(20);
@@ -175,7 +175,7 @@ class StrategyPersistenceAdapterTest extends DataJpaTestBase {
 
     @Test
     void findByStrategyVersionIds_emptyCollection_returnsEmptyMap() {
-        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionIds(java.util.List.of())).isEmpty();
+        assertThat(strategyInfiniteDetailAdapter.findByStrategyVersionIds(List.of())).isEmpty();
     }
 
     @Test

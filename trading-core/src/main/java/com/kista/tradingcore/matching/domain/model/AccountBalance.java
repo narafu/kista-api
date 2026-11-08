@@ -43,6 +43,11 @@ public record AccountBalance(
         BigDecimal amountUsd();
     }
 
+    // 이력 없는 빈 잔고 — 보유 0·평단 없음·예수금 0
+    public static AccountBalance empty() {
+        return new AccountBalance(BigDecimal.ZERO, null, BigDecimal.ZERO);
+    }
+
     // 주문 목록 중 BUY 합계 금액 — hasSufficientDepositFor/원장 상한 판정 공용
     public static BigDecimal buyTotal(List<PlannedOrder> orders) {
         return orders.stream()

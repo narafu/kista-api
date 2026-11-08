@@ -5,6 +5,11 @@ import java.math.BigDecimal;
 // 현재가(current)와 전일종가(prevClose)를 함께 보유하는 가격 스냅샷 — KIS·Toss 공용
 public record PriceSnapshot(BigDecimal current, BigDecimal prevClose) {
 
+    // snapshot이 null일 때 안전하게 current를 반환
+    public static BigDecimal currentOrNull(PriceSnapshot snapshot) {
+        return snapshot != null ? snapshot.current() : null;
+    }
+
     // snapshot이 null일 때 안전하게 prevClose를 반환 — 반복 삼항 통일
     public static BigDecimal prevCloseOrNull(PriceSnapshot snapshot) {
         return snapshot != null ? snapshot.prevClose() : null;

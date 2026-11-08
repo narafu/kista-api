@@ -3,7 +3,6 @@ package com.kista.tradingcore.trading.application.service.support;
 import java.util.NoSuchElementException;
 import com.kista.tradingcore.trading.domain.model.NextOrdersPreview.SkipReason;
 import com.kista.tradingcore.matching.domain.model.AccountBalance;
-import com.kista.tradingcore.trading.domain.model.CyclePosition;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.application.port.output.CyclePositionPort;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +28,10 @@ public class TradingBalanceLoader {
                 .orElse(new BalanceLoad(null, SkipReason.NO_CYCLE_HISTORY));
     }
 
-    // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → IllegalStateException
-    public BalanceLoad loadBalanceOrThrow(Strategy strategy) {
-        CyclePosition latest = cyclePositionPort.findLatestOneByStrategyId(strategy.id())
-                .orElseThrow(() -> new NoSuchElementException("전략 이력이 없습니다: " + strategy.id()));
-        return new BalanceLoad(latest.toBalance(), null);
+    // 잔고 로드 — execute용: 이력 없음은 데이터 무결성 오류 → NoSuchElementException
+    public AccountBalance loadBalanceOrThrow(Strategy strategy) {
+        return cyclePositionPort.findLatestOneByStrategyId(strategy.id())
+                .orElseThrow(() -> new NoSuchElementException("전략 이력이 없습니다: " + strategy.id()))
+                .toBalance();
     }
 }

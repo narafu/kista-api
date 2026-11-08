@@ -47,7 +47,7 @@ class StrategyLedgerBudget {
         if (ledger == null) ledger = BigDecimal.ZERO;
         BigDecimal committed = sameDayOrders.stream()
                 .filter(o -> o.direction() == OrderDirection.BUY)
-                .map(o -> o.price().multiply(o.quantity()))
+                .map(o -> o.amount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return ledger.subtract(committed).subtract(pendingCancelledFill(unreportedCancelled));
     }
@@ -64,7 +64,7 @@ class StrategyLedgerBudget {
     BigDecimal pendingCancelledFill(List<Order> unreportedCancelled) {
         return unreportedCancelled.stream()
                 .map(o -> o.filledQuantity() == null
-                        ? o.price().multiply(o.quantity())
+                        ? o.amount()
                         : o.filledPrice() == null ? BigDecimal.ZERO : o.filledQuantity().multiply(o.filledPrice()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

@@ -110,7 +110,7 @@ class TradingCandidatePlanner {
 
     // 잔고 로드 — KIS·Toss 모두 cycle_position DB 이력 사용 (전략 공식 기준)
     private AccountBalance loadBalance(Strategy strategy, TradingAccount account) {
-        AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy).balance();
+        AccountBalance balance = balanceLoader.loadBalanceOrThrow(strategy);
         log.info("[accountId={}] 잔고 조회: {} {}주, 통합주문가능금액 ${}",
                 account.id(), strategy.ticker().name(), balance.holdings(), balance.usdDeposit());
         return balance;
@@ -133,7 +133,7 @@ class TradingCandidatePlanner {
         TradingAccount account = ctx.account();
         AccountBalance balance = loadBalance(strategy, account);
         PriceSnapshot priceSnapshot = startPriceSnapshots.get(strategy.ticker());
-        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
+        BigDecimal price = PriceSnapshot.currentOrNull(priceSnapshot);
         BigDecimal prevClosePrice = PriceSnapshot.prevCloseOrNull(priceSnapshot);
         List<Order> existingOrders = orderPort.findPlannedOrPlacedByCycleAndDate(ctx.currentCycle().id(), tradeDate);
         CycleOrderStrategy strategyHandler = cycleOrderStrategies.of(strategy.type());
@@ -210,7 +210,7 @@ class TradingCandidatePlanner {
             boolean recalculateInfinitePosition) {
         Strategy strategy = ctx.strategy();
         TradingAccount account = ctx.account();
-        BigDecimal price = priceSnapshot != null ? priceSnapshot.current() : null;
+        BigDecimal price = PriceSnapshot.currentOrNull(priceSnapshot);
         log.info("[accountId={}] 오늘 주문 {}건 존재 — 재계산 skip", account.id(), existingCount);
         if (strategy.isInfinite() && recalculateInfinitePosition) {
             // position 재계산: 저장 없이 매수 보정(BuyOrderPriceCapper)용으로만 사용

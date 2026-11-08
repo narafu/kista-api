@@ -45,6 +45,11 @@ public record Order(
         filledQuantity = Quantities.normalize(filledQuantity);
     }
 
+    // 주문 금액 = 가격 × 수량 (price non-null 전제)
+    public BigDecimal amount() {
+        return price.multiply(quantity);
+    }
+
     // 증권사에 접수된 전략 주문 — 접수번호 보유 + 수동 보정 행(UNKNOWN_LEG) 제외
     public boolean isBrokerSubmitted() {
         return externalOrderId != null && !UNKNOWN_LEG.equals(orderLeg);

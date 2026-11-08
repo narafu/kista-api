@@ -8,7 +8,11 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.sql.Timestamp;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -22,6 +26,8 @@ class TradingBatchRunPersistenceAdapterDbTest extends DataJpaTestBase {
     private static final LocalDate DAY = LocalDate.of(2026, 10, 7);
 
     @Autowired TradingBatchRunPersistenceAdapter adapter;
+    @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired Clock clock;
 
     @Test
     void findPhase_noRow_empty() {
@@ -37,6 +43,17 @@ class TradingBatchRunPersistenceAdapterDbTest extends DataJpaTestBase {
         assertThat(adapter.findPhase(TradingBatchJob.CLOSE, DAY)).contains(TradingBatchPhase.PLACED);
         assertThat(adapter.findPhase(TradingBatchJob.OPEN, DAY)).contains(TradingBatchPhase.DONE);
         assertThat(adapter.findPhase(TradingBatchJob.CLOSE, DAY.plusDays(1))).isEmpty();
+    }
+
+    @Test
+    void recordPhase_updatedAtFollowsClock() {
+        adapter.recordPhase(TradingBatchJob.CLOSE, DAY, TradingBatchPhase.PLANNED);
+        adapter.recordPhase(TradingBatchJob.CLOSE, DAY, TradingBatchPhase.PLACED); // upsert 경로도 Clock 기준
+
+        Timestamp updatedAt = jdbcTemplate.queryForObject(
+                "SELECT updated_at FROM trading_batch_run WHERE job_name = ? AND trade_date = ?",
+                Timestamp.class, TradingBatchJob.CLOSE.lockName(), DAY);
+        assertThat(updatedAt.toInstant()).isEqualTo(Instant.now(clock));
     }
 
     @Test

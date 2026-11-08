@@ -21,7 +21,7 @@ public interface TradingExecutionUseCase {
     void executeBatchNow(List<BatchContext> contexts) throws InterruptedException;
     // 재기동 재개 — 마감 배치 접수 완료 이후 중단분 리포트
     void resumeCloseReport(List<BatchContext> contexts) throws InterruptedException;
-    // 수동 실행 (INFINITE 전용)
+    // 수동 실행 (DCA는 배치 전용이라 거부)
     List<Order> executeManually(UUID strategyId, UUID requesterId);
     // 전략 주문 전체 취소 (오늘 PLANNED + PLACED, best-effort)
     CancelResult cancelByCycle(UUID strategyId, UUID requesterId);
