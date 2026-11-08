@@ -13,7 +13,6 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
@@ -23,7 +22,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "dca_execution", schema = "trading")
 @Getter
-@Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class DcaExecutionEntity extends BaseCreatedAtEntity {
 

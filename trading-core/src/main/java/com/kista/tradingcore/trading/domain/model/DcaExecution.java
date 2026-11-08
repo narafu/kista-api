@@ -26,7 +26,7 @@ public record DcaExecution(
         Instant createdAt           // 생성 시각
 ) {
     public DcaExecution {
-        java.util.Objects.requireNonNull(direction, "direction"); // dca_execution.direction NOT NULL
+        if (direction == null) throw new IllegalArgumentException("방향은 필수입니다."); // dca_execution.direction NOT NULL
         quantity = Quantities.normalize(quantity); // DB scale 8 → 정수 주식 수량 형태 유지
     }
 

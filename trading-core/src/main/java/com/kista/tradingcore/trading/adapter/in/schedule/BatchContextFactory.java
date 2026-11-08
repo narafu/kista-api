@@ -47,8 +47,8 @@ class BatchContextFactory {
         for (Strategy strategy : strategies) {
             try {
                 // 코인 계좌 전략은 주식 개장·마감 배치 대상이 아니다(사이클·알림 판정 전에 조용히 제외) — 코인 DCA는 전용 스케줄러(묶음 C)가 실행
-                TradingAccount owner = accountsById.get(strategy.accountId());
-                if (owner != null && owner.broker().isCryptoExchange()) continue;
+                TradingAccount account = accountsById.get(strategy.accountId());
+                if (account != null && account.broker().isCryptoExchange()) continue;
                 StrategyCycle currentCycle = cyclesById.get(strategy.id());
                 if (currentCycle == null) {
                     throw new NoSuchElementException("활성 사이클 없음: strategyId=" + strategy.id());
@@ -58,11 +58,10 @@ class BatchContextFactory {
                     IllegalStateException zombie = new IllegalStateException(
                             "[좀비 사이클] 최신 사이클이 이미 종료됨(endDate=" + currentCycle.endDate()
                                     + ") — rotation 실패 추정, 전략 확인 후 수동 재등록 필요: strategyId=" + strategy.id());
-                    log.error(zombie.getMessage());
+                    log.error("[strategyId={}] {}", strategy.id(), zombie.getMessage());
                     errorReportPort.reportError(zombie);
                     continue;
                 }
-                TradingAccount account = accountsById.get(strategy.accountId());
                 if (account == null) {
                     throw new NoSuchElementException("계좌를 찾을 수 없습니다: " + strategy.accountId());
                 }

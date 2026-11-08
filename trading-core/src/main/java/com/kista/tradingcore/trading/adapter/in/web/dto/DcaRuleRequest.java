@@ -33,7 +33,8 @@ public record DcaRuleRequest(
         if (conditions != null && conditions.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("조건 항목이 비어 있습니다.");
         }
-        List<DcaCondition> domainConditions = conditions == null ? List.of()
+        // null은 그대로 넘긴다 — DcaRule이 빈 목록으로 정규화
+        List<DcaCondition> domainConditions = conditions == null ? null
                 : conditions.stream().map(DcaConditionRequest::toDomain).toList();
         // 주식 주문유형이면 실행 시각을 저장하지 않는다(무시) — 커널 검증은 방어선
         Integer hour = orderType == OrderType.MARKET ? executionHour : null;

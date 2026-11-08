@@ -5,7 +5,6 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.application.usecase.FetchHousingPriceIndexUseCase;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,7 +14,6 @@ import java.time.Duration;
 // 매주 토요일 KST 08:10 KB Land 주간 아파트 매매가격지수 수집 및 저장 (5분위 배치와 10분 stagger)
 // KB Land가 과거 기준일 값을 사후 보정할 수 있어, 매주는 최근 구간만 가볍게 갱신하고
 // 월 1회(매월 1일 08:20 KST) 20년 전체를 다시 받아 오래된 구간의 보정도 반영한다.
-@Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)

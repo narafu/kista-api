@@ -145,16 +145,4 @@ public record DstInfo(
         return new DstInfo(isDst, now.toInstant().minusMillis(1),
                 atKst(date, postCloseTime(isDst)), atKst(date, marketOpenTime(isDst)));
     }
-
-    // 수동 실행용: orderAt을 과거로 설정해 waitUntilOrderTime 스킵, postClose/marketOpen은 정상 계산
-    public static DstInfo immediate(ZonedDateTime now) {
-        boolean isDst = resolveDst(now.toInstant());
-        // postTime이 이미 지났으면 내일 날짜 사용 (같은 날 05:10 KST 이후 호출 시 과거 Instant 방지)
-        LocalDate targetDate = now.toLocalTime().isBefore(postCloseTime(isDst))
-                ? now.toLocalDate()
-                : now.toLocalDate().plusDays(1);
-        return new DstInfo(isDst, now.toInstant().minusMillis(1),
-                atKst(targetDate, postCloseTime(isDst)),
-                atKst(targetDate, marketOpenTime(isDst)));
-    }
 }

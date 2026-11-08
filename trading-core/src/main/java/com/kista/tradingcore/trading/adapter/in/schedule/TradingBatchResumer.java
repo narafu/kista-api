@@ -28,7 +28,7 @@ import java.time.ZonedDateTime;
 public class TradingBatchResumer {
 
     private static final LocalTime CLOSE_CRON = TradingCloseScheduler.CRON_TIME;  // TradingCloseScheduler cron 시각
-    private static final LocalTime OPEN_CRON = LocalTime.of(22, 0);  // TradingOpenScheduler cron 시각
+    private static final LocalTime OPEN_CRON = TradingOpenScheduler.CRON_TIME;  // TradingOpenScheduler cron 시각
 
     private final TradingBatchRunPort batchRunPort;
     private final TradingCloseScheduler closeScheduler;

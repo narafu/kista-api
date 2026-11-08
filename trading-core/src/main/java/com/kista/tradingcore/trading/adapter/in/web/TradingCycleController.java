@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +35,6 @@ import com.kista.shared.kernel.StrategyTicker;
 @Tag(name = "거래 사이클", description = "계좌별 매매 사이클 등록·조회·수정·삭제·일시중지·재개")
 @RestController
 @RequiredArgsConstructor
-@Slf4j
 public class TradingCycleController {
 
     private final StrategyUseCase tradingCycle;                  // CRUD + pause/resume + 이력·주문·시드 미리보기
@@ -240,9 +238,9 @@ public class TradingCycleController {
 
     // 전략(사이클) 기준 거래 이력 조회 — 커서 기반 페이지네이션
     @Operation(summary = "전략 거래 이력 조회")
-    @GetMapping("/api/trading-cycles/{strategyId}/history")
+    @GetMapping("/api/trading-cycles/{id}/history")
     public CycleHistoryPageResponse getStrategyHistory(
-            @PathVariable UUID strategyId,
+            @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -251,14 +249,14 @@ public class TradingCycleController {
         Instant cursorInstant = cursor != null ? Instant.parse(cursor) : null;
         return CycleHistoryPageResponse.from(
                 tradingCycle.getByStrategy(
-                        strategyId, userId, from, to, cursorInstant, Math.clamp(size, 1, 200)));
+                        id, userId, from, to, cursorInstant, Math.clamp(size, 1, 200)));
     }
 
     // 전략(사이클) 기준 주문 내역 조회 — 사용자 전략 상세 화면용
     @Operation(summary = "전략 주문 내역 조회")
-    @GetMapping("/api/trading-cycles/{strategyId}/orders")
+    @GetMapping("/api/trading-cycles/{id}/orders")
     public StrategyOrdersResponse getStrategyOrders(
-            @PathVariable UUID strategyId,
+            @PathVariable UUID id,
             @AuthenticationPrincipal UUID userId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -266,7 +264,7 @@ public class TradingCycleController {
         LocalDate resolvedFrom = from != null ? from : today.minusDays(30);
         LocalDate resolvedTo = to != null ? to : today;
         return StrategyOrdersResponse.from(
-                tradingCycle.getOrdersByStrategy(strategyId, userId, resolvedFrom, resolvedTo));
+                tradingCycle.getOrdersByStrategy(id, userId, resolvedFrom, resolvedTo));
     }
 
     // DCA 회차 이력 — 거래일 DESC 페이지 (미주문 사유 포함)

@@ -14,7 +14,6 @@ import com.kista.tradingcore.trading.application.port.output.StrategyVrDetailPor
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategies;
 import com.kista.tradingcore.matching.domain.strategy.CycleOrderStrategy;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -26,7 +25,6 @@ import java.util.UUID;
 
 // TradingService/ManualTradingService/TradingPreviewService가 공유하던 주문 계획 공통부 추출
 // '전략 라우팅 → plan(PlanContext) → 잔고 유효성 검증'까지만 수행 — 저장·알림·반환 변환은 호출측 책임
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class CycleOrderComputer {

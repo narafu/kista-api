@@ -13,7 +13,6 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.UuidGenerator;
 
 import java.math.BigDecimal;
@@ -23,7 +22,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "strategy_dca_condition", schema = "trading")
 @Getter
-@Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class StrategyDcaConditionEntity extends BaseCreatedAtEntity {
 
@@ -60,11 +58,15 @@ class StrategyDcaConditionEntity extends BaseCreatedAtEntity {
         e.operator = c.operator();
         e.smaPeriod = c.smaPeriod();
         // DB numeric(10,2)와 같은 scale로 정규화 — save() 반환값과 조회값을 일치시킨다
-        e.threshold = c.threshold() == null ? null : c.threshold().setScale(2, RoundingMode.HALF_UP);
+        e.threshold = scale2(c.threshold());
         return e;
     }
 
     DcaCondition toDomain() {
         return new DcaCondition(indicator, operator, smaPeriod, threshold);
+    }
+
+    private static BigDecimal scale2(BigDecimal v) {
+        return v == null ? null : v.setScale(2, RoundingMode.HALF_UP);
     }
 }

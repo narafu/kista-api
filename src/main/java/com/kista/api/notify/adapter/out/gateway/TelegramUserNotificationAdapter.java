@@ -5,13 +5,11 @@ import com.kista.shared.platform.telegram.TelegramProperties;
 import com.kista.api.notify.domain.model.NotificationRecipient;
 import com.kista.api.notify.application.port.output.UserNotificationPort;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 class TelegramUserNotificationAdapter implements UserNotificationPort {

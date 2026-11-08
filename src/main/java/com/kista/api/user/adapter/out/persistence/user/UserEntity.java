@@ -8,7 +8,6 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
@@ -20,7 +19,6 @@ import com.kista.shared.kernel.UserStatus;
 @Table(name = "users", schema = "public")
 @SQLRestriction("deleted_at IS NULL")
 @Getter
-@Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class UserEntity extends BaseAuditEntity {
 

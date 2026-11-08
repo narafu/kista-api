@@ -283,7 +283,7 @@ public class OrderPersistenceAdapter implements OrderPort {
     // 주문 엔티티 조회 → 변경 → 명시적 save (dirty checking 대신 명시적 저장 유지)
     private void mutate(UUID orderId, Consumer<OrderEntity> change) {
         OrderEntity e = repository.findById(orderId)
-                .orElseThrow(() -> new IllegalStateException("Order not found: " + orderId));
+                .orElseThrow(() -> new IllegalStateException("주문을 찾을 수 없습니다."));
         change.accept(e);
         repository.save(e);
     }

@@ -36,7 +36,7 @@ class RuntimeSettingsPersistenceAdapter implements RuntimeSettingsPort {
         return repository.findBySettingKeyForUpdate(SETTING_KEY)
                 .map(RuntimeSettingsEntity::getSettingValue)
                 .map(this::deserialize)
-                .orElseThrow(() -> new IllegalStateException("runtime settings row missing after initialization"));
+                .orElseThrow(() -> new IllegalStateException("런타임 설정 행이 초기화 후에도 없습니다."));
     }
 
     @Override

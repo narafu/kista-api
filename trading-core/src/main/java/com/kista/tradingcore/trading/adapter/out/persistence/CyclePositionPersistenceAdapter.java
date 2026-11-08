@@ -152,7 +152,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
         CyclePositionEntity latest = cycleRepo.findTop1ByStrategyIdOrderByCreatedAtDesc(strategyId)
                 .flatMap(sc -> positionRepo.findByStrategyCycleIdOrderByCreatedAtDesc(
                         sc.getId(), PageRequest.of(0, 1)).stream().findFirst())
-                .orElseThrow(() -> new IllegalStateException("포지션 이력 없음: " + strategyId));
+                .orElseThrow(() -> new IllegalStateException("포지션 이력이 없습니다."));
 
         latest.setUsdDeposit(newDeposit);
         positionRepo.save(latest);
@@ -162,7 +162,7 @@ class CyclePositionPersistenceAdapter implements CyclePositionPort {
     @Override
     public void updateBalance(UUID cyclePositionId, AccountBalance balance) {
         CyclePositionEntity entity = positionRepo.findById(cyclePositionId)
-                .orElseThrow(() -> new NoSuchElementException("포지션 이력이 없습니다: cyclePositionId=" + cyclePositionId));
+                .orElseThrow(() -> new NoSuchElementException("포지션 이력이 없습니다."));
         entity.setHoldings(balance.holdings());
         entity.setAvgPrice(balance.avgPrice());
         entity.setUsdDeposit(balance.usdDeposit());

@@ -22,7 +22,6 @@ import com.kista.tradingcore.trading.domain.model.Order;
 import com.kista.tradingcore.trading.domain.model.Strategy;
 import com.kista.tradingcore.trading.domain.model.StrategySeedPreview;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +36,6 @@ import java.util.UUID;
 // 전략(사이클) 기준 조회 전용 — 시드 미리보기, 거래 이력, 주문 내역 (stats에서 이관됐던 전략 소유 read)
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class StrategyHistoryQueryService {
 
     private final AccountPort accountPort;

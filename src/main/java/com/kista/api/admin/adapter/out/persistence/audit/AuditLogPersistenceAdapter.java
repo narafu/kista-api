@@ -27,7 +27,7 @@ class AuditLogPersistenceAdapter implements AuditLogPort {
 
     @Override
     public AuditLog findById(UUID id) {
-        return repo.findById(id).map(this::toDomain).orElseThrow(() -> new NoSuchElementException("AuditLog not found: " + id));
+        return repo.findById(id).map(this::toDomain).orElseThrow(() -> new NoSuchElementException("감사 로그를 찾을 수 없습니다."));
     }
 
     @Override

@@ -633,6 +633,8 @@ trading-core 감사 결과를 모은 원장이다. 한 번에 리팩토링하지
 | `CryptoLedgerRecorder` 증분 `divide(volume, 8, HALF_UP)` | `trading/application/service/` `CryptoLedgerRecorder` (코드 주석 있음) | 증분을 `LEDGER_SCALE`(2)로 먼저 반올림하면 경계에서 최종 예수금이 0.01 어긋난다. DB `numeric(20,2)`가 최종 합을 한 번 반올림하는 현행이 동작 보존이다(2026-11-08). |
 | 잠금·종목·정책 단위 로그의 비표준 접두사 | `TradingService:461` lockName, `TradingPriceFetcher:192` ticker, `DcaPlanInputCollector:145` `[DCA]`(전략 간 공유 일봉 캐시 안), `StrategyStartAmountCalculator:43` `[PRIVACY]`, `TradingPolicyService` | 쓸 수 있는 strategyId·accountId·orderId·userId가 범위에 없다. 잠금 하나가 전략 여러 개를 덮어 id 하나를 넘기면 오해를 부른다(CQ-07, 2026-11-08). |
 | 미사용 import 빌드 가드 | 빌드 설정(Checkstyle·Spotless·Error Prone 없음) | import는 바이트코드에 남지 않아 ArchUnit·`-Xlint`로 못 잡고, 가드는 신규 플러그인이 필요하다. 약 1,100개 파일 중 21개이고 타입 이동 뒤 남은 잔재라 재발 근거가 없다. 재검토 트리거는 이관과 무관한 재발이 감사에서 확인될 때(CQ-42, 2026-11-08). |
+| `StrategyStatusInternalController` ARCHIVED 이중 검사 | `trading/adapter/in/web/StrategyStatusInternalController.java:37,48` | 선검사를 지우면 이미 ARCHIVED인 전략에 ARCHIVED를 요청할 때 no-op 200이 돼 400에서 바뀐다. switch의 `case ARCHIVED`는 default 없는 switch 컴파일 가드라 필요하다(CQ 감사 2026-11-08). |
+| not-found ISE→NoSuchElementException 일괄 교체 | `StrategyCyclePersistenceAdapter`·`OrderPersistenceAdapter`·`CyclePositionPersistenceAdapter` | ISE는 400, NSEE는 404라 상태코드가 바뀐다. 2026-11-08 감사에서 타입은 유지하고 메시지만 한국어 고정 문구로 바꿨다. |
 
 ### CQ-39 PRIVACY 전략 원장 변화와 체결 주문 합이 어긋남
 - 주제: 원장 정합성 조사. 유형: 불일치(원인 미확정). 위험: 중간.

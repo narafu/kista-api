@@ -1,6 +1,5 @@
 package com.kista.tradingcore.trading.application.service.support;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +16,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 
 // 사이클 단위 배치 작업을 가상 스레드로 병렬 실행 — 그룹(계좌)별 Semaphore로 브로커 rate limit·Toss 토큰 경합 제어
-@Slf4j
 @Component
 public class TradingParallelRunner {
 

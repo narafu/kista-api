@@ -10,7 +10,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.UUID;
-import com.kista.shared.kernel.StrategyCycleSeedType;
 
 public record TradingCycleResponse(
         @Schema(description = "거래 사이클 고유 ID")
@@ -106,7 +105,7 @@ public record TradingCycleResponse(
                 c.type().name(), c.status().name(),
                 c.ticker().name(), detail.initialUsdDeposit(),
                 detail.startDate(),
-                c.cycleSeedType() != null ? c.cycleSeedType().name() : StrategyCycleSeedType.NONE.name(),
+                c.cycleSeedType().name(),
                 detail.divisionCount(),
                 detail.isReverseMode(),
                 detail.currentRound(),

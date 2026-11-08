@@ -5,14 +5,12 @@ import com.kista.shared.platform.scheduling.SchedulerLockService;
 import com.kista.shared.kernel.TimeZones;
 import com.kista.api.benchmark.application.usecase.SyncMarketIndexPricesUseCase;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "scheduler", name = "enabled", matchIfMissing = true)

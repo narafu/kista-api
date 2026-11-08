@@ -50,15 +50,10 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     }
 
     @Override
-    public Optional<StrategyCycle> findById(UUID cycleId) {
-        return jpaRepository.findById(cycleId).map(this::toDomain);
-    }
-
-    @Override
     public void markEnded(UUID cycleId, BigDecimal endAmount, LocalDate endDate) {
         // 사이클 종료 기록: load-set-save 패턴 (OrderPersistenceAdapter.markFilled와 동일)
         StrategyCycleEntity e = jpaRepository.findById(cycleId)
-                .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
+                .orElseThrow(() -> new IllegalStateException("사이클을 찾을 수 없습니다."));
         e.setEndAmount(endAmount);
         e.setEndDate(endDate);
         jpaRepository.save(e);
@@ -68,7 +63,7 @@ class StrategyCyclePersistenceAdapter implements StrategyCyclePort {
     public void updateStartAmount(UUID cycleId, BigDecimal startAmount) {
         // 시드 수정: load-set-save 패턴 (markEnded와 동일)
         StrategyCycleEntity e = jpaRepository.findById(cycleId)
-                .orElseThrow(() -> new IllegalStateException("StrategyCycle not found: " + cycleId));
+                .orElseThrow(() -> new IllegalStateException("사이클을 찾을 수 없습니다."));
         e.setStartAmount(startAmount);
         jpaRepository.save(e);
     }

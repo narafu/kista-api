@@ -5,7 +5,6 @@ import org.hibernate.annotations.UuidGenerator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -13,7 +12,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "fcm_device_tokens", schema = "public")
 @Getter
-@Setter(AccessLevel.PACKAGE)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 class FcmDeviceTokenEntity {
 
